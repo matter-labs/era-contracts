@@ -76,7 +76,7 @@ pub fn insert_residue_elements_and_commitments(
     template: &str,
     vk: &HashMap<String, Value>,
     vk_hash: &str,
-    l2_mode: bool,
+    contract_name: &str,
 ) -> Result<String, Box<dyn Error>> {
     let reg = Handlebars::new();
     let residue_g2_elements = generate_residue_g2_elements(vk);
@@ -85,7 +85,7 @@ pub fn insert_residue_elements_and_commitments(
     let verifier_contract_template =
         template.replace("{{residue_g2_elements}}", &residue_g2_elements);
 
-    let modexp_function = get_modexp_function(l2_mode);
+    let modexp_function = get_modexp_function();
     let verifier_contract_template =
         verifier_contract_template.replace("{{modexp_function}}", &modexp_function);
 
@@ -93,7 +93,8 @@ pub fn insert_residue_elements_and_commitments(
         &verifier_contract_template,
         &json!({"residue_g2_elements": residue_g2_elements,
                         "commitments": commitments,
-                        "vk_hash": vk_hash}),
+                        "vk_hash": vk_hash,
+                        "contract_name": contract_name}),
     )?)
 }
 

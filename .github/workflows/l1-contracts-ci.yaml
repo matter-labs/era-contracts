@@ -247,15 +247,25 @@ jobs:
         working-directory: tools
         run: rustup toolchain install
 
-      - name: Generate verifiers
+      - name: Generate Era verifiers
         working-directory: tools
-        run: cargo run
+        run: cargo run --bin zksync_verifier_contract_generator --release -- --variant era
 
-      - name: Compare L1VerifierPlonk.sol
-        run: diff tools/data/VerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/L1VerifierPlonk.sol
+      - name: Compare EraVerifierPlonk.sol
+        run: diff tools/data/EraVerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/EraVerifierPlonk.sol
 
-      - name: Compare VerifierFflonk.sol
-        run: diff tools/data/VerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/L1VerifierFflonk.sol
+      - name: Compare EraVerifierFflonk.sol
+        run: diff tools/data/EraVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/EraVerifierFflonk.sol
+
+      - name: Generate ZKsyncOS verifiers
+        working-directory: tools
+        run: cargo run --bin zksync_verifier_contract_generator --release -- --variant zksync-os
+
+      - name: Compare ZKsyncOSVerifierPlonk.sol
+        run: diff tools/data/ZKsyncOSVerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol
+
+      - name: Compare ZKsyncOSVerifierFflonk.sol
+        run: diff tools/data/ZKsyncOSVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol
 
   coverage:
     defaults:

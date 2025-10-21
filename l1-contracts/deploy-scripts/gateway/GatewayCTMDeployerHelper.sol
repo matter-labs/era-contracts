@@ -4,7 +4,8 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
+import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -58,10 +59,17 @@ library GatewayCTMDeployerHelper {
             eraChainId,
             l1ChainId,
             config.aliasedGovernanceAddress,
+            config.isZKsyncOS,
             contracts,
             innerConfig
         );
-        contracts = _deployVerifier(config.testnetVerifier, contracts, innerConfig, config.aliasedGovernanceAddress);
+        contracts = _deployVerifier(
+            config.testnetVerifier,
+            config.isZKsyncOS,
+            contracts,
+            innerConfig,
+            config.aliasedGovernanceAddress
+        );
 
         contracts.stateTransition.validatorTimelockImplementation = _deployInternal(
             "ValidatorTimelock",
@@ -129,6 +137,7 @@ library GatewayCTMDeployerHelper {
         uint256 _eraChainId,
         uint256 _l1ChainId,
         address _governanceAddress,
+        bool _isZKsyncOS,
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig
     ) internal returns (DeployedContracts memory) {
@@ -170,7 +179,7 @@ library GatewayCTMDeployerHelper {
         _deployedContracts.stateTransition.diamondInit = _deployInternal(
             "DiamondInit",
             "DiamondInit.sol",
-            hex"",
+            abi.encode(_isZKsyncOS),
             innerConfig
         );
         _deployedContracts.stateTransition.genesisUpgrade = _deployInternal(
@@ -185,32 +194,53 @@ library GatewayCTMDeployerHelper {
 
     function _deployVerifier(
         bool _testnetVerifier,
+        bool _isZKsyncOS,
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig,
         address _verifierOwner
     ) internal returns (DeployedContracts memory) {
-        address verifierFflonk = _deployInternal("L1VerifierFflonk", "L1VerifierFflonk.sol", hex"", innerConfig);
-        address verifierPlonk = _deployInternal("L1VerifierPlonk", "L1VerifierPlonk.sol", hex"", innerConfig);
+        address verifierFflonk;
+        address verifierPlonk;
+
+        if (_isZKsyncOS) {
+            verifierFflonk = _deployInternal(
+                "ZKsyncOSVerifierFflonk",
+                "ZKsyncOSVerifierFflonk.sol",
+                hex"",
+                innerConfig
+            );
+            verifierPlonk = _deployInternal("ZKsyncOSVerifierPlonk", "ZKsyncOSVerifierPlonk.sol", hex"", innerConfig);
+        } else {
+            verifierFflonk = _deployInternal("EraVerifierFflonk", "EraVerifierFflonk.sol", hex"", innerConfig);
+            verifierPlonk = _deployInternal("EraVerifierPlonk", "EraVerifierPlonk.sol", hex"", innerConfig);
+        }
 
         _deployedContracts.stateTransition.verifierFflonk = verifierFflonk;
         _deployedContracts.stateTransition.verifierPlonk = verifierPlonk;
-
-        bytes memory constructorParams = abi.encode(verifierFflonk, verifierPlonk, _verifierOwner);
 
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = _deployInternal(
                 "TestnetVerifier",
                 "TestnetVerifier.sol",
-                constructorParams,
+                abi.encode(verifierFflonk, verifierPlonk, _verifierOwner, _isZKsyncOS),
                 innerConfig
             );
         } else {
-            _deployedContracts.stateTransition.verifier = _deployInternal(
-                "DualVerifier",
-                "DualVerifier.sol",
-                constructorParams,
-                innerConfig
-            );
+            if (_isZKsyncOS) {
+                _deployedContracts.stateTransition.verifier = _deployInternal(
+                    "ZKsyncOSDualVerifier",
+                    "ZKsyncOSDualVerifier.sol",
+                    abi.encode(verifierFflonk, verifierPlonk, _verifierOwner),
+                    innerConfig
+                );
+            } else {
+                _deployedContracts.stateTransition.verifier = _deployInternal(
+                    "EraDualVerifier",
+                    "EraDualVerifier.sol",
+                    abi.encode(verifierFflonk, verifierPlonk),
+                    innerConfig
+                );
+            }
         }
         return _deployedContracts;
     }
@@ -250,12 +280,21 @@ library GatewayCTMDeployerHelper {
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig
     ) internal returns (DeployedContracts memory) {
-        _deployedContracts.stateTransition.chainTypeManagerImplementation = _deployInternal(
-            "ChainTypeManager",
-            "ChainTypeManager.sol",
-            abi.encode(L2_BRIDGEHUB_ADDR),
-            innerConfig
-        );
+        if (_config.isZKsyncOS) {
+            _deployedContracts.stateTransition.chainTypeManagerImplementation = _deployInternal(
+                "ZKsyncOSChainTypeManager",
+                "ZKsyncOSChainTypeManager.sol",
+                abi.encode(L2_BRIDGEHUB_ADDR),
+                innerConfig
+            );
+        } else {
+            _deployedContracts.stateTransition.chainTypeManagerImplementation = _deployInternal(
+                "EraChainTypeManager",
+                "EraChainTypeManager.sol",
+                abi.encode(L2_BRIDGEHUB_ADDR),
+                innerConfig
+            );
+        }
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
@@ -318,13 +357,15 @@ library GatewayCTMDeployerHelper {
             serverNotifier: _deployedContracts.stateTransition.serverNotifierProxy
         });
 
+        bytes memory initCalldata = abi.encodeCall(IChainTypeManager.initialize, (diamondInitData));
+
         _deployedContracts.stateTransition.chainTypeManagerProxy = _deployInternal(
             "TransparentUpgradeableProxy",
             "TransparentUpgradeableProxy.sol",
             abi.encode(
                 _deployedContracts.stateTransition.chainTypeManagerImplementation,
                 _deployedContracts.stateTransition.chainTypeManagerProxyAdmin,
-                abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))
+                initCalldata
             ),
             innerConfig
         );
@@ -352,7 +393,7 @@ library GatewayCTMDeployerHelper {
     /// @notice List of factory dependencies needed for the correct execution of
     /// CTMDeployer and healthy functionaling of the system overall
     function getListOfFactoryDeps() external returns (bytes[] memory dependencies) {
-        uint256 totalDependencies = 21;
+        uint256 totalDependencies = 25;
         dependencies = new bytes[](totalDependencies);
         uint256 index = 0;
 
@@ -367,13 +408,20 @@ library GatewayCTMDeployerHelper {
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("Admin.sol", "AdminFacet");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("DiamondInit.sol", "DiamondInit");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("L1GenesisUpgrade.sol", "L1GenesisUpgrade");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("L1VerifierFflonk.sol", "L1VerifierFflonk");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("L1VerifierPlonk.sol", "L1VerifierPlonk");
-        // Include both verifiers since we cannot determine which one will be used
+        // Include all verifiers since we cannot determine which one will be used
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraVerifierFflonk.sol", "EraVerifierFflonk");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraVerifierPlonk.sol", "EraVerifierPlonk");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSVerifierFflonk.sol", "ZKsyncOSVerifierFflonk");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSVerifierPlonk.sol", "ZKsyncOSVerifierPlonk");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("TestnetVerifier.sol", "TestnetVerifier");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("DualVerifier.sol", "DualVerifier");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraDualVerifier.sol", "EraDualVerifier");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSDualVerifier.sol", "ZKsyncOSDualVerifier");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ValidatorTimelock.sol", "ValidatorTimelock");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ChainTypeManager.sol", "ChainTypeManager");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1(
+            "ZKsyncOSChainTypeManager.sol",
+            "ZKsyncOSChainTypeManager"
+        );
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraChainTypeManager.sol", "EraChainTypeManager");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ProxyAdmin.sol", "ProxyAdmin");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1(
             "TransparentUpgradeableProxy.sol",

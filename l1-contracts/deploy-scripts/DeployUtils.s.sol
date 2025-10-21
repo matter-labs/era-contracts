@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {FacetCut, StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
+import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -14,7 +14,6 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
@@ -200,29 +199,18 @@ abstract contract DeployUtils is Create2FactoryUtils {
         addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
-    function getFacetCuts(
+    function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual returns (FacetCut[] memory facetCuts);
+    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts);
 
-    function formatFacetCuts(
-        FacetCut[] memory facetCutsUnformatted
-    ) internal returns (Diamond.FacetCut[] memory facetCuts) {
-        facetCuts = new Diamond.FacetCut[](facetCutsUnformatted.length);
-        for (uint256 i = 0; i < facetCutsUnformatted.length; i++) {
-            facetCuts[i] = Diamond.FacetCut({
-                facet: facetCutsUnformatted[i].facet,
-                action: Diamond.Action(uint8(facetCutsUnformatted[i].action)),
-                isFreezable: facetCutsUnformatted[i].isFreezable,
-                selectors: facetCutsUnformatted[i].selectors
-            });
-        }
-    }
+    function getUpgradeAddedFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts);
 
-    function getDiamondCutData(
+    function getChainCreationDiamondCutData(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
-        FacetCut[] memory facetCutsUnformatted = getFacetCuts(stateTransition);
-        Diamond.FacetCut[] memory facetCuts = formatFacetCuts(facetCutsUnformatted);
+        Diamond.FacetCut[] memory facetCuts = getChainCreationFacetCuts(stateTransition);
 
         DiamondInitializeDataNewChain memory initializeData = getInitializeData(stateTransition);
 
@@ -239,7 +227,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
     function getChainCreationParams(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (ChainCreationParams memory) {
-        Diamond.DiamondCutData memory diamondCut = getDiamondCutData(stateTransition);
+        Diamond.DiamondCutData memory diamondCut = getChainCreationDiamondCutData(stateTransition);
         return
             ChainCreationParams({
                 genesisUpgrade: stateTransition.genesisUpgrade,
@@ -294,11 +282,9 @@ abstract contract DeployUtils is Create2FactoryUtils {
         FeeParams memory feeParams = getFeeParams();
 
         require(stateTransition.verifier != address(0), "verifier is zero");
-
-        // TODO should be provided?
-        //        if (!stateTransition.isOnGateway) {
-        //            require(addresses.blobVersionedHashRetriever != address(0), "blobVersionedHashRetriever is zero");
-        //        }
+        require(config.contracts.bootloaderHash != bytes32(0), "bootloader hash is zero");
+        require(config.contracts.defaultAAHash != bytes32(0), "default aa hash is zero");
+        require(config.contracts.evmEmulatorHash != bytes32(0), "evm emulator hash is zero");
 
         return
             DiamondInitializeDataNewChain({
@@ -358,15 +344,14 @@ abstract contract DeployUtils is Create2FactoryUtils {
         if (compareStrings(contractName, "ChainRegistrar")) {
             return abi.encode();
         } else if (compareStrings(contractName, "L1Bridgehub")) {
-            return abi.encode(config.ownerAddress, (config.contracts.maxNumberOfChains));
+            return abi.encode(config.ownerAddress, config.contracts.maxNumberOfChains);
         } else if (compareStrings(contractName, "L1MessageRoot")) {
-            return abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId);
+            return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy);
         } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
             return
                 abi.encode(
-                    config.l1ChainId,
                     config.ownerAddress,
                     addresses.bridgehub.bridgehubProxy,
                     addresses.bridges.l1AssetRouterProxy,
@@ -420,17 +405,34 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Verifier")) {
-            /// TODO: Currently setting it to owner address (which means whole bridgehub owner).
-            /// In practice we might want to set it to CTM owner (which in production will be less restritive).
-            return
-                abi.encode(
-                    addresses.stateTransition.verifierFflonk,
-                    addresses.stateTransition.verifierPlonk,
-                    config.ownerAddress
-                );
-        } else if (compareStrings(contractName, "VerifierFflonk")) {
+            if (config.testnetVerifier) {
+                return
+                    abi.encode(
+                        addresses.stateTransition.verifierFflonk,
+                        addresses.stateTransition.verifierPlonk,
+                        config.ownerAddress,
+                        config.isZKsyncOS
+                    );
+            } else {
+                if (config.isZKsyncOS) {
+                    return
+                        abi.encode(
+                            addresses.stateTransition.verifierFflonk,
+                            addresses.stateTransition.verifierPlonk,
+                            config.ownerAddress
+                        );
+                } else {
+                    return
+                        abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
+                }
+            }
+        } else if (compareStrings(contractName, "EraVerifierFflonk")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "VerifierPlonk")) {
+        } else if (compareStrings(contractName, "EraVerifierPlonk")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "ZKsyncOSVerifierFflonk")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
             return abi.encode();
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();
@@ -454,6 +456,10 @@ abstract contract DeployUtils is Create2FactoryUtils {
             restrictions[0] = addresses.accessControlRestrictionAddress;
             return abi.encode(restrictions);
         } else if (compareStrings(contractName, "ChainTypeManager")) {
+            return abi.encode(addresses.bridgehub.bridgehubProxy);
+        } else if (compareStrings(contractName, "EraChainTypeManager")) {
+            return abi.encode(addresses.bridgehub.bridgehubProxy);
+        } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
             return abi.encode();
@@ -484,7 +490,10 @@ abstract contract DeployUtils is Create2FactoryUtils {
         return L2ContractHelper.hashL2Bytecode(getCreationCode(contractName, true));
     }
 
-    function getInitializeCalldata(string memory contractName) internal virtual returns (bytes memory);
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual returns (bytes memory);
 
     function test() internal virtual {}
 }

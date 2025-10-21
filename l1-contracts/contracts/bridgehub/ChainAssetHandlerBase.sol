@@ -7,14 +7,14 @@ import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/Enumerable
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehub} from "./IBridgehub.sol";
+import {IBridgehubBase, BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData} from "./IBridgehubBase.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
 import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, NotAssetRouter, NotL1, SLHasDifferentCTM} from "./L1BridgehubErrors.sol";
+import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, NotAssetRouter, SLHasDifferentCTM} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused} from "../common/L1ContractErrors.sol";
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
@@ -35,14 +35,36 @@ abstract contract ChainAssetHandlerBase is
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /*//////////////////////////////////////////////////////////////
-                            IMMUTABLE GETTERS
+                            EXTERNAL GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    ///@notice virtual getters standing in for the original immutables
+    /// @notice The asset ID of ETH token
+    function ETH_TOKEN_ASSET_ID() external view virtual returns (bytes32);
+
+    /// @notice The chain ID of L1
+    function L1_CHAIN_ID() external view virtual returns (uint256);
+
+    /// @notice The bridgehub contract
+    function BRIDGEHUB() external view virtual returns (address);
+
+    /// @notice The message root contract
+    function MESSAGE_ROOT() external view virtual returns (address);
+
+    /// @notice The asset router contract
+    function ASSET_ROUTER() external view virtual returns (address);
+
+    /*//////////////////////////////////////////////////////////////
+                            INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
     function _ethTokenAssetId() internal view virtual returns (bytes32);
+
     function _l1ChainId() internal view virtual returns (uint256);
-    function _bridgehub() internal view virtual returns (IBridgehub);
-    function _messageRoot() internal view virtual returns (IMessageRoot);
+
+    function _bridgehub() internal view virtual returns (address);
+
+    function _messageRoot() internal view virtual returns (address);
+
     function _assetRouter() internal view virtual returns (address);
 
     /// @notice Used to pause the migrations of chains. Used for upgrades.
@@ -60,14 +82,6 @@ abstract contract ChainAssetHandlerBase is
     modifier whenMigrationsNotPaused() {
         if (migrationPaused) {
             revert MigrationPaused();
-        }
-        _;
-    }
-
-    /// @notice Only when the contract is deployed on L1.
-    modifier onlyL1() {
-        if (_l1ChainId() != block.chainid) {
-            revert NotL1(_l1ChainId(), block.chainid);
         }
         _;
     }
@@ -98,8 +112,11 @@ abstract contract ChainAssetHandlerBase is
         returns (bytes memory bridgehubMintData)
     {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
-        if (_assetId != _bridgehub().ctmAssetIdFromChainId(bridgehubBurnData.chainId)) {
-            revert IncorrectChainAssetId(_assetId, _bridgehub().ctmAssetIdFromChainId(bridgehubBurnData.chainId));
+        if (_assetId != IBridgehubBase(_bridgehub()).ctmAssetIdFromChainId(bridgehubBurnData.chainId)) {
+            revert IncorrectChainAssetId(
+                _assetId,
+                IBridgehubBase(_bridgehub()).ctmAssetIdFromChainId(bridgehubBurnData.chainId)
+            );
         }
 
         address zkChain;
@@ -107,7 +124,7 @@ abstract contract ChainAssetHandlerBase is
         // to avoid stack too deep
         {
             address ctm;
-            (zkChain, ctm) = _bridgehub().forwardedBridgeBurnSetSettlementLayer(
+            (zkChain, ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeBurnSetSettlementLayer(
                 bridgehubBurnData.chainId,
                 _settlementChainId
             );
@@ -125,20 +142,23 @@ abstract contract ChainAssetHandlerBase is
             );
 
             // For security reasons, chain migration is temporarily restricted to settlement layers with the same CTM
-            if (_settlementChainId != _l1ChainId() && _bridgehub().chainTypeManager(_settlementChainId) != ctm) {
+            if (
+                _settlementChainId != _l1ChainId() &&
+                IBridgehubBase(_bridgehub()).chainTypeManager(_settlementChainId) != ctm
+            ) {
                 revert SLHasDifferentCTM();
             }
         }
         bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
             _settlementChainId == _l1ChainId()
                 ? L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS
-                : _bridgehub().getZKChain(_settlementChainId),
+                : IBridgehubBase(_bridgehub()).getZKChain(_settlementChainId),
             _originalCaller,
             bridgehubBurnData.chainData
         );
         BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
             chainId: bridgehubBurnData.chainId,
-            baseTokenAssetId: _bridgehub().baseTokenAssetId(bridgehubBurnData.chainId),
+            baseTokenAssetId: IBridgehubBase(_bridgehub()).baseTokenAssetId(bridgehubBurnData.chainId),
             ctmData: ctmMintData,
             chainData: chainMintData
         });
@@ -161,7 +181,7 @@ abstract contract ChainAssetHandlerBase is
             (BridgehubMintCTMAssetData)
         );
 
-        (address zkChain, address ctm) = _bridgehub().forwardedBridgeMint(
+        (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeMint(
             _assetId,
             bridgehubMintData.chainId,
             bridgehubMintData.baseTokenAssetId
@@ -174,44 +194,13 @@ abstract contract ChainAssetHandlerBase is
                 revert ChainIdNotRegistered(bridgehubMintData.chainId);
             }
             // We want to allow any chain to be migrated,
-            _bridgehub().registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
-            _messageRoot().addNewChain(bridgehubMintData.chainId);
+            IBridgehubBase(_bridgehub()).registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
+            IMessageRoot(_messageRoot()).addNewChain(bridgehubMintData.chainId);
         }
 
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);
 
         emit MigrationFinalized(bridgehubMintData.chainId, _assetId, zkChain);
-    }
-
-    /// @dev IL1AssetHandler interface, used to undo a failed migration of a chain.
-    // / @param _chainId the chainId of the chain
-    /// @param _assetId the assetId of the chain's CTM
-    /// @param _data the data for the recovery.
-    /// @param _depositSender the address of the entity that initiated the deposit.
-    // slither-disable-next-line locked-ether
-    function bridgeRecoverFailedTransfer(
-        uint256,
-        bytes32 _assetId,
-        address _depositSender,
-        bytes calldata _data
-    ) external payable override requireZeroValue(msg.value) onlyAssetRouter onlyL1 {
-        BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
-
-        (address zkChain, address ctm) = _bridgehub().forwardedBridgeRecoverFailedTransfer(bridgehubBurnData.chainId);
-
-        IChainTypeManager(ctm).forwardedBridgeRecoverFailedTransfer({
-            _chainId: bridgehubBurnData.chainId,
-            _assetInfo: _assetId,
-            _depositSender: _depositSender,
-            _ctmData: bridgehubBurnData.ctmData
-        });
-
-        IZKChain(zkChain).forwardedBridgeRecoverFailedTransfer({
-            _chainId: bridgehubBurnData.chainId,
-            _assetInfo: _assetId,
-            _originalCaller: _depositSender,
-            _chainData: bridgehubBurnData.chainData
-        });
     }
 
     /*//////////////////////////////////////////////////////////////

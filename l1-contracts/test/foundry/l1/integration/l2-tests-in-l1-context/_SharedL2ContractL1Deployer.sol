@@ -16,7 +16,6 @@ import {Config, DeployUtils, DeployedAddresses} from "deploy-scripts/DeployUtils
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {L2ChainAssetHandler} from "contracts/bridgehub/L2ChainAssetHandler.sol";
@@ -27,7 +26,8 @@ import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.s
 import {L2MessageVerification} from "../../../../../contracts/bridgehub/L2MessageVerification.sol";
 import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 
-import {Action, FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {DeployCTMIntegrationScript} from "../deploy-scripts/DeployCTMIntegration.s.sol";
 
@@ -66,10 +66,11 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         addresses.stateTransition.verifier = deploySimpleContract("Verifier", true);
         addresses.stateTransition.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
         deployStateTransitionDiamondFacets();
+        string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
         (
             addresses.stateTransition.chainTypeManagerImplementation,
             addresses.stateTransition.chainTypeManagerProxy
-        ) = deployTuppWithContract("ChainTypeManager", true);
+        ) = deployTuppWithContract(ctmContractName, true);
     }
 
     // add this to be excluded from coverage report
@@ -83,14 +84,31 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
     }
 
     function getInitializeCalldata(
-        string memory contractName
+        string memory contractName,
+        bool isZKBytecode
     ) internal virtual override(DeployIntegrationUtils, DeployL1HelperScript) returns (bytes memory) {
-        return super.getInitializeCalldata(contractName);
+        return super.getInitializeCalldata(contractName, isZKBytecode);
     }
 
-    function getFacetCuts(
+    function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override(DeployCTMIntegrationScript, DeployIntegrationUtils) returns (FacetCut[] memory) {
-        return super.getFacetCuts(stateTransition);
+    )
+        internal
+        virtual
+        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
+        returns (Diamond.FacetCut[] memory)
+    {
+        return super.getChainCreationFacetCuts(stateTransition);
+    }
+
+    function getUpgradeAddedFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    )
+        internal
+        virtual
+        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
+        returns (Diamond.FacetCut[] memory)
+    {
+        return super.getUpgradeAddedFacetCuts(stateTransition);
     }
 }

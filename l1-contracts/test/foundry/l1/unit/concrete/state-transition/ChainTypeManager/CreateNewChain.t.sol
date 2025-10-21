@@ -6,11 +6,10 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {HashMismatch, Unauthorized, ZKChainLimitReached, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {console} from "forge-std/console.sol";
-import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
+import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
+
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 contract createNewChainTest is ChainTypeManagerTest {
     function setUp() public {
@@ -59,7 +58,7 @@ contract createNewChainTest is ChainTypeManagerTest {
         uint256[] memory mockData = new uint256[](1);
         mockData[0] = chainId;
 
-        vm.mockCall(address(bridgehub), abi.encodeCall(IBridgehub.getAllZKChainChainIDs, ()), abi.encode(mockData));
+        vm.mockCall(address(bridgehub), abi.encodeCall(IBridgehubBase.getAllZKChainChainIDs, ()), abi.encode(mockData));
         uint256[] memory chainIds = _getAllZKChainIDs();
 
         assertEq(chainIds.length, 1);

@@ -18,6 +18,27 @@ use fflonk::insert_residue_elements_and_commitments as fflonk_insert_residue_ele
 use plonk::insert_residue_elements_and_commitments as plonk_insert_residue_elements_and_commitments;
 use serde_json::{from_reader, Value};
 use structopt::StructOpt;
+use std::str::FromStr;
+
+#[derive(Debug, Clone)]
+enum Variant {
+    Era,
+    ZKsyncOS,
+    Custom,
+}
+
+impl FromStr for Variant {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "era" => Ok(Variant::Era),
+            "zksync-os" | "zksyncos" => Ok(Variant::ZKsyncOS),
+            "custom" => Ok(Variant::Custom),
+            _ => Err(format!("Invalid variant '{}'. Valid options: era, zksync-os, custom", s)),
+        }
+    }
+}
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -25,6 +46,10 @@ use structopt::StructOpt;
     about = "Tool for generating verifier contract using scheduler json key"
 )]
 struct Opt {
+    /// Variant to use: era, zksync-os, or custom
+    #[structopt(long = "variant", default_value = "custom")]
+    variant: Variant,
+
     /// Input path to scheduler verification key file.
     #[structopt(
         long = "plonk_input_path",
@@ -47,16 +72,47 @@ struct Opt {
     #[structopt(long = "plonk_output_path", default_value = "data/VerifierPlonk.sol")]
     plonk_output_path: String,
 
-    /// The Verifier is to be compiled for an L2 network, where modexp precompile is not available.
-    #[structopt(short = "l2", long = "l2_mode")]
-    l2_mode: bool,
+}
+
+fn resolve_paths(opt: &Opt) -> (String, String, String, String) {
+    match opt.variant {
+        Variant::Era => (
+            "data/Era_plonk_scheduler_key.json".to_string(),
+            "data/Era_fflonk_scheduler_key.json".to_string(),
+            "data/EraVerifierPlonk.sol".to_string(),
+            "data/EraVerifierFflonk.sol".to_string(),
+        ),
+        Variant::ZKsyncOS => (
+            "data/ZKsyncOS_plonk_scheduler_key.json".to_string(),
+            "data/ZKsyncOS_fflonk_scheduler_key.json".to_string(),
+            "data/ZKsyncOSVerifierPlonk.sol".to_string(),
+            "data/ZKsyncOSVerifierFflonk.sol".to_string(),
+        ),
+        Variant::Custom => (
+            opt.plonk_input_path.clone(),
+            opt.fflonk_input_path.clone(),
+            opt.plonk_output_path.clone(),
+            opt.fflonk_output_path.clone(),
+        ),
+    }
+}
+
+fn resolve_contract_name(variant: &Variant) -> String {
+    match variant {
+        Variant::Era => "Era".to_string(),
+        Variant::ZKsyncOS => "ZKsyncOS".to_string(),
+        Variant::Custom => "".to_string(),
+    }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
 
-    let plonk_reader = BufReader::new(File::open(&opt.plonk_input_path)?);
-    let fflonk_reader = BufReader::new(File::open(&opt.fflonk_input_path)?);
+    let (plonk_input_path, fflonk_input_path, plonk_output_path, fflonk_output_path) = resolve_paths(&opt);
+    let contract_name = resolve_contract_name(&opt.variant);
+
+    let plonk_reader = BufReader::new(File::open(&plonk_input_path)?);
+    let fflonk_reader = BufReader::new(File::open(&fflonk_input_path)?);
 
     let plonk_vk: HashMap<String, Value> = from_reader(plonk_reader)?;
     let fflonk_vk: HashMap<String, Value> = from_reader(fflonk_reader)?;
@@ -66,27 +122,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let fflonk_verifier_contract_template =
         fs::read_to_string("data/fflonk_verifier_contract_template.txt")?;
 
-    let plonk_verifier_contract_template = if opt.l2_mode {
-        plonk_verifier_contract_template
-            .replace("contract VerifierPlonk", "contract L2VerifierPlonk")
-    } else {
-        plonk_verifier_contract_template
-            .replace("contract VerifierPlonk", "contract L1VerifierPlonk")
-    };
+    let plonk_verification_key = fs::read_to_string(&plonk_input_path)
+        .unwrap_or_else(|_| panic!("Unable to read from {}", &plonk_input_path));
 
-    let fflonk_verifier_contract_template = if opt.l2_mode {
-        fflonk_verifier_contract_template
-            .replace("contract VerifierFflonk", "contract L2VerifierFflonk")
-    } else {
-        fflonk_verifier_contract_template
-            .replace("contract VerifierFflonk", "contract L1VerifierFflonk")
-    };
-
-    let plonk_verification_key = fs::read_to_string(&opt.plonk_input_path)
-        .unwrap_or_else(|_| panic!("Unable to read from {}", &opt.plonk_input_path));
-
-    let fflonk_verification_key = fs::read_to_string(&opt.fflonk_input_path)
-        .unwrap_or_else(|_| panic!("Unable to read from {}", &opt.fflonk_input_path));
+    let fflonk_verification_key = fs::read_to_string(&fflonk_input_path)
+        .unwrap_or_else(|_| panic!("Unable to read from {}", &fflonk_input_path));
 
     let plonk_verification_key: VerificationKey<Bn256, ZkSyncSnarkWrapperCircuit> =
         serde_json::from_str(&plonk_verification_key).unwrap();
@@ -104,20 +144,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         &plonk_verifier_contract_template,
         &plonk_vk,
         &plonk_vk_hash,
-        opt.l2_mode,
+        &contract_name,
     )?;
 
     let fflonk_verifier_contract_template = fflonk_insert_residue_elements_and_commitments(
         &fflonk_verifier_contract_template,
         &fflonk_vk,
         &fflonk_vk_hash,
-        opt.l2_mode,
+        &contract_name,
     )?;
 
-    let mut plonk_file = File::create(opt.plonk_output_path)?;
+    let mut plonk_file = File::create(plonk_output_path)?;
     plonk_file.write_all(plonk_verifier_contract_template.as_bytes())?;
 
-    let mut fflonk_file = File::create(opt.fflonk_output_path)?;
+    let mut fflonk_file = File::create(fflonk_output_path)?;
     fflonk_file.write_all(fflonk_verifier_contract_template.as_bytes())?;
 
     Ok(())

@@ -20,6 +20,7 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
     /// @param _ctmDeployer the address of the ctm deployer
     /// @param _fixedForceDeploymentsData the force deployments data
     /// @param _additionalForceDeploymentsData the additional force deployments data
+    // slither-disable-next-line locked-ether
     function genesisUpgrade(
         bool _isZKsyncOS,
         uint256 _chainId,

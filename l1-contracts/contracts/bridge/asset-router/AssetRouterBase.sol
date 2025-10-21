@@ -14,9 +14,8 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
-import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -44,19 +43,17 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
      */
     uint256[48] private __gap;
 
-    /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyBridgehub() {
-        if (msg.sender != address(_bridgehub())) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    /// @inheritdoc IAssetRouterBase
+    /// @notice Sets the asset handler address for a specified asset ID on the chain of the asset deployment tracker.
+    /// @dev The caller of this function is encoded within the `assetId`, therefore, it should be invoked by the asset deployment tracker contract.
+    /// @dev No access control on the caller, as msg.sender is encoded in the assetId.
+    /// @dev Typically, for most tokens, ADT is the native token vault. However, custom tokens may have their own specific asset deployment trackers.
+    /// @dev `setAssetHandlerAddressOnCounterpart` should be called on L1 to set asset handlers on L2 chains for a specific asset ID.
+    /// @param _assetRegistrationData The asset data which may include the asset address and any additional required data or encodings.
+    /// @param _assetHandlerAddress The address of the asset handler to be set for the provided asset.
     function setAssetHandlerAddressThisChain(
         bytes32 _assetRegistrationData,
         address _assetHandlerAddress
-    ) external virtual override;
+    ) external virtual;
 
     function _setAssetHandlerAddressThisChain(
         address _nativeTokenVault,
@@ -78,7 +75,12 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
                             Receive transaction Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc IAssetRouterBase
+    /// @notice Finalize the withdrawal and release funds.
+    /// @param _chainId The chain ID of the transaction to check.
+    /// @param _assetId The bridged asset ID.
+    /// @param _transferData The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
+    /// @dev We have both the legacy finalizeWithdrawal and the new finalizeDeposit functions,
+    /// finalizeDeposit uses the new format. On the L2 we have finalizeDeposit with new and old formats both.
     function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) public payable virtual;
 
     function _finalizeDeposit(
@@ -136,7 +138,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
             // Note, that it may "pollute" error handling a bit: instead of getting error for asset handler not being
             // present, the user will get whatever error the native token vault will return, however, providing
             // more advanced error handling requires more extensive code and will be added in the future releases.
-            INativeTokenVault(_nativeTokenVault).tryRegisterTokenFromBurnData(_transferData, _assetId);
+            INativeTokenVaultBase(_nativeTokenVault).tryRegisterTokenFromBurnData(_transferData, _assetId);
 
             // We do not do any additional transformations here (like setting `assetHandler` in the mapping),
             // because we expect that all those happened inside `tryRegisterTokenFromBurnData`
@@ -173,10 +175,4 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     function unpause() external onlyOwner {
         _unpause();
     }
-
-    function _bridgehub() internal view virtual returns (IBridgehub);
-
-    function _l1ChainId() internal view virtual returns (uint256);
-
-    function _eraChainId() internal view virtual returns (uint256);
 }

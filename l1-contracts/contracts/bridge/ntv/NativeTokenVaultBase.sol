@@ -11,9 +11,10 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
-import {INativeTokenVault} from "./INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "./INativeTokenVaultBase.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
+import {AssetRouterBase} from "../asset-router/AssetRouterBase.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
@@ -27,8 +28,8 @@ import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Vault holding L1 native ETH and ERC20 tokens bridged into the ZK chains.
 /// @dev Designed for use with a proxy for upgradability.
-abstract contract NativeTokenVault is
-    INativeTokenVault,
+abstract contract NativeTokenVaultBase is
+    INativeTokenVaultBase,
     IAssetHandler,
     Ownable2StepUpgradeable,
     PausableUpgradeable,
@@ -36,6 +37,17 @@ abstract contract NativeTokenVault is
 {
     using SafeERC20 for IERC20;
 
+    /*//////////////////////////////////////////////////////////////
+                            INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function _assetRouter() internal view virtual returns (IAssetRouterBase);
+
+    function _l1ChainId() internal view virtual returns (uint256);
+
+    function _baseTokenAssetId() internal view virtual returns (bytes32);
+
+    function _wethToken() internal view virtual returns (address);
     /// @dev Contract that stores the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
     IBeacon public bridgedTokenBeacon;
@@ -64,7 +76,7 @@ abstract contract NativeTokenVault is
         _;
     }
 
-    /// @inheritdoc INativeTokenVault
+    /// @inheritdoc INativeTokenVaultBase
     function registerToken(address _nativeToken) external virtual {
         _registerToken(_nativeToken);
     }
@@ -86,7 +98,7 @@ abstract contract NativeTokenVault is
         newAssetId = _unsafeRegisterNativeToken(_nativeToken);
     }
 
-    /// @inheritdoc INativeTokenVault
+    /// @inheritdoc INativeTokenVaultBase
     function ensureTokenIsRegistered(address _nativeToken) public returns (bytes32 tokenAssetId) {
         bytes32 currentAssetId = assetId[_nativeToken];
         if (currentAssetId == bytes32(0)) {
@@ -400,7 +412,10 @@ abstract contract NativeTokenVault is
         tokenAddress[newAssetId] = _nativeToken;
         assetId[_nativeToken] = newAssetId;
         originChainId[newAssetId] = block.chainid;
-        _assetRouter().setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
+        AssetRouterBase(address(_assetRouter())).setAssetHandlerAddressThisChain(
+            bytes32(uint256(uint160(_nativeToken))),
+            address(this)
+        );
     }
 
     function _handleChainBalanceIncrease(
@@ -490,7 +505,7 @@ abstract contract NativeTokenVault is
     function calculateCreate2TokenAddress(
         uint256 _tokenOriginChainId,
         address _bridgeToken
-    ) public view virtual override returns (address);
+    ) public view virtual returns (address);
 
     /// @notice Deploys and initializes the bridged token for the native counterpart.
     /// @param _tokenOriginChainId The chain id of the origin token.
@@ -545,12 +560,4 @@ abstract contract NativeTokenVault is
     function unpause() external onlyOwner {
         _unpause();
     }
-
-    function _wethToken() internal view virtual returns (address);
-
-    function _assetRouter() internal view virtual returns (IAssetRouterBase);
-
-    function _baseTokenAssetId() internal view virtual returns (bytes32);
-
-    function _l1ChainId() internal view virtual returns (uint256);
 }

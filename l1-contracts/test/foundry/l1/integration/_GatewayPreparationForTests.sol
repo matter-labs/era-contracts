@@ -116,7 +116,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
                 // Some non-zero address
                 _gatewayServerNotifier: address(uint160(1)),
                 _refundRecipient: msg.sender,
-                _ctmChainId: 0
+                _ctmRepresentativeChainId: 0
             })
         );
         Utils.executeCalls(L1Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner(), bytes32(0), 0, calls);

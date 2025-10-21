@@ -115,6 +115,8 @@ error GasPerPubdataMismatch();
 error GenesisBatchCommitmentZero();
 // 0x7940c83f
 error GenesisBatchHashZero();
+// 0xb4fc6835
+error GenesisIndexStorageZero();
 // 0x3a1a8589
 error GenesisUpgradeZero();
 // 0xd356e6ba
@@ -378,6 +380,11 @@ error ZeroGasPriceL1TxZKSyncOS();
 error ZKChainLimitReached();
 // 0x0e0ff4d9
 error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32 blobOpeningCommitment);
+
+// 0xd08a97e6
+error InvalidMockProofLength();
+// 0x616008dd
+error UnsupportedChainIdForMockVerifier();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

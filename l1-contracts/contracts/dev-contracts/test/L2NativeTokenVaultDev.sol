@@ -7,8 +7,7 @@ import {Create2} from "@openzeppelin/contracts-v4/utils/Create2.sol";
 import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
-import {NativeTokenVault} from "contracts/bridge/ntv/NativeTokenVault.sol";
+import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 
@@ -19,7 +18,7 @@ contract L2NativeTokenVaultDev is L2NativeTokenVault {
     function calculateCreate2TokenAddress(
         uint256 _originChainId,
         address _l1Token
-    ) public view override(L2NativeTokenVault) returns (address) {
+    ) public view override returns (address) {
         bytes32 salt = _getCreate2Salt(_originChainId, _l1Token);
         return
             Create2.computeAddress(

@@ -9,7 +9,7 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 /// @notice Modified version of the Permutations over Lagrange-bases for Oecumenical Noninteractive arguments of
 /// Knowledge (PLONK) verifier.
 /// Modifications have been made to optimize the proof system for ZK chain circuits.
-/// @dev Contract was generated from a verification key with a hash of 0x259ded4b0e02de2d25d489f6c3485edb2d647e8b77a096f859499897c243e6bf
+/// @dev Contract was generated from a verification key with a hash of 0x6a4509801ec284b8921c63dc6aaba668a0d71382d87ae4095ffc2235154e9fa3
 /// @dev It uses a custom memory layout inside the inline assembly block. Each reserved memory cell is declared in the
 /// constants below.
 /// @dev For a better understanding of the verifier algorithm please refer to the following papers:
@@ -18,7 +18,7 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 /// * Plonk for ZKsync v1.1: https://github.com/matter-labs/solidity_plonk_verifier/raw/recursive/bellman_vk_codegen_recursive/RecursivePlonkUnrolledForEthereum.pdf
 /// The notation used in the code is the same as in the papers.
 /* solhint-enable max-line-length */
-contract L2VerifierPlonk is IVerifier {
+contract ZKsyncOSVerifierPlonk is IVerifier {
     /*//////////////////////////////////////////////////////////////
                              Verification keys
     //////////////////////////////////////////////////////////////*/
@@ -284,8 +284,8 @@ contract L2VerifierPlonk is IVerifier {
     function _loadVerificationKey() internal pure virtual {
         assembly {
             // gate setup commitments
-            mstore(VK_GATE_SETUP_0_X_SLOT, 0x115013b5bceb6eb2268a31c0da5897f1af9118615edf48a6aef7a1e79788b98e)
-            mstore(VK_GATE_SETUP_0_Y_SLOT, 0x106e02bf8687b4803b250c32b6a85cbdd275bc770cd65b9be98107316531d727)
+            mstore(VK_GATE_SETUP_0_X_SLOT, 0x219d2213cfcb8af0868c83d659e49052d72d2e4119809034e96e82685a727ec8)
+            mstore(VK_GATE_SETUP_0_Y_SLOT, 0x2a48c8d09206cb271404359c31d3088a7c5cecc2e380738300e90600ab6425bf)
             mstore(VK_GATE_SETUP_1_X_SLOT, 0x0feda978f4639d0a725df74c4738bf178adca34e6a4f7cc38d6a9ae9ee49f695)
             mstore(VK_GATE_SETUP_1_Y_SLOT, 0x2f7068beedb881aea392246c33ccc026ea9c8f6ea558a055b6df00ebfdf210a3)
             mstore(VK_GATE_SETUP_2_X_SLOT, 0x06eccb685da5c8cc09a13698b2a22e383025abc75393d68c1da5a7dbacffbd9b)
@@ -296,8 +296,8 @@ contract L2VerifierPlonk is IVerifier {
             mstore(VK_GATE_SETUP_4_Y_SLOT, 0x1ac2f036e3de6e4a9bacd5eacc778fa3fbdf5fd4b06e551038c704adecbeb639)
             mstore(VK_GATE_SETUP_5_X_SLOT, 0x048e2130f16d54d7e07df66330b4d892753b5141ecacb4007573d9ea4a8ff028)
             mstore(VK_GATE_SETUP_5_Y_SLOT, 0x13a3819d4cb80114e51de741a5fb48ce4ba20e82c5d39d16f70ca0461f49a131)
-            mstore(VK_GATE_SETUP_6_X_SLOT, 0x2ea3ddc1e70175b18e5700083c5e4bb2dc26003286a68f60e90d3125f4f087bd)
-            mstore(VK_GATE_SETUP_6_Y_SLOT, 0x04e91a7968dc135a99a703c6cb514be7f0f01b64330752a08c8796c42e040118)
+            mstore(VK_GATE_SETUP_6_X_SLOT, 0x0b7a2ef1fabe150bf63039a13cebf4d2ea7f0146781d22dcdf0a3dddca452fa8)
+            mstore(VK_GATE_SETUP_6_Y_SLOT, 0x19e1fff4dd608b8860bf384e6bec543af0e1ef5efd3bae85c293401b2d665a96)
             mstore(VK_GATE_SETUP_7_X_SLOT, 0x1affeacdceb1b6f018bbb6762bb5aebcd54c3e24801ce01d06146d1bf0938b2c)
             mstore(VK_GATE_SETUP_7_Y_SLOT, 0x19a277dd9eaac40538f3177e3390ec21d097f88afb04158dd59e963a327fe9da)
 
@@ -374,18 +374,16 @@ contract L2VerifierPlonk is IVerifier {
 
             /// @dev Performs modular exponentiation using the formula (value ^ power) mod R_MOD.
             function modexp(value, power) -> res {
-                res := 1
-                for {
-
-                } gt(power, 0) {
-
-                } {
-                    if mod(power, 2) {
-                        res := mulmod(res, value, R_MOD)
-                    }
-                    value := mulmod(value, value, R_MOD)
-                    power := shr(1, power)
+                mstore(0x00, 0x20)
+                mstore(0x20, 0x20)
+                mstore(0x40, 0x20)
+                mstore(0x60, value)
+                mstore(0x80, power)
+                mstore(0xa0, R_MOD)
+                if iszero(staticcall(gas(), 5, 0, 0xc0, 0x00, 0x20)) {
+                    revertWithMessage(24, "modexp precompile failed")
                 }
+                res := mload(0x00)
             }
 
             /// @dev Performs a point multiplication operation and stores the result in a given memory destination.

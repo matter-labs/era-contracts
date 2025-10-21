@@ -29,7 +29,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
@@ -181,17 +181,18 @@ contract ExecutorTest is Test {
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
         DummyBridgehub dummyBridgehub = new DummyBridgehub();
-        messageRoot = new L1MessageRoot(IBridgehub(address(dummyBridgehub)), l1ChainID);
+        messageRoot = new L1MessageRoot(address(dummyBridgehub));
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
 
         dummyBridgehub.setSharedBridge(address(sharedBridge));
 
-        vm.mockCall(
-            address(messageRoot),
-            abi.encodeWithSelector(MessageRootBase.addChainBatchRoot.selector, 9, 1, bytes32(0)),
-            abi.encode()
-        );
+        // FIXME: amend the tests as appending chain batch roots is not allowed on L1.
+        // vm.mockCall(
+        //     address(messageRoot),
+        //     abi.encodeWithSelector(MessageRootBase.addChainBatchRoot.selector, 9, 1, bytes32(0)),
+        //     abi.encode()
+        // );
 
         eraChainId = 9;
 
@@ -227,7 +228,8 @@ contract ExecutorTest is Test {
         TestnetVerifier testnetVerifier = new TestnetVerifier(
             IVerifierV2(address(0)),
             IVerifier(address(0)),
-            address(0)
+            address(0),
+            false
         );
 
         InitializeData memory params = InitializeData({
