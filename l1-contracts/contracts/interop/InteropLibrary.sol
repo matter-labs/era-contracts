@@ -162,11 +162,15 @@ library InteropLibrary {
         return l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(destination), calls, bundleAttrs);
     }
 
-    /// @notice Build and send a bundle of calls in one go.
-    /// @param  destination       Interoperable chain identifier (e.g., InteroperableAddress.formatEvmV1(271))
-    /// @param  targets            Address that will be called on destination chain
-    /// @param  executionAddresses  If necessary, custom execution address can be specified. If 0 address is passed, then default executor will be used
-    /// @param  dataArray              Data which will be passed to the target
+    /// @notice Build and send a bundle of interop calls in one go.
+    /// @dev
+    /// - All arrays must be the same length; each index describes one call.
+    /// - If an entry in `executionAddresses` is the zero address, the default executor will be used (see library policy).
+    /// - `destination` is the destination chain id; it is converted to an interoperable chain identifier internally.
+    /// @param destination          Destination chain id (e.g., 271 for zkSync Era testnet), later wrapped via InteroperableAddress.formatEvmV1.
+    /// @param targets              Target contracts to call on the destination chain (one per call).
+    /// @param executionAddresses   Optional executor addresses (one per call). Use address(0) to accept the default.
+    /// @param dataArray            Calldata payloads for each target (one per call).
     /// @return bundleHash Hash of the sent bundle
     function sendBundle(
         uint256 destination,
