@@ -40,8 +40,8 @@ contract SystemContractProxy is TransparentUpgradeableProxy {
         } else if (selector == ISystemContractProxy.forceInitAdmin.selector) {
             if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
                 Proxy._fallback();
-                // The `Proxy._fallback()` will delegate the call to the implementation,
-                // and return the call result, so we don't need to do anything else here.
+                // The `Proxy._fallback()` will delegate the call to the implementation, and does the complete return,
+                // making any code after that unreachable so we don't need to do anything else here.
             }
 
             // This functionality is only allowed if the admin is still uninitialized.
