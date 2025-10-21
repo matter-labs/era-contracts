@@ -167,7 +167,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             IERC7786Attributes.unbundlerAddress,
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
         );
-        l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(271), calls, bundleAttributes);
+        l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(destinationChainId), calls, bundleAttributes);
     }
 
     function test_requestTokenTransferInteropViaLibrary() public {
@@ -196,7 +196,33 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         InteropLibrary.sendToken(destinationChainId, l2TokenAddress, 100, address(this));
     }
 
+    function test_requestNativeTokenTransferViaLibrary() public {
+        uint256 destinationChainId = 271;
+
+        vm.deal(address(this), 1000 ether);
+
+        vm.mockCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+            abi.encode(bytes(""))
+        );
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
+            abi.encode(baseTokenAssetId)
+        );
+
+        vm.mockCall(
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue.selector),
+            abi.encode(bytes(""))
+        );
+
+        InteropLibrary.sendNative(destinationChainId, address(this), 100);
+    }
+
     function test_requestSendCall() public {
+        uint256 destinationChainId = 271;
         address l2TokenAddress = initializeTokenByDeposit();
         bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
         vm.deal(address(this), 1000 ether);
@@ -218,12 +244,11 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
         );
         calls[0] = InteropCallStarter({
-            to: InteroperableAddress.formatEvmV1(L2_ASSET_ROUTER_ADDR),
+            to: InteroperableAddress.formatEvmV1(destinationChainId, L2_ASSET_ROUTER_ADDR),
             data: secondBridgeCalldata,
             callAttributes: attributes
         });
 
-        uint256 destinationChainId = 271;
         vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
@@ -240,11 +265,75 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue.selector),
             abi.encode(bytes(""))
         );
-        IERC7786GatewaySource(address(l2InteropCenter)).sendMessage(
-            calls[0].to,
-            calls[0].data,
-            calls[0].callAttributes
+        l2InteropCenter.sendMessage(calls[0].to, calls[0].data, calls[0].callAttributes);
+    }
+
+    function test_requestSendCallViaLibrary() public {
+        address l2TokenAddress = initializeTokenByDeposit();
+        bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
+        uint256 destinationChainId = 271;
+        vm.deal(address(this), 1000 ether);
+
+        bytes memory secondBridgeCalldata = bytes.concat(
+            NEW_ENCODING_VERSION,
+            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), 0))
         );
+
+        vm.mockCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+            abi.encode(bytes(""))
+        );
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
+            abi.encode(baseTokenAssetId)
+        );
+
+        vm.mockCall(
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue.selector),
+            abi.encode(bytes(""))
+        );
+
+        InteropLibrary.sendCall(destinationChainId, L2_ASSET_ROUTER_ADDR, address(0), secondBridgeCalldata);
+    }
+
+    function test_requestSendBundleViaLibrary() public {
+        address l2TokenAddress = initializeTokenByDeposit();
+        bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
+        uint256 destinationChainId = 271;
+        vm.deal(address(this), 1000 ether);
+
+        bytes memory secondBridgeCalldata = bytes.concat(
+            NEW_ENCODING_VERSION,
+            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), 0))
+        );
+
+        vm.mockCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+            abi.encode(bytes(""))
+        );
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
+            abi.encode(baseTokenAssetId)
+        );
+
+        vm.mockCall(
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue.selector),
+            abi.encode(bytes(""))
+        );
+
+        address[] memory targets = new address[](1);
+        targets[0] = L2_ASSET_ROUTER_ADDR;
+        address[] memory executionAddresses = new address[](1);
+        executionAddresses[0] = address(0);
+        bytes[] memory dataArray = new bytes[](1);
+        dataArray[0] = secondBridgeCalldata;
+        InteropLibrary.sendBundle(destinationChainId, targets, executionAddresses, dataArray);
     }
 
     function test_supportsAttributes() public {
