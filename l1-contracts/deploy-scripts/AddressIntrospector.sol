@@ -78,18 +78,18 @@ library AddressIntrospector {
     struct NonDisoverable {
         address rollupDAManager;
         address bytecodesSupplier;
-        address l1RollupDAValidator;
     }
 
     function getBridgehubAddresses(IL1Bridgehub _bridgehub) public view returns (BridgehubAddresses memory info) {
         info.bridgehubProxy = address(_bridgehub);
-        info.assetRouter = _bridgehub.assetRouter();
+        info.assetRouter = address(_bridgehub.assetRouter());
         info.messageRoot = address(_bridgehub.messageRoot());
         info.l1CtmDeployer = address(_bridgehub.l1CtmDeployer());
-        info.admin = _bridgehub.admin();
+        info.admin = address(_bridgehub.admin());
         info.chainAssetHandler = _bridgehub.chainAssetHandler();
-        //        info.sharedBridgeLegacy = _bridgehub.sharedBridge();
-        info.assetRouterAddresses = getAssetRouterAddresses(IL1AssetRouter(info.assetRouter));
+        if (info.assetRouter != address(0)) {
+            info.assetRouterAddresses = getAssetRouterAddresses(IL1AssetRouter(info.assetRouter));
+        }
         info.governance = IOwnable(info.bridgehubProxy).owner();
         info.transparentProxyAdmin = Utils.getProxyAdmin(info.bridgehubProxy);
     }
@@ -113,7 +113,17 @@ library AddressIntrospector {
         info.baseToken = _zkChain.getBaseToken();
         info.transactionFilterer = _zkChain.getTransactionFilterer();
         info.settlementLayer = _zkChain.getSettlementLayer();
-        (info.l1DAValidator, info.l2DAValidatorScheme) = _zkChain.getDAValidatorPair();
+        (uint256 major, uint256 minor, uint256 patch) = _zkChain.getSemverProtocolVersion();
+        if (minor >= 29) {
+            (info.l1DAValidator, info.l2DAValidatorScheme) = _zkChain.getDAValidatorPair();
+        } else {
+            (bool ok, bytes memory data) = address(_zkChain).staticcall(
+                abi.encodeWithSignature("getDAValidatorPair()")
+            );
+            if (ok && data.length >= 32) {
+                (info.l1DAValidator, ) = abi.decode(data, (address, address));
+            }
+        }
     }
 
     function getAssetRouterAddresses(

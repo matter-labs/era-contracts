@@ -540,14 +540,11 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         string memory toml = vm.readFile(newConfigPath);
 
         nonDisoverable.bytecodesSupplier = toml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
-        nonDisoverable.l1RollupDAValidator = toml.readAddress("$.contracts.l1_rollup_da_validator");
 
         address bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
 
         setAddressesBasedOnBridgehub(bridgehubProxy);
         newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
-
-        newConfig.oldProtocolVersion = toml.readUint("$.old_protocol_version");
 
         newConfig.priorityTxsL2GasLimit = toml.readUint("$.priority_txs_l2_gas_limit");
         newConfig.maxExpectedL1GasPrice = toml.readUint("$.max_expected_l1_gas_price");
@@ -614,7 +611,9 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             IZKChain(IL1Bridgehub(discoveredBridgehub.bridgehubProxy).getZKChain(config.eraChainId))
         );
 
+        addresses.daAddresses.l1RollupDAValidator = discoveredEraZkChain.l1DAValidator;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
+        newConfig.oldProtocolVersion = ctmProtocolVersion;
         require(
             ctmProtocolVersion != getNewProtocolVersion(),
             "The new protocol version is already present on the ChainTypeManager"
@@ -626,9 +625,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
         newConfig.oldValidatorTimelock = discoveredCTM.validatorTimelockPostV29;
         newConfig.ecosystemAdminAddress = discoveredBridgehub.admin;
-
-        address eraDiamondProxy = L1Bridgehub(discoveredBridgehub.bridgehubProxy).getZKChain(config.eraChainId);
-        (addresses.daAddresses.l1RollupDAValidator, ) = GettersFacet(eraDiamondProxy).getDAValidatorPair();
     }
 
     function generateFixedForceDeploymentsData() internal virtual {
@@ -684,7 +680,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
             gatewayChainId: config.gatewayChainId,
-        l1AssetRouter: bridges.l1AssetRouterProxy,
+            l1AssetRouter: bridges.l1AssetRouterProxy,
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
@@ -1604,7 +1600,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             target: nonDisoverable.rollupDAManager,
             data: abi.encodeCall(
                 RollupDAManager.updateDAPair,
-                (nonDisoverable.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true)
+                (addresses.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true)
             ),
             value: 0
         });

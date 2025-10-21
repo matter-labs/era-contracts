@@ -69,7 +69,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         super.initializeConfig(newConfigPath);
         string memory toml = vm.readFile(newConfigPath);
 
-        v28ProtocolVersion = toml.readUint("$.v28_protocol_version");
+        v28ProtocolVersion = newConfig.oldProtocolVersion;
 
         bytes memory encodedOldValidatorTimelocks = toml.readBytes("$.V29.encoded_old_validator_timelocks");
         oldValidatorTimelocks = abi.decode(encodedOldValidatorTimelocks, (address[]));

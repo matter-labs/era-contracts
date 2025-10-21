@@ -67,23 +67,22 @@ struct DeployedAddresses {
 
 // TODO potentially remove
 // solhint-disable-next-line gas-struct-packing
-    struct BridgehubDeployedAddresses {
-        address bridgehubImplementation;
-        address bridgehubProxy;
-        address ctmDeploymentTrackerImplementation;
-        address ctmDeploymentTrackerProxy;
-        address messageRootImplementation;
-        address messageRootProxy;
-        address chainAssetHandlerImplementation;
-        address chainAssetHandlerProxy;
-        address interopCenterImplementation;
-        address interopCenterProxy;
-        address assetTrackerImplementation;
-        address assetTrackerProxy;
-        address chainRegistrationSenderImplementation;
-        address chainRegistrationSenderProxy;
-    }
-
+struct BridgehubDeployedAddresses {
+    address bridgehubImplementation;
+    address bridgehubProxy;
+    address ctmDeploymentTrackerImplementation;
+    address ctmDeploymentTrackerProxy;
+    address messageRootImplementation;
+    address messageRootProxy;
+    address chainAssetHandlerImplementation;
+    address chainAssetHandlerProxy;
+    address interopCenterImplementation;
+    address interopCenterProxy;
+    address assetTrackerImplementation;
+    address assetTrackerProxy;
+    address chainRegistrationSenderImplementation;
+    address chainRegistrationSenderProxy;
+}
 
 // solhint-disable-next-line gas-struct-packing
 struct BridgesDeployedAddresses {
@@ -155,9 +154,11 @@ abstract contract DeployCTMUtils is DeployUtils {
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
+        config.eraChainId = toml.readUint("$.era_chain_id");
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
-        config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
-
+        if (toml.keyExists("$.is_zk_sync_os")) {
+            config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
+        }
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"
         );

@@ -107,6 +107,10 @@ abstract contract DeployL1CoreUtils is DeployUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "ProxyAdmin")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "ChainRegistrationSender")) {
+            return abi.encode(addresses.bridgehub.bridgehubProxy);
+        } else if (compareStrings(contractName, "InteropCenter")) {
+            return abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId, config.ownerAddress);
         } else if (compareStrings(contractName, "BridgedStandardERC20")) {
             return abi.encode();
         } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
