@@ -14,6 +14,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {CallStatus, IInteropHandler} from "contracts/interop/IInteropHandler.sol";
@@ -28,6 +29,7 @@ import {IMessageVerification} from "contracts/common/interfaces/IMessageVerifica
 
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
+import {InteropLibrary} from "contracts/interop/InteropLibrary.sol";
 
 abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
     address constant UNBUNDLER_ADDRESS = address(0x1);
@@ -98,6 +100,41 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         // Decode the returned bundle hash
         bytes32 bundleHash = abi.decode(returnData, (bytes32));
         assertNotEq(bundleHash, bytes32(0), "Bundle hash should not be zero");
+    }
+
+    function test_requestNativeTokenTransferViaLibrary() public {
+        uint256 destinationChainId = 271;
+
+        vm.deal(address(this), 1000 ether);
+
+        vm.mockCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+            abi.encode(bytes(""))
+        );
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
+            abi.encode(baseTokenAssetId)
+        );
+
+        vm.mockCall(
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue.selector),
+            abi.encode(bytes(""))
+        );
+
+        InteropLibrary.sendNative(destinationChainId, address(this), 100);
+    }
+
+    function test_sendMessageToL1ViaLibrary() public {
+        vm.mockCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+            abi.encode(bytes(""))
+        );
+
+        InteropLibrary.sendMessage("testing interop");
     }
 
     function getInclusionProof(address messageSender) public view returns (MessageInclusionProof memory) {
