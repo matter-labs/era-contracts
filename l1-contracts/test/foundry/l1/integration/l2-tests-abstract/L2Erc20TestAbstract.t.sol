@@ -33,33 +33,11 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
     address constant UNBUNDLER_ADDRESS = address(0x1);
     address constant EXECUTION_ADDRESS = address(0x2);
 
-    function performDeposit(address depositor, address receiver, uint256 amount) internal {
-        vm.prank(aliasedL1AssetRouter);
-        L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDeposit({
-            _l1Sender: depositor,
-            _l2Receiver: receiver,
-            _l1Token: L1_TOKEN_ADDRESS,
-            _amount: amount,
-            _data: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
-        });
-    }
-
-    function initializeTokenByDeposit() internal returns (address l2TokenAddress) {
-        performDeposit(makeAddr("someDepositor"), makeAddr("someReceiver"), 1);
-
-        l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
-        if (l2TokenAddress == address(0)) {
-            revert("Token not initialized");
-        }
-        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
-        BridgedStandardERC20(l2TokenAddress).bridgeMint(address(this), 100000);
-    }
-
     function test_shouldFinalizeERC20Deposit() public {
         address depositor = makeAddr("depositor");
         address receiver = makeAddr("receiver");
 
-        performDeposit(depositor, receiver, 100);
+        performDeposit(depositor, receiver, L1_TOKEN_ADDRESS, 100);
 
         address l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
 
@@ -71,7 +49,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
     }
 
     function test_governanceShouldBeAbleToReinitializeToken() public {
-        address l2TokenAddress = initializeTokenByDeposit();
+        address l2TokenAddress = initializeTokenByDeposit(L1_TOKEN_ADDRESS);
 
         BridgedStandardERC20.ERC20Getters memory getters = BridgedStandardERC20.ERC20Getters({
             ignoreName: false,
@@ -88,7 +66,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
     }
 
     function test_governanceShouldNotBeAbleToSkipInitializerVersions() public {
-        address l2TokenAddress = initializeTokenByDeposit();
+        address l2TokenAddress = initializeTokenByDeposit(L1_TOKEN_ADDRESS);
 
         BridgedStandardERC20.ERC20Getters memory getters = BridgedStandardERC20.ERC20Getters({
             ignoreName: false,
@@ -123,7 +101,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
     }
 
     function test_requestTokenTransferInterop() public {
-        address l2TokenAddress = initializeTokenByDeposit();
+        address l2TokenAddress = initializeTokenByDeposit(L1_TOKEN_ADDRESS);
         bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
         vm.deal(address(this), 1000 ether);
 
@@ -143,11 +121,13 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         });
 
         uint256 destinationChainId = 271;
+
         vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes(""))
         );
+
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
             abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
@@ -165,11 +145,12 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             IERC7786Attributes.unbundlerAddress,
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
         );
-        l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(271), calls, bundleAttributes);
+
+        l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(destinationChainId), calls, bundleAttributes);
     }
 
     function test_requestSendCall() public {
-        address l2TokenAddress = initializeTokenByDeposit();
+        address l2TokenAddress = initializeTokenByDeposit(L1_TOKEN_ADDRESS);
         bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
         vm.deal(address(this), 1000 ether);
 
