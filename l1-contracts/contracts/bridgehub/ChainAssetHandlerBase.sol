@@ -76,6 +76,12 @@ abstract contract ChainAssetHandlerBase is
     /// @notice Used to track the number of times each chain has migrated.
     /// NOTE: this mapping may be deprecated in the future, don't rely on it!
     mapping(uint256 chainId => uint256 migrationNumber) public migrationNumber;
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+     */
+    uint256[48] private __gap;
 
     /// @notice Only the asset router can call.
     modifier onlyAssetRouter() {
