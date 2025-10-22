@@ -5,13 +5,9 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
-
-import {Governance} from "contracts/governance/Governance.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
@@ -21,9 +17,6 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
@@ -38,8 +31,6 @@ import {Call} from "contracts/governance/Common.sol";
 
 import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-
-import {DeployedAddresses} from "../DeployUtils.s.sol";
 
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
 

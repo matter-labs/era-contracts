@@ -22,7 +22,6 @@ import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
 import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
