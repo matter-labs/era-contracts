@@ -7,7 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {stdJson} from "forge-std/StdJson.sol";
 
-import {FinalizeL1DepositParams} from "contracts/common/Messaging.sol";
+import {FinalizeL1DepositParams, L2Message} from "contracts/common/Messaging.sol";
 import {Utils} from "../Utils.sol";
 import {AltL2ToL1Log, AltLog, AltTransactionReceipt, L2ToL1Log, L2ToL1LogProof, Log, TransactionReceipt} from "./ReceipTypes.sol";
 
@@ -17,6 +17,14 @@ import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IGetters} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
+import {L2_MESSAGE_VERIFICATION} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+
+import {L2MessageVerification} from "contracts/interop/L2MessageVerification.sol";
+
+enum WithdrawalType {   
+    L1,
+    GW
+}
 
 contract ZKSProvider is Script {
     function finalizeWithdrawal(
@@ -26,7 +34,7 @@ contract ZKSProvider is Script {
         bytes32 withdrawalHash,
         uint256 index
     ) public {
-        FinalizeL1DepositParams memory params = getFinalizeWithdrawalParams(chainId, l2RpcUrl, withdrawalHash, index);
+        FinalizeL1DepositParams memory params = getFinalizeWithdrawalParams(chainId, l2RpcUrl, withdrawalHash, index, WithdrawalType.L1);
 
         IBridgehubBase bridgehub = IBridgehubBase(l1Bridgehub);
         IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
@@ -40,14 +48,34 @@ contract ZKSProvider is Script {
         vm.stopBroadcast();
     }
 
+    function l2ProveMessageInclusion(
+        uint256 chainId,
+        string memory l2RpcUrl,
+        bytes32 withdrawalHash,
+        uint256 index
+    ) public {
+        FinalizeL1DepositParams memory params = getFinalizeWithdrawalParams(chainId, l2RpcUrl, withdrawalHash, index, WithdrawalType.GW);
+        L2Message memory message = L2Message({
+            txNumberInBatch: params.l2TxNumberInBatch,
+            sender: params.l2Sender,
+            data: params.message
+        });
+        // L2MessageVerification messageVerification = new L2MessageVerification();
+        // messageVerification.proveL2MessageInclusionShared(params.chainId, params.l2BatchNumber, params.l2MessageIndex, message, params.merkleProof);
+        vm.startBroadcast();
+        L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared(params.chainId, params.l2BatchNumber, params.l2MessageIndex, message, params.merkleProof);
+        vm.stopBroadcast();
+    }
+
     function waitForWithdrawalToBeFinalized(
         uint256 chainId,
         address l1Bridgehub,
         string memory l2RpcUrl,
         bytes32 withdrawalHash,
-        uint256 index
+        uint256 index,
+        WithdrawalType withdrawalType
     ) public {
-        FinalizeL1DepositParams memory params = getFinalizeWithdrawalParams(chainId, l2RpcUrl, withdrawalHash, index);
+        FinalizeL1DepositParams memory params = getFinalizeWithdrawalParams(chainId, l2RpcUrl, withdrawalHash, index, withdrawalType);
         waitForBatchToBeExecuted(l1Bridgehub, chainId, params);
     }
 
@@ -185,7 +213,8 @@ contract ZKSProvider is Script {
         uint256 chainId,
         string memory l2RpcUrl,
         bytes32 withdrawalHash,
-        uint256 index
+        uint256 index,
+        WithdrawalType withdrawalType
     ) public returns (FinalizeL1DepositParams memory params) {
         require(bytes(l2RpcUrl).length > 0, "L2 RPC URL not set");
 
@@ -197,7 +226,7 @@ contract ZKSProvider is Script {
         }
 
         // Get L2ToL1 log proof
-        L2ToL1LogProof memory proof = getL2ToL1LogProof(l2RpcUrl, withdrawalHash, l2ToL1LogIndex);
+        L2ToL1LogProof memory proof = getL2ToL1LogProof(l2RpcUrl, withdrawalHash, l2ToL1LogIndex, withdrawalType);
         // console.log("withdrawalHash");
         // console.logBytes32(withdrawalHash);
 
@@ -254,7 +283,8 @@ contract ZKSProvider is Script {
     function getL2ToL1LogProof(
         string memory l2RpcUrl,
         bytes32 txHash,
-        uint64 logIndex
+        uint64 logIndex,
+        WithdrawalType withdrawalType
     ) internal returns (L2ToL1LogProof memory proof) {
         string[] memory args = new string[](9);
         args[0] = "curl";
@@ -270,6 +300,7 @@ contract ZKSProvider is Script {
             vm.toString(txHash),
             '",',
             vm.toString(logIndex),
+            withdrawalType == WithdrawalType.GW ? ",\"proof_based_gw\"" : "",
             "]}"
         ); // todo later: add ,"proof_based_gw" for interop
         // Execute RPC call
