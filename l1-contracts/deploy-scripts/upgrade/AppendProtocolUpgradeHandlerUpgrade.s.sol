@@ -6,7 +6,6 @@ pragma solidity 0.8.28;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 // Note that the `ProtocolUpgradeHandler` uses `OpenZeppeling v5`.
 interface ProxyAdminV5 {
