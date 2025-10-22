@@ -107,12 +107,12 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
     ) external payable override requireZeroValue(msg.value) onlyAssetRouter {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
 
-        (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedbridgeConfirmTransferResult(
+        (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeConfirmTransferResult(
             bridgehubBurnData.chainId,
             _txStatus
         );
 
-        IChainTypeManager(ctm).forwardedbridgeConfirmTransferResult({
+        IChainTypeManager(ctm).forwardedBridgeConfirmTransferResult({
             _chainId: bridgehubBurnData.chainId,
             _txStatus: _txStatus,
             _assetInfo: _assetId,
@@ -126,7 +126,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
 
         isMigrationInProgress[bridgehubBurnData.chainId] = false;
 
-        IZKChain(zkChain).forwardedbridgeConfirmTransferResult({
+        IZKChain(zkChain).forwardedBridgeConfirmTransferResult({
             _chainId: bridgehubBurnData.chainId,
             _txStatus: _txStatus,
             _assetInfo: _assetId,

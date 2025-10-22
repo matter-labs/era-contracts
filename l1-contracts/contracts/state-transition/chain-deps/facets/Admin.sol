@@ -462,7 +462,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function forwardedbridgeConfirmTransferResult(
+    function forwardedBridgeConfirmTransferResult(
         uint256 /* _chainId */,
         TxStatus _txStatus,
         bytes32 /* _assetInfo */,

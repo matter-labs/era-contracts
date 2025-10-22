@@ -551,7 +551,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// param _assetInfo the assetInfo of the chain
     /// param _depositSender the address of that sent the deposit
     /// param _ctmData the data of the migration
-    function forwardedbridgeConfirmTransferResult(
+    function forwardedBridgeConfirmTransferResult(
         uint256 /* _chainId */,
         TxStatus /* _txStatus */,
         bytes32 /* _assetInfo */,

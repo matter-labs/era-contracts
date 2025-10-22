@@ -179,7 +179,7 @@ interface IChainTypeManager {
 
     function forwardedBridgeMint(uint256 _chainId, bytes calldata _data) external returns (address);
 
-    function forwardedbridgeConfirmTransferResult(
+    function forwardedBridgeConfirmTransferResult(
         uint256 _chainId,
         TxStatus _txStatus,
         bytes32 _assetInfo,

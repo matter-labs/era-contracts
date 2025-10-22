@@ -554,7 +554,7 @@ abstract contract BridgehubBase is
     /// @param _chainId The chain ID of the chain.
     /// @return zkChain The address of the ZK chain.
     /// @return ctm The address of the CTM of the chain.
-    function forwardedbridgeConfirmTransferResult(
+    function forwardedBridgeConfirmTransferResult(
         uint256 _chainId,
         TxStatus _txStatus
     ) external onlyChainAssetHandler returns (address zkChain, address ctm) {
