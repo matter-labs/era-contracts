@@ -8,7 +8,6 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IChainRegistrationSender} from "contracts/bridgehub/IChainRegistrationSender.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";

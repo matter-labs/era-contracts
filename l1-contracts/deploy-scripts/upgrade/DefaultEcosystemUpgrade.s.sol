@@ -20,7 +20,6 @@ import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
