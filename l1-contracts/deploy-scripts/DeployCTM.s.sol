@@ -76,7 +76,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
 
     function runForTest(address bridgehub, bool skipL1Deployments) public {
         saveDiamondSelectors();
-        runInner(vm.envString("CTM_CONFIG"), vm.envString("CTM_OUTPUT"), bridgehub, false);
+        runInner(vm.envString("CTM_CONFIG"), vm.envString("CTM_OUTPUT"), bridgehub, false, skipL1Deployments);
     }
 
     function getAddresses() public view returns (DeployedAddresses memory) {
@@ -327,7 +327,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         address dangerousTestOnlyForcedBeacon;
         if (config.supportL2LegacySharedBridgeTest) {
             L1AssetRouter assetRouter = L1AssetRouter(discoveredBridgehub.assetRouter);
-            (dangerousTestOnlyForcedBeacon, ) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
+            (dangerousTestOnlyForcedBeacon,) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
                 address(assetRouter.legacyBridge()),
                 discoveredBridgehub.assetRouterAddresses.l1Nullifier,
                 addresses.governance
@@ -351,12 +351,12 @@ contract DeployCTMScript is Script, DeployCTMUtils {
             interopCenterBytecodeInfo: abi.encode(getL2BytecodeHash("InteropCenter")),
             interopHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("InteropHandler")),
             assetTrackerBytecodeInfo: abi.encode(getL2BytecodeHash("L2AssetTracker")),
-            // For newly created chains it it is expected that the following bridges are not present at the moment
-            // of creation of the chain
+        // For newly created chains it it is expected that the following bridges are not present at the moment
+        // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
-                addresses.bridgehub.chainRegistrationSenderProxy
+                discoveredBridgehub.chainRegistrationSenderProxy
             ),
             dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon
         });

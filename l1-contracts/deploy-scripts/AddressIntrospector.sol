@@ -24,8 +24,10 @@ library AddressIntrospector {
         address l1CtmDeployer;
         address admin;
         address governance;
+        address chainRegistrationSenderProxy;
         address transparentProxyAdmin;
         address chainAssetHandler;
+        address interopCenterProxy;
         address sharedBridgeLegacy; // optional legacy alias, if present on implementation
         AssetRouterAddresses assetRouterAddresses;
     }
@@ -121,7 +123,7 @@ library AddressIntrospector {
                 abi.encodeWithSignature("getDAValidatorPair()")
             );
             if (ok && data.length >= 32) {
-                (info.l1DAValidator, ) = abi.decode(data, (address, address));
+                (info.l1DAValidator,) = abi.decode(data, (address, address));
             }
         }
     }
@@ -158,17 +160,17 @@ library AddressIntrospector {
         IL1Bridgehub _bridgehub,
         uint256 _chainId
     )
-        external
-        view
-        returns (
-            BridgehubAddresses memory bh,
-            CTMAddresses memory ctm,
-            ZkChainAddresses memory zk,
-            AssetRouterAddresses memory ar,
-            BaseTokenRoute memory baseRoute,
-            address[] memory zkFacets,
-            L1ERC20BridgeAddresses memory legacyBridge
-        )
+    external
+    view
+    returns (
+        BridgehubAddresses memory bh,
+        CTMAddresses memory ctm,
+        ZkChainAddresses memory zk,
+        AssetRouterAddresses memory ar,
+        BaseTokenRoute memory baseRoute,
+        address[] memory zkFacets,
+        L1ERC20BridgeAddresses memory legacyBridge
+    )
     {
         bh = getBridgehubAddresses(_bridgehub);
 

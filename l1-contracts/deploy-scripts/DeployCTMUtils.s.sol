@@ -65,24 +65,6 @@ struct DeployedAddresses {
     address accessControlRestrictionAddress;
 }
 
-// TODO potentially remove
-// solhint-disable-next-line gas-struct-packing
-struct BridgehubDeployedAddresses {
-    address bridgehubImplementation;
-    address bridgehubProxy;
-    address ctmDeploymentTrackerImplementation;
-    address ctmDeploymentTrackerProxy;
-    address messageRootImplementation;
-    address messageRootProxy;
-    address chainAssetHandlerImplementation;
-    address chainAssetHandlerProxy;
-    address interopCenterImplementation;
-    address interopCenterProxy;
-    address assetTrackerImplementation;
-    address assetTrackerProxy;
-    address chainRegistrationSenderImplementation;
-    address chainRegistrationSenderProxy;
-}
 
 // solhint-disable-next-line gas-struct-packing
 struct BridgesDeployedAddresses {
@@ -96,6 +78,7 @@ struct Config {
     uint256 l1ChainId;
     address deployerAddress;
     uint256 eraChainId;
+    uint256 gatewayChainId;
     address ownerAddress;
     bool testnetVerifier;
     bool supportL2LegacySharedBridgeTest;
@@ -452,7 +435,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             restrictions[0] = addresses.accessControlRestrictionAddress;
             return abi.encode(restrictions);
         } else if (compareStrings(contractName, "ChainTypeManager")) {
-            return abi.encode(discoveredBridgehub.bridgehubProxy, addresses.bridgehub.interopCenterProxy);
+            return abi.encode(discoveredBridgehub.bridgehubProxy, discoveredBridgehub.interopCenterProxy);
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ProxyAdmin")) {
@@ -473,10 +456,10 @@ abstract contract DeployCTMUtils is DeployUtils {
             return
                 abi.encode(
                     config.l1ChainId,
-                    addresses.bridgehub.bridgehubProxy,
+                    discoveredBridgehub.bridgehubProxy,
                     addresses.bridges.l1AssetRouterProxy,
-                    addresses.vaults.l1NativeTokenVaultProxy,
-                    addresses.bridgehub.messageRootProxy
+                    discoveredBridgehub.assetRouterAddresses.nativeTokenVault,
+                    discoveredBridgehub.messageRoot
                 );
         } else {
             revert(string.concat("Contract ", contractName, " creation calldata not set"));

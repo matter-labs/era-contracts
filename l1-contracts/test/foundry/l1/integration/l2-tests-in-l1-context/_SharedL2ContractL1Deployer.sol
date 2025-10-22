@@ -61,10 +61,10 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         initializeConfig(inputPath);
         addresses.transparentProxyAdmin = address(0x1);
         // TODO verify
-        addresses.bridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
-        addresses.bridgehub.interopCenterProxy = L2_INTEROP_CENTER_ADDR;
-        addresses.bridges.l1AssetRouterProxy = L2_ASSET_ROUTER_ADDR;
-        addresses.vaults.l1NativeTokenVaultProxy = L2_NATIVE_TOKEN_VAULT_ADDR;
+//        addresses.bridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
+//        addresses.bridgehub.interopCenterProxy = L2_INTEROP_CENTER_ADDR;
+//        addresses.bridges.l1AssetRouterProxy = L2_ASSET_ROUTER_ADDR;
+//        addresses.vaults.l1NativeTokenVaultProxy = L2_NATIVE_TOKEN_VAULT_ADDR;
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         if (!_skip) {
@@ -88,10 +88,10 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     )
-        internal
-        virtual
-        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
-        returns (Diamond.FacetCut[] memory)
+    internal
+    virtual
+    override(DeployCTMIntegrationScript, DeployIntegrationUtils)
+    returns (Diamond.FacetCut[] memory)
     {
         return super.getChainCreationFacetCuts(stateTransition);
     }
@@ -99,10 +99,10 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
     function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     )
-        internal
-        virtual
-        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
-        returns (Diamond.FacetCut[] memory)
+    internal
+    virtual
+    override(DeployCTMIntegrationScript, DeployIntegrationUtils)
+    returns (Diamond.FacetCut[] memory)
     {
         return super.getUpgradeAddedFacetCuts(stateTransition);
     }

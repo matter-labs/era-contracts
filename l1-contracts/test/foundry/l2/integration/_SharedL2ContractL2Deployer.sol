@@ -46,9 +46,6 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         );
         initializeConfig(inputPath);
         addresses.transparentProxyAdmin = address(0x1);
-        addresses.bridges.l1AssetRouterProxy = L2_ASSET_ROUTER_ADDR;
-        addresses.vaults.l1NativeTokenVaultProxy = L2_NATIVE_TOKEN_VAULT_ADDR;
-        addresses.bridgehub.interopCenterProxy = L2_INTEROP_CENTER_ADDR;
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         instantiateCreate2Factory();

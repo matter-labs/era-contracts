@@ -4,12 +4,6 @@ pragma solidity ^0.8.10;
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-// solhint-disable-next-line gas-struct-packing
-struct L1NativeTokenVaultAddresses {
-    address l1NativeTokenVaultImplementation;
-    address l1NativeTokenVaultProxy;
-}
-
 abstract contract DeployUtils is Create2FactoryUtils {
     function deployTuppWithContract(
         string memory contractName,
