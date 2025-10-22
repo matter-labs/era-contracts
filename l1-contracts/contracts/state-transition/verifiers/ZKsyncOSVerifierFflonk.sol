@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
+import {IZKsyncOSVerifier} from "../chain-interfaces/IZKsyncOSVerifier.sol";
 
 /// @title Fflonk Verifier Implementation
 /// @author Matter Labs
@@ -11,7 +12,7 @@ import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 /// * Fflonk Paper: https://eprint.iacr.org/2021/1167
 /// @dev Contract was generated from a verification key with a hash of 0x6f36a08c517b060fa97308cdb3e23b04842ff839d451a753ec8fae1a5408304a
 /// @custom:security-contact security@matterlabs.dev
-contract ZKsyncOSVerifierFflonk is IVerifierV2 {
+contract ZKsyncOSVerifierFflonk is IVerifierV2, IZKsyncOSVerifier {
     // ================Constants================
     uint32 internal constant DST_0 = 0;
     uint32 internal constant DST_1 = 1;
@@ -128,6 +129,11 @@ contract ZKsyncOSVerifierFflonk is IVerifierV2 {
                     _getG2Elements()
                 )
             );
+    }
+
+    /// @inheritdoc IZKsyncOSVerifier
+    function executionVersion() external pure returns (uint32) {
+        return 2;
     }
 
     /// @dev This breakdown is done to avoid stack-too-deep error

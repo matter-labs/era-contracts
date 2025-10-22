@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {EmptyProofLength, UnknownVerifierType} from "../../common/L1ContractErrors.sol";
+import {IDualVerifier} from "../chain-interfaces/IDualVerifier.sol";
 
 /// @title Dual Verifier
 /// @author Matter Labs
@@ -13,7 +14,7 @@ import {EmptyProofLength, UnknownVerifierType} from "../../common/L1ContractErro
 /// to the correct verifier based on the provided proof type. It reuses the same interface as on the original `Verifier`
 /// contract, while abusing on of the fields (`_recursiveAggregationInput`) for proof verification type. The contract is
 /// needed for the smooth transition from PLONK based verifier to the FFLONK verifier.
-contract EraDualVerifier is IVerifier {
+contract EraDualVerifier is IVerifier, IDualVerifier {
     /// @notice The latest FFLONK verifier contract.
     IVerifierV2 public immutable FFLONK_VERIFIER;
 
@@ -78,6 +79,21 @@ contract EraDualVerifier is IVerifier {
         else {
             revert UnknownVerifierType();
         }
+    }
+
+    /// @notice Returns the address of the PLONK verifier contract.
+    function plonkVerifiers(uint32 _version) external view returns (IVerifier) {
+        if (_version != 0) {
+            return IVerifier(address(0));
+        }
+        return PLONK_VERIFIER;
+    }
+
+    function fflonkVerifiers(uint32 _version) external view returns (IVerifierV2) {
+        if (_version != 0) {
+            return IVerifierV2(address(0));
+        }
+        return FFLONK_VERIFIER;
     }
 
     /// @notice Extract the proof by removing the first element (proof type differentiator).

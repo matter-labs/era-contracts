@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
+import {IZKsyncOSVerifier} from "../chain-interfaces/IZKsyncOSVerifier.sol";
 
 /* solhint-disable max-line-length */
 /// @author Matter Labs
@@ -18,7 +19,7 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 /// * Plonk for ZKsync v1.1: https://github.com/matter-labs/solidity_plonk_verifier/raw/recursive/bellman_vk_codegen_recursive/RecursivePlonkUnrolledForEthereum.pdf
 /// The notation used in the code is the same as in the papers.
 /* solhint-enable max-line-length */
-contract ZKsyncOSVerifierPlonk is IVerifier {
+contract ZKsyncOSVerifierPlonk is IVerifier, IZKsyncOSVerifier {
     /*//////////////////////////////////////////////////////////////
                              Verification keys
     //////////////////////////////////////////////////////////////*/
@@ -267,6 +268,11 @@ contract ZKsyncOSVerifierPlonk is IVerifier {
 
             vkHash := keccak256(start, length)
         }
+    }
+
+    /// @inheritdoc IZKsyncOSVerifier
+    function executionVersion() external pure returns (uint32) {
+        return 2;
     }
 
     /// @notice Load verification keys to memory in runtime.
