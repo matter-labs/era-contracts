@@ -358,7 +358,6 @@ struct InteropBalanceChange {
     AssetBalanceChange[] assetBalanceChanges;
 }
 
-
 /// @param _chainId The ZK chain id to which deposit was initiated.
 /// @param _depositSender The address of the entity that initiated the deposit.
 /// @param _assetId The unique identifier of the deposited L1 token.
@@ -372,12 +371,12 @@ struct InteropBalanceChange {
 struct ConfirmTransferResultData {
     uint256 _chainId;
     address _depositSender;
+    uint16 _l2TxNumberInBatch;
+    TxStatus _txStatus;
     bytes32 _assetId;
     bytes _assetData;
     bytes32 _l2TxHash;
     uint256 _l2BatchNumber;
     uint256 _l2MessageIndex;
-    uint16 _l2TxNumberInBatch;
     bytes32[] _merkleProof;
-    TxStatus _txStatus;
 }

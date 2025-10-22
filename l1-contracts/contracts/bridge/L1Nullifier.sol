@@ -273,17 +273,15 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         });
     }
 
-    function bridgeConfirmTransferResult(
-        ConfirmTransferResultData memory _confirmTransferResultData
-    ) internal {
+    function bridgeConfirmTransferResult(ConfirmTransferResultData memory _confirmTransferResultData) internal {
         _verifyAndClearTransfer(false, _confirmTransferResultData);
-        l1AssetRouter.bridgeConfirmTransferResult(
-            _confirmTransferResultData._chainId,
-            _confirmTransferResultData._txStatus,
-            _confirmTransferResultData._depositSender,
-            _confirmTransferResultData._assetId,
-            _confirmTransferResultData._assetData
-        );
+        l1AssetRouter.bridgeConfirmTransferResult({
+            _chainId: _confirmTransferResultData._chainId,
+            _txStatus: _confirmTransferResultData._txStatus,
+            _depositSender: _confirmTransferResultData._depositSender,
+            _assetId: _confirmTransferResultData._assetId,
+            _assetData: _confirmTransferResultData._assetData
+        });
     }
 
     /// @inheritdoc IL1Nullifier
@@ -301,19 +299,26 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         _verifyAndClearTransfer(
             false,
             ConfirmTransferResultData({
+                _chainId: _chainId,
+                _depositSender: _depositSender,
+                _assetId: _assetId,
+                _assetData: _assetData,
+                _l2TxHash: _l2TxHash,
+                _l2BatchNumber: _l2BatchNumber,
+                _l2MessageIndex: _l2MessageIndex,
+                _l2TxNumberInBatch: _l2TxNumberInBatch,
+                _merkleProof: _merkleProof,
+                _txStatus: TxStatus.Failure
+            })
+        );
+
+        l1AssetRouter.bridgeConfirmTransferResult({
             _chainId: _chainId,
+            _txStatus: TxStatus.Failure,
             _depositSender: _depositSender,
             _assetId: _assetId,
-            _assetData: _assetData,
-            _l2TxHash: _l2TxHash,
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _merkleProof: _merkleProof,
-            _txStatus: TxStatus.Failure
-        }));
-
-        l1AssetRouter.bridgeConfirmTransferResult(_chainId, TxStatus.Failure, _depositSender, _assetId, _assetData);
+            _assetData: _assetData
+        });
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
@@ -356,7 +361,11 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bool notCheckedInLegacyBridgeOrWeCanCheckDeposit;
         {
             // Deposits that happened before the upgrade cannot be checked here, they have to be claimed and checked in the legacyBridge
-            bool weCanCheckDepositHere = !_isPreSharedBridgeDepositOnEra(_confirmTransferResultData._chainId, _confirmTransferResultData._l2BatchNumber, _confirmTransferResultData._l2TxNumberInBatch);
+            bool weCanCheckDepositHere = !_isPreSharedBridgeDepositOnEra(
+                _confirmTransferResultData._chainId,
+                _confirmTransferResultData._l2BatchNumber,
+                _confirmTransferResultData._l2TxNumberInBatch
+            );
             // Double claims are not possible, as depositHappened is checked here for all except legacy deposits (which have to happen through the legacy bridge)
             // Funds claimed before the update will still be recorded in the legacy bridge
             // Note we double check NEW deposits if they are called from the legacy bridge
@@ -364,9 +373,16 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         }
 
         if (notCheckedInLegacyBridgeOrWeCanCheckDeposit) {
-            bytes32 dataHash = depositHappened[_confirmTransferResultData._chainId][_confirmTransferResultData._l2TxHash];
+            bytes32 dataHash = depositHappened[_confirmTransferResultData._chainId][
+                _confirmTransferResultData._l2TxHash
+            ];
             // Determine if the given dataHash matches the calculated legacy transaction hash.
-            bool isLegacyTxDataHash = _isLegacyTxDataHash(_confirmTransferResultData._depositSender, _confirmTransferResultData._assetId, _confirmTransferResultData._assetData, dataHash);
+            bool isLegacyTxDataHash = _isLegacyTxDataHash(
+                _confirmTransferResultData._depositSender,
+                _confirmTransferResultData._assetId,
+                _confirmTransferResultData._assetData,
+                dataHash
+            );
             // If the dataHash matches the legacy transaction hash, skip the next step.
             // Otherwise, perform the check using the new transaction data hash encoding.
             if (!isLegacyTxDataHash) {
@@ -634,7 +650,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes memory assetData = DataEncoding.encodeBridgeBurnData(_amount, address(0), address(0));
 
         {
-                ConfirmTransferResultData memory confirmTransferResultData = ConfirmTransferResultData({
+            ConfirmTransferResultData memory confirmTransferResultData = ConfirmTransferResultData({
                 _depositSender: _depositSender,
                 _chainId: _chainId,
                 _assetId: assetId,
@@ -647,10 +663,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 _txStatus: TxStatus.Failure
             });
 
-            _verifyAndClearTransfer(
-                false,
-                confirmTransferResultData
-            );
+            _verifyAndClearTransfer(false, confirmTransferResultData);
         }
 
         l1AssetRouter.bridgeConfirmTransferResult({
@@ -698,17 +711,18 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         _verifyAndClearTransfer(
             true,
             ConfirmTransferResultData({
-            _depositSender: _depositSender,
-            _chainId: ERA_CHAIN_ID,
-            _assetId: assetId,
-            _assetData: assetData,
-            _l2TxHash: _l2TxHash,
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _merkleProof: _merkleProof,
-            _txStatus: TxStatus.Failure
-        }));
+                _depositSender: _depositSender,
+                _chainId: ERA_CHAIN_ID,
+                _assetId: assetId,
+                _assetData: assetData,
+                _l2TxHash: _l2TxHash,
+                _l2BatchNumber: _l2BatchNumber,
+                _l2MessageIndex: _l2MessageIndex,
+                _l2TxNumberInBatch: _l2TxNumberInBatch,
+                _merkleProof: _merkleProof,
+                _txStatus: TxStatus.Failure
+            })
+        );
 
         l1AssetRouter.bridgeConfirmTransferResult({
             _chainId: ERA_CHAIN_ID,

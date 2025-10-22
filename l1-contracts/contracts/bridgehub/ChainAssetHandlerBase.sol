@@ -15,7 +15,7 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {IncorrectChainAssetId, IncorrectSender, MigrationNotToL1, MigrationNumberAlreadySet, MigrationNumberMismatch, NotSystemContext, OnlyAssetTrackerOrChain, OnlyChain, SLHasDifferentCTM, ZKChainNotRegistered, IteratedMigrationsNotSupported} from "./L1BridgehubErrors.sol";
-import {ChainIdNotRegistered, MigrationPaused, NotAssetRouter, NotL1} from "../common/L1ContractErrors.sol";
+import {ChainIdNotRegistered, MigrationPaused, NotAssetRouter} from "../common/L1ContractErrors.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
@@ -231,8 +231,7 @@ abstract contract ChainAssetHandlerBase is
         emit MigrationStarted(bridgehubBurnData.chainId, _assetId, _settlementChainId);
     }
 
-    function _setMigrationInProgressOnL1(uint256 _chainId) internal virtual {
-    }
+    function _setMigrationInProgressOnL1(uint256 _chainId) internal virtual {}
 
     /// @dev IL1AssetHandler interface, used to receive a chain on the settlement layer.
     /// @param _assetId the assetId of the chain's CTM

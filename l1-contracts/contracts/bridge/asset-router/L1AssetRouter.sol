@@ -303,13 +303,13 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes32 _assetId,
         bytes calldata _assetData
     ) external override onlyNullifier nonReentrant whenNotPaused {
-        IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeConfirmTransferResult(
-            _chainId,
-            _txStatus,
-            _assetId,
-            _depositSender,
-            _assetData
-        );
+        IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeConfirmTransferResult({
+            _chainId: _chainId,
+            _txStatus: _txStatus,
+            _assetId: _assetId,
+            _depositSender: _depositSender,
+            _data: _assetData
+        });
 
         emit ClaimedFailedDepositAssetRouter(_chainId, _assetId, _assetData);
     }

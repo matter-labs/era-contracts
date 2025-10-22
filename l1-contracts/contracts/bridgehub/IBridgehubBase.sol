@@ -203,7 +203,10 @@ interface IBridgehubBase {
 
     function registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) external;
 
-    function forwardedbridgeConfirmTransferResult(uint256 _chainId, TxStatus _txStatus) external returns (address zkChain, address ctm);
+    function forwardedbridgeConfirmTransferResult(
+        uint256 _chainId,
+        TxStatus _txStatus
+    ) external returns (address zkChain, address ctm);
 
     function forwardTransactionOnGateway(
         uint256 _chainId,
