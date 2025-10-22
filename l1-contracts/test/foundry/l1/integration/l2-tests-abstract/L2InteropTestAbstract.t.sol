@@ -15,9 +15,11 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
 import {IAssetRouterBase, AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
-import {InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {IInteropCenter, InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {CallStatus, IInteropHandler} from "contracts/interop/IInteropHandler.sol";
+import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
+import {ChainIsNotRegistered} from "contracts/interop/InteropErrors.sol";
 import {UnauthorizedMessageSender, WrongDestinationChainId} from "contracts/interop/InteropErrors.sol";
 import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
 
@@ -48,6 +50,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         // assertTrue(success);
     }
 
+    /// @dev sender chain and recipient chain have the same base token
     function test_sendBundle_simple() public {
         vm.mockCall(
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -60,7 +63,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             abi.encode(bytes32(0))
         );
 
-        bytes memory destinationChainId = InteroperableAddress.formatEvmV1(260);
+        bytes memory destinationChainId = InteroperableAddress.formatEvmV1(RECIPIENT_CHAIN_CHAINID);
 
         address targetContract = makeAddr("targetContract");
         InteropCallStarter[] memory callStarters = new InteropCallStarter[](1);
@@ -77,11 +80,11 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         bytes[] memory bundleAttributes = new bytes[](2);
         bundleAttributes[0] = abi.encodePacked(
             IERC7786Attributes.executionAddress.selector,
-            InteroperableAddress.formatEvmV1(260, executionAddress)
+            InteroperableAddress.formatEvmV1(SENDER_CHAIN_CHAINID, executionAddress)
         );
         bundleAttributes[1] = abi.encodePacked(
             IERC7786Attributes.unbundlerAddress.selector,
-            InteroperableAddress.formatEvmV1(260, unbundlerAddress)
+            InteroperableAddress.formatEvmV1(RECIPIENT_CHAIN_CHAINID, unbundlerAddress)
         );
 
         (bool success, bytes memory returnData) = L2_INTEROP_CENTER_ADDR.call(
@@ -98,6 +101,87 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         // Decode the returned bundle hash
         bytes32 bundleHash = abi.decode(returnData, (bytes32));
         assertNotEq(bundleHash, bytes32(0), "Bundle hash should not be zero");
+    }
+
+    /// @dev sender chain and recipient chain have different base tokens
+    /// it is also a regression test for
+    /// https://matter-labs-workspace.slack.com/archives/C04054TJR5X/p1761152926305929
+    function test_InteropCenter_sendBundle_2() public {
+        vm.mockCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+            abi.encode(bytes32(0))
+        );
+
+        address sender = makeAddr("sender");
+        address targetContract = makeAddr("targetContract");
+        address executionAddress = makeAddr("executionAddress");
+        address unbundlerAddress = makeAddr("unbundlerAddress");
+        bytes memory destinationChainId = InteroperableAddress.formatEvmV1(RECIPIENT_CHAIN_2_CHAINID);
+
+        InteropCallStarter[] memory callStarters = new InteropCallStarter[](1);
+        callStarters[0] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(targetContract),
+            data: abi.encodeWithSignature("simpleCall()"),
+            callAttributes: new bytes[](0)
+        });
+
+        bytes[] memory bundleAttributes = new bytes[](2);
+        bundleAttributes[0] = abi.encodePacked(
+            IERC7786Attributes.executionAddress.selector,
+            InteroperableAddress.formatEvmV1(SENDER_CHAIN_CHAINID, executionAddress)
+        );
+        bundleAttributes[1] = abi.encodePacked(
+            IERC7786Attributes.unbundlerAddress.selector,
+            InteroperableAddress.formatEvmV1(SENDER_CHAIN_CHAINID, unbundlerAddress)
+        );
+
+        vm.expectEmit(false, false, false, false, L2_INTEROP_CENTER_ADDR);
+        emit IERC7786GatewaySource.MessageSent(bytes32(0), "", "", "", 0, new bytes[](0));
+        vm.expectEmit(false, false, false, false, L2_INTEROP_CENTER_ADDR);
+        InteropBundle memory ib;
+        emit IInteropCenter.InteropBundleSent(bytes32(0), bytes32(0), ib);
+
+        uint256 interopBundleNonceBefore = InteropCenter(L2_INTEROP_CENTER_ADDR).interopBundleNonce(sender);
+
+        vm.prank(sender);
+        bytes32 bundleHash = l2InteropCenter.sendBundle(destinationChainId, callStarters, bundleAttributes);
+
+        uint256 interopBundleNonceAfter = InteropCenter(L2_INTEROP_CENTER_ADDR).interopBundleNonce(sender);
+
+        assertNotEq(bundleHash, bytes32(0), "Bundle hash should not be zero");
+        assertEq(interopBundleNonceAfter, interopBundleNonceBefore + 1, "bundle nonce must be incremented");
+    }
+
+    function test_InteropCenter_sendBundle_RevertsIfRecipientChainBaseTokenAssetIdIsZero() public {
+        vm.mockCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+            abi.encode(bytes(""))
+        );
+
+        InteropCallStarter[] memory callStarters = new InteropCallStarter[](1);
+        callStarters[0] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(makeAddr("targetContract")),
+            data: abi.encodeWithSignature("simpleCall()"),
+            callAttributes: new bytes[](0)
+        });
+
+        bytes[] memory bundleAttributes = new bytes[](1);
+        bundleAttributes[0] = abi.encodeCall(
+            IERC7786Attributes.unbundlerAddress,
+            (InteroperableAddress.formatEvmV1(makeAddr("unbundlerAddress")))
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(ChainIsNotRegistered.selector, RECIPIENT_CHAIN_3_CHAINID), L2_INTEROP_CENTER_ADDR);
+
+        vm.prank(makeAddr("sender"));
+        l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(RECIPIENT_CHAIN_3_CHAINID), callStarters, bundleAttributes);
+    }
+
+    function test_InteropCenter_sendBundle_RevertsIfSenderChainBaseTokenAssetIdIsZero() public {
+        vm.skip(true);
+        revert('todo');
     }
 
     function getInclusionProof(address messageSender) public view returns (MessageInclusionProof memory) {

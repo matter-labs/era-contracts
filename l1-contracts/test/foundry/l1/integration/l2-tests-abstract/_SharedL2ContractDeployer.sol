@@ -16,7 +16,7 @@ import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.s
 
 import {IL2NativeTokenVault} from "../../../../../contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL2Bridgehub} from "contracts/bridgehub/IL2Bridgehub.sol";
@@ -30,6 +30,7 @@ import {BridgehubL2TransactionRequest} from "../../../../../contracts/common/Mes
 import {IInteropCenter, InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
 import {L2WrappedBaseToken} from "../../../../../contracts/bridge/L2WrappedBaseToken.sol";
 import {L2SharedBridgeLegacy} from "../../../../../contracts/bridge/L2SharedBridgeLegacy.sol";
+import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {MailboxFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {AdminFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Admin.sol";
 import {DataEncoding} from "../../../../../contracts/common/libraries/DataEncoding.sol";
@@ -64,6 +65,10 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
     uint256 internal constant L1_CHAIN_ID = 10; // it cannot be 9, the default block.chainid
     uint256 internal ERA_CHAIN_ID = 270;
     uint256 internal GATEWAY_CHAIN_ID = 506;
+    uint256 internal SENDER_CHAIN_CHAINID = block.chainid;
+    uint256 internal RECIPIENT_CHAIN_CHAINID = 1001;
+    uint256 internal RECIPIENT_CHAIN_2_CHAINID = 1002;
+    uint256 internal RECIPIENT_CHAIN_3_CHAINID = 1003;
     uint256 internal mintChainId = 300;
     address internal l1AssetRouter = makeAddr("l1AssetRouter");
     address internal aliasedL1AssetRouter = AddressAliasHelper.applyL1ToL2Alias(l1AssetRouter);
@@ -71,6 +76,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
     // We won't actually deploy an L1 token in these tests, but we need some address for it.
     address internal L1_TOKEN_ADDRESS = 0x1111100000000000000000000000000000011111;
 
+    address internal RECIPIENT_CHAIN_2_BASE_TOKEN_L1_ADDRESS = makeAddr("RECIPIENT_CHAIN_BASE_TOKEN");
     string internal constant TOKEN_DEFAULT_NAME = "TestnetERC20Token";
     string internal constant TOKEN_DEFAULT_SYMBOL = "TET";
     uint8 internal constant TOKEN_DEFAULT_DECIMALS = 18;
@@ -149,6 +155,46 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             chainTypeManager = IChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
             getExampleChainCommitment();
         }
+
+        vm.label(0x000000000000000000000000000000000000800B, 'SystemContext');
+        vm.label(L2_BRIDGEHUB_ADDR, 'Bridgehub');
+        vm.label(L2_ASSET_ROUTER_ADDR, 'L2AssetRouter');
+        vm.label(L2_NATIVE_TOKEN_VAULT_ADDR, 'L2NativeTokenVault');
+        vm.label(L2_INTEROP_CENTER_ADDR, 'InteropCenter');
+
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        l2Bridgehub.registerChainForInterop(SENDER_CHAIN_CHAINID, baseTokenAssetId);
+
+        initializeTokenByDeposit(RECIPIENT_CHAIN_2_BASE_TOKEN_L1_ADDRESS);
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        l2Bridgehub.registerChainForInterop(RECIPIENT_CHAIN_CHAINID, baseTokenAssetId);
+
+        initializeTokenByDeposit(RECIPIENT_CHAIN_2_BASE_TOKEN_L1_ADDRESS);
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        l2Bridgehub.registerChainForInterop(RECIPIENT_CHAIN_2_CHAINID, DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, RECIPIENT_CHAIN_2_BASE_TOKEN_L1_ADDRESS));
+    
+    }
+
+    function performDeposit(address depositor, address receiver, address _l1Token, uint256 amount) internal {
+        vm.prank(aliasedL1AssetRouter);
+        L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDeposit({
+            _l1Sender: depositor,
+            _l2Receiver: receiver,
+            _l1Token: _l1Token,
+            _amount: amount,
+            _data: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
+        });
+    }
+
+    function initializeTokenByDeposit(address _l1Token) internal returns (address l2TokenAddress) {
+        performDeposit(makeAddr("someDepositor"), makeAddr("someReceiver"), _l1Token, 1);
+
+        l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(_l1Token);
+        if (l2TokenAddress == address(0)) {
+            revert("Token not initialized");
+        }
+        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
+        BridgedStandardERC20(l2TokenAddress).bridgeMint(address(this), 100000);
     }
 
     function getExampleChainCommitment() internal returns (bytes memory) {
