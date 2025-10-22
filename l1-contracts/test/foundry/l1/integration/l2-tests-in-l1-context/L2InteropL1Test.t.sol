@@ -43,5 +43,4 @@ contract L2InteropL1Test is Test, SharedL2ContractL1Deployer, L2InteropTestAbstr
     ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
         return super.getUpgradeAddedFacetCuts(stateTransition);
     }
-
 }

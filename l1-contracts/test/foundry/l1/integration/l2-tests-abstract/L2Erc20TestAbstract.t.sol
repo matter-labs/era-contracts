@@ -19,7 +19,6 @@ import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
-import {DeployCTMUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";

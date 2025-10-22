@@ -4,13 +4,6 @@ pragma solidity 0.8.28;
 import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Config, DeployCTMUtils, DeployedAddresses} from "deploy-scripts/DeployCTMUtils.s.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -60,11 +53,6 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         );
         initializeConfig(inputPath);
         addresses.transparentProxyAdmin = address(0x1);
-        // TODO verify
-//        addresses.bridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
-//        addresses.bridgehub.interopCenterProxy = L2_INTEROP_CENTER_ADDR;
-//        addresses.bridges.l1AssetRouterProxy = L2_ASSET_ROUTER_ADDR;
-//        addresses.vaults.l1NativeTokenVaultProxy = L2_NATIVE_TOKEN_VAULT_ADDR;
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         if (!_skip) {
@@ -88,10 +76,10 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     )
-    internal
-    virtual
-    override(DeployCTMIntegrationScript, DeployIntegrationUtils)
-    returns (Diamond.FacetCut[] memory)
+        internal
+        virtual
+        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
+        returns (Diamond.FacetCut[] memory)
     {
         return super.getChainCreationFacetCuts(stateTransition);
     }
@@ -99,10 +87,10 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
     function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     )
-    internal
-    virtual
-    override(DeployCTMIntegrationScript, DeployIntegrationUtils)
-    returns (Diamond.FacetCut[] memory)
+        internal
+        virtual
+        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
+        returns (Diamond.FacetCut[] memory)
     {
         return super.getUpgradeAddedFacetCuts(stateTransition);
     }

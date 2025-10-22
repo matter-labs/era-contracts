@@ -44,5 +44,4 @@ contract L2AssetTrackerL1Test is Test, SharedL2ContractL1Deployer, L2AssetTracke
     ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
         return super.getUpgradeAddedFacetCuts(stateTransition);
     }
-
 }
