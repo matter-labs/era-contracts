@@ -18,7 +18,7 @@ contract L2NativeTokenVaultDev is L2NativeTokenVault {
     function calculateCreate2TokenAddress(
         uint256 _originChainId,
         address _l1Token
-    ) public view override(L2NativeTokenVault) returns (address) {
+    ) public view override returns (address) {
         bytes32 salt = _getCreate2Salt(_originChainId, _l1Token);
         return
             Create2.computeAddress(

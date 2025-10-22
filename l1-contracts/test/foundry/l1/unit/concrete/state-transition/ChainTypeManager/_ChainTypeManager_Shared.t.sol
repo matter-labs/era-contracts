@@ -65,7 +65,7 @@ contract ChainTypeManagerTest is UtilsTest {
     uint256 l1ChainId = 5;
     uint256 chainId = 112;
     address internal testnetVerifier =
-        address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0)));
+        address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0), false));
     bytes internal forceDeploymentsData = hex"";
 
     uint256 eraChainId = 9;

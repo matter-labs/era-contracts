@@ -20,6 +20,7 @@ import {L2CanonicalTransaction, L2Message, TxStatus} from "contracts/common/Mess
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
 import {IGetters, IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -342,7 +343,7 @@ contract L1GatewayTests is
         });
         bytes memory bridgehubMintData = abi.encode(data);
         bytes memory message = abi.encodePacked(
-            IAssetRouterBase.finalizeDeposit.selector,
+            AssetRouterBase.finalizeDeposit.selector,
             gatewayChainId,
             assetId,
             bridgehubMintData

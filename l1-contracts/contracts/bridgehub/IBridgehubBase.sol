@@ -173,14 +173,6 @@ interface IBridgehubBase {
 
     function addTokenAssetId(bytes32 _baseTokenAssetId) external;
 
-    function setAddresses(
-        address _sharedBridge,
-        ICTMDeploymentTracker _l1CtmDeployer,
-        IMessageRoot _messageRoot,
-        address _chainAssetHandler,
-        address _chainRegistrationSender
-    ) external;
-
     function setChainAssetHandler(address _chainAssetHandler) external;
 
     function setCTMAssetAddress(bytes32 _additionalData, address _assetAddress) external;
@@ -207,10 +199,4 @@ interface IBridgehubBase {
         uint256 _chainId,
         TxStatus _txStatus
     ) external returns (address zkChain, address ctm);
-
-    function forwardTransactionOnGateway(
-        uint256 _chainId,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
-    ) external;
 }
