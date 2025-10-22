@@ -65,7 +65,6 @@ struct DeployedAddresses {
     address accessControlRestrictionAddress;
 }
 
-
 // solhint-disable-next-line gas-struct-packing
 struct BridgesDeployedAddresses {
     address erc20BridgeProxy;

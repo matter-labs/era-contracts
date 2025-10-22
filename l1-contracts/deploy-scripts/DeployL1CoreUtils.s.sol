@@ -23,6 +23,8 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {BridgehubDeployedAddresses, BridgesDeployedAddresses, L1NativeTokenVaultAddresses} from "./DeployedAddresses.sol";
+import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
+import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
@@ -131,14 +133,22 @@ abstract contract DeployL1CoreUtils is DeployUtils {
                     addresses.bridgehub.messageRootProxy
                 );
         } else if (compareStrings(contractName, "L1Nullifier")) {
-            return abi.encode(addresses.bridgehub.bridgehubProxy, config.eraChainId, config.eraDiamondProxyAddress);
+            return
+                abi.encode(
+                    addresses.bridgehub.bridgehubProxy,
+                    addresses.bridgehub.messageRootProxy,
+                    config.eraChainId,
+                    config.eraDiamondProxyAddress
+                );
         } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
             return
                 abi.encode(
                     config.ownerAddress,
                     addresses.bridgehub.bridgehubProxy,
                     addresses.bridges.l1AssetRouterProxy,
-                    addresses.bridgehub.messageRootProxy
+                    addresses.bridgehub.messageRootProxy,
+                    addresses.bridgehub.assetTrackerProxy,
+                    addresses.bridges.l1NullifierProxy
                 );
         } else if (compareStrings(contractName, "L1AssetRouter")) {
             return
@@ -173,6 +183,15 @@ abstract contract DeployL1CoreUtils is DeployUtils {
                 );
         } else if (compareStrings(contractName, "ChainAdminOwnable")) {
             return abi.encode(config.ownerAddress, address(0));
+        } else if (compareStrings(contractName, "L1AssetTracker")) {
+            return
+                abi.encode(
+                    config.l1ChainId,
+                    addresses.bridgehub.bridgehubProxy,
+                    addresses.bridges.l1AssetRouterProxy,
+                    addresses.vaults.l1NativeTokenVaultProxy,
+                    addresses.bridgehub.messageRootProxy
+                );
         } else if (compareStrings(contractName, "ChainAdmin")) {
             address[] memory restrictions = new address[](1);
             restrictions[0] = addresses.accessControlRestrictionAddress;
@@ -195,6 +214,8 @@ abstract contract DeployL1CoreUtils is DeployUtils {
                 return type(L1Bridgehub).creationCode;
             } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
                 return type(L1ChainAssetHandler).creationCode;
+            } else if (compareStrings(contractName, "ChainRegistrationSender")) {
+                return type(ChainRegistrationSender).creationCode;
             } else if (compareStrings(contractName, "L1MessageRoot")) {
                 return type(L1MessageRoot).creationCode;
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
@@ -207,6 +228,8 @@ abstract contract DeployL1CoreUtils is DeployUtils {
                 }
             } else if (compareStrings(contractName, "L1AssetRouter")) {
                 return type(L1AssetRouter).creationCode;
+            } else if (compareStrings(contractName, "L1AssetTracker")) {
+                return type(L1AssetTracker).creationCode;
             } else if (compareStrings(contractName, "L1ERC20Bridge")) {
                 return type(L1ERC20Bridge).creationCode;
             } else if (compareStrings(contractName, "L1NativeTokenVault")) {
@@ -237,6 +260,10 @@ abstract contract DeployL1CoreUtils is DeployUtils {
                 return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1MessageRoot")) {
                 return abi.encodeCall(L1MessageRoot.initialize, ());
+            } else if (compareStrings(contractName, "ChainRegistrationSender")) {
+                return abi.encodeCall(ChainRegistrationSender.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "L1AssetTracker")) {
+                return abi.encodeCall(L1AssetTracker.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
                 return abi.encodeCall(L1ChainAssetHandler.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
@@ -251,7 +278,7 @@ abstract contract DeployL1CoreUtils is DeployUtils {
                 return
                     abi.encodeCall(
                         L1NativeTokenVault.initialize,
-                        (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
+                        (config.deployerAddress, addresses.bridges.bridgedTokenBeacon)
                     );
             } else {
                 revert(string.concat("Contract ", contractName, " initialize calldata not set"));
