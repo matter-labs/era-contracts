@@ -8,7 +8,6 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IChainRegistrationSender} from "contracts/bridgehub/IChainRegistrationSender.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
@@ -28,7 +27,6 @@ import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
-import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
 
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
@@ -45,7 +43,7 @@ struct Config {
     uint256 chainChainId;
     bool validiumMode;
     uint256 bridgehubCreateNewChainSalt;
-    address validatorSenderOperatorCommitEth;
+    address validatorSenderOperatorEth;
     address validatorSenderOperatorBlobsEth;
     // optional - if not set, then equal to 0
     address validatorSenderOperatorProve;
@@ -184,7 +182,7 @@ contract RegisterZKChainScript is Script {
         config.governanceMinDelay = uint256(toml.readUint("$.chain.governance_min_delay"));
         config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
         config.validiumMode = toml.readBool("$.chain.validium_mode");
-        config.validatorSenderOperatorCommitEth = toml.readAddress("$.chain.validator_sender_operator_commit_eth");
+        config.validatorSenderOperatorEth = toml.readAddress("$.chain.validator_sender_operator_eth");
         config.validatorSenderOperatorBlobsEth = toml.readAddress("$.chain.validator_sender_operator_blobs_eth");
 
         // These were added to zkstack tool recently (9th Sept 2025).
@@ -251,7 +249,7 @@ contract RegisterZKChainScript is Script {
         config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
         config.baseToken = toml.readAddress("$.chain.base_token_addr");
         config.validiumMode = toml.readBool("$.chain.validium_mode");
-        config.validatorSenderOperatorCommitEth = toml.readAddress("$.chain.validator_sender_operator_commit_eth");
+        config.validatorSenderOperatorEth = toml.readAddress("$.chain.validator_sender_operator_eth");
         config.validatorSenderOperatorBlobsEth = toml.readAddress("$.chain.validator_sender_operator_blobs_eth");
         // These were added to zkstack tool recently (9th Sept 2025).
         config.validatorSenderOperatorProve = toml.readAddress("$.chain.validator_sender_operator_prove");
@@ -452,10 +450,10 @@ contract RegisterZKChainScript is Script {
         // are only provided in ZKsync OS, while on Era all of them are filled by committer.
         validatorTimelock.addValidatorRoles(
             chainAddress,
-            config.validatorSenderOperatorCommitEth,
+            config.validatorSenderOperatorEth,
             IValidatorTimelock.ValidatorRotationParams({
                 rotatePrecommitterRole: true,
-                rotateCommitterRole: true,
+                rotateCommitterRole: false,
                 rotateReverterRole: true,
                 rotateProverRole: true,
                 rotateExecutorRole: true

@@ -30,7 +30,7 @@ contract TestFacet is ZKChainBase {
 contract DiamondProxyTest is UtilsTest {
     Diamond.FacetCut[] internal facetCuts;
     address internal testnetVerifier =
-        address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0)));
+        address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0), false));
     DummyBridgehub internal dummyBridgehub;
     InitializeData internal initializeData;
 

@@ -13,7 +13,7 @@ import {Transaction} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {IAssetRouterBase, AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {CallStatus, IInteropHandler} from "contracts/interop/IInteropHandler.sol";
@@ -306,7 +306,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             from: L2_ASSET_ROUTER_ADDR,
             value: 0,
             data: abi.encodeCall(
-                IAssetRouterBase.finalizeDeposit,
+                AssetRouterBase.finalizeDeposit,
                 (
                     L1_CHAIN_ID,
                     assetId,
@@ -327,7 +327,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             from: L2_ASSET_ROUTER_ADDR,
             value: 0,
             data: abi.encodeCall(
-                IAssetRouterBase.finalizeDeposit,
+                AssetRouterBase.finalizeDeposit,
                 (
                     L1_CHAIN_ID,
                     assetId,
@@ -348,7 +348,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             from: L2_ASSET_ROUTER_ADDR,
             value: 0,
             data: abi.encodeCall(
-                IAssetRouterBase.finalizeDeposit,
+                AssetRouterBase.finalizeDeposit,
                 (
                     L1_CHAIN_ID,
                     assetId,

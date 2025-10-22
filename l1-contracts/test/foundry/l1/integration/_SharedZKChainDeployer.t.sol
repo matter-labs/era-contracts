@@ -23,7 +23,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         address baseToken;
         uint256 bridgehubCreateNewChainSalt;
         bool validiumMode;
-        address validatorSenderOperatorCommitEth;
+        address validatorSenderOperatorEth;
         address validatorSenderOperatorBlobsEth;
         address validatorSenderOperatorProve;
         address validatorSenderOperatorExecute;
@@ -95,7 +95,7 @@ contract ZKChainDeployer is L1ContractDeployer {
             baseToken: __baseToken,
             bridgehubCreateNewChainSalt: __salt,
             validiumMode: false,
-            validatorSenderOperatorCommitEth: address(0),
+            validatorSenderOperatorEth: address(0),
             validatorSenderOperatorBlobsEth: address(1),
             validatorSenderOperatorProve: address(2),
             validatorSenderOperatorExecute: address(3),
@@ -120,11 +120,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         }
 
         vm.serializeUint("chain", "validium_mode", validiumMode);
-        vm.serializeAddress(
-            "chain",
-            "validator_sender_operator_commit_eth",
-            description.validatorSenderOperatorCommitEth
-        );
+        vm.serializeAddress("chain", "validator_sender_operator_eth", description.validatorSenderOperatorEth);
         vm.serializeAddress(
             "chain",
             "validator_sender_operator_blobs_eth",

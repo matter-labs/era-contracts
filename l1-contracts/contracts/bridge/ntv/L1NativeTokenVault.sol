@@ -10,7 +10,6 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
-import {INativeTokenVaultBase} from "./INativeTokenVaultBase.sol";
 import {NativeTokenVaultBase} from "./NativeTokenVaultBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
@@ -269,11 +268,13 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return bytes32(0);
     }
 
-    // get the computed address before the contract DeployWithCreate2 deployed using Bytecode of contract DeployWithCreate2 and salt specified by the sender
+    /// @notice Used to get the expected bridged token address corresponding to its native counterpart.
+    /// @param _originChainId The chain id of the origin token.
+    /// @param _nonNativeToken The address of token on its origin chain.
     function calculateCreate2TokenAddress(
         uint256 _originChainId,
         address _nonNativeToken
-    ) public view override(INativeTokenVaultBase, NativeTokenVaultBase) returns (address) {
+    ) public view override returns (address) {
         bytes32 salt = _getCreate2Salt(_originChainId, _nonNativeToken);
         return
             Create2.computeAddress(
