@@ -30,6 +30,8 @@ error IteratedMigrationsNotSupported();
 error LocallyNoChainsAtGenesis();
 // 0x913183d8
 error MessageRootNotRegistered();
+// 0x8f2da8de
+error MigrationNotInProgress();
 // 0x4010a88d
 error MigrationNotToL1();
 // 0x12b08c62
@@ -99,4 +101,3 @@ error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress)
 // 0x7b968d06
 error ZKChainNotRegistered();
 
-error MigrationNotInProgress();
