@@ -5,9 +5,6 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-// import {Vm} from "forge-std/Vm.sol";
-import {stdToml} from "forge-std/StdToml.sol";
-
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
@@ -24,7 +21,6 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
@@ -80,6 +76,7 @@ contract GatewayCTMFromL1 is Script {
         bytes32 genesisBatchCommitment;
         uint256 latestProtocolVersion;
         bytes forceDeploymentsData;
+        bool isZKsyncOS;
     }
 
     struct Output {
@@ -222,7 +219,8 @@ contract GatewayCTMFromL1 is Script {
             genesisRollupLeafIndex: toml.readUint("$.genesis_rollup_leaf_index"),
             genesisBatchCommitment: toml.readBytes32("$.genesis_batch_commitment"),
             latestProtocolVersion: toml.readUint("$.latest_protocol_version"),
-            forceDeploymentsData: toml.readBytes("$.force_deployments_data")
+            forceDeploymentsData: toml.readBytes("$.force_deployments_data"),
+            isZKsyncOS: toml.readBool("$.is_zk_sync_os")
         });
 
         address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.governanceAddr);
@@ -232,6 +230,7 @@ contract GatewayCTMFromL1 is Script {
             eraChainId: config.eraChainId,
             l1ChainId: config.l1ChainId,
             testnetVerifier: config.testnetVerifier,
+            isZKsyncOS: config.isZKsyncOS,
             adminSelectors: Utils.getAllSelectorsForFacet("Admin"),
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
@@ -382,24 +381,50 @@ contract GatewayCTMFromL1 is Script {
     }
 
     function deployGatewayVerifier() internal returns (address verifier) {
-        address verifierFflonk = address(
-            _deployInternal(ContractsBytecodesLib.getCreationCode("VerifierFflonk"), hex"")
-        );
-        console.log("VerifierFflonk deployed at", verifierFflonk);
-        address verifierPlonk = address(_deployInternal(ContractsBytecodesLib.getCreationCode("VerifierPlonk"), hex""));
-        console.log("VerifierPlonk deployed at", verifierPlonk);
+        address verifierFflonk;
+        address verifierPlonk;
+
+        if (config.isZKsyncOS) {
+            verifierFflonk = address(
+                _deployInternal(ContractsBytecodesLib.getCreationCode("ZKsyncOSVerifierFflonk"), hex"")
+            );
+            console.log("ZKsyncOSVerifierFflonk deployed at", verifierFflonk);
+            verifierPlonk = address(
+                _deployInternal(ContractsBytecodesLib.getCreationCode("ZKsyncOSVerifierPlonk"), hex"")
+            );
+            console.log("ZKsyncOSVerifierPlonk deployed at", verifierPlonk);
+        } else {
+            verifierFflonk = address(
+                _deployInternal(ContractsBytecodesLib.getCreationCode("EraVerifierFflonk"), hex"")
+            );
+            console.log("EraVerifierFflonk deployed at", verifierFflonk);
+            verifierPlonk = address(_deployInternal(ContractsBytecodesLib.getCreationCode("EraVerifierPlonk"), hex""));
+            console.log("EraVerifierPlonk deployed at", verifierPlonk);
+        }
 
         if (config.testnetVerifier) {
             verifier = address(
-                _deployInternal(ContractsBytecodesLib.getCreationCode("TestnetVerifier"), abi.encode(config.l1ChainId))
-            );
-        } else {
-            verifier = address(
                 _deployInternal(
-                    ContractsBytecodesLib.getCreationCode("DualVerifier"),
-                    abi.encode(verifierFflonk, verifierPlonk)
+                    ContractsBytecodesLib.getCreationCode("TestnetVerifier"),
+                    abi.encode(verifierFflonk, verifierPlonk, config.governanceAddr, config.isZKsyncOS)
                 )
             );
+        } else {
+            if (config.isZKsyncOS) {
+                verifier = address(
+                    _deployInternal(
+                        ContractsBytecodesLib.getCreationCode("ZKsyncOSDualVerifier"),
+                        abi.encode(verifierFflonk, verifierPlonk, config.governanceAddr)
+                    )
+                );
+            } else {
+                verifier = address(
+                    _deployInternal(
+                        ContractsBytecodesLib.getCreationCode("EraDualVerifier"),
+                        abi.encode(verifierFflonk, verifierPlonk)
+                    )
+                );
+            }
         }
 
         console.log("Verifier deployed at", verifier);

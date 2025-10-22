@@ -8,7 +8,6 @@ import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-import {INativeTokenVaultBase} from "./INativeTokenVaultBase.sol";
 import {IL2NativeTokenVault} from "./IL2NativeTokenVault.sol";
 import {NativeTokenVaultBase} from "./NativeTokenVaultBase.sol";
 
@@ -321,7 +320,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     function calculateCreate2TokenAddress(
         uint256 _tokenOriginChainId,
         address _nonNativeToken
-    ) public view virtual override(INativeTokenVaultBase, NativeTokenVaultBase) returns (address) {
+    ) public view virtual override returns (address) {
         if (address(L2_LEGACY_SHARED_BRIDGE) != address(0) && _tokenOriginChainId == L1_CHAIN_ID) {
             return L2_LEGACY_SHARED_BRIDGE.l2TokenAddress(_nonNativeToken);
         } else {

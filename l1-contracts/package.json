@@ -79,6 +79,7 @@
     "deploy-testkit": "ts-node scripts/deploy-testkit.ts",
     "verify": "hardhat run --network env scripts/verify.ts",
     "verify-on-l2-explorer": "yarn ts-node scripts/verify-on-l2-explorer.ts",
+    "verify-contracts": "ts-node scripts/verify-contracts.ts",
     "read-variable": "ts-node scripts/read-variable.ts",
     "initialize-bridges": "ts-node scripts/initialize-bridges.ts",
     "initialize-validator": "ts-node scripts/initialize-validator.ts",
