@@ -140,22 +140,6 @@ contract L1GatewayTests is
         IZKChain chain = IZKChain(IBridgehubBase(addresses.bridgehub).getZKChain(_chainId));
         vm.startBroadcast(chain.getAdmin());
         IAdmin(address(chain)).unpauseDeposits();
-        vm.mockCall(
-            addresses.ecosystemAddresses.bridgehub.messageRootProxy,
-            abi.encodeWithSelector(IMessageVerification.proveL1ToL2TransactionStatusShared.selector),
-            abi.encode(true)
-        );
-        IL1ChainAssetHandler(address(addresses.bridgehub.chainAssetHandler())).confirmSuccessfulMigrationToGateway(
-            _chainId,
-            address(0),
-            bytes32(0),
-            bytes(""),
-            bytes32(0),
-            0,
-            0,
-            0,
-            new bytes32[](0)
-        );
         vm.stopBroadcast();
     }
 
