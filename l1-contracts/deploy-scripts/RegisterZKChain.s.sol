@@ -8,7 +8,6 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IChainRegistrationSender} from "contracts/bridgehub/IChainRegistrationSender.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
@@ -28,7 +27,6 @@ import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
-import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
 
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
