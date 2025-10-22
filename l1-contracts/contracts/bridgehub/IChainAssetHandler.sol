@@ -19,4 +19,8 @@ interface IChainAssetHandler is IAssetHandler, IL1AssetHandler {
     /// @param assetId Asset ID of the token for the zkChain's CTM
     /// @param zkChain The address of the ZK chain on the chain where it is migrated to.
     event MigrationFinalized(uint256 indexed chainId, bytes32 indexed assetId, address indexed zkChain);
+
+    function migrationNumber(uint256 _chainId) external view returns (uint256);
+
+    function setMigrationNumberForV30(uint256 _chainId) external;
 }

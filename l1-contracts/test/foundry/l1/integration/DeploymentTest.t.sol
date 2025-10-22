@@ -12,11 +12,10 @@ import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
-import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
+
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 
 contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
@@ -45,12 +44,12 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         _registerNewTokens(tokens);
 
         _deployEra();
-        // _deployZKChain(ETH_TOKEN_ADDRESS);
-        // _deployZKChain(ETH_TOKEN_ADDRESS);
-        // _deployZKChain(tokens[0]);
-        // _deployZKChain(tokens[0]);
-        // _deployZKChain(tokens[1]);
-        // _deployZKChain(tokens[1]);
+        _deployZKChain(ETH_TOKEN_ADDRESS);
+        _deployZKChain(ETH_TOKEN_ADDRESS);
+        _deployZKChain(tokens[0]);
+        _deployZKChain(tokens[0]);
+        _deployZKChain(tokens[1]);
+        _deployZKChain(tokens[1]);
 
         releaseConfigLock();
 
@@ -77,38 +76,15 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         assertNotEq(newChainAddress, address(0));
 
         address[] memory chainAddresses = addresses.bridgehub.getAllZKChains();
-        assertEq(chainAddresses.length, 1);
+        assertEq(chainAddresses.length, 7);
         assertEq(chainAddresses[0], newChainAddress);
 
         uint256[] memory chainIds = addresses.bridgehub.getAllZKChainChainIDs();
-        assertEq(chainIds.length, 1);
+        assertEq(chainIds.length, 7);
         assertEq(chainIds[0], chainId);
 
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(chainId);
         assertEq(protocolVersion, 120259084288);
-    }
-
-    function test_bridgehubSetter() public {
-        uint256 chainId = zkChainIds[0];
-        uint256 randomChainId = 123456;
-
-        vm.mockCall(
-            address(addresses.chainTypeManager),
-            abi.encodeWithSelector(IChainTypeManager.getZKChainLegacy.selector, randomChainId),
-            abi.encode(address(0x01))
-        );
-        vm.store(address(addresses.bridgehub), keccak256(abi.encode(randomChainId, 205)), bytes32(uint256(uint160(1))));
-        vm.store(
-            address(addresses.bridgehub),
-            keccak256(abi.encode(randomChainId, 204)),
-            bytes32(uint256(uint160(address(addresses.chainTypeManager))))
-        );
-        addresses.bridgehub.registerLegacyChain(randomChainId);
-
-        assertEq(addresses.bridgehub.settlementLayer(randomChainId), block.chainid);
-
-        address messageRoot = address(addresses.bridgehub.messageRoot());
-        assertTrue(L1MessageRoot(messageRoot).chainIndex(randomChainId) != 0);
     }
 
     function test_registerAlreadyDeployedZKChain() public {
@@ -124,7 +100,8 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 owner,
                 addresses.chainTypeManager.protocolVersion(),
                 addresses.chainTypeManager.storedBatchZero(),
-                address(addresses.bridgehub)
+                address(addresses.bridgehub),
+                address(addresses.interopCenter)
             );
 
             address stmAddr = IZKChain(chain).getChainTypeManager();
@@ -155,16 +132,14 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 owner,
                 addresses.chainTypeManager.protocolVersion(),
                 addresses.chainTypeManager.storedBatchZero(),
-                address(addresses.bridgehub.assetRouter())
+                address(addresses.bridgehub),
+                address(addresses.interopCenter)
             );
 
             address stmAddr = IZKChain(chain).getChainTypeManager();
 
             vm.startBroadcast(owner);
             addresses.bridgehub.addTokenAssetId(baseTokenAssetId);
-            vm.expectRevert(
-                abi.encodeWithSelector(IncorrectBridgeHubAddress.selector, address(addresses.bridgehub.assetRouter()))
-            );
             addresses.bridgehub.registerAlreadyDeployedZKChain(chainId, chain);
             vm.stopBroadcast();
         }

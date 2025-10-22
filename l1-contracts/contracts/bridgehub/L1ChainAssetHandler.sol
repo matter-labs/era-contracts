@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -28,6 +29,12 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
     /// @dev The asset router contract.
     address public immutable override ASSET_ROUTER;
 
+    /// @dev The asset tracker contract.
+    address internal immutable ASSET_TRACKER;
+
+    /// @dev The L1 nullifier contract.
+    IL1Nullifier internal immutable L1_NULLIFIER;
+
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -48,11 +55,17 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
         return ASSET_ROUTER;
     }
 
+    function _assetTracker() internal view override returns (address) {
+        return ASSET_TRACKER;
+    }
+
     constructor(
         address _owner,
         address _bridgehub,
         address _assetRouter,
-        address _messageRoot
+        address _messageRoot,
+        address _assetTracker,
+        IL1Nullifier _l1Nullifier
     ) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGEHUB = _bridgehub;
@@ -60,6 +73,8 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
         MESSAGE_ROOT = _messageRoot;
         L1_CHAIN_ID = block.chainid;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
+        ASSET_TRACKER = _assetTracker;
+        L1_NULLIFIER = _l1Nullifier;
         _transferOwnership(_owner);
     }
 

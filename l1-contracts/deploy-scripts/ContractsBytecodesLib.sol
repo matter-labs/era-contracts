@@ -45,8 +45,9 @@ library ContractsBytecodesLib {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCode.
-        string[43] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[46] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction", /// ??
+            "L2AssetTracker",
             "BeaconProxy",
             "BridgedStandardERC20",
             "BridgedTokenBeacon",
@@ -63,6 +64,8 @@ library ContractsBytecodesLib {
             "DiamondInit",
             "DiamondProxy",
             "DefaultUpgrade",
+            "InteropCenter",
+            "InteropHandler",
             "EraDualVerifier",
             "ZKsyncOSDualVerifier",
             "L1GenesisUpgrade",
@@ -100,11 +103,7 @@ library ContractsBytecodesLib {
             "TimestampAsserter"
         ];
 
-        string[3] memory SYSTEM_CONTRACT_IDENTIFIERS = [
-            "SystemTransparentUpgradeableProxy",
-            "L2GatewayUpgrade",
-            "L2V29Upgrade"
-        ];
+        string[2] memory SYSTEM_CONTRACT_IDENTIFIERS = ["SystemTransparentUpgradeableProxy", "L2V29Upgrade"];
 
         // --- Special Cases: System Contracts ---
         // These contracts are typically read from a 'system-contracts' or similar directory.

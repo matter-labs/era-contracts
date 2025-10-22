@@ -41,8 +41,11 @@ struct L2TransactionRequestTwoBridgesInner {
 struct BridgehubMintCTMAssetData {
     uint256 chainId;
     bytes32 baseTokenAssetId;
+    uint256 batchNumber;
     bytes ctmData;
     bytes chainData;
+    uint256 migrationNumber;
+    uint256 v30UpgradeChainBatchNumber;
 }
 
 struct BridgehubBurnCTMAssetData {
@@ -111,6 +114,8 @@ interface IBridgehubBase {
     function admin() external view returns (address);
 
     function assetRouter() external view returns (address);
+
+    function chainRegistrationSender() external view returns (address);
 
     function whitelistedSettlementLayers(uint256 _chainId) external view returns (bool);
 

@@ -9,10 +9,10 @@ import "forge-std/console.sol";
 
 import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
-import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
-
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
+
 import {L2Erc20TestAbstract} from "../l2-tests-abstract/L2Erc20TestAbstract.t.sol";
+import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
 
 import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";

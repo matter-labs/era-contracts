@@ -24,7 +24,6 @@ import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsync
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {GatewayUpgrade} from "contracts/upgrades/GatewayUpgrade.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
@@ -90,7 +89,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     // solhint-disable-next-line gas-struct-packing
     struct UpgradeDeployedAddresses {
         ExpectedL2Addresses expectedL2Addresses;
-        address gatewayUpgrade;
         address transitionaryOwner;
         address upgradeTimer;
         address bytecodesSupplier;
@@ -757,6 +755,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
+            gatewayChainId: config.gatewayChainId,
             l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
@@ -767,8 +766,15 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             messageRootBytecodeInfo: abi.encode(getL2BytecodeHash("L2MessageRoot")),
             chainAssetHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
             beaconDeployerInfo: abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
+            interopCenterBytecodeInfo: abi.encode(getL2BytecodeHash("InteropCenter")),
+            interopHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("InteropHandler")),
+            assetTrackerBytecodeInfo: abi.encode(getL2BytecodeHash("AssetTracker")),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
+            aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
+                addresses.bridgehub.chainRegistrationSenderProxy
+            ),
+            // upgradeAddresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
             dangerousTestOnlyForcedBeacon: address(0)
         });
     }
@@ -1064,7 +1070,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             "validium_l1_da_validator_addr",
             addresses.daAddresses.noDAValidiumL1DAValidator
         );
-        vm.serializeAddress("deployed_addresses", "l1_gateway_upgrade", upgradeAddresses.gatewayUpgrade);
         vm.serializeAddress("deployed_addresses", "l1_transitionary_owner", upgradeAddresses.transitionaryOwner);
         vm.serializeAddress("deployed_addresses", "upgrade_stage_validator", upgradeAddresses.upgradeStageValidator);
         vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
@@ -1785,9 +1790,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
                 return type(ValidatorTimelock).creationCode;
             }
         } else {
-            if (compareStrings(contractName, "GatewayUpgrade")) {
-                return Utils.readZKFoundryBytecodeL1("GatewayUpgrade.sol", "GatewayUpgrade");
-            } else if (compareStrings(contractName, "DefaultUpgrade")) {
+            if (compareStrings(contractName, "DefaultUpgrade")) {
                 return Utils.readZKFoundryBytecodeL1("DefaultUpgrade.sol", "DefaultUpgrade");
             } else if (compareStrings(contractName, "BytecodesSupplier")) {
                 return Utils.readZKFoundryBytecodeL1("BytecodesSupplier.sol", "BytecodesSupplier");
@@ -1814,9 +1817,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         string memory contractName,
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "GatewayUpgrade")) {
-            return abi.encode();
-        } else if (compareStrings(contractName, "DefaultUpgrade")) {
+        if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
             return abi.encode();

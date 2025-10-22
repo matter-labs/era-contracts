@@ -5,6 +5,9 @@ pragma solidity 0.8.28;
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
+import {SERVICE_TRANSACTION_SENDER} from "../common/Config.sol";
+import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
+import {Unauthorized} from "../common/L1ContractErrors.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
 import {IL2Bridgehub} from "./IL2Bridgehub.sol";
@@ -41,6 +44,16 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     /// the old version where it was an immutable.
     uint256 public MAX_NUMBER_OF_ZK_CHAINS;
 
+    modifier onlyChainRegistrationSender() {
+        if (
+            msg.sender != AddressAliasHelper.undoL1ToL2Alias(chainRegistrationSender) &&
+            msg.sender != SERVICE_TRANSACTION_SENDER
+        ) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// @notice Initializes the contract.
     /// @dev This function is used to initialize the contract with the initial values.
     /// @param _l1ChainId The chain id of L1.
@@ -71,6 +84,17 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         // We will change this with interop.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
     }
+
+    /// @notice used to register chains on L2 for the purpose of interop.
+    /// @param _chainId the chainId of the chain to be registered.
+    /// @param _baseTokenAssetId the base token asset id of the chain.
+    function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external onlyChainRegistrationSender {
+        baseTokenAssetId[_chainId] = _baseTokenAssetId;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            IMMUTABLE GETTERS
+    //////////////////////////////////////////////////////////////*/
 
     /// @dev Returns the asset ID of ETH token for internal use.
     function _ethTokenAssetId() internal view override returns (bytes32) {
@@ -116,11 +140,13 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         address _assetRouter,
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
-        address _chainAssetHandler
+        address _chainAssetHandler,
+        address _chainRegistrationSender
     ) external override onlyOwnerOrUpgrader {
         assetRouter = _assetRouter;
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;
         chainAssetHandler = _chainAssetHandler;
+        chainRegistrationSender = _chainRegistrationSender;
     }
 }

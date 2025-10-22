@@ -8,12 +8,14 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
+import {Call} from "contracts/governance/Common.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+
+import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -24,19 +26,30 @@ import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.s
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+
+import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
+import {InteropCenter} from "contracts/interop/InteropCenter.sol";
+
+import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {ChainTypeManager, IChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 
+import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
+
+import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
+import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
@@ -45,6 +58,7 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {Config, DeployedAddresses} from "./DeployUtils.s.sol";
 import {DeployL1HelperScript} from "./DeployL1HelperScript.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 contract DeployCTMScript is Script, DeployL1HelperScript {
     using stdToml for string;
@@ -61,13 +75,14 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             "/script-config/config-deploy-l1.toml",
             "/script-out/output-deploy-l1.toml",
             bridgehub,
-            reuseGovAndAdmin
+            reuseGovAndAdmin,
+            false
         );
     }
 
-    function runForTest(address bridgehub) public {
+    function runForTest(address bridgehub, bool skipL1Deployments) public {
         saveDiamondSelectors();
-        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"), bridgehub, false);
+        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"), bridgehub, false, skipL1Deployments);
     }
 
     function getAddresses() public view returns (DeployedAddresses memory) {
@@ -82,7 +97,8 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         string memory inputPath,
         string memory outputPath,
         address bridgehub,
-        bool reuseGovAndAdmin
+        bool reuseGovAndAdmin,
+        bool skipL1Deployments
     ) internal {
         string memory root = vm.projectRoot();
         inputPath = string.concat(root, inputPath);
@@ -90,7 +106,9 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
 
         initializeConfig(inputPath);
 
-        instantiateCreate2Factory();
+        if (!skipL1Deployments) {
+            instantiateCreate2Factory();
+        }
 
         console.log("Initializing core contracts from BH");
         IL1Bridgehub bridgehubProxy = IL1Bridgehub(bridgehub);
@@ -110,6 +128,12 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         addresses.bridgehub.messageRootImplementation = Utils.getImplementation(messageRoot);
         addresses.bridgehub.chainAssetHandlerProxy = chainAssetHandler;
         addresses.bridgehub.chainAssetHandlerImplementation = Utils.getImplementation(chainAssetHandler);
+        addresses.bridgehub.assetTrackerProxy = address(L1NativeTokenVault(nativeTokenVault).l1AssetTracker());
+        addresses.bridgehub.assetTrackerImplementation = Utils.getImplementation(addresses.bridgehub.assetTrackerProxy);
+        addresses.bridgehub.chainRegistrationSenderProxy = IBridgehubBase(bridgehub).chainRegistrationSender();
+        addresses.bridgehub.chainRegistrationSenderImplementation = Utils.getImplementation(
+            addresses.bridgehub.chainRegistrationSenderProxy
+        );
 
         // Bridges
         addresses.bridges.erc20BridgeProxy = erc20Bridge;
@@ -294,6 +318,29 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             "ctm_deployment_tracker_implementation_addr",
             addresses.bridgehub.ctmDeploymentTrackerImplementation
         );
+        vm.serializeAddress(
+            "bridgehub",
+            "chain_registration_sender_proxy_addr",
+            addresses.bridgehub.chainRegistrationSenderProxy
+        );
+        vm.serializeAddress(
+            "bridgehub",
+            "chain_registration_sender_implementation_addr",
+            addresses.bridgehub.chainRegistrationSenderImplementation
+        );
+        vm.serializeAddress("bridgehub", "interop_center_proxy_addr", addresses.bridgehub.interopCenterProxy);
+        vm.serializeAddress(
+            "bridgehub",
+            "interop_center_implementation_addr",
+            addresses.bridgehub.interopCenterImplementation
+        );
+        vm.serializeAddress("bridgehub", "l1_asset_tracker_proxy_addr", addresses.bridgehub.assetTrackerProxy);
+        vm.serializeAddress(
+            "bridgehub",
+            "asset_tracker_implementation_addr",
+            addresses.bridgehub.assetTrackerImplementation
+        );
+
         vm.serializeAddress("bridgehub", "message_root_proxy_addr", addresses.bridgehub.messageRootProxy);
         string memory bridgehub = vm.serializeAddress(
             "bridgehub",
@@ -474,6 +521,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
 
         FixedForceDeploymentsData memory data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
+            gatewayChainId: config.gatewayChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
@@ -485,10 +533,16 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             messageRootBytecodeInfo: abi.encode(getL2BytecodeHash("L2MessageRoot")),
             beaconDeployerInfo: abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
             chainAssetHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
+            interopCenterBytecodeInfo: abi.encode(getL2BytecodeHash("InteropCenter")),
+            interopHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("InteropHandler")),
+            assetTrackerBytecodeInfo: abi.encode(getL2BytecodeHash("L2AssetTracker")),
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
+            aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
+                addresses.bridgehub.chainRegistrationSenderProxy
+            ),
             dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon
         });
 

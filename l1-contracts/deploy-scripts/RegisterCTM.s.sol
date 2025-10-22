@@ -23,7 +23,7 @@ contract RegisterCTM is Script {
     }
 
     function registerCTM(address bridgehub, address chainTypeManagerProxy, bool shouldSend) public virtual {
-        console.log("Registering CTM");
+        console.log("Registering CTM for L1 contracts");
 
         runInner("/script-out/register-ctm-l1.toml", bridgehub, chainTypeManagerProxy, shouldSend);
     }

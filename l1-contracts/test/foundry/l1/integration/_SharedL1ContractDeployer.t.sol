@@ -7,15 +7,19 @@ import {DeployL1CoreContractsIntegrationScript} from "./deploy-scripts/DeployL1C
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {DeployCTMIntegrationScript} from "./deploy-scripts/DeployCTMIntegration.s.sol";
 import {RegisterCTM} from "deploy-scripts/RegisterCTM.s.sol";
+import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Config, DeployedAddresses} from "deploy-scripts/DeployUtils.s.sol";
+import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 
-contract L1ContractDeployer is Test {
+contract L1ContractDeployer is UtilsTest {
     using stdStorage for StdStorage;
 
     DeployL1CoreContractsIntegrationScript l1CoreContractsScript;
@@ -26,11 +30,14 @@ contract L1ContractDeployer is Test {
         address bridgehubProxyAddress;
         address bridgehubOwnerAddress;
         L1Bridgehub bridgehub;
+        IInteropCenter interopCenter;
         CTMDeploymentTracker ctmDeploymentTracker;
         L1AssetRouter sharedBridge;
+        L1AssetTracker l1AssetTracker;
         L1Nullifier l1Nullifier;
         L1NativeTokenVault l1NativeTokenVault;
         IChainTypeManager chainTypeManager;
+        ChainRegistrationSender chainRegistrationSender;
     }
 
     Config public ecosystemConfig;
@@ -66,7 +73,7 @@ contract L1ContractDeployer is Test {
 
         DeployedAddresses memory coreContractsAddresses = deployEcosystem();
         ctmScript = new DeployCTMIntegrationScript();
-        ctmScript.runForTest(coreContractsAddresses.bridgehub.bridgehubProxy);
+        ctmScript.runForTest(coreContractsAddresses.bridgehub.bridgehubProxy, false);
         addresses.ecosystemAddresses = ctmScript.getAddresses();
         registerCTM(
             addresses.ecosystemAddresses.bridgehub.bridgehubProxy,
@@ -76,6 +83,7 @@ contract L1ContractDeployer is Test {
         ecosystemConfig = ctmScript.getConfig();
 
         addresses.bridgehub = L1Bridgehub(addresses.ecosystemAddresses.bridgehub.bridgehubProxy);
+        addresses.interopCenter = IInteropCenter(addresses.ecosystemAddresses.bridgehub.interopCenterProxy);
         addresses.chainTypeManager = IChainTypeManager(
             addresses.ecosystemAddresses.stateTransition.chainTypeManagerProxy
         );
@@ -87,6 +95,10 @@ contract L1ContractDeployer is Test {
         addresses.l1Nullifier = L1Nullifier(addresses.ecosystemAddresses.bridges.l1NullifierProxy);
         addresses.l1NativeTokenVault = L1NativeTokenVault(
             payable(addresses.ecosystemAddresses.vaults.l1NativeTokenVaultProxy)
+        );
+        addresses.l1AssetTracker = L1AssetTracker(addresses.ecosystemAddresses.bridgehub.assetTrackerProxy);
+        addresses.chainRegistrationSender = ChainRegistrationSender(
+            addresses.ecosystemAddresses.bridgehub.chainRegistrationSenderProxy
         );
 
         _acceptOwnership();
@@ -149,5 +161,5 @@ contract L1ContractDeployer is Test {
     }
 
     // add this to be excluded from coverage report
-    function test() internal virtual {}
+    function test() internal virtual override {}
 }

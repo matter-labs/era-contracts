@@ -6,6 +6,8 @@ pragma solidity ^0.8.20;
 error CallerMustBeBootloader();
 // 0xbe4bf9e4
 error CallerMustBeEvmContract();
+// 0x775f8864
+error CallerMustBeInteropCenter();
 // 0x9eedbd2b
 error CallerMustBeSystemContract();
 // 0xee455381
@@ -106,6 +108,12 @@ error L2BlockNumberZero();
 error LegacyBridgeNotProxy();
 // 0x43e266b0
 error MalformedBytecode(BytecodeError);
+// 0x9bb54c35
+error MerkleIndexOutOfBounds();
+// 0x8e23ac1a
+error MerklePathEmpty();
+// 0x1c500385
+error MerklePathOutOfBounds();
 // 0xe90aded4
 error NonceAlreadyUsed(address account, uint256 nonce);
 // 0xbac091ee

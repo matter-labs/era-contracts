@@ -17,6 +17,8 @@ interface IBaseToken {
 
     function withdrawWithMessage(address _l1Receiver, bytes calldata _additionalData) external payable;
 
+    function burnMsgValue() external payable;
+
     event Mint(address indexed account, uint256 amount);
 
     event Transfer(address indexed from, address indexed to, uint256 value);

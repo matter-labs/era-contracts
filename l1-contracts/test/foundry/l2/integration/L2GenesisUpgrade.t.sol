@@ -4,10 +4,12 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+
 import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
 import {L2GenesisUpgrade} from "contracts/l2-upgrades/L2GenesisUpgrade.sol";
 import {IL2GenesisUpgrade} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
-import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_GENESIS_UPGRADE_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_GENESIS_UPGRADE_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "deploy-scripts/Utils.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
@@ -21,12 +23,14 @@ import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_
 import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
 import {SystemContractsArgs} from "./L2Utils.sol";
 import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
-import {ISystemContext} from "contracts/state-transition/l2-deps/ISystemContext.sol";
+import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
 import {L2GatewayTestAbstract} from "../../l1/integration/l2-tests-abstract/L2GatewayTestAbstract.t.sol";
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {Create2FactoryUtils} from "deploy-scripts/Create2FactoryUtils.s.sol";
 
 contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2ContractL2Deployer {
+    using stdStorage for StdStorage;
+
     uint256 constant CHAIN_ID = 270;
     address ctmDeployerAddress = makeAddr("ctmDeployer");
     address bridgehubOwnerAddress = makeAddr("bridgehubOwner");
@@ -57,6 +61,12 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
 
     function setUp() public override {
         super.setUp();
+
+        vm.store(
+            L2_INTEROP_HANDLER_ADDR,
+            bytes32(0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4),
+            bytes32(uint256(0))
+        );
 
         // Deploy and etch L2ComplexUpgrader
         bytes memory complexUpgraderCode = Utils.readZKFoundryBytecodeL1("L2ComplexUpgrader.sol", "L2ComplexUpgrader");
@@ -95,7 +105,9 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
                 predeployedL2WethAddress: address(1),
                 baseTokenL1Address: address(1),
                 baseTokenName: "Ether",
-                baseTokenSymbol: "ETH"
+                baseTokenSymbol: "ETH",
+                baseTokenOriginChainId: 1,
+                baseTokenOriginAddress: address(1)
             })
         );
 
@@ -108,29 +120,42 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
         );
         bytes memory l2NtvBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(l2NativeTokenVaultBytecode));
 
-        bytes memory l2AssetRouterBytecode = Utils.readZKFoundryBytecodeL1("L2AssetRouter.sol", "L2AssetRouter");
-        bytes memory l2AssetRouterBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(l2AssetRouterBytecode));
-
-        bytes memory bridgehubBytecode = Utils.readZKFoundryBytecodeL1("L2Bridgehub.sol", "L2Bridgehub");
-        bytes memory bridgehubBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(bridgehubBytecode));
-
-        bytes memory chainAssetHandlerBytecode = Utils.readZKFoundryBytecodeL1(
-            "L2ChainAssetHandler.sol",
-            "L2ChainAssetHandler"
+        bytes memory l2AssetRouterBytecodeInfo = abi.encode(
+            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("L2AssetRouter.sol", "L2AssetRouter"))
         );
+
+        bytes memory bridgehubBytecodeInfo = abi.encode(
+            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("L2Bridgehub.sol", "L2Bridgehub"))
+        );
+
         bytes memory chainAssetHandlerBytecodeInfo = abi.encode(
-            L2ContractHelper.hashL2Bytecode(chainAssetHandlerBytecode)
+            L2ContractHelper.hashL2Bytecode(
+                Utils.readZKFoundryBytecodeL1("L2ChainAssetHandler.sol", "L2ChainAssetHandler")
+            )
         );
 
-        bytes memory beaconDeployerBytecode = Utils.readZKFoundryBytecodeL1(
-            "UpgradeableBeaconDeployer.sol",
-            "UpgradeableBeaconDeployer"
+        bytes memory beaconDeployerBytecodeInfo = abi.encode(
+            L2ContractHelper.hashL2Bytecode(
+                Utils.readZKFoundryBytecodeL1("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer")
+            )
         );
-        bytes memory beaconDeployerBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(beaconDeployerBytecode));
+
+        bytes memory interopCenterBytecodeInfo = abi.encode(
+            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("InteropCenter.sol", "InteropCenter"))
+        );
+
+        bytes memory interopHandlerBytecodeInfo = abi.encode(
+            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("InteropHandler.sol", "InteropHandler"))
+        );
+
+        bytes memory assetTrackerBytecodeInfo = abi.encode(
+            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("L2AssetTracker.sol", "L2AssetTracker"))
+        );
 
         fixedForceDeploymentsData = abi.encode(
             FixedForceDeploymentsData({
                 l1ChainId: 1,
+                gatewayChainId: 1,
                 eraChainId: CHAIN_ID,
                 l1AssetRouter: address(1),
                 l2TokenProxyBytecodeHash: bytes32(0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70),
@@ -141,10 +166,14 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
                 l2NtvBytecodeInfo: l2NtvBytecodeInfo,
                 messageRootBytecodeInfo: messageRootBytecodeInfo,
                 chainAssetHandlerBytecodeInfo: chainAssetHandlerBytecodeInfo,
+                interopCenterBytecodeInfo: interopCenterBytecodeInfo,
+                interopHandlerBytecodeInfo: interopHandlerBytecodeInfo,
+                assetTrackerBytecodeInfo: assetTrackerBytecodeInfo,
                 beaconDeployerInfo: beaconDeployerBytecodeInfo,
                 // For genesis upgrade these values will always be zero
                 l2SharedBridgeLegacyImpl: address(0),
                 l2BridgedStandardERC20Impl: address(0),
+                aliasedChainRegistrationSender: address(1),
                 dangerousTestOnlyForcedBeacon: address(0)
             })
         );

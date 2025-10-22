@@ -60,4 +60,6 @@ interface ISystemContext {
     function getCurrentPubdataSpent() external view returns (uint256 currentPubdataSpent);
 
     function setChainId(uint256 _newChainId) external;
+
+    function getSettlementLayerChainId() external view returns (uint256);
 }
