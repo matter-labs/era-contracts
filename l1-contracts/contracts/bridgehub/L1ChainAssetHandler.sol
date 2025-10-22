@@ -101,29 +101,37 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
     /// @param _data the data for the recovery.
     /// @param _depositSender the address of the entity that initiated the deposit.
     // slither-disable-next-line locked-ether
-    function bridgeRecoverFailedTransfer(
+    function bridgeConfirmTransferResult(
         uint256,
+        TxStatus _txStatus,
         bytes32 _assetId,
         address _depositSender,
         bytes calldata _data
     ) external payable override requireZeroValue(msg.value) onlyAssetRouter {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
 
-        (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeRecoverFailedTransfer(
-            bridgehubBurnData.chainId
+        (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedbridgeConfirmTransferResult(
+            bridgehubBurnData.chainId,
+            _txStatus
         );
 
-        IChainTypeManager(ctm).forwardedBridgeRecoverFailedTransfer({
+        IChainTypeManager(ctm).forwardedbridgeConfirmTransferResult({
             _chainId: bridgehubBurnData.chainId,
+            _txStatus: _txStatus,
             _assetInfo: _assetId,
             _depositSender: _depositSender,
             _ctmData: bridgehubBurnData.ctmData
         });
 
-        --migrationNumber[bridgehubBurnData.chainId];
+        if (_txStatus == TxStatus.Failure) {
+            --migrationNumber[bridgehubBurnData.chainId];
+        }
 
-        IZKChain(zkChain).forwardedBridgeRecoverFailedTransfer({
+        isMigrationInProgress[bridgehubBurnData.chainId] = false;
+
+        IZKChain(zkChain).forwardedbridgeConfirmTransferResult({
             _chainId: bridgehubBurnData.chainId,
+            _txStatus: _txStatus,
             _assetInfo: _assetId,
             _originalCaller: _depositSender,
             _chainData: bridgehubBurnData.chainData

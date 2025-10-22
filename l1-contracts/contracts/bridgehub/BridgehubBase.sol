@@ -558,9 +558,11 @@ abstract contract BridgehubBase is
         uint256 _chainId,
         TxStatus _txStatus
     ) external onlyChainAssetHandler returns (address zkChain, address ctm) {
-        settlementLayer[_chainId] = block.chainid;
         zkChain = getZKChain(_chainId);
         ctm = chainTypeManager[_chainId];
+        if (_txStatus == TxStatus.Failure) {
+            settlementLayer[_chainId] = block.chainid;
+        }
     }
 
     /*////////////////////////////////////////////////////////////

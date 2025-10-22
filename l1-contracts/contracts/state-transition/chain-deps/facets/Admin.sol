@@ -464,11 +464,14 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @inheritdoc IAdmin
     function forwardedbridgeConfirmTransferResult(
         uint256 /* _chainId */,
-        TxStatus /* _txStatus */,
+        TxStatus _txStatus,
         bytes32 /* _assetInfo */,
         address /* _depositSender */,
         bytes calldata _chainData
     ) external payable override onlyChainAssetHandler {
+        if (_txStatus == TxStatus.Success) {
+            return;
+        }
         // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
         uint256 protocolVersion = abi.decode(_chainData, (uint256));
 
