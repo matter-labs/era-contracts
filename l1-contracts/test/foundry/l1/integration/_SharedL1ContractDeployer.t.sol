@@ -91,6 +91,9 @@ contract L1ContractDeployer is UtilsTest {
         addresses.l1Nullifier = L1Nullifier(ecosystemAddresses.bridges.l1NullifierProxy);
         addresses.l1NativeTokenVault = L1NativeTokenVault(payable(address(addresses.l1Nullifier.l1NativeTokenVault())));
 
+        addresses.chainRegistrationSender = ChainRegistrationSender(
+            ecosystemAddresses.bridgehub.chainRegistrationSenderProxy
+        );
         _acceptOwnership();
         _setEraBatch();
 
