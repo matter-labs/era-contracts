@@ -35,6 +35,8 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
+import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {Governance} from "contracts/governance/Governance.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
@@ -55,18 +57,20 @@ import {SystemContractsProcessing} from "./SystemContractsProcessing.s.sol";
 import {BytecodePublisher} from "./BytecodePublisher.s.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
 import {BridgehubDeployedAddresses, L1NativeTokenVaultAddresses, BridgesDeployedAddresses} from "../DeployL1CoreUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
-import {DeployCTMScript} from "../DeployCTM.s.sol";
+import {DeployCTMUtils, DeployedAddresses} from "../DeployCTMUtils.s.sol";
 import {AddressIntrospector} from "../AddressIntrospector.sol";
 
 /// @notice Script used for default upgrade flow
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
+contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
     using stdToml for string;
 
     /**
@@ -147,6 +151,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     AddressIntrospector.CTMAddresses internal discoveredCTM;
     AddressIntrospector.ZkChainAddresses internal discoveredEraZkChain;
     AddressIntrospector.NonDisoverable internal nonDisoverable;
+    L1Bridgehub internal bridgehub;
 
     uint256[] internal factoryDepsHashes;
     mapping(bytes32 => bool) internal isHashInFactoryDeps;
@@ -270,7 +275,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     }
 
     /// @notice E2e upgrade generation
-    function run() public virtual override {
+    function run() public virtual {
         initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
         prepareEcosystemUpgrade();
 
@@ -534,14 +539,78 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     }
 
     function initializeConfig(string memory newConfigPath) internal virtual override {
-        super.initializeConfig(newConfigPath);
         string memory toml = vm.readFile(newConfigPath);
 
+        bytes32 create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
+        address create2FactoryAddr;
+        if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
+            create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
+        }
+        _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
+
+        config.eraChainId = toml.readUint("$.era_chain_id");
         nonDisoverable.bytecodesSupplier = toml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
+        bridgehub = L1Bridgehub(toml.readAddress("$.contracts.bridgehub_proxy_address"));
+        setAddressesBasedOnBridgehub();
 
-        address bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
+        config.l1ChainId = block.chainid;
+        config.deployerAddress = msg.sender;
+        config.ownerAddress = discoveredBridgehub.governance;
 
-        setAddressesBasedOnBridgehub(bridgehubProxy);
+        (bool ok, bytes memory data) = addresses.stateTransition.verifier.staticcall(
+            abi.encodeWithSignature("isTestnetVerifier()")
+        );
+        if (ok) {
+            config.testnetVerifier = abi.decode(data, (bool));
+        }
+
+        // TODO verify it we have function named _getDangerousTestOnlyForcedBeacon , that uses this
+        config.supportL2LegacySharedBridgeTest = false;
+
+        if (toml.keyExists("$.is_zk_sync_os")) {
+            config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
+        }
+
+        config.contracts.governanceSecurityCouncilAddress = Governance(payable(discoveredBridgehub.governance))
+            .securityCouncil();
+        config.contracts.governanceMinDelay = Governance(payable(discoveredBridgehub.governance)).minDelay();
+        config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
+
+        config.contracts.validatorTimelockExecutionDelay = ValidatorTimelock(discoveredCTM.validatorTimelockPostV29)
+            .executionDelay();
+        config.contracts.latestProtocolVersion = ChainTypeManager(discoveredCTM.ctmProxy).protocolVersion();
+
+        // TODO IT's used ONLY for chain creation params and it's never read by chain TYPE maanger, do we need iT? is it legacy?
+        config.contracts.priorityTxMaxGasLimit = toml.readUint("$.contracts.priority_tx_max_gas_limit");
+
+        config.contracts.diamondInitPubdataPricingMode = PubdataPricingMode(
+            toml.readUint("$.contracts.diamond_init_pubdata_pricing_mode")
+        );
+        config.contracts.diamondInitBatchOverheadL1Gas = toml.readUint(
+            "$.contracts.diamond_init_batch_overhead_l1_gas"
+        );
+        config.contracts.diamondInitMaxPubdataPerBatch = toml.readUint(
+            "$.contracts.diamond_init_max_pubdata_per_batch"
+        );
+        config.contracts.diamondInitMaxL2GasPerBatch = toml.readUint("$.contracts.diamond_init_max_l2_gas_per_batch");
+        config.contracts.diamondInitPriorityTxMaxPubdata = toml.readUint(
+            "$.contracts.diamond_init_priority_tx_max_pubdata"
+        );
+        config.contracts.diamondInitMinimalL2GasPrice = toml.readUint("$.contracts.diamond_init_minimal_l2_gas_price");
+        /// FInished here
+
+        // This values are unique pre upgrade
+        config.contracts.genesisRoot = toml.readBytes32("$.contracts.genesis_root");
+        config.contracts.genesisRollupLeafIndex = toml.readUint("$.contracts.genesis_rollup_leaf_index");
+        config.contracts.genesisBatchCommitment = toml.readBytes32("$.contracts.genesis_batch_commitment");
+        config.contracts.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
+        config.contracts.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
+        config.contracts.evmEmulatorHash = toml.readBytes32("$.contracts.evm_emulator_hash");
+
+        if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
+            config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
+        }
+
         newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
 
         newConfig.priorityTxsL2GasLimit = toml.readUint("$.priority_txs_l2_gas_limit");
@@ -549,6 +618,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
         nonDisoverable.rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
 
+        // TODO Refactor read it from gateway
         gatewayConfig.gatewayStateTransition.chainTypeManagerProxy = toml.readAddress(
             "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
         );
@@ -600,13 +670,13 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         });
     }
 
-    function setAddressesBasedOnBridgehub(address bridgehubProxy) internal virtual {
-        discoveredBridgehub = AddressIntrospector.getBridgehubAddresses(IL1Bridgehub(bridgehubProxy));
+    function setAddressesBasedOnBridgehub() internal virtual {
+        discoveredBridgehub = AddressIntrospector.getBridgehubAddresses(bridgehub);
         config.ownerAddress = discoveredBridgehub.governance;
-        address ctm = IL1Bridgehub(discoveredBridgehub.bridgehubProxy).chainTypeManager(config.eraChainId);
+        address ctm = bridgehub.chainTypeManager(config.eraChainId);
         discoveredCTM = AddressIntrospector.getCTMAddresses(IChainTypeManager(ctm));
         discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(
-            IZKChain(IL1Bridgehub(discoveredBridgehub.bridgehubProxy).getZKChain(config.eraChainId))
+            IZKChain(bridgehub.getZKChain(config.eraChainId))
         );
 
         addresses.daAddresses.l1RollupDAValidator = discoveredEraZkChain.l1DAValidator;
@@ -701,7 +771,13 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
     function saveOutputVersionSpecific() internal virtual {}
 
-    function saveOutput(string memory outputPath) internal virtual override {
+    function getUpgradeAddedFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
+        return getChainCreationFacetCuts(stateTransition);
+    }
+
+    function saveOutput(string memory outputPath) internal virtual {
         // Serialize bridgehub addresses
         vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", discoveredBridgehub.bridgehubProxy);
         vm.serializeAddress("bridgehub", "bridgehub_implementation_addr", bridgehubAddresses.bridgehubImplementation);
@@ -1596,7 +1672,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             target: nonDisoverable.rollupDAManager,
             data: abi.encodeCall(
                 RollupDAManager.updateDAPair,
-                (addresses.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true)
+                (addresses.daAddresses.l1RollupDAValidator, L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256, true)
             ),
             value: 0
         });
@@ -1608,7 +1684,11 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(
             RollupDAManager.updateDAPair,
-            (gatewayConfig.gatewayStateTransition.rollupSLDAValidator, getRollupL2DACommitmentScheme(), true)
+            (
+                gatewayConfig.gatewayStateTransition.rollupSLDAValidator,
+                L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256,
+                true
+            )
         );
 
         calls = _prepareL1ToGatewayCall(
@@ -1617,6 +1697,10 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             l1GasPrice,
             gatewayConfig.gatewayStateTransition.rollupDAManager
         );
+    }
+
+    function getAddresses() public view returns (DeployedAddresses memory) {
+        return addresses;
     }
 
     /// @notice Tests that it is possible to upgrade a chain to the new version

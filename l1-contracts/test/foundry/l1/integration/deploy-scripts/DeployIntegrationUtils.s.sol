@@ -63,7 +63,7 @@ abstract contract DeployIntegrationUtils is Script, DeployCTMUtils {
 
     function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
+    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
         return getChainCreationFacetCuts(stateTransition);
     }
 }

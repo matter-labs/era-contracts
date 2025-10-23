@@ -125,6 +125,14 @@ abstract contract DeployCTMUtils is DeployUtils {
     // Addresses discovered from already deployed core contracts (Bridgehub, AssetRouter, etc.)
     AddressIntrospector.BridgehubAddresses internal discoveredBridgehub;
 
+    function deployStateTransitionDiamondFacets() internal {
+        addresses.stateTransition.executorFacet = deploySimpleContract("ExecutorFacet", false);
+        addresses.stateTransition.adminFacet = deploySimpleContract("AdminFacet", false);
+        addresses.stateTransition.mailboxFacet = deploySimpleContract("MailboxFacet", false);
+        addresses.stateTransition.gettersFacet = deploySimpleContract("GettersFacet", false);
+        addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit", false);
+    }
+
     function initializeConfig(string memory configPath) internal virtual {
         string memory toml = vm.readFile(configPath);
 
@@ -145,7 +153,6 @@ abstract contract DeployCTMUtils is DeployUtils {
             "$.contracts.governance_security_council_address"
         );
         config.contracts.governanceMinDelay = toml.readUint("$.contracts.governance_min_delay");
-        config.contracts.maxNumberOfChains = toml.readUint("$.contracts.max_number_of_chains");
 
         bytes32 create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
         address create2FactoryAddr;
@@ -185,21 +192,38 @@ abstract contract DeployCTMUtils is DeployUtils {
         }
     }
 
-    function deployStateTransitionDiamondFacets() internal {
-        addresses.stateTransition.executorFacet = deploySimpleContract("ExecutorFacet", false);
-        addresses.stateTransition.adminFacet = deploySimpleContract("AdminFacet", false);
-        addresses.stateTransition.mailboxFacet = deploySimpleContract("MailboxFacet", false);
-        addresses.stateTransition.gettersFacet = deploySimpleContract("GettersFacet", false);
-        addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit", false);
-    }
-
+    /// @notice Get all four facet cuts
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts);
-
-    function getUpgradeAddedFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts);
+    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
+        // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.
+        // If we start to use different selectors for Gateway, we should change this.
+        facetCuts = new Diamond.FacetCut[](4);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: stateTransition.adminFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
+        });
+        facetCuts[1] = Diamond.FacetCut({
+            facet: stateTransition.gettersFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.gettersFacet.code)
+        });
+        facetCuts[2] = Diamond.FacetCut({
+            facet: stateTransition.mailboxFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
+        });
+        facetCuts[3] = Diamond.FacetCut({
+            facet: stateTransition.executorFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.executorFacet.code)
+        });
+    }
 
     function getChainCreationDiamondCutData(
         StateTransitionDeployedAddresses memory stateTransition
