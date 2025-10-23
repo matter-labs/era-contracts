@@ -404,7 +404,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
     }
 
     function getNewProtocolVersion() public virtual returns (uint256) {
-        return config.contracts.latestProtocolVersion;
+        return config.contracts.chainCreationParams.latestProtocolVersion;
     }
 
     function getProtocolUpgradeNonce() public virtual returns (uint256) {
@@ -575,10 +575,12 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
 
         config.contracts.validatorTimelockExecutionDelay = ValidatorTimelock(discoveredCTM.validatorTimelockPostV29)
             .executionDelay();
-        config.contracts.latestProtocolVersion = ChainTypeManager(discoveredCTM.ctmProxy).protocolVersion();
 
         // Default values for initializing the chain. They are part of the chain creation params,
         // meanwhile they are not saved anywhere
+        config.contracts.chainCreationParams.latestProtocolVersion = toml.readUint(
+            "$.contracts.latest_protocol_version"
+        );
         config.contracts.chainCreationParams.priorityTxMaxGasLimit = toml.readUint(
             "$.contracts.priority_tx_max_gas_limit"
         );
@@ -1845,7 +1847,11 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
                 return abi.encode(config.l1ChainId, gatewayConfig.gatewayStateTransition.rollupDAManager);
             }
         } else if (compareStrings(contractName, "UpgradeStageValidator")) {
-            return abi.encode(addresses.stateTransition.chainTypeManagerProxy, config.contracts.latestProtocolVersion);
+            return
+                abi.encode(
+                    addresses.stateTransition.chainTypeManagerProxy,
+                    config.contracts.chainCreationParams.latestProtocolVersion
+                );
         } else if (compareStrings(contractName, "DiamondProxy")) {
             Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
             Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({

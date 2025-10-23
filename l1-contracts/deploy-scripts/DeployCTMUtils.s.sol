@@ -93,7 +93,6 @@ struct ContractsConfig {
     uint256 governanceMinDelay;
     bytes diamondCutData;
     uint256 maxNumberOfChains;
-    uint256 latestProtocolVersion;
     // questionable
     address availL1DAValidator;
     ChainCreationParamsConfig chainCreationParams;
@@ -265,7 +264,7 @@ abstract contract DeployCTMUtils is DeployUtils {
                 owner: msg.sender,
                 validatorTimelock: stateTransition.validatorTimelock,
                 chainCreationParams: chainCreationParams,
-                protocolVersion: config.contracts.latestProtocolVersion,
+                protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
                 serverNotifier: stateTransition.serverNotifierProxy
             });
     }
