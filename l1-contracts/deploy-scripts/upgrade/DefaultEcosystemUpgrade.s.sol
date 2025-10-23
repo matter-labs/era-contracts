@@ -550,7 +550,11 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
 
         config.eraChainId = toml.readUint("$.era_chain_id");
         nonDisoverable.bytecodesSupplier = toml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
+        nonDisoverable.rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
         bridgehub = L1Bridgehub(toml.readAddress("$.contracts.bridgehub_proxy_address"));
+        if (toml.keyExists("$.is_zk_sync_os")) {
+            config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
+        }
         setAddressesBasedOnBridgehub();
 
         config.l1ChainId = block.chainid;
@@ -567,10 +571,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
         // TODO verify it we have function named _getDangerousTestOnlyForcedBeacon , that uses this
         config.supportL2LegacySharedBridgeTest = false;
 
-        if (toml.keyExists("$.is_zk_sync_os")) {
-            config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
-        }
-
         config.contracts.governanceSecurityCouncilAddress = Governance(payable(discoveredBridgehub.governance))
             .securityCouncil();
         config.contracts.governanceMinDelay = Governance(payable(discoveredBridgehub.governance)).minDelay();
@@ -580,7 +580,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
             .executionDelay();
         config.contracts.latestProtocolVersion = ChainTypeManager(discoveredCTM.ctmProxy).protocolVersion();
 
-        // TODO IT's used ONLY for chain creation params and it's never read by chain TYPE maanger, do we need iT? is it legacy?
+        // Default values for initializing the chain. They are part of the chain creation params,
+        // meanwhile they are not saved anywhere
         config.contracts.priorityTxMaxGasLimit = toml.readUint("$.contracts.priority_tx_max_gas_limit");
 
         config.contracts.diamondInitPubdataPricingMode = PubdataPricingMode(
@@ -597,9 +598,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
             "$.contracts.diamond_init_priority_tx_max_pubdata"
         );
         config.contracts.diamondInitMinimalL2GasPrice = toml.readUint("$.contracts.diamond_init_minimal_l2_gas_price");
-        /// FInished here
 
-        // This values are unique pre upgrade
+        // Protocol specific params for the entire CTM
         config.contracts.genesisRoot = toml.readBytes32("$.contracts.genesis_root");
         config.contracts.genesisRollupLeafIndex = toml.readUint("$.contracts.genesis_rollup_leaf_index");
         config.contracts.genesisBatchCommitment = toml.readBytes32("$.contracts.genesis_batch_commitment");
@@ -613,12 +613,13 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
 
         newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
 
+        // L2 transactions params
         newConfig.priorityTxsL2GasLimit = toml.readUint("$.priority_txs_l2_gas_limit");
         newConfig.maxExpectedL1GasPrice = toml.readUint("$.max_expected_l1_gas_price");
 
-        nonDisoverable.rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
+        // Gateway params
 
-        // TODO Refactor read it from gateway
+        gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
         gatewayConfig.gatewayStateTransition.chainTypeManagerProxy = toml.readAddress(
             "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
         );
@@ -634,10 +635,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
         gatewayConfig.gatewayStateTransition.rollupSLDAValidator = toml.readAddress(
             "$.gateway.gateway_state_transition.rollup_sl_da_validator"
         );
-
         gatewayConfig.gatewayStateTransition.isOnGateway = true;
-
-        gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
     }
 
     function getBridgehubAdmin() public virtual returns (address admin) {
