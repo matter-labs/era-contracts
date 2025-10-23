@@ -149,17 +149,16 @@ abstract contract DeployCTMUtils is DeployUtils {
         if (toml.keyExists("$.is_zk_sync_os")) {
             config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
         }
-        config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
-            "$.contracts.governance_security_council_address"
-        );
-        config.contracts.governanceMinDelay = toml.readUint("$.contracts.governance_min_delay");
-
         bytes32 create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
         address create2FactoryAddr;
         if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
             create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
         }
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
+        config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
+            "$.contracts.governance_security_council_address"
+        );
+        config.contracts.governanceMinDelay = toml.readUint("$.contracts.governance_min_delay");
 
         config.contracts.validatorTimelockExecutionDelay = toml.readUint(
             "$.contracts.validator_timelock_execution_delay"
