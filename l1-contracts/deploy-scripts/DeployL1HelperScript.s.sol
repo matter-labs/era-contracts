@@ -198,6 +198,10 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 return Utils.readZKFoundryBytecodeL1("L2Bridgehub.sol", "L2Bridgehub");
             } else if (compareStrings(contractName, "L2MessageRoot")) {
                 return Utils.readZKFoundryBytecodeL1("L2MessageRoot.sol", "L2MessageRoot");
+            } else if (compareStrings(contractName, "L2ChainAssetHandler")) {
+                return Utils.readZKFoundryBytecodeL1("L2ChainAssetHandler.sol", "L2ChainAssetHandler");
+            } else if (compareStrings(contractName, "UpgradeableBeaconDeployer")) {
+                return Utils.readZKFoundryBytecodeL1("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer");
             } else if (compareStrings(contractName, "ICTMDeploymentTracker")) {
                 return Utils.readZKFoundryBytecodeL1("ICTMDeploymentTracker.sol", "ICTMDeploymentTracker");
             } else if (compareStrings(contractName, "L2AssetRouter")) {
