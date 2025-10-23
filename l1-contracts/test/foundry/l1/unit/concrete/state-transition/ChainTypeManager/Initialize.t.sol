@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
-import {IChainTypeManager, ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
+import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {GenesisBatchCommitmentZero, GenesisBatchHashZero, GenesisUpgradeZero} from "contracts/common/L1ContractErrors.sol";
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 

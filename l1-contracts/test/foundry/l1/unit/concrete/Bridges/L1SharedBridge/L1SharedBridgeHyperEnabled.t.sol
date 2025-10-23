@@ -8,7 +8,7 @@ import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 

@@ -5,10 +5,10 @@ pragma solidity 0.8.28;
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
-import {ETH_TOKEN_ADDRESS, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
+import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
 import {IL1Bridgehub} from "./IL1Bridgehub.sol";
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehubBase.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter} from "./IBridgehubBase.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
@@ -16,8 +16,7 @@ import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {BridgehubL2TransactionRequest} from "../common/Messaging.sol";
 import {ChainIdAlreadyPresent, ChainNotLegacy, ChainNotPresentInCTM, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
-import {SettlementLayersMustSettleOnL1} from "../common/L1ContractErrors.sol";
-import {ChainIdAlreadyExists, ChainIdMismatch, IncorrectBridgeHubAddress, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {ChainIdAlreadyExists, ChainIdMismatch, IncorrectBridgeHubAddress, MsgValueMismatch, SettlementLayersMustSettleOnL1, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

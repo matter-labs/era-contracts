@@ -10,7 +10,7 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";

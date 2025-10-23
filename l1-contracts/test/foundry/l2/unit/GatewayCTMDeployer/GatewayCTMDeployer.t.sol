@@ -21,8 +21,8 @@ import {ValidiumL1DAValidator} from "contracts/state-transition/data-availabilit
 
 import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
 import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
-import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
-import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
+
+
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
@@ -34,7 +34,7 @@ import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChain
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";

@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {IBridgehubBase, BridgehubBurnCTMAssetData} from "./IBridgehubBase.sol";
+import {BridgehubBurnCTMAssetData, IBridgehubBase} from "./IBridgehubBase.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";

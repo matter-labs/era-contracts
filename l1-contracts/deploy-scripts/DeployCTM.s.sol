@@ -11,16 +11,16 @@ import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
+
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
+
+
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IRollupDAManager} from "./interfaces/IRollupDAManager.sol";
-import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
+
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
@@ -30,21 +30,20 @@ import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
+
+
+
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
+
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
+
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
-import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
@@ -58,7 +57,6 @@ import {L2NativeTokenVaultZKOS} from "contracts/bridge/ntv/L2NativeTokenVaultZKO
 import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
 
-import {Utils} from "./Utils.sol";
 
 contract DeployCTMScript is Script, DeployL1HelperScript {
     using stdToml for string;

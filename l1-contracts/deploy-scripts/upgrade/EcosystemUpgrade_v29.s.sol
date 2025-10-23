@@ -8,13 +8,13 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
-import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {GatewayUpgrade, GatewayUpgradeEncodedInput} from "contracts/upgrades/GatewayUpgrade.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+
+
+
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
@@ -23,11 +23,11 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
-import {AddressHasNoCode} from "../ZkSyncScriptErrors.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
+
+
+
+
+
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";

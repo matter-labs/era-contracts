@@ -5,22 +5,20 @@ pragma solidity ^0.8.24;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {Action, FacetCut, StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
+import {Utils} from "./Utils.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+
+
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+
+
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+
+
+
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
@@ -44,7 +42,7 @@ import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifier
 import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
 import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
@@ -61,14 +59,13 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
-import {Config, DeployUtils, DeployedAddresses, GeneratedData} from "./DeployUtils.s.sol";
-import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {DeployUtils} from "./DeployUtils.s.sol";
+
 
 import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
-import {L2NativeTokenVaultZKOS} from "contracts/bridge/ntv/L2NativeTokenVaultZKOS.sol";
+
 import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
-import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 
 abstract contract DeployL1HelperScript is Script, DeployUtils {
     function deployTuppWithContract(

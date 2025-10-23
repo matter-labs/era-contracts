@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {UnknownVerifierVersion} from "../L1StateTransitionErrors.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {EmptyProofLength, Unauthorized, UnknownVerifierType, InvalidMockProofLength, UnsupportedChainIdForMockVerifier, InvalidProof} from "../../common/L1ContractErrors.sol";
+import {EmptyProofLength, InvalidMockProofLength, InvalidProof, Unauthorized, UnknownVerifierType, UnsupportedChainIdForMockVerifier} from "../../common/L1ContractErrors.sol";
 import {ZKsyncOSChainTypeManager} from "../../state-transition/ZKsyncOSChainTypeManager.sol";
 
 /// @title Dual Verifier

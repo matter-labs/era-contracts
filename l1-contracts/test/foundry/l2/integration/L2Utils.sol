@@ -14,7 +14,7 @@ import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
-import {IL2Bridgehub} from "contracts/bridgehub/IL2Bridgehub.sol";
+
 import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";

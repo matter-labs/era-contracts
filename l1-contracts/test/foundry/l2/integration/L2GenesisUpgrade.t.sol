@@ -6,11 +6,10 @@ import {Test} from "forge-std/Test.sol";
 
 import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
 import {L2GenesisUpgrade} from "contracts/l2-upgrades/L2GenesisUpgrade.sol";
-import {IL2GenesisUpgrade} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
-import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_GENESIS_UPGRADE_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {FixedForceDeploymentsData, IL2GenesisUpgrade, ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_GENESIS_UPGRADE_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "deploy-scripts/Utils.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {L2WrappedBaseToken} from "contracts/bridge/L2WrappedBaseToken.sol";
 import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
@@ -20,10 +19,8 @@ import {UpgradeableBeaconDeployer} from "contracts/bridge/ntv/UpgradeableBeaconD
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
 import {SystemContractsArgs} from "./L2Utils.sol";
-import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
 import {ISystemContext} from "contracts/state-transition/l2-deps/ISystemContext.sol";
-import {L2GatewayTestAbstract} from "../../l1/integration/l2-tests-abstract/L2GatewayTestAbstract.t.sol";
-import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
+
 import {Create2FactoryUtils} from "deploy-scripts/Create2FactoryUtils.s.sol";
 
 contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2ContractL2Deployer {

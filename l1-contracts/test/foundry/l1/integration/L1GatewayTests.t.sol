@@ -8,19 +8,19 @@ import "forge-std/console.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
-import {IBridgehubBase, BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehubBase.sol";
+
+import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehubBase, L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {GatewayDeployer} from "./_SharedGatewayDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
-import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction, L2Message, TxStatus} from "contracts/common/Messaging.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -28,7 +28,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-import {NotInGatewayMode} from "contracts/bridgehub/L1BridgehubErrors.sol";
+
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
