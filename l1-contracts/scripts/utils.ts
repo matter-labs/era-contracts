@@ -1,11 +1,11 @@
 // hardhat import should be the first import in the file
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import * as hardhat from "hardhat";
 import * as chalk from "chalk";
-import { ethers } from "ethers";
+import { BytesLike, ethers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
 import { spawn as _spawn } from "child_process";
+import * as blakejs from "blakejs";
 
 const warning = chalk.bold.yellow;
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
@@ -128,4 +128,8 @@ export function spawn(command: string): Promise<void> {
       }
     });
   });
+}
+
+export function blake2s(data: BytesLike) {
+  return `0x${blakejs.blake2sHex(ethers.utils.arrayify(data))}`;
 }

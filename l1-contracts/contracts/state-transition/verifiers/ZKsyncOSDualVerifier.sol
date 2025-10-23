@@ -17,7 +17,7 @@ import {IZKsyncOSVerifier} from "../chain-interfaces/IZKsyncOSVerifier.sol";
 /// to the verifier based on the provided proof type. It reuses the same interface as on the original `Verifier`
 /// contract, while abusing on of the fields (`_recursiveAggregationInput`) for proof verification type.
 contract ZKsyncOSDualVerifier is IVerifier, IDualVerifier {
-    uint32 public constant DEFAULT_EXECUTION_VERSION = 2;
+    uint32 public constant DEFAULT_EXECUTION_VERSION = 3;
 
     /// @dev Type of verification for ZKsync OS PLONK verifier.
     uint256 internal constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;

@@ -133,7 +133,7 @@ contract ZKsyncOSVerifierFflonk is IVerifierV2, IZKsyncOSVerifier {
 
     /// @inheritdoc IZKsyncOSVerifier
     function executionVersion() external pure returns (uint32) {
-        return 2;
+        return 3;
     }
 
     /// @dev This breakdown is done to avoid stack-too-deep error

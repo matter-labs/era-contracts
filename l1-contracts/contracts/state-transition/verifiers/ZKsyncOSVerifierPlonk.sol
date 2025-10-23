@@ -272,7 +272,7 @@ contract ZKsyncOSVerifierPlonk is IVerifier, IZKsyncOSVerifier {
 
     /// @inheritdoc IZKsyncOSVerifier
     function executionVersion() external pure returns (uint32) {
-        return 2;
+        return 3;
     }
 
     /// @notice Load verification keys to memory in runtime.
