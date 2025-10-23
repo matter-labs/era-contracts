@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {PriorityTreeTest, PriorityOpsBatchInfo} from "contracts/dev-contracts/test/PriorityTreeTest.sol";
+import {PriorityOpsBatchInfo, PriorityTreeTest} from "contracts/dev-contracts/test/PriorityTreeTest.sol";
 
 contract PriorityTreeSharedTest is Test {
     PriorityTreeTest internal priorityTree;

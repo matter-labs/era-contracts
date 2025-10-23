@@ -11,15 +11,26 @@ write smart contracts in C++, Rust and other popular languages.
 
 ### Building
 
-Compile the solidity and yul contracts: `yarn l1 build`
+```shell
+cd era-contracts
+./recompute_hashes.sh
+```
 
 ### Testing
 
-To run unit tests, execute `yarn l1 test`.
+Use the following commands to run tests.
 
-Similarly, to run tests in Foundry execute `yarn l1 test:foundry`.
+```shell
+cd era-contracts
+yarn l1 test:foundry
+yarn l1 test:zkfoundry
+```
 
-To run the fork test, use `yarn l1 test:fork`
+And the following command for the fork tests.
+
+```shell
+yarn l1 test:fork
+```
 
 ### Security Testing and Linting
 

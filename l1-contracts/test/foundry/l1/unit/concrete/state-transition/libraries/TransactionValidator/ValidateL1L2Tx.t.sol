@@ -4,14 +4,14 @@ pragma solidity 0.8.28;
 
 import {TransactionValidatorSharedTest} from "./_TransactionValidator_Shared.t.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {PubdataGreaterThanLimit, TxnBodyGasLimitNotEnoughGas, ValidateTxnNotEnoughGas, TooMuchGas} from "contracts/common/L1ContractErrors.sol";
+import {PubdataGreaterThanLimit, TooMuchGas, TxnBodyGasLimitNotEnoughGas, ValidateTxnNotEnoughGas} from "contracts/common/L1ContractErrors.sol";
 import {OverheadForTransactionMustBeEqualToTxSlotOverhead} from "test/foundry/L1TestsErrors.sol";
 
 contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
     function test_BasicRequestL1L2() public pure {
         L2CanonicalTransaction memory testTx = createTestTransaction();
         testTx.gasLimit = 500000;
-        validateL1ToL2Transaction(testTx, 500000, 100000);
+        validateL1ToL2Transaction(testTx, 500000, 100000, false);
     }
 
     function test_RevertWhen_GasLimitdoesntCoverOverhead() public {
@@ -19,7 +19,7 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         // The limit is so low, that it doesn't even cover the overhead
         testTx.gasLimit = 0;
         vm.expectRevert(TxnBodyGasLimitNotEnoughGas.selector);
-        validateL1ToL2Transaction(testTx, 500000, 100000);
+        validateL1ToL2Transaction(testTx, 500000, 100000, false);
     }
 
     function test_RevertWhen_GasLimitHigherThanMax() public {
@@ -30,7 +30,7 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         uint256 priorityTxMaxGasLimit = 500000;
         testTx.gasLimit = priorityTxMaxGasLimit + 1000000;
         vm.expectRevert(TooMuchGas.selector);
-        validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit, 100000);
+        validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit, 100000, false);
     }
 
     function test_RevertWhen_TooMuchPubdata() public {
@@ -44,7 +44,7 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         // (hypothetically, assuming all the gas was spent on writing).
         testTx.gasPerPubdataByteLimit = 1;
         vm.expectRevert(abi.encodeWithSelector(PubdataGreaterThanLimit.selector, 100000, 490000));
-        validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit, 100000);
+        validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit, 100000, false);
     }
 
     function test_RevertWhen_BelowMinimumCost() public {
@@ -52,7 +52,7 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         uint256 priorityTxMaxGasLimit = 500000;
         testTx.gasLimit = 200000;
         vm.expectRevert(ValidateTxnNotEnoughGas.selector);
-        validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit, 100000);
+        validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit, 100000, false);
     }
 
     function test_RevertWhen_HugePubdata() public {
@@ -62,7 +62,7 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         // Setting huge pubdata limit should cause the panic.
         testTx.gasPerPubdataByteLimit = type(uint256).max;
         vm.expectRevert();
-        validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit, 100000);
+        validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit, 100000, false);
     }
 
     function test_ShouldAllowLargeTransactions() public pure {
@@ -76,7 +76,7 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
 
         // This transaction could publish 2B bytes of pubdata & has 2B gas, which is more than would be typically
         // allowed in the production system
-        validateL1ToL2Transaction(testTx, largeGasLimit, largeGasLimit);
+        validateL1ToL2Transaction(testTx, largeGasLimit, largeGasLimit, false);
     }
 
     function test_ShouldReturnCorrectOverhead_ShortTx() public pure {
@@ -89,5 +89,21 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         if (getOverheadForTransaction(1000000) != 1000000 * 10) {
             revert OverheadForTransactionMustBeEqualToTxSlotOverhead(getOverheadForTransaction(1000000));
         }
+    }
+
+    function test_BasicRequestL1L2_ZKsyncOS() public pure {
+        L2CanonicalTransaction memory testTx = createTestTransaction();
+        testTx.maxFeePerGas = 100000;
+        testTx.gasLimit = 500000;
+        validateL1ToL2Transaction(testTx, 500000, 100000, true);
+    }
+
+    function test_RevertWhen_BelowMinimumCost_ZKsyncOS() public {
+        L2CanonicalTransaction memory testTx = createTestTransaction();
+        uint256 priorityTxMaxGasLimit = 500000;
+        testTx.maxFeePerGas = 1;
+        testTx.gasLimit = 199999;
+        vm.expectRevert(ValidateTxnNotEnoughGas.selector);
+        validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit, 100000, true);
     }
 }

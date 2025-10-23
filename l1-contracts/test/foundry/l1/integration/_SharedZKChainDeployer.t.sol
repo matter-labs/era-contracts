@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
-import {RegisterZKChainScript} from "deploy-scripts/RegisterZKChain.s.sol";
+import {Config as ChainConfig, RegisterZKChainScript} from "deploy-scripts/RegisterZKChain.s.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
@@ -12,8 +12,6 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-
-import {Config as ChainConfig} from "deploy-scripts/RegisterZKChain.s.sol";
 
 contract ZKChainDeployer is L1ContractDeployer {
     using stdStorage for StdStorage;
@@ -27,6 +25,8 @@ contract ZKChainDeployer is L1ContractDeployer {
         bool validiumMode;
         address validatorSenderOperatorCommitEth;
         address validatorSenderOperatorBlobsEth;
+        address validatorSenderOperatorProve;
+        address validatorSenderOperatorExecute;
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
         bool allowEvmEmulator;
@@ -90,6 +90,8 @@ contract ZKChainDeployer is L1ContractDeployer {
             validiumMode: false,
             validatorSenderOperatorCommitEth: address(0),
             validatorSenderOperatorBlobsEth: address(1),
+            validatorSenderOperatorProve: address(2),
+            validatorSenderOperatorExecute: address(3),
             baseTokenGasPriceMultiplierNominator: uint128(1),
             baseTokenGasPriceMultiplierDenominator: uint128(1),
             allowEvmEmulator: false
@@ -121,6 +123,8 @@ contract ZKChainDeployer is L1ContractDeployer {
             "validator_sender_operator_blobs_eth",
             description.validatorSenderOperatorBlobsEth
         );
+        vm.serializeAddress("chain", "validator_sender_operator_prove", description.validatorSenderOperatorProve);
+        vm.serializeAddress("chain", "validator_sender_operator_execute", description.validatorSenderOperatorExecute);
         vm.serializeUint(
             "chain",
             "base_token_gas_price_multiplier_nominator",

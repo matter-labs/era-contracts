@@ -17,6 +17,7 @@ struct ZKChainSpecificForceDeploymentsData {
 /// @notice The structure that describes force deployments that are the same for each chain.
 /// @dev Note, that for simplicity, the same struct is used both for upgrading to the
 /// Gateway version and for the Genesis. Some fields may not be used in either of those.
+// FIXME: not in sync with L1.
 // solhint-disable-next-line gas-struct-packing
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
@@ -29,6 +30,7 @@ struct FixedForceDeploymentsData {
     bytes32 l2AssetRouterBytecodeHash;
     bytes32 l2NtvBytecodeHash;
     bytes32 messageRootBytecodeHash;
+    bytes32 chainAssetHandlerBytecodeHash;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
     // The forced beacon address. It is needed only for internal testing.

@@ -15,28 +15,6 @@ import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 /// @author Matter Labs
 /// @notice This is used for fast debugging of the L2NTV by running it in L1 context, i.e. normal foundry instead of foundry --zksync.
 contract L2NativeTokenVaultDev is L2NativeTokenVault {
-    constructor(
-        uint256 _l1ChainId,
-        address _aliasedOwner,
-        bytes32 _l2TokenProxyBytecodeHash,
-        address _legacySharedBridge,
-        address _bridgedTokenBeacon,
-        bool _contractsDeployedAlready,
-        address _wethToken,
-        bytes32 _baseTokenAssetId
-    )
-        L2NativeTokenVault(
-            _l1ChainId,
-            _aliasedOwner,
-            _l2TokenProxyBytecodeHash,
-            _legacySharedBridge,
-            _bridgedTokenBeacon,
-            _contractsDeployedAlready,
-            _wethToken,
-            _baseTokenAssetId
-        )
-    {}
-
     /// @notice copied from L1NTV for L1 compilation
     function calculateCreate2TokenAddress(
         uint256 _originChainId,

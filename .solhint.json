@@ -8,7 +8,7 @@
     "check-send-result": "error",
     "compiler-version": ["error", "^0.8.0"],
     "const-name-snakecase": "off",
-    "contract-name-camelcase": "off",
+    "contract-name-capwords": "off",
     "gas-calldata-parameters": "error",
     "gas-custom-errors": "error",
     "gas-increment-by-one": "error",

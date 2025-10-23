@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS} from "contracts/common/Config.sol";
+import {MAX_NEW_FACTORY_DEPS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {TransactionFiltererTrue} from "contracts/dev-contracts/test/DummyTransactionFiltererTrue.sol";
 import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransactionFiltererFalse.sol";
 import {TransactionNotAllowed, Unauthorized} from "contracts/common/L1ContractErrors.sol";
