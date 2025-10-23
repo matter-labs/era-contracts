@@ -8,6 +8,7 @@ import {console2 as console} from "forge-std/Script.sol";
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
 
+import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 
 import {L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";

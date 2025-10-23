@@ -27,7 +27,12 @@ library ContractsBytecodesLib {
     }
 
     function getCreationCodeEVM(string memory contractIdentifier) internal view returns (bytes memory) {
-        string[3] memory DA_CONTRACT_IDENTIFIERS = ["RollupL1DAValidator", "AvailL1DAValidator", "DummyAvailBridge"];
+        string[4] memory DA_CONTRACT_IDENTIFIERS = [
+            "RollupL1DAValidator",
+            "BlobsL1DAValidatorZKsyncOS",
+            "AvailL1DAValidator",
+            "DummyAvailBridge"
+        ];
 
         uint256 DA_CONTRACT_IDENTIFIERS_LENGTH = DA_CONTRACT_IDENTIFIERS.length;
         for (uint i = 0; i < DA_CONTRACT_IDENTIFIERS_LENGTH; i++) {
@@ -45,7 +50,7 @@ library ContractsBytecodesLib {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCode.
-        string[43] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[44] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction", /// ??
             "BeaconProxy",
             "BridgedStandardERC20",
@@ -58,7 +63,8 @@ library ContractsBytecodesLib {
             "L1ChainAssetHandler",
             "L2ChainAssetHandler",
             "ChainRegistrar",
-            "ChainTypeManager",
+            "EraChainTypeManager",
+            "ZKsyncOSChainTypeManager",
             "CTMDeploymentTracker",
             "DiamondInit",
             "DiamondProxy",

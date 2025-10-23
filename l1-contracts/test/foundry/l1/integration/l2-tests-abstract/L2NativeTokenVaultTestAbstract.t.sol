@@ -18,6 +18,10 @@ import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandar
 // import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
 // import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
+import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
@@ -132,7 +136,7 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         // fails on the following line without this `mockCall`
         // https://github.com/matter-labs/era-contracts/blob/cebfe26a41f3b83039a7d36558bf4e0401b154fc/l1-contracts/contracts/bridge/ntv/NativeTokenVault.sol#L163
         vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IBridgedStandardToken.bridgeMint, (receiver, amount)), "");
-        vm.prank(address(l2NativeTokenVault.ASSET_ROUTER()));
+        vm.prank(L2_ASSET_ROUTER_ADDR);
         IAssetHandler(address(l2NativeTokenVault)).bridgeMint(originChainId, assetId, data);
 
         assertNotEq(l2NativeTokenVault.originChainId(assetId), 0);

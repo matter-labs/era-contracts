@@ -18,8 +18,6 @@ import {NotInGatewayMode, NotRelayedSender} from "./L1BridgehubErrors.sol";
 /// @dev The Bridgehub contract serves as the primary entry point for L1->L2 communication,
 /// facilitating interactions between end user and bridges.
 /// It also manages state transition managers, base tokens, and chain registrations.
-/// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains
-/// between different settlement layers (for example from L1 to Gateway).
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
@@ -103,7 +101,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         uint256 _chainId,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) external override onlySettlementLayerRelayedSender {
+    ) external onlySettlementLayerRelayedSender {
         if (L1_CHAIN_ID == block.chainid) {
             revert NotInGatewayMode();
         }

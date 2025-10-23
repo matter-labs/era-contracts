@@ -6,7 +6,7 @@ import {IZKChainBase} from "../chain-interfaces/IZKChainBase.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
-import {L2DACommitmentScheme, ZKChainCommitment} from "../../common/Config.sol";
+import {ZKChainCommitment, L2DACommitmentScheme} from "../../common/Config.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
