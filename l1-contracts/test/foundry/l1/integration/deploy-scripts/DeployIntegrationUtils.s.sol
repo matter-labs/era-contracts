@@ -7,7 +7,7 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {DeployCTMUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
-import {StateTransitionDeployedAddresses} from "deploy-scripts/DeployedAddresses.sol";
+import {StateTransitionDeployedAddresses} from "deploy-scripts/Types.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 abstract contract DeployIntegrationUtils is Script, DeployCTMUtils {

@@ -6,7 +6,7 @@ pragma solidity 0.8.28;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Utils} from "../Utils.sol";
-import {StateTransitionDeployedAddresses} from "../DeployedAddresses.sol";
+import {StateTransitionDeployedAddresses} from "../Types.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 

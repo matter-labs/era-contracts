@@ -52,7 +52,7 @@ import {DeployUtils} from "./DeployUtils.sol";
 import {AddressIntrospector} from "./AddressIntrospector.sol";
 
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
-import {StateTransitionDeployedAddresses, DataAvailabilityDeployedAddresses} from "./DeployedAddresses.sol";
+import {StateTransitionDeployedAddresses, DataAvailabilityDeployedAddresses, ChainCreationParamsConfig} from "./Types.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
@@ -89,26 +89,14 @@ struct Config {
 struct ContractsConfig {
     address multicall3Addr;
     uint256 validatorTimelockExecutionDelay;
-    bytes32 genesisRoot;
-    uint256 genesisRollupLeafIndex;
-    bytes32 genesisBatchCommitment;
-    uint256 latestProtocolVersion;
-    uint256 priorityTxMaxGasLimit;
-    PubdataPricingMode diamondInitPubdataPricingMode;
-    uint256 diamondInitBatchOverheadL1Gas;
-    uint256 diamondInitMaxPubdataPerBatch;
-    uint256 diamondInitMaxL2GasPerBatch;
-    uint256 diamondInitPriorityTxMaxPubdata;
-    uint256 diamondInitMinimalL2GasPrice;
     address governanceSecurityCouncilAddress;
     uint256 governanceMinDelay;
     bytes diamondCutData;
-    bytes32 bootloaderHash;
-    bytes32 defaultAAHash;
-    bytes32 evmEmulatorHash;
     uint256 maxNumberOfChains;
+    uint256 latestProtocolVersion;
     // questionable
     address availL1DAValidator;
+    ChainCreationParamsConfig chainCreationParams;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -163,28 +151,40 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.contracts.validatorTimelockExecutionDelay = toml.readUint(
             "$.contracts.validator_timelock_execution_delay"
         );
-        config.contracts.genesisRoot = toml.readBytes32("$.contracts.genesis_root");
-        config.contracts.genesisRollupLeafIndex = toml.readUint("$.contracts.genesis_rollup_leaf_index");
-        config.contracts.genesisBatchCommitment = toml.readBytes32("$.contracts.genesis_batch_commitment");
-        config.contracts.latestProtocolVersion = toml.readUint("$.contracts.latest_protocol_version");
-        config.contracts.priorityTxMaxGasLimit = toml.readUint("$.contracts.priority_tx_max_gas_limit");
-        config.contracts.diamondInitPubdataPricingMode = PubdataPricingMode(
+        config.contracts.chainCreationParams.genesisRoot = toml.readBytes32("$.contracts.genesis_root");
+        config.contracts.chainCreationParams.genesisRollupLeafIndex = toml.readUint(
+            "$.contracts.genesis_rollup_leaf_index"
+        );
+        config.contracts.chainCreationParams.genesisBatchCommitment = toml.readBytes32(
+            "$.contracts.genesis_batch_commitment"
+        );
+        config.contracts.chainCreationParams.latestProtocolVersion = toml.readUint(
+            "$.contracts.latest_protocol_version"
+        );
+        config.contracts.chainCreationParams.priorityTxMaxGasLimit = toml.readUint(
+            "$.contracts.priority_tx_max_gas_limit"
+        );
+        config.contracts.chainCreationParams.diamondInitPubdataPricingMode = PubdataPricingMode(
             toml.readUint("$.contracts.diamond_init_pubdata_pricing_mode")
         );
-        config.contracts.diamondInitBatchOverheadL1Gas = toml.readUint(
+        config.contracts.chainCreationParams.diamondInitBatchOverheadL1Gas = toml.readUint(
             "$.contracts.diamond_init_batch_overhead_l1_gas"
         );
-        config.contracts.diamondInitMaxPubdataPerBatch = toml.readUint(
+        config.contracts.chainCreationParams.diamondInitMaxPubdataPerBatch = toml.readUint(
             "$.contracts.diamond_init_max_pubdata_per_batch"
         );
-        config.contracts.diamondInitMaxL2GasPerBatch = toml.readUint("$.contracts.diamond_init_max_l2_gas_per_batch");
-        config.contracts.diamondInitPriorityTxMaxPubdata = toml.readUint(
+        config.contracts.chainCreationParams.diamondInitMaxL2GasPerBatch = toml.readUint(
+            "$.contracts.diamond_init_max_l2_gas_per_batch"
+        );
+        config.contracts.chainCreationParams.diamondInitPriorityTxMaxPubdata = toml.readUint(
             "$.contracts.diamond_init_priority_tx_max_pubdata"
         );
-        config.contracts.diamondInitMinimalL2GasPrice = toml.readUint("$.contracts.diamond_init_minimal_l2_gas_price");
-        config.contracts.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
-        config.contracts.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
-        config.contracts.evmEmulatorHash = toml.readBytes32("$.contracts.evm_emulator_hash");
+        config.contracts.chainCreationParams.diamondInitMinimalL2GasPrice = toml.readUint(
+            "$.contracts.diamond_init_minimal_l2_gas_price"
+        );
+        config.contracts.chainCreationParams.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
+        config.contracts.chainCreationParams.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
+        config.contracts.chainCreationParams.evmEmulatorHash = toml.readBytes32("$.contracts.evm_emulator_hash");
 
         if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
             config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
@@ -248,9 +248,9 @@ abstract contract DeployCTMUtils is DeployUtils {
         return
             ChainCreationParams({
                 genesisUpgrade: stateTransition.genesisUpgrade,
-                genesisBatchHash: config.contracts.genesisRoot,
-                genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
-                genesisBatchCommitment: config.contracts.genesisBatchCommitment,
+                genesisBatchHash: config.contracts.chainCreationParams.genesisRoot,
+                genesisIndexRepeatedStorageChanges: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex),
+                genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
                 diamondCut: diamondCut,
                 forceDeploymentsData: generatedData.forceDeploymentsData
             });
@@ -282,12 +282,12 @@ abstract contract DeployCTMUtils is DeployUtils {
     function getFeeParams() internal returns (FeeParams memory) {
         return
             FeeParams({
-                pubdataPricingMode: config.contracts.diamondInitPubdataPricingMode,
-                batchOverheadL1Gas: uint32(config.contracts.diamondInitBatchOverheadL1Gas),
-                maxPubdataPerBatch: uint32(config.contracts.diamondInitMaxPubdataPerBatch),
-                maxL2GasPerBatch: uint32(config.contracts.diamondInitMaxL2GasPerBatch),
-                priorityTxMaxPubdata: uint32(config.contracts.diamondInitPriorityTxMaxPubdata),
-                minimalL2GasPrice: uint64(config.contracts.diamondInitMinimalL2GasPrice)
+                pubdataPricingMode: config.contracts.chainCreationParams.diamondInitPubdataPricingMode,
+                batchOverheadL1Gas: uint32(config.contracts.chainCreationParams.diamondInitBatchOverheadL1Gas),
+                maxPubdataPerBatch: uint32(config.contracts.chainCreationParams.diamondInitMaxPubdataPerBatch),
+                maxL2GasPerBatch: uint32(config.contracts.chainCreationParams.diamondInitMaxL2GasPerBatch),
+                priorityTxMaxPubdata: uint32(config.contracts.chainCreationParams.diamondInitPriorityTxMaxPubdata),
+                minimalL2GasPrice: uint64(config.contracts.chainCreationParams.diamondInitMinimalL2GasPrice)
             });
     }
 
@@ -299,18 +299,18 @@ abstract contract DeployCTMUtils is DeployUtils {
         FeeParams memory feeParams = getFeeParams();
 
         require(stateTransition.verifier != address(0), "verifier is zero");
-        require(config.contracts.bootloaderHash != bytes32(0), "bootloader hash is zero");
-        require(config.contracts.defaultAAHash != bytes32(0), "default aa hash is zero");
-        require(config.contracts.evmEmulatorHash != bytes32(0), "evm emulator hash is zero");
+        require(config.contracts.chainCreationParams.bootloaderHash != bytes32(0), "bootloader hash is zero");
+        require(config.contracts.chainCreationParams.defaultAAHash != bytes32(0), "default aa hash is zero");
+        require(config.contracts.chainCreationParams.evmEmulatorHash != bytes32(0), "evm emulator hash is zero");
 
         return
             DiamondInitializeDataNewChain({
                 verifier: IVerifier(stateTransition.verifier),
                 verifierParams: verifierParams,
-                l2BootloaderBytecodeHash: config.contracts.bootloaderHash,
-                l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
-                l2EvmEmulatorBytecodeHash: config.contracts.evmEmulatorHash,
-                priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
+                l2BootloaderBytecodeHash: config.contracts.chainCreationParams.bootloaderHash,
+                l2DefaultAccountBytecodeHash: config.contracts.chainCreationParams.defaultAAHash,
+                l2EvmEmulatorBytecodeHash: config.contracts.chainCreationParams.evmEmulatorHash,
+                priorityTxMaxGasLimit: config.contracts.chainCreationParams.priorityTxMaxGasLimit,
                 feeParams: feeParams
             });
     }

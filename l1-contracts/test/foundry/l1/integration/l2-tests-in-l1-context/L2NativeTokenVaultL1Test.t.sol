@@ -14,7 +14,7 @@ import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2Contra
 import {DeployCTMUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
 import {L2NativeTokenVaultTestAbstract} from "../l2-tests-abstract/L2NativeTokenVaultTestAbstract.t.sol";
 
-import {StateTransitionDeployedAddresses} from "deploy-scripts/DeployedAddresses.sol";
+import {StateTransitionDeployedAddresses} from "deploy-scripts/Types.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 

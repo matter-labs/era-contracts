@@ -22,7 +22,7 @@ import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
-import {BridgehubDeployedAddresses, BridgesDeployedAddresses, L1NativeTokenVaultAddresses} from "./DeployedAddresses.sol";
+import {BridgehubDeployedAddresses, BridgesDeployedAddresses, L1NativeTokenVaultAddresses} from "./Types.sol";
 import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
 

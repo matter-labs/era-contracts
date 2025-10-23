@@ -36,7 +36,7 @@ import {Call} from "contracts/governance/Common.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
-import {ZkChainAddresses} from "./DeployedAddresses.sol";
+import {ZkChainAddresses} from "./Types.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {

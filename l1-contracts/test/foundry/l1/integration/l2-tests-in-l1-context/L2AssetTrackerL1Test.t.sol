@@ -14,7 +14,7 @@ import {DeployUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
 import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
 import {L2AssetTrackerTest} from "../l2-tests-abstract/L2AssetTracker.t.sol";
 
-import {StateTransitionDeployedAddresses} from "deploy-scripts/DeployedAddresses.sol";
+import {StateTransitionDeployedAddresses} from "deploy-scripts/Types.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.10;
 
+import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+
 // solhint-disable-next-line gas-struct-packing
 struct L1NativeTokenVaultAddresses {
     address l1NativeTokenVaultImplementation;
@@ -78,4 +80,21 @@ struct StateTransitionDeployedAddresses {
     address rollupDAManager;
     address rollupSLDAValidator;
     bool isOnGateway;
+}
+
+struct ChainCreationParamsConfig {
+    bytes32 genesisRoot;
+    uint256 genesisRollupLeafIndex;
+    bytes32 genesisBatchCommitment;
+    uint256 latestProtocolVersion;
+    uint256 priorityTxMaxGasLimit;
+    PubdataPricingMode diamondInitPubdataPricingMode;
+    uint256 diamondInitBatchOverheadL1Gas;
+    uint256 diamondInitMaxPubdataPerBatch;
+    uint256 diamondInitMaxL2GasPerBatch;
+    uint256 diamondInitPriorityTxMaxPubdata;
+    uint256 diamondInitMinimalL2GasPrice;
+    bytes32 bootloaderHash;
+    bytes32 defaultAAHash;
+    bytes32 evmEmulatorHash;
 }

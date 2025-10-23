@@ -13,7 +13,7 @@ import {ITransparentUpgradeableProxy, TransparentUpgradeableProxy} from "@openze
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {Utils} from "../Utils.sol";
-import {StateTransitionDeployedAddresses} from "../DeployedAddresses.sol";
+import {StateTransitionDeployedAddresses} from "../Types.sol";
 import {L2_BRIDGEHUB_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
@@ -489,9 +489,9 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
 
         proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: _composeUpgradeTx(forceDeployments),
-            bootloaderHash: config.contracts.bootloaderHash,
-            defaultAccountHash: config.contracts.defaultAAHash,
-            evmEmulatorHash: config.contracts.evmEmulatorHash,
+            bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
+            defaultAccountHash: config.contracts.chainCreationParams.defaultAAHash,
+            evmEmulatorHash: config.contracts.chainCreationParams.evmEmulatorHash,
             verifier: stateTransition.verifier,
             verifierParams: verifierParams,
             l1ContractsUpgradeCalldata: new bytes(0),
@@ -579,30 +579,40 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
 
         // Default values for initializing the chain. They are part of the chain creation params,
         // meanwhile they are not saved anywhere
-        config.contracts.priorityTxMaxGasLimit = toml.readUint("$.contracts.priority_tx_max_gas_limit");
+        config.contracts.chainCreationParams.priorityTxMaxGasLimit = toml.readUint(
+            "$.contracts.priority_tx_max_gas_limit"
+        );
 
-        config.contracts.diamondInitPubdataPricingMode = PubdataPricingMode(
+        config.contracts.chainCreationParams.diamondInitPubdataPricingMode = PubdataPricingMode(
             toml.readUint("$.contracts.diamond_init_pubdata_pricing_mode")
         );
-        config.contracts.diamondInitBatchOverheadL1Gas = toml.readUint(
+        config.contracts.chainCreationParams.diamondInitBatchOverheadL1Gas = toml.readUint(
             "$.contracts.diamond_init_batch_overhead_l1_gas"
         );
-        config.contracts.diamondInitMaxPubdataPerBatch = toml.readUint(
+        config.contracts.chainCreationParams.diamondInitMaxPubdataPerBatch = toml.readUint(
             "$.contracts.diamond_init_max_pubdata_per_batch"
         );
-        config.contracts.diamondInitMaxL2GasPerBatch = toml.readUint("$.contracts.diamond_init_max_l2_gas_per_batch");
-        config.contracts.diamondInitPriorityTxMaxPubdata = toml.readUint(
+        config.contracts.chainCreationParams.diamondInitMaxL2GasPerBatch = toml.readUint(
+            "$.contracts.diamond_init_max_l2_gas_per_batch"
+        );
+        config.contracts.chainCreationParams.diamondInitPriorityTxMaxPubdata = toml.readUint(
             "$.contracts.diamond_init_priority_tx_max_pubdata"
         );
-        config.contracts.diamondInitMinimalL2GasPrice = toml.readUint("$.contracts.diamond_init_minimal_l2_gas_price");
+        config.contracts.chainCreationParams.diamondInitMinimalL2GasPrice = toml.readUint(
+            "$.contracts.diamond_init_minimal_l2_gas_price"
+        );
 
         // Protocol specific params for the entire CTM
-        config.contracts.genesisRoot = toml.readBytes32("$.contracts.genesis_root");
-        config.contracts.genesisRollupLeafIndex = toml.readUint("$.contracts.genesis_rollup_leaf_index");
-        config.contracts.genesisBatchCommitment = toml.readBytes32("$.contracts.genesis_batch_commitment");
-        config.contracts.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
-        config.contracts.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
-        config.contracts.evmEmulatorHash = toml.readBytes32("$.contracts.evm_emulator_hash");
+        config.contracts.chainCreationParams.genesisRoot = toml.readBytes32("$.contracts.genesis_root");
+        config.contracts.chainCreationParams.genesisRollupLeafIndex = toml.readUint(
+            "$.contracts.genesis_rollup_leaf_index"
+        );
+        config.contracts.chainCreationParams.genesisBatchCommitment = toml.readBytes32(
+            "$.contracts.genesis_batch_commitment"
+        );
+        config.contracts.chainCreationParams.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
+        config.contracts.chainCreationParams.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
+        config.contracts.chainCreationParams.evmEmulatorHash = toml.readBytes32("$.contracts.evm_emulator_hash");
 
         if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
             config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
@@ -934,34 +944,38 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
         vm.serializeUint(
             "contracts_newConfig",
             "diamond_init_max_l2_gas_per_batch",
-            config.contracts.diamondInitMaxL2GasPerBatch
+            config.contracts.chainCreationParams.diamondInitMaxL2GasPerBatch
         );
         vm.serializeUint(
             "contracts_newConfig",
             "diamond_init_batch_overhead_l1_gas",
-            config.contracts.diamondInitBatchOverheadL1Gas
+            config.contracts.chainCreationParams.diamondInitBatchOverheadL1Gas
         );
         vm.serializeUint(
             "contracts_newConfig",
             "diamond_init_max_pubdata_per_batch",
-            config.contracts.diamondInitMaxPubdataPerBatch
+            config.contracts.chainCreationParams.diamondInitMaxPubdataPerBatch
         );
         vm.serializeUint(
             "contracts_newConfig",
             "diamond_init_minimal_l2_gas_price",
-            config.contracts.diamondInitMinimalL2GasPrice
+            config.contracts.chainCreationParams.diamondInitMinimalL2GasPrice
         );
         vm.serializeUint(
             "contracts_newConfig",
             "diamond_init_priority_tx_max_pubdata",
-            config.contracts.diamondInitPriorityTxMaxPubdata
+            config.contracts.chainCreationParams.diamondInitPriorityTxMaxPubdata
         );
         vm.serializeUint(
             "contracts_newConfig",
             "diamond_init_pubdata_pricing_mode",
-            uint256(config.contracts.diamondInitPubdataPricingMode)
+            uint256(config.contracts.chainCreationParams.diamondInitPubdataPricingMode)
         );
-        vm.serializeUint("contracts_newConfig", "priority_tx_max_gas_limit", config.contracts.priorityTxMaxGasLimit);
+        vm.serializeUint(
+            "contracts_newConfig",
+            "priority_tx_max_gas_limit",
+            config.contracts.chainCreationParams.priorityTxMaxGasLimit
+        );
 
         // Serialize upgrade addresses
         vm.serializeAddress(
@@ -1099,9 +1113,18 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
         }
 
         // Double check for consistency:
-        require(bytes32(factoryDeps[0]) == config.contracts.bootloaderHash, "bootloader hash factory dep mismatch");
-        require(bytes32(factoryDeps[1]) == config.contracts.defaultAAHash, "default aa hash factory dep mismatch");
-        require(bytes32(factoryDeps[2]) == config.contracts.evmEmulatorHash, "EVM emulator hash factory dep mismatch");
+        require(
+            bytes32(factoryDeps[0]) == config.contracts.chainCreationParams.bootloaderHash,
+            "bootloader hash factory dep mismatch"
+        );
+        require(
+            bytes32(factoryDeps[1]) == config.contracts.chainCreationParams.defaultAAHash,
+            "default aa hash factory dep mismatch"
+        );
+        require(
+            bytes32(factoryDeps[2]) == config.contracts.chainCreationParams.evmEmulatorHash,
+            "EVM emulator hash factory dep mismatch"
+        );
 
         factoryDepsHashes = factoryDeps;
 
