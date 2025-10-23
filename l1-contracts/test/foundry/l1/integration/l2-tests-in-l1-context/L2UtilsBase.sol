@@ -25,11 +25,7 @@ import {L2MessageVerification} from "../../../../../contracts/bridgehub/L2Messag
 import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "../../../../../contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-
-
 import {SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
-
-
 
 library L2UtilsBase {
     using stdToml for string;

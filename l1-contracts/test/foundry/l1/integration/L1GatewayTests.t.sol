@@ -28,7 +28,6 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";

@@ -9,15 +9,9 @@ import {Utils} from "./Utils.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
-
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
-
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-
-
-
-
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -60,7 +54,6 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
 import {DeployUtils} from "./DeployUtils.s.sol";
-
 
 import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";

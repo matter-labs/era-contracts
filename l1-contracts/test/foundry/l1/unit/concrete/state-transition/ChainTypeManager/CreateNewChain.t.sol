@@ -7,8 +7,6 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {HashMismatch, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
-
-
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 contract createNewChainTest is ChainTypeManagerTest {

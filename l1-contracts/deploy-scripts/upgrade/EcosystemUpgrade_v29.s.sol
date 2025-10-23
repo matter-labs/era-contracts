@@ -13,8 +13,6 @@ import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 
-
-
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
@@ -23,10 +21,6 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-
-
-
-
 
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 

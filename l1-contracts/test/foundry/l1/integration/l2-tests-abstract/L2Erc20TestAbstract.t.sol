@@ -14,8 +14,6 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-
-
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";

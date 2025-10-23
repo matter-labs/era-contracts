@@ -19,16 +19,9 @@ import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandar
 
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-
 // import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
-
-
-
-
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
-
-
 
 import {TokenIsLegacy, TokenNotLegacy} from "contracts/common/L1ContractErrors.sol";
 

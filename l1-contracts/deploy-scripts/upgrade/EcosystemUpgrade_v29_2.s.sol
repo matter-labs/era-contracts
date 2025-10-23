@@ -9,18 +9,12 @@ import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
 
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 
-
-
 import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
-
-
-
-
 
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
 

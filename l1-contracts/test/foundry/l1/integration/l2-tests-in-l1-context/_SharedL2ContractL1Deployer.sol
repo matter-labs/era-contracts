@@ -8,17 +8,6 @@ import {Config, DeployUtils, DeployedAddresses} from "deploy-scripts/DeployUtils
 
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-
-
-
-
-
-
-
-
-
-
-
 import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
