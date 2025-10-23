@@ -44,7 +44,7 @@ import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifier
 import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
 import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
-
+import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
@@ -61,7 +61,14 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
-import {DeployUtils} from "./DeployUtils.s.sol";
+import {Config, DeployUtils, DeployedAddresses, GeneratedData} from "./DeployUtils.s.sol";
+import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+
+import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
+import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {L2NativeTokenVaultZKOS} from "contracts/bridge/ntv/L2NativeTokenVaultZKOS.sol";
+import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
+import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 
 abstract contract DeployL1HelperScript is Script, DeployUtils {
     function deployTuppWithContract(
@@ -187,12 +194,81 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 return type(UpgradeStageValidator).creationCode;
             }
         } else {
-            if (compareStrings(contractName, "Verifier")) {
+            if (compareStrings(contractName, "L2Bridgehub")) {
+                return Utils.readZKFoundryBytecodeL1("L2Bridgehub.sol", "L2Bridgehub");
+            } else if (compareStrings(contractName, "L2MessageRoot")) {
+                return Utils.readZKFoundryBytecodeL1("L2MessageRoot.sol", "L2MessageRoot");
+            } else if (compareStrings(contractName, "ICTMDeploymentTracker")) {
+                return Utils.readZKFoundryBytecodeL1("ICTMDeploymentTracker.sol", "ICTMDeploymentTracker");
+            } else if (compareStrings(contractName, "L2AssetRouter")) {
+                return Utils.readZKFoundryBytecodeL1("L2AssetRouter.sol", "L2AssetRouter");
+            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
+                return Utils.readZKFoundryBytecodeL1("L1ERC20Bridge.sol", "L1ERC20Bridge");
+            } else if (compareStrings(contractName, "L2NativeTokenVault")) {
+                return Utils.readZKFoundryBytecodeL1("L2NativeTokenVault.sol", "L2NativeTokenVault");
+            } else if (compareStrings(contractName, "BridgedStandardERC20")) {
+                return Utils.readZKFoundryBytecodeL1("BridgedStandardERC20.sol", "BridgedStandardERC20");
+            } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
+                return Utils.readZKFoundryBytecodeL1("UpgradeableBeacon.sol", "UpgradeableBeacon");
+            } else if (compareStrings(contractName, "BlobVersionedHashRetriever")) {
+                return hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
+            } else if (compareStrings(contractName, "RollupDAManager")) {
+                return Utils.readZKFoundryBytecodeL1("RollupDAManager.sol", "RollupDAManager");
+            } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
+                return Utils.readZKFoundryBytecodeL1("ValidiumL1DAValidator.sol", "ValidiumL1DAValidator");
+            } else if (compareStrings(contractName, "Verifier")) {
                 if (config.testnetVerifier) {
                     return getCreationCode("TestnetVerifier", true);
                 } else {
                     return getCreationCode("DualVerifier", true);
                 }
+            } else if (compareStrings(contractName, "VerifierFflonk")) {
+                return Utils.readZKFoundryBytecodeL1("L1VerifierFflonk.sol", "L1VerifierFflonk");
+            } else if (compareStrings(contractName, "VerifierPlonk")) {
+                return Utils.readZKFoundryBytecodeL1("L1VerifierPlonk.sol", "L1VerifierPlonk");
+            } else if (compareStrings(contractName, "DefaultUpgrade")) {
+                return Utils.readZKFoundryBytecodeL1("DefaultUpgrade.sol", "DefaultUpgrade");
+            } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
+                return Utils.readZKFoundryBytecodeL1("L1GenesisUpgrade.sol", "L1GenesisUpgrade");
+            } else if (compareStrings(contractName, "ValidatorTimelock")) {
+                return Utils.readZKFoundryBytecodeL1("ValidatorTimelock.sol", "ValidatorTimelock");
+            } else if (compareStrings(contractName, "Governance")) {
+                return Utils.readZKFoundryBytecodeL1("Governance.sol", "Governance");
+            } else if (compareStrings(contractName, "ChainAdminOwnable")) {
+                return Utils.readZKFoundryBytecodeL1("ChainAdminOwnable.sol", "ChainAdminOwnable");
+            } else if (compareStrings(contractName, "AccessControlRestriction")) {
+                // TODO(EVM-924): this function is unused
+                return Utils.readZKFoundryBytecodeL1("AccessControlRestriction.sol", "AccessControlRestriction");
+            } else if (compareStrings(contractName, "ChainAdmin")) {
+                return Utils.readZKFoundryBytecodeL1("ChainAdmin.sol", "ChainAdmin");
+            } else if (compareStrings(contractName, "ChainTypeManager")) {
+                return Utils.readZKFoundryBytecodeL1("ChainTypeManager.sol", "ChainTypeManager");
+            } else if (compareStrings(contractName, "BytecodesSupplier")) {
+                return Utils.readZKFoundryBytecodeL1("BytecodesSupplier.sol", "BytecodesSupplier");
+            } else if (compareStrings(contractName, "ProxyAdmin")) {
+                return Utils.readZKFoundryBytecodeL1("ProxyAdmin.sol", "ProxyAdmin");
+            } else if (compareStrings(contractName, "ExecutorFacet")) {
+                return Utils.readZKFoundryBytecodeL1("Executor.sol", "ExecutorFacet");
+            } else if (compareStrings(contractName, "AdminFacet")) {
+                return Utils.readZKFoundryBytecodeL1("Admin.sol", "AdminFacet");
+            } else if (compareStrings(contractName, "MailboxFacet")) {
+                return Utils.readZKFoundryBytecodeL1("Mailbox.sol", "MailboxFacet");
+            } else if (compareStrings(contractName, "GettersFacet")) {
+                return Utils.readZKFoundryBytecodeL1("Getters.sol", "GettersFacet");
+            } else if (compareStrings(contractName, "DiamondInit")) {
+                return Utils.readZKFoundryBytecodeL1("DiamondInit.sol", "DiamondInit");
+            } else if (compareStrings(contractName, "ServerNotifier")) {
+                return Utils.readZKFoundryBytecodeL1("ServerNotifier.sol", "ServerNotifier");
+            } else if (compareStrings(contractName, "BeaconProxy")) {
+                return Utils.readZKFoundryBytecodeL1("BeaconProxy.sol", "BeaconProxy");
+            } else if (compareStrings(contractName, "RollupL2DAValidator")) {
+                return Utils.readZKFoundryBytecodeL2("RollupL2DAValidator.sol", "RollupL2DAValidator");
+            } else if (compareStrings(contractName, "ValidiumL2DAValidator")) {
+                return Utils.readZKFoundryBytecodeL2("ValidiumL2DAValidator.sol", "ValidiumL2DAValidator");
+            } else if (compareStrings(contractName, "AvailL2DAValidator")) {
+                return Utils.readZKFoundryBytecodeL2("AvailL2DAValidator.sol", "AvailL2DAValidator");
+            } else {
+                revert(string.concat("Contract ", contractName, " creation code not set"));
             }
         }
         return ContractsBytecodesLib.getCreationCode(contractName, isZKBytecode);

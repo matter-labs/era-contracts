@@ -39,10 +39,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     IAssetRouterBase public immutable ASSET_ROUTER;
 
     /// @dev The assetId of the base token.
-    bytes32 public immutable override BASE_TOKEN_ASSET_ID;
-
-    /// @dev The chain ID of L1.
-    uint256 public immutable override L1_CHAIN_ID;
+    bytes32 public immutable BASE_TOKEN_ASSET_ID;
 
     /// @dev The chain ID of L1.
     uint256 public immutable L1_CHAIN_ID;
