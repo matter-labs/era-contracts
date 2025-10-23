@@ -561,15 +561,12 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
         config.deployerAddress = msg.sender;
         config.ownerAddress = discoveredBridgehub.governance;
 
-        (bool ok, bytes memory data) = addresses.stateTransition.verifier.staticcall(
+        (bool ok, bytes memory data) = discoveredEraZkChain.verifier.staticcall(
             abi.encodeWithSignature("isTestnetVerifier()")
         );
         if (ok) {
             config.testnetVerifier = abi.decode(data, (bool));
         }
-
-        // TODO verify it we have function named _getDangerousTestOnlyForcedBeacon , that uses this
-        config.supportL2LegacySharedBridgeTest = false;
 
         config.contracts.governanceSecurityCouncilAddress = Governance(payable(discoveredBridgehub.governance))
             .securityCouncil();
@@ -618,7 +615,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
         newConfig.maxExpectedL1GasPrice = toml.readUint("$.max_expected_l1_gas_price");
 
         // Gateway params
-
         gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
         gatewayConfig.gatewayStateTransition.chainTypeManagerProxy = toml.readAddress(
             "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
