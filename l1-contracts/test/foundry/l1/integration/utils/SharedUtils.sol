@@ -21,19 +21,4 @@ contract SharedUtils is Test {
         // We modify the unprocessedIndex so that the tree size is zero
         vm.store(address(chain), slot, bytes32(value + treeSize));
     }
-
-    function _pauseDeposits(address _bridgehub, uint256 _chainId) public {
-        IZKChain chain = IZKChain(IBridgehubBase(_bridgehub).getZKChain(_chainId));
-        uint256 l1ChainId = IL1Bridgehub(_bridgehub).L1_CHAIN_ID();
-        if (block.chainid == l1ChainId) {
-            vm.warp(block.timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END + 1);
-            vm.startBroadcast(chain.getAdmin());
-            IAdmin(address(chain)).pauseDepositsBeforeInitiatingMigration();
-            vm.stopBroadcast();
-        } else {
-            vm.prank(GW_ASSET_TRACKER_ADDR);
-            IMailboxImpl(address(chain)).pauseDepositsOnGateway(block.timestamp);
-        }
-        vm.warp(block.timestamp + CHAIN_MIGRATION_TIME_WINDOW_START + 1);
-    }
 }

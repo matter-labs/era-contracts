@@ -75,7 +75,6 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     function test_withdrawFromGateway() public {
         finalizeDeposit();
         clearPriorityQueue(address(addresses.bridgehub.bridgehubProxy), mintChainId);
-        _pauseDeposits(L2_BRIDGEHUB_ADDR, mintChainId);
         address newAdmin = address(0x1);
         bytes memory newDiamondCut = abi.encode();
         BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({

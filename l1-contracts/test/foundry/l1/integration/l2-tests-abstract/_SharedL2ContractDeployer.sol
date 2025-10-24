@@ -91,6 +91,9 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
     }
 
     function setUpInner(bool _skip) public virtual {
+        // Timestamp needs to be big enough for `pauseDepositsBeforeInitiatingMigration` time checks
+        vm.warp(1000000);
+
         if (_skip) {
             vm.startBroadcast();
         }
