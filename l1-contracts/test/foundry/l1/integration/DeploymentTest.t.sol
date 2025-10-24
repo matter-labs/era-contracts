@@ -6,7 +6,7 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -16,11 +16,9 @@ import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
+import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -28,8 +26,10 @@ import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
+import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 
-contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
@@ -47,6 +47,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
     }
 
     function prepare() public {
+        takeConfigLock(); // Prevents race condition with configs
         _generateUserAddresses();
 
         _deployL1Contracts();
@@ -60,6 +61,8 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         // _deployZKChain(tokens[0]);
         // _deployZKChain(tokens[1]);
         // _deployZKChain(tokens[1]);
+
+        releaseConfigLock();
 
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
@@ -92,30 +95,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         assertEq(chainIds[0], chainId);
 
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(chainId);
-        assertEq(protocolVersion, 25);
-    }
-
-    function test_bridgehubSetter() public {
-        uint256 chainId = zkChainIds[0];
-        uint256 randomChainId = 123456;
-
-        vm.mockCall(
-            address(addresses.chainTypeManager),
-            abi.encodeWithSelector(IChainTypeManager.getZKChainLegacy.selector, randomChainId),
-            abi.encode(address(0x01))
-        );
-        vm.store(address(addresses.bridgehub), keccak256(abi.encode(randomChainId, 205)), bytes32(uint256(uint160(1))));
-        vm.store(
-            address(addresses.bridgehub),
-            keccak256(abi.encode(randomChainId, 204)),
-            bytes32(uint256(uint160(address(addresses.chainTypeManager))))
-        );
-        addresses.bridgehub.registerLegacyChain(randomChainId);
-
-        assertEq(addresses.bridgehub.settlementLayer(randomChainId), block.chainid);
-
-        address messageRoot = address(addresses.bridgehub.messageRoot());
-        assertTrue(MessageRoot(messageRoot).chainIndex(randomChainId) != 0);
+        assertEq(protocolVersion, 120259084288);
     }
 
     function test_registerAlreadyDeployedZKChain() public {
@@ -131,7 +111,8 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 owner,
                 addresses.chainTypeManager.protocolVersion(),
                 addresses.chainTypeManager.storedBatchZero(),
-                address(addresses.bridgehub)
+                address(addresses.bridgehub),
+                address(addresses.interopCenter)
             );
 
             address stmAddr = IZKChain(chain).getChainTypeManager();
@@ -162,7 +143,8 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 owner,
                 addresses.chainTypeManager.protocolVersion(),
                 addresses.chainTypeManager.storedBatchZero(),
-                address(addresses.bridgehub.sharedBridge())
+                address(addresses.bridgehub.assetRouter()),
+                address(addresses.interopCenter)
             );
 
             address stmAddr = IZKChain(chain).getChainTypeManager();
@@ -170,7 +152,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
             vm.startBroadcast(owner);
             addresses.bridgehub.addTokenAssetId(baseTokenAssetId);
             vm.expectRevert(
-                abi.encodeWithSelector(IncorrectBridgeHubAddress.selector, address(addresses.bridgehub.sharedBridge()))
+                abi.encodeWithSelector(IncorrectBridgeHubAddress.selector, address(addresses.bridgehub.assetRouter()))
             );
             addresses.bridgehub.registerAlreadyDeployedZKChain(chainId, chain);
             vm.stopBroadcast();

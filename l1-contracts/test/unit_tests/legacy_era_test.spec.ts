@@ -17,7 +17,7 @@ import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
 import { IL1ERC20BridgeFactory } from "../../typechain/IL1ERC20BridgeFactory";
 import type { IMailbox } from "../../typechain/IMailbox";
 
-import { ethTestConfig } from "../../src.ts/utils";
+import { ethTestConfig } from "../../src.ts/constants";
 import { Action, facetCut } from "../../src.ts/diamondCut";
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";

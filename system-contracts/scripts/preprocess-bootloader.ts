@@ -82,6 +82,7 @@ const params = {
   RIGHT_PADDED_SEND_L2_TO_L1_LOG_SELECTOR: getPaddedSelector("L1Messenger", "sendL2ToL1Log"),
   PUBLISH_PUBDATA_SELECTOR: getSelector("L1Messenger", "publishPubdataAndClearState"),
   RIGHT_PADDED_SET_NEW_BATCH_SELECTOR: getPaddedSelector("SystemContext", "setNewBatch"),
+  RIGHT_PADDED_SET_SETTLEMENT_LAYER_CHAIN_ID_SELECTOR: getPaddedSelector("SystemContext", "setSettlementLayerChainId"),
   RIGHT_PADDED_OVERRIDE_BATCH_SELECTOR: getPaddedSelector("SystemContext", "unsafeOverrideBatch"),
   // Error
   REVERT_ERROR_SELECTOR: padZeroRight(getRevertSelector(), PADDED_SELECTOR_LENGTH),
@@ -90,6 +91,8 @@ const params = {
   GET_TX_HASHES_SELECTOR: getSelector("BootloaderUtilities", "getTransactionHashes"),
   CREATE_SELECTOR: getSelector("ContractDeployer", "create"),
   CREATE2_SELECTOR: getSelector("ContractDeployer", "create2"),
+  CREATE_EVM_SELECTOR: getSelector("ContractDeployer", "createEVM"),
+  CREATE2_EVM_SELECTOR: getSelector("ContractDeployer", "create2EVM"),
   CREATE_ACCOUNT_SELECTOR: getSelector("ContractDeployer", "createAccount"),
   CREATE2_ACCOUNT_SELECTOR: getSelector("ContractDeployer", "create2Account"),
   PADDED_TRANSFER_FROM_TO_SELECTOR: getPaddedSelector("L2BaseToken", "transferFromTo"),
@@ -97,12 +100,14 @@ const params = {
   SUCCESSFUL_PAYMASTER_VALIDATION_MAGIC_VALUE: getPaddedSelector("IPaymaster", "validateAndPayForPaymasterTransaction"),
   PUBLISH_COMPRESSED_BYTECODE_SELECTOR: getSelector("Compressor", "publishCompressedBytecode"),
   GET_MARKER_PADDED_SELECTOR: getPaddedSelector("KnownCodesStorage", "getMarker"),
+  GET_CODE_SIZE_SELECTOR: getPaddedSelector("AccountCodeStorage", "getCodeSize"),
   RIGHT_PADDED_SET_L2_BLOCK_SELECTOR: getPaddedSelector("SystemContext", "setL2Block"),
   RIGHT_PADDED_APPEND_TRANSACTION_TO_L2_BLOCK_SELECTOR: getPaddedSelector(
     "SystemContext",
     "appendTransactionToCurrentL2Block"
   ),
   RIGHT_PADDED_PUBLISH_TIMESTAMP_DATA_TO_L1_SELECTOR: getPaddedSelector("SystemContext", "publishTimestampDataToL1"),
+  RIGHT_PADDED_SET_L2_INTEROP_ROOT_SELECTOR: getPaddedSelector("L2InteropRootStorage", "addInteropRoot"),
   COMPRESSED_BYTECODES_SLOTS: 196608,
   ENSURE_RETURNED_MAGIC: 1,
   FORBID_ZERO_GAS_PER_PUBDATA: 1,
@@ -110,7 +115,7 @@ const params = {
   PADDED_FORCE_DEPLOY_ON_ADDRESSES_SELECTOR: getPaddedSelector("ContractDeployer", "forceDeployOnAddresses"),
   // One of "worst case" scenarios for the number of state diffs in a batch is when 780kb of pubdata is spent
   // on repeated writes, that are all zeroed out. In this case, the number of diffs is 780kb / 5 = 156k. This means that they will have
-  // accoomdate 42432000 bytes of calldata for the uncompressed state diffs. Adding 780kb on top leaves us with
+  // accommodate 42432000 bytes of calldata for the uncompressed state diffs. Adding 780kb on top leaves us with
   // roughly 43212000 bytes needed for calldata.
   // 1350375 slots are needed to accommodate this amount of data. We round up to 1360000 slots just in case.
   //
@@ -208,6 +213,19 @@ async function main() {
     BOOTLOADER_TYPE: "playground_batch",
   });
 
+  // For impersonating block start
+  console.log("Preprocessing production impersonating bootloader");
+  const provedBatchImpersonatingBootloader = preprocess.preprocess(bootloader, {
+    BOOTLOADER_TYPE: "proved_batch",
+    ACCOUNT_IMPERSONATING: true,
+  });
+  console.log("Preprocessing fee estimation impersonating bootloader");
+  const feeEstimationImpersonatingBootloader = preprocess.preprocess(bootloader, {
+    BOOTLOADER_TYPE: "playground_batch",
+    ACCOUNT_IMPERSONATING: true,
+  });
+  // For impersonating block end
+
   console.log("Preprocessing bootloader tests");
   const bootloaderTests = await renderFile("bootloader/tests/bootloader/bootloader_test.yul", {});
 
@@ -251,6 +269,13 @@ async function main() {
   writeFileSync(`${OUTPUT_DIR_2}/fee_estimate.yul`, feeEstimationBootloader);
   writeFileSync(`${OUTPUT_DIR_2}/dummy.yul`, dummy);
   writeFileSync(`${OUTPUT_DIR_2}/transfer_test.yul`, transferTest);
+
+  // For impersonating block start
+  writeFileSync(`${OUTPUT_DIR_1}/proved_batch_impersonating.yul`, provedBatchImpersonatingBootloader);
+  writeFileSync(`${OUTPUT_DIR_1}/fee_estimate_impersonating.yul`, feeEstimationImpersonatingBootloader);
+  writeFileSync(`${OUTPUT_DIR_2}/proved_batch_impersonating.yul`, provedBatchImpersonatingBootloader);
+  writeFileSync(`${OUTPUT_DIR_2}/fee_estimate_impersonating.yul`, feeEstimationImpersonatingBootloader);
+  // For impersonating block end
 
   console.log("Bootloader preprocessing done!");
 }

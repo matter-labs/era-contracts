@@ -3,7 +3,7 @@ pragma solidity ^0.8.18;
 
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
-import {ZeroAddress, MigrationPaused, MigrationsNotPaused, ProtocolIdMismatch} from "../common/L1ContractErrors.sol";
+import {MigrationPaused, MigrationsNotPaused, ProtocolIdMismatch, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @title Rules to validate that different upgrade stages have passed.
 /// @author Matter Labs

@@ -2,11 +2,10 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
-import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
+import {L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {IAssetHandler} from "../bridge/interfaces/IAssetHandler.sol";
+import {IInteropCenter} from "../interop/IInteropCenter.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -45,6 +44,7 @@ struct BridgehubMintCTMAssetData {
     bytes32 baseTokenAssetId;
     bytes ctmData;
     bytes chainData;
+    uint256 migrationNumber;
 }
 
 struct BridgehubBurnCTMAssetData {
@@ -55,7 +55,7 @@ struct BridgehubBurnCTMAssetData {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IBridgehub is IAssetHandler, IL1AssetHandler {
+interface IBridgehub {
     /// @notice pendingAdmin is changed
     /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
     event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);
@@ -72,18 +72,6 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
     );
 
     event SettlementLayerRegistered(uint256 indexed chainId, bool indexed isWhitelisted);
-
-    /// @notice Emitted when the bridging to the chain is started.
-    /// @param chainId Chain ID of the ZK chain
-    /// @param assetId Asset ID of the token for the zkChain's CTM
-    /// @param settlementLayerChainId The chain id of the settlement layer the chain migrates to.
-    event MigrationStarted(uint256 indexed chainId, bytes32 indexed assetId, uint256 indexed settlementLayerChainId);
-
-    /// @notice Emitted when the bridging to the chain is complete.
-    /// @param chainId Chain ID of the ZK chain
-    /// @param assetId Asset ID of the token for the zkChain's CTM
-    /// @param zkChain The address of the ZK chain on the chain where it is migrated to.
-    event MigrationFinalized(uint256 indexed chainId, bytes32 indexed assetId, address indexed zkChain);
 
     /// @notice Starts the transfer of admin rights. Only the current admin or owner can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
@@ -104,9 +92,11 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 
-    function sharedBridge() external view returns (address);
-
     function messageRoot() external view returns (IMessageRoot);
+
+    function interopCenter() external view returns (IInteropCenter);
+
+    // function assetTracker() external view returns (IAssetTracker);
 
     function getZKChain(uint256 _chainId) external view returns (address);
 
@@ -119,6 +109,8 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
     function admin() external view returns (address);
 
     function assetRouter() external view returns (address);
+
+    function chainRegistrationSender() external view returns (address);
 
     /// Mailbox forwarder
 
@@ -184,8 +176,13 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
     function setAddresses(
         address _sharedBridge,
         ICTMDeploymentTracker _l1CtmDeployer,
-        IMessageRoot _messageRoot
+        IMessageRoot _messageRoot,
+        address _chainAssetHandler,
+        address _interopCenter,
+        address _chainRegistrationSender
     ) external;
+
+    function setChainAssetHandler(address _chainAssetHandler) external;
 
     event NewChain(uint256 indexed chainId, address chainTypeManager, address indexed chainGovernance);
 
@@ -211,12 +208,6 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
     //     bytes calldata _diamondCut
     // ) external;
 
-    function forwardTransactionOnGateway(
-        uint256 _chainId,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
-    ) external;
-
     function ctmAssetIdFromChainId(uint256 _chainId) external view returns (bytes32);
 
     function ctmAssetIdFromAddress(address _ctmAddress) external view returns (bytes32);
@@ -229,15 +220,34 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function L1_CHAIN_ID() external view returns (uint256);
 
+    function chainAssetHandler() external view returns (address);
+
     function registerAlreadyDeployedZKChain(uint256 _chainId, address _hyperchain) external;
-
-    /// @notice return the ZK chain contract for a chainId
-    /// @dev It is a legacy method. Do not use!
-    function getHyperchain(uint256 _chainId) external view returns (address);
-
-    function registerLegacyChain(uint256 _chainId) external;
 
     function pauseMigration() external;
 
     function unpauseMigration() external;
+
+    function forwardedBridgeBurnSetSettlementLayer(
+        uint256 _chainId,
+        uint256 _newSettlementLayerChainId
+    ) external returns (address zkChain, address ctm);
+
+    function forwardedBridgeMint(
+        bytes32 _assetId,
+        uint256 _chainId,
+        bytes32 _baseTokenAssetId
+    ) external returns (address zkChain, address ctm);
+
+    function registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) external;
+
+    function forwardedBridgeRecoverFailedTransfer(uint256 _chainId) external returns (address zkChain, address ctm);
+
+    function forwardTransactionOnGateway(
+        uint256 _chainId,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external;
+
+    function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external;
 }

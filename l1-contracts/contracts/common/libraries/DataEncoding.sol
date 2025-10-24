@@ -2,10 +2,12 @@
 
 pragma solidity 0.8.28;
 
-import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
 import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../../bridge/ntv/INativeTokenVault.sol";
-import {IncorrectTokenAddressFromNTV, UnsupportedEncodingVersion, InvalidNTVBurnData} from "../L1ContractErrors.sol";
+import {AssetIdMismatch, IncorrectTokenAddressFromNTV, InvalidNTVBurnData, L2WithdrawalMessageWrongLength, UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
+import {WrongMsgLength} from "../../bridge/L1BridgeContractErrors.sol";
+import {UnsafeBytes} from "./UnsafeBytes.sol";
 
 /**
  * @author Matter Labs
@@ -192,5 +194,114 @@ library DataEncoding {
         bytes memory _decimals
     ) internal pure returns (bytes memory) {
         return bytes.concat(NEW_ENCODING_VERSION, abi.encode(_chainId, _name, _symbol, _decimals));
+    }
+
+    /// @notice Encodes the asset tracker data by combining chain id, asset id, amount, minting chain status and settlement layer balance.
+    /// @param _chainId The id of the chain being migrated.
+    /// @param _assetId The id of the asset being migrated.
+    /// @param _amount The amount being migrated.
+    /// @param _migratingChainIsMinter Whether the migrating chain is a minter.
+    /// @param _hasSettlingMintingChains Whether there are still settling minting chains.
+    /// @param _newSLBalance The new settlement layer balance.
+    /// @return The encoded asset tracker data.
+    function encodeAssetTrackerData(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        bool _migratingChainIsMinter,
+        bool _hasSettlingMintingChains,
+        uint256 _newSLBalance
+    ) internal pure returns (bytes memory) {
+        return
+            abi.encode(_chainId, _assetId, _amount, _migratingChainIsMinter, _hasSettlingMintingChains, _newSLBalance);
+    }
+
+    /// @notice Decodes the asset tracker data into its component parts.
+    /// @param _data The encoded asset tracker data.
+    /// @return chainId The id of the chain being migrated.
+    /// @return assetId The id of the asset being migrated.
+    /// @return amount The amount being migrated.
+    /// @return migratingChainIsMinter Whether the migrating chain is a minter.
+    /// @return hasSettlingMintingChains Whether there are still settling minting chains.
+    /// @return newSLBalance The new settlement layer balance.
+    function decodeAssetTrackerData(
+        bytes calldata _data
+    )
+        internal
+        pure
+        returns (
+            uint256 chainId,
+            bytes32 assetId,
+            uint256 amount,
+            bool migratingChainIsMinter,
+            bool hasSettlingMintingChains,
+            uint256 newSLBalance
+        )
+    {
+        return abi.decode(_data, (uint256, bytes32, uint256, bool, bool, uint256));
+    }
+
+    /// @notice Checks if the assetId is correct.
+    /// @param _tokenOriginChainId The chain id of the token origin.
+    /// @param _assetId The asset id to check.
+    /// @param _originToken The origin token address.
+    function assetIdCheck(uint256 _tokenOriginChainId, bytes32 _assetId, address _originToken) internal pure {
+        bytes32 expectedAssetId = encodeNTVAssetId(_tokenOriginChainId, _originToken);
+        if (_assetId != expectedAssetId) {
+            // Make sure that a NativeTokenVault sent the message
+            revert AssetIdMismatch(expectedAssetId, _assetId);
+        }
+    }
+
+    function decodeBaseTokenFinalizeWithdrawalData(
+        bytes memory _l2ToL1message
+    ) internal pure returns (address l1Receiver, uint256 amount) {
+        uint256 offset = 4; // we already read the function signature
+        // The data is expected to be at least 56 bytes long.
+        require(_l2ToL1message.length >= 56, L2WithdrawalMessageWrongLength(_l2ToL1message.length));
+        // this message is a base token withdrawal
+        (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
+        // slither-disable-next-line unused-return
+        (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
+    }
+
+    function decodeLegacyFinalizeWithdrawalData(
+        bytes memory _l2ToL1message
+    ) internal pure returns (address l1Token, bytes memory transferData) {
+        uint256 offset = 4; // we already read the function signature
+
+        // Check that the message length is correct.
+        // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
+        // 76 (bytes).
+        require(_l2ToL1message.length == 76, L2WithdrawalMessageWrongLength(_l2ToL1message.length));
+        address l1Receiver;
+        uint256 amount;
+        (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
+        // We use the IL1ERC20Bridge for backward compatibility with old withdrawals.
+        (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
+        // slither-disable-next-line unused-return
+        (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
+
+        // We also convert the data into the new format.
+        transferData = DataEncoding.encodeBridgeMintData({
+            _originalCaller: address(0),
+            _remoteReceiver: l1Receiver,
+            _originToken: l1Token,
+            _amount: amount,
+            _erc20Metadata: new bytes(0)
+        });
+    }
+
+    function decodeAssetRouterFinalizeDepositData(
+        bytes memory _l2ToL1message
+    ) internal pure returns (uint256 originChainId, bytes32 assetId, bytes memory transferData) {
+        uint256 offset = 4; // we already read the function signature
+
+        // The data is expected to be at least 68 bytes long to contain assetId.
+        require(_l2ToL1message.length >= 68, WrongMsgLength(68, _l2ToL1message.length));
+        // slither-disable-next-line unused-return
+        (originChainId, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset); // originChainId, not used for L2->L1 txs
+        (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
+        transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
     }
 }

@@ -234,8 +234,6 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
     // priorityTxMaxPubdata,
     // maxL2GasPerBatch,
     // minimalL2GasPrice,
-
-    // blobVersionedHashRetriever
   ] = ethers.utils.defaultAbiCoder.decode(
     [
       "address",
@@ -252,7 +250,6 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
       "uint256",
       "uint256",
       "uint256",
-      "address",
     ],
     diamondCut.initCalldata
   );
@@ -340,7 +337,7 @@ async function checkBridgehub() {
     throw new Error("Bridgehub zkChain is not correct");
   }
 
-  const sharedBridge = await contract.sharedBridge();
+  const sharedBridge = await contract.assetRouter();
   if (sharedBridge.toLowerCase() != sharedBridgeProxy.toLowerCase()) {
     throw new Error("Bridgehub sharedBridge is not correct");
   }

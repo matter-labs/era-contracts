@@ -2,14 +2,14 @@
 
 pragma solidity 0.8.28;
 
-import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "./interfaces/IAccount.sol";
-import {TransactionHelper, Transaction, EIP_712_TX_TYPE, L1_TO_L2_TX_TYPE} from "./libraries/TransactionHelper.sol";
+import {ACCOUNT_VALIDATION_SUCCESS_MAGIC, IAccount} from "./interfaces/IAccount.sol";
+import {EIP_712_TX_TYPE, L1_TO_L2_TX_TYPE, Transaction, TransactionHelper} from "./libraries/TransactionHelper.sol";
 import {SystemContractsCaller} from "./libraries/SystemContractsCaller.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, NONCE_HOLDER_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, INonceHolder} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, INonceHolder, NONCE_HOLDER_SYSTEM_CONTRACT} from "./Constants.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {InsufficientFunds, InvalidSig, SigField, FailedToPayOperator} from "./SystemContractErrors.sol";
+import {FailedToPayOperator, InsufficientFunds, InvalidSig, SigField} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -109,6 +109,10 @@ contract DefaultAccount is IAccount {
         }
     }
 
+    ///
+    /// FOUNDRY SUPPORT START
+    ///
+    /// @inheritdoc IAccount
     /// @notice Method called by the bootloader to execute the transaction.
     /// @param _transaction The transaction to execute.
     /// @dev It also accepts unused _txHash and _suggestedSignedHash parameters:
@@ -118,8 +122,12 @@ contract DefaultAccount is IAccount {
         bytes32, // _txHash
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
-    ) external payable override ignoreNonBootloader ignoreInDelegateCall {
+    ) external payable override ignoreNonBootloader ignoreInDelegateCall returns (bytes memory returnData) {
         _execute(_transaction);
+        returnData = bytes("");
+        ///
+        /// FOUNDRY SUPPORT END
+        ///
     }
 
     /// @notice Method that should be used to initiate a transaction from this account by an external call.

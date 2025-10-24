@@ -7,7 +7,6 @@ import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
@@ -24,10 +23,12 @@ contract MailboxTest is Test {
     address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
     address diamondProxy;
     address bridgehub;
+    address interopCenter;
 
     function deployDiamondProxy() internal returns (address proxy) {
         sender = makeAddr("sender");
         bridgehub = makeAddr("bridgehub");
+        interopCenter = makeAddr("interopCenter");
         vm.deal(sender, 100 ether);
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
@@ -53,6 +54,7 @@ contract MailboxTest is Test {
         proxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
         utilsFacet = UtilsFacet(proxy);
         utilsFacet.util_setBridgehub(bridgehub);
+        utilsFacet.util_setInteropCenter(interopCenter);
     }
 
     function setupDiamondProxy() public {
@@ -61,6 +63,9 @@ contract MailboxTest is Test {
         mailboxFacet = IMailbox(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
         gettersFacet = IGetters(diamondProxy);
+
+        // utilsFacet.util_setBridgehub(bridgehub);
+        // utilsFacet.util_setInteropCenter(interopCenter);
     }
 
     // add this to be excluded from coverage report

@@ -10,6 +10,8 @@ import {IImmutableSimulator} from "./interfaces/IImmutableSimulator.sol";
 import {IBaseToken} from "./interfaces/IBaseToken.sol";
 import {IBridgehub} from "./interfaces/IBridgehub.sol";
 import {IL1Messenger} from "./interfaces/IL1Messenger.sol";
+import {IMessageVerification} from "./interfaces/IMessageVerification.sol";
+import {IChainAssetHandler} from "./interfaces/IChainAssetHandler.sol";
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {ICompressor} from "./interfaces/ICompressor.sol";
 import {IComplexUpgrader} from "./interfaces/IComplexUpgrader.sol";
@@ -18,6 +20,12 @@ import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 import {IMessageRoot} from "./interfaces/IMessageRoot.sol";
 import {ICreate2Factory} from "./interfaces/ICreate2Factory.sol";
 import {IEvmHashesStorage} from "./interfaces/IEvmHashesStorage.sol";
+import {IL2AssetRouter} from "./interfaces/IL2AssetRouter.sol";
+import {IL2AssetTracker} from "./interfaces/IL2AssetTracker.sol";
+import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
+import {IInteropHandler} from "./interfaces/IInteropHandler.sol";
+import {IInteropCenter} from "./interfaces/IInteropCenter.sol";
+import {IL2InteropRootStorage} from "./interfaces/IL2InteropRootStorage.sol";
 
 /// @dev All the system contracts introduced by ZKsync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
@@ -107,15 +115,26 @@ address constant EVM_PREDEPLOYS_MANAGER = address(SYSTEM_CONTRACTS_OFFSET + 0x14
 IEvmHashesStorage constant EVM_HASHES_STORAGE = IEvmHashesStorage(address(SYSTEM_CONTRACTS_OFFSET + 0x15));
 
 ICreate2Factory constant L2_CREATE2_FACTORY = ICreate2Factory(address(USER_CONTRACTS_OFFSET));
-address constant L2_ASSET_ROUTER = address(USER_CONTRACTS_OFFSET + 0x03);
+IL2AssetRouter constant L2_ASSET_ROUTER = IL2AssetRouter(address(USER_CONTRACTS_OFFSET + 0x03));
 IBridgehub constant L2_BRIDGE_HUB = IBridgehub(address(USER_CONTRACTS_OFFSET + 0x02));
 address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x04);
+IL2NativeTokenVault constant L2_NATIVE_TOKEN_VAULT = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(address(USER_CONTRACTS_OFFSET + 0x05));
 // Note, that on its own this contract does not provide much functionality, but having it on a constant address
 // serves as a convenient storage for its bytecode to be accessible via `extcodehash`.
 address constant SLOAD_CONTRACT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x06);
 
 address constant WRAPPED_BASE_TOKEN_IMPL_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x07);
+IL2InteropRootStorage constant L2_INTEROP_ROOT_STORAGE = IL2InteropRootStorage(address(USER_CONTRACTS_OFFSET + 0x08));
+IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(address(USER_CONTRACTS_OFFSET + 0x09));
+address constant L2_CHAIN_ASSET_HANDLER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0a);
+IChainAssetHandler constant L2_CHAIN_ASSET_HANDLER = IChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDRESS);
+address constant L2_INTEROP_CENTER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0b);
+IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(L2_INTEROP_CENTER_ADDRESS);
+IInteropHandler constant L2_INTEROP_HANDLER = IInteropHandler(address(USER_CONTRACTS_OFFSET + 0x0c));
+address constant L2_ASSET_TRACKER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0d);
+IL2AssetTracker constant L2_ASSET_TRACKER = IL2AssetTracker(address(L2_ASSET_TRACKER_ADDRESS));
+
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.
@@ -148,12 +167,16 @@ enum SystemLogKey {
     PREV_BATCH_HASH_KEY,
     L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
     USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+    MESSAGE_ROOT_ROLLING_HASH_KEY,
+    L2_TXS_STATUS_ROLLING_HASH_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
 /// @dev The number of leaves in the L2->L1 log Merkle tree.
 /// While formally a tree of any length is acceptable, the node supports only a constant length of 16384 leaves.
 uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 16_384;
+
+uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_DEPTH = 14 + 1;
 
 /// @dev The length of the derived key in bytes inside compressed state diffs.
 uint256 constant DERIVED_KEY_LENGTH = 32;
@@ -193,3 +216,6 @@ uint8 constant ERA_VM_BYTECODE_FLAG = 1;
 uint8 constant EVM_BYTECODE_FLAG = 2;
 
 address constant SERVICE_CALL_PSEUDO_CALLER = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
+
+/// @dev The metadata version that is supported by the ZK Chains to prove that an L2->L1 log was included in a batch.
+uint256 constant SUPPORTED_PROOF_METADATA_VERSION = 1;

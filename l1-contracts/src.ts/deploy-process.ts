@@ -12,13 +12,8 @@ import type { FacetCut } from "./diamondCut";
 import type { Deployer } from "./deploy";
 import { getTokens } from "./deploy-token";
 
-import {
-  ADDRESS_ONE,
-  L2_BRIDGEHUB_ADDRESS,
-  L2_MESSAGE_ROOT_ADDRESS,
-  isCurrentNetworkLocal,
-  encodeNTVAssetId,
-} from "../src.ts/utils";
+import { ADDRESS_ONE, L2_BRIDGEHUB_ADDRESS, L2_MESSAGE_ROOT_ADDRESS } from "../src.ts/constants";
+import { isCurrentNetworkLocal, encodeNTVAssetId } from "../src.ts/utils";
 
 export const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000";
 export const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
@@ -90,11 +85,6 @@ export async function initialBridgehubDeployment(
     await deployer.setParametersSharedBridge();
   }
 
-  if (deployer.isZkMode()) {
-    await deployer.updateBlobVersionedHashRetrieverZkMode();
-  } else {
-    await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
-  }
   await deployer.deployChainTypeManagerContract(create2Salt, extraFacets, gasPrice);
   await deployer.setChainTypeManagerInValidatorTimelock({ gasPrice });
 }

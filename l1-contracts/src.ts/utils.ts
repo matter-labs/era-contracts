@@ -5,31 +5,13 @@ import * as hardhat from "hardhat";
 import type { BytesLike, BigNumberish } from "ethers";
 import { ethers } from "ethers";
 import * as fs from "fs";
-import * as path from "path";
 import { DiamondInitFactory } from "../typechain";
 import type { DiamondCut, FacetCut } from "./diamondCut";
 import { diamondCut } from "./diamondCut";
 import { SYSTEM_CONFIG, web3Url } from "../scripts/utils";
 import { Wallet as ZkWallet, Provider } from "zksync-ethers";
+import { L2_NATIVE_TOKEN_VAULT_ADDRESS, L1_TO_L2_ALIAS_OFFSET } from "./constants";
 
-export const testConfigPath = process.env.ZKSYNC_ENV
-  ? path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant")
-  : "./test/test_config/constant";
-export const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../SystemConfig.json").REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
-
-export const SYSTEM_UPGRADE_L2_TX_TYPE = 254;
-export const ADDRESS_ONE = "0x0000000000000000000000000000000000000001";
-export const ETH_ADDRESS_IN_CONTRACTS = ADDRESS_ONE;
-export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
-export const L2_BRIDGEHUB_ADDRESS = "0x0000000000000000000000000000000000010002";
-export const L2_ASSET_ROUTER_ADDRESS = "0x0000000000000000000000000000000000010003";
-export const L2_NATIVE_TOKEN_VAULT_ADDRESS = "0x0000000000000000000000000000000000010004";
-export const L2_MESSAGE_ROOT_ADDRESS = "0x0000000000000000000000000000000000010005";
-export const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000008006";
-export const EMPTY_STRING_KECCAK = "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate2"]);
 
 export const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
@@ -237,7 +219,6 @@ function checkValidInitialCutHashParams(
   l2DefaultAccountBytecodeHash: string,
   l2EvmEmulatorBytecodeHash: string,
   verifier: string,
-  blobVersionedHashRetriever: string,
   priorityTxMaxGasLimit: number
 ) {
   // We do not fetch the following numbers from the environment because they are very rarely changed
@@ -270,9 +251,6 @@ function checkValidInitialCutHashParams(
   if (verifier === ethers.constants.AddressZero) {
     throw new Error("Verifier address is zero");
   }
-  if (blobVersionedHashRetriever === ethers.constants.AddressZero) {
-    throw new Error("Blob versioned hash retriever address is zero");
-  }
   if (priorityTxMaxGasLimit !== EXPECTED_PRIORITY_TX_MAX_GAS_LIMIT) {
     throw new Error(
       `Expected priority tx max gas limit to be ${EXPECTED_PRIORITY_TX_MAX_GAS_LIMIT}, got ${priorityTxMaxGasLimit}`
@@ -288,7 +266,6 @@ export function compileInitialCutHash(
   l2DefaultAccountBytecodeHash: string,
   l2EvmEmulatorBytecodeHash: string,
   verifier: string,
-  blobVersionedHashRetriever: string,
   priorityTxMaxGasLimit: number,
   diamondInit: string,
   strictMode: boolean = true
@@ -301,7 +278,6 @@ export function compileInitialCutHash(
       l2DefaultAccountBytecodeHash,
       l2EvmEmulatorBytecodeHash,
       verifier,
-      blobVersionedHashRetriever,
       priorityTxMaxGasLimit
     );
   }
@@ -322,6 +298,7 @@ export function compileInitialCutHash(
     {
       chainId: "0x0000000000000000000000000000000000000000000000000000000000000001",
       bridgehub: "0x0000000000000000000000000000000000001234",
+      interopCenter: "0x0000000000000000000000000000000000001235",
       chainTypeManager: "0x0000000000000000000000000000000000002234",
       protocolVersion: "0x0000000000000000000000000000000000002234",
       admin: "0x0000000000000000000000000000000000003234",
@@ -335,11 +312,10 @@ export function compileInitialCutHash(
       l2EvmEmulatorBytecodeHash,
       priorityTxMaxGasLimit,
       feeParams,
-      blobVersionedHashRetriever,
     },
   ]);
 
-  return diamondCut(facetCuts, diamondInit, "0x" + diamondInitCalldata.slice(2 + (4 + 8 * 32) * 2));
+  return diamondCut(facetCuts, diamondInit, "0x" + diamondInitCalldata.slice(2 + (4 + 9 * 32) * 2));
 }
 
 export enum PubdataSource {

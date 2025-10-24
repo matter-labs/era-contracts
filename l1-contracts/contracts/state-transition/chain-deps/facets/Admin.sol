@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
+import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {MAX_GAS_PER_TRANSACTION, ZKChainCommitment} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
@@ -12,11 +13,11 @@ import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.s
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, InvalidDAForPermanentRollup, AlreadyPermanentRollup} from "../../../common/L1ContractErrors.sol";
-import {NotL1, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, AlreadyMigrated, NotChainAdmin, ProtocolVersionNotUpToDate, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, InvalidNumberOfBatchHashes, PriorityQueueNotReady, VerifiedIsNotConsistentWithCommitted, NotAllBatchesExecuted, OutdatedProtocolVersion, NotHistoricalRoot, ContractNotDeployed, NotMigrated} from "../../L1StateTransitionErrors.sol";
+import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidPubdataPricingMode, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized} from "../../../common/L1ContractErrors.sol";
+import {AlreadyMigrated, ContractNotDeployed, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, V30UpgradeGatewayBlockNumberNotSet, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
-import {IL2ContractDeployer, AllowedBytecodeTypes} from "../../../common/interfaces/IL2ContractDeployer.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -146,6 +147,11 @@ contract AdminFacet is ZKChainBase, IAdmin {
         emit NewTransactionFilterer(oldTransactionFilterer, _transactionFilterer);
     }
 
+    /// @inheritdoc IAdmin
+    function getRollupDAManager() external view returns (address) {
+        return address(ROLLUP_DA_MANAGER);
+    }
+
     /// @notice Sets the DA validator pair with the given addresses.
     /// @dev It does not check for these addresses to be non-zero, since when migrating to a new settlement
     /// layer, we set them to zero.
@@ -246,6 +252,13 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
         Diamond.diamondCut(cutData);
         emit ExecuteUpgrade(cutData);
+
+        uint256 v30UpgradeGatewayBlockNumber = (IBridgehub(s.bridgehub).messageRoot()).v30UpgradeGatewayBlockNumber();
+        require(v30UpgradeGatewayBlockNumber != 0, V30UpgradeGatewayBlockNumberNotSet());
+        IMailbox(address(this)).requestL2ServiceTransaction(
+            L2_MESSAGE_ROOT_ADDR,
+            abi.encodeCall(L2_MESSAGE_ROOT.saveV30UpgradeGatewayBlockNumberOnL2, v30UpgradeGatewayBlockNumber)
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -287,7 +300,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         address _settlementLayer,
         address _originalCaller,
         bytes calldata _data
-    ) external payable override onlyBridgehub returns (bytes memory chainBridgeMintData) {
+    ) external payable override onlyChainAssetHandler returns (bytes memory chainBridgeMintData) {
         if (s.settlementLayer != address(0)) {
             revert AlreadyMigrated();
         }
@@ -303,12 +316,11 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert ProtocolVersionNotUpToDate(currentProtocolVersion, protocolVersion);
         }
 
-        if (block.chainid != L1_CHAIN_ID) {
-            // We assume that GW -> L1 transactions can never fail and provide no recovery mechanism from it.
-            // That's why we need to bound the gas that can be consumed during such a migration.
-            if (s.totalBatchesCommitted != s.totalBatchesExecuted) {
-                revert NotAllBatchesExecuted();
-            }
+        // We assume that GW -> L1 transactions can never fail and provide no recovery mechanism from it.
+        // That's why we need to bound the gas that can be consumed during such a migration.
+        // We also require all committed batches to be executed, since each batch has a predefined settlement layer. 
+        if (s.totalBatchesCommitted != s.totalBatchesExecuted) {
+            revert NotAllBatchesExecuted();
         }
 
         s.settlementLayer = _settlementLayer;
@@ -319,7 +331,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     function forwardedBridgeMint(
         bytes calldata _data,
         bool _contractAlreadyDeployed
-    ) external payable override onlyBridgehub {
+    ) external payable override onlyChainAssetHandler {
         ZKChainCommitment memory _commitment = abi.decode(_data, (ZKChainCommitment));
 
         IChainTypeManager ctm = IChainTypeManager(s.chainTypeManager);
@@ -337,6 +349,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         s.totalBatchesVerified = batchesVerified;
         s.totalBatchesExecuted = batchesExecuted;
         s.isPermanentRollup = _commitment.isPermanentRollup;
+        s.precommitmentForTheLatestBatch = _commitment.precommitmentForTheLatestBatch;
 
         // Some consistency checks just in case.
         if (batchesExecuted > batchesVerified) {
@@ -367,7 +380,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
                     _commitment.priorityTree.sides[_commitment.priorityTree.sides.length - 1]
                 )
             ) {
-                revert NotHistoricalRoot();
+                revert NotHistoricalRoot(_commitment.priorityTree.sides[_commitment.priorityTree.sides.length - 1]);
             }
             if (!_contractAlreadyDeployed) {
                 revert ContractNotDeployed();
@@ -404,7 +417,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         bytes32 /* _assetInfo */,
         address /* _depositSender */,
         bytes calldata _chainData
-    ) external payable override onlyBridgehub {
+    ) external payable override onlyChainAssetHandler {
         // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
         uint256 protocolVersion = abi.decode(_chainData, (uint256));
 
@@ -423,10 +436,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @dev Note, that this is a getter method helpful for debugging and should not be relied upon by clients.
     /// @return commitment The commitment for the chain.
     function prepareChainCommitment() public view returns (ZKChainCommitment memory commitment) {
-        if (_isPriorityQueueActive()) {
-            revert PriorityQueueNotReady();
-        }
-
         commitment.totalBatchesCommitted = s.totalBatchesCommitted;
         commitment.totalBatchesVerified = s.totalBatchesVerified;
         commitment.totalBatchesExecuted = s.totalBatchesExecuted;
@@ -434,6 +443,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         commitment.l2SystemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         commitment.priorityTree = s.priorityTree.getCommitment();
         commitment.isPermanentRollup = s.isPermanentRollup;
+        commitment.precommitmentForTheLatestBatch = s.precommitmentForTheLatestBatch;
 
         // just in case
         if (commitment.totalBatchesExecuted > commitment.totalBatchesVerified) {
