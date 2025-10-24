@@ -35,6 +35,7 @@ import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_VERSION_SPECIF
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
+import {DeployL1CoreUtils} from "../DeployL1CoreUtils.s.sol";
 
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
@@ -68,10 +69,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
 
     function deployNewEcosystemContractsL1() public virtual override {
         DeployL1CoreUtils l1CoreDeployer = new DeployL1CoreUtils();
-        l1CoreDeployer.initializeConfig(
-            vm.envString("V29_UPGRADE_ECOSYSTEM_INPUT"),
-            vm.envString("V29_UPGRADE_ECOSYSTEM_OUTPUT")
-        );
+        l1CoreDeployer.initializeConfig(vm.envString("V29_UPGRADE_ECOSYSTEM_INPUT"));
         l1CoreDeployer.deploySimpleContract("L1Bridgehub", false);
         deploySimpleContract("L1ChainTypeManager", false);
     }

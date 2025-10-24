@@ -8,7 +8,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
     function deployTuppWithContract(
         string memory contractName,
         bool isZKBytecode
-    ) internal returns (address implementation, address proxy) {
+    ) public returns (address implementation, address proxy) {
         (implementation, proxy) = deployTuppWithContractAndProxyAdmin(
             contractName,
             transparentProxyAdmin(),
@@ -20,7 +20,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         string memory contractName,
         address proxyAdmin,
         bool isZKBytecode
-    ) internal returns (address implementation, address proxy) {
+    ) public returns (address implementation, address proxy) {
         implementation = deployViaCreate2AndNotify(
             getCreationCode(contractName, false),
             getCreationCalldata(contractName, false),
@@ -59,7 +59,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
     function deploySimpleContract(
         string memory contractName,
         bool isZKBytecode
-    ) internal returns (address contractAddress) {
+    ) public returns (address contractAddress) {
         contractAddress = deployViaCreate2AndNotify(
             getCreationCode(contractName, false),
             getCreationCalldata(contractName, false),
@@ -72,7 +72,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         string memory contractName,
         address owner,
         bool isZKBytecode
-    ) internal returns (address contractAddress) {
+    ) public returns (address contractAddress) {
         contractAddress = deployWithOwnerAndNotify(
             getCreationCode(contractName, false),
             getCreationCalldata(contractName, false),
