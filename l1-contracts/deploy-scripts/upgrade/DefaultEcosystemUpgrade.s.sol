@@ -680,7 +680,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
         discoveredBridgehub = AddressIntrospector.getBridgehubAddresses(bridgehub);
         config.ownerAddress = discoveredBridgehub.governance;
         address ctm = bridgehub.chainTypeManager(config.eraChainId);
-        discoveredCTM = AddressIntrospector.getCTMAddresses(IChainTypeManager(ctm));
+        discoveredCTM = AddressIntrospector.getCTMAddresses(ChainTypeManager(ctm));
         discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(
             IZKChain(bridgehub.getZKChain(config.eraChainId))
         );

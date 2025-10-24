@@ -52,7 +52,11 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml"
         );
         initializeConfig(inputPath);
-        addresses.transparentProxyAdmin = address(0x1);
+        discoveredBridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
+        discoveredBridgehub.transparentProxyAdmin = address(0x1);
+        discoveredBridgehub.assetRouter = L2_ASSET_ROUTER_ADDR;
+        discoveredBridgehub.assetRouterAddresses.nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
+        discoveredBridgehub.interopCenterProxy = L2_INTEROP_CENTER_ADDR;
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         if (!_skip) {
@@ -62,7 +66,6 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         addresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
         addresses.stateTransition.verifier = deploySimpleContract("Verifier", true);
         addresses.stateTransition.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
-        discoveredBridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
         deployStateTransitionDiamondFacets();
         (
             addresses.stateTransition.chainTypeManagerImplementation,

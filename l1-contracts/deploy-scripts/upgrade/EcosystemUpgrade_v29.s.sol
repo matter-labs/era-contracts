@@ -66,6 +66,11 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         prepareDefaultTestUpgradeCalls();
     }
 
+    function deployNewEcosystemContractsL1() public virtual override {
+        deploySimpleContract("L1Bridgehub", false);
+        deploySimpleContract("L1ChainTypeManager", false);
+    }
+
     function initializeConfig(string memory newConfigPath) internal override {
         super.initializeConfig(newConfigPath);
         string memory toml = vm.readFile(newConfigPath);

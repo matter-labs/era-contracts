@@ -349,30 +349,32 @@ contract DeployCTMScript is Script, DeployCTMUtils {
     function _buildForceDeploymentsData(
         address dangerousTestOnlyForcedBeacon
     ) private returns (FixedForceDeploymentsData memory data) {
-        data.l1ChainId = config.l1ChainId;
-        data.gatewayChainId = config.gatewayChainId;
-        data.eraChainId = config.eraChainId;
-        data.l1AssetRouter = discoveredBridgehub.assetRouter;
-        data.l2TokenProxyBytecodeHash = getL2BytecodeHash("BeaconProxy");
-        data.aliasedL1Governance = AddressAliasHelper.applyL1ToL2Alias(addresses.governance);
-        data.maxNumberOfZKChains = config.contracts.maxNumberOfChains;
-        data.bridgehubBytecodeInfo = abi.encode(getL2BytecodeHash("L2Bridgehub"));
-        data.l2AssetRouterBytecodeInfo = abi.encode(getL2BytecodeHash("L2AssetRouter"));
-        data.l2NtvBytecodeInfo = abi.encode(getL2BytecodeHash("L2NativeTokenVault"));
-        data.messageRootBytecodeInfo = abi.encode(getL2BytecodeHash("L2MessageRoot"));
-        data.beaconDeployerInfo = abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer"));
-        data.chainAssetHandlerBytecodeInfo = abi.encode(getL2BytecodeHash("L2ChainAssetHandler"));
-        data.interopCenterBytecodeInfo = abi.encode(getL2BytecodeHash("InteropCenter"));
-        data.interopHandlerBytecodeInfo = abi.encode(getL2BytecodeHash("InteropHandler"));
-        data.assetTrackerBytecodeInfo = abi.encode(getL2BytecodeHash("L2AssetTracker"));
-        // For newly created chains it is expected that the following bridges are not present at the moment
-        // of creation of the chain
-        data.l2SharedBridgeLegacyImpl = address(0);
-        data.l2BridgedStandardERC20Impl = address(0);
-        data.aliasedChainRegistrationSender = AddressAliasHelper.applyL1ToL2Alias(
-            discoveredBridgehub.chainRegistrationSenderProxy
-        );
-        data.dangerousTestOnlyForcedBeacon = dangerousTestOnlyForcedBeacon;
+        FixedForceDeploymentsData memory data = FixedForceDeploymentsData({
+            l1ChainId: config.l1ChainId,
+            gatewayChainId: config.gatewayChainId,
+            eraChainId: config.eraChainId,
+            l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
+            l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
+            aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
+            maxNumberOfZKChains: config.contracts.maxNumberOfChains,
+            bridgehubBytecodeInfo: abi.encode(getL2BytecodeHash("L2Bridgehub")),
+            l2AssetRouterBytecodeInfo: abi.encode(getL2BytecodeHash("L2AssetRouter")),
+            l2NtvBytecodeInfo: abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
+            messageRootBytecodeInfo: abi.encode(getL2BytecodeHash("L2MessageRoot")),
+            beaconDeployerInfo: abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
+            chainAssetHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
+            interopCenterBytecodeInfo: abi.encode(getL2BytecodeHash("InteropCenter")),
+            interopHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("InteropHandler")),
+            assetTrackerBytecodeInfo: abi.encode(getL2BytecodeHash("L2AssetTracker")),
+            // For newly created chains it it is expected that the following bridges are not present at the moment
+            // of creation of the chain
+            l2SharedBridgeLegacyImpl: address(0),
+            l2BridgedStandardERC20Impl: address(0),
+            aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
+                discoveredBridgehub.chainRegistrationSenderProxy
+            ),
+            dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon
+        });
     }
 
     function deployServerNotifier() internal returns (address implementation, address proxy) {

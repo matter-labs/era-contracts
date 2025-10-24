@@ -23,7 +23,7 @@ contract UpgradeIntegrationTest is Test {
     function setUp() public {
         ecosystemUpgrade = new EcosystemUpgrade_v29();
         ecosystemUpgrade.initialize(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT);
-
+        ecosystemUpgrade.deployNewEcosystemContractsL1();
         chainUpgrade = new ChainUpgrade();
     }
 

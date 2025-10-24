@@ -6,7 +6,7 @@ import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
@@ -96,14 +96,14 @@ library AddressIntrospector {
         info.transparentProxyAdmin = Utils.getProxyAdmin(info.bridgehubProxy);
     }
 
-    function getCTMAddresses(IChainTypeManager _ctm) public view returns (CTMAddresses memory info) {
+    function getCTMAddresses(ChainTypeManager _ctm) public view returns (CTMAddresses memory info) {
         address ctmAddr = address(_ctm);
         info.ctmProxy = ctmAddr;
         info.l1GenesisUpgrade = _ctm.l1GenesisUpgrade();
         info.validatorTimelockPostV29 = _tryAddress(ctmAddr, "validatorTimelockPostV29()");
-        info.legacyValidatorTimelock = _tryAddress(ctmAddr, "validatorTimelock()");
-        info.admin = _tryAddress(ctmAddr, "admin()");
-        info.serverNotifier = _tryAddress(ctmAddr, "serverNotifierAddress()");
+        info.legacyValidatorTimelock = _ctm.validatorTimelock();
+        info.admin = _ctm.admin();
+        info.serverNotifier = _ctm.serverNotifierAddress();
     }
 
     function getZkChainAddresses(IZKChain _zkChain) public view returns (ZkChainAddresses memory info) {
@@ -194,7 +194,7 @@ library AddressIntrospector {
         bh = getBridgehubAddresses(_bridgehub);
 
         address ctmAddr = _bridgehub.chainTypeManager(_chainId);
-        ctm = getCTMAddresses(IChainTypeManager(ctmAddr));
+        ctm = getCTMAddresses(ChainTypeManager(ctmAddr));
 
         address zkAddr = _bridgehub.getZKChain(_chainId);
         zk = getZkChainAddresses(IZKChain(zkAddr));
