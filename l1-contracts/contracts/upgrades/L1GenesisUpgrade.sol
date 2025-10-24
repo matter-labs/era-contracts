@@ -11,14 +11,13 @@ import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {IL2GenesisUpgrade} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL1GenesisUpgrade} from "./IL1GenesisUpgrade.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
-import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_GENESIS_UPGRADE_ADDR} from "../common/L2ContractAddresses.sol"; //, COMPLEX_UPGRADER_ADDR, GENESIS_UPGRADE_ADDR
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
+import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_GENESIS_UPGRADE_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {PRIORITY_TX_MAX_GAS_LIMIT, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
-import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {L1FixedForceDeploymentsHelper} from "./L1FixedForceDeploymentsHelper.sol";
 
 /// @author Matter Labs
@@ -39,7 +38,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
         bytes calldata _fixedForceDeploymentsData,
         bytes[] calldata _factoryDeps
     ) public override returns (bytes32) {
-        address baseTokenAddress = IBridgehub(s.bridgehub).baseToken(_chainId);
+        address baseTokenAddress = IL1Bridgehub(s.bridgehub).baseToken(_chainId);
 
         L2CanonicalTransaction memory l2ProtocolUpgradeTx;
 
@@ -53,7 +52,13 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
                 );
                 bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
                     IL2GenesisUpgrade.genesisUpgrade,
-                    (_chainId, _l1CtmDeployerAddress, _fixedForceDeploymentsData, additionalForceDeploymentsData)
+                    (
+                        s.zksyncOS,
+                        _chainId,
+                        _l1CtmDeployerAddress,
+                        _fixedForceDeploymentsData,
+                        additionalForceDeploymentsData
+                    )
                 );
                 complexUpgraderCalldata = abi.encodeCall(
                     IComplexUpgrader.upgrade,
@@ -64,7 +69,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
             // slither-disable-next-line unused-return
             (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(_protocolVersion));
             l2ProtocolUpgradeTx = L2CanonicalTransaction({
-                txType: SYSTEM_UPGRADE_L2_TX_TYPE,
+                txType: _getUpgradeTxType(),
                 from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
                 to: uint256(uint160(L2_COMPLEX_UPGRADER_ADDR)),
                 gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
@@ -78,7 +83,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
                 reserved: [uint256(0), 0, 0, 0],
                 data: complexUpgraderCalldata,
                 signature: new bytes(0),
-                factoryDeps: L2ContractHelper.hashFactoryDeps(_factoryDeps),
+                factoryDeps: new uint256[](0),
                 paymasterInput: new bytes(0),
                 reservedDynamic: new bytes(0)
             });

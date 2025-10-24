@@ -3,7 +3,7 @@ use std::sync::Arc;
 use colored::Colorize;
 use once_cell::sync::OnceCell;
 
-use zksync_multivm::tracers::dynamic::vm_1_5_0::DynTracer;
+use zksync_multivm::tracers::dynamic::vm_1_5_2::DynTracer;
 
 use zksync_multivm::interface::tracer::{TracerExecutionStatus, TracerExecutionStopReason};
 use zksync_multivm::vm_latest::{

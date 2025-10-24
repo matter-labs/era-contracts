@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {L2TransactionRequestTwoBridgesInner, IBridgehub} from "./IBridgehub.sol";
+import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "./IBridgehubBase.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetDeploymentTracker} from "../bridge/interfaces/IL1AssetDeploymentTracker.sol";
 
@@ -16,7 +16,7 @@ interface ICTMDeploymentTracker is IL1AssetDeploymentTracker {
         bytes calldata _data
     ) external payable returns (L2TransactionRequestTwoBridgesInner memory request);
 
-    function BRIDGE_HUB() external view returns (IBridgehub);
+    function BRIDGE_HUB() external view returns (IBridgehubBase);
 
     function L1_ASSET_ROUTER() external view returns (IAssetRouterBase);
 

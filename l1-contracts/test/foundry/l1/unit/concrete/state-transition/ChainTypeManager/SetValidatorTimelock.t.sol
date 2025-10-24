@@ -3,8 +3,6 @@ pragma solidity 0.8.28;
 
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
-import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
-
 contract setValidatorTimelockTest is ChainTypeManagerTest {
     function setUp() public {
         deploy();
@@ -12,16 +10,16 @@ contract setValidatorTimelockTest is ChainTypeManagerTest {
 
     function test_SettingValidatorTimelock() public {
         assertEq(
-            chainContractAddress.validatorTimelock(),
+            chainContractAddress.validatorTimelockPostV29(),
             validator,
             "Initial validator timelock address is not correct"
         );
 
         address newValidatorTimelock = address(0x0000000000000000000000000000000000004235);
-        chainContractAddress.setValidatorTimelock(newValidatorTimelock);
+        chainContractAddress.setValidatorTimelockPostV29(newValidatorTimelock);
 
         assertEq(
-            chainContractAddress.validatorTimelock(),
+            chainContractAddress.validatorTimelockPostV29(),
             newValidatorTimelock,
             "Validator timelock update was not successful"
         );
@@ -33,7 +31,7 @@ contract setValidatorTimelockTest is ChainTypeManagerTest {
 
         address notOwner = makeAddr("notOwner");
         assertEq(
-            chainContractAddress.validatorTimelock(),
+            chainContractAddress.validatorTimelockPostV29(),
             validator,
             "Initial validator timelock address is not correct"
         );
@@ -41,8 +39,8 @@ contract setValidatorTimelockTest is ChainTypeManagerTest {
         vm.prank(notOwner);
         vm.expectRevert("Ownable: caller is not the owner");
         address newValidatorTimelock = address(0x0000000000000000000000000000000000004235);
-        chainContractAddress.setValidatorTimelock(newValidatorTimelock);
+        chainContractAddress.setValidatorTimelockPostV29(newValidatorTimelock);
 
-        assertEq(chainContractAddress.validatorTimelock(), validator, "Validator should not have been updated");
+        assertEq(chainContractAddress.validatorTimelockPostV29(), validator, "Validator should not have been updated");
     }
 }

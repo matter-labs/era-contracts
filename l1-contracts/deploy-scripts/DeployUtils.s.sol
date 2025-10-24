@@ -3,37 +3,17 @@ pragma solidity ^0.8.24;
 
 // solhint-disable no-console, gas-custom-errors
 
-import {Script, console2 as console} from "forge-std/Script.sol";
+import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {StateTransitionDeployedAddresses, FacetCut, Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS, ADDRESS_ONE} from "./Utils.sol";
-import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {ChainTypeManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
+import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {Create2AndTransfer} from "./Create2AndTransfer.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
-
-struct FixedForceDeploymentsData {
-    uint256 l1ChainId;
-    uint256 eraChainId;
-    address l1AssetRouter;
-    bytes32 l2TokenProxyBytecodeHash;
-    address aliasedL1Governance;
-    uint256 maxNumberOfZKChains;
-    bytes32 bridgehubBytecodeHash;
-    bytes32 l2AssetRouterBytecodeHash;
-    bytes32 l2NtvBytecodeHash;
-    bytes32 messageRootBytecodeHash;
-    address l2SharedBridgeLegacyImpl;
-    address l2BridgedStandardERC20Impl;
-    // The forced beacon address. It is needed only for internal testing.
-    // MUST be equal to 0 in production.
-    // It will be the job of the governance to ensure that this value is set correctly.
-    address dangerousTestOnlyForcedBeacon;
-}
 
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
@@ -46,9 +26,8 @@ struct DeployedAddresses {
     address governance;
     address chainAdmin;
     address accessControlRestrictionAddress;
-    address blobVersionedHashRetriever;
+    address create2Factory;
     address chainRegistrar;
-    address protocolUpgradeHandlerProxy;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -73,6 +52,8 @@ struct BridgehubDeployedAddresses {
     address ctmDeploymentTrackerProxy;
     address messageRootImplementation;
     address messageRootProxy;
+    address chainAssetHandlerImplementation;
+    address chainAssetHandlerProxy;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -96,6 +77,7 @@ struct Config {
     address ownerAddress;
     bool testnetVerifier;
     bool supportL2LegacySharedBridgeTest;
+    bool isZKsyncOS;
     ContractsConfig contracts;
     TokensConfig tokens;
 }
@@ -157,6 +139,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
+        config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
 
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"
@@ -215,33 +198,18 @@ abstract contract DeployUtils is Create2FactoryUtils {
         addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
-    function deployBlobVersionedHashRetriever() internal {
-        addresses.blobVersionedHashRetriever = deploySimpleContract("BlobVersionedHashRetriever", false);
-    }
-
-    function getFacetCuts(
+    function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual returns (FacetCut[] memory facetCuts);
+    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts);
 
-    function formatFacetCuts(
-        FacetCut[] memory facetCutsUnformatted
-    ) internal returns (Diamond.FacetCut[] memory facetCuts) {
-        facetCuts = new Diamond.FacetCut[](facetCutsUnformatted.length);
-        for (uint256 i = 0; i < facetCutsUnformatted.length; i++) {
-            facetCuts[i] = Diamond.FacetCut({
-                facet: facetCutsUnformatted[i].facet,
-                action: Diamond.Action(uint8(facetCutsUnformatted[i].action)),
-                isFreezable: facetCutsUnformatted[i].isFreezable,
-                selectors: facetCutsUnformatted[i].selectors
-            });
-        }
-    }
+    function getUpgradeAddedFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts);
 
-    function getDiamondCutData(
+    function getChainCreationDiamondCutData(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
-        FacetCut[] memory facetCutsUnformatted = getFacetCuts(stateTransition);
-        Diamond.FacetCut[] memory facetCuts = formatFacetCuts(facetCutsUnformatted);
+        Diamond.FacetCut[] memory facetCuts = getChainCreationFacetCuts(stateTransition);
 
         DiamondInitializeDataNewChain memory initializeData = getInitializeData(stateTransition);
 
@@ -258,7 +226,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
     function getChainCreationParams(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (ChainCreationParams memory) {
-        Diamond.DiamondCutData memory diamondCut = getDiamondCutData(stateTransition);
+        Diamond.DiamondCutData memory diamondCut = getChainCreationDiamondCutData(stateTransition);
         return
             ChainCreationParams({
                 genesisUpgrade: stateTransition.genesisUpgrade,
@@ -313,10 +281,9 @@ abstract contract DeployUtils is Create2FactoryUtils {
         FeeParams memory feeParams = getFeeParams();
 
         require(stateTransition.verifier != address(0), "verifier is zero");
-
-        if (!stateTransition.isOnGateway) {
-            require(addresses.blobVersionedHashRetriever != address(0), "blobVersionedHashRetriever is zero");
-        }
+        require(config.contracts.bootloaderHash != bytes32(0), "bootloader hash is zero");
+        require(config.contracts.defaultAAHash != bytes32(0), "default aa hash is zero");
+        require(config.contracts.evmEmulatorHash != bytes32(0), "evm emulator hash is zero");
 
         return
             DiamondInitializeDataNewChain({
@@ -326,10 +293,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
                 l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
                 l2EvmEmulatorBytecodeHash: config.contracts.evmEmulatorHash,
                 priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
-                feeParams: feeParams,
-                blobVersionedHashRetriever: stateTransition.isOnGateway
-                    ? ADDRESS_ONE
-                    : addresses.blobVersionedHashRetriever
+                feeParams: feeParams
             });
     }
 
@@ -378,12 +342,20 @@ abstract contract DeployUtils is Create2FactoryUtils {
     ) internal view virtual returns (bytes memory) {
         if (compareStrings(contractName, "ChainRegistrar")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "Bridgehub")) {
-            return abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains));
-        } else if (compareStrings(contractName, "MessageRoot")) {
+        } else if (compareStrings(contractName, "L1Bridgehub")) {
+            return abi.encode(config.ownerAddress, config.contracts.maxNumberOfChains);
+        } else if (compareStrings(contractName, "L1MessageRoot")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy);
+        } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
+            return
+                abi.encode(
+                    config.ownerAddress,
+                    addresses.bridgehub.bridgehubProxy,
+                    addresses.bridges.l1AssetRouterProxy,
+                    addresses.bridgehub.messageRootProxy
+                );
         } else if (compareStrings(contractName, "L1Nullifier")) {
             return
                 abi.encode(
@@ -419,8 +391,6 @@ abstract contract DeployUtils is Create2FactoryUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
             return abi.encode(addresses.bridges.bridgedStandardERC20Implementation);
-        } else if (compareStrings(contractName, "BlobVersionedHashRetriever")) {
-            return abi.encode();
         } else if (compareStrings(contractName, "RollupDAManager")) {
             return abi.encode();
         } else if (compareStrings(contractName, "RollupL1DAValidator")) {
@@ -432,18 +402,41 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Verifier")) {
-            return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
-        } else if (compareStrings(contractName, "VerifierFflonk")) {
+            if (config.testnetVerifier) {
+                return
+                    abi.encode(
+                        addresses.stateTransition.verifierFflonk,
+                        addresses.stateTransition.verifierPlonk,
+                        config.ownerAddress,
+                        config.isZKsyncOS
+                    );
+            } else {
+                if (config.isZKsyncOS) {
+                    return
+                        abi.encode(
+                            addresses.stateTransition.verifierFflonk,
+                            addresses.stateTransition.verifierPlonk,
+                            config.ownerAddress
+                        );
+                } else {
+                    return
+                        abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
+                }
+            }
+        } else if (compareStrings(contractName, "EraVerifierFflonk")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "VerifierPlonk")) {
+        } else if (compareStrings(contractName, "EraVerifierPlonk")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "ZKsyncOSVerifierFflonk")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
             return abi.encode();
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ValidatorTimelock")) {
-            uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
-            return abi.encode(config.deployerAddress, executionDelay);
+            return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "Governance")) {
             return
                 abi.encode(
@@ -476,13 +469,24 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "ServerNotifier")) {
             return abi.encode();
         } else if (compareStrings(contractName, "DiamondInit")) {
-            return abi.encode();
+            return abi.encode(config.isZKsyncOS);
         } else {
             revert(string.concat("Contract ", contractName, " creation calldata not set"));
         }
     }
 
-    function getInitializeCalldata(string memory contractName) internal virtual returns (bytes memory);
+    function calculateExpectedL2Address(string memory contractName) internal returns (address) {
+        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
+    }
+
+    function getL2BytecodeHash(string memory contractName) public view virtual returns (bytes32) {
+        return L2ContractHelper.hashL2Bytecode(getCreationCode(contractName, true));
+    }
+
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual returns (bytes memory);
 
     function test() internal virtual {}
 }

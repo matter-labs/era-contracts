@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.21;
 
-import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
@@ -13,7 +12,7 @@ import {FeeOnTransferToken} from "contracts/dev-contracts/FeeOnTransferToken.sol
 import {ReenterL1ERC20Bridge} from "contracts/dev-contracts/test/ReenterL1ERC20Bridge.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {Utils} from "../../Utils/Utils.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 

@@ -3,17 +3,10 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "../Utils.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
-import {L2ContractsBytecodesLib} from "../L2ContractsBytecodesLib.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {Call as GovernanceCall} from "contracts/governance/Common.sol"; // renamed to avoid conflict
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {Call as GovernanceCall} from "contracts/governance/Common.sol";
+
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
@@ -28,11 +21,11 @@ contract FinalizeUpgrade is Script {
     function initChains(address bridgehub, uint256[] calldata chains) external {
         // We do not change this method
         for (uint256 i = 0; i < chains.length; ++i) {
-            Bridgehub bh = Bridgehub(bridgehub);
+            L1Bridgehub bh = L1Bridgehub(bridgehub);
 
             if (bh.baseTokenAssetId(chains[i]) == bytes32(0)) {
                 vm.broadcast();
-                Bridgehub(bridgehub).registerLegacyChain(chains[i]);
+                L1Bridgehub(bridgehub).registerLegacyChain(chains[i]);
             }
         }
     }
@@ -154,12 +147,12 @@ contract FinalizeUpgrade is Script {
             // 1. Combine logic of initChains
             // ---------------------------------------------------
             for (uint256 i = currentPosition; i < params.chains.length && i < currentEnd; i++) {
-                Bridgehub bh = Bridgehub(params.bridgehub);
+                L1Bridgehub bh = L1Bridgehub(params.bridgehub);
                 console.log("Processing chain: ", params.chains[i]);
                 if (bh.baseTokenAssetId(params.chains[i]) == bytes32(0)) {
                     // Register legacy chain if needed
                     bytes memory data = abi.encodeWithSelector(
-                        Bridgehub.registerLegacyChain.selector,
+                        L1Bridgehub.registerLegacyChain.selector,
                         params.chains[i]
                     );
 

@@ -4,19 +4,18 @@ pragma solidity 0.8.28;
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
 
 import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
-import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
+import {DiamondInit, InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {FeeParams, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Utils} from "../Utils/Utils.sol";
-import {InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManager.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {DiamondAlreadyFrozen, Unauthorized, DiamondNotFrozen} from "contracts/common/L1ContractErrors.sol";
+import {DiamondAlreadyFrozen, DiamondNotFrozen, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {
@@ -31,17 +30,18 @@ contract UpgradeLogicTest is DiamondCutTest {
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](11);
-        selectors[0] = adminFacet.setPendingAdmin.selector;
-        selectors[1] = adminFacet.acceptAdmin.selector;
-        selectors[2] = adminFacet.setValidator.selector;
-        selectors[3] = adminFacet.setPorterAvailability.selector;
-        selectors[4] = adminFacet.setPriorityTxMaxGasLimit.selector;
-        selectors[5] = adminFacet.changeFeeParams.selector;
-        selectors[6] = adminFacet.setTokenMultiplier.selector;
-        selectors[7] = adminFacet.upgradeChainFromVersion.selector;
-        selectors[8] = adminFacet.executeUpgrade.selector;
-        selectors[9] = adminFacet.freezeDiamond.selector;
-        selectors[10] = adminFacet.unfreezeDiamond.selector;
+        uint256 i = 0;
+        selectors[i++] = adminFacet.setPendingAdmin.selector;
+        selectors[i++] = adminFacet.acceptAdmin.selector;
+        selectors[i++] = adminFacet.setValidator.selector;
+        selectors[i++] = adminFacet.setPorterAvailability.selector;
+        selectors[i++] = adminFacet.setPriorityTxMaxGasLimit.selector;
+        selectors[i++] = adminFacet.changeFeeParams.selector;
+        selectors[i++] = adminFacet.setTokenMultiplier.selector;
+        selectors[i++] = adminFacet.upgradeChainFromVersion.selector;
+        selectors[i++] = adminFacet.executeUpgrade.selector;
+        selectors[i++] = adminFacet.freezeDiamond.selector;
+        selectors[i++] = adminFacet.unfreezeDiamond.selector;
         return selectors;
     }
 
@@ -52,7 +52,7 @@ contract UpgradeLogicTest is DiamondCutTest {
         DummyBridgehub dummyBridgehub = new DummyBridgehub();
 
         diamondCutTestContract = new DiamondCutTestContract();
-        diamondInit = new DiamondInit();
+        diamondInit = new DiamondInit(false);
         adminFacet = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         gettersFacet = new GettersFacet();
 
@@ -104,8 +104,7 @@ contract UpgradeLogicTest is DiamondCutTest {
                 maxL2GasPerBatch: 80_000_000,
                 priorityTxMaxPubdata: 99_000,
                 minimalL2GasPrice: 250_000_000
-            }),
-            blobVersionedHashRetriever: makeAddr("blobVersionedHashRetriver")
+            })
         });
 
         bytes memory diamondInitCalldata = abi.encodeWithSelector(diamondInit.initialize.selector, params);

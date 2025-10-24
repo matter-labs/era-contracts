@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
-import {ZeroAddress, MigrationPaused, MigrationsNotPaused, ProtocolIdMismatch} from "../common/L1ContractErrors.sol";
+import {MigrationPaused, MigrationsNotPaused, ProtocolIdMismatch, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @title Rules to validate that different upgrade stages have passed.
 /// @author Matter Labs
@@ -12,7 +12,7 @@ import {ZeroAddress, MigrationPaused, MigrationsNotPaused, ProtocolIdMismatch} f
 /// next upgrade stage.
 contract UpgradeStageValidator {
     /// @notice Address of bridgehub.
-    IBridgehub public immutable BRIDGEHUB;
+    IL1Bridgehub public immutable BRIDGEHUB;
 
     /// @notice Address of chain type manager.
     IChainTypeManager public immutable CHAIN_TYPE_MANAGER;
@@ -30,7 +30,7 @@ contract UpgradeStageValidator {
         }
 
         CHAIN_TYPE_MANAGER = IChainTypeManager(chainTypeManager);
-        BRIDGEHUB = IBridgehub(CHAIN_TYPE_MANAGER.BRIDGE_HUB());
+        BRIDGEHUB = IL1Bridgehub(CHAIN_TYPE_MANAGER.BRIDGE_HUB());
         NEW_PROTOCOL_VERSION = newProtocolVersion;
     }
 
