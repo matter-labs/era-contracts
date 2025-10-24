@@ -24,7 +24,7 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 
 import {DeployCTMScript} from "../DeployCTM.s.sol";
 
@@ -128,7 +128,7 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
             ctmProtocolVersion == config.contracts.latestProtocolVersion,
             "The latest protocol version is not correct"
         );
-        serverNotifier = ChainTypeManager(ctm).serverNotifierAddress();
+        serverNotifier = EraChainTypeManager(ctm).serverNotifierAddress();
         addresses.bridges.l1AssetRouterProxy = L1Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
 
         addresses.vaults.l1NativeTokenVaultProxy = address(
@@ -262,7 +262,7 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
             ecosystemAdminCalls[0] = Call({
                 target: addresses.stateTransition.chainTypeManagerProxy,
                 value: 0,
-                data: abi.encodeCall(ChainTypeManager.setServerNotifier, (serverNotifier))
+                data: abi.encodeCall(EraChainTypeManager.setServerNotifier, (serverNotifier))
             });
             ecosystemAdminCalls[1] = Call({
                 target: serverNotifier,
