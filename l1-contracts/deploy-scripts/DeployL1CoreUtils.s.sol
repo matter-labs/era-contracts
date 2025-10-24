@@ -61,7 +61,7 @@ struct TokensConfig {
     address tokenWethAddress;
 }
 
-abstract contract DeployL1CoreUtils is DeployUtils {
+contract DeployL1CoreUtils is DeployUtils {
     using stdToml for string;
 
     Config public config;

@@ -103,7 +103,7 @@ struct GeneratedData {
     bytes forceDeploymentsData;
 }
 
-abstract contract DeployCTMUtils is DeployUtils {
+contract DeployCTMUtils is DeployUtils {
     using stdToml for string;
 
     Config public config;

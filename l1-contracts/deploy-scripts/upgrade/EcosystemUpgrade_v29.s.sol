@@ -67,7 +67,12 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     }
 
     function deployNewEcosystemContractsL1() public virtual override {
-        deploySimpleContract("L1Bridgehub", false);
+        DeployL1CoreUtils l1CoreDeployer = new DeployL1CoreUtils();
+        l1CoreDeployer.initializeConfig(
+            vm.envString("V29_UPGRADE_ECOSYSTEM_INPUT"),
+            vm.envString("V29_UPGRADE_ECOSYSTEM_OUTPUT")
+        );
+        l1CoreDeployer.deploySimpleContract("L1Bridgehub", false);
         deploySimpleContract("L1ChainTypeManager", false);
     }
 
