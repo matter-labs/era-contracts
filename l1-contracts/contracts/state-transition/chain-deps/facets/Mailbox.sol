@@ -328,11 +328,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         require(_checkV30UpgradeProcessed(_chainId), RequireDepositsPaused());
 
         BalanceChange memory balanceChange;
-        // baseTokenAssetId is known on Gateway, we do not read it here for gas-saving purposes.
-        // Note, that here we trust the calling chain to provide the correct _baseTokenAmount.
-        // This means that only CTMs that ZK Gateways can trust can exist in this release.
-        balanceChange.baseTokenAmount = _baseTokenAmount;
-
         if (_getBalanceChange) {
             IL1AssetTracker assetTracker = IL1AssetTracker(s.assetTracker);
             INativeTokenVaultBase nativeTokenVault = INativeTokenVaultBase(s.nativeTokenVault);

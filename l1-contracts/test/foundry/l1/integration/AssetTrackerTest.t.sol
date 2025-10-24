@@ -167,7 +167,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             chainMigrationNumber: migrationNumber,
             assetMigrationNumber: migrationNumber - 1,
             originToken: tokenAddress,
-            isL1ToGateway: true
+            isL1ToGateway: true,
+            chainInitialMigrationNumber: migrationNumber - 1
         });
         ConfirmBalanceMigrationData memory confirmData = ConfirmBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
@@ -239,6 +240,11 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         );
         console.log("chainAssetHandler", address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy));
         vm.mockCall(
+            address(L2_CHAIN_ASSET_HANDLER_ADDR),
+            abi.encodeWithSelector(IChainAssetHandler.chainInitialMigrationNumber.selector),
+            abi.encode(migrationNumber - 1)
+        );
+        vm.mockCall(
             address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
             abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
             abi.encode(migrationNumber)
@@ -279,6 +285,11 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
                 abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
                 abi.encode(migrationNumber)
             );
+            vm.mockCall(
+                address(L2_CHAIN_ASSET_HANDLER_ADDR),
+                abi.encodeWithSelector(IChainAssetHandler.chainInitialMigrationNumber.selector),
+                abi.encode(migrationNumber)
+            );
         }
 
         gwAssetTracker.initiateGatewayToL1MigrationOnGateway(eraZKChainId, assetId);
@@ -292,7 +303,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             chainMigrationNumber: migrationNumber,
             assetMigrationNumber: migrationNumber - 1,
             originToken: tokenAddress,
-            isL1ToGateway: false
+            isL1ToGateway: false,
+            chainInitialMigrationNumber: migrationNumber
         });
         ConfirmBalanceMigrationData memory confirmData = ConfirmBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
