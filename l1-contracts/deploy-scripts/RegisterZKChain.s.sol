@@ -133,7 +133,6 @@ contract RegisterZKChainScript is Script {
         addValidators();
         configureZkSyncStateTransition();
         setPendingAdmin();
-        registerOnOtherChains();
 
         if (config.initializeLegacyBridge) {
             deployLegacySharedBridge();
@@ -531,27 +530,6 @@ contract RegisterZKChainScript is Script {
         zkChain.setPendingAdmin(output.chainAdmin);
         vm.stopBroadcast();
         console.log("Owner for ", output.diamondProxy, "set to", output.chainAdmin);
-    }
-
-    function registerOnOtherChains() internal {
-        IBridgehubBase bridgehub = IBridgehubBase(config.bridgehub);
-        uint256[] memory chainsToRegisterOn = bridgehub.getAllZKChainChainIDs();
-        IChainRegistrationSender chainRegistrationSender = IChainRegistrationSender(
-            bridgehub.chainRegistrationSender()
-        );
-        for (uint256 i = 0; i < chainsToRegisterOn.length; i++) {
-            vm.startBroadcast();
-            chainRegistrationSender.registerChain(chainsToRegisterOn[i], config.chainChainId);
-            vm.stopBroadcast();
-        }
-        for (uint256 i = 0; i < chainsToRegisterOn.length; i++) {
-            if (chainsToRegisterOn[i] == config.chainChainId) {
-                continue;
-            }
-            vm.startBroadcast();
-            chainRegistrationSender.registerChain(config.chainChainId, chainsToRegisterOn[i]);
-            vm.stopBroadcast();
-        }
     }
 
     function deployChainProxyAddress() internal {
