@@ -13,8 +13,8 @@ import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {Utils, ChainInfoFromBridgehub} from "./Utils.sol";
-import {IGovernance} from "contracts/governance/IGovernance.sol";
+import {ChainInfoFromBridgehub, Utils} from "./Utils.sol";
+
 import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
@@ -24,9 +24,9 @@ import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainS
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
+import {BridgehubBurnCTMAssetData, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
@@ -141,6 +141,11 @@ contract AdminFunctions is Script {
         Utils.executeCalls(governanceAddr, bytes32(0), 0, calls);
     }
 
+    function ecosystemAdminExecuteCalls(bytes memory callsToExecute, address ecosystemAdminAddr) public {
+        Call[] memory calls = abi.decode(callsToExecute, (Call[]));
+        saveAndSendAdminTx(ecosystemAdminAddr, calls, true);
+    }
+
     function adminEncodeMulticall(bytes memory callsToExecute) external {
         Call[] memory calls = abi.decode(callsToExecute, (Call[]));
 
@@ -204,9 +209,9 @@ contract AdminFunctions is Script {
         bytes memory data;
         // The interface should be compatible with both the new and the old ValidatorTimelock
         if (addValidator) {
-            data = abi.encodeCall(ValidatorTimelock.addValidator, (chainId, validatorAddress));
+            data = abi.encodeCall(ValidatorTimelock.addValidatorForChainId, (chainId, validatorAddress));
         } else {
-            data = abi.encodeCall(ValidatorTimelock.removeValidator, (chainId, validatorAddress));
+            data = abi.encodeCall(ValidatorTimelock.removeValidatorForChainId, (chainId, validatorAddress));
         }
 
         Utils.adminExecute(adminAddr, accessControlRestriction, validatorTimelock, data, 0);
@@ -593,7 +598,10 @@ contract AdminFunctions is Script {
             data.bridgehub,
             data.l2ChainId
         );
-        bytes memory callData = abi.encodeCall(ValidatorTimelock.addValidator, (data.l2ChainId, data.validatorAddress));
+        bytes memory callData = abi.encodeCall(
+            ValidatorTimelock.addValidatorForChainId,
+            (data.l2ChainId, data.validatorAddress)
+        );
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
             callData,
@@ -632,6 +640,22 @@ contract AdminFunctions is Script {
                 _shouldSend: _shouldSend
             })
         );
+    }
+
+    function enableValidator(
+        address bridgehub,
+        uint256 l2ChainId,
+        address validatorAddress,
+        address validatorTimelock,
+        bool _shouldSend
+    ) public {
+        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(bridgehub, l2ChainId);
+
+        bytes memory callData = abi.encodeCall(ValidatorTimelock.addValidatorForChainId, (l2ChainId, validatorAddress));
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: validatorTimelock, value: 0, data: callData});
+
+        saveAndSendAdminTx(l2ChainInfo.admin, calls, _shouldSend);
     }
 
     struct StartMigrateChainFromGatewayParams {

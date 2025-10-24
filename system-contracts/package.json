@@ -52,14 +52,14 @@
     ]
   },
   "scripts": {
-    "build": "yarn build:system-contracts && yarn build:bootloader",
-    "build:foundry": "yarn preprocess:emulator && yarn preprocess:system-contracts && forge build --zksync && yarn preprocess:bootloader && forge build --zksync",
+    "build": "yarn preprocess:emulator && yarn preprocess:system-contracts && forge build --zksync && yarn preprocess:bootloader && forge build --zksync",
+    "build:foundry": "yarn build",
     "build:bootloader": "yarn preprocess:bootloader && yarn compile-yul compile-bootloader",
     "build:system-contracts": "yarn preprocess:emulator && yarn preprocess:system-contracts && hardhat compile && yarn compile-yul compile-precompiles",
     "build:test-system-contracts": "yarn preprocess:system-contracts --test-mode && hardhat compile && yarn compile-yul compile-precompiles && yarn compile-zasm",
     "clean": "yarn clean:bootloader && yarn clean:system-contracts",
     "clean:bootloader": "rm -rf ./bootloader/build ./bootloader/tests/artifacts",
-    "clean:system-contracts": "rm -rf ./contracts-preprocessed && hardhat clean",
+    "clean:system-contracts": "rm -rf ./contracts-preprocessed && hardhat clean && forge clean",
     "compile-yul": "ts-node scripts/compile-yul.ts",
     "compile-zasm": "ts-node scripts/compile-zasm.ts",
     "deploy-preimages": "ts-node scripts/deploy-preimages.ts",
@@ -69,11 +69,12 @@
     "preprocess:emulator": "rm -f ./contracts/EvmEmulator.yul && yarn ts-node scripts/preprocess-emulator.ts",
     "preprocess:system-contracts": "rm -rf ./contracts-preprocessed && ts-node scripts/preprocess-system-contracts.ts",
     "verify-on-explorer": "yarn ts-node scripts/verify-on-explorer.ts",
-    "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode",
-    "test-no-build": "hardhat test --network zkSyncTestNode",
+    "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode test/*.spec.ts test/**/*.spec.ts",
+    "test-no-build": "hardhat test --network zkSyncTestNode test/*.spec.ts test/**/*.spec.ts",
+    "test-l2-v29-upgrade": "yarn build:system-contracts && hardhat test --network zkSyncTestNode test/manual-tests/L2V29Upgrade.manual.ts",
     "test-node": "./bin/anvil-zksync --protocol-version=28 --emulate-evm",
     "test-node-local-contracts": "yarn build:foundry && ./bin/anvil-zksync --protocol-version=28 --dev-system-contracts=local --system-contracts-path='.'",
-    "test:bootloader": "cd bootloader/test_infra && cargo run",
+    "test:bootloader": "cd ./bootloader/test_infra && cargo run",
     "install-anvil": "ts-node ./scripts/install-anvil.ts"
   }
 }

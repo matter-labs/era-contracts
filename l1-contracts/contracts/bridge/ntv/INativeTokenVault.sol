@@ -23,6 +23,12 @@ interface INativeTokenVault {
     /// @notice Returns the chain ID of the origin chain for a given asset ID
     function originChainId(bytes32 assetId) external view returns (uint256);
 
+    /// @notice Returns the number of bridged tokens.
+    function bridgedTokensCount() external view returns (uint256);
+
+    /// @notice Returns the bridged token at index `index`.
+    function bridgedTokens(uint256 index) external view returns (bytes32);
+
     /// @notice Registers tokens within the NTV.
     /// @dev The goal is to allow bridging native tokens automatically, by registering them on the fly.
     /// @notice Allows the bridge to register a token address for the vault.

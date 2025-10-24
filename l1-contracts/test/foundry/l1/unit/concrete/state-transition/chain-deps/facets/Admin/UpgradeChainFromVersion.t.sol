@@ -6,7 +6,7 @@ import {AdminTest} from "./_Admin_Shared.t.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {ProtocolIdMismatch, ProtocolIdNotGreater, InvalidProtocolVersion, ValueMismatch, Unauthorized, HashMismatch} from "contracts/common/L1ContractErrors.sol";
+import {HashMismatch, InvalidProtocolVersion, ProtocolIdMismatch, ProtocolIdNotGreater, Unauthorized, ValueMismatch} from "contracts/common/L1ContractErrors.sol";
 
 contract UpgradeChainFromVersionTest is AdminTest {
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);

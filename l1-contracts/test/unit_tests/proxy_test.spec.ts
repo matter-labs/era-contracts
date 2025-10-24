@@ -93,7 +93,7 @@ describe("Diamond proxy tests", function () {
         admin: governorAddress,
         validatorTimelock: governorAddress,
         baseTokenAssetId: "0x0000000000000000000000000000000000000000000000000000000000000001",
-        baseTokenBridge: "0x0000000000000000000000000000000000000001",
+        interopCenter: "0x0000000000000000000000000000000000000001",
         storedBatchZero: "0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21",
         verifier: "0x0000000000000000000000000000000000000001",
         verifierParams: dummyVerifierParams,
@@ -102,7 +102,6 @@ describe("Diamond proxy tests", function () {
         l2EvmEmulatorBytecodeHash: "0x0100000000000000000000000000000000000000000000000000000000000000",
         priorityTxMaxGasLimit: 500000, // priority tx max L2 gas limit
         feeParams: defaultFeeParams(),
-        blobVersionedHashRetriever: "0x0000000000000000000000000000000000000001",
       },
     ]);
 

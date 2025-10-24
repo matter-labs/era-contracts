@@ -10,7 +10,7 @@ import { web3Provider } from "./utils";
 import type { TokenDescription } from "../src.ts/deploy-token";
 import { deployTokens, deployContracts, mintTokens } from "../src.ts/deploy-token";
 
-import { ethTestConfig } from "../src.ts/utils";
+import { ethTestConfig } from "../src.ts/constants";
 
 const provider = web3Provider();
 

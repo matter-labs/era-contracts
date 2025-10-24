@@ -8,7 +8,7 @@ import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider, GAS_MULTIPLIER, web3Url } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
 import { initialBridgehubDeployment } from "../src.ts/deploy-process";
-import { ethTestConfig } from "../src.ts/utils";
+import { ethTestConfig } from "../src.ts/constants";
 import { Wallet as ZkWallet, Provider as ZkProvider } from "zksync-ethers";
 
 const provider = web3Provider();

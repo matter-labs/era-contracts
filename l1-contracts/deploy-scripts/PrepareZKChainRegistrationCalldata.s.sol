@@ -8,13 +8,13 @@ import {stdToml} from "forge-std/StdToml.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {Utils, ADDRESS_ONE} from "./Utils.sol";
+import {ADDRESS_ONE, Utils} from "./Utils.sol";
 
 /**
  * @title Prepare ZKChain Registration Calldata
@@ -143,7 +143,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         config.erc20BridgeProxy = toml.readAddress("$.deployed_addresses.erc20_bridge_proxy_addr");
 
         ecosystem.bridgehub = IChainTypeManager(config.stateTransitionProxy).BRIDGE_HUB();
-        ecosystem.l1SharedBridgeProxy = address(Bridgehub(ecosystem.bridgehub).sharedBridge());
+        ecosystem.l1SharedBridgeProxy = address(Bridgehub(ecosystem.bridgehub).assetRouter());
         ecosystem.governance = Bridgehub(ecosystem.bridgehub).owner();
 
         config.chainId = toml.readUint("$.chain.chain_id");

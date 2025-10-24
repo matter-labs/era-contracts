@@ -2,8 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {FeeParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {FeeParams, IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
@@ -18,6 +17,10 @@ contract UtilsFacet is ZKChainBase {
 
     function util_setBridgehub(address _bridgehub) external {
         s.bridgehub = _bridgehub;
+    }
+
+    function util_setInteropCenter(address _interopCenter) external {
+        s.interopCenter = _interopCenter;
     }
 
     function util_getBridgehub() external view returns (address) {

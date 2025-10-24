@@ -36,8 +36,14 @@ uint256 constant MAX_ALLOWED_MINOR_VERSION_DELTA = 100;
 /// NOTE: The constant is set to zero for the Alpha release period
 uint256 constant PRIORITY_EXPIRATION = 0 days;
 
-/// @dev Timestamp - seconds since unix epoch.
-uint256 constant COMMIT_TIMESTAMP_NOT_OLDER = 3 days;
+// @dev The chainId of Ethereum Mainnet
+uint256 constant MAINNET_CHAIN_ID = 1;
+
+/// @dev Timestamp - seconds since unix epoch. This value will be used on the mainnet.
+uint256 constant MAINNET_COMMIT_TIMESTAMP_NOT_OLDER = 3 days;
+
+/// @dev Timestamp - seconds since unix epoch. This value will be used on testnets.
+uint256 constant TESTNET_COMMIT_TIMESTAMP_NOT_OLDER = 30 days;
 
 /// @dev Maximum available error between real commit batch timestamp and analog used in the verifier (in seconds)
 /// @dev Must be used cause miner's `block.timestamp` value can differ on some small value (as we know - 12 seconds)
@@ -160,7 +166,20 @@ struct ZKChainCommitment {
     PriorityTreeCommitment priorityTree;
     /// @notice Whether a chain is a permanent rollup.
     bool isPermanentRollup;
+    /// @notice The precommitment to the transactions of the latest batch.
+    bytes32 precommitmentForTheLatestBatch;
 }
 
 /// @dev Used as the `msg.sender` for system service transactions.
 address constant SERVICE_TRANSACTION_SENDER = address(uint160(0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF));
+
+/// @dev To avoid higher costs the writes, we avoid making the slot zero.
+/// This ensures that the cost of writes is always 5k and avoids the 20k initial write from the non-zero value.
+bytes32 constant DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH = bytes32(uint256(1));
+
+/// @dev The length of a packed transaction precommitment in bytes. It consists of two parts: 32-byte tx hash and 1-byte status (0 or 1).
+uint256 constant PACKED_L2_PRECOMMITMENT_LENGTH = 33;
+
+uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 16_384;
+
+uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_DEPTH = 14 + 1;

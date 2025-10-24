@@ -10,6 +10,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IChainRegistrationSender} from "contracts/bridgehub/IChainRegistrationSender.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -17,13 +18,13 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {Utils, ADDRESS_ONE} from "./Utils.sol";
-import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
+import {ADDRESS_ONE, Utils} from "./Utils.sol";
+import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -128,6 +129,7 @@ contract RegisterZKChainScript is Script {
         addValidators();
         configureZkSyncStateTransition();
         setPendingAdmin();
+        registerOnOtherChains();
 
         if (config.initializeLegacyBridge) {
             deployLegacySharedBridge();
@@ -418,8 +420,8 @@ contract RegisterZKChainScript is Script {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(config.validatorTimelock);
 
         vm.startBroadcast(msg.sender);
-        validatorTimelock.addValidator(config.chainChainId, config.validatorSenderOperatorCommitEth);
-        validatorTimelock.addValidator(config.chainChainId, config.validatorSenderOperatorBlobsEth);
+        validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorCommitEth);
+        validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorBlobsEth);
         vm.stopBroadcast();
 
         console.log("Validators added");
@@ -451,6 +453,27 @@ contract RegisterZKChainScript is Script {
         console.log("Owner for ", output.diamondProxy, "set to", output.chainAdmin);
     }
 
+    function registerOnOtherChains() internal {
+        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        uint256[] memory chainsToRegisterOn = bridgehub.getAllZKChainChainIDs();
+        IChainRegistrationSender chainRegistrationSender = IChainRegistrationSender(
+            bridgehub.chainRegistrationSender()
+        );
+        for (uint256 i = 0; i < chainsToRegisterOn.length; i++) {
+            vm.startBroadcast();
+            chainRegistrationSender.registerChain(chainsToRegisterOn[i], config.chainChainId);
+            vm.stopBroadcast();
+        }
+        for (uint256 i = 0; i < chainsToRegisterOn.length; i++) {
+            if (chainsToRegisterOn[i] == config.chainChainId) {
+                continue;
+            }
+            vm.startBroadcast();
+            chainRegistrationSender.registerChain(config.chainChainId, chainsToRegisterOn[i]);
+            vm.stopBroadcast();
+        }
+    }
+
     function deployChainProxyAddress() internal {
         bytes memory input = abi.encode(type(ProxyAdmin).creationCode, config.create2Salt, output.chainAdmin);
         bytes memory encoded = abi.encodePacked(type(Create2AndTransfer).creationCode, input);
@@ -465,7 +488,7 @@ contract RegisterZKChainScript is Script {
     function deployLegacySharedBridge() internal {
         bytes[] memory emptyDeps = new bytes[](0);
         address legacyBridgeImplAddr = Utils.deployThroughL1Deterministic({
-            bytecode: L2ContractsBytecodesLib.readL2LegacySharedBridgeDevBytecode(),
+            bytecode: ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacyDev"),
             constructorargs: hex"",
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -476,7 +499,7 @@ contract RegisterZKChainScript is Script {
         });
 
         output.l2LegacySharedBridge = Utils.deployThroughL1Deterministic({
-            bytecode: L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecode(),
+            bytecode: ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy"),
             constructorargs: L2LegacySharedBridgeTestHelper.getLegacySharedBridgeProxyConstructorParams(
                 legacyBridgeImplAddr,
                 config.l1Erc20Bridge,
@@ -495,10 +518,10 @@ contract RegisterZKChainScript is Script {
 
     function getFactoryDeps() internal view returns (bytes[] memory) {
         bytes[] memory factoryDeps = new bytes[](4);
-        factoryDeps[0] = L2ContractsBytecodesLib.readBeaconProxyBytecode();
-        factoryDeps[1] = L2ContractsBytecodesLib.readStandardERC20Bytecode();
-        factoryDeps[2] = L2ContractsBytecodesLib.readUpgradeableBeaconBytecode();
-        factoryDeps[3] = L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecodeFromSystemContracts();
+        factoryDeps[0] = ContractsBytecodesLib.getCreationCode("BeaconProxy");
+        factoryDeps[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
+        factoryDeps[2] = ContractsBytecodesLib.getCreationCode("UpgradeableBeacon");
+        factoryDeps[3] = ContractsBytecodesLib.getCreationCode("SystemTransparentUpgradeableProxy");
         return factoryDeps;
     }
 

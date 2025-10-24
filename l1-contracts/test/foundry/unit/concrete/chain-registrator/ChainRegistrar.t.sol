@@ -4,12 +4,13 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
-import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-
+import {InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import "contracts/bridgehub/Bridgehub.sol";
 import "contracts/chain-registrar/ChainRegistrar.sol";
-import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import "contracts/dev-contracts/test/DummyBridgehub.sol";
 import "contracts/dev-contracts/test/DummySharedBridge.sol";
@@ -17,7 +18,6 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {console2 as console} from "forge-std/Script.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
-import {FeeParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import "contracts/dev-contracts/test/DummyZKChain.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -27,6 +27,8 @@ import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 
 contract ChainRegistrarTest is Test {
     DummyBridgehub private bridgeHub;
+    InteropCenter private interopCenter;
+    MessageRoot private messageRoot;
     DummyChainTypeManagerWBH private ctm;
     address private admin;
     address private deployer;
@@ -40,6 +42,8 @@ contract ChainRegistrarTest is Test {
 
     constructor() {
         bridgeHub = new DummyBridgehub();
+        interopCenter = new InteropCenter(IBridgehub(address(bridgeHub)), block.chainid, makeAddr("admin"));
+        messageRoot = new MessageRoot(IBridgehub(address(bridgeHub)), block.chainid);
         ctm = new DummyChainTypeManagerWBH(address(bridgeHub));
         admin = makeAddr("admin");
         deployer = makeAddr("deployer");
@@ -47,6 +51,8 @@ contract ChainRegistrarTest is Test {
 
         l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IBridgehub(address(bridgeHub)),
+            _messageRoot: IMessageRoot(address(messageRoot)),
+            _interopCenter: (interopCenter),
             _eraChainId: 270,
             _eraDiamondProxy: makeAddr("era")
         });
@@ -54,6 +60,7 @@ contract ChainRegistrarTest is Test {
         assetRouter = new L1AssetRouter({
             _l1WethAddress: makeAddr("weth"),
             _bridgehub: address(bridgeHub),
+            _interopCenter: address(interopCenter),
             _l1Nullifier: address(l1NullifierImpl),
             _eraChainId: 270,
             _eraDiamondProxy: makeAddr("era")
@@ -85,8 +92,7 @@ contract ChainRegistrarTest is Test {
                 maxL2GasPerBatch: 80_000_000,
                 priorityTxMaxPubdata: 99_000,
                 minimalL2GasPrice: 250_000_000
-            }),
-            blobVersionedHashRetriever: makeAddr("blob")
+            })
         });
         initCalldata = abi.encode(initializeData);
 

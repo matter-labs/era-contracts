@@ -76,6 +76,7 @@ interface IConsensusRegistry {
     /// @param a First component of the BLS12-381 public key.
     /// @param b Second component of the BLS12-381 public key.
     /// @param c Third component of the BLS12-381 public key.
+    // solhint-disable-next-line
     struct BLS12_381PublicKey {
         bytes32 a;
         bytes32 b;
@@ -85,6 +86,7 @@ interface IConsensusRegistry {
     /// @dev Represents BLS12_381 signature.
     /// @param a First component of the BLS12-381 signature.
     /// @param b Second component of the BLS12-381 signature.
+    // solhint-disable-next-line
     struct BLS12_381Signature {
         bytes32 a;
         bytes16 b;
@@ -122,11 +124,13 @@ interface IConsensusRegistry {
     /// @dev Fails if validator owner already exists.
     /// @dev Fails if a validator with the same public key already exists.
     /// @param _validatorOwner The address of the validator's owner.
+    /// @param _validatorIsLeader Flag indicating if the validator is a leader.
     /// @param _validatorWeight The voting weight of the validator.
     /// @param _validatorPubKey The BLS12-381 public key of the validator.
     /// @param _validatorPoP The proof-of-possession (PoP) of the validator's public key.
     function add(
         address _validatorOwner,
+        bool _validatorIsLeader,
         uint32 _validatorWeight,
         BLS12_381PublicKey calldata _validatorPubKey,
         BLS12_381Signature calldata _validatorPoP
