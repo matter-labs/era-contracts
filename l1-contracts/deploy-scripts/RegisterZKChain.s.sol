@@ -35,6 +35,7 @@ import {Call} from "contracts/governance/Common.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
+import {PAUSE_DEPOSITS_TIME_WINDOW_END} from "contracts/common/Config.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -114,6 +115,7 @@ contract RegisterZKChainScript is Script {
     }
 
     function runInner(string memory outputPath) internal {
+        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END + 1);
         string memory root = vm.projectRoot();
 
         outputPath = string.concat(root, outputPath);
