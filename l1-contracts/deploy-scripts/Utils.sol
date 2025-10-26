@@ -1328,6 +1328,16 @@ library Utils {
         bytecodeInfo = getZKOSBytecodeInfo(bytecode);
     }
 
+    function getZKOSProxyUpgradeBytecodeInfo(
+        string memory fileName,
+        string memory contractName
+    ) internal returns (bytes memory bytecodeInfo) {
+        bytes memory bytecodeInfo = getZKOSBytecodeInfoForContract(fileName, contractName);
+        bytes memory proxyBytecodeInfo = getZKOSBytecodeInfoForContract("SystemContractProxy.sol", "SystemContractProxy");
+
+        return abi.encode(bytecodeInfo, proxyBytecodeInfo);
+    }
+
     function mergeCalls(Call[] memory a, Call[] memory b) public pure returns (Call[] memory result) {
         result = new Call[](a.length + b.length);
         for (uint256 i = 0; i < a.length; i++) {
