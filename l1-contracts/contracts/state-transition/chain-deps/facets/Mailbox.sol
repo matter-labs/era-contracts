@@ -590,7 +590,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         /// We provide 3.5 days window to process all deposits.
         /// After that, the deposits are not being processed for 3.5 days.
         return
-            timestamp != 0 &&
             timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START <= block.timestamp &&
             block.timestamp < timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END;
     }
