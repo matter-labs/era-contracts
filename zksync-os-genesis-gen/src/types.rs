@@ -188,7 +188,7 @@ fn flat_storage_key_for_contract(address: Address, key: B256) -> B256 {
     bytes[12..32].copy_from_slice(address.as_slice());
     // second 32 bytes: the full storage slot key
     bytes[32..64].copy_from_slice(key.as_slice());
-    B256::from_slice(Blake2s256::digest(bytes).as_slice())
+    B256::from_slice(&Blake2s256::digest(bytes))
 }
 
 fn account_properties_flat_key(address: Address) -> B256 {

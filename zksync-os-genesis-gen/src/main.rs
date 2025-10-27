@@ -12,15 +12,21 @@ const L2_COMPLEX_UPGRADER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::
 const L2_GENESIS_UPGRADE: Address = Address(FixedBytes::<20>(hex_literal::hex!("0000000000000000000000000000000000010001")));
 const L2_WRAPPED_BASE_TOKEN: Address = Address(FixedBytes::<20>(hex_literal::hex!("0000000000000000000000000000000000010007")));
 const SYSTEM_CONTRACT_PROXY_ADMIN: Address = Address(FixedBytes::<20>(hex_literal::hex!("000000000000000000000000000000000001000c")));
-const SYSTEM_CONTRACT_PROXY_PREIMAGE: Address = Address(FixedBytes::<20>(hex_literal::hex!("000000000000000000000000000000000001000d")));
 const L2_COMPLEX_UPGRADER_IMPL_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!("504c4af171d1b5f31c8b8f181c21484b75110f87")));
 
-const INITIAL_CONTRACTS: [(Address, &str); 6] = [
+const SYSTEM_PROXY_ADMIN_OWNER_SLOT: B256 = B256::ZERO;
+const EIP1967_IMPLEMENTATION_SLOT: B256 = FixedBytes::<32>(hex_literal::hex!(
+    "360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
+));
+const EIP1967_ADMIN_SLOT: B256 = FixedBytes::<32>(hex_literal::hex!(
+    "b53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103"
+));
+
+const INITIAL_CONTRACTS: [(Address, &str); 5] = [
     (L2_COMPLEX_UPGRADER_ADDR, "SystemContractProxy"),
     (L2_GENESIS_UPGRADE, "L2GenesisUpgrade"),
     (L2_WRAPPED_BASE_TOKEN, "L2WrappedBaseToken"),
     (SYSTEM_CONTRACT_PROXY_ADMIN, "SystemContractProxyAdmin"),
-    (SYSTEM_CONTRACT_PROXY_PREIMAGE, "SystemContractProxy"),
     (L2_COMPLEX_UPGRADER_IMPL_ADDR, "L2ComplexUpgrader"),
 ];
 
@@ -51,26 +57,16 @@ fn construct_additional_storage() -> BTreeMap<Address, BTreeMap<B256, B256>> {
     use alloy::primitives::B256;
     use std::collections::BTreeMap;
 
-    // Storage slot keys as B256
-    let slot_zero = B256::from([0u8; 32]);
-    let slot_impl = B256::from_slice(&hex_literal::hex!(
-        "360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
-    ));
-    let slot_admin = B256::from_slice(&hex_literal::hex!(
-        "b53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103"
-    ));
-
     let mut map: BTreeMap<Address, BTreeMap<B256, B256>> = BTreeMap::new();
 
-    let mut admin_map = BTreeMap::new();
-    admin_map.insert(slot_zero, address_to_b256(&L2_COMPLEX_UPGRADER_ADDR));
-    map.insert(SYSTEM_CONTRACT_PROXY_ADMIN, admin_map);
+    let mut system_contract_proxy_admin_storage = BTreeMap::new();
+    system_contract_proxy_admin_storage.insert(SYSTEM_PROXY_ADMIN_OWNER_SLOT, address_to_b256(&L2_COMPLEX_UPGRADER_ADDR));
+    map.insert(SYSTEM_CONTRACT_PROXY_ADMIN, system_contract_proxy_admin_storage);
 
-    // SYSTEM_CONTRACT_PROXY: slot impl => L2_COMPLEX_UPGRADER, slot admin => SYSTEM_CONTRACT_PROXY_ADMIN
-    let mut proxy_map = BTreeMap::new();
-    proxy_map.insert(slot_impl, address_to_b256(&L2_COMPLEX_UPGRADER_IMPL_ADDR));
-    proxy_map.insert(slot_admin, address_to_b256(&SYSTEM_CONTRACT_PROXY_ADMIN));
-    map.insert(L2_COMPLEX_UPGRADER_ADDR, proxy_map);
+    let mut l2_complex_upgrader_storage = BTreeMap::new();
+    l2_complex_upgrader_storage.insert(EIP1967_IMPLEMENTATION_SLOT, address_to_b256(&L2_COMPLEX_UPGRADER_IMPL_ADDR));
+    l2_complex_upgrader_storage.insert(EIP1967_ADMIN_SLOT, address_to_b256(&SYSTEM_CONTRACT_PROXY_ADMIN));
+    map.insert(L2_COMPLEX_UPGRADER_ADDR, l2_complex_upgrader_storage);
 
     map
 }
