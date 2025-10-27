@@ -9,6 +9,9 @@ use serde::{Deserialize, Serialize};
 use zk_os_api::helpers::{set_properties_code, set_properties_nonce};
 use zk_os_basic_system::system_implementation::flat_storage_model::{AccountProperties, ACCOUNT_PROPERTIES_STORAGE_ADDRESS};
 
+/// The depth of the Merkle tree used for the genesis state.
+const MERKLE_TREE_DEPTH: usize = 64;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FullGenesis {
     /// Initial contracts to deploy in genesis.
@@ -64,22 +67,32 @@ pub struct InitialGenesisInput {
     pub execution_version: u32,
 }
 
+
+/// A leaf in the genesis state Merkle tree.
+///
+/// The tree is of depth 64, and each leaf contains:
+/// - `key`: the storage key (B256)
+/// - `value`: the storage value (B256)
+/// - `next_index`: the index of the leaf with the next largest key (u64)
+///
+/// The initial leaves are:
+/// - The minimal leaf (key = 0, value = 0, next_index = 2)
+/// - The maximal leaf (key = MAX_B256_VALUE, value = 0, next_index = 1), which points to itself
+///
+/// All other leaves are sorted by key, and their `next_index` points to the next leaf in key order.
 #[derive(Debug)]
 struct LeafInfo {
     key: B256,
     value: B256,
-    next_index: u64
+    next_index: u64,
 }
 
 impl LeafInfo {
     fn new(key: B256, value: B256, next_index: u64) -> Self {
-        Self {
-            key,
-            value,
-            next_index
-        }
+        Self { key, value, next_index }
     }
 
+    /// Hashes the leaf as blake2s256(key || value || next_index_le)
     fn hash_leaf(&self) -> B256 {
         let mut hashed_bytes = [0; 2 * 32 + 8];
         hashed_bytes[..32].copy_from_slice(self.key.as_slice());
@@ -87,76 +100,85 @@ impl LeafInfo {
         hashed_bytes[64..].copy_from_slice(&self.next_index.to_le_bytes());
         B256::from_slice(&Blake2s256::digest(&hashed_bytes))
     }
-
 }
 
+
+/// The maximal possible B256 value (all bytes set to 0xFF).
 const MAX_B256_VALUE: B256 = FixedBytes::<32>([0xFF; 32]);
 
-fn calculate_merkle_root(tree_depth: usize, logs: &[LeafInfo]) -> B256 {
-    let mut level = 0;
-    let mut nodes: Vec<B256> = logs.iter().map(|leaf| leaf.hash_leaf()).collect();
+
+/// Calculates the Merkle root of a tree of given depth from the provided leaves.
+///
+/// The tree is filled with the given leaves, and empty leaves are filled with the hash of a zero leaf.
+fn calculate_merkle_root(tree_depth: usize, logs: &[LeafInfo]) -> anyhow::Result<B256> {
+    // Hash all leaves
+    let mut nodes: Vec<B256> = logs.iter().map(LeafInfo::hash_leaf).collect();
     let mut empty_subtree_hash = LeafInfo::new(B256::ZERO, B256::ZERO, 0).hash_leaf();
 
-    while level < tree_depth {
-        let mut next_nodes = Vec::new();
-        for i in (0..nodes.len()).step_by(2) {
-            let lhs = nodes[i];
-            let rhs = if i + 1 < nodes.len() {
-                nodes[i + 1]
-            } else {
-                empty_subtree_hash
-            };
-            let mut branch_data = [0; 64];
-            branch_data[..32].copy_from_slice(lhs.as_slice());
-            branch_data[32..].copy_from_slice(rhs.as_slice());
-            next_nodes.push(B256::from_slice(&Blake2s256::digest(&branch_data)));
-        }
-        nodes = next_nodes;
-        level += 1;
+    for _level in 0..tree_depth {
+        // Pair up nodes, hash each pair, fill with empty hash if odd
+        nodes = nodes
+            .chunks(2)
+            .map(|chunk| {
+                let lhs = chunk[0];
+                let rhs = if chunk.len() > 1 { chunk[1] } else { empty_subtree_hash };
+                let mut branch_data = [0; 64];
+                branch_data[..32].copy_from_slice(lhs.as_slice());
+                branch_data[32..].copy_from_slice(rhs.as_slice());
+                B256::from_slice(&Blake2s256::digest(&branch_data))
+            })
+            .collect();
+
+        // Update the empty subtree hash for this level
         let mut branch_data = [0; 64];
         branch_data[..32].copy_from_slice(empty_subtree_hash.as_slice());
         branch_data[32..].copy_from_slice(empty_subtree_hash.as_slice());
         empty_subtree_hash = B256::from_slice(&Blake2s256::digest(&branch_data));
     }
 
-    if nodes.len() != 1 {
-        panic!(
-            "Merkle reduction did not collapse to a single root (len={}).",
-            nodes.len()
-        );
+    if nodes.len() > 1 {
+        anyhow::bail!("Merkle reduction did not collapse to a single root (len={}).", nodes.len());
     }
 
-    nodes[0]
+    return Ok(nodes[0]);
 }
 
-fn build_initial_genesis_root(initial_storage_logs: BTreeMap<B256, B256>) -> (B256, u64) {
-    let total_provided_logs = initial_storage_logs.len();
-    let provided_logs = initial_storage_logs.into_iter().enumerate().map(|(num, (k,v))| {
-        let next_leaf = if num == total_provided_logs - 1 {
-            1
-        } else {
-            num as u64 + 3
-        };
-        LeafInfo::new(k, v, next_leaf)
-    });
 
-    let mut initial_storage_logs = vec![
+/// Builds the initial genesis root for the state tree.
+///
+/// The tree is of depth 64. The first two leaves are:
+/// - Minimal leaf: key = 0, value = 0, next_index = 2
+/// - Maximal leaf: key = MAX_B256_VALUE, value = 0, next_index = 1 (points to itself)
+///
+/// All other leaves are sorted by key, and their `next_index` points to the next leaf in key order.
+fn build_initial_genesis_root(initial_storage_logs: BTreeMap<B256, B256>) -> anyhow::Result<(B256, u64)> {
+    let total_provided_logs = initial_storage_logs.len();
+    // Enumerate and build leaves for provided logs
+    let provided_leaves: Vec<LeafInfo> = initial_storage_logs
+        .into_iter()
+        .enumerate()
+        .map(|(num, (k, v))| {
+            let next_leaf = if num == total_provided_logs - 1 { 1 } else { num as u64 + 3 };
+            LeafInfo::new(k, v, next_leaf)
+        })
+        .collect();
+
+    // The initial leaves: minimal and maximal
+    let mut leaves = vec![
         LeafInfo::new(B256::ZERO, B256::ZERO, 2),
         LeafInfo::new(MAX_B256_VALUE, B256::ZERO, 1),
     ];
-    initial_storage_logs.extend(provided_logs);
+    leaves.extend(provided_leaves);
 
-    let total_leaves = initial_storage_logs.len() as u64;
-
-    (calculate_merkle_root(64, &initial_storage_logs), total_leaves)
-
+    let total_leaves = leaves.len() as u64;
+    Ok((calculate_merkle_root(MERKLE_TREE_DEPTH, &leaves)?, total_leaves))
 }
 
 fn build_initial_genesis_commitment(
     initial_storage_logs: BTreeMap<B256, B256>,
     genesis_block: Header
-) -> B256 {
-    let (genesis_root, leaves_count) = build_initial_genesis_root(initial_storage_logs);
+) -> anyhow::Result<B256> {
+    let (genesis_root, leaves_count) = build_initial_genesis_root(initial_storage_logs)?;
     let number = 0u64;
     let timestamp = 0u64;
 
@@ -177,8 +199,7 @@ fn build_initial_genesis_commitment(
     hasher.update(last_256_block_hashes_blake);
     hasher.update(timestamp.to_be_bytes());
     let state_commitment = B256::from_slice(&hasher.finalize());
-    state_commitment
-
+    Ok(state_commitment)
 }
 
 fn flat_storage_key_for_contract(address: Address, key: B256) -> B256 {
@@ -270,6 +291,6 @@ pub fn build_genesis(genesis_input: InitialGenesisInput) -> anyhow::Result<FullG
         additional_storage: genesis_input.additional_storage,
         additional_storage_raw: genesis_input.additional_storage_raw,
         execution_version: genesis_input.execution_version,
-        genesis_root: build_initial_genesis_commitment(storage_logs, header),
+        genesis_root: build_initial_genesis_commitment(storage_logs, header)?,
     })
 }

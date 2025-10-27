@@ -6106,7 +6106,6 @@ dependencies = [
  "serde",
  "serde_json",
  "structopt",
- "tokio",
  "zksync_os_api",
  "zksync_os_interface",
 ]
