@@ -38,6 +38,8 @@ error InvalidPubdataSource(uint8 pubdataSource);
 error InvalidStartIndex(uint256 treeStartIndex, uint256 commitmentStartIndex);
 // 0x0f67bc0a
 error InvalidUnprocessedIndex(uint256 treeUnprocessedIndex, uint256 commitmentUnprocessedIndex);
+// 0x0a4df5de
+error InvalidVerifierVersion();
 // 0x2e89f517
 error L1DAValidatorAddressIsZero();
 // 0x7fbff2dd
@@ -88,5 +90,3 @@ error UnsupportedProofMetadataVersion(uint256 metadataVersion);
 error ValL1DAWrongInputLength(uint256 inputLength, uint256 expectedLength);
 // 0x712d02d2
 error VerifiedIsNotConsistentWithCommitted(uint256 batchesVerified, uint256 batchesCommitted);
-// 0x8fd63d21
-error InvalidVerifierVersion();
