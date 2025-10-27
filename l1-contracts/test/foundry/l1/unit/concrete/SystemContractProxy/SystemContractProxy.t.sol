@@ -3,14 +3,14 @@ pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
-import { SystemContractProxy } from "contracts/l2-upgrades/SystemContractProxy.sol";
-import { ISystemContractProxy } from "contracts/l2-upgrades/ISystemContractProxy.sol";
-import { SystemContractProxyAdmin } from "contracts/l2-upgrades/SystemContractProxyAdmin.sol";
-import { ITransparentUpgradeableProxy } from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {SystemContractProxy} from "contracts/l2-upgrades/SystemContractProxy.sol";
+import {ISystemContractProxy} from "contracts/l2-upgrades/ISystemContractProxy.sol";
+import {SystemContractProxyAdmin} from "contracts/l2-upgrades/SystemContractProxyAdmin.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import { L2_COMPLEX_UPGRADER_ADDR } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-import { SystemContractProxyInitialized } from "contracts/common/L1ContractErrors.sol";
+import {SystemContractProxyInitialized} from "contracts/common/L1ContractErrors.sol";
 
 contract MockImplementation {
     event Delegated(bytes4 indexed sig, address indexed arg);
@@ -34,7 +34,7 @@ contract MockImplementation {
         emit Delegated(msg.sig, newImpl);
     }
 
-    function upgradeToAndCall(address newImpl, bytes calldata /*data*/ ) external {
+    function upgradeToAndCall(address newImpl, bytes calldata /*data*/) external {
         emit Delegated(msg.sig, newImpl);
     }
 
@@ -52,19 +52,17 @@ contract MockImplementation {
 contract SystemContractProxyTest is Test {
     // ERC1967 slots (from OpenZeppelin):
     // bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1)
-    bytes32 internal constant _IMPLEMENTATION_SLOT =
-        0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+    bytes32 internal constant _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
     // bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1)
-    bytes32 internal constant _ADMIN_SLOT =
-        0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+    bytes32 internal constant _ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
-    address internal owner;        // Owner of SystemContractProxyAdmin
-    address internal newAdmin;     // New proxy admin set later
-    address internal user;         // Non-admin user
+    address internal owner; // Owner of SystemContractProxyAdmin
+    address internal newAdmin; // New proxy admin set later
+    address internal user; // Non-admin user
 
-    address internal proxy;        // The etched SystemContractProxy
-    address internal proxyAdmin;   // The etched SystemContractProxyAdmin
+    address internal proxy; // The etched SystemContractProxy
+    address internal proxyAdmin; // The etched SystemContractProxyAdmin
 
     MockImplementation internal impl1;
     MockImplementation internal impl2;
@@ -124,12 +122,20 @@ contract SystemContractProxyTest is Test {
         // Non-admin calls should delegate admin() to the implementation (returning impl sentinel)
         vm.prank(user);
         address apparentAdmin = ITransparentUpgradeableProxy(payable(proxy)).admin();
-        assertEq(apparentAdmin, address(0x00000000000000000000000000000000000A11cE), "admin() should be delegated for non-admin callers");
+        assertEq(
+            apparentAdmin,
+            address(0x00000000000000000000000000000000000A11cE),
+            "admin() should be delegated for non-admin callers"
+        );
 
         // Non-admin calls should delegate implementation() to the implementation (returning impl sentinel)
         vm.prank(user);
         address apparentImpl = ITransparentUpgradeableProxy(payable(proxy)).implementation();
-        assertEq(apparentImpl, address(0x000000000000000000000000000000000000bEEF), "implementation() should be delegated for non-admin callers");
+        assertEq(
+            apparentImpl,
+            address(0x000000000000000000000000000000000000bEEF),
+            "implementation() should be delegated for non-admin callers"
+        );
     }
 
     function test_NonAdmin_UpgradeAndChangeAdminSelectorsDelegate_NoStateChange() public {
@@ -209,6 +215,10 @@ contract SystemContractProxyTest is Test {
 
         vm.prank(admin);
         address reportedImpl = ITransparentUpgradeableProxy(payable(proxy)).implementation();
-        assertEq(reportedImpl, _readImplementation(proxy), "as admin, implementation() should return real implementation");
+        assertEq(
+            reportedImpl,
+            _readImplementation(proxy),
+            "as admin, implementation() should return real implementation"
+        );
     }
 }

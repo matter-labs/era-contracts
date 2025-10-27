@@ -1333,7 +1333,10 @@ library Utils {
         string memory contractName
     ) internal returns (bytes memory bytecodeInfo) {
         bytes memory bytecodeInfo = getZKOSBytecodeInfoForContract(fileName, contractName);
-        bytes memory proxyBytecodeInfo = getZKOSBytecodeInfoForContract("SystemContractProxy.sol", "SystemContractProxy");
+        bytes memory proxyBytecodeInfo = getZKOSBytecodeInfoForContract(
+            "SystemContractProxy.sol",
+            "SystemContractProxy"
+        );
 
         return abi.encode(bytecodeInfo, proxyBytecodeInfo);
     }

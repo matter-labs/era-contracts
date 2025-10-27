@@ -72,10 +72,7 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     function updateZKSyncOSContract(bytes memory _bytecodeInfo, address _newAddress) internal {
-        (bytes memory bytecodeInfo, bytes memory bytecodeInfoSystemProxy) = abi.decode(
-            (_bytecodeInfo),
-            (bytes, bytes)
-        );
+        (bytes memory bytecodeInfo, bytes memory bytecodeInfoSystemProxy) = abi.decode((_bytecodeInfo), (bytes, bytes));
 
         // The address to force deploy the implementation to.
         // The first 32 bytes are 0s to ensure that the address will never collide with neither create nor create2.
@@ -100,7 +97,11 @@ library L2GenesisForceDeploymentsHelper {
     /// @param _upgradeType The upgrade type to use.
     /// @param _bytecodeInfo The bytecode information for deployment.
     /// @param _newAddress The address where the contract should be deployed.
-    function conductContractUpgrade(IComplexUpgrader.ContractUpgradeType _upgradeType, bytes memory _bytecodeInfo, address _newAddress) internal {
+    function conductContractUpgrade(
+        IComplexUpgrader.ContractUpgradeType _upgradeType,
+        bytes memory _bytecodeInfo,
+        address _newAddress
+    ) internal {
         if (_upgradeType == IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment) {
             unsafeForceDeployZKSyncOS(_bytecodeInfo, _newAddress);
         } else if (_upgradeType == IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade) {
@@ -161,7 +162,11 @@ library L2GenesisForceDeploymentsHelper {
             L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
         }
 
-        conductContractUpgrade(expectedUpgradeType, fixedForceDeploymentsData.bridgehubBytecodeInfo, address(L2_BRIDGEHUB_ADDR));
+        conductContractUpgrade(
+            expectedUpgradeType,
+            fixedForceDeploymentsData.bridgehubBytecodeInfo,
+            address(L2_BRIDGEHUB_ADDR)
+        );
         if (_isGenesisUpgrade) {
             L2Bridgehub(L2_BRIDGEHUB_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
@@ -225,7 +230,11 @@ library L2GenesisForceDeploymentsHelper {
         });
 
         // Now initializing the upgradeable token beacon
-        conductContractUpgrade(expectedUpgradeType, fixedForceDeploymentsData.l2NtvBytecodeInfo, L2_NATIVE_TOKEN_VAULT_ADDR);
+        conductContractUpgrade(
+            expectedUpgradeType,
+            fixedForceDeploymentsData.l2NtvBytecodeInfo,
+            L2_NATIVE_TOKEN_VAULT_ADDR
+        );
 
         if (_isGenesisUpgrade) {
             address deployedTokenBeacon;

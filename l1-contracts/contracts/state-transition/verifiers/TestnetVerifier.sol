@@ -51,7 +51,7 @@ contract TestnetVerifier is IVerifier, IDualVerifier {
     function plonkVerifiers(uint32 version) external view returns (IVerifier) {
         return dualVerifier.plonkVerifiers(version);
     }
-    
+
     function fflonkVerifiers(uint32 version) external view returns (IVerifierV2) {
         return dualVerifier.fflonkVerifiers(version);
     }

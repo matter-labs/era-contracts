@@ -9,20 +9,20 @@ import {ConstructorsNotSupported, SystemContractProxyInitialized} from "../commo
 import {ISystemContractProxy} from "./ISystemContractProxy.sol";
 
 /// @notice Proxy contract for system contracts on L2.
-/// Note, that constructors are not supported during force deployments, so the first 
+/// Note, that constructors are not supported during force deployments, so the first
 /// thing that should happen after the contract is spawned is the initialization of the admin.
 contract SystemContractProxy is TransparentUpgradeableProxy {
     /// @dev The constructor is never expected to be actually activated.
     constructor() TransparentUpgradeableProxy(address(0), address(0), "") {
         revert ConstructorsNotSupported();
     }
-    
+
     /// @notice Force initializes the admin of the proxy.
     /// @dev You can read more about the logic in the doc-comments for the interface.
-    /// The contract does not inherit the interface for the reasons of implementing the 
+    /// The contract does not inherit the interface for the reasons of implementing the
     /// transparent proxy pattern correctly.
     function _dispatchForceInitAdmin() internal {
-        (address newAdmin) = abi.decode(msg.data[4:], (address));
+        address newAdmin = abi.decode(msg.data[4:], (address));
         _changeAdmin(newAdmin);
     }
 
@@ -31,11 +31,13 @@ contract SystemContractProxy is TransparentUpgradeableProxy {
     function _fallback() internal override {
         bytes4 selector = msg.sig;
 
-        if(selector == ITransparentUpgradeableProxy.upgradeTo.selector ||
-           selector == ITransparentUpgradeableProxy.upgradeToAndCall.selector ||
-           selector == ITransparentUpgradeableProxy.changeAdmin.selector ||
-           selector == ITransparentUpgradeableProxy.admin.selector ||
-           selector == ITransparentUpgradeableProxy.implementation.selector) {
+        if (
+            selector == ITransparentUpgradeableProxy.upgradeTo.selector ||
+            selector == ITransparentUpgradeableProxy.upgradeToAndCall.selector ||
+            selector == ITransparentUpgradeableProxy.changeAdmin.selector ||
+            selector == ITransparentUpgradeableProxy.admin.selector ||
+            selector == ITransparentUpgradeableProxy.implementation.selector
+        ) {
             super._fallback();
         } else if (selector == ISystemContractProxy.forceInitAdmin.selector) {
             if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
