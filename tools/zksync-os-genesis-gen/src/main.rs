@@ -32,7 +32,7 @@ const INITIAL_CONTRACTS: [(Address, &str); 5] = [
 
 fn bytecode_to_code(contract_name: &str) -> Vec<u8> {
     let path = format!(
-        "../l1-contracts/out/{contract_name}.sol/{contract_name}.json"
+        "../../l1-contracts/out/{contract_name}.sol/{contract_name}.json"
     );
     let file_content = std::fs::read_to_string(&path).expect("Failed to read contract bytecode file");
     let artifact: serde_json::Value = serde_json::from_str(&file_content).expect("Failed to parse JSON file");
@@ -75,7 +75,7 @@ fn construct_additional_storage() -> BTreeMap<Address, BTreeMap<B256, B256>> {
 #[structopt(name = "zksync-os-genesis-gen")]
 struct Opt {
     /// Output file path
-    #[structopt(long = "output-file", default_value = "../zksync-os-genesis.json")]
+    #[structopt(long = "output-file", default_value = "../../zksync-os-genesis.json")]
     output_file: String,
 }
 fn main() {
