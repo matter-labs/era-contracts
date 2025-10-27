@@ -14,7 +14,6 @@ blake2 = "0.10.6"
 zk_os_api = { package = "zksync_os_api", git = "https://github.com/matter-labs/zksync-os", tag = "v0.0.26" }
 zk_os_basic_system = { package = "basic_system", git = "https://github.com/matter-labs/zksync-os", tag = "v0.0.26" }
 
-tokio = "1.45.1"
 anyhow = "1"
 hex = "0.4"
 hex-literal = "1.0.0"
