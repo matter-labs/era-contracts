@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use structopt::StructOpt;
+use std::fs;
 use alloy::primitives::{Address, FixedBytes, B256};
 
 use crate::types::{build_genesis, InitialGenesisInput};
@@ -77,9 +78,31 @@ struct Opt {
     /// Output file path
     #[structopt(long = "output-file", default_value = "../../zksync-os-genesis.json")]
     output_file: String,
+
+    /// Skip execution version check
+    #[structopt(long = "no-execution-version-check")]
+    no_execution_version_check: bool,
 }
-fn main() {
+
+
+fn check_execution_version_in_solidity(path: &str, version: u32) -> anyhow::Result<bool> {
+    let content = fs::read_to_string(path)?;
+    let expected = format!("DEFAULT_EXECUTION_VERSION = {}", version);
+    Ok(content.contains(&expected))
+}
+
+
+fn main() -> anyhow::Result<()> {
     let opt = Opt::from_args();
+    if !opt.no_execution_version_check {
+        let verifier_path = "../../l1-contracts/contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
+        if !check_execution_version_in_solidity(verifier_path, EXECUTION_VERSION)? {
+            anyhow::bail!(
+                "ERROR: Could not find 'DEFAULT_EXECUTION_VERSION = {}' in {}.\nPlease ensure the Rust and Solidity execution versions are aligned.",
+                EXECUTION_VERSION, verifier_path
+            );
+        }
+    }
     println!("Output file: {}", opt.output_file);
 
     let initial_genesis_input = InitialGenesisInput {
@@ -95,8 +118,10 @@ fn main() {
         execution_version: EXECUTION_VERSION
     };
 
-    let result = build_genesis(initial_genesis_input).expect("Failed to build genesis"); 
+    let result = build_genesis(initial_genesis_input)?; 
 
-    let json = serde_json::to_string_pretty(&result).expect("Failed to serialize genesis to JSON");
-    std::fs::write(&opt.output_file, json).expect("Failed to write genesis to file");
+    let json = serde_json::to_string_pretty(&result)?;
+    std::fs::write(&opt.output_file, json)?;
+
+    Ok(())
 }
