@@ -133,7 +133,7 @@ contract L1GatewayTests is
     }
 
     function _pauseDeposits(uint256 _chainId) public {
-        _pauseDeposits(address(addresses.bridgehub), _chainId);
+        pauseDepositsBeforeInitiatingMigration(address(addresses.bridgehub), _chainId);
     }
 
     function _unpauseDeposits(uint256 _chainId) public {
