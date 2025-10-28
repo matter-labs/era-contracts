@@ -324,6 +324,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
     /// @param _checkedInLegacyBridge Whether the deposit was already checked in the legacy bridge system.
+    /// @param _confirmTransferResultData The data for confirming the transfer result.
     /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
     function _verifyAndClearTransfer(
         bool _checkedInLegacyBridge,
