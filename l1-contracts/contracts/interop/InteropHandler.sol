@@ -360,7 +360,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         bytes32 /* receiveId */,
         bytes calldata sender,
         bytes calldata payload
-    ) external payable nonReentrant returns (bytes4) {
+    ) external payable returns (bytes4) {
         // Verify that call to this function is a result of a call being executed, meaning this message came from a valid bundle.
         // This is the only way receiveMessage can be invoked on InteropHandler by itself.
         require(msg.sender == address(this), Unauthorized(msg.sender));
