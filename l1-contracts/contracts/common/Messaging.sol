@@ -325,6 +325,7 @@ struct TokenBalanceMigrationData {
     uint256 tokenOriginChainId;
     uint256 amount;
     uint256 chainMigrationNumber;
+    uint256 chainInitialMigrationNumber;
     uint256 assetMigrationNumber;
 }
 
