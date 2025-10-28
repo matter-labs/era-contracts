@@ -218,7 +218,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
             InvalidSelector(bytes4(payload[0:4]))
         );
 
-        (bool success, ) = address(this).call(payload);
+        (bool success, ) = address(this).call{value: msg.value}(payload);
         require(success, ExecuteMessageFailed());
         return IERC7786Recipient.receiveMessage.selector;
     }
