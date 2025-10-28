@@ -297,8 +297,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             chainMigrationNumber: chainMigrationNumber,
             assetMigrationNumber: assetMigrationNumber[block.chainid][_assetId],
             originToken: originalToken,
-            isL1ToGateway: true,
-            chainInitialMigrationNumber: 0
+            isL1ToGateway: true
         });
         _sendMigrationDataToL1(tokenBalanceMigrationData);
     }
