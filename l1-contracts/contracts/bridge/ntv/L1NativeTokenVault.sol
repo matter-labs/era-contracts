@@ -49,6 +49,12 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
     IL1Nullifier public immutable override L1_NULLIFIER;
 
+    /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
+    ///      This mapping was deprecated in favor of AssetTracker component, now it will be responsible for tracking chain balances.
+    ///      We have a `chainBalance` function now, which returns the values in this mapping, for backwards compatibility.
+    // slither-disable-next-line uninitialized-state
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) internal DEPRECATED_chainBalance;
+
     /// @notice AssetTracker component address on L1. On L2 the address is L2_ASSET_TRACKER_ADDR.
     ///         It adds one more layer of security on top of cross chain communication.
     ///         Refer to its documentation for more details.
@@ -77,11 +83,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     function _wethToken() internal view override returns (address) {
         return WETH_TOKEN;
     }
-    /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
-    ///      This mapping was deprecated in favor of AssetTracker component, now it will be responsible for tracking chain balances.
-    ///      We have a `chainBalance` function now, which returns the values in this mapping, for backwards compatibility.
-    // slither-disable-next-line uninitialized-state
-    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) internal DEPRECATED_chainBalance;
 
     /// @dev Returns the value of `DEPRECATED_chainBalance` for backwards compatibility.
     ///      The function body will be replaced with revert in the next release.
