@@ -42,7 +42,6 @@ import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 import {IMessageRoot, IMessageVerification} from "contracts/bridgehub/IMessageRoot.sol";
-import {IL1ChainAssetHandler} from "contracts/bridgehub/IL1ChainAssetHandler.sol";
 
 contract L1GatewayTests is
     L1ContractDeployer,
