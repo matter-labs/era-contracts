@@ -20,7 +20,7 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {AlreadyCurrentSL, NotChainAssetHandler, NotCurrentSL, NotRelayedSender, SLNotWhitelisted} from "./L1BridgehubErrors.sol";
-import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdCantBeCurrentChain, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, MigrationPaused, NoCTMForAssetId, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
+import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdCantBeCurrentChain, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, NoCTMForAssetId, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @author Matter Labs
