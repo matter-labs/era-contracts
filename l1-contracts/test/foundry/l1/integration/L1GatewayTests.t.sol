@@ -112,7 +112,7 @@ contract L1GatewayTests is
         vm.deal(gatewayChain.getAdmin(), 100000000000000000000000000000000000);
 
         vm.mockCall(
-            address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
+            address(ecosystemAddresses.bridgehub.messageRootProxy),
             abi.encodeWithSelector(IMessageRoot.getProofData.selector),
             abi.encode(
                 ProofData({
@@ -240,7 +240,7 @@ contract L1GatewayTests is
 
         // Mock Call for Msg Inclusion
         vm.mockCall(
-            address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
+            address(ecosystemAddresses.bridgehub.messageRootProxy),
             abi.encodeWithSelector(
                 IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
                 migratingChainId,
@@ -301,7 +301,7 @@ contract L1GatewayTests is
         // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId.
         vm.chainId(migratingChainId);
         vm.mockCall(
-            address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
+            address(ecosystemAddresses.bridgehub.messageRootProxy),
             abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
             abi.encode(true)
         );
@@ -316,7 +316,7 @@ contract L1GatewayTests is
             abi.encode(addresses.chainTypeManager.protocolVersion())
         );
         vm.mockCall(
-            address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
+            address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
             abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
             abi.encode(2)
         );
@@ -336,7 +336,7 @@ contract L1GatewayTests is
             batchNumber: 0,
             ctmData: ctmData,
             chainData: chainData,
-            migrationNumber: IChainAssetHandler(address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy))
+            migrationNumber: IChainAssetHandler(address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy))
                 .migrationNumber(migratingChainId),
             v30UpgradeChainBatchNumber: 0
         });

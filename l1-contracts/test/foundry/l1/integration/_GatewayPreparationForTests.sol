@@ -29,7 +29,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         // console.log("Gateway chain id skipped value = %s", toml.readUint("$.chain.chain_chain_id"));
 
         // Grab config from output of l1 deployment
-        path = string.concat(root, vm.envString("L1_OUTPUT"));
+        path = string.concat(root, vm.envString("CTM_OUTPUT"));
         toml = vm.readFile(path);
 
         // config.gatewayChainId = 506; //toml.readUint("$.chain.chain_chain_id");

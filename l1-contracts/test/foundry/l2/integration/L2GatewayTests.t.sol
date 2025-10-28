@@ -11,6 +11,7 @@ import {SystemContractsArgs} from "./L2Utils.sol";
 
 import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
 
+import {DeployCTMUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
 import {L2GatewayTestAbstract} from "../../l1/integration/l2-tests-abstract/L2GatewayTestAbstract.t.sol";
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 

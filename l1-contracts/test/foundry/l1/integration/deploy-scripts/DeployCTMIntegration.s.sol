@@ -7,7 +7,7 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {DeployCTMScript} from "deploy-scripts/DeployCTM.s.sol";
-import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {StateTransitionDeployedAddresses} from "deploy-scripts/Types.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 contract DeployCTMIntegrationScript is Script, DeployCTMScript {
@@ -63,7 +63,7 @@ contract DeployCTMIntegrationScript is Script, DeployCTMScript {
 
     function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
+    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
         return getChainCreationFacetCuts(stateTransition);
     }
 }

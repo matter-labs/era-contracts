@@ -11,7 +11,7 @@ import {console2 as console} from "forge-std/Script.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 
 import {L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
+import {Utils} from "../Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
@@ -21,6 +21,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
+import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";

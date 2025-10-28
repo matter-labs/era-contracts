@@ -452,7 +452,10 @@ contract GatewayCTMFromL1 is Script {
         console.log("Dummy diamond proxy deployed at", dp);
 
         output.gatewayStateTransition.chainTypeManagerImplementation = address(
-            _deployInternal(ContractsBytecodesLib.getCreationCode("ChainTypeManager"), abi.encode(L2_BRIDGEHUB_ADDR))
+            _deployInternal(
+                ContractsBytecodesLib.getCreationCode("ChainTypeManager"),
+                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
+            )
         );
         console.log(
             "StateTransitionImplementation deployed at",

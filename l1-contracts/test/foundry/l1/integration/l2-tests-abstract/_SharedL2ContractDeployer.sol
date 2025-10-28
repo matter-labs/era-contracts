@@ -40,6 +40,7 @@ import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainB
 import {SystemContractsArgs} from "./Utils.sol";
 import {SharedUtils} from "../utils/SharedUtils.sol";
 
+import {DeployCTMUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
@@ -106,6 +107,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             beaconProxyBytecodeHash := extcodehash(beaconProxy)
         }
 
+        discoveredBridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
         sharedBridgeLegacy = deployL2SharedBridgeLegacy(
             L1_CHAIN_ID,
             ERA_CHAIN_ID,

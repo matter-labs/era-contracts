@@ -94,12 +94,10 @@ library ContractsBytecodesLib {
             "UpgradeableBeaconDeployer"
         ];
 
-        string[6] memory L2_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[4] memory L2_GENERIC_CONTRACT_IDENTIFIERS = [
             "ForceDeployUpgrader",
             "RollupL2DAValidator",
             "ConsensusRegistry",
-            "AvailL2DAValidator",
-            "ValidiumL2DAValidator",
             "TimestampAsserter"
         ];
 

@@ -60,7 +60,7 @@ contract DeployErc20Script is Script {
         string memory root = vm.projectRoot();
 
         // Grab config from output of l1 deployment
-        string memory path = string.concat(root, vm.envString("L1_OUTPUT"));
+        string memory path = string.concat(root, vm.envString("CTM_OUTPUT"));
         string memory toml = vm.readFile(path);
 
         // Config file must be parsed key by key, otherwise values returned
