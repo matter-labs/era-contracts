@@ -358,3 +358,26 @@ struct InteropBalanceChange {
     uint256 baseTokenAmount;
     AssetBalanceChange[] assetBalanceChanges;
 }
+
+/// @param _chainId The ZK chain id to which deposit was initiated.
+/// @param _depositSender The address of the entity that initiated the deposit.
+/// @param _assetId The unique identifier of the deposited L1 token.
+/// @param _assetData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
+/// @param _l2TxHash The L2 transaction hash of the failed deposit finalization.
+/// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed.
+/// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
+/// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent.
+/// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization.
+/// @param _txStatus The status of the transaction.
+struct ConfirmTransferResultData {
+    uint256 _chainId;
+    address _depositSender;
+    uint16 _l2TxNumberInBatch;
+    TxStatus _txStatus;
+    bytes32 _assetId;
+    bytes _assetData;
+    bytes32 _l2TxHash;
+    uint256 _l2BatchNumber;
+    uint256 _l2MessageIndex;
+    bytes32[] _merkleProof;
+}

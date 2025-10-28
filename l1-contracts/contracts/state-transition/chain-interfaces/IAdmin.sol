@@ -7,6 +7,7 @@ import {IZKChainBase} from "../chain-interfaces/IZKChainBase.sol";
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
 import {L2DACommitmentScheme, ZKChainCommitment} from "../../common/Config.sol";
+import {TxStatus} from "../../common/Messaging.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
@@ -169,8 +170,9 @@ interface IAdmin is IZKChainBase {
     ) external payable returns (bytes memory _bridgeMintData);
 
     /// @dev Similar to IL1AssetHandler interface, used to claim failed chain transfers.
-    function forwardedBridgeRecoverFailedTransfer(
+    function forwardedBridgeConfirmTransferResult(
         uint256 _chainId,
+        TxStatus _txStatus,
         bytes32 _assetInfo,
         address _originalCaller,
         bytes calldata _chainData

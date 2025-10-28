@@ -559,7 +559,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
     function saveDiamondSelectors() public {
         AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)));
         GettersFacet gettersFacet = new GettersFacet();
-        MailboxFacet mailboxFacet = new MailboxFacet(1, 1);
+        MailboxFacet mailboxFacet = new MailboxFacet(1, 1, addresses.bridgehub.chainAssetHandlerProxy);
         ExecutorFacet executorFacet = new ExecutorFacet(1);
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);
         bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);

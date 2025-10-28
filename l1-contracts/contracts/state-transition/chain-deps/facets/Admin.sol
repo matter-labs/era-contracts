@@ -23,6 +23,7 @@ import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
+import {TxStatus} from "../../../common/Messaging.sol";
 
 /// @title Admin Contract controls access rights for contract management.
 /// @author Matter Labs
@@ -461,12 +462,16 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function forwardedBridgeRecoverFailedTransfer(
+    function forwardedBridgeConfirmTransferResult(
         uint256 /* _chainId */,
+        TxStatus _txStatus,
         bytes32 /* _assetInfo */,
         address /* _depositSender */,
         bytes calldata _chainData
     ) external payable override onlyChainAssetHandler {
+        if (_txStatus == TxStatus.Success) {
+            return;
+        }
         // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
         uint256 protocolVersion = abi.decode(_chainData, (uint256));
 
