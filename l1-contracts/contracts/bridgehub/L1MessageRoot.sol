@@ -70,8 +70,8 @@ contract L1MessageRoot is MessageRootBase {
             IncorrectFunctionSignature()
         );
 
-        // slither-disable-next-line unused-return
-        (uint256 chainId, ) = UnsafeBytes.readUint256(_finalizeWithdrawalParams.message, offset);
+        uint256 chainId;
+        (chainId, offset) = UnsafeBytes.readUint256(_finalizeWithdrawalParams.message, offset);
         // slither-disable-next-line unused-return
         (uint256 receivedV30UpgradeChainBatchNumber, ) = UnsafeBytes.readUint256(
             _finalizeWithdrawalParams.message,
