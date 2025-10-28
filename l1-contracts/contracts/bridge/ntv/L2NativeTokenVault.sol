@@ -246,8 +246,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         tokenAddress[_assetId] = _expectedToken;
         assetId[_expectedToken] = _assetId;
         originChainId[_assetId] = L1_CHAIN_ID;
-        bridgedTokens[bridgedTokensCount] = _assetId;
-        ++bridgedTokensCount;
+        _addTokenToTokensList(_assetId);
         L2_ASSET_TRACKER.registerLegacyTokenOnChain(_assetId);
     }
 
