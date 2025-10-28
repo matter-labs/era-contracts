@@ -29,7 +29,7 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
+import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 
 import {DeployCTMScript} from "../DeployCTM.s.sol";
 
@@ -133,7 +133,7 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
             ctmProtocolVersion == config.contracts.latestProtocolVersion,
             "The latest protocol version is not correct"
         );
-        serverNotifier = EraChainTypeManager(ctm).serverNotifierAddress();
+        serverNotifier = ChainTypeManagerBase(ctm).serverNotifierAddress();
         addresses.bridges.l1AssetRouterProxy = L1Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
 
         addresses.vaults.l1NativeTokenVaultProxy = address(
@@ -267,7 +267,7 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
             ecosystemAdminCalls[0] = Call({
                 target: addresses.stateTransition.chainTypeManagerProxy,
                 value: 0,
-                data: abi.encodeCall(EraChainTypeManager.setServerNotifier, (serverNotifier))
+                data: abi.encodeCall(ChainTypeManagerBase.setServerNotifier, (serverNotifier))
             });
             ecosystemAdminCalls[1] = Call({
                 target: serverNotifier,
