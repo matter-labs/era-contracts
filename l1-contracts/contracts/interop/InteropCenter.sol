@@ -272,12 +272,14 @@ contract InteropCenter is
             L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalBurnedCallsValue}();
         } else {
             require(msg.value == _totalIndirectCallsValue, MsgValueMismatch(_totalIndirectCallsValue, msg.value));
-            L2_ASSET_ROUTER.bridgehubDepositBaseToken(
-                _destinationChainId,
-                destinationChainBaseTokenAssetId,
-                msg.sender,
-                _totalBurnedCallsValue
-            );
+            if (_totalBurnedCallsValue > 0) {
+                L2_ASSET_ROUTER.bridgehubDepositBaseToken(
+                    _destinationChainId,
+                    destinationChainBaseTokenAssetId,
+                    msg.sender,
+                    _totalBurnedCallsValue
+                );
+            }
         }
     }
 
