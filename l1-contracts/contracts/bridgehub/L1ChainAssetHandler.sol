@@ -134,4 +134,8 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
             _chainData: bridgehubBurnData.chainData
         });
     }
+
+    function _setMigrationInProgressOnL1(uint256 _chainId) internal override {
+        isMigrationInProgress[_chainId] = true;
+    }
 }
