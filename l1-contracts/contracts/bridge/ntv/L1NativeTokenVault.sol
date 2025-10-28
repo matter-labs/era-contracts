@@ -33,19 +33,19 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token.
-    address public immutable override WETH_TOKEN;
+    address public immutable WETH_TOKEN;
 
     /// @dev The L1 asset router contract.
-    IAssetRouterBase public immutable override ASSET_ROUTER;
+    IAssetRouterBase public immutable ASSET_ROUTER;
 
     /// @dev The assetId of the base token.
-    bytes32 public immutable override BASE_TOKEN_ASSET_ID;
+    bytes32 public immutable BASE_TOKEN_ASSET_ID;
 
     /// @dev The chain ID of L1.
-    uint256 public immutable override L1_CHAIN_ID;
+    uint256 public immutable L1_CHAIN_ID;
 
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
-    IL1Nullifier public immutable override L1_NULLIFIER;
+    IL1Nullifier public immutable L1_NULLIFIER;
 
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS

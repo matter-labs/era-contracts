@@ -12,6 +12,7 @@ import {SETTLEMENT_LAYER_RELAY_SENDER, ZKChainCommitment} from "contracts/common
 
 import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {BridgehubBase} from "contracts/bridgehub/BridgehubBase.sol";
+import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
 
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
@@ -50,7 +51,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         // todo fix this test
         finalizeDeposit();
         vm.prank(SETTLEMENT_LAYER_RELAY_SENDER);
-        BridgehubBase(address(l2Bridgehub)).forwardTransactionOnGateway(mintChainId, bytes32(0), 0);
+        L2Bridgehub(address(l2Bridgehub)).forwardTransactionOnGateway(mintChainId, bytes32(0), 0);
     }
 
     function test_withdrawFromGateway() public {

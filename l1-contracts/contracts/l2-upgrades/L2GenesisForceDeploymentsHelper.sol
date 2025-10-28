@@ -24,6 +24,8 @@ import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
 
 import {UpgradeableBeaconDeployer} from "../bridge/ntv/UpgradeableBeaconDeployer.sol";
 
+import {FixedForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
+
 /// @title L2GenesisForceDeploymentsHelper
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
