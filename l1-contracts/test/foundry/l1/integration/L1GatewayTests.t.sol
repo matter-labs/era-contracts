@@ -136,13 +136,6 @@ contract L1GatewayTests is
         pauseDepositsBeforeInitiatingMigration(address(addresses.bridgehub), _chainId);
     }
 
-    function _unpauseDeposits(uint256 _chainId) public {
-        IZKChain chain = IZKChain(IBridgehubBase(addresses.bridgehub).getZKChain(_chainId));
-        vm.startBroadcast(chain.getAdmin());
-        IAdmin(address(chain)).unpauseDeposits();
-        vm.stopBroadcast();
-    }
-
     // This is a method to simplify porting the tests for now.
     // Here we rely that the first restriction is the AccessControlRestriction
     // TODO(EVM-924): this function is not used.
@@ -186,7 +179,6 @@ contract L1GatewayTests is
         clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
-        _unpauseDeposits(migratingChainId);
         IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
         uint256 expectedValue = 1000000000000000000000;
 
@@ -433,7 +425,6 @@ contract L1GatewayTests is
         clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
-        _unpauseDeposits(migratingChainId);
         IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
 
         bytes

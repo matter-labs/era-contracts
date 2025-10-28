@@ -314,9 +314,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         emit DepositsPaused(s.chainId, timestamp);
     }
 
-    /// @inheritdoc IAdmin
-    function unpauseDeposits() external onlyAdmin onlyL1 {
-        require(s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_END >= block.timestamp, DepositsNotPaused());
+    function _unpauseDeposits() internal {
         s.pausedDepositsTimestamp = 0;
         emit DepositsUnpaused(s.chainId);
     }
@@ -469,6 +467,8 @@ contract AdminFacet is ZKChainBase, IAdmin {
         address /* _depositSender */,
         bytes calldata _chainData
     ) external payable override onlyChainAssetHandler {
+        _unpauseDeposits();
+
         if (_txStatus == TxStatus.Success) {
             return;
         }
