@@ -22,14 +22,13 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
-import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
+import {IChainTypeManager, ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
-
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
@@ -137,7 +136,7 @@ contract ChainTypeManagerTest is Test {
         new TransparentUpgradeableProxy(
             address(chainTypeManager),
             admin,
-            abi.encodeCall(EraChainTypeManager.initialize, ctmInitializeDataNoGovernor)
+            abi.encodeCall(IChainTypeManager.initialize, ctmInitializeDataNoGovernor)
         );
 
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
@@ -151,7 +150,7 @@ contract ChainTypeManagerTest is Test {
         TransparentUpgradeableProxy transparentUpgradeableProxy = new TransparentUpgradeableProxy(
             address(chainTypeManager),
             admin,
-            abi.encodeCall(EraChainTypeManager.initialize, ctmInitializeData)
+            abi.encodeCall(IChainTypeManager.initialize, ctmInitializeData)
         );
         chainContractAddress = EraChainTypeManager(address(transparentUpgradeableProxy));
 

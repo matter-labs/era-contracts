@@ -8,7 +8,7 @@ import {Test} from "forge-std/Test.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
-import {InvalidL2DACommitmentScheme, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {ZeroAddress, InvalidL2DACommitmentScheme} from "contracts/common/L1ContractErrors.sol";
 
 contract RollupDAManagerTest is Test {
     // Instance of the contract under test

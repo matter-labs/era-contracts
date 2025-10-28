@@ -10,11 +10,11 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
+import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 import {Utils} from "../Utils.sol";
 
@@ -59,6 +59,7 @@ library GatewayCTMDeployerHelper {
             eraChainId,
             l1ChainId,
             config.aliasedGovernanceAddress,
+            config.isZKsyncOS,
             contracts,
             innerConfig
         );
@@ -136,6 +137,7 @@ library GatewayCTMDeployerHelper {
         uint256 _eraChainId,
         uint256 _l1ChainId,
         address _governanceAddress,
+        bool _isZKsyncOS,
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig
     ) internal returns (DeployedContracts memory) {
@@ -177,7 +179,7 @@ library GatewayCTMDeployerHelper {
         _deployedContracts.stateTransition.diamondInit = _deployInternal(
             "DiamondInit",
             "DiamondInit.sol",
-            abi.encode(false),
+            abi.encode(_isZKsyncOS),
             innerConfig
         );
         _deployedContracts.stateTransition.genesisUpgrade = _deployInternal(
@@ -355,12 +357,7 @@ library GatewayCTMDeployerHelper {
             serverNotifier: _deployedContracts.stateTransition.serverNotifierProxy
         });
 
-        bytes memory initCalldata;
-        if (_config.isZKsyncOS) {
-            initCalldata = abi.encodeCall(ZKsyncOSChainTypeManager.initialize, (diamondInitData));
-        } else {
-            initCalldata = abi.encodeCall(EraChainTypeManager.initialize, (diamondInitData));
-        }
+        bytes memory initCalldata = abi.encodeCall(IChainTypeManager.initialize, (diamondInitData));
 
         _deployedContracts.stateTransition.chainTypeManagerProxy = _deployInternal(
             "TransparentUpgradeableProxy",

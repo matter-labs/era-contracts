@@ -38,22 +38,6 @@ abstract contract NativeTokenVaultBase is
     using SafeERC20 for IERC20;
 
     /*//////////////////////////////////////////////////////////////
-                            EXTERNAL GETTERS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice The Weth token address
-    function WETH_TOKEN() external view virtual returns (address);
-
-    /// @notice The AssetRouter contract
-    function ASSET_ROUTER() external view virtual returns (IAssetRouterBase);
-
-    /// @notice The chain ID of the L1 chain
-    function L1_CHAIN_ID() external view virtual returns (uint256);
-
-    /// @notice The base token asset ID
-    function BASE_TOKEN_ASSET_ID() external view virtual returns (bytes32);
-
-    /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 

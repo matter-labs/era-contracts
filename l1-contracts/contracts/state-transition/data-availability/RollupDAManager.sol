@@ -2,7 +2,7 @@
 pragma solidity ^0.8.18;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {InvalidL2DACommitmentScheme, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {ZeroAddress, InvalidL2DACommitmentScheme} from "../../common/L1ContractErrors.sol";
 import {L2DACommitmentScheme} from "../../common/Config.sol";
 
 /// @title The RollupManager contract
