@@ -274,7 +274,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         });
     }
 
-    function bridgeConfirmTransferResult(ConfirmTransferResultData memory _confirmTransferResultData) internal {
+    function bridgeConfirmTransferResult(ConfirmTransferResultData memory _confirmTransferResultData) public nonReentrant {
         _verifyAndClearTransfer(false, _confirmTransferResultData);
         l1AssetRouter.bridgeConfirmTransferResult({
             _chainId: _confirmTransferResultData._chainId,
