@@ -36,3 +36,4 @@ error WrongDestinationChainId(bytes32 bundleHash, uint256 expected, uint256 actu
 // 0x534ab1b2
 error WrongSourceChainId(bytes32 bundleHash, uint256 expected, uint256 actual);
 error InvalidInteropBundleVersion();
+error InvalidInteropCallVersion();
