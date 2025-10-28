@@ -46,7 +46,8 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
 
     modifier onlyChainRegistrationSender() {
         if (
-            msg.sender != AddressAliasHelper.undoL1ToL2Alias(chainRegistrationSender) &&
+            /// Note on the L2 the chainRegistrationSender is aliased.
+            msg.sender != chainRegistrationSender &&
             msg.sender != SERVICE_TRANSACTION_SENDER
         ) {
             revert Unauthorized(msg.sender);
