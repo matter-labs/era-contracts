@@ -209,7 +209,8 @@ library L2GenesisForceDeploymentsHelper {
                 deployedTokenBeacon,
                 wrappedBaseTokenAddress,
                 additionalForceDeploymentsData.baseTokenAssetId,
-                additionalForceDeploymentsData.baseTokenOriginAddress
+                additionalForceDeploymentsData.baseTokenOriginAddress,
+                additionalForceDeploymentsData.baseTokenOriginChainId
             );
         } else {
             // solhint-disable-next-line func-named-parameters
@@ -219,7 +220,8 @@ library L2GenesisForceDeploymentsHelper {
                 l2LegacySharedBridge,
                 wrappedBaseTokenAddress,
                 additionalForceDeploymentsData.baseTokenAssetId,
-                additionalForceDeploymentsData.baseTokenOriginAddress
+                additionalForceDeploymentsData.baseTokenOriginAddress,
+                additionalForceDeploymentsData.baseTokenOriginChainId
             );
         }
 

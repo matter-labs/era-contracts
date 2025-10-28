@@ -110,7 +110,7 @@ abstract contract NativeTokenVaultBase is
         if (originChainId[_assetId] == block.chainid) {
             return token;
         } else {
-            _getOriginTokenFromAddress(token);
+            return _getOriginTokenFromAddress(token);
         }
     }
 

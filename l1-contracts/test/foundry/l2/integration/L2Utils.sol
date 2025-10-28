@@ -192,7 +192,8 @@ library L2Utils {
             _args.l2TokenBeacon,
             address(0),
             ethAssetId,
-            ETH_TOKEN_ADDRESS
+            ETH_TOKEN_ADDRESS,
+            _args.l1ChainId
         );
     }
 
