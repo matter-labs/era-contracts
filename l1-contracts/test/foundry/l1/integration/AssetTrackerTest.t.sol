@@ -304,7 +304,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             assetMigrationNumber: migrationNumber - 1,
             originToken: tokenAddress,
             isL1ToGateway: false,
-            chainInitialMigrationNumber: migrationNumber
+            chainInitialMigrationNumber: migrationNumber 
         });
         ConfirmBalanceMigrationData memory confirmData = ConfirmBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
