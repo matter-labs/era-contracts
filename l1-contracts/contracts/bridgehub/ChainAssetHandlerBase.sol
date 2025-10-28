@@ -83,6 +83,9 @@ abstract contract ChainAssetHandlerBase is
      */
     uint256[48] private __gap;
 
+    /// @notice Used to track the initial migration number of a chain, i.e. the first time it migrates to a settlement layer.
+    mapping(uint256 chainId => uint256 chainInitialMigrationNumber) public chainInitialMigrationNumber;
+
     /// @notice Only the asset router can call.
     modifier onlyAssetRouter() {
         if (msg.sender != _assetRouter()) {
@@ -278,6 +281,7 @@ abstract contract ChainAssetHandlerBase is
             // We want to allow any chain to be migrated,
             IBridgehubBase(_bridgehub()).registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
             IMessageRoot(_messageRoot()).addNewChain(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
+            chainInitialMigrationNumber[bridgehubMintData.chainId] = bridgehubMintData.migrationNumber;
         } else {
             // Note, that here we rely on the correctness of the provided data.
             // A malicious settlement layer could provide invalid values here.

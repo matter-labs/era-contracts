@@ -295,7 +295,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAdmin
-    function pauseDepositsBeforeInitiatingMigration() external onlyAdmin onlyL1 {
+    function pauseDepositsBeforeInitiatingMigration() external onlyAdminOrChainTypeManager onlyL1 {
         require(s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_END < block.timestamp, DepositsAlreadyPaused());
         uint256 timestamp;
         // Note, if the chain is new (total number of priority transactions is 0) we allow admin to pause the deposits with immediate effect.

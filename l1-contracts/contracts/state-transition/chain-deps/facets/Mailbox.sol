@@ -25,7 +25,7 @@ import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddre
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 
 import {BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, NotAssetRouter, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed} from "../../../common/L1ContractErrors.sol";
-import {RequireDepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
+import {DepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 import {DepthMoreThanOneForRecursiveMerkleProof} from "../../../bridgehub/L1BridgehubErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -329,7 +329,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             revert NotHyperchain();
         }
         // We pause L1->GW->L2 deposits.
-        require(_checkV30UpgradeProcessed(_chainId), RequireDepositsPaused());
+        require(_checkV30UpgradeProcessed(_chainId), DepositsPaused());
 
         BalanceChange memory balanceChange;
         if (_getBalanceChange) {
@@ -624,7 +624,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
         /// We only check deposits paused on L1 to keep the GW and L1 Priority queues the same.
         if (block.chainid == L1_CHAIN_ID) {
-            require(!_depositsPaused(), RequireDepositsPaused());
+            require(!_depositsPaused(), DepositsPaused());
         }
 
         // Data that is needed for the operator to simulate priority queue offchain

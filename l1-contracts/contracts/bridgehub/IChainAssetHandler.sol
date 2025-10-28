@@ -21,5 +21,7 @@ interface IChainAssetHandler is IAssetHandler {
 
     function migrationNumber(uint256 _chainId) external view returns (uint256);
 
+    function chainInitialMigrationNumber(uint256 _chainId) external view returns (uint256);
+
     function setMigrationNumberForV30(uint256 _chainId) external;
 }

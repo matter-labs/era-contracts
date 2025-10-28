@@ -31,6 +31,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
+import {PAUSE_DEPOSITS_TIME_WINDOW_END} from "contracts/common/Config.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
@@ -74,6 +75,7 @@ contract ChainTypeManagerTest is UtilsTest {
     Diamond.FacetCut[] internal facetCuts;
 
     function deploy() public {
+        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END + 1);
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
         messageroot = new L1MessageRoot(address(bridgehub), 1);
         chainAssetHandler = new L1ChainAssetHandler(
