@@ -13,9 +13,10 @@ import {ITransparentUpgradeableProxy, TransparentUpgradeableProxy} from "@openze
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
-import {L2_BRIDGEHUB_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 
 import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
 import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
@@ -1327,24 +1328,30 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     }
 
     function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
-        require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
+        require(
+            addresses.bridgehub.chainAssetHandlerProxy != address(0),
+            "chainAssetHandlerProxy is zero in newConfig"
+        );
 
         result = new Call[](1);
         result[0] = Call({
-            target: addresses.bridgehub.bridgehubProxy,
+            target: addresses.bridgehub.chainAssetHandlerProxy,
             value: 0,
-            data: abi.encodeCall(IBridgehubBase.pauseMigration, ())
+            data: abi.encodeCall(IChainAssetHandler.pauseMigration, ())
         });
     }
 
     function prepareUnpauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
-        require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
+        require(
+            addresses.bridgehub.chainAssetHandlerProxy != address(0),
+            "chainAssetHandlerProxy is zero in newConfig"
+        );
 
         result = new Call[](1);
         result[0] = Call({
-            target: addresses.bridgehub.bridgehubProxy,
+            target: addresses.bridgehub.chainAssetHandlerProxy,
             value: 0,
-            data: abi.encodeCall(IBridgehubBase.unpauseMigration, ())
+            data: abi.encodeCall(IChainAssetHandler.unpauseMigration, ())
         });
     }
 
@@ -1456,18 +1463,18 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeCall(IBridgehubBase.pauseMigration, ());
+        bytes memory l2Calldata = abi.encodeCall(IChainAssetHandler.pauseMigration, ());
 
-        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDR);
+        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_CHAIN_ASSET_HANDLER_ADDR);
     }
 
     function prepareUnpauseMigrationCallForGateway(
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeCall(IBridgehubBase.unpauseMigration, ());
+        bytes memory l2Calldata = abi.encodeCall(IChainAssetHandler.unpauseMigration, ());
 
-        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDR);
+        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_CHAIN_ASSET_HANDLER_ADDR);
     }
 
     function prepareNewChainCreationParamsCallForGateway(

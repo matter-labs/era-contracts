@@ -82,18 +82,10 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         }
 
         // Deploy TransparentUpgradeableProxy for ChainTypeManager
-        bytes memory initCalldata;
-        if (config.isZKsyncOS) {
-            initCalldata = abi.encodeCall(
-                IChainTypeManager.initialize,
-                getChainTypeManagerInitializeData(addresses.stateTransition)
-            );
-        } else {
-            initCalldata = abi.encodeCall(
-                IChainTypeManager.initialize,
-                getChainTypeManagerInitializeData(addresses.stateTransition)
-            );
-        }
+        bytes memory initCalldata = abi.encodeCall(
+            IChainTypeManager.initialize,
+            getChainTypeManagerInitializeData(addresses.stateTransition)
+        );
 
         addresses.stateTransition.chainTypeManagerProxy = address(
             new TransparentUpgradeableProxy(

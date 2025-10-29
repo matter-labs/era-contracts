@@ -303,13 +303,10 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                         L1NativeTokenVault.initialize,
                         (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
                     );
-            } else if (compareStrings(contractName, "EraChainTypeManager")) {
-                return
-                    abi.encodeCall(
-                        IChainTypeManager.initialize,
-                        getChainTypeManagerInitializeData(addresses.stateTransition)
-                    );
-            } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
+            } else if (
+                compareStrings(contractName, "EraChainTypeManager") ||
+                compareStrings(contractName, "ZKsyncOSChainTypeManager")
+            ) {
                 return
                     abi.encodeCall(
                         IChainTypeManager.initialize,

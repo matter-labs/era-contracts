@@ -181,6 +181,8 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         );
         IOwnable(address(ctmDeploymentTracker)).transferOwnership(addresses.governance);
 
+        IOwnable(addresses.bridgehub.chainAssetHandlerProxy).transferOwnership(addresses.governance);
+
         vm.stopBroadcast();
         console.log("Owners updated");
     }
