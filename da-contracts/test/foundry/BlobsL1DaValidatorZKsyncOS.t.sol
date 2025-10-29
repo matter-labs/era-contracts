@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "forge-std/Test.sol";
-import "../../contracts/BlobsL1DAValidatorZKsyncOS.sol";
-import "../../contracts/DAContractsErrors.sol";
-import {IL1DAValidator, L1DAValidatorOutput} from  "../../contracts/IL1DAValidator.sol";
+import {Test} from "forge-std/Test.sol";
+import {BlobsL1DAValidatorZKsyncOS, BLOB_EXPIRATION_BLOCKS} from "../../contracts/BlobsL1DAValidatorZKsyncOS.sol";
+import {InvalidBlobsPublished, InvalidBlobsDAInputLength,BlobNotPublished, NonEmptyBlobVersionHash} from "../../contracts/DAContractsErrors.sol";
+import {L1DAValidatorOutput} from  "../../contracts/IL1DAValidator.sol";
 
 /// @dev Mock contract to override _getBlobVersionedHash
 contract MockBlobsL1DAValidator is BlobsL1DAValidatorZKsyncOS {
     bytes32[] internal mockBlobs;
 
-    function setMockBlobs(bytes32[] memory blobs) external {
+    function setMockBlobs(bytes32[] calldata blobs) external {
         delete mockBlobs;
-        for (uint256 i = 0; i < blobs.length; i++) {
+        uint256 len = blobs.length;
+        for (uint256 i = 0; i < len; ++i) {
             mockBlobs.push(blobs[i]);
         }
     }
@@ -26,7 +27,7 @@ contract MockBlobsL1DAValidator is BlobsL1DAValidatorZKsyncOS {
 }
 
 contract BlobsL1DAValidatorZKsyncOSTest is Test {
-    MockBlobsL1DAValidator validator;
+    MockBlobsL1DAValidator internal validator;
 
     function setUp() public {
         validator = new MockBlobsL1DAValidator();
@@ -62,6 +63,7 @@ contract BlobsL1DAValidatorZKsyncOSTest is Test {
     function testCheckDAInvalidLength() public {
         bytes memory badInput = hex"1234"; // not multiple of 32
         vm.expectRevert(abi.encodeWithSelector(InvalidBlobsDAInputLength.selector, 2));
+        // solhint-disable-next-line func-named-parameters
         validator.checkDA(1, 1, bytes32(0), badInput, 0);
     }
 
@@ -70,6 +72,7 @@ contract BlobsL1DAValidatorZKsyncOSTest is Test {
         bytes memory operatorInput = abi.encodePacked(notPublished);
 
         vm.expectRevert(BlobNotPublished.selector);
+        // solhint-disable-next-line func-named-parameters
         validator.checkDA(1, 1, keccak256(operatorInput), operatorInput, 0);
     }
 
@@ -83,6 +86,7 @@ contract BlobsL1DAValidatorZKsyncOSTest is Test {
         bytes memory operatorInput = abi.encodePacked(bytes32(0));
 
         vm.expectRevert(abi.encodeWithSelector(NonEmptyBlobVersionHash.selector, 1));
+        // solhint-disable-next-line func-named-parameters
         validator.checkDA(1, 1, keccak256(operatorInput), operatorInput, 0);
     }
 
@@ -102,6 +106,7 @@ contract BlobsL1DAValidatorZKsyncOSTest is Test {
                 wrongHash
             )
         );
+        // solhint-disable-next-line func-named-parameters
         validator.checkDA(1, 1, wrongHash, operatorInput, 0);
     }
 
@@ -114,6 +119,7 @@ contract BlobsL1DAValidatorZKsyncOSTest is Test {
         bytes memory operatorInput = abi.encodePacked(bytes32(0));
         bytes32 expectedHash = keccak256(abi.encodePacked(blobs[0]));
 
+        // solhint-disable-next-line func-named-parameters
         L1DAValidatorOutput memory out = validator.checkDA(
             1,
             1,
@@ -143,6 +149,7 @@ contract BlobsL1DAValidatorZKsyncOSTest is Test {
         bytes memory operatorInput = abi.encodePacked(publishedBlob, bytes32(0));
         bytes32 expectedHash = keccak256(abi.encodePacked(publishedBlob, providedBlob));
 
+        // solhint-disable-next-line func-named-parameters
         L1DAValidatorOutput memory out = validator.checkDA(
             1,
             1,
