@@ -54,6 +54,8 @@ error LocalRootIsZero();
 error LocalRootMustBeZero();
 // 0x9b5f85eb
 error MessageRootIsZero();
+// 0xf148c8da
+error MigrationInProgress();
 // 0x32fff278
 error MismatchL2DACommitmentScheme(uint256 operatorProvidedScheme, uint256 expectedScheme);
 // 0x2c01a4af

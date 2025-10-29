@@ -158,6 +158,9 @@ interface IAdmin is IZKChainBase {
     /// @notice Pauses deposits before initiating migration to the Gateway.
     function pauseDepositsBeforeInitiatingMigration() external;
 
+    /// @notice Unpauses deposits, used after the chain is initialized
+    function unpauseDeposits() external;
+
     /// @dev Similar to IL1AssetHandler interface, used to send chains.
     function forwardedBridgeBurn(
         address _settlementLayer,
