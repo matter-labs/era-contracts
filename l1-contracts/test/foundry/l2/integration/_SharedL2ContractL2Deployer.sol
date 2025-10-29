@@ -44,7 +44,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml"
         );
         initializeConfig(inputPath);
-        addresses.transparentProxyAdmin = address(0x1);
+        addresses.transparentProxyAdmin = makeAddr("transparentProxyAdmin");
         addresses.bridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
         addresses.bridges.l1AssetRouterProxy = L2_ASSET_ROUTER_ADDR;
         addresses.vaults.l1NativeTokenVaultProxy = L2_NATIVE_TOKEN_VAULT_ADDR;
