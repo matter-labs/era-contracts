@@ -110,12 +110,12 @@ contract RegisterZKChainScript is Script {
     function runForTest() public {
         console.log("Deploying ZKChain");
 
+        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END + 1);
         initializeConfigTest();
         runInner(vm.envString("ZK_CHAIN_OUT"));
     }
 
     function runInner(string memory outputPath) internal {
-        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END + 1);
         string memory root = vm.projectRoot();
 
         outputPath = string.concat(root, outputPath);
