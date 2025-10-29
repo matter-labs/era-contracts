@@ -42,6 +42,7 @@ contract BlobsL1DAValidatorZKsyncOSTest is Test {
 
         assertEq(validator.publishedBlobs(blobs[0]), block.number);
         assertEq(validator.publishedBlobs(blobs[1]), block.number);
+        assertEq(validator.publishedBlobs(keccak256("nonexistent")), 0);
     }
 
     function testIsBlobAvailable() public {
@@ -112,6 +113,35 @@ contract BlobsL1DAValidatorZKsyncOSTest is Test {
         // operator input asks to pull blob0
         bytes memory operatorInput = abi.encodePacked(bytes32(0));
         bytes32 expectedHash = keccak256(abi.encodePacked(blobs[0]));
+
+        L1DAValidatorOutput memory out = validator.checkDA(
+            1,
+            1,
+            expectedHash,
+            operatorInput,
+            0
+        );
+
+        assertEq(out.stateDiffHash, bytes32(0));
+        assertEq(out.blobsLinearHashes.length, 0);
+    }
+
+        function testCheckDAWithMixedProvidedAndPublishedBlob() public {
+        // publish one blob beforehand
+        bytes32 publishedBlob = keccak256("published");
+        bytes32[] memory blobs = new bytes32[](1);
+        blobs[0] = publishedBlob;
+        validator.setMockBlobs(blobs);
+        validator.publishBlobs();
+
+        // operator provides one directly + one placeholder for pulling from tx (mock)
+        bytes32 providedBlob = keccak256("provided");
+        bytes32[] memory txBlobs = new bytes32[](1);
+        txBlobs[0] = providedBlob;
+        validator.setMockBlobs(txBlobs); // will be pulled for the zero placeholder
+
+        bytes memory operatorInput = abi.encodePacked(publishedBlob, bytes32(0));
+        bytes32 expectedHash = keccak256(abi.encodePacked(publishedBlob, providedBlob));
 
         L1DAValidatorOutput memory out = validator.checkDA(
             1,
