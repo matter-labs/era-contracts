@@ -49,10 +49,14 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     modifier onlyL1() {
+        _onlyL1();
+        _;
+    }
+
+    function _onlyL1() internal {
         if (block.chainid != L1_CHAIN_ID) {
             revert NotL1(block.chainid);
         }
-        _;
     }
 
     /// @inheritdoc IAdmin
