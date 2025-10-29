@@ -1,12 +1,12 @@
 import {stdToml} from "forge-std/StdToml.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {GatewayGovernanceUtils} from "deploy-scripts/GatewayGovernanceUtils.s.sol";
+import {GatewayGovernanceUtils} from "deploy-scripts/gateway/GatewayGovernanceUtils.s.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 
-import {DeployGatewayTransactionFilterer} from "deploy-scripts/DeployGatewayTransactionFilterer.s.sol";
+import {DeployGatewayTransactionFilterer} from "deploy-scripts/gateway/DeployGatewayTransactionFilterer.s.sol";
 
-import {Utils, ChainInfoFromBridgehub} from "deploy-scripts/Utils.sol";
+import {ChainInfoFromBridgehub, Utils} from "deploy-scripts/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {AdminFunctions} from "deploy-scripts/AdminFunctions.s.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -105,16 +105,19 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
 
     function fullGatewayRegistration() public {
         Call[] memory calls = _prepareGatewayGovernanceCalls(
-            _getL1GasPrice(),
-            // Some non-zero address
-            address(uint160(1)),
-            // Some non-zero address
-            address(uint160(1)),
-            // Some non-zero address
-            address(uint160(1)),
-            // Some non-zero address
-            address(uint160(1)),
-            msg.sender
+            PrepareGatewayGovernanceCalls({
+                _l1GasPrice: _getL1GasPrice(),
+                // Some non-zero address
+                _gatewayCTMAddress: address(uint160(1)),
+                // Some non-zero address
+                _gatewayRollupDAManager: address(uint160(1)),
+                // Some non-zero address
+                _gatewayValidatorTimelock: address(uint160(1)),
+                // Some non-zero address
+                _gatewayServerNotifier: address(uint160(1)),
+                _refundRecipient: msg.sender,
+                _ctmChainId: 0
+            })
         );
         Utils.executeCalls(Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner(), bytes32(0), 0, calls);
     }

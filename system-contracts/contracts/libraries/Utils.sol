@@ -4,8 +4,8 @@ pragma solidity ^0.8.20;
 
 import {EfficientCall} from "./EfficientCall.sol";
 import {RLPEncoder} from "./RLPEncoder.sol";
-import {MalformedBytecode, BytecodeError, Overflow} from "../SystemContractErrors.sol";
-import {ERA_VM_BYTECODE_FLAG, EVM_BYTECODE_FLAG, CREATE2_EVM_PREFIX} from "../Constants.sol";
+import {BytecodeError, MalformedBytecode, Overflow} from "../SystemContractErrors.sol";
+import {CREATE2_EVM_PREFIX, ERA_VM_BYTECODE_FLAG, EVM_BYTECODE_FLAG} from "../Constants.sol";
 
 /**
  * @author Matter Labs

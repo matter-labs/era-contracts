@@ -9,7 +9,7 @@ import {IPaymasterFlow} from "../interfaces/IPaymasterFlow.sol";
 import {BASE_TOKEN_SYSTEM_CONTRACT, BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
 import {RLPEncoder} from "./RLPEncoder.sol";
 import {EfficientCall} from "./EfficientCall.sol";
-import {UnsupportedTxType, InvalidInput, UnsupportedPaymasterFlow} from "../SystemContractErrors.sol";
+import {InvalidInput, UnsupportedPaymasterFlow, UnsupportedTxType} from "../SystemContractErrors.sol";
 
 /// @dev The type id of ZKsync's EIP-712-signed transaction.
 uint8 constant EIP_712_TX_TYPE = 0x71;

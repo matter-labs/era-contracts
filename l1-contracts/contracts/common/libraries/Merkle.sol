@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
-import {MerklePathEmpty, MerklePathOutOfBounds, MerkleIndexOutOfBounds, MerklePathLengthMismatch, MerkleNothingToProve, MerkleIndexOrHeightMismatch} from "../../common/L1ContractErrors.sol";
+import {MerkleIndexOrHeightMismatch, MerkleIndexOutOfBounds, MerkleNothingToProve, MerklePathEmpty, MerklePathLengthMismatch, MerklePathOutOfBounds} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

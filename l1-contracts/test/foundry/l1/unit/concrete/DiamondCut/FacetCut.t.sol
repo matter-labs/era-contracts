@@ -9,7 +9,7 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {ReplaceFunctionFacetAddressZero, RemoveFunctionFacetAddressNotZero, FacetExists, SelectorsMustAllHaveSameFreezability, AddressHasNoCode, RemoveFunctionFacetAddressZero, ZeroAddress, NoFunctionsForDiamondCut} from "contracts/common/L1ContractErrors.sol";
+import {AddressHasNoCode, FacetExists, NoFunctionsForDiamondCut, RemoveFunctionFacetAddressNotZero, RemoveFunctionFacetAddressZero, ReplaceFunctionFacetAddressZero, SelectorsMustAllHaveSameFreezability, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract FacetCutTest is DiamondCutTest {
     MailboxFacet private mailboxFacet;
@@ -20,10 +20,11 @@ contract FacetCutTest is DiamondCutTest {
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](4);
-        selectors[0] = executorFacet1.commitBatchesSharedBridge.selector;
-        selectors[1] = executorFacet1.proveBatchesSharedBridge.selector;
-        selectors[2] = executorFacet1.executeBatchesSharedBridge.selector;
-        selectors[3] = executorFacet1.revertBatchesSharedBridge.selector;
+        uint256 i = 0;
+        selectors[i++] = executorFacet1.commitBatchesSharedBridge.selector;
+        selectors[i++] = executorFacet1.proveBatchesSharedBridge.selector;
+        selectors[i++] = executorFacet1.executeBatchesSharedBridge.selector;
+        selectors[i++] = executorFacet1.revertBatchesSharedBridge.selector;
         return selectors;
     }
 

@@ -2,13 +2,13 @@
 
 pragma solidity 0.8.28;
 
-import {ICompressor, OPERATION_BITMASK, LENGTH_BITS_OFFSET, MAX_ENUMERATION_INDEX_SIZE} from "./interfaces/ICompressor.sol";
+import {ICompressor, LENGTH_BITS_OFFSET, MAX_ENUMERATION_INDEX_SIZE, OPERATION_BITMASK} from "./interfaces/ICompressor.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {UnsafeBytesCalldata} from "./libraries/UnsafeBytesCalldata.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
-import {L1_MESSENGER_CONTRACT, STATE_DIFF_ENTRY_SIZE, KNOWN_CODE_STORAGE_CONTRACT} from "./Constants.sol";
-import {DerivedKeyNotEqualToCompressedValue, EncodedAndRealBytecodeChunkNotEqual, DictionaryDividedByEightNotGreaterThanEncodedDividedByTwo, EncodedLengthNotFourTimesSmallerThanOriginal, IndexOutOfBounds, IndexSizeError, UnsupportedOperation, CompressorInitialWritesProcessedNotEqual, CompressorEnumIndexNotEqual, StateDiffLengthMismatch, CompressionValueTransformError, CompressionValueAddError, CompressionValueSubError} from "./SystemContractErrors.sol";
+import {KNOWN_CODE_STORAGE_CONTRACT, L1_MESSENGER_CONTRACT, STATE_DIFF_ENTRY_SIZE} from "./Constants.sol";
+import {CompressionValueAddError, CompressionValueSubError, CompressionValueTransformError, CompressorEnumIndexNotEqual, CompressorInitialWritesProcessedNotEqual, DerivedKeyNotEqualToCompressedValue, DictionaryDividedByEightNotGreaterThanEncodedDividedByTwo, EncodedAndRealBytecodeChunkNotEqual, EncodedLengthNotFourTimesSmallerThanOriginal, IndexOutOfBounds, IndexSizeError, StateDiffLengthMismatch, UnsupportedOperation} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
