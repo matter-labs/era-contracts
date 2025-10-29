@@ -27,6 +27,7 @@ import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
 import {L2GatewayTestAbstract} from "../../l1/integration/l2-tests-abstract/L2GatewayTestAbstract.t.sol";
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {Create2FactoryUtils} from "deploy-scripts/Create2FactoryUtils.s.sol";
+import {TokenMetadata, TokenBridgingData} from "contracts/common/Messaging.sol";
 
 contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2ContractL2Deployer {
     using stdStorage for StdStorage;
@@ -100,14 +101,15 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
 
         additionalForceDeploymentsData = abi.encode(
             ZKChainSpecificForceDeploymentsData({
-                baseTokenAssetId: bytes32(0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70),
+                baseTokenBridgingData: TokenBridgingData({
+                    assetId: bytes32(0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70),
+                    originChainId: 1,
+                    originToken: address(1)
+                }),
                 l2LegacySharedBridge: address(0),
                 predeployedL2WethAddress: address(1),
                 baseTokenL1Address: address(1),
-                baseTokenName: "Ether",
-                baseTokenSymbol: "ETH",
-                baseTokenOriginChainId: 1,
-                baseTokenOriginAddress: address(1)
+                baseTokenMetadata: TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18})
             })
         );
 
