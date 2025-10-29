@@ -50,6 +50,7 @@ jobs:
         with:
           key: artifacts-l1-contracts-foudry-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
@@ -73,6 +74,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-contracts-foudry-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
