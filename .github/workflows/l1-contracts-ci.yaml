@@ -70,6 +70,20 @@ jobs:
             l2-contracts/zkout
             system-contracts/zkout
 
+      - name: Upload artifacts for download
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            da-contracts/cache-forge
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
+
   lint:
     runs-on: ubuntu-latest
 
