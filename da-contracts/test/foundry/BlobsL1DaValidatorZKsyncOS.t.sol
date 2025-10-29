@@ -3,8 +3,8 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {BlobsL1DAValidatorZKsyncOS, BLOB_EXPIRATION_BLOCKS} from "../../contracts/BlobsL1DAValidatorZKsyncOS.sol";
-import {InvalidBlobsPublished, InvalidBlobsDAInputLength,BlobNotPublished, NonEmptyBlobVersionHash} from "../../contracts/DAContractsErrors.sol";
-import {L1DAValidatorOutput} from  "../../contracts/IL1DAValidator.sol";
+import {InvalidBlobsPublished, InvalidBlobsDAInputLength, BlobNotPublished, NonEmptyBlobVersionHash} from "../../contracts/DAContractsErrors.sol";
+import {L1DAValidatorOutput} from "../../contracts/IL1DAValidator.sol";
 
 /// @dev Mock contract to override _getBlobVersionedHash
 contract MockBlobsL1DAValidator is BlobsL1DAValidatorZKsyncOS {
@@ -100,11 +100,7 @@ contract BlobsL1DAValidatorZKsyncOSTest is Test {
 
         bytes32 wrongHash = keccak256("wrong");
         vm.expectRevert(
-            abi.encodeWithSelector(
-                InvalidBlobsPublished.selector,
-                keccak256(abi.encodePacked(blobs[0])),
-                wrongHash
-            )
+            abi.encodeWithSelector(InvalidBlobsPublished.selector, keccak256(abi.encodePacked(blobs[0])), wrongHash)
         );
         // solhint-disable-next-line func-named-parameters
         validator.checkDA(1, 1, wrongHash, operatorInput, 0);
@@ -120,19 +116,13 @@ contract BlobsL1DAValidatorZKsyncOSTest is Test {
         bytes32 expectedHash = keccak256(abi.encodePacked(blobs[0]));
 
         // solhint-disable-next-line func-named-parameters
-        L1DAValidatorOutput memory out = validator.checkDA(
-            1,
-            1,
-            expectedHash,
-            operatorInput,
-            0
-        );
+        L1DAValidatorOutput memory out = validator.checkDA(1, 1, expectedHash, operatorInput, 0);
 
         assertEq(out.stateDiffHash, bytes32(0));
         assertEq(out.blobsLinearHashes.length, 0);
     }
 
-        function testCheckDAWithMixedProvidedAndPublishedBlob() public {
+    function testCheckDAWithMixedProvidedAndPublishedBlob() public {
         // publish one blob beforehand
         bytes32 publishedBlob = keccak256("published");
         bytes32[] memory blobs = new bytes32[](1);
@@ -150,13 +140,7 @@ contract BlobsL1DAValidatorZKsyncOSTest is Test {
         bytes32 expectedHash = keccak256(abi.encodePacked(publishedBlob, providedBlob));
 
         // solhint-disable-next-line func-named-parameters
-        L1DAValidatorOutput memory out = validator.checkDA(
-            1,
-            1,
-            expectedHash,
-            operatorInput,
-            0
-        );
+        L1DAValidatorOutput memory out = validator.checkDA(1, 1, expectedHash, operatorInput, 0);
 
         assertEq(out.stateDiffHash, bytes32(0));
         assertEq(out.blobsLinearHashes.length, 0);
