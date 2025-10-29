@@ -38,6 +38,7 @@ import {DummyL2BaseTokenSystemContract} from "../../../../../contracts/dev-contr
 import {DummyL2InteropAccount} from "../../../../../contracts/dev-contracts/test/DummyL2InteropAccount.sol";
 
 import {SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
+import {TokenMetadata, TokenBridgingData} from "contracts/common/Messaging.sol";
 
 library L2UtilsBase {
     using stdToml for string;
@@ -182,9 +183,12 @@ library L2UtilsBase {
                 _args.legacySharedBridge,
                 _args.l2TokenBeacon,
                 wethToken,
-                baseTokenAssetId,
-                ETH_TOKEN_ADDRESS,
-                _args.l1ChainId
+                TokenBridgingData({
+                    assetId: baseTokenAssetId,
+                    originChainId: _args.l1ChainId,
+                    originToken: ETH_TOKEN_ADDRESS
+                }),
+                TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18})
             );
 
             vm.store(
