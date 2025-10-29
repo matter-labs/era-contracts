@@ -1,13 +1,14 @@
 [profile.default]
 src = 'contracts'
 out = 'out'
-libs = ['node_modules', 'lib']
+libs = ['node_modules', 'lib', '../lib']
 remappings = [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
     "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
-    "l2-contracts/=../l2-contracts/contracts/"
+    "l2-contracts/=../l2-contracts/contracts/",
+    "forge-std/=../lib/forge-std/src/",
 ]
-allow_paths = ["../l2-contracts/contracts"]
+allow_paths = ["../l2-contracts/contracts", "../l1-contracts/lib"]
 fs_permissions = [
     { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
     { access = "read", path = "../system-contracts/artifacts-zk/contracts-preprocessed" },
