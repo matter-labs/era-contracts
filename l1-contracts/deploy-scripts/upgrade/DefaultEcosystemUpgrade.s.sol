@@ -756,7 +756,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         // TODO(refactor): do we need this?
         additionalDependencies[4] = ContractsBytecodesLib.getCreationCode("DiamondProxy");
         additionalDependencies[5] = ContractsBytecodesLib.getCreationCode("L2V29Upgrade");
-        additionalDependencies[6] = ContractsBytecodesLib.getCreationCode("ProxyAdmin");
+        additionalDependencies[6] = Utils.readSystemContractsBytecode("ProxyAdmin");
 
         for (uint256 i; i < additionalForceDeployments.length; i++) {
             additionalDependencies[6 + i] = ContractsBytecodesLib.getCreationCode(additionalForceDeployments[i]);
@@ -1196,7 +1196,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         (Call[] memory testUpgradeChainCall, address ZKChainAdmin) = TESTONLY_prepareTestUpgradeChainCall();
         vm.serializeAddress("test_upgrade_calls", "test_upgrade_chain_caller", ZKChainAdmin);
         vm.serializeBytes("test_upgrade_calls", "test_upgrade_chain", abi.encode(testUpgradeChainCall));
-        (Call[] memory testCreateChainCall, address bridgehubAdmin) = TESTONLY_prepareCreateChainCall();
+        (Call[] memory testCreateChainCall, address bridgehubAdmin) = TESTONLY_prepareTestCreateChainCall();
         vm.serializeAddress("test_upgrade_calls", "test_create_chain_caller", bridgehubAdmin);
 
         string memory testUpgradeCallsSerialized = vm.serializeBytes(
@@ -1770,7 +1770,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
     }
 
     /// @notice Tests that it is possible to create a new chain with the new version
-    function TESTONLY_prepareCreateChainCall() private returns (Call[] memory calls, address admin) {
+    function TESTONLY_prepareTestCreateChainCall() private returns (Call[] memory calls, address admin) {
         admin = getBridgehubAdmin();
         calls = new Call[](1);
         calls[0] = prepareCreateNewChainCall(555)[0];

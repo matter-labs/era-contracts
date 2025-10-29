@@ -843,9 +843,9 @@
     "contractName": "l1-contracts/GatewayCTMDeployer",
     "zkBytecodeHash": "0x010004150b81d606133f4cb08e2cb5f21f2adf0e5cce24bcca39fe3b1532d9ba",
     "zkBytecodePath": "/l1-contracts/zkout/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
-    "evmBytecodeHash": "0xfb687d8ff9678c2ab484f87d2c190f843b8094047db4a596734c2b95bf699b1d",
+    "evmBytecodeHash": "0x48be1470d7e44f0f1dbd9f027e4d70b7527fef2f747f65b75ae538590d8db7fa",
     "evmBytecodePath": "/l1-contracts/out/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
-    "evmDeployedBytecodeHash": "0x81ebbca9afce5c1a309725564fe18b96595d00c0706d16da8c22ccc3051e2d22"
+    "evmDeployedBytecodeHash": "0x168114df60620cb3a1707e7466b58995f4c4a708f0d08e27b0bf1046bed97562"
   },
   {
     "contractName": "l1-contracts/GatewayTransactionFilterer",
@@ -1411,9 +1411,9 @@
     "contractName": "l1-contracts/ZKsyncOSVerifierFflonk",
     "zkBytecodeHash": "0x010009bf79f4d5dbe0d181ea9f730925447a6feb3e6fc513ba64c5d6cb1c39eb",
     "zkBytecodePath": "/l1-contracts/zkout/ZKsyncOSVerifierFflonk.sol/ZKsyncOSVerifierFflonk.json",
-    "evmBytecodeHash": "0x6f9505fb532f7576d7fd97834e2e53213b444c588e2226b89b13fe5e9037b98f",
+    "evmBytecodeHash": "0x1a6abff7c7a6e99380766e7c597620f96ee8590f50648e463447f392fb8b054e",
     "evmBytecodePath": "/l1-contracts/out/ZKsyncOSVerifierFflonk.sol/ZKsyncOSVerifierFflonk.json",
-    "evmDeployedBytecodeHash": "0xf1cb91abd582c73dd7385ee2db4189689295b9d31c46e6b5052ab346fd060c9b"
+    "evmDeployedBytecodeHash": "0x348d484e813eb11832f690a46278e7297d0945075e5064d08833331610b81c1f"
   },
   {
     "contractName": "l1-contracts/ZKsyncOSVerifierPlonk",
