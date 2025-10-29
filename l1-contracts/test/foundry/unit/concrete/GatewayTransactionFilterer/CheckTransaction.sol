@@ -52,7 +52,7 @@ contract CheckTransactionTest is GatewayTransactionFiltererTest {
     }
 
     function test_TransactionAllowedFromWhitelistedSenderForChainBridging() public {
-        address stm = address(0x6060606);
+        address stm = makeAddr("stm");
         bytes memory txCalladata = abi.encodeCall(
             AssetRouterBase.finalizeDeposit,
             (uint256(10), bytes32("0x12345"), bytes("0x23456"))
@@ -82,7 +82,7 @@ contract CheckTransactionTest is GatewayTransactionFiltererTest {
     function test_TransactionFailsWithInvalidSelectorEvenIfTheSenderIsAR() public {
         bytes memory txCalladata = abi.encodeCall(
             AssetRouterBase.setAssetHandlerAddressThisChain,
-            (bytes32("0x12345"), address(0x01234567890123456789))
+            (bytes32("0x12345"), makeAddr("testAddress"))
         );
         vm.prank(owner);
         vm.expectRevert(
