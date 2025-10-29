@@ -75,6 +75,7 @@ contract ChainTypeManagerTest is UtilsTest {
     Diamond.FacetCut[] internal facetCuts;
 
     function deploy() public {
+        // Timestamp needs to be late enough for `pauseDepositsBeforeInitiatingMigration` time checks
         vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END + 1);
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
         messageroot = new L1MessageRoot(address(bridgehub), 1);

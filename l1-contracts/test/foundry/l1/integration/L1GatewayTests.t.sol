@@ -31,7 +31,6 @@ import {NotInGatewayMode} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
-import {SharedUtils} from "./utils/SharedUtils.sol";
 import {GatewayUtils} from "deploy-scripts/gateway/GatewayUtils.s.sol";
 import {Utils} from "../unit/concrete/Utils/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -49,7 +48,6 @@ contract L1GatewayTests is
     TokenDeployer,
     L2TxMocker,
     GatewayDeployer,
-    SharedUtils,
     ConfigSemaphore
 {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -85,10 +83,11 @@ contract L1GatewayTests is
         _registerNewTokens(tokens);
 
         _deployEra();
-        _deployZKChain(ETH_TOKEN_ADDRESS, migratingChainId);
+        _deployZKChainWithPausedDeposits(ETH_TOKEN_ADDRESS, migratingChainId);
         acceptPendingAdmin(migratingChainId);
         _deployZKChain(ETH_TOKEN_ADDRESS, gatewayChainId);
         acceptPendingAdmin(gatewayChainId);
+        vm.warp(block.timestamp + 1);
 
         // _deployZKChain(tokens[1]);
         // _deployZKChain(tokens[1]);
@@ -130,10 +129,6 @@ contract L1GatewayTests is
 
         // vm.deal(msg.sender, 100000000000000000000000000000000000);
         // vm.deal(bridgehub, 100000000000000000000000000000000000);
-    }
-
-    function _pauseDeposits() internal {
-        pauseDepositsBeforeInitiatingMigration(address(addresses.bridgehub), migratingChainId);
     }
 
     // Used for both successful and failed migrations.
@@ -230,24 +225,18 @@ contract L1GatewayTests is
     //
     function test_moveChainToGateway() public {
         _setUpGatewayWithFilterer();
-        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
-        _pauseDeposits();
         gatewayScript.migrateChainToGateway(migratingChainId);
         require(addresses.bridgehub.settlementLayer(migratingChainId) == gatewayChainId, "Migration failed");
     }
 
     function test_l2Registration() public {
         _setUpGatewayWithFilterer();
-        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
-        _pauseDeposits();
         gatewayScript.migrateChainToGateway(migratingChainId);
         gatewayScript.fullGatewayRegistration();
     }
 
     function test_startMessageToL2() public {
         _setUpGatewayWithFilterer();
-        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
-        _pauseDeposits();
         gatewayScript.migrateChainToGateway(migratingChainId);
         _confirmMigration(TxStatus.Success);
 
@@ -266,8 +255,6 @@ contract L1GatewayTests is
 
     function test_recoverFromFailedChainMigration() public {
         _setUpGatewayWithFilterer();
-        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
-        _pauseDeposits();
         gatewayScript.migrateChainToGateway(migratingChainId);
 
         _confirmMigration(TxStatus.Failure);
@@ -275,8 +262,6 @@ contract L1GatewayTests is
 
     function test_finishMigrateBackChain() public {
         _setUpGatewayWithFilterer();
-        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
-        _pauseDeposits();
         gatewayScript.migrateChainToGateway(migratingChainId);
         migrateBackChain();
     }
@@ -364,8 +349,6 @@ contract L1GatewayTests is
 
     function test_chainMigrationWithUpgrade() public {
         _setUpGatewayWithFilterer();
-        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
-        _pauseDeposits();
         gatewayScript.migrateChainToGateway(migratingChainId);
 
         // Try to perform an upgrade
@@ -425,8 +408,6 @@ contract L1GatewayTests is
 
     function test_proveL2LogsInclusionFromData() public {
         _setUpGatewayWithFilterer();
-        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
-        _pauseDeposits();
         gatewayScript.migrateChainToGateway(migratingChainId);
         IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
 
