@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {Test} from "l2-contracts/../lib/forge-std/src/Test.sol";
 import {BlobsL1DAValidatorZKsyncOS, BLOB_EXPIRATION_BLOCKS} from "../../contracts/BlobsL1DAValidatorZKsyncOS.sol";
 import {InvalidBlobsPublished, InvalidBlobsDAInputLength, BlobNotPublished, NonEmptyBlobVersionHash} from "../../contracts/DAContractsErrors.sol";
 import {L1DAValidatorOutput} from "../../contracts/IL1DAValidator.sol";
