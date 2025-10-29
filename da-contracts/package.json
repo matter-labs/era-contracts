@@ -58,7 +58,8 @@
     "clean": "hardhat clean",
     "clean:foundry": "forge clean",
     "verify": "hardhat run --network env scripts/verify.ts",
-    "test": "forge test --ffi --match-path 'test/foundry/*'"
+    "test": "forge test --ffi --match-path 'test/foundry/*'",
+    "test:foundry": "forge test --ffi --match-path 'test/foundry/*'"
   },
   "dependencies": {
     "dotenv": "^16.0.3",

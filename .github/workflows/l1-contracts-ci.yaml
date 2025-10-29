@@ -175,6 +175,10 @@ jobs:
         working-directory: ./l1-contracts
         run: yarn test:foundry
 
+      - name: Run DA tests
+        working-directory: ./da-contracts
+        run: yarn test:foundry
+
       # TODO: restore once we can get back to latest foundry
       # - name: Check gas snapshots
       #   working-directory: ./l1-contracts
