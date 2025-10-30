@@ -94,6 +94,8 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
 
         prepareDefaultGovernanceCalls();
         prepareDefaultEcosystemAdminCalls();
+
+        prepareDefaultTestUpgradeCalls();
     }
 
     function initializeConfig(string memory newConfigPath) internal override {
