@@ -33,6 +33,8 @@ import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
 import {IERC7786Recipient} from "contracts/interop/IERC7786Recipient.sol";
 
+import {InteropLibrary} from "contracts/interop/InteropLibrary.sol";
+
 abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer {
     uint256 destinationChainId = 271;
 
@@ -154,6 +156,38 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         extractAndExecuteBundles(logs, destinationChainId);
+    }
+
+    function test_requestTokenTransferInteropViaLibrary() public {
+        address l2TokenAddress = initializeTokenByDeposit();
+
+        vm.deal(address(this), 1000 ether);
+
+        InteropLibrary.sendToken(destinationChainId, l2TokenAddress, 100, address(this));
+    }
+
+    function test_requestSendCallViaLibrary() public {
+        address l2TokenAddress = initializeTokenByDeposit();
+        bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
+        vm.deal(address(this), 1000 ether);
+
+        bytes memory secondBridgeCalldata = bytes.concat(
+            NEW_ENCODING_VERSION,
+            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), 0))
+        );
+
+        InteropLibrary.sendCall(destinationChainId, L2_ASSET_ROUTER_ADDR, address(0), secondBridgeCalldata);
+    }
+
+    function test_requestNativeTokenTransferViaLibrary() public {
+        vm.deal(address(this), 1000 ether);
+
+        InteropLibrary.sendNative(destinationChainId, address(this), 100);
+    }
+
+    function test_sendMessageToL1ViaLibrary() public {
+
+        InteropLibrary.sendMessage("testing interop");
     }
 
     function test_supportsAttributes() public {
