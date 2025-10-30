@@ -35,7 +35,7 @@ contract L2GenesisForceDeploymentsInitTest is Test {
     using L2GenesisForceDeploymentsHelper for *;
 
     // Fake deployer address for CTM
-    address ctmDeployer = address(0xDEAD);
+    address ctmDeployer = makeAddr("ctmDeployer");
 
     MockZKOSContractDeployer deployer;
 
@@ -54,9 +54,9 @@ contract L2GenesisForceDeploymentsInitTest is Test {
         FixedForceDeploymentsData memory fixedData;
         fixedData.l1ChainId = 111;
         fixedData.eraChainId = 222;
-        fixedData.aliasedL1Governance = address(0xABCD);
+        fixedData.aliasedL1Governance = makeAddr("aliasedL1Governance");
         fixedData.maxNumberOfZKChains = 5;
-        fixedData.l1AssetRouter = address(0xAAAA);
+        fixedData.l1AssetRouter = makeAddr("l1AssetRouter");
         fixedData.messageRootBytecodeInfo = abi.encode(bytes32(keccak256("messageroot")), bytes32(0), bytes32(0));
         fixedData.bridgehubBytecodeInfo = abi.encode(bytes32(keccak256("bridgehub")), bytes32(0), bytes32(0));
         fixedData.l2AssetRouterBytecodeInfo = abi.encode(bytes32(keccak256("assetRouter")), bytes32(0), bytes32(0));
@@ -71,7 +71,7 @@ contract L2GenesisForceDeploymentsInitTest is Test {
         // === Prepare additional data ===
         ZKChainSpecificForceDeploymentsData memory addData;
         addData.baseTokenAssetId = keccak256("baseTokenAsset");
-        addData.baseTokenL1Address = address(0xBEEF);
+        addData.baseTokenL1Address = makeAddr("baseTokenL1Address");
         addData.baseTokenName = "Ether";
         addData.baseTokenSymbol = "ETH";
 
@@ -91,7 +91,7 @@ contract L2GenesisForceDeploymentsInitTest is Test {
         vm.mockCall(
             L2_NTV_BEACON_DEPLOYER_ADDR,
             abi.encodeWithSelector(UpgradeableBeaconDeployer.deployUpgradeableBeacon.selector),
-            abi.encode(address(123456))
+            abi.encode(makeAddr("upgradeableBeacon"))
         );
 
         // Check that final addresses match.
@@ -132,9 +132,9 @@ contract L2GenesisForceDeploymentsInitTest is Test {
         FixedForceDeploymentsData memory fixedData;
         fixedData.l1ChainId = 111;
         fixedData.eraChainId = 222;
-        fixedData.aliasedL1Governance = address(0xABCD);
+        fixedData.aliasedL1Governance = makeAddr("aliasedL1Governance");
         fixedData.maxNumberOfZKChains = 5;
-        fixedData.l1AssetRouter = address(0xAAAA);
+        fixedData.l1AssetRouter = makeAddr("l1AssetRouter");
         fixedData.messageRootBytecodeInfo = abi.encode(bytes32(keccak256("messageroot")), bytes32(0), bytes32(0));
         fixedData.bridgehubBytecodeInfo = abi.encode(bytes32(keccak256("bridgehub")), bytes32(0), bytes32(0));
         fixedData.l2AssetRouterBytecodeInfo = abi.encode(bytes32(keccak256("assetRouter")), bytes32(0), bytes32(0));
@@ -150,7 +150,7 @@ contract L2GenesisForceDeploymentsInitTest is Test {
         // === Prepare additional data ===
         ZKChainSpecificForceDeploymentsData memory addData;
         addData.baseTokenAssetId = keccak256("baseTokenAsset");
-        addData.baseTokenL1Address = address(0xBEEF);
+        addData.baseTokenL1Address = makeAddr("baseTokenL1Address");
         addData.baseTokenName = "Ether";
         addData.baseTokenSymbol = "ETH";
 
@@ -167,7 +167,7 @@ contract L2GenesisForceDeploymentsInitTest is Test {
         vm.mockCall(
             L2_NATIVE_TOKEN_VAULT_ADDR,
             abi.encodeWithSelector(bytes4(keccak256("WETH_TOKEN()"))),
-            abi.encode(address(1234))
+            abi.encode(makeAddr("wethToken"))
         );
         vm.mockCall(
             L2_NATIVE_TOKEN_VAULT_ADDR,
