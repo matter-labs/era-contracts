@@ -45,8 +45,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         // assertTrue(success);
     }
 
-
-
     function test_l2MessageVerification() public {
         MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
         L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared(

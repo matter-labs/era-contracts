@@ -96,6 +96,4 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             DataEncoding.encodeBridgeBurnData(100, address(1), address(l2NativeToken))
         );
     }
-
-    
 }

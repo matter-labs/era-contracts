@@ -332,7 +332,10 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         return getInclusionProof(messageSender, ERA_CHAIN_ID);
     }
 
-    function getInclusionProof(address messageSender, uint256 _chainId) public view returns (MessageInclusionProof memory) {
+    function getInclusionProof(
+        address messageSender,
+        uint256 _chainId
+    ) public view returns (MessageInclusionProof memory) {
         bytes32[] memory proof = new bytes32[](27);
         proof[0] = bytes32(0x010f050000000000000000000000000000000000000000000000000000000000);
         proof[1] = bytes32(0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba);
