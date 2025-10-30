@@ -133,12 +133,7 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
             calls[0].data,
             calls[0].callAttributes
         );
-        console.log(vm.toString(InteroperableAddress.formatEvmV1(EXECUTION_ADDRESS)));
-        console.logBytes(InteroperableAddress.formatEvmV1(270, EXECUTION_ADDRESS));
-        console.logBytes(abi.encodeCall(
-            IERC7786Attributes.executionAddress,
-            (InteroperableAddress.formatEvmV1(EXECUTION_ADDRESS))
-        ));
+
         Vm.Log[] memory logs = vm.getRecordedLogs();
         extractAndExecuteBundles(logs, destinationChainId);
     }
