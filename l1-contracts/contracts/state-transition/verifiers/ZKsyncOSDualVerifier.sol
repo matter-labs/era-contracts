@@ -48,13 +48,13 @@ contract ZKsyncOSDualVerifier is IVerifier, IDualVerifier {
         plonkVerifiers[DEFAULT_EXECUTION_VERSION] = _plonkVerifier;
 
         if (_fflonkVerifier != IVerifierV2(address(0))) {
-            if(IZKsyncOSVerifier(address(_fflonkVerifier)).executionVersion() != DEFAULT_EXECUTION_VERSION) {
-                revert InvalidVerifierVersion()
+            if (IZKsyncOSVerifier(address(_fflonkVerifier)).executionVersion() != DEFAULT_EXECUTION_VERSION) {
+                revert InvalidVerifierVersion();
             }
         }
         if (_plonkVerifier != IVerifier(address(0))) {
             if (IZKsyncOSVerifier(address(_plonkVerifier)).executionVersion() != DEFAULT_EXECUTION_VERSION) {
-                revert InvalidVerifierVersion(); 
+                revert InvalidVerifierVersion();
             }
         }
     }
