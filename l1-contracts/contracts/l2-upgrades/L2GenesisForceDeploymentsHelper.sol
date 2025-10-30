@@ -14,6 +14,8 @@ import {L2NativeTokenVault} from "../bridge/ntv/L2NativeTokenVault.sol";
 import {L2MessageRoot} from "../bridgehub/L2MessageRoot.sol";
 import {L2Bridgehub} from "../bridgehub/L2Bridgehub.sol";
 import {L2AssetRouter} from "../bridge/asset-router/L2AssetRouter.sol";
+import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
+import {IL2SharedBridgeLegacy} from "../bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {L2ChainAssetHandler} from "../bridgehub/L2ChainAssetHandler.sol";
 import {DeployFailed} from "../common/L1ContractErrors.sol";
 
@@ -128,7 +130,7 @@ library L2GenesisForceDeploymentsHelper {
         // we should be able to query it.
         address l2LegacySharedBridge = _isGenesisUpgrade
             ? address(0)
-            : L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE();
+            : address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
 
         forceDeployOnAddress(
             _isZKsyncOS,
@@ -140,8 +142,8 @@ library L2GenesisForceDeploymentsHelper {
             L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.eraChainId,
-                fixedForceDeploymentsData.l1AssetRouter,
-                l2LegacySharedBridge,
+                IL1AssetRouter(fixedForceDeploymentsData.l1AssetRouter),
+                IL2SharedBridgeLegacy(l2LegacySharedBridge),
                 additionalForceDeploymentsData.baseTokenAssetId,
                 fixedForceDeploymentsData.aliasedL1Governance
             );
@@ -150,8 +152,8 @@ library L2GenesisForceDeploymentsHelper {
             L2AssetRouter(L2_ASSET_ROUTER_ADDR).updateL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.eraChainId,
-                fixedForceDeploymentsData.l1AssetRouter,
-                l2LegacySharedBridge,
+                IL1AssetRouter(fixedForceDeploymentsData.l1AssetRouter),
+                IL2SharedBridgeLegacy(l2LegacySharedBridge),
                 additionalForceDeploymentsData.baseTokenAssetId
             );
         }

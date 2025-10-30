@@ -32,7 +32,7 @@ contract GatewayUtils is Script {
     ) public {
         IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddr);
 
-        address assetRouter = bridgehub.assetRouter();
+        address assetRouter = address(bridgehub.assetRouter());
         IL1Nullifier l1Nullifier = L1AssetRouter(assetRouter).L1_NULLIFIER();
 
         vm.broadcast();

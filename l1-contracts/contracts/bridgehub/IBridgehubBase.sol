@@ -5,6 +5,7 @@ pragma solidity ^0.8.21;
 import {L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
+import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -108,7 +109,7 @@ interface IBridgehubBase {
 
     function admin() external view returns (address);
 
-    function assetRouter() external view returns (address);
+    function assetRouter() external view returns (IAssetRouterBase);
 
     function whitelistedSettlementLayers(uint256 _chainId) external view returns (bool);
 

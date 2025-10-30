@@ -667,7 +667,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             ctmProtocolVersion != getNewProtocolVersion(),
             "The new protocol version is already present on the ChainTypeManager"
         );
-        addresses.bridges.l1AssetRouterProxy = L1Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
+        addresses.bridges.l1AssetRouterProxy = address(L1Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter());
         addresses.stateTransition.genesisUpgrade = address(IChainTypeManager(ctm).l1GenesisUpgrade());
 
         addresses.vaults.l1NativeTokenVaultProxy = address(

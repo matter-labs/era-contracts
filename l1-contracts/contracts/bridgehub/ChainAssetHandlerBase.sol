@@ -11,6 +11,9 @@ import {IBridgehubBase, BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData} fr
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
+import {IL1Bridgehub} from "./IL1Bridgehub.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
+import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
@@ -45,13 +48,13 @@ abstract contract ChainAssetHandlerBase is
     function L1_CHAIN_ID() external view virtual returns (uint256);
 
     /// @notice The bridgehub contract
-    function BRIDGEHUB() external view virtual returns (address);
+    function BRIDGEHUB() external view virtual returns (IL1Bridgehub);
 
     /// @notice The message root contract
-    function MESSAGE_ROOT() external view virtual returns (address);
+    function MESSAGE_ROOT() external view virtual returns (IMessageRoot);
 
     /// @notice The asset router contract
-    function ASSET_ROUTER() external view virtual returns (address);
+    function ASSET_ROUTER() external view virtual returns (IAssetRouterBase);
 
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
@@ -61,11 +64,11 @@ abstract contract ChainAssetHandlerBase is
 
     function _l1ChainId() internal view virtual returns (uint256);
 
-    function _bridgehub() internal view virtual returns (address);
+    function _bridgehub() internal view virtual returns (IL1Bridgehub);
 
-    function _messageRoot() internal view virtual returns (address);
+    function _messageRoot() internal view virtual returns (IMessageRoot);
 
-    function _assetRouter() internal view virtual returns (address);
+    function _assetRouter() internal view virtual returns (IAssetRouterBase);
 
     /// @notice Used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
@@ -79,8 +82,8 @@ abstract contract ChainAssetHandlerBase is
 
     /// @notice Only the asset router can call.
     modifier onlyAssetRouter() {
-        if (msg.sender != _assetRouter()) {
-            revert NotAssetRouter(msg.sender, _assetRouter());
+        if (msg.sender != address(_assetRouter())) {
+            revert NotAssetRouter(msg.sender, address(_assetRouter()));
         }
         _;
     }

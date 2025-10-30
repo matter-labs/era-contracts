@@ -11,6 +11,7 @@ import {IL2Bridgehub} from "./IL2Bridgehub.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
+import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {NotInGatewayMode, NotRelayedSender} from "./L1BridgehubErrors.sol";
 
 /// @author Matter Labs
@@ -116,7 +117,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         IMessageRoot _messageRoot,
         address _chainAssetHandler
     ) external override onlyOwnerOrUpgrader {
-        assetRouter = _assetRouter;
+        assetRouter = IAssetRouterBase(_assetRouter);
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;
         chainAssetHandler = _chainAssetHandler;
