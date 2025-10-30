@@ -67,9 +67,7 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     function forceDeployOnAddressZKSyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
-        if (_newAddress.code.length > 0) {
-            revert ZKSyncOSNotForceDeployForExistingContract(_newAddress);
-        }
+        require(_newAddress.code.length == 0, ZKSyncOSNotForceDeployForExistingContract(_newAddress));
         unsafeForceDeployZKSyncOS(_bytecodeInfo, _newAddress);
     }
 
