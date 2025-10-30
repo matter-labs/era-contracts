@@ -193,10 +193,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (_newBatch.chainId != s.chainId) {
             revert IncorrectBatchChainId(_newBatch.chainId, s.chainId);
         }
-        // FIXME: this is wrong, but the server does not support sending the correct value yet
-        // if (_newBatch.daCommitmentScheme != s.l2DACommitmentScheme) {
-        //     revert MismatchL2DACommitmentScheme(uint256(_newBatch.daCommitmentScheme), uint256(s.l2DACommitmentScheme));
-        // }
+        if (_newBatch.daCommitmentScheme != s.l2DACommitmentScheme) {
+            revert MismatchL2DACommitmentScheme(uint256(_newBatch.daCommitmentScheme), uint256(s.l2DACommitmentScheme));
+        }
 
         // The batch proof public input can be calculated as keccak256(state_commitment_before & state_commitment_after & batch_output_hash)
         // batch output hash commits to information about batch that needs to be opened on l1.
