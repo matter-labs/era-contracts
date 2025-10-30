@@ -34,6 +34,8 @@ import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
 import {IERC7786Recipient} from "contracts/interop/IERC7786Recipient.sol";
 
 abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer {
+    uint256 destinationChainId = 271;
+
     function test_requestTokenTransferInterop() public {
         address l2TokenAddress = initializeTokenByDeposit();
         bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
@@ -54,23 +56,6 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
             callAttributes: callAttributes
         });
 
-        uint256 destinationChainId = 271;
-        vm.mockCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
-            abi.encode(bytes(""))
-        );
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
-            abi.encode(baseTokenAssetId)
-        );
-
-        vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue.selector),
-            abi.encode(bytes(""))
-        );
 
         bytes[] memory bundleAttributes = new bytes[](1);
         bundleAttributes[0] = abi.encodeCall(
@@ -85,18 +70,6 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
     }
 
     function test_sendBundle_simple() public {
-        vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(IBaseToken.burnMsgValue.selector),
-            abi.encode()
-        );
-        vm.mockCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
-            abi.encode(bytes32(0))
-        );
-
-        uint256 destinationChainId = 260;
         bytes memory destinationChainIdBytes = InteroperableAddress.formatEvmV1(destinationChainId);
 
         address targetContract = makeAddr("targetContract");
@@ -173,23 +146,6 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
             callAttributes: attributes
         });
 
-        uint256 destinationChainId = 271;
-        vm.mockCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
-            abi.encode(bytes(""))
-        );
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
-            abi.encode(baseTokenAssetId)
-        );
-
-        vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue.selector),
-            abi.encode(bytes(""))
-        );
         vm.recordLogs();
         IERC7786GatewaySource(address(l2InteropCenter)).sendMessage(
             InteroperableAddress.formatEvmV1(destinationChainId, L2_ASSET_ROUTER_ADDR),
