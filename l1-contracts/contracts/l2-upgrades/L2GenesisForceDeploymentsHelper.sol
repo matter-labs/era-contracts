@@ -82,6 +82,8 @@ library L2GenesisForceDeploymentsHelper {
     /// is the same for all the chains.
     /// @param _additionalForceDeploymentsData Encoded data for force deployments that
     /// is specific for each ZK Chain.
+    /// It deploys a bunch of contracts at given fixed addresses, and initializes them accordingly (different
+    /// flow for genesis vs non-genesis upgrade). Most of these contracts expose initL2 / updateL2 methods.
     function performForceDeployedContractsInit(
         bool _isZKsyncOS,
         address _ctmDeployer,
