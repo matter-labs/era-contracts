@@ -2,9 +2,9 @@
 
 pragma solidity 0.8.28;
 
-import {COMPRESSOR_CONTRACT, PUBDATA_CHUNK_PUBLISHER, L2DACommitmentScheme, STATE_DIFF_ENTRY_SIZE, L2_TO_L1_LOG_SERIALIZE_SIZE, STATE_DIFF_COMPRESSION_VERSION_NUMBER} from "../Constants.sol";
+import {COMPRESSOR_CONTRACT, L2DACommitmentScheme, L2_TO_L1_LOG_SERIALIZE_SIZE, PUBDATA_CHUNK_PUBLISHER, STATE_DIFF_COMPRESSION_VERSION_NUMBER, STATE_DIFF_ENTRY_SIZE} from "../Constants.sol";
 import {EfficientCall} from "../libraries/EfficientCall.sol";
-import {ReconstructionMismatch, PubdataField, InvalidDACommitmentScheme} from "../SystemContractErrors.sol";
+import {InvalidDACommitmentScheme, PubdataField, ReconstructionMismatch} from "../SystemContractErrors.sol";
 import {Utils} from "./Utils.sol";
 
 /**
