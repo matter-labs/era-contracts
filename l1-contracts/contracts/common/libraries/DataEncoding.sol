@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
 import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
-import {AssetIdMismatch, IncorrectTokenAddressFromNTV, InvalidNTVBurnData, L2WithdrawalMessageWrongLength, UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
+import {AssetIdMismatch, IncorrectTokenAddressFromNTV, InvalidNTVBurnData, L2WithdrawalMessageWrongLength, UnsupportedEncodingVersion, BadTransferDataLength} from "../L1ContractErrors.sol";
 import {WrongMsgLength} from "../../bridge/L1BridgeContractErrors.sol";
 import {UnsafeBytes} from "./UnsafeBytes.sol";
 import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
@@ -49,6 +49,15 @@ library DataEncoding {
         }
 
         (amount, receiver, maybeTokenAddress) = abi.decode(_data, (uint256, address, address));
+    }
+
+    function encodeAssetRouterBridgehubDepositData(bytes32 _assetId, bytes memory _transferData) internal pure returns (bytes memory) {
+        return bytes.concat(NEW_ENCODING_VERSION, abi.encode(_assetId, _transferData));
+    }
+
+    function decodeAssetRouterBridgehubDepositData(bytes calldata _dataWithVersion) internal pure returns (bytes32 assetId, bytes memory transferData) {
+        require(_dataWithVersion.length >= 33, BadTransferDataLength());
+        (assetId, transferData) = abi.decode(_dataWithVersion[1:], (bytes32, bytes));
     }
 
     /// @notice Abi.encodes the data required for bridgeMint on remote chain.

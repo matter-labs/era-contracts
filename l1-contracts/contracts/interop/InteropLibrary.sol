@@ -10,6 +10,7 @@ import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {AmountMustBeGreaterThanZero, ArgumentsLengthNotIdentical, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 library InteropLibrary {
     address internal constant UNBUNDLER_ADDRESS = address(0x1);
@@ -30,10 +31,8 @@ library InteropLibrary {
         address receiver,
         address maybeTokenAddress
     ) internal pure returns (bytes memory) {
-        // Inner payload: abi.encode(amount, receiver, fee)
-        bytes memory inner = abi.encode(amount, receiver, maybeTokenAddress);
-        // Outer: abi.encode(l2TokenAssetId, inner), prefixed by version byte
-        return bytes.concat(NEW_ENCODING_VERSION, abi.encode(l2TokenAssetId, inner));
+        bytes memory inner = DataEncoding.encodeBridgeBurnData(amount, receiver, maybeTokenAddress);
+        return DataEncoding.encodeAssetRouterBridgehubDepositData(l2TokenAssetId, inner);
     }
 
     /// @notice Create a single Interop call to the L2 asset router with the 7786 "indirectCall" attribute set.
