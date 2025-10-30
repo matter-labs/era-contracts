@@ -8,7 +8,7 @@ import "forge-std/console.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_VERIFICATION, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_HANDLER, L2_MESSAGE_VERIFICATION, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Transaction} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
@@ -20,7 +20,7 @@ import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {CallStatus, IInteropHandler} from "contracts/interop/IInteropHandler.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {UnauthorizedMessageSender, WrongDestinationChainId} from "contracts/interop/InteropErrors.sol";
-import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {BundleAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall, InteropCallStarter, L2Message, MessageInclusionProof} from "contracts/common/Messaging.sol";
@@ -31,10 +31,7 @@ import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
 import {InteropLibrary} from "contracts/interop/InteropLibrary.sol";
 
-abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
-    address constant UNBUNDLER_ADDRESS = address(0x1);
-    address constant EXECUTION_ADDRESS = address(0x2);
-
+abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer {
     function test_requestL2TransactionDirectWithCalldata() public {
         // Note: get this from real local txs
         bytes
@@ -50,57 +47,6 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         // assertTrue(success);
     }
 
-    function test_sendBundle_simple() public {
-        vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(IBaseToken.burnMsgValue.selector),
-            abi.encode()
-        );
-        vm.mockCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
-            abi.encode(bytes32(0))
-        );
-
-        bytes memory destinationChainId = InteroperableAddress.formatEvmV1(260);
-
-        address targetContract = makeAddr("targetContract");
-        InteropCallStarter[] memory callStarters = new InteropCallStarter[](1);
-
-        callStarters[0] = InteropCallStarter({
-            to: InteroperableAddress.formatEvmV1(targetContract),
-            data: abi.encodeWithSignature("simpleCall()"),
-            callAttributes: new bytes[](0)
-        });
-
-        address executionAddress = makeAddr("executionAddress");
-        address unbundlerAddress = makeAddr("unbundlerAddress");
-
-        bytes[] memory bundleAttributes = new bytes[](2);
-        bundleAttributes[0] = abi.encodePacked(
-            IERC7786Attributes.executionAddress.selector,
-            InteroperableAddress.formatEvmV1(260, executionAddress)
-        );
-        bundleAttributes[1] = abi.encodePacked(
-            IERC7786Attributes.unbundlerAddress.selector,
-            InteroperableAddress.formatEvmV1(260, unbundlerAddress)
-        );
-
-        (bool success, bytes memory returnData) = L2_INTEROP_CENTER_ADDR.call(
-            abi.encodeWithSelector(
-                InteropCenter.sendBundle.selector,
-                destinationChainId,
-                callStarters,
-                bundleAttributes
-            )
-        );
-
-        assertTrue(success, "sendBundle should succeed");
-
-        // Decode the returned bundle hash
-        bytes32 bundleHash = abi.decode(returnData, (bytes32));
-        assertNotEq(bundleHash, bytes32(0), "Bundle hash should not be zero");
-    }
 
     function test_requestNativeTokenTransferViaLibrary() public {
         uint256 destinationChainId = 271;
@@ -135,50 +81,6 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         );
 
         InteropLibrary.sendMessage("testing interop");
-    }
-
-    function getInclusionProof(address messageSender) public view returns (MessageInclusionProof memory) {
-        bytes32[] memory proof = new bytes32[](27);
-        proof[0] = bytes32(0x010f050000000000000000000000000000000000000000000000000000000000);
-        proof[1] = bytes32(0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba);
-        proof[2] = bytes32(0xc3d03eebfd83049991ea3d3e358b6712e7aa2e2e63dc2d4b438987cec28ac8d0);
-        proof[3] = bytes32(0xe3697c7f33c31a9b0f0aeb8542287d0d21e8c4cf82163d0c44c7a98aa11aa111);
-        proof[4] = bytes32(0x199cc5812543ddceeddd0fc82807646a4899444240db2c0d2f20c3cceb5f51fa);
-        proof[5] = bytes32(0xe4733f281f18ba3ea8775dd62d2fcd84011c8c938f16ea5790fd29a03bf8db89);
-        proof[6] = bytes32(0x1798a1fd9c8fbb818c98cff190daa7cc10b6e5ac9716b4a2649f7c2ebcef2272);
-        proof[7] = bytes32(0x66d7c5983afe44cf15ea8cf565b34c6c31ff0cb4dd744524f7842b942d08770d);
-        proof[8] = bytes32(0xb04e5ee349086985f74b73971ce9dfe76bbed95c84906c5dffd96504e1e5396c);
-        proof[9] = bytes32(0xac506ecb5465659b3a927143f6d724f91d8d9c4bdb2463aee111d9aa869874db);
-        proof[10] = bytes32(0x124b05ec272cecd7538fdafe53b6628d31188ffb6f345139aac3c3c1fd2e470f);
-        proof[11] = bytes32(0xc3be9cbd19304d84cca3d045e06b8db3acd68c304fc9cd4cbffe6d18036cb13f);
-        proof[12] = bytes32(0xfef7bd9f889811e59e4076a0174087135f080177302763019adaf531257e3a87);
-        proof[13] = bytes32(0xa707d1c62d8be699d34cb74804fdd7b4c568b6c1a821066f126c680d4b83e00b);
-        proof[14] = bytes32(0xf6e093070e0389d2e529d60fadb855fdded54976ec50ac709e3a36ceaa64c291);
-        proof[15] = bytes32(0xe4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf75944);
-        proof[16] = bytes32(0x000000000000000000000000000000000000000000000000000000000000001e);
-        proof[17] = bytes32(0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21);
-        proof[18] = bytes32(0x72bb6e886e3de761d93578a590bfe0e44fb544481eb63186f6a6d184aec321a8);
-        proof[19] = bytes32(0x3cc519adb13de86ec011fa462394c5db945103c4d35919c9433d7b990de49c87);
-        proof[20] = bytes32(0xcc52bf2ee1507ce0b5dbf31a95ce4b02043c142aab2466fc24db520852cddf5f);
-        proof[21] = bytes32(0x40ad48c159fc740c32e9b540f79561a4760501ef80e32c61e477ac3505d3dabd);
-        proof[22] = bytes32(0x0000000000000000000000000000009f00000000000000000000000000000001);
-        proof[23] = bytes32(0x00000000000000000000000000000000000000000000000000000000000001fa);
-        proof[24] = bytes32(0x0102000100000000000000000000000000000000000000000000000000000000);
-        proof[25] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
-        proof[26] = bytes32(0xe25714e53790167f58b1da56145a1c025a461008fe358f583f53d764000ca847);
-
-        return
-            MessageInclusionProof({
-                chainId: ERA_CHAIN_ID,
-                l1BatchNumber: 31,
-                l2MessageIndex: 0,
-                message: L2Message(
-                    0,
-                    address(messageSender),
-                    hex"9c884fd1000000000000000000000000000000000000000000000000000000000000010f76b59944c0e577e988c1b823ef4ad168478ddfe6044cca433996ade7637ec70d00000000000000000000000083aeb38092d5f5a5cf7fb8ccf94c981c1d37d81300000000000000000000000083aeb38092d5f5a5cf7fb8ccf94c981c1d37d813000000000000000000000000ee0dcf9b8c3048530fd6b2211ae3ba32e8590905000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000001c1010000000000000000000000000000000000000000000000000000000000000009000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000004574254430000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000457425443000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000"
-                ),
-                proof: proof
-            });
     }
 
     function test_l2MessageVerification() public {
@@ -225,13 +127,11 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         vm.expectEmit(true, false, false, false);
         emit IInteropHandler.BundleExecuted(bundleHash);
         vm.prank(EXECUTION_ADDRESS);
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).executeBundle(bundle, proof);
+        L2_INTEROP_HANDLER.executeBundle(bundle, proof);
         // Check storage changes
         assertEq(
             uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
             2,
-            "BundleStatus should be FullyExecuted"
-        );
         for (uint256 i = 0; i < interopBundle.calls.length; ++i) {
             assertEq(
                 uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, i)),

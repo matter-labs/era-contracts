@@ -90,7 +90,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         address _bridgedTokenBeacon,
         address _wethToken,
         bytes32 _baseTokenAssetId,
-        address _baseTokenOriginToken
+        address _baseTokenOriginToken,
+        uint256 _baseTokenOriginChainId
     ) public onlyUpgrader {
         _disableInitializers();
         // solhint-disable-next-line func-named-parameters
@@ -100,7 +101,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             _legacySharedBridge,
             _wethToken,
             _baseTokenAssetId,
-            _baseTokenOriginToken
+            _baseTokenOriginToken,
+            _baseTokenOriginChainId
         );
         if (_aliasedOwner == address(0)) {
             revert EmptyAddress();
@@ -124,7 +126,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         address _legacySharedBridge,
         address _wethToken,
         bytes32 _baseTokenAssetId,
-        address _baseTokenOriginToken
+        address _baseTokenOriginToken,
+        uint256 _baseTokenOriginChainId
     ) public onlyUpgrader {
         WETH_TOKEN = _wethToken;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
@@ -132,6 +135,10 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         ASSET_ROUTER = IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
         BASE_TOKEN_ORIGIN_TOKEN = _baseTokenOriginToken;
+
+        tokenAddress[_baseTokenAssetId] = L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
+        assetId[L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR] = _baseTokenAssetId;
+        originChainId[_baseTokenAssetId] = _baseTokenOriginChainId;
 
         require(_l2TokenProxyBytecodeHash != bytes32(0), EmptyBytes32());
 

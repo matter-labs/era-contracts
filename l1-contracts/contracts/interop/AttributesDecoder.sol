@@ -14,7 +14,7 @@ library AttributesDecoder {
         return (uint256(bytes32(_data[4:36])));
     }
 
-    function decodeInteroperableAddress(bytes calldata _data) internal pure returns (bytes calldata) {
-        return _data[4:];
+    function decodeInteroperableAddress(bytes calldata _data) internal pure returns (bytes memory) {
+        return abi.decode(_data[4:], (bytes));
     }
 }

@@ -290,7 +290,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             return savedEmptyMessageRoot;
         }
         FullMerkleMemory.FullTree memory sharedTree;
-        sharedTree.createTree(2);
+        sharedTree.createTree(1);
         // slither-disable-next-line unused-return
         sharedTree.setup(SHARED_ROOT_TREE_EMPTY_HASH);
 
