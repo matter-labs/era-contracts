@@ -2,13 +2,12 @@
 
 pragma solidity 0.8.28;
 
-import {UnknownVerifierVersion, InvalidVerifierVersion} from "../L1StateTransitionErrors.sol";
+import {UnknownVerifierVersion} from "../L1StateTransitionErrors.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {EmptyProofLength, Unauthorized, UnknownVerifierType, InvalidMockProofLength, UnsupportedChainIdForMockVerifier, InvalidProof} from "../../common/L1ContractErrors.sol";
 import {ZKsyncOSChainTypeManager} from "../../state-transition/ZKsyncOSChainTypeManager.sol";
 import {IDualVerifier} from "../chain-interfaces/IDualVerifier.sol";
-import {IZKsyncOSVerifier} from "../chain-interfaces/IZKsyncOSVerifier.sol";
 
 /// @title Dual Verifier
 /// @author Matter Labs
@@ -46,17 +45,6 @@ contract ZKsyncOSDualVerifier is IVerifier, IDualVerifier {
         CHAIN_TYPE_MANAGER = ZKsyncOSChainTypeManager(_chainTypeManager);
         fflonkVerifiers[DEFAULT_EXECUTION_VERSION] = _fflonkVerifier;
         plonkVerifiers[DEFAULT_EXECUTION_VERSION] = _plonkVerifier;
-
-        if (_fflonkVerifier != IVerifierV2(address(0))) {
-            if (IZKsyncOSVerifier(address(_fflonkVerifier)).executionVersion() != DEFAULT_EXECUTION_VERSION) {
-                revert InvalidVerifierVersion();
-            }
-        }
-        if (_plonkVerifier != IVerifier(address(0))) {
-            if (IZKsyncOSVerifier(address(_plonkVerifier)).executionVersion() != DEFAULT_EXECUTION_VERSION) {
-                revert InvalidVerifierVersion();
-            }
-        }
     }
 
     function addVerifier(uint32 version, IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) external onlyCtmOwner {

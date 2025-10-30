@@ -38,8 +38,6 @@ error InvalidPubdataSource(uint8 pubdataSource);
 error InvalidStartIndex(uint256 treeStartIndex, uint256 commitmentStartIndex);
 // 0x0f67bc0a
 error InvalidUnprocessedIndex(uint256 treeUnprocessedIndex, uint256 commitmentUnprocessedIndex);
-// 0x0a4df5de
-error InvalidVerifierVersion();
 // 0x2e89f517
 error L1DAValidatorAddressIsZero();
 // 0x7fbff2dd
