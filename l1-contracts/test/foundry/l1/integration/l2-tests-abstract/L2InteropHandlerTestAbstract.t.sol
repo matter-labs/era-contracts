@@ -29,7 +29,7 @@ import {IMessageVerification} from "contracts/common/interfaces/IMessageVerifica
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
 
-abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
+abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer {
     address constant UNBUNDLER_ADDRESS = address(0x1);
     address constant EXECUTION_ADDRESS = address(0x2);
 
@@ -48,57 +48,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         // assertTrue(success);
     }
 
-    function test_sendBundle_simple() public {
-        vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(IBaseToken.burnMsgValue.selector),
-            abi.encode()
-        );
-        vm.mockCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
-            abi.encode(bytes32(0))
-        );
 
-        bytes memory destinationChainId = InteroperableAddress.formatEvmV1(260);
-
-        address targetContract = makeAddr("targetContract");
-        InteropCallStarter[] memory callStarters = new InteropCallStarter[](1);
-
-        callStarters[0] = InteropCallStarter({
-            to: InteroperableAddress.formatEvmV1(targetContract),
-            data: abi.encodeWithSignature("simpleCall()"),
-            callAttributes: new bytes[](0)
-        });
-
-        address executionAddress = makeAddr("executionAddress");
-        address unbundlerAddress = makeAddr("unbundlerAddress");
-
-        bytes[] memory bundleAttributes = new bytes[](2);
-        bundleAttributes[0] = abi.encodePacked(
-            IERC7786Attributes.executionAddress.selector,
-            InteroperableAddress.formatEvmV1(260, executionAddress)
-        );
-        bundleAttributes[1] = abi.encodePacked(
-            IERC7786Attributes.unbundlerAddress.selector,
-            InteroperableAddress.formatEvmV1(260, unbundlerAddress)
-        );
-
-        (bool success, bytes memory returnData) = L2_INTEROP_CENTER_ADDR.call(
-            abi.encodeWithSelector(
-                InteropCenter.sendBundle.selector,
-                destinationChainId,
-                callStarters,
-                bundleAttributes
-            )
-        );
-
-        assertTrue(success, "sendBundle should succeed");
-
-        // Decode the returned bundle hash
-        bytes32 bundleHash = abi.decode(returnData, (bytes32));
-        assertNotEq(bundleHash, bytes32(0), "Bundle hash should not be zero");
-    }
 
     function test_l2MessageVerification() public {
         MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);

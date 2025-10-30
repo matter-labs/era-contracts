@@ -11,11 +11,11 @@ import {SystemContractsArgs} from "./L2Utils.sol";
 
 import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
 
-import {L2InteropTestAbstract} from "../../l1/integration/l2-tests-abstract/L2InteropTestAbstract.t.sol";
+import {L2InteropHandlerTestAbstract} from "../../l1/integration/l2-tests-abstract/L2InteropHandlerTestAbstract.t.sol";
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {Create2FactoryUtils} from "deploy-scripts/Create2FactoryUtils.s.sol";
 
-contract L2InteropTests is Test, L2InteropTestAbstract, SharedL2ContractL2Deployer {
+contract L2InteropHandlerTests is Test, L2InteropHandlerTestAbstract, SharedL2ContractL2Deployer {
     // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
     // It is a bit easier to use EOA and it is sufficient for the tests.
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL2Deployer) {}
