@@ -153,19 +153,6 @@ contract BridgeHelperTest is Test {
         assertEq(abi.decode(symbol, (string)), "SYM"); // symbol ok
         assertEq(decimals.length, 0); // decimals reverted → empty bytes
     }
-
-    function testGetERC20Getters_WithAllRevertsButName() public {
-        RevertingERC20 token = new RevertingERC20(true);
-        bytes memory result = BridgeHelper.getERC20Getters(address(token), ORIGIN_CHAIN_ID);
-
-        (uint256 chainId, bytes memory name, bytes memory symbol, bytes memory decimals) = dec.decodeTokenData(result);
-
-        assertEq(chainId, ORIGIN_CHAIN_ID);
-        assertEq(name.length, 0); // name reverted → empty bytes
-        assertEq(symbol.length, 0); // symbol reverted → empty bytes
-        assertEq(decimals.length, 0); // decimals reverted → empty bytes
-    }
-
     function testGetERC20Getters_WithAllReverts() public {
         RevertingERC20 token = new RevertingERC20(true);
         bytes memory result = BridgeHelper.getERC20Getters(address(token), ORIGIN_CHAIN_ID);
