@@ -54,13 +54,14 @@ contract ExecutorTest is Test {
     bytes32 internal newCommittedBlockCommitment;
     uint256 internal currentTimestamp;
     IExecutor.CommitBatchInfo internal newCommitBatchInfo;
+    IExecutor.CommitBatchInfoZKsyncOS internal newCommitBatchInfoZKsyncOS;
     IExecutor.StoredBatchInfo internal newStoredBatchInfo;
     DummyEraBaseTokenBridge internal sharedBridge;
     ValidatorTimelock internal validatorTimelock;
     address internal rollupL1DAValidator;
     L1MessageRoot internal messageRoot;
 
-    uint256 eraChainId;
+    uint256 l2ChainId;
 
     IExecutor.StoredBatchInfo internal genesisStoredBatchInfo;
     uint256[] internal proofInput;
@@ -194,14 +195,14 @@ contract ExecutorTest is Test {
         //     abi.encode()
         // );
 
-        eraChainId = 9;
+        l2ChainId = 9;
 
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
 
         admin = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         getters = new GettersFacet();
         executor = new TestExecutor();
-        mailbox = new MailboxFacet(eraChainId, block.chainid);
+        mailbox = new MailboxFacet(l2ChainId, block.chainid);
 
         DummyCTM chainTypeManager = new DummyCTM(owner, address(0));
         vm.mockCall(
@@ -209,7 +210,7 @@ contract ExecutorTest is Test {
             abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector),
             abi.encode(bool(true))
         );
-        DiamondInit diamondInit = new DiamondInit(false);
+        DiamondInit diamondInit = new DiamondInit(isZKsyncOS());
         validatorTimelock = ValidatorTimelock(deployValidatorTimelock(address(dummyBridgehub), owner, 0));
 
         bytes8 dummyHash = 0x1234567890123456;
@@ -234,7 +235,7 @@ contract ExecutorTest is Test {
 
         InitializeData memory params = InitializeData({
             // TODO REVIEW
-            chainId: eraChainId,
+            chainId: l2ChainId,
             bridgehub: address(dummyBridgehub),
             chainTypeManager: address(chainTypeManager),
             protocolVersion: 0,
@@ -296,7 +297,7 @@ contract ExecutorTest is Test {
         getters = GettersFacet(address(diamondProxy));
         mailbox = MailboxFacet(address(diamondProxy));
         admin = AdminFacet(address(diamondProxy));
-        chainTypeManager.setZKChain(eraChainId, address(diamondProxy));
+        chainTypeManager.setZKChain(l2ChainId, address(diamondProxy));
 
         // Initiate the token multiplier to enable L1 -> L2 transactions.
         vm.prank(address(chainTypeManager));
@@ -326,17 +327,35 @@ contract ExecutorTest is Test {
             systemLogs: l2Logs,
             operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
+        newCommitBatchInfoZKsyncOS = IExecutor.CommitBatchInfoZKsyncOS({
+            batchNumber: 1,
+            newStateCommitment: Utils.randomBytes32("newStateCommitment"),
+            numberOfLayer1Txs: 0,
+            priorityOperationsHash: keccak256(""),
+            dependencyRootsRollingHash: keccak256(""),
+            l2LogsTreeRoot: bytes32(""),
+            daCommitmentScheme: L2_DA_COMMITMENT_SCHEME,
+            daCommitment: bytes32(""),
+            firstBlockTimestamp: uint64(currentTimestamp),
+            lastBlockTimestamp: uint64(currentTimestamp),
+            chainId: l2ChainId,
+            operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        });
 
-        dummyBridgehub.setZKChain(eraChainId, address(diamondProxy));
+        dummyBridgehub.setZKChain(l2ChainId, address(diamondProxy));
 
         vm.prank(owner);
-        validatorTimelock.addValidatorForChainId(eraChainId, validator);
+        validatorTimelock.addValidatorForChainId(l2ChainId, validator);
 
         vm.mockCall(
             address(sharedBridge),
             abi.encodeWithSelector(IL1AssetRouter.bridgehubDepositBaseToken.selector),
             abi.encode(true)
         );
+    }
+
+    function isZKsyncOS() internal virtual pure returns(bool) {
+        return false;
     }
 
     // add this to be excluded from coverage report
