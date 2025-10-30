@@ -139,7 +139,6 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
             IERC7786Attributes.unbundlerAddress,
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
         );
-        InteroperableAddress.parseEvmV1(InteroperableAddress.formatEvmV1(EXECUTION_ADDRESS));
         calls[0] = InteropCallStarter({
             to: InteroperableAddress.formatEvmV1(L2_ASSET_ROUTER_ADDR),
             data: secondBridgeCalldata,

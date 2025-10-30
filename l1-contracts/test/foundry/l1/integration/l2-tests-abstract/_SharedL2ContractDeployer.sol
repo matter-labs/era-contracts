@@ -59,7 +59,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     IL2AssetRouter l2AssetRouter = IL2AssetRouter(L2_ASSET_ROUTER_ADDR);
     IL2Bridgehub l2Bridgehub = IL2Bridgehub(L2_BRIDGEHUB_ADDR);
-    IInteropCenter l2InteropCenter = IInteropCenter(L2_INTEROP_CENTER_ADDR);
+    InteropCenter l2InteropCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
     IL2NativeTokenVault l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
     uint256 internal constant L1_CHAIN_ID = 10; // it cannot be 9, the default block.chainid

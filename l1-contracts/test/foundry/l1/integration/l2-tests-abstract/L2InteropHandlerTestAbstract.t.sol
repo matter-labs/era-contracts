@@ -14,6 +14,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
 import {IAssetRouterBase, AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {CallStatus, IInteropHandler} from "contracts/interop/IInteropHandler.sol";
@@ -28,6 +29,7 @@ import {IMessageVerification} from "contracts/common/interfaces/IMessageVerifica
 
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
+import {InteropLibrary} from "contracts/interop/InteropLibrary.sol";
 
 abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer {
     function test_requestL2TransactionDirectWithCalldata() public {
@@ -43,6 +45,42 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         address recipient = L2_BRIDGEHUB_ADDR;
         // (bool success, ) = recipient.call(data);
         // assertTrue(success);
+    }
+
+
+    function test_requestNativeTokenTransferViaLibrary() public {
+        uint256 destinationChainId = 271;
+
+        vm.deal(address(this), 1000 ether);
+
+        vm.mockCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+            abi.encode(bytes(""))
+        );
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
+            abi.encode(baseTokenAssetId)
+        );
+
+        vm.mockCall(
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue.selector),
+            abi.encode(bytes(""))
+        );
+
+        InteropLibrary.sendNative(destinationChainId, address(this), 100);
+    }
+
+    function test_sendMessageToL1ViaLibrary() public {
+        vm.mockCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+            abi.encode(bytes(""))
+        );
+
+        InteropLibrary.sendMessage("testing interop");
     }
 
     function test_l2MessageVerification() public {
