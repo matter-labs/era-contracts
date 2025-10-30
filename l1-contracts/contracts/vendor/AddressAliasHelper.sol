@@ -81,12 +81,12 @@ library AddressAliasHelper {
                 ? _originalCaller
                 : AddressAliasHelper.applyL1ToL2Alias(_originalCaller);
             // solhint-enable avoid-tx-origin
-        } else if (_refundRecipient.code.length > 0 && !_is7702AccountRefundRecipient) {
+        } else {
             // If the `_refundRecipient` is a smart contract, we apply the L1 to L2 alias to prevent foot guns.
             // Also we check that refund recipient is not EIP7702 account, as this would result in incorrect aliasing
-            _recipient = AddressAliasHelper.applyL1ToL2Alias(_refundRecipient);
-        } else {
-            _recipient = _refundRecipient;
+            _recipient = (_refundRecipient.code.length == 0 || _is7702AccountRefundRecipient)
+                ? _refundRecipient
+                : AddressAliasHelper.applyL1ToL2Alias(_refundRecipient);
         }
     }
 }
