@@ -86,6 +86,6 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
 
-          git add -A
+          git add AllContractHashes.json || echo "No changes to add"
           git commit -m "chore: Updated hashes from CI" || echo "No changes to commit"
           git push origin HEAD
