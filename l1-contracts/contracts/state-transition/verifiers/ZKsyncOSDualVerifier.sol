@@ -83,9 +83,9 @@ contract ZKsyncOSDualVerifier is IVerifier, IDualVerifier {
 
         if (verifierType == ZKSYNC_OS_PLONK_VERIFICATION_TYPE) {
             uint256[] memory args = new uint256[](1);
-            args[0] = computeZKSyncOSHash(_proof[1], _publicInputs);
+            args[0] = computeZKsyncOSHash(_proof[1], _publicInputs);
 
-            return plonkVerifiers[verifierVersion].verify(args, _extractZKSyncOSProof(_proof));
+            return plonkVerifiers[verifierVersion].verify(args, _extractZKsyncOSProof(_proof));
         } else if (verifierType == ZKSYNC_OS_MOCK_VERIFICATION_TYPE) {
             // just for safety - not allowing to use mock verifier on mainnet
             if (block.chainid == 1) {
@@ -93,9 +93,9 @@ contract ZKsyncOSDualVerifier is IVerifier, IDualVerifier {
             }
 
             uint256[] memory args = new uint256[](1);
-            args[0] = computeZKSyncOSHash(_proof[1], _publicInputs);
+            args[0] = computeZKsyncOSHash(_proof[1], _publicInputs);
 
-            return mockVerify(args, _extractZKSyncOSProof(_proof));
+            return mockVerify(args, _extractZKsyncOSProof(_proof));
         }
         // If the verifier type is unknown, revert with an error.
         else {
@@ -145,7 +145,7 @@ contract ZKsyncOSDualVerifier is IVerifier, IDualVerifier {
         }
     }
 
-    function _extractZKSyncOSProof(uint256[] calldata _proof) internal pure returns (uint256[] memory result) {
+    function _extractZKsyncOSProof(uint256[] calldata _proof) internal pure returns (uint256[] memory result) {
         uint256 resultLength = _proof.length - 1 - 1;
 
         // Allocate memory for the new array (_proof.length - 1) since the first element is omitted.
@@ -157,7 +157,7 @@ contract ZKsyncOSDualVerifier is IVerifier, IDualVerifier {
         }
     }
 
-    function computeZKSyncOSHash(
+    function computeZKsyncOSHash(
         uint256 initialHash,
         uint256[] calldata _publicInputs
     ) public pure returns (uint256 result) {

@@ -14,7 +14,7 @@ import {L2MessageRoot} from "../bridgehub/L2MessageRoot.sol";
 import {L2Bridgehub} from "../bridgehub/L2Bridgehub.sol";
 import {L2AssetRouter} from "../bridge/asset-router/L2AssetRouter.sol";
 import {L2ChainAssetHandler} from "../bridgehub/L2ChainAssetHandler.sol";
-import {DeployFailed, UnsupportedUpgradeType, ZKSyncOSNotForceDeployForExistingContract} from "../common/L1ContractErrors.sol";
+import {DeployFailed, UnsupportedUpgradeType, ZKsyncOSNotForceDeployForExistingContract} from "../common/L1ContractErrors.sol";
 
 import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
@@ -48,7 +48,7 @@ library L2GenesisForceDeploymentsHelper {
         IL2ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(forceDeployments);
     }
 
-    function unsafeForceDeployZKSyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
+    function unsafeForceDeployZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
         (bytes32 bytecodeHash, uint32 bytecodeLength, bytes32 observableBytecodeHash) = abi.decode(
             _bytecodeInfo,
             (bytes32, uint32, bytes32)
@@ -66,23 +66,23 @@ library L2GenesisForceDeploymentsHelper {
         }
     }
 
-    function forceDeployOnAddressZKSyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
-        require(_newAddress.code.length == 0, ZKSyncOSNotForceDeployForExistingContract(_newAddress));
-        unsafeForceDeployZKSyncOS(_bytecodeInfo, _newAddress);
+    function forceDeployOnAddressZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
+        require(_newAddress.code.length == 0, ZKsyncOSNotForceDeployForExistingContract(_newAddress));
+        unsafeForceDeployZKsyncOS(_bytecodeInfo, _newAddress);
     }
 
-    function updateZKSyncOSContract(bytes memory _bytecodeInfo, address _newAddress) internal {
+    function updateZKsyncOSContract(bytes memory _bytecodeInfo, address _newAddress) internal {
         (bytes memory bytecodeInfo, bytes memory bytecodeInfoSystemProxy) = abi.decode((_bytecodeInfo), (bytes, bytes));
 
         // The address to force deploy the implementation to.
         // The first 32 bytes are 0s to ensure that the address will never collide with neither create nor create2.
         // This is the case, since for both create and create2 the preimage for hash starts with a non-zero byte.
         address implAddress = address(uint160(uint256(keccak256(bytes.concat(bytes32(0), bytecodeInfo)))));
-        forceDeployOnAddressZKSyncOS(bytecodeInfo, implAddress);
+        forceDeployOnAddressZKsyncOS(bytecodeInfo, implAddress);
 
         // If the address does not have any bytecode, we expect that it is a proxy
         if (_newAddress.code.length == 0) {
-            forceDeployOnAddressZKSyncOS(bytecodeInfoSystemProxy, _newAddress);
+            forceDeployOnAddressZKsyncOS(bytecodeInfoSystemProxy, _newAddress);
             ISystemContractProxy(_newAddress).forceInitAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR);
         }
 
@@ -93,7 +93,7 @@ library L2GenesisForceDeploymentsHelper {
         );
     }
 
-    /// @notice Unified function to force deploy contracts based on whether it's ZKSyncOS or Era.
+    /// @notice Unified function to force deploy contracts based on whether it's ZKsyncOS or Era.
     /// @param _upgradeType The upgrade type to use.
     /// @param _bytecodeInfo The bytecode information for deployment.
     /// @param _newAddress The address where the contract should be deployed.
@@ -103,9 +103,9 @@ library L2GenesisForceDeploymentsHelper {
         address _newAddress
     ) internal {
         if (_upgradeType == IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment) {
-            unsafeForceDeployZKSyncOS(_bytecodeInfo, _newAddress);
+            unsafeForceDeployZKsyncOS(_bytecodeInfo, _newAddress);
         } else if (_upgradeType == IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade) {
-            updateZKSyncOSContract(_bytecodeInfo, _newAddress);
+            updateZKsyncOSContract(_bytecodeInfo, _newAddress);
         } else if (_upgradeType == IComplexUpgrader.ContractUpgradeType.EraForceDeployment) {
             forceDeployEra(_bytecodeInfo, _newAddress);
         } else {
@@ -144,7 +144,7 @@ library L2GenesisForceDeploymentsHelper {
 
         // For Era chains, the SystemContractProxyAdmin is never used during deployment, but it is expected to be present
         // just in case. This line is just for consistency.
-        // For ZKSyncOS chains, we expect that both the contract and the owner has been populated at the time of the genesis.
+        // For ZKsyncOS chains, we expect that both the contract and the owner has been populated at the time of the genesis.
         // These are not predeployed only for legacy chains. For them, special logic (not covered here) would be used to ensure
         // that they have this contract is predeployed and the owner is set correctly.
         if (SystemContractProxyAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR).owner() != address(this)) {

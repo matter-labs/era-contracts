@@ -6,7 +6,7 @@ import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 import {L1_TX_CALLDATA_COST_NATIVE_ZKSYNC_OS, L1_TX_CALLDATA_PRICE_L2_GAS_ZKSYNC_OS, L1_TX_DELTA_544_ENCODING_BYTES, L1_TX_DELTA_FACTORY_DEPS_L2_GAS, L1_TX_DELTA_FACTORY_DEPS_PUBDATA, L1_TX_ENCODING_136_BYTES_COST_NATIVE_ZKSYNC_OS, L1_TX_INTRINSIC_L2_GAS, L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS, L1_TX_INTRINSIC_PUBDATA, L1_TX_INTRINSIC_PUBDATA_ZSKYNC_OS, L1_TX_MIN_L2_GAS_BASE, L1_TX_STATIC_NATIVE_ZKSYNC_OS, MEMORY_OVERHEAD_GAS, TX_SLOT_OVERHEAD_L2_GAS, UPGRADE_TX_NATIVE_PER_GAS, ZKSYNC_OS_L1_TX_NATIVE_PRICE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "../../common/Config.sol";
-import {InvalidUpgradeTxn, PubdataGreaterThanLimit, TooMuchGas, TxnBodyGasLimitNotEnoughGas, UpgradeTxVerifyParam, ValidateTxnNotEnoughGas, ZeroGasPriceL1TxZKSyncOS} from "../../common/L1ContractErrors.sol";
+import {InvalidUpgradeTxn, PubdataGreaterThanLimit, TooMuchGas, TxnBodyGasLimitNotEnoughGas, UpgradeTxVerifyParam, ValidateTxnNotEnoughGas, ZeroGasPriceL1TxZKsyncOS} from "../../common/L1ContractErrors.sol";
 
 /// @title ZKsync Library for validating L1 -> L2 transactions
 /// @author Matter Labs
@@ -36,11 +36,11 @@ library TransactionValidator {
             revert PubdataGreaterThanLimit(_priorityTxMaxPubdata, l2GasForTxBody / _transaction.gasPerPubdataByteLimit);
         }
 
-        // Currently we don't support L1->L2 transactions with 0 `maxFeePerGas` in ZKSyncOS,
+        // Currently we don't support L1->L2 transactions with 0 `maxFeePerGas` in ZKsyncOS,
         // it's allowed only for upgrade transactions.
         // It should be ensured by constants in FeeParams, although we are double-checking it just in case.
         if (zksyncOS && _transaction.maxFeePerGas == 0 && _transaction.txType != ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE) {
-            revert ZeroGasPriceL1TxZKSyncOS();
+            revert ZeroGasPriceL1TxZKsyncOS();
         }
 
         // Ensuring that the transaction covers the minimal costs for its processing:
