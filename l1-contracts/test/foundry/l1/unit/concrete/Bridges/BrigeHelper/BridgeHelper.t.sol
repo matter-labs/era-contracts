@@ -167,15 +167,14 @@ contract BridgeHelperTest is Test {
     function testGetERC20Getters_InvalidAddress() public view {
         // Use an address with no code
         address invalidToken = address(0xdead); // nothing deployed here
-        uint256 originChainId = 270;
 
-        bytes memory result = BridgeHelper.getERC20Getters(invalidToken, originChainId);
+        bytes memory result = BridgeHelper.getERC20Getters(invalidToken, ORIGIN_CHAIN_ID);
 
         // Decode the token data using DataEncoding
         (uint256 chainId, bytes memory name, bytes memory symbol, bytes memory decimals) = dec.decodeTokenData(result);
 
         // Assert expected behavior
-        assertEq(chainId, originChainId);
+        assertEq(chainId, ORIGIN_CHAIN_ID);
         assertEq(name.length, 0, "name should be empty");
         assertEq(symbol.length, 0, "symbol should be empty");
         assertEq(decimals.length, 0, "decimals should be empty");
