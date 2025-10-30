@@ -69,7 +69,7 @@ contract L2MessageRoot is MessageRootBase {
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
-    ) external override onlyChain(_chainId) {
+    ) external onlyChain(_chainId) {
         // Make sure that chain is registered.
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();

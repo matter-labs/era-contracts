@@ -106,8 +106,6 @@ interface IBridgehubBase {
 
     function getAllZKChainChainIDs() external view returns (uint256[] memory);
 
-    function migrationPaused() external view returns (bool);
-
     function admin() external view returns (address);
 
     function assetRouter() external view returns (address);
@@ -170,10 +168,6 @@ interface IBridgehubBase {
     function setChainAssetHandler(address _chainAssetHandler) external;
 
     function setCTMAssetAddress(bytes32 _additionalData, address _assetAddress) external;
-
-    function pauseMigration() external;
-
-    function unpauseMigration() external;
 
     /// Asset Handler functions
     function forwardedBridgeBurnSetSettlementLayer(

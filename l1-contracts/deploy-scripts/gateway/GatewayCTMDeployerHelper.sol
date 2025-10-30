@@ -4,7 +4,8 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
+import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -14,7 +15,7 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
+import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 import {Utils} from "../Utils.sol";
 
@@ -59,6 +60,7 @@ library GatewayCTMDeployerHelper {
             eraChainId,
             l1ChainId,
             config.aliasedGovernanceAddress,
+            config.isZKsyncOS,
             contracts,
             innerConfig
         );
@@ -136,6 +138,7 @@ library GatewayCTMDeployerHelper {
         uint256 _eraChainId,
         uint256 _l1ChainId,
         address _governanceAddress,
+        bool _isZKsyncOS,
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig
     ) internal returns (DeployedContracts memory) {
@@ -177,7 +180,7 @@ library GatewayCTMDeployerHelper {
         _deployedContracts.stateTransition.diamondInit = _deployInternal(
             "DiamondInit",
             "DiamondInit.sol",
-            abi.encode(false),
+            abi.encode(_isZKsyncOS),
             innerConfig
         );
         _deployedContracts.stateTransition.genesisUpgrade = _deployInternal(
@@ -278,12 +281,21 @@ library GatewayCTMDeployerHelper {
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig
     ) internal returns (DeployedContracts memory) {
-        _deployedContracts.stateTransition.chainTypeManagerImplementation = _deployInternal(
-            "ChainTypeManager",
-            "ChainTypeManager.sol",
-            abi.encode(L2_BRIDGEHUB_ADDR),
-            innerConfig
-        );
+        if (_config.isZKsyncOS) {
+            _deployedContracts.stateTransition.chainTypeManagerImplementation = _deployInternal(
+                "ZKsyncOSChainTypeManager",
+                "ZKsyncOSChainTypeManager.sol",
+                abi.encode(L2_BRIDGEHUB_ADDR),
+                innerConfig
+            );
+        } else {
+            _deployedContracts.stateTransition.chainTypeManagerImplementation = _deployInternal(
+                "EraChainTypeManager",
+                "EraChainTypeManager.sol",
+                abi.encode(L2_BRIDGEHUB_ADDR),
+                innerConfig
+            );
+        }
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
@@ -346,13 +358,15 @@ library GatewayCTMDeployerHelper {
             serverNotifier: _deployedContracts.stateTransition.serverNotifierProxy
         });
 
+        bytes memory initCalldata = abi.encodeCall(IChainTypeManager.initialize, (diamondInitData));
+
         _deployedContracts.stateTransition.chainTypeManagerProxy = _deployInternal(
             "TransparentUpgradeableProxy",
             "TransparentUpgradeableProxy.sol",
             abi.encode(
                 _deployedContracts.stateTransition.chainTypeManagerImplementation,
                 _deployedContracts.stateTransition.chainTypeManagerProxyAdmin,
-                abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))
+                initCalldata
             ),
             innerConfig
         );
@@ -380,7 +394,7 @@ library GatewayCTMDeployerHelper {
     /// @notice List of factory dependencies needed for the correct execution of
     /// CTMDeployer and healthy functionaling of the system overall
     function getListOfFactoryDeps() external returns (bytes[] memory dependencies) {
-        uint256 totalDependencies = 24;
+        uint256 totalDependencies = 25;
         dependencies = new bytes[](totalDependencies);
         uint256 index = 0;
 
@@ -404,7 +418,11 @@ library GatewayCTMDeployerHelper {
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraDualVerifier.sol", "EraDualVerifier");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSDualVerifier.sol", "ZKsyncOSDualVerifier");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ValidatorTimelock.sol", "ValidatorTimelock");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ChainTypeManager.sol", "ChainTypeManager");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1(
+            "ZKsyncOSChainTypeManager.sol",
+            "ZKsyncOSChainTypeManager"
+        );
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraChainTypeManager.sol", "EraChainTypeManager");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ProxyAdmin.sol", "ProxyAdmin");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1(
             "TransparentUpgradeableProxy.sol",

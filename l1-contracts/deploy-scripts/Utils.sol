@@ -23,9 +23,9 @@ import {IEmergencyUpgrageBoard} from "./interfaces/IEmergencyUpgrageBoard.sol";
 import {ISecurityCouncil} from "./interfaces/ISecurityCouncil.sol";
 import {IMultisig} from "./interfaces/IMultisig.sol";
 import {ISafe} from "./interfaces/ISafe.sol";
-
+import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
 /// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the guardians.
@@ -109,6 +109,19 @@ struct SelectorToFacet {
 struct FacetToSelectors {
     bytes4[] selectors;
     uint16 facetPosition;
+}
+
+struct FacetCut {
+    address facet;
+    Action action;
+    bool isFreezable;
+    bytes4[] selectors;
+}
+
+enum Action {
+    Add,
+    Replace,
+    Remove
 }
 
 struct ChainInfoFromBridgehub {
@@ -1298,7 +1311,21 @@ library Utils {
         info.diamondProxy = L1Bridgehub(_bridgehub).getZKChain(_chainId);
         info.admin = IGetters(info.diamondProxy).getAdmin();
         info.ctm = L1Bridgehub(_bridgehub).chainTypeManager(_chainId);
-        info.serverNotifier = ChainTypeManager(info.ctm).serverNotifierAddress();
+        info.serverNotifier = IChainTypeManager(info.ctm).serverNotifierAddress();
+    }
+
+    function getZKOSBytecodeInfo(bytes memory bytecode) internal returns (bytes memory bytecodeInfo) {
+        bytes32 bytecodeBlakeHash = blakeHashBytecode(bytecode);
+        bytes32 observableBytecodeBlakeHash = keccak256(bytecode);
+        bytecodeInfo = abi.encode(bytecodeBlakeHash, bytecode.length, observableBytecodeBlakeHash);
+    }
+
+    function getZKOSBytecodeInfoForContract(
+        string memory fileName,
+        string memory contractName
+    ) internal returns (bytes memory bytecodeInfo) {
+        bytes memory bytecode = readFoundryDeployedBytecodeL1(fileName, contractName);
+        bytecodeInfo = getZKOSBytecodeInfo(bytecode);
     }
 
     function mergeCalls(Call[] memory a, Call[] memory b) public pure returns (Call[] memory result) {

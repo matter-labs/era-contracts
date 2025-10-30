@@ -13,9 +13,10 @@ import {ITransparentUpgradeableProxy, TransparentUpgradeableProxy} from "@openze
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
-import {L2_BRIDGEHUB_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 
 import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
 import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
@@ -23,10 +24,8 @@ import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyn
 import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
-import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {GatewayUpgrade} from "contracts/upgrades/GatewayUpgrade.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
@@ -38,16 +37,13 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {ChainCreationParams, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 
 import {SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
@@ -56,7 +52,6 @@ import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
-import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -74,7 +69,6 @@ import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.
 
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
-import {DeployedAddresses} from "../DeployUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {DeployCTMScript} from "../DeployCTM.s.sol";
@@ -218,7 +212,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
         deployStateTransitionDiamondFacets();
 
-        addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager", false);
+        string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
+        addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract(ctmContractName, false);
 
         addresses.stateTransition.serverNotifierImplementation = deploySimpleContract("ServerNotifier", false);
 
@@ -333,7 +328,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
     /// @notice Get facet cuts that should be removed
     function getFacetCutsForDeletion() internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
-        address diamondProxy = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy).getHyperchain(
+        address diamondProxy = IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy).getHyperchain(
             config.eraChainId
         );
         IZKChain.Facet[] memory facets = IZKChain(diamondProxy).facets();
@@ -673,7 +668,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             "The new protocol version is already present on the ChainTypeManager"
         );
         addresses.bridges.l1AssetRouterProxy = L1Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
-        addresses.stateTransition.genesisUpgrade = address(ChainTypeManager(ctm).l1GenesisUpgrade());
+        addresses.stateTransition.genesisUpgrade = address(IChainTypeManager(ctm).l1GenesisUpgrade());
 
         addresses.vaults.l1NativeTokenVaultProxy = address(
             L1AssetRouter(addresses.bridges.l1AssetRouterProxy).nativeTokenVault()
@@ -698,9 +693,9 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         addresses.bridges.erc20BridgeProxy = address(
             L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
         );
-        newConfig.oldValidatorTimelock = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy)
+        newConfig.oldValidatorTimelock = IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy)
             .validatorTimelock();
-        addresses.stateTransition.serverNotifierProxy = ChainTypeManager(
+        addresses.stateTransition.serverNotifierProxy = IChainTypeManager(
             addresses.stateTransition.chainTypeManagerProxy
         ).serverNotifierAddress();
 
@@ -1322,7 +1317,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         Call memory ctmCall = Call({
             target: addresses.stateTransition.chainTypeManagerProxy,
             data: abi.encodeCall(
-                ChainTypeManager.setNewVersionUpgrade,
+                IChainTypeManager.setNewVersionUpgrade,
                 (upgradeCut, previousProtocolVersion, deadline, newProtocolVersion)
             ),
             value: 0
@@ -1333,24 +1328,30 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     }
 
     function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
-        require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
+        require(
+            addresses.bridgehub.chainAssetHandlerProxy != address(0),
+            "chainAssetHandlerProxy is zero in newConfig"
+        );
 
         result = new Call[](1);
         result[0] = Call({
-            target: addresses.bridgehub.bridgehubProxy,
+            target: addresses.bridgehub.chainAssetHandlerProxy,
             value: 0,
-            data: abi.encodeCall(IBridgehubBase.pauseMigration, ())
+            data: abi.encodeCall(IChainAssetHandler.pauseMigration, ())
         });
     }
 
     function prepareUnpauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
-        require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
+        require(
+            addresses.bridgehub.chainAssetHandlerProxy != address(0),
+            "chainAssetHandlerProxy is zero in newConfig"
+        );
 
         result = new Call[](1);
         result[0] = Call({
-            target: addresses.bridgehub.bridgehubProxy,
+            target: addresses.bridgehub.chainAssetHandlerProxy,
             value: 0,
-            data: abi.encodeCall(IBridgehubBase.unpauseMigration, ())
+            data: abi.encodeCall(IChainAssetHandler.unpauseMigration, ())
         });
     }
 
@@ -1388,7 +1389,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
         gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
 
-        gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = deployGWContract("ChainTypeManager");
+        string memory gwCtmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
+        gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = deployGWContract(gwCtmContractName);
 
         deployUpgradeSpecificContractsGW();
     }
@@ -1445,7 +1447,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         Diamond.DiamondCutData memory upgradeCut = generateUpgradeCutData(gatewayConfig.gatewayStateTransition);
 
         bytes memory l2Calldata = abi.encodeCall(
-            ChainTypeManager.setNewVersionUpgrade,
+            IChainTypeManager.setNewVersionUpgrade,
             (upgradeCut, previousProtocolVersion, deadline, newProtocolVersion)
         );
 
@@ -1461,18 +1463,18 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeCall(IBridgehubBase.pauseMigration, ());
+        bytes memory l2Calldata = abi.encodeCall(IChainAssetHandler.pauseMigration, ());
 
-        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDR);
+        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_CHAIN_ASSET_HANDLER_ADDR);
     }
 
     function prepareUnpauseMigrationCallForGateway(
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeCall(IBridgehubBase.unpauseMigration, ());
+        bytes memory l2Calldata = abi.encodeCall(IChainAssetHandler.unpauseMigration, ());
 
-        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDR);
+        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_CHAIN_ASSET_HANDLER_ADDR);
     }
 
     function prepareNewChainCreationParamsCallForGateway(
@@ -1485,7 +1487,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         );
 
         bytes memory l2Calldata = abi.encodeCall(
-            ChainTypeManager.setChainCreationParams,
+            IChainTypeManager.setChainCreationParams,
             (getChainCreationParams(gatewayConfig.gatewayStateTransition))
         );
 
@@ -1591,7 +1593,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         calls[0] = Call({
             target: addresses.stateTransition.chainTypeManagerProxy,
             data: abi.encodeCall(
-                ChainTypeManager.setChainCreationParams,
+                IChainTypeManager.setChainCreationParams,
                 (getChainCreationParams(addresses.stateTransition))
             ),
             value: 0
@@ -1718,7 +1720,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             target: addresses.daAddresses.rollupDAManager,
             data: abi.encodeCall(
                 RollupDAManager.updateDAPair,
-                (addresses.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true) //
+                (addresses.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true)
             ),
             value: 0
         });
@@ -1839,7 +1841,10 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             return abi.encode();
         } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "ChainTypeManager")) {
+        } else if (
+            compareStrings(contractName, "EraChainTypeManager") ||
+            compareStrings(contractName, "ZKsyncOSChainTypeManager")
+        ) {
             if (!isZKBytecode) {
                 return abi.encode(addresses.bridgehub.bridgehubProxy);
             } else {

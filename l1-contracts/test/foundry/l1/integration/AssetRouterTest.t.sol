@@ -20,6 +20,7 @@ import {L2Message} from "contracts/common/Messaging.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
+import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
@@ -181,7 +182,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         vm.store(address(bridgedToken), bytes32(uint256(207)), bytes32(0));
         vm.mockCall(
             address(L2_NATIVE_TOKEN_VAULT_ADDR),
-            abi.encodeWithSelector(NativeTokenVaultBase.L1_CHAIN_ID.selector),
+            abi.encodeWithSignature("L1_CHAIN_ID()"),
             abi.encode(block.chainid)
         );
         vm.broadcast(L2_NATIVE_TOKEN_VAULT_ADDR); // kl todo call ntv, or even assetRouter/bridgehub
