@@ -10,11 +10,7 @@ contract EIP7702Checker {
     bytes3 internal constant EIP7702_PREFIX = 0xef0100;
 
     function isEIP7702Account(address _account) external view returns (bool) {
-        uint256 size;
-        assembly {
-            size := extcodesize(_account)
-        }
-        if (size != EIP7702_CODE_SIZE) return false;
+        if (_account.code.length != EIP7702_CODE_SIZE) return false;
 
         bytes3 prefix;
         assembly {
