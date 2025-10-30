@@ -237,9 +237,9 @@ library Utils {
             _newBatchesData[0].batchNumber,
             _newBatchesData[_newBatchesData.length - 1].batchNumber,
             bytes.concat(
-            bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS),
-            abi.encode(_lastCommittedBatchData, _newBatchesData)
-        )
+                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS),
+                abi.encode(_lastCommittedBatchData, _newBatchesData)
+            )
         );
     }
 

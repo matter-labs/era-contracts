@@ -393,11 +393,6 @@ error ZKChainLimitReached();
 // 0x05563c3d
 error ZKSyncOSNotForceDeployForExistingContract(address);
 
-
-
-
-
-
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
     LegacyBridgeFirstBatch,

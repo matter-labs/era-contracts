@@ -354,7 +354,7 @@ contract ExecutorTest is Test {
         );
     }
 
-    function isZKsyncOS() internal virtual pure returns(bool) {
+    function isZKsyncOS() internal pure virtual returns (bool) {
         return false;
     }
 
