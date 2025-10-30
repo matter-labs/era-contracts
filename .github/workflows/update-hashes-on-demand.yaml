@@ -59,7 +59,26 @@ jobs:
       - name: Run command
         run: |
           echo "Updating PR #${{ github.event.inputs.pr_number }} on branch ${{ steps.pr.outputs.head_ref }}"
-          ./recompute_hashes.sh
+          git submodule update --init --recursive
+
+          yarn
+
+          # Cleanup everything and recompile
+          forge clean --root da-contracts
+          yarn --cwd l1-contracts clean
+          forge clean --root l1-contracts
+          yarn --cwd l2-contracts clean
+          forge clean --root l2-contracts
+          yarn --cwd system-contracts clean
+          forge clean --root system-contracts
+
+          yarn --cwd da-contracts build:foundry
+          yarn --cwd l1-contracts build:foundry
+          yarn --cwd l2-contracts build:foundry
+          yarn --cwd system-contracts build:foundry
+
+          yarn calculate-hashes:fix
+
 
       - name: Commit and push changes
         run: |
