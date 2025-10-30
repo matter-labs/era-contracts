@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {Action, FacetCut, StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
+import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
