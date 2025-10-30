@@ -178,6 +178,10 @@ function collectErrorUsages(directories: string[], usedErrors: Set<string>) {
           // Also check for error selector usage like ErrorName.selector
           const selectorRegex = /([A-Za-z0-9_]+)\.selector/g;
           while ((match = selectorRegex.exec(fileContent)) !== null) usedErrors.add(match[1]);
+
+          // Check for errors used in require statements like require(condition, ErrorName(...))
+          const requireRegex = /require\s*\([^,]+,\s*([A-Za-z0-9_]+)\s*\(/g;
+          while ((match = requireRegex.exec(fileContent)) !== null) usedErrors.add(match[1]);
         }
       }
     }
