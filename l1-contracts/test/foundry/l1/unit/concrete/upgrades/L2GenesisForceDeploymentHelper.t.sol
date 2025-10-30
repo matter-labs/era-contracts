@@ -99,11 +99,31 @@ contract L2GenesisForceDeploymentsInitTest is Test {
         fixedData.aliasedL1Governance = aliasedL1Governance;
         fixedData.maxNumberOfZKChains = MAX_ZK_CHAINS;
         fixedData.l1AssetRouter = l1AssetRouter;
-        fixedData.messageRootBytecodeInfo = abi.encode(bytes32(keccak256("messageroot")), uint32(1000), bytes32(keccak256("observable_messageroot")));
-        fixedData.bridgehubBytecodeInfo = abi.encode(bytes32(keccak256("bridgehub")), uint32(2000), bytes32(keccak256("observable_bridgehub")));
-        fixedData.l2AssetRouterBytecodeInfo = abi.encode(bytes32(keccak256("assetRouter")), uint32(3000), bytes32(keccak256("observable_assetRouter")));
-        fixedData.l2NtvBytecodeInfo = abi.encode(bytes32(keccak256("ntv")), uint32(4000), bytes32(keccak256("observable_ntv")));
-        fixedData.chainAssetHandlerBytecodeInfo = abi.encode(bytes32(keccak256("chainHandler")), uint32(5000), bytes32(keccak256("observable_chainHandler")));
+        fixedData.messageRootBytecodeInfo = abi.encode(
+            bytes32(keccak256("messageroot")),
+            uint32(1000),
+            bytes32(keccak256("observable_messageroot"))
+        );
+        fixedData.bridgehubBytecodeInfo = abi.encode(
+            bytes32(keccak256("bridgehub")),
+            uint32(2000),
+            bytes32(keccak256("observable_bridgehub"))
+        );
+        fixedData.l2AssetRouterBytecodeInfo = abi.encode(
+            bytes32(keccak256("assetRouter")),
+            uint32(3000),
+            bytes32(keccak256("observable_assetRouter"))
+        );
+        fixedData.l2NtvBytecodeInfo = abi.encode(
+            bytes32(keccak256("ntv")),
+            uint32(4000),
+            bytes32(keccak256("observable_ntv"))
+        );
+        fixedData.chainAssetHandlerBytecodeInfo = abi.encode(
+            bytes32(keccak256("chainHandler")),
+            uint32(5000),
+            bytes32(keccak256("observable_chainHandler"))
+        );
         return fixedData;
     }
 
@@ -118,27 +138,23 @@ contract L2GenesisForceDeploymentsInitTest is Test {
 
     function testForceDeployment_zkos_Genesis() public {
         FixedForceDeploymentsData memory fixedData = _createFixedData();
-        fixedData.beaconDeployerInfo = abi.encode(bytes32(keccak256("beaconDeployer")), uint32(6000), bytes32(keccak256("observable_beaconDeployer")));
-        
+        fixedData.beaconDeployerInfo = abi.encode(
+            bytes32(keccak256("beaconDeployer")),
+            uint32(6000),
+            bytes32(keccak256("observable_beaconDeployer"))
+        );
+
         ZKChainSpecificForceDeploymentsData memory addData = _createAdditionalData();
 
         bytes memory fixedEncoded = abi.encode(fixedData);
         bytes memory addEncoded = abi.encode(addData);
 
         // Expect exact parameter validation for initialization calls
-        vm.expectCall(
-            L2_MESSAGE_ROOT_ADDR,
-            abi.encodeWithSelector(L2MessageRoot.initL2.selector, L1_CHAIN_ID)
-        );
-        
+        vm.expectCall(L2_MESSAGE_ROOT_ADDR, abi.encodeWithSelector(L2MessageRoot.initL2.selector, L1_CHAIN_ID));
+
         vm.expectCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(
-                L2Bridgehub.initL2.selector,
-                L1_CHAIN_ID,
-                aliasedL1Governance,
-                MAX_ZK_CHAINS
-            )
+            abi.encodeWithSelector(L2Bridgehub.initL2.selector, L1_CHAIN_ID, aliasedL1Governance, MAX_ZK_CHAINS)
         );
 
         vm.expectCall(
@@ -168,10 +184,7 @@ contract L2GenesisForceDeploymentsInitTest is Test {
 
         vm.expectCall(
             L2_NTV_BEACON_DEPLOYER_ADDR,
-            abi.encodeWithSelector(
-                UpgradeableBeaconDeployer.deployUpgradeableBeacon.selector,
-                aliasedL1Governance
-            )
+            abi.encodeWithSelector(UpgradeableBeaconDeployer.deployUpgradeableBeacon.selector, aliasedL1Governance)
         );
 
         vm.expectCall(
@@ -224,7 +237,7 @@ contract L2GenesisForceDeploymentsInitTest is Test {
         FixedForceDeploymentsData memory fixedData = _createFixedData();
         // Not used for non-genesis upgrade
         fixedData.beaconDeployerInfo = "";
-        
+
         ZKChainSpecificForceDeploymentsData memory addData = _createAdditionalData();
         address legacyBridge = makeAddr("legacyBridge");
 
@@ -234,11 +247,7 @@ contract L2GenesisForceDeploymentsInitTest is Test {
         // Expect update calls instead of init calls for non-genesis
         vm.expectCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(
-                L2Bridgehub.updateL2.selector,
-                L1_CHAIN_ID,
-                MAX_ZK_CHAINS
-            )
+            abi.encodeWithSelector(L2Bridgehub.updateL2.selector, L1_CHAIN_ID, MAX_ZK_CHAINS)
         );
 
         vm.expectCall(
@@ -320,7 +329,7 @@ contract L2GenesisForceDeploymentsInitTest is Test {
     function testForceDeployment_Era_Genesis() public {
         FixedForceDeploymentsData memory fixedData = _createFixedData();
         fixedData.beaconDeployerInfo = abi.encode(bytes32(keccak256("beaconDeployer")));
-        
+
         ZKChainSpecificForceDeploymentsData memory addData = _createAdditionalData();
 
         bytes memory fixedEncoded = abi.encode(fixedData);
@@ -363,8 +372,12 @@ contract L2GenesisForceDeploymentsInitTest is Test {
 
     function testForceDeployment_DeploymentFailure() public {
         FixedForceDeploymentsData memory fixedData = _createFixedData();
-        fixedData.beaconDeployerInfo = abi.encode(bytes32(keccak256("beaconDeployer")), uint32(6000), bytes32(keccak256("observable_beaconDeployer")));
-        
+        fixedData.beaconDeployerInfo = abi.encode(
+            bytes32(keccak256("beaconDeployer")),
+            uint32(6000),
+            bytes32(keccak256("observable_beaconDeployer"))
+        );
+
         ZKChainSpecificForceDeploymentsData memory addData = _createAdditionalData();
 
         bytes memory fixedEncoded = abi.encode(fixedData);
@@ -405,7 +418,7 @@ contract L2GenesisForceDeploymentsInitTest is Test {
         FixedForceDeploymentsData memory fixedData = _createFixedData();
         // Invalid bytecode info - missing required fields
         fixedData.messageRootBytecodeInfo = abi.encode(bytes32(0));
-        
+
         ZKChainSpecificForceDeploymentsData memory addData = _createAdditionalData();
 
         bytes memory fixedEncoded = abi.encode(fixedData);
@@ -424,8 +437,12 @@ contract L2GenesisForceDeploymentsInitTest is Test {
 
     function testForceDeployment_GenesisVsNonGenesis_DifferentBehavior() public {
         FixedForceDeploymentsData memory fixedData = _createFixedData();
-        fixedData.beaconDeployerInfo = abi.encode(bytes32(keccak256("beaconDeployer")), uint32(6000), bytes32(keccak256("observable_beaconDeployer")));
-        
+        fixedData.beaconDeployerInfo = abi.encode(
+            bytes32(keccak256("beaconDeployer")),
+            uint32(6000),
+            bytes32(keccak256("observable_beaconDeployer"))
+        );
+
         ZKChainSpecificForceDeploymentsData memory addData = _createAdditionalData();
 
         bytes memory fixedEncoded = abi.encode(fixedData);
@@ -434,7 +451,7 @@ contract L2GenesisForceDeploymentsInitTest is Test {
         // Test Genesis: should call initL2
         vm.expectCall(L2_MESSAGE_ROOT_ADDR, abi.encodeWithSelector(L2MessageRoot.initL2.selector));
         vm.expectCall(L2_BRIDGEHUB_ADDR, abi.encodeWithSelector(L2Bridgehub.initL2.selector));
-        
+
         // Should NOT call updateL2 for genesis
         vm.expectCall(L2_BRIDGEHUB_ADDR, abi.encodeWithSelector(L2Bridgehub.updateL2.selector), 0);
 
