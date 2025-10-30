@@ -132,6 +132,8 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         assertEq(
             uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
             2,
+            "BundleStatus should be FullyExecuted"
+        );
         for (uint256 i = 0; i < interopBundle.calls.length; ++i) {
             assertEq(
                 uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, i)),

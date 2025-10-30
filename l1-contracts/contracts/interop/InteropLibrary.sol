@@ -8,7 +8,7 @@ import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 // import {IInteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
-import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {AmountMustBeGreaterThanZero, ArgumentsLengthNotIdentical, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 library InteropLibrary {
@@ -28,10 +28,10 @@ library InteropLibrary {
         bytes32 l2TokenAssetId,
         uint256 amount,
         address receiver,
-        uint256 fee
+        address maybeTokenAddress
     ) internal pure returns (bytes memory) {
         // Inner payload: abi.encode(amount, receiver, fee)
-        bytes memory inner = abi.encode(amount, receiver, fee);
+        bytes memory inner = abi.encode(amount, receiver, maybeTokenAddress);
         // Outer: abi.encode(l2TokenAssetId, inner), prefixed by version byte
         return bytes.concat(NEW_ENCODING_VERSION, abi.encode(l2TokenAssetId, inner));
     }
@@ -151,7 +151,7 @@ library InteropLibrary {
             l2TokenAssetId,
             amount,
             recipient,
-            0 // fee
+            address(0) // maybeTokenAddress
         );
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
