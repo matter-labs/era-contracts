@@ -63,15 +63,6 @@ jobs:
 
           yarn
 
-          # Cleanup everything and recompile
-          forge clean --root da-contracts
-          yarn --cwd l1-contracts clean
-          forge clean --root l1-contracts
-          yarn --cwd l2-contracts clean
-          forge clean --root l2-contracts
-          yarn --cwd system-contracts clean
-          forge clean --root system-contracts
-
           yarn --cwd da-contracts build:foundry
           yarn --cwd l1-contracts build:foundry
           yarn --cwd l2-contracts build:foundry
