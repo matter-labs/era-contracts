@@ -31,11 +31,10 @@ import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {InteropBundle, InteropCall, InteropCallStarter, MessageInclusionProof} from "contracts/common/Messaging.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
+import {IERC7786Recipient} from "contracts/interop/IERC7786Recipient.sol";
 
 
 abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer {
-        address constant UNBUNDLER_ADDRESS = address(0x1);
-        address constant EXECUTION_ADDRESS = address(0x2);
 
         function test_requestTokenTransferInterop() public {
         address l2TokenAddress = initializeTokenByDeposit();
@@ -99,9 +98,15 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
             abi.encode(bytes32(0))
         );
 
-        bytes memory destinationChainId = InteroperableAddress.formatEvmV1(260);
+        uint256 destinationChainId = 260;
+        bytes memory destinationChainIdBytes = InteroperableAddress.formatEvmV1(destinationChainId);
 
         address targetContract = makeAddr("targetContract");
+        vm.mockCall(
+            targetContract,
+            abi.encodeWithSelector(IERC7786Recipient.receiveMessage.selector),
+            abi.encode(IERC7786Recipient.receiveMessage.selector)
+        );
         InteropCallStarter[] memory callStarters = new InteropCallStarter[](1);
 
         callStarters[0] = InteropCallStarter({
@@ -110,29 +115,33 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
             callAttributes: new bytes[](0)
         });
 
-        address executionAddress = makeAddr("executionAddress");
-        address unbundlerAddress = makeAddr("unbundlerAddress");
+
 
         bytes[] memory bundleAttributes = new bytes[](2);
         bundleAttributes[0] = abi.encodeCall(
             IERC7786Attributes.executionAddress,
-            InteroperableAddress.formatEvmV1(executionAddress)
+            InteroperableAddress.formatEvmV1(EXECUTION_ADDRESS)
         );
 
         bundleAttributes[1] = abi.encodeCall(
             IERC7786Attributes.unbundlerAddress,
-            InteroperableAddress.formatEvmV1(260, unbundlerAddress)
+            InteroperableAddress.formatEvmV1(260, UNBUNDLER_ADDRESS)
         );
+
+        vm.recordLogs();
 
         (bool success, bytes memory returnData) =  L2_INTEROP_CENTER_ADDR.call(
             abi.encodeWithSelector(
                 InteropCenter.sendBundle.selector,
-                destinationChainId,
+                destinationChainIdBytes,
                 callStarters,
                 bundleAttributes
             )
         );
 
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        extractAndExecuteBundles(logs, destinationChainId);
+        
         assertTrue(success, "sendBundle should succeed");
 
         // Decode the returned bundle hash

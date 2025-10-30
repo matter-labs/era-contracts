@@ -87,6 +87,9 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     IChainTypeManager internal chainTypeManager;
 
+    address UNBUNDLER_ADDRESS;
+    address EXECUTION_ADDRESS;
+
     function setUp() public virtual {
         setUpInner(false);
     }
@@ -106,6 +109,8 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         assembly {
             beaconProxyBytecodeHash := extcodehash(beaconProxy)
         }
+        UNBUNDLER_ADDRESS = makeAddr("unbundlerAddress");
+        EXECUTION_ADDRESS = makeAddr("executionAddress");
 
         sharedBridgeLegacy = deployL2SharedBridgeLegacy(
             L1_CHAIN_ID,

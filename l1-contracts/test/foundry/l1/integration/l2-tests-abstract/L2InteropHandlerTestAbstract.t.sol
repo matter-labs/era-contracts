@@ -30,9 +30,6 @@ import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
 
 abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer {
-    address constant UNBUNDLER_ADDRESS = address(0x1);
-    address constant EXECUTION_ADDRESS = address(0x2);
-
     function test_requestL2TransactionDirectWithCalldata() public {
         // Note: get this from real local txs
         bytes
