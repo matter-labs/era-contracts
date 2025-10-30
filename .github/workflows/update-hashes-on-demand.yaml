@@ -1,0 +1,55 @@
+name: Update Hashes in PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Pull Request number to update"
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # we need full history to fetch PR branch
+
+      - name: Get PR branch info
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: parseInt(context.payload.inputs.pr_number, 10),
+            });
+            core.setOutput("head_ref", pr.data.head.ref);
+            core.setOutput("head_repo", pr.data.head.repo.full_name);
+
+      - name: Checkout PR branch
+        run: |
+          git fetch origin "${{ steps.pr.outputs.head_ref }}"
+          git checkout "${{ steps.pr.outputs.head_ref }}"
+
+      - name: Run command
+        run: |
+          echo "Updating PR #${{ github.event.inputs.pr_number }} on branch ${{ steps.pr.outputs.head_ref }}"
+          ./recompute_hashes.sh
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+
+          git add -A
+          git commit -m "chore: Updated hashes from CI" || echo "No changes to commit"
+          git push origin HEAD
