@@ -21,7 +21,7 @@ import {IMultisigCommitter} from "./IMultisigCommitter.sol";
 contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgradeable {
 	/// @dev EIP-712 TypeHash for commitBatchesMultisig
     bytes32 internal constant COMMIT_BATCHES_MULTISIG_TYPEHASH =
-        keccak256("CommitBatchesMultisig(address chainAddress, uint256 processBatchFrom, uint256 processBatchTo, bytes batchData)");
+        keccak256("CommitBatchesMultisig(address chainAddress,uint256 processBatchFrom,uint256 processBatchTo,bytes batchData)");
 
 	bytes32 public constant override COMMIT_VERIFIER_ROLE = keccak256("COMMIT_VERIFIER_ROLE");
 
@@ -57,7 +57,7 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
 		address[] calldata signers,
 		bytes[] calldata signatures
     ) external onlyRole(chainAddress, COMMITTER_ROLE) {
-        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(COMMIT_BATCHES_MULTISIG_TYPEHASH, chainAddress, processBatchFrom, processBatchTo, batchData)));
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(COMMIT_BATCHES_MULTISIG_TYPEHASH, chainAddress, processBatchFrom, processBatchTo, keccak256(batchData))));
 		_checkSignatures(chainAddress, signers, signatures, digest);
 		// signatures validated, follow normal commitBatchesSharedBridge flow
 		_recordBatchCommitment(chainAddress, processBatchFrom, processBatchTo);
