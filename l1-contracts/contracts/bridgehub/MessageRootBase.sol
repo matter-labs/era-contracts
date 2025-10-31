@@ -34,9 +34,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
 
     function _bridgehub() internal view virtual returns (address);
 
-    function L1_CHAIN_ID() public view virtual returns (uint256) {
-        return l1ChainId;
-    }
+    function L1_CHAIN_ID() public view virtual returns (uint256);
 
     /// @notice Emitted when a new chain is added to the MessageRoot.
     /// @param chainId The ID of the chain that is being added to the MessageRoot.
