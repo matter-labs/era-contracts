@@ -12,9 +12,6 @@ import {AmountMustBeGreaterThanZero, ArgumentsLengthNotIdentical, ZeroAddress} f
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 library InteropLibrary {
-    address internal constant UNBUNDLER_ADDRESS = address(0x1);
-    address internal constant EXECUTION_ADDRESS = address(0x2);
-
     IL2NativeTokenVault internal constant l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
     InteropCenter internal constant l2InteropCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
 
@@ -53,9 +50,10 @@ library InteropLibrary {
         uint256 destinationChainId,
         address target,
         address executionAddress,
+        address unbundlerAddress,
         bytes memory data
     ) internal pure returns (InteropCallStarter memory) {
-        bytes[] memory callAttributes = buildCallAttributes(executionAddress);
+        bytes[] memory callAttributes = buildCallAttributes(executionAddress, unbundlerAddress);
 
         return
             InteropCallStarter({
@@ -69,9 +67,10 @@ library InteropLibrary {
     function buildBundleCall(
         address target,
         address executionAddress,
+        address unbundlerAddress,
         bytes memory data
     ) internal pure returns (InteropCallStarter memory) {
-        bytes[] memory callAttributes = buildCallAttributes(executionAddress);
+        bytes[] memory callAttributes = buildCallAttributes(executionAddress, unbundlerAddress);
 
         return
             InteropCallStarter({
@@ -98,17 +97,20 @@ library InteropLibrary {
     }
 
     /// @notice Bundle-level attributes.
-    function buildBundleAttributes() internal pure returns (bytes[] memory attrs) {
+    function buildBundleAttributes(address unbundlerAddress) internal pure returns (bytes[] memory attrs) {
         attrs = new bytes[](1);
         attrs[0] = abi.encodeCall(
             IERC7786Attributes.unbundlerAddress,
-            (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
+            (InteroperableAddress.formatEvmV1(unbundlerAddress))
         );
     }
 
     /// @notice Build a call-level 7786 attributes array.
     /// @param executionAddress   Optional executor (EOA/contract) on destination chain
-    function buildCallAttributes(address executionAddress) internal pure returns (bytes[] memory attributes) {
+    function buildCallAttributes(
+        address executionAddress,
+        address unbundlerAddress
+    ) internal pure returns (bytes[] memory attributes) {
         bytes[] memory attributes = new bytes[](3);
         attributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
         attributes[1] = abi.encodeCall(
@@ -117,7 +119,7 @@ library InteropLibrary {
         );
         attributes[2] = abi.encodeCall(
             IERC7786Attributes.unbundlerAddress,
-            (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
+            (InteroperableAddress.formatEvmV1(unbundlerAddress))
         );
     }
 
@@ -135,7 +137,8 @@ library InteropLibrary {
         uint256 destination,
         address l2TokenAddress,
         uint256 amount,
-        address recipient
+        address recipient,
+        address unbundlerAddress
     ) internal returns (bytes32 bundleHash) {
         if (amount == 0) {
             revert AmountMustBeGreaterThanZero();
@@ -155,7 +158,7 @@ library InteropLibrary {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = buildSecondBridgeCall(secondBridgeCalldata);
 
-        bytes[] memory bundleAttrs = buildBundleAttributes();
+        bytes[] memory bundleAttrs = buildBundleAttributes(unbundlerAddress);
 
         return l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(destination), calls, bundleAttrs);
     }
@@ -174,7 +177,9 @@ library InteropLibrary {
         uint256 destination,
         address[] memory targets,
         address[] memory executionAddresses,
-        bytes[] memory dataArray
+        bytes[] memory dataArray,
+        address executionAddress,
+        address unbundlerAddress
     ) internal returns (bytes32 bundleHash) {
         if (targets.length != executionAddresses.length || targets.length != dataArray.length) {
             revert ArgumentsLengthNotIdentical();
@@ -187,13 +192,13 @@ library InteropLibrary {
             }
 
             if (executionAddresses[i] == address(0)) {
-                executionAddresses[i] = EXECUTION_ADDRESS;
+                executionAddresses[i] = executionAddress;
             }
 
-            calls[i] = buildBundleCall(targets[i], executionAddresses[i], dataArray[i]);
+            calls[i] = buildBundleCall(targets[i], executionAddresses[i], unbundlerAddress, dataArray[i]);
         }
 
-        bytes[] memory bundleAttrs = buildBundleAttributes();
+        bytes[] memory bundleAttrs = buildBundleAttributes(unbundlerAddress);
 
         return l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(destination), calls, bundleAttrs);
     }
@@ -207,19 +212,26 @@ library InteropLibrary {
     function sendCall(
         uint256 destination,
         address target,
+        bytes memory data,
         address executionAddress,
-        bytes memory data
+        address unbundlerAddress
     ) internal returns (bytes32 sendId) {
         if (target == address(0)) {
             revert ZeroAddress();
         }
 
         if (executionAddress == address(0)) {
-            executionAddress = EXECUTION_ADDRESS;
+            executionAddress = executionAddress;
         }
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
-        calls[0] = buildSendCall(destination, target, executionAddress, data);
+        calls[0] = buildSendCall({
+            destination: destination,
+            target: target,
+            executionAddress: executionAddress,
+            unbundlerAddress: unbundlerAddress,
+            data: data
+        });
 
         return l2InteropCenter.sendMessage(calls[0].to, calls[0].data, calls[0].callAttributes);
     }
@@ -229,7 +241,12 @@ library InteropLibrary {
     /// @param  recipient         Address that will receive the tokens on remote chain
     /// @param  amount            Amount to transfer
     /// @return bundleHash Hash of the sent bundle
-    function sendNative(uint256 destination, address recipient, uint256 amount) internal returns (bytes32 bundleHash) {
+    function sendNative(
+        uint256 destination,
+        address recipient,
+        address unbundlerAddress,
+        uint256 amount
+    ) internal returns (bytes32 bundleHash) {
         if (recipient == address(0)) {
             revert ZeroAddress();
         }
@@ -239,7 +256,7 @@ library InteropLibrary {
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = buildSendNativeCall(recipient, amount);
-        bytes[] memory bundleAttributes = buildBundleAttributes();
+        bytes[] memory bundleAttributes = buildBundleAttributes(unbundlerAddress);
 
         return
             l2InteropCenter.sendBundle{value: amount}(

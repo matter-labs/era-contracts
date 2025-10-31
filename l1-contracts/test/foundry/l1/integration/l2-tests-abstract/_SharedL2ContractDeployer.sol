@@ -91,6 +91,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
     address UNBUNDLER_ADDRESS;
     address EXECUTION_ADDRESS;
     address interopTargetContract;
+    uint256 originalChainId;
 
     function setUp() public virtual {
         setUpInner(false);
@@ -115,6 +116,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         EXECUTION_ADDRESS = makeAddr("executionAddress");
 
         interopTargetContract = makeAddr("interopTargetContract");
+        originalChainId = block.chainid;
 
         sharedBridgeLegacy = deployL2SharedBridgeLegacy(
             L1_CHAIN_ID,

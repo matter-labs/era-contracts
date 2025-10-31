@@ -16,7 +16,7 @@ import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {InteropBundle} from "contracts/common/Messaging.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 
@@ -28,7 +28,7 @@ import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
-import {InteropBundle, InteropCall, InteropCallStarter, MessageInclusionProof} from "contracts/common/Messaging.sol";
+import {InteropBundle, InteropCall, CallStatus, InteropCallStarter, MessageInclusionProof} from "contracts/common/Messaging.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
 import {IERC7786Recipient} from "contracts/interop/IERC7786Recipient.sol";
@@ -37,86 +37,6 @@ import {InteropLibrary} from "contracts/interop/InteropLibrary.sol";
 
 abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer {
     uint256 destinationChainId = 271;
-
-    // function test_requestTokenTransferInterop() public {
-    //     address l2TokenAddress = initializeTokenByDeposit();
-    //     bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
-    //     vm.deal(address(this), 1000 ether);
-
-    //     bytes memory secondBridgeCalldata = bytes.concat(
-    //         NEW_ENCODING_VERSION,
-    //         abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), 0))
-    //     );
-
-    //     InteropCallStarter[] memory calls = new InteropCallStarter[](1);
-    //     bytes[] memory callAttributes = new bytes[](1);
-    //     callAttributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
-
-    //     calls[0] = InteropCallStarter({
-    //         to: InteroperableAddress.formatEvmV1(L2_ASSET_ROUTER_ADDR),
-    //         data: secondBridgeCalldata,
-    //         callAttributes: callAttributes
-    //     });
-
-    //     bytes[] memory bundleAttributes = new bytes[](1);
-    //     bundleAttributes[0] = abi.encodeCall(
-    //         IERC7786Attributes.unbundlerAddress,
-    //         (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
-    //     );
-    //     l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(271), calls, bundleAttributes);
-    //     vm.recordLogs();
-
-    //     Vm.Log[] memory logs = vm.getRecordedLogs();
-    //     extractAndExecuteBundles(logs, destinationChainId);
-    // }
-
-    // function test_sendBundle_simple() public {
-    //     bytes memory destinationChainIdBytes = InteroperableAddress.formatEvmV1(destinationChainId);
-
-    //     vm.mockCall(
-    //         interopTargetContract,
-    //         abi.encodeWithSelector(IERC7786Recipient.receiveMessage.selector),
-    //         abi.encode(IERC7786Recipient.receiveMessage.selector)
-    //     );
-    //     InteropCallStarter[] memory callStarters = new InteropCallStarter[](1);
-
-    //     callStarters[0] = InteropCallStarter({
-    //         to: InteroperableAddress.formatEvmV1(interopTargetContract),
-    //         data: abi.encodeWithSignature("simpleCall()"),
-    //         callAttributes: new bytes[](0)
-    //     });
-
-    //     bytes[] memory bundleAttributes = new bytes[](2);
-    //     bundleAttributes[0] = abi.encodeCall(
-    //         IERC7786Attributes.executionAddress,
-    //         InteroperableAddress.formatEvmV1(EXECUTION_ADDRESS)
-    //     );
-
-    //     bundleAttributes[1] = abi.encodeCall(
-    //         IERC7786Attributes.unbundlerAddress,
-    //         InteroperableAddress.formatEvmV1(260, UNBUNDLER_ADDRESS)
-    //     );
-
-    //     vm.recordLogs();
-
-    //     (bool success, bytes memory returnData) = L2_INTEROP_CENTER_ADDR.call(
-    //         abi.encodeWithSelector(
-    //             InteropCenter.sendBundle.selector,
-    //             destinationChainIdBytes,
-    //             callStarters,
-    //             bundleAttributes
-    //         )
-    //     );
-
-    //     Vm.Log[] memory logs = vm.getRecordedLogs();
-    //     extractAndExecuteBundles(logs, destinationChainId);
-
-    //     assertTrue(success, "sendBundle should succeed");
-
-    //     // Decode the returned bundle hash
-    //     bytes32 bundleHash = abi.decode(returnData, (bytes32));
-    //     assertNotEq(bundleHash, bytes32(0), "Bundle hash should not be zero");
-    // }
 
     function test_requestSendCall() public {
         address l2TokenAddress = initializeTokenByDeposit();
@@ -153,7 +73,7 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
         );
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        extractAndExecuteBundles(logs, destinationChainId);
+        extractAndExecuteSingleBundle(logs, destinationChainId, EXECUTION_ADDRESS);
     }
 
     function test_requestTokenTransferInteropViaLibrary() public {
@@ -161,9 +81,9 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
         vm.deal(address(this), 1000 ether);
         vm.recordLogs();
 
-        InteropLibrary.sendToken(destinationChainId, l2TokenAddress, 100, address(this));
+        InteropLibrary.sendToken(destinationChainId, l2TokenAddress, 100, address(this), UNBUNDLER_ADDRESS);
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        extractAndExecuteBundles(logs, destinationChainId);
+        extractAndExecuteSingleBundle(logs, destinationChainId, EXECUTION_ADDRESS);
     }
 
     function test_requestSendCallViaLibrary() public {
@@ -176,20 +96,87 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
         InteropLibrary.sendCall(
             destinationChainId,
             interopTargetContract,
+            abi.encodeWithSignature("simpleCall()"),
             EXECUTION_ADDRESS,
-            abi.encodeWithSignature("simpleCall()")
+            UNBUNDLER_ADDRESS
         );
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        extractAndExecuteBundles(logs, destinationChainId);
+        extractAndExecuteSingleBundle(logs, destinationChainId, EXECUTION_ADDRESS);
     }
 
     function test_requestNativeTokenTransferViaLibrary() public {
         vm.deal(address(this), 1000 ether);
         vm.recordLogs();
 
-        InteropLibrary.sendNative(destinationChainId, interopTargetContract, 100);
+        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100);
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        extractAndExecuteBundles(logs, destinationChainId);
+        extractAndExecuteSingleBundle(logs, destinationChainId, EXECUTION_ADDRESS);
+    }
+
+    function test_executeBundleViaReceiveMessage() public {
+        vm.deal(address(this), 1000 ether);
+        vm.recordLogs();
+
+        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100);
+        Vm.Log[] memory logs1 = vm.getRecordedLogs();
+        bytes memory logsData = extractFirstBundleFromLogs(logs1);
+        (bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle memory interopBundle) = abi.decode(
+            logsData,
+            (bytes32, bytes32, InteropBundle)
+        );
+        bytes memory bundle = abi.encode(interopBundle);
+        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR, block.chainid);
+
+        vm.recordLogs();
+
+        InteropLibrary.sendCall(
+            destinationChainId,
+            L2_INTEROP_HANDLER_ADDR,
+            abi.encodeCall(L2_INTEROP_HANDLER.executeBundle, (bundle, proof)),
+            EXECUTION_ADDRESS,
+            UNBUNDLER_ADDRESS
+        );
+        Vm.Log[] memory logs2 = vm.getRecordedLogs();
+        extractAndExecuteSingleBundle(logs2, destinationChainId, EXECUTION_ADDRESS);
+    }
+
+    function test_unbundleBundleViaReceiveMessage() public {
+        vm.deal(address(this), 1000 ether);
+        vm.recordLogs();
+
+        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100);
+        Vm.Log[] memory logs1 = vm.getRecordedLogs();
+        bytes memory logsData = extractFirstBundleFromLogs(logs1);
+        (bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle memory interopBundle) = abi.decode(
+            logsData,
+            (bytes32, bytes32, InteropBundle)
+        );
+        bytes memory bundle = abi.encode(interopBundle);
+        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR, block.chainid);
+
+        vm.chainId(destinationChainId);
+        vm.mockCall(
+            address(L2_MESSAGE_VERIFICATION),
+            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
+            abi.encode(true)
+        );
+        L2_INTEROP_HANDLER.verifyBundle(bundle, proof);
+        vm.chainId(originalChainId);
+
+        vm.recordLogs();
+
+        CallStatus[] memory callStatuses = new CallStatus[](1);
+        callStatuses[0] = CallStatus.Executed;
+        vm.prank(UNBUNDLER_ADDRESS);
+        InteropLibrary.sendCall(
+            destinationChainId,
+            L2_INTEROP_HANDLER_ADDR,
+            abi.encodeCall(L2_INTEROP_HANDLER.unbundleBundle, (originalChainId, bundle, callStatuses)),
+            EXECUTION_ADDRESS,
+            UNBUNDLER_ADDRESS
+        );
+        Vm.Log[] memory logs2 = vm.getRecordedLogs();
+        extractAndExecuteSingleBundle(logs2, destinationChainId, UNBUNDLER_ADDRESS);
     }
 
     function test_sendMessageToL1ViaLibrary() public {
@@ -209,7 +196,16 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
         );
     }
 
-    function extractAndExecuteBundles(Vm.Log[] memory logs, uint256 destinationChainId) internal {
+    function extractAndExecuteSingleBundle(
+        Vm.Log[] memory logs,
+        uint256 destinationChainId,
+        address executionAddress
+    ) internal {
+        bytes memory data = extractFirstBundleFromLogs(logs);
+        executeBundle(data, executionAddress);
+    }
+
+    function extractFirstBundleFromLogs(Vm.Log[] memory logs) internal returns (bytes memory data) {
         for (uint256 i = 0; i < logs.length; i++) {
             if (
                 logs[i].emitter == address(l2InteropCenter) &&
@@ -218,22 +214,26 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
                     "InteropBundleSent(bytes32,bytes32,(bytes1,uint256,uint256,bytes32,(bytes1,bool,address,address,uint256,bytes)[],(bytes,bytes)))"
                 )
             ) {
-                bytes memory data = logs[i].data;
-                (bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle memory interopBundle) = abi.decode(
-                    data,
-                    (bytes32, bytes32, InteropBundle)
-                );
-                bytes memory bundle = abi.encode(interopBundle);
-                MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR, block.chainid);
-                vm.mockCall(
-                    address(L2_MESSAGE_VERIFICATION),
-                    abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
-                    abi.encode(true)
-                );
-                vm.chainId(destinationChainId);
-                vm.prank(EXECUTION_ADDRESS);
-                L2_INTEROP_HANDLER.executeBundle(bundle, proof);
+                data = logs[i].data;
+                break;
             }
         }
+    }
+
+    function executeBundle(bytes memory logsData, address executionAddress) internal {
+        (bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle memory interopBundle) = abi.decode(
+            logsData,
+            (bytes32, bytes32, InteropBundle)
+        );
+        bytes memory bundle = abi.encode(interopBundle);
+        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR, block.chainid);
+        vm.mockCall(
+            address(L2_MESSAGE_VERIFICATION),
+            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
+            abi.encode(true)
+        );
+        vm.chainId(destinationChainId);
+        vm.prank(executionAddress);
+        L2_INTEROP_HANDLER.executeBundle(bundle, proof);
     }
 }
