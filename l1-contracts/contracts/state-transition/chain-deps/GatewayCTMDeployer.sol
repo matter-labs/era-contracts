@@ -336,13 +336,9 @@ contract GatewayCTMDeployer {
                 );
             } else {
                 _deployedContracts.stateTransition.verifier = address(
-                    new EraTestnetVerifier{salt: _salt}(
-                        IVerifierV2(fflonkVerifier),
-                        IVerifier(verifierPlonk)
-                    )
+                    new EraTestnetVerifier{salt: _salt}(IVerifierV2(fflonkVerifier), IVerifier(verifierPlonk))
                 );
             }
-            
         } else {
             if (_isZKsyncOS) {
                 _deployedContracts.stateTransition.verifier = address(

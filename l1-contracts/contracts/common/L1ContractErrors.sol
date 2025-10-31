@@ -218,6 +218,8 @@ error MigrationPaused();
 error MigrationsNotPaused();
 // 0xfa44b527
 error MissingSystemLogs(uint256 expected, uint256 actual);
+// 0x1508fb47
+error MockVerifierNotSupported();
 // 0x4a094431
 error MsgValueMismatch(uint256 expectedMsgValue, uint256 providedMsgValue);
 // 0xb385a3da
@@ -356,8 +358,6 @@ error UnexpectedSystemLog(uint256 logKey);
 error UnknownVerifierType();
 // 0x616008dd
 error UnsupportedChainIdForMockVerifier();
-// 
-error MockVerifierNotSupported();
 // 0xf3dd1b9c
 error UnsupportedCommitBatchEncoding(uint8 version);
 // 0x084a1449

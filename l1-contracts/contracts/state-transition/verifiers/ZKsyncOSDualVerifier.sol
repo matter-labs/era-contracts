@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {UnknownVerifierVersion} from "../L1StateTransitionErrors.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {EmptyProofLength, UnknownVerifierType, InvalidMockProofLength, MockVerifierNotSupported, InvalidProof} from "../../common/L1ContractErrors.sol";
+import {EmptyProofLength, UnknownVerifierType, MockVerifierNotSupported} from "../../common/L1ContractErrors.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 /// @title Dual Verifier
@@ -28,11 +28,7 @@ contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier {
     /// @param _fflonkVerifier The address of the FFLONK verifier contract.
     /// @param _plonkVerifier The address of the PLONK verifier contract.
     /// @param _initialOwner The address of the initial owner of this contract.
-    constructor(
-        IVerifierV2 _fflonkVerifier, 
-        IVerifier _plonkVerifier, 
-        address _initialOwner
-    ) {
+    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address _initialOwner) {
         fflonkVerifiers[0] = _fflonkVerifier;
         plonkVerifiers[0] = _plonkVerifier;
         _transferOwnership(_initialOwner);
@@ -90,7 +86,7 @@ contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier {
     }
 
     /// @dev Verifies the correctness of public input, doesn't check the validity of proof itself.
-    function mockVerify(uint256[] memory _publicInputs, uint256[] memory _proof) public view virtual returns (bool) {
+    function mockVerify(uint256[] memory, uint256[] memory) public view virtual returns (bool) {
         revert MockVerifierNotSupported();
     }
 

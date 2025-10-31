@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {ZKsyncOSDualVerifier} from "./ZKsyncOSDualVerifier.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {EmptyProofLength, UnknownVerifierType, InvalidMockProofLength, MockVerifierNotSupported, InvalidProof} from "../../common/L1ContractErrors.sol";
+import {InvalidMockProofLength, InvalidProof} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -21,7 +21,7 @@ contract ZKsyncOSTestnetVerifier is ZKsyncOSDualVerifier {
     }
 
     /// @dev Verifies the correctness of public input, doesn't check the validity of proof itself.
-    function mockVerify(uint256[] memory _publicInputs, uint256[] memory _proof) override public view returns (bool) {
+    function mockVerify(uint256[] memory _publicInputs, uint256[] memory _proof) public view override returns (bool) {
         if (_proof.length != 2) {
             revert InvalidMockProofLength();
         }

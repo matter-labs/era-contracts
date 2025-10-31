@@ -15,10 +15,7 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 contract EraTestnetVerifier is IVerifier {
     EraDualVerifier public immutable dualVerifier;
 
-    constructor(
-        IVerifierV2 _fflonkVerifier,
-        IVerifier _plonkVerifier
-    ) {
+    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) {
         assert(block.chainid != 1);
 
         dualVerifier = new EraDualVerifier(_fflonkVerifier, _plonkVerifier);
