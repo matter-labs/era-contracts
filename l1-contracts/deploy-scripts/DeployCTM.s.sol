@@ -221,7 +221,11 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             // We add the verifier to the default execution version
             // TODO: make it passed from zkstack_cli
             vm.broadcast(msg.sender);
-            verifierAddress.addVerifier(DEFAULT_ZKSYNC_OS_VERIFIER_VERSION, IVerifierV2(addresses.stateTransition.verifierFflonk), IVerifier(addresses.stateTransition.verifierPlonk));            
+            verifierAddress.addVerifier(
+                DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
+                IVerifierV2(addresses.stateTransition.verifierFflonk),
+                IVerifier(addresses.stateTransition.verifierPlonk)
+            );
         }
     }
 
@@ -316,7 +320,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
 
         IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
 
-        if(config.isZKsyncOS) {
+        if (config.isZKsyncOS) {
             // We need to transfer the ownership of the Verifier
             ZKsyncOSDualVerifier(dualVerifierAddress).transferOwnership(addresses.governance);
         }

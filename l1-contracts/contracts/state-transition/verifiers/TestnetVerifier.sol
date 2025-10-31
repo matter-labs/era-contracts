@@ -17,7 +17,12 @@ import {IDualVerifier} from "../chain-interfaces/IDualVerifier.sol";
 contract TestnetVerifier is IVerifier, IDualVerifier {
     IDualVerifier public immutable dualVerifier;
 
-    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address _zksyncOSVerifierOwner, bool _isZKsyncOS) {
+    constructor(
+        IVerifierV2 _fflonkVerifier,
+        IVerifier _plonkVerifier,
+        address _zksyncOSVerifierOwner,
+        bool _isZKsyncOS
+    ) {
         assert(block.chainid != 1);
 
         if (_isZKsyncOS) {
