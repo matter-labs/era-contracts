@@ -356,6 +356,8 @@ error UnexpectedSystemLog(uint256 logKey);
 error UnknownVerifierType();
 // 0x616008dd
 error UnsupportedChainIdForMockVerifier();
+// 
+error MockVerifierNotSupported();
 // 0xf3dd1b9c
 error UnsupportedCommitBatchEncoding(uint8 version);
 // 0x084a1449

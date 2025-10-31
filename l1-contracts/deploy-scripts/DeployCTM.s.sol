@@ -59,7 +59,7 @@ import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
 import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
-import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 
 import {Utils} from "./Utils.sol";
 
@@ -216,12 +216,9 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         (addresses.stateTransition.verifier) = deploySimpleContract("Verifier", false);
 
         if (config.isZKsyncOS) {
-            ZKsyncOSDualVerifier verifierAddress = ZKsyncOSDualVerifier(getDualVerifierAddress());
-
             // We add the verifier to the default execution version
-            // TODO: make it passed from zkstack_cli
             vm.broadcast(msg.sender);
-            verifierAddress.addVerifier(
+            ZKsyncOSDualVerifier(addresses.stateTransition.verifier).addVerifier(
                 DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
                 IVerifierV2(addresses.stateTransition.verifierFflonk),
                 IVerifier(addresses.stateTransition.verifierPlonk)
@@ -304,8 +301,6 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
     }
 
     function updateOwners() internal {
-        address dualVerifierAddress = getDualVerifierAddress();
-
         vm.startBroadcast(msg.sender);
 
         ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.stateTransition.validatorTimelock);
@@ -322,7 +317,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
 
         if (config.isZKsyncOS) {
             // We need to transfer the ownership of the Verifier
-            ZKsyncOSDualVerifier(dualVerifierAddress).transferOwnership(addresses.governance);
+            ZKsyncOSDualVerifier(addresses.stateTransition.verifier).transferOwnership(addresses.governance);
         }
 
         vm.stopBroadcast();
@@ -636,14 +631,6 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
     ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
         // This function is not used in this script
         revert("not implemented");
-    }
-
-    function getDualVerifierAddress() internal view returns (address) {
-        if (config.testnetVerifier) {
-            return address(TestnetVerifier(addresses.stateTransition.verifier).dualVerifier());
-        } else {
-            return addresses.stateTransition.verifier;
-        }
     }
 
     // add this to be excluded from coverage report
