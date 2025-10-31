@@ -31,7 +31,6 @@ import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -109,7 +108,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
 
         console.log("Initializing core contracts from BH");
         IL1Bridgehub bridgehubProxy = IL1Bridgehub(bridgehub);
-        L1AssetRouter assetRouter = L1AssetRouter(bridgehubProxy.assetRouter());
+        L1AssetRouter assetRouter = L1AssetRouter(address(bridgehubProxy.assetRouter()));
         address messageRoot = address(bridgehubProxy.messageRoot());
         address l1CtmDeployer = address(bridgehubProxy.l1CtmDeployer());
         address chainAssetHandler = address(bridgehubProxy.chainAssetHandler());

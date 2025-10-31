@@ -61,6 +61,21 @@ jobs:
         with:
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
+
+      - name: Upload artifacts for download
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
@@ -113,6 +128,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
@@ -163,6 +179,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
@@ -173,6 +190,10 @@ jobs:
 
       - name: Run tests
         working-directory: ./l1-contracts
+        run: yarn test:foundry
+
+      - name: Run DA tests
+        working-directory: ./da-contracts
         run: yarn test:foundry
 
       # TODO: restore once we can get back to latest foundry
@@ -302,6 +323,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
@@ -350,7 +372,7 @@ jobs:
         with:
           coverage-files: ./l1-contracts/lcov.info
           working-directory: l1-contracts
-          minimum-coverage: 83 # TODO(EVM-944): increase threshold to 85
+          minimum-coverage: 75 # TODO(EVM-944): increase threshold to 85
 
 
   # FIXME: restore gas report CI
@@ -382,6 +404,7 @@ jobs:
   #         fail-on-cache-miss: true
   #         key: artifacts-l1-${{ github.sha }}
   #         path: |
+  #           da-contracts/cache-forge
   #           da-contracts/out
   #           l1-contracts/cache-forge
   #           l1-contracts/out

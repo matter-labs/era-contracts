@@ -15,6 +15,8 @@ import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2
 
 import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {L2ChainAssetHandler} from "contracts/bridgehub/L2ChainAssetHandler.sol";
 import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
@@ -23,7 +25,6 @@ import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {L2MessageVerification} from "../../../../../contracts/bridgehub/L2MessageVerification.sol";
 import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
-import {L2_COMPLEX_UPGRADER_ADDR} from "../../../../../contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {DeployCTMIntegrationScript} from "../deploy-scripts/DeployCTMIntegration.s.sol";
 
@@ -92,8 +93,8 @@ library L2UtilsBase {
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
             _args.l1ChainId,
             _args.eraChainId,
-            _args.l1AssetRouter,
-            _args.legacySharedBridge,
+            IL1AssetRouter(_args.l1AssetRouter),
+            IL2SharedBridgeLegacy(_args.legacySharedBridge),
             baseTokenAssetId,
             _args.aliasedOwner
         );

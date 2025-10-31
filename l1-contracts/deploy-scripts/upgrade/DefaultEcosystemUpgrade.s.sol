@@ -667,7 +667,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             ctmProtocolVersion != getNewProtocolVersion(),
             "The new protocol version is already present on the ChainTypeManager"
         );
-        addresses.bridges.l1AssetRouterProxy = L1Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
+        addresses.bridges.l1AssetRouterProxy = address(L1Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter());
         addresses.stateTransition.genesisUpgrade = address(IChainTypeManager(ctm).l1GenesisUpgrade());
 
         addresses.vaults.l1NativeTokenVaultProxy = address(
@@ -742,7 +742,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         // TODO(refactor): do we need this?
         additionalDependencies[4] = ContractsBytecodesLib.getCreationCode("DiamondProxy");
         additionalDependencies[5] = ContractsBytecodesLib.getCreationCode("L2V29Upgrade");
-        additionalDependencies[6] = Utils.readSystemContractsBytecode("ProxyAdmin");
+        additionalDependencies[6] = ContractsBytecodesLib.getCreationCode("ProxyAdmin");
 
         for (uint256 i; i < additionalForceDeployments.length; i++) {
             additionalDependencies[6 + i] = ContractsBytecodesLib.getCreationCode(additionalForceDeployments[i]);
