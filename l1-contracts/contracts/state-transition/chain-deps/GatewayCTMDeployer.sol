@@ -22,7 +22,8 @@ import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsync
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {IEIP7702Checker} from "../chain-interfaces/IEIP7702Checker.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
-import {TestnetVerifier} from "../verifiers/TestnetVerifier.sol";
+import {EraTestnetVerifier} from "../verifiers/EraTestnetVerifier.sol";
+import {ZKsyncOSTestnetVerifier} from "../verifiers/ZKsyncOSTestnetVerifier.sol";
 import {ValidatorTimelock} from "../ValidatorTimelock.sol";
 import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
 
@@ -324,14 +325,19 @@ contract GatewayCTMDeployer {
         _deployedContracts.stateTransition.verifierFflonk = fflonkVerifier;
         _deployedContracts.stateTransition.verifierPlonk = verifierPlonk;
         if (_testnetVerifier) {
-            _deployedContracts.stateTransition.verifier = address(
-                new TestnetVerifier{salt: _salt}(
-                    IVerifierV2(fflonkVerifier),
-                    IVerifier(verifierPlonk),
-                    _verifierOwner,
-                    _isZKsyncOS
-                )
-            );
+            if (_isZKsyncOS) {
+                _deployedContracts.stateTransition.verifier = address(
+                    new ZKsyncOSTestnetVerifier{salt: _salt}(
+                        IVerifierV2(fflonkVerifier),
+                        IVerifier(verifierPlonk),
+                        _verifierOwner
+                    )
+                );
+            } else {
+                _deployedContracts.stateTransition.verifier = address(
+                    new EraTestnetVerifier{salt: _salt}(IVerifierV2(fflonkVerifier), IVerifier(verifierPlonk))
+                );
+            }
         } else {
             if (_isZKsyncOS) {
                 _deployedContracts.stateTransition.verifier = address(

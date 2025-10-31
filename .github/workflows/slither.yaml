@@ -48,7 +48,8 @@ jobs:
           rm -rf ./l1-contracts/contracts/state-transition/verifiers/EraVerifierFflonk.sol
           rm -rf ./l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol
           rm -rf ./l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol
-          rm -rf ./l1-contracts/contracts/state-transition/verifiers/TestnetVerifier.sol
+          rm -rf ./l1-contracts/contracts/state-transition/verifiers/EraTestnetVerifier.sol
+          rm -rf ./l1-contracts/contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol
           rm -rf ./l1-contracts/contracts/dev-contracts/test/PlonkVerifierTest.sol
           rm -rf ./l1-contracts/contracts/dev-contracts/test/PlonkVerifierRecursiveTest.sol
           rm -rf ./l1-contracts/contracts/dev-contracts/test/VerifierTest.sol
