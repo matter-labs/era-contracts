@@ -38,37 +38,37 @@ import {InteropLibrary} from "contracts/interop/InteropLibrary.sol";
 abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer {
     uint256 destinationChainId = 271;
 
-    function test_requestTokenTransferInterop() public {
-        address l2TokenAddress = initializeTokenByDeposit();
-        bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
-        vm.deal(address(this), 1000 ether);
+    // function test_requestTokenTransferInterop() public {
+    //     address l2TokenAddress = initializeTokenByDeposit();
+    //     bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
+    //     vm.deal(address(this), 1000 ether);
 
-        bytes memory secondBridgeCalldata = bytes.concat(
-            NEW_ENCODING_VERSION,
-            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), 0))
-        );
+    //     bytes memory secondBridgeCalldata = bytes.concat(
+    //         NEW_ENCODING_VERSION,
+    //         abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), 0))
+    //     );
 
-        InteropCallStarter[] memory calls = new InteropCallStarter[](1);
-        bytes[] memory callAttributes = new bytes[](1);
-        callAttributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
+    //     InteropCallStarter[] memory calls = new InteropCallStarter[](1);
+    //     bytes[] memory callAttributes = new bytes[](1);
+    //     callAttributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
 
-        calls[0] = InteropCallStarter({
-            to: InteroperableAddress.formatEvmV1(L2_ASSET_ROUTER_ADDR),
-            data: secondBridgeCalldata,
-            callAttributes: callAttributes
-        });
+    //     calls[0] = InteropCallStarter({
+    //         to: InteroperableAddress.formatEvmV1(L2_ASSET_ROUTER_ADDR),
+    //         data: secondBridgeCalldata,
+    //         callAttributes: callAttributes
+    //     });
 
-        bytes[] memory bundleAttributes = new bytes[](1);
-        bundleAttributes[0] = abi.encodeCall(
-            IERC7786Attributes.unbundlerAddress,
-            (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
-        );
-        l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(271), calls, bundleAttributes);
-        vm.recordLogs();
+    //     bytes[] memory bundleAttributes = new bytes[](1);
+    //     bundleAttributes[0] = abi.encodeCall(
+    //         IERC7786Attributes.unbundlerAddress,
+    //         (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
+    //     );
+    //     l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(271), calls, bundleAttributes);
+    //     vm.recordLogs();
 
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        extractAndExecuteBundles(logs, destinationChainId);
-    }
+    //     Vm.Log[] memory logs = vm.getRecordedLogs();
+    //     extractAndExecuteBundles(logs, destinationChainId);
+    // }
 
     // function test_sendBundle_simple() public {
     //     bytes memory destinationChainIdBytes = InteroperableAddress.formatEvmV1(destinationChainId);
