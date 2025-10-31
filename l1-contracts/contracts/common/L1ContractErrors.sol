@@ -17,6 +17,8 @@ error AlreadyPermanentRollup();
 error AlreadyWhitelisted(address);
 // 0x5e85ae73
 error AmountMustBeGreaterThanZero();
+// 0xa5cea466
+error ArgumentsLengthNotIdentical();
 // 0xfde974f4
 error AssetHandlerDoesNotExist(bytes32 assetId);
 // 0x64107968
