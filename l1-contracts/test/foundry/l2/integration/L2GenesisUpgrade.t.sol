@@ -171,7 +171,7 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
             abi.encodeWithSelector(bytes4(keccak256("getMarker(bytes32)"))),
             abi.encode(1)
         );
-        
+
         // Mock SystemContractProxyAdmin.owner() to return the complex upgrader address
         vm.mockCall(
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
