@@ -2,11 +2,11 @@
 
 pragma solidity 0.8.28;
 
-import {CalldataDA, BLOB_COMMITMENT_SIZE, BLOB_SIZE_BYTES} from "./CalldataDA.sol";
-import {PubdataInputTooSmall, PubdataLengthTooBig, InvalidPubdataHash} from "../L1StateTransitionErrors.sol";
+import {BLOB_COMMITMENT_SIZE, BLOB_SIZE_BYTES, CalldataDA} from "./CalldataDA.sol";
+import {InvalidPubdataHash, PubdataInputTooSmall, PubdataLengthTooBig} from "../L1StateTransitionErrors.sol";
 
 /// @notice Contract that contains the functionality for processing the calldata DA.
-/// @dev The expected l2DAValidator that should be used with it `RollupL2DAValidator`.
+/// @dev The expected L2DACommitmentScheme that should be used with it is `BLOBS_AND_PUBDATA_KECCAK256`.
 abstract contract CalldataDAGateway is CalldataDA {
     /// @inheritdoc CalldataDA
     function _processCalldataDA(
