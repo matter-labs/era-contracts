@@ -125,12 +125,13 @@ contract L1FixedForceDeploymentsHelperTest is Test {
         ZKChainSpecificForceDeploymentsData memory chainData = abi.decode(data, (ZKChainSpecificForceDeploymentsData));
 
         // Check the values
-        assertEq(chainData.baseTokenAssetId, baseTokenAssetId);
+        assertEq(chainData.baseTokenBridgingData.assetId, baseTokenAssetId);
         assertEq(chainData.l2LegacySharedBridge, legacySharedBridgeAddress);
         assertEq(chainData.predeployedL2WethAddress, address(0));
         assertEq(chainData.baseTokenL1Address, ETH_TOKEN_ADDRESS);
-        assertEq(chainData.baseTokenName, "Ether");
-        assertEq(chainData.baseTokenSymbol, "ETH");
+        assertEq(chainData.baseTokenMetadata.name, "Ether");
+        assertEq(chainData.baseTokenMetadata.symbol, "ETH");
+        assertEq(chainData.baseTokenMetadata.decimals, 18);
     }
 
     // Test with ERC20 that correctly implements metadata
@@ -151,12 +152,13 @@ contract L1FixedForceDeploymentsHelperTest is Test {
         ZKChainSpecificForceDeploymentsData memory chainData = abi.decode(data, (ZKChainSpecificForceDeploymentsData));
 
         // Check the values
-        assertEq(chainData.baseTokenAssetId, baseTokenAssetId);
+        assertEq(chainData.baseTokenBridgingData.assetId, baseTokenAssetId);
         assertEq(chainData.l2LegacySharedBridge, legacySharedBridgeAddress);
         assertEq(chainData.predeployedL2WethAddress, address(0));
         assertEq(chainData.baseTokenL1Address, address(token));
-        assertEq(chainData.baseTokenName, "Test Token");
-        assertEq(chainData.baseTokenSymbol, "TTK");
+        assertEq(chainData.baseTokenMetadata.name, "Test Token");
+        assertEq(chainData.baseTokenMetadata.symbol, "TTK");
+        assertEq(chainData.baseTokenMetadata.decimals, 18);
     }
 
     // Test with ERC20 that does not implement metadata
@@ -177,11 +179,12 @@ contract L1FixedForceDeploymentsHelperTest is Test {
         ZKChainSpecificForceDeploymentsData memory chainData = abi.decode(data, (ZKChainSpecificForceDeploymentsData));
 
         // Check the values
-        assertEq(chainData.baseTokenAssetId, baseTokenAssetId);
+        assertEq(chainData.baseTokenBridgingData.assetId, baseTokenAssetId);
         assertEq(chainData.l2LegacySharedBridge, legacySharedBridgeAddress);
         assertEq(chainData.predeployedL2WethAddress, address(0));
         assertEq(chainData.baseTokenL1Address, address(token));
-        assertEq(chainData.baseTokenName, "Base Token");
-        assertEq(chainData.baseTokenSymbol, "BT");
+        assertEq(chainData.baseTokenMetadata.name, "Base Token");
+        assertEq(chainData.baseTokenMetadata.symbol, "BT");
+        assertEq(chainData.baseTokenMetadata.decimals, 18);
     }
 }

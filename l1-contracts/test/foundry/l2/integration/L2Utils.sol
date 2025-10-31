@@ -34,6 +34,7 @@ import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/_Share
 
 import {Utils} from "deploy-scripts/Utils.sol";
 import {L2ChainAssetHandler} from "contracts/bridgehub/L2ChainAssetHandler.sol";
+import {TokenMetadata, TokenBridgingData} from "contracts/common/Messaging.sol";
 
 library L2Utils {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
@@ -191,9 +192,8 @@ library L2Utils {
             _args.legacySharedBridge,
             _args.l2TokenBeacon,
             address(0),
-            ethAssetId,
-            ETH_TOKEN_ADDRESS,
-            _args.l1ChainId
+            TokenBridgingData({assetId: ethAssetId, originChainId: _args.l1ChainId, originToken: ETH_TOKEN_ADDRESS}),
+            TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18})
         );
     }
 
