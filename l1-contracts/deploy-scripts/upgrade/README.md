@@ -1,4 +1,19 @@
-# Gateway upgrade related scripts
+# Upgrade Scripts
+
+## Preparing the scripts for a new upgrade
+
+You can use the latest `EcosystemUpgrade_v**` script as a starting point. As a rule of thumb, all contracts that were changed in the release branch should be upgraded. In case the compiler version or compilation configuration has changed, all contracts have to be upgraded, as the bytecodehashes will change for these contract. In general, deployed contracts should reflect the latest changes to contracts in the repository.
+
+## Patch Upgrades
+
+Patch upgrades tend to introduce minor fixes and so they only modify some contracts. More personal judgement should be used when defining a new patch upgrade scripts. You should have the following pointers in mind:
+
+- You may not need to redefine all four facet cuts, you can override `getUpgradeAddedFacetCuts` to specify only the ones that are needed for the upgrade. The old facets should equally be deleted via `getFacetCutsForDeletion`. Note that when creating a new chain all four facet cuts are needed, as done by `getChainCreationFacetCuts`.
+- You may need to override both `deployNewEcosystemContractsL1` and `deployNewEcosystemContractsGW` to only deploy the relevant contracts.
+- The addresses for contracts that are not deployed but needed (facets, verifier...) should be read from the input file via `initializeConfig`, and they should equal the latest values.
+- Some of the `prepareStage1GovernanceCalls` and `prepareGatewaySpecificStage1GovernanceCalls` may be overridden and left empty if they are not part of the upgrade.
+
+You can check out [EcosystemUpgrade_v29_2.s.sol](./EcosystemUpgrade_v29_2.s.sol) as an example.
 
 ## Setup
 
@@ -15,13 +30,13 @@ If this fails you have some issues with foundry or your setup. Try cleaning your
 2. Simulate the deployment (Runs EcosystemUpgrade, simulates transactions, outputs the upgrade data, i.e. required addresses, config addresses, protocol version and the Diamond Cuts)
 
    ```sh
-   UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.0-precompiles/stage.toml UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28-ecosystem.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000 --private-key 0x1e3273afc83535c5bacf772f961b33fdeca520833941c116421d13e4d9fc5cea
+   UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.0-precompiles/stage.toml UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28-ecosystem.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000 --private-key $PRIVATE_KEY
    ```
 
 3. Run the following to prepare the ecosystem (Similar to the above, broadcasts all the txs, and saves them in run-latest.json). This step only has to be ran once. The private key has to be provided for this step.
 
    ```sh
-   UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.0-precompiles/stage.toml UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28-ecosystem.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000 --broadcast --slow
+   UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.0-precompiles/stage.toml UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28-ecosystem.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000 --broadcast --slow --private-key $PRIVATE_KEY
    ```
 
 4. Verify contracts based on logs
@@ -29,13 +44,13 @@ If this fails you have some issues with foundry or your setup. Try cleaning your
 5. Generate the yaml file for the upgrade (generating calldata)
 
 ```sh
-UPGRADE_ECOSYSTEM_OUTPUT=script-out/v27-ecosystem.toml UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS=broadcast/EcosystemUpgrade.s.sol/<CHAIN_ID>/run-latest.json yarn upgrade-yaml-output-generator
+UPGRADE_ECOSYSTEM_OUTPUT=script-out/v27-ecosystem.toml UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS=broadcast/EcosystemUpgrade.s.sol/<CHAIN_ID>/run-latest.json YAML_OUTPUT_FILE=script-out/yaml-output.yaml yarn upgrade-yaml-output-generator
 ```
 
 e.g.:
 
 ```sh
-UPGRADE_ECOSYSTEM_OUTPUT=script-out/v27-ecosystem.toml UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS=broadcast/EcosystemUpgrade.s.sol/11155111/run-latest.json yarn upgrade-yaml-output-generator
+UPGRADE_ECOSYSTEM_OUTPUT=script-out/v27-ecosystem.toml UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS=broadcast/EcosystemUpgrade.s.sol/11155111/run-latest.json YAML_OUTPUT_FILE=script-out/yaml-output.yaml yarn upgrade-yaml-output-generator
 ```
 
 ## Finalization of the upgrade

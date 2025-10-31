@@ -12,19 +12,19 @@ import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/a
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
-import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
+import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {BurningNativeWETHNotSupported, AddressAlreadySet, WithdrawFailed, Unauthorized, AssetIdNotSupported, SharedBridgeKey, SharedBridgeValueNotSet, L2WithdrawalMessageWrongLength, InsufficientChainBalance, ZeroAddress, ValueMismatch, NonEmptyMsgValue, DepositExists, ValueMismatch, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, InvalidProof, NoFundsTransferred, DepositDoesNotExist, WithdrawalAlreadyFinalized, InvalidSelector, TokensWithFeesNotSupported} from "contracts/common/L1ContractErrors.sol";
+import {AddressAlreadySet, AssetIdNotSupported, BurningNativeWETHNotSupported, DepositDoesNotExist, DepositExists, EmptyDeposit, InsufficientChainBalance, InvalidProof, InvalidSelector, L2WithdrawalMessageWrongLength, NoFundsTransferred, NonEmptyMsgValue, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, WithdrawFailed, WithdrawalAlreadyFinalized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
-import {WrongCounterpart, EthTransferFailed, EmptyToken, NativeTokenVaultAlreadySet, ZeroAmountToTransfer, WrongAmountTransferred, ClaimFailedDepositFailed} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {ClaimFailedDepositFailed, EmptyToken, EthTransferFailed, NativeTokenVaultAlreadySet, WrongAmountTransferred, WrongCounterpart, ZeroAmountToTransfer} from "contracts/bridge/L1BridgeContractErrors.sol";
 
 /// We are testing all the specified revert and require cases.
 contract L1AssetRouterFailTest is L1AssetRouterTest {
@@ -89,14 +89,14 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     function test_setNativeTokenVault_alreadySet() public {
         vm.prank(owner);
         vm.expectRevert(NativeTokenVaultAlreadySet.selector);
-        sharedBridge.setNativeTokenVault(INativeTokenVault(address(0)));
+        sharedBridge.setNativeTokenVault(INativeTokenVaultBase(address(0)));
     }
 
     function test_setNativeTokenVault_emptyAddressProvided() public {
         stdstore.target(address(sharedBridge)).sig(sharedBridge.nativeTokenVault.selector).checked_write(address(0));
         vm.prank(owner);
         vm.expectRevert(ZeroAddress.selector);
-        sharedBridge.setNativeTokenVault(INativeTokenVault(address(0)));
+        sharedBridge.setNativeTokenVault(INativeTokenVaultBase(address(0)));
     }
 
     function test_setAssetHandlerAddressOnCounterpart_wrongCounterPartAddress() public {
@@ -180,7 +180,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.prank(bridgehubAddress);
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
             abi.encode(ETH_TOKEN_ASSET_ID)
         );
         vm.expectRevert(abi.encodeWithSelector(AssetIdNotSupported.selector, ETH_TOKEN_ASSET_ID));
@@ -193,7 +193,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.prank(bridgehubAddress);
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
             abi.encode(tokenAssetId)
         );
         vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, amount, 0));
@@ -205,7 +205,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.prank(bridgehubAddress);
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
             abi.encode(ETH_TOKEN_ASSET_ID)
         );
         vm.expectRevert(NonEmptyMsgValue.selector);
@@ -226,7 +226,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.prank(bridgehubAddress);
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseToken.selector),
+            abi.encodeWithSelector(IBridgehubBase.baseToken.selector),
             abi.encode(address(token))
         );
         vm.expectRevert(EmptyDeposit.selector);
@@ -244,7 +244,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_finalizeWithdrawal_EthOnEth_withdrawalFailed() public {
         vm.deal(address(nativeTokenVault), 0);
-        bytes memory message = abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, alice, amount);
+        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -255,7 +255,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL2MessageInclusion.selector,
+                IBridgehubBase.proveL2MessageInclusion.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -287,7 +287,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                IBridgehubBase.proveL1ToL2TransactionStatus.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -325,7 +325,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                IBridgehubBase.proveL1ToL2TransactionStatus.selector,
                 eraChainId,
                 txHash,
                 l2BatchNumber,
@@ -367,7 +367,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                IBridgehubBase.proveL1ToL2TransactionStatus.selector,
                 eraChainId,
                 txHash,
                 l2BatchNumber,
@@ -382,7 +382,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.expectRevert(InsufficientChainBalance.selector);
         vm.mockCall(
             address(bridgehubAddress),
-            abi.encodeWithSelector(IBridgehub.proveL1ToL2TransactionStatus.selector),
+            abi.encodeWithSelector(IBridgehubBase.proveL1ToL2TransactionStatus.selector),
             abi.encode(true)
         );
         l1Nullifier.bridgeRecoverFailedTransfer({
@@ -401,7 +401,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     function test_claimFailedDeposit_proofInvalid() public {
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.proveL1ToL2TransactionStatus.selector),
+            abi.encodeWithSelector(IBridgehubBase.proveL1ToL2TransactionStatus.selector),
             abi.encode(address(0))
         );
         vm.prank(bridgehubAddress);
@@ -424,7 +424,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                IBridgehubBase.proveL1ToL2TransactionStatus.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -459,7 +459,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                IBridgehubBase.proveL1ToL2TransactionStatus.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -496,7 +496,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                IBridgehubBase.proveL1ToL2TransactionStatus.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -623,7 +623,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             amount
         );
 
-        vm.mockCall(bridgehubAddress, abi.encode(IBridgehub.proveL2MessageInclusion.selector), abi.encode(true));
+        vm.mockCall(bridgehubAddress, abi.encode(IBridgehubBase.proveL2MessageInclusion.selector), abi.encode(true));
 
         vm.expectRevert(
             abi.encodeWithSelector(SharedBridgeValueNotSet.selector, SharedBridgeKey.PostUpgradeFirstBatch)
@@ -639,7 +639,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_finalizeWithdrawal_chainBalance() public {
-        bytes memory message = abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, alice, amount);
+        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -650,7 +650,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL2MessageInclusion.selector,
+                IBridgehubBase.proveL2MessageInclusion.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -673,7 +673,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_checkWithdrawal_wrongProof() public {
-        bytes memory message = abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, alice, amount);
+        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -684,7 +684,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL2MessageInclusion.selector,
+                IBridgehubBase.proveL2MessageInclusion.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -706,7 +706,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_parseL2WithdrawalMessage_wrongMsgLength() public {
-        bytes memory message = abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector);
+        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector);
 
         vm.expectRevert(abi.encodeWithSelector(L2WithdrawalMessageWrongLength.selector, message.length));
         sharedBridge.finalizeWithdrawal({
@@ -724,7 +724,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseToken.selector, alice, amount),
+            abi.encodeWithSelector(IBridgehubBase.baseToken.selector, alice, amount),
             abi.encode(ETH_TOKEN_ADDRESS)
         );
 
@@ -744,9 +744,9 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_parseL2WithdrawalMessage_wrongSelector() public {
         // notice that the selector is wrong
-        bytes memory message = abi.encodePacked(IMailbox.proveL2LogInclusion.selector, alice, amount);
+        bytes memory message = abi.encodePacked(IMailboxImpl.proveL2LogInclusion.selector, alice, amount);
 
-        vm.expectRevert(abi.encodeWithSelector(InvalidSelector.selector, IMailbox.proveL2LogInclusion.selector));
+        vm.expectRevert(abi.encodeWithSelector(InvalidSelector.selector, IMailboxImpl.proveL2LogInclusion.selector));
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
             _l2BatchNumber: l2BatchNumber,
@@ -793,7 +793,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.requestL2TransactionDirect.selector),
+            abi.encodeWithSelector(IL1Bridgehub.requestL2TransactionDirect.selector),
             abi.encode(txHash)
         );
 

@@ -2,6 +2,7 @@ era_chain_id = 9
 owner_address = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
 testnet_verifier = true
 support_l2_legacy_shared_bridge_test = false
+is_zk_sync_os = true
 
 [gateway]
 chain_id = 123
@@ -16,7 +17,7 @@ validator_timelock_execution_delay = 0
 genesis_root = "0x1000000000000000000000000000000000000000000000000000000000000000"
 genesis_rollup_leaf_index = 1
 genesis_batch_commitment = "0x1000000000000000000000000000000000000000000000000000000000000000"
-latest_protocol_version = 25
+latest_protocol_version = 120259084288
 recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
