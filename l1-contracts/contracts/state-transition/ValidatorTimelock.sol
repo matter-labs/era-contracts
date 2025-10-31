@@ -78,10 +78,10 @@ contract ValidatorTimelock is
 
     /// @inheritdoc IValidatorTimelock
     function initialize(address _initialOwner, uint32 _initialExecutionDelay) external virtual initializer {
-        __ValidatorTimelock_init(_initialOwner, _initialExecutionDelay);
+        _validatorTimelockInit(_initialOwner, _initialExecutionDelay);
     }
 
-    function __ValidatorTimelock_init(address _initialOwner, uint32 _initialExecutionDelay) internal onlyInitializing {
+    function _validatorTimelockInit(address _initialOwner, uint32 _initialExecutionDelay) internal onlyInitializing {
         _transferOwnership(_initialOwner);
         executionDelay = _initialExecutionDelay;
     }

@@ -33,7 +33,7 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
 
 	/// @inheritdoc IValidatorTimelock
 	function initialize(address _initialOwner, uint32 _initialExecutionDelay) external override(ValidatorTimelock, IValidatorTimelock) initializer {
-		__ValidatorTimelock_init(_initialOwner, _initialExecutionDelay);
+		_validatorTimelockInit(_initialOwner, _initialExecutionDelay);
 		__EIP712_init("MultisigCommitter", "1");
 	}
 
