@@ -410,26 +410,15 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "MockEIP7702Checker")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Verifier")) {
-            if (config.testnetVerifier) {
+            if (config.isZKsyncOS) {
                 return
                     abi.encode(
                         addresses.stateTransition.verifierFflonk,
                         addresses.stateTransition.verifierPlonk,
-                        config.ownerAddress,
-                        config.isZKsyncOS
+                        msg.sender
                     );
             } else {
-                if (config.isZKsyncOS) {
-                    return
-                        abi.encode(
-                            addresses.stateTransition.verifierFflonk,
-                            addresses.stateTransition.verifierPlonk,
-                            config.ownerAddress
-                        );
-                } else {
-                    return
-                        abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
-                }
+                return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
             }
         } else if (compareStrings(contractName, "EraVerifierFflonk")) {
             return abi.encode();

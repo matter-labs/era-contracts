@@ -69,6 +69,8 @@ error ChainIdMismatch();
 error ChainIdNotRegistered(uint256 chainId);
 // 0x8f620a06
 error ChainIdTooBig();
+// 0x8746f42f
+error ConstructorsNotSupported();
 // 0xec273439
 error CTMAlreadyRegistered();
 // 0xc630ef3c
@@ -148,14 +150,16 @@ error InvalidCaller(address);
 error InvalidChainId();
 // 0x92daded2
 error InvalidDAForPermanentRollup();
-// 0x3f98a77e
-error InvalidL2DACommitmentScheme(uint8);
 // 0x4fbe5dba
 error InvalidDelay();
+// 0x3f98a77e
+error InvalidL2DACommitmentScheme(uint8);
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
 // 0xa1ec1876
 error InvalidMessageRoot(bytes32 expectedMessageRoot, bytes32 providedMessageRoot);
+// 0xd08a97e6
+error InvalidMockProofLength();
 // 0xde4c0b96
 error InvalidNTVBurnData();
 // 0xd8e9405c
@@ -216,6 +220,8 @@ error MigrationPaused();
 error MigrationsNotPaused();
 // 0xfa44b527
 error MissingSystemLogs(uint256 expected, uint256 actual);
+// 0x1508fb47
+error MockVerifierNotSupported();
 // 0x4a094431
 error MsgValueMismatch(uint256 expectedMsgValue, uint256 providedMsgValue);
 // 0xb385a3da
@@ -244,6 +250,8 @@ error NonIncreasingTimestamp();
 error NonSequentialBatch();
 // 0x0ac76f01
 error NonSequentialVersion();
+// 0x0e0ff4d9
+error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32 blobOpeningCommitment);
 // 0xfa5cd00f
 error NotAllowed(address addr);
 // 0x64846fe4
@@ -310,6 +318,8 @@ error SharedBridgeNotSet();
 error SharedBridgeValueNotSet(SharedBridgeKey);
 // 0xdf3a8fdd
 error SlotOccupied();
+// 0xcc0f168b
+error SystemContractProxyInitialized();
 // 0xae43b424
 error SystemLogsSizeTooBig();
 // 0x08753982
@@ -356,6 +366,8 @@ error UnsupportedEncodingVersion();
 error UnsupportedExecuteBatchEncoding(uint8 version);
 // 0xf338f830
 error UnsupportedProofBatchEncoding(uint8 version);
+// 0x1906f346
+error UnsupportedUpgradeType();
 // 0xf093c2e5
 error UpgradeBatchNumberIsNotZero();
 // 0x47b3b145
@@ -376,17 +388,12 @@ error WrongMagicValue(uint256 expectedMagicValue, uint256 providedMagicValue);
 error ZeroAddress();
 // 0xc84885d4
 error ZeroChainId();
-// 0x1bc36e67
-error ZeroGasPriceL1TxZKSyncOS();
+// 0xdb60e600
+error ZeroGasPriceL1TxZKsyncOS();
 // 0x601b6882
 error ZKChainLimitReached();
-// 0x0e0ff4d9
-error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32 blobOpeningCommitment);
-
-// 0xd08a97e6
-error InvalidMockProofLength();
-// 0x616008dd
-error UnsupportedChainIdForMockVerifier();
+// 0x646ac57e
+error ZKsyncOSNotForceDeployForExistingContract(address);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

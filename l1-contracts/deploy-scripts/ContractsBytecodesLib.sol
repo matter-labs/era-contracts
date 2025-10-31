@@ -78,7 +78,7 @@ library ContractsBytecodesLib {
             "L2NativeTokenVault",
             "L2SharedBridgeLegacy",
             "L2SharedBridgeLegacyDev",
-            "TestnetVerifier",
+            "EraTestnetVerifier",
             "L2ProxyAdminDeployer",
             "L2WrappedBaseToken",
             "Multicall3",
