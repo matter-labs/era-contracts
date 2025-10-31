@@ -53,7 +53,7 @@ library InteropLibrary {
         address unbundlerAddress,
         bytes memory data
     ) internal pure returns (InteropCallStarter memory) {
-        bytes[] memory callAttributes = buildCallAttributes(executionAddress, unbundlerAddress);
+        bytes[] memory callAttributes = buildCallAttributes(false, executionAddress, unbundlerAddress);
 
         return
             InteropCallStarter({
@@ -70,7 +70,7 @@ library InteropLibrary {
         address unbundlerAddress,
         bytes memory data
     ) internal pure returns (InteropCallStarter memory) {
-        bytes[] memory callAttributes = buildCallAttributes(executionAddress, unbundlerAddress);
+        bytes[] memory callAttributes = buildCallAttributes(true, executionAddress, unbundlerAddress);
 
         return
             InteropCallStarter({
@@ -108,19 +108,31 @@ library InteropLibrary {
     /// @notice Build a call-level 7786 attributes array.
     /// @param executionAddress   Optional executor (EOA/contract) on destination chain
     function buildCallAttributes(
+        bool indirectCall,
         address executionAddress,
         address unbundlerAddress
-    ) internal pure returns (bytes[] memory attributes) {
-        bytes[] memory attributes = new bytes[](3);
-        attributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
-        attributes[1] = abi.encodeCall(
+    ) internal pure returns (bytes[] memory) {
+        uint256 length;
+        if (indirectCall) ++length;
+        if (executionAddress != address(0)) ++length;
+        if (unbundlerAddress != address(0)) ++length;
+        bytes[] memory attributes = new bytes[](length);
+        if (indirectCall) {
+            attributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
+        }
+        if (executionAddress != address(0)) {
+            attributes[0] = abi.encodeCall(
             IERC7786Attributes.executionAddress,
             (InteroperableAddress.formatEvmV1(executionAddress))
-        );
-        attributes[2] = abi.encodeCall(
-            IERC7786Attributes.unbundlerAddress,
-            (InteroperableAddress.formatEvmV1(unbundlerAddress))
-        );
+            );
+        }
+        if (unbundlerAddress != address(0)) {
+            attributes[1] = abi.encodeCall(
+                IERC7786Attributes.unbundlerAddress,
+                (InteroperableAddress.formatEvmV1(unbundlerAddress))
+            );
+        }
+        return attributes;
     }
 
     /*//////////////////////////////////////////////////////////////
