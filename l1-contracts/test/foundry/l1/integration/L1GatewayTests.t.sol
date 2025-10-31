@@ -28,6 +28,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
 import {NotInGatewayMode} from "contracts/bridgehub/L1BridgehubErrors.sol";
+import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
@@ -144,7 +145,7 @@ contract L1GatewayTests is
             address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
             abi.encodeWithSelector(
                 IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
-                migratingChainId,
+                gatewayChainId,
                 l2TxHash,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -163,9 +164,7 @@ contract L1GatewayTests is
             BridgehubBurnCTMAssetData({
                 chainId: migratingChainId,
                 ctmData: abi.encode(
-                    address(1),
-                    msg.sender,
-                    addresses.chainTypeManager.protocolVersion(),
+                    AddressAliasHelper.applyL1ToL2Alias(msg.sender),
                     ecosystemConfig.contracts.diamondCutData
                 ),
                 chainData: abi.encode(IZKChain(addresses.bridgehub.getZKChain(migratingChainId)).getProtocolVersion())
@@ -177,7 +176,7 @@ contract L1GatewayTests is
             bytes32 txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(chainAdmin, assetId, transferData)));
             vm.startBroadcast(address(addresses.bridgehub));
             IL1AssetRouter(address(bridgehub.assetRouter())).bridgehubConfirmL2Transaction({
-                _chainId: migratingChainId,
+                _chainId: gatewayChainId,
                 _txDataHash: txDataHash,
                 _txHash: l2TxHash
             });
@@ -185,7 +184,7 @@ contract L1GatewayTests is
         }
 
         ConfirmTransferResultData memory transferResultData = ConfirmTransferResultData({
-            _chainId: migratingChainId,
+            _chainId: gatewayChainId,
             _depositSender: chainAdmin,
             _assetId: assetId,
             _assetData: transferData,
