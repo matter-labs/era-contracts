@@ -93,7 +93,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
     }
 
     /// @dev IL1AssetHandler interface, used to undo a failed migration of a chain.
-    /// @param _chainId the chainId of the chain
+    // / @param _chainId the chainId of the chain
     /// @param _assetId the assetId of the chain's CTM
     /// @param _data the data for the recovery.
     /// @param _depositSender the address of the entity that initiated the deposit.
