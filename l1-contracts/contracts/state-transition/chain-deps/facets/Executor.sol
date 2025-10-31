@@ -241,6 +241,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 abi.encode(RELAYED_EXECUTOR_VERSION_ZKSYNC_OS, storedBatchInfo)
             );
         }
+
+        // Emitting the block range for a batch. This is needed for indexing purposes.
+        // Note, that in this release the data emitting here is provided by the operator and so not trusted.
+        emit ReportCommitedBatchRangeZKsyncOS(_newBatch.batchNumber, _newBatch.firstBlockNumber, _newBatch.lastBlockNumber);
     }
 
     /// @notice Verifies that a stored precommitment for a given batch matches the expected rolling hash.
