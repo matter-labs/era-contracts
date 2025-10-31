@@ -497,7 +497,7 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function test_setAddresses(address randomAssetRouter, address randomCTMDeployer, address randomMessageRoot) public {
-        assertTrue(bridgeHub.assetRouter() == address(0), "Shared bridge is already there");
+        assertTrue(address(bridgeHub.assetRouter()) == address(0), "Shared bridge is already there");
         assertTrue(bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
         assertTrue(bridgeHub.messageRoot() == IMessageRoot(address(0)), "Message root is already there");
 
@@ -509,7 +509,7 @@ contract ExperimentalBridgeTest is Test {
             address(0)
         );
 
-        assertTrue(bridgeHub.assetRouter() == randomAssetRouter, "Shared bridge is already there");
+        assertTrue(address(bridgeHub.assetRouter()) == randomAssetRouter, "Shared bridge is already there");
         assertTrue(
             bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(randomCTMDeployer),
             "L1 CTM deployer is already there"
@@ -534,7 +534,7 @@ contract ExperimentalBridgeTest is Test {
             address(0)
         );
 
-        assertTrue(bridgeHub.assetRouter() == address(0), "Shared bridge is already there");
+        assertTrue(address(bridgeHub.assetRouter()) == address(0), "Shared bridge is already there");
         assertTrue(bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
         assertTrue(bridgeHub.messageRoot() == IMessageRoot(address(0)), "Message root is already there");
     }
@@ -1034,7 +1034,7 @@ contract ExperimentalBridgeTest is Test {
         _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, true, address(0));
 
         assertTrue(bridgeHub.baseTokenAssetId(l2TxnReqDirect.chainId) == ETH_TOKEN_ASSET_ID);
-        console.log(IL1AssetRouter(bridgeHub.assetRouter()).assetHandlerAddress(ETH_TOKEN_ASSET_ID));
+        console.log(IL1AssetRouter(address(bridgeHub.assetRouter())).assetHandlerAddress(ETH_TOKEN_ASSET_ID));
         assertTrue(bridgeHub.baseToken(l2TxnReqDirect.chainId) == ETH_TOKEN_ADDRESS);
 
         assertTrue(bridgeHub.getZKChain(l2TxnReqDirect.chainId) == address(mockChainContract));

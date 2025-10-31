@@ -42,7 +42,7 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     function _l1ChainId() internal view virtual returns (uint256);
 
     /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by the asset router.
-    address public assetRouter;
+    IAssetRouterBase public assetRouter;
 
     /// @notice ChainTypeManagers that are registered, and ZKchains that use these CTMs can use this bridgehub as settlement layer.
     mapping(address chainTypeManager => bool) public chainTypeManagerIsRegistered;
@@ -106,7 +106,8 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[32] private __gap;
+    // 19 storage slots used above + 31 reserved here => 50 total slots for this contract.
+    uint256[31] private __gap;
 
     modifier onlyOwnerOrAdmin() {
         if (msg.sender != admin && msg.sender != owner()) {
@@ -554,7 +555,7 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
             revert AssetIdNotSupported(_assetId);
         }
 
-        if (assetRouter == address(0)) {
+        if (address(assetRouter) == address(0)) {
             revert SharedBridgeNotSet();
         }
         if (chainTypeManager[_chainId] != address(0)) {
@@ -587,6 +588,6 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
 
     /// @notice return the asset router
     function sharedBridge() public view returns (address) {
-        return assetRouter;
+        return address(assetRouter);
     }
 }

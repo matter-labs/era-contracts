@@ -11,6 +11,7 @@ import {IL1Bridgehub} from "./IL1Bridgehub.sol";
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehubBase.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
@@ -189,7 +190,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             }
 
             // slither-disable-next-line arbitrary-send-eth
-            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: msg.value}(
+            IL1AssetRouter(address(assetRouter)).bridgehubDepositBaseToken{value: msg.value}(
                 _request.chainId,
                 tokenAssetId,
                 msg.sender,
@@ -248,7 +249,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             }
 
             // slither-disable-next-line arbitrary-send-eth
-            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
+            IL1AssetRouter(address(assetRouter)).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
                 _request.chainId,
                 tokenAssetId,
                 msg.sender,
@@ -299,7 +300,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         IMessageRoot _messageRoot,
         address _chainAssetHandler
     ) external override onlyOwnerOrUpgrader {
-        assetRouter = _assetRouter;
+        assetRouter = IAssetRouterBase(_assetRouter);
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;
         chainAssetHandler = _chainAssetHandler;
