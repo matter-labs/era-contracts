@@ -56,8 +56,15 @@ import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVaultZKOS} from "contracts/bridge/ntv/L2NativeTokenVaultZKOS.sol";
 import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
+import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 
 import {Utils} from "./Utils.sol";
+
+// TODO: pass this value from zkstack_cli
+uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 3;
 
 contract DeployCTMScript is Script, DeployL1HelperScript {
     using stdToml for string;
@@ -207,6 +214,16 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             (addresses.stateTransition.verifierPlonk) = deploySimpleContract("EraVerifierPlonk", false);
         }
         (addresses.stateTransition.verifier) = deploySimpleContract("Verifier", false);
+
+        if (config.isZKsyncOS) {
+            // We add the verifier to the default execution version
+            vm.broadcast(msg.sender);
+            ZKsyncOSDualVerifier(addresses.stateTransition.verifier).addVerifier(
+                DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
+                IVerifierV2(addresses.stateTransition.verifierFflonk),
+                IVerifier(addresses.stateTransition.verifierPlonk)
+            );
+        }
     }
 
     function setChainTypeManagerInServerNotifier() internal {
@@ -297,6 +314,11 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
 
         IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
+
+        if (config.isZKsyncOS) {
+            // We need to transfer the ownership of the Verifier
+            ZKsyncOSDualVerifier(addresses.stateTransition.verifier).transferOwnership(addresses.governance);
+        }
 
         vm.stopBroadcast();
         console.log("Owners updated");
@@ -507,22 +529,22 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
             bridgehubBytecodeInfo: config.isZKsyncOS
-                ? Utils.getZKOSBytecodeInfoForContract("L2Bridgehub.sol", "L2Bridgehub")
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2Bridgehub.sol", "L2Bridgehub")
                 : abi.encode(getL2BytecodeHash("L2Bridgehub")),
             l2AssetRouterBytecodeInfo: config.isZKsyncOS
-                ? Utils.getZKOSBytecodeInfoForContract("L2AssetRouter.sol", "L2AssetRouter")
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2AssetRouter.sol", "L2AssetRouter")
                 : abi.encode(getL2BytecodeHash("L2AssetRouter")),
             l2NtvBytecodeInfo: config.isZKsyncOS
-                ? Utils.getZKOSBytecodeInfoForContract("L2NativeTokenVaultZKOS.sol", "L2NativeTokenVaultZKOS")
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2NativeTokenVaultZKOS.sol", "L2NativeTokenVaultZKOS")
                 : abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
             messageRootBytecodeInfo: config.isZKsyncOS
-                ? Utils.getZKOSBytecodeInfoForContract("L2MessageRoot.sol", "L2MessageRoot")
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2MessageRoot.sol", "L2MessageRoot")
                 : abi.encode(getL2BytecodeHash("L2MessageRoot")),
             beaconDeployerInfo: config.isZKsyncOS
-                ? Utils.getZKOSBytecodeInfoForContract("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer")
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer")
                 : abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
             chainAssetHandlerBytecodeInfo: config.isZKsyncOS
-                ? Utils.getZKOSBytecodeInfoForContract("L2ChainAssetHandler.sol", "L2ChainAssetHandler")
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2ChainAssetHandler.sol", "L2ChainAssetHandler")
                 : abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain

@@ -5,8 +5,8 @@ pragma solidity 0.8.28;
 import {UnknownVerifierVersion} from "../L1StateTransitionErrors.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {EmptyProofLength, Unauthorized, UnknownVerifierType, InvalidMockProofLength, UnsupportedChainIdForMockVerifier, InvalidProof} from "../../common/L1ContractErrors.sol";
-import {ZKsyncOSChainTypeManager} from "../../state-transition/ZKsyncOSChainTypeManager.sol";
+import {EmptyProofLength, UnknownVerifierType, MockVerifierNotSupported} from "../../common/L1ContractErrors.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 /// @title Dual Verifier
 /// @author Matter Labs
@@ -14,42 +14,32 @@ import {ZKsyncOSChainTypeManager} from "../../state-transition/ZKsyncOSChainType
 /// @notice This contract wraps ZKsync OS specific Plonk verifiers and routes zk-SNARK proof verification
 /// to the verifier based on the provided proof type. It reuses the same interface as on the original `Verifier`
 /// contract, while abusing on of the fields (`_recursiveAggregationInput`) for proof verification type.
-contract ZKsyncOSDualVerifier is IVerifier {
+contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier {
     /// @dev Type of verification for ZKsync OS PLONK verifier.
     uint256 internal constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
 
     // @notice This is proof-skipping verifier (mock), it's only checking the correctness of the public inputs.
     uint256 internal constant ZKSYNC_OS_MOCK_VERIFICATION_TYPE = 3;
 
-    /// @dev Address of the CTM, owner of which can also add or remove verifiers.
-    ZKsyncOSChainTypeManager public immutable CHAIN_TYPE_MANAGER;
-
     /// @notice Mapping of different verifiers dependant on their version.
     mapping(uint32 => IVerifierV2) public fflonkVerifiers;
     mapping(uint32 => IVerifier) public plonkVerifiers;
 
-    modifier onlyCtmOwner() {
-        if (msg.sender != CHAIN_TYPE_MANAGER.owner()) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
     /// @param _fflonkVerifier The address of the FFLONK verifier contract.
     /// @param _plonkVerifier The address of the PLONK verifier contract.
-    /// @param _chainTypeManager The address of the CTM, owner of which can add or remove verifiers.
-    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address _chainTypeManager) {
-        CHAIN_TYPE_MANAGER = ZKsyncOSChainTypeManager(_chainTypeManager);
+    /// @param _initialOwner The address of the initial owner of this contract.
+    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address _initialOwner) {
         fflonkVerifiers[0] = _fflonkVerifier;
         plonkVerifiers[0] = _plonkVerifier;
+        _transferOwnership(_initialOwner);
     }
 
-    function addVerifier(uint32 version, IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) external onlyCtmOwner {
+    function addVerifier(uint32 version, IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) external onlyOwner {
         fflonkVerifiers[version] = _fflonkVerifier;
         plonkVerifiers[version] = _plonkVerifier;
     }
 
-    function removeVerifier(uint32 version) external onlyCtmOwner {
+    function removeVerifier(uint32 version) external onlyOwner {
         delete fflonkVerifiers[version];
         delete plonkVerifiers[version];
     }
@@ -80,19 +70,14 @@ contract ZKsyncOSDualVerifier is IVerifier {
 
         if (verifierType == ZKSYNC_OS_PLONK_VERIFICATION_TYPE) {
             uint256[] memory args = new uint256[](1);
-            args[0] = computeZKSyncOSHash(_proof[1], _publicInputs);
+            args[0] = computeZKsyncOSHash(_proof[1], _publicInputs);
 
-            return plonkVerifiers[verifierVersion].verify(args, _extractZKSyncOSProof(_proof));
+            return plonkVerifiers[verifierVersion].verify(args, _extractZKsyncOSProof(_proof));
         } else if (verifierType == ZKSYNC_OS_MOCK_VERIFICATION_TYPE) {
-            // just for safety - not allowing to use mock verifier on mainnet
-            if (block.chainid == 1) {
-                revert UnsupportedChainIdForMockVerifier();
-            }
-
             uint256[] memory args = new uint256[](1);
-            args[0] = computeZKSyncOSHash(_proof[1], _publicInputs);
+            args[0] = computeZKsyncOSHash(_proof[1], _publicInputs);
 
-            return mockVerify(args, _extractZKSyncOSProof(_proof));
+            return mockVerify(args, _extractZKsyncOSProof(_proof));
         }
         // If the verifier type is unknown, revert with an error.
         else {
@@ -101,17 +86,8 @@ contract ZKsyncOSDualVerifier is IVerifier {
     }
 
     /// @dev Verifies the correctness of public input, doesn't check the validity of proof itself.
-    function mockVerify(uint256[] memory _publicInputs, uint256[] memory _proof) public view virtual returns (bool) {
-        if (_proof.length != 2) {
-            revert InvalidMockProofLength();
-        }
-        if (_proof[0] != 13) {
-            revert InvalidProof();
-        }
-        if (_proof[1] != _publicInputs[0]) {
-            revert InvalidProof();
-        }
-        return true;
+    function mockVerify(uint256[] memory, uint256[] memory) public view virtual returns (bool) {
+        revert MockVerifierNotSupported();
     }
 
     /// @inheritdoc IVerifier
@@ -142,7 +118,7 @@ contract ZKsyncOSDualVerifier is IVerifier {
         }
     }
 
-    function _extractZKSyncOSProof(uint256[] calldata _proof) internal pure returns (uint256[] memory result) {
+    function _extractZKsyncOSProof(uint256[] calldata _proof) internal pure returns (uint256[] memory result) {
         uint256 resultLength = _proof.length - 1 - 1;
 
         // Allocate memory for the new array (_proof.length - 1) since the first element is omitted.
@@ -154,7 +130,7 @@ contract ZKsyncOSDualVerifier is IVerifier {
         }
     }
 
-    function computeZKSyncOSHash(
+    function computeZKsyncOSHash(
         uint256 initialHash,
         uint256[] calldata _publicInputs
     ) public pure returns (uint256 result) {
