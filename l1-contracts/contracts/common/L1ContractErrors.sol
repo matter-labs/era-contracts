@@ -316,6 +316,12 @@ error SettlementLayersMustSettleOnL1();
 error SharedBridgeNotSet();
 // 0x7774d2f9
 error SharedBridgeValueNotSet(SharedBridgeKey);
+// 0xa7781cbb
+error SignersNotSorted();
+// 0x3b94fe24
+error SignerNotAuthorized(address signer);
+// 0xabdc734e
+error SignatureNotValid(address signer);
 // 0xdf3a8fdd
 error SlotOccupied();
 // 0xcc0f168b
@@ -394,19 +400,6 @@ error ZeroGasPriceL1TxZKsyncOS();
 error ZKChainLimitReached();
 // 0x646ac57e
 error ZKsyncOSNotForceDeployForExistingContract(address);
-// 0x0e0ff4d9
-error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32 blobOpeningCommitment);
-// TODO
-error SignersNotSorted();
-// TODO
-error SignerNotAuthorized(address signer);
-// TODO
-error SignatureNotValid(address signer);
-
-// 0xd08a97e6
-error InvalidMockProofLength();
-// 0x616008dd
-error UnsupportedChainIdForMockVerifier();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
