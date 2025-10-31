@@ -415,12 +415,22 @@ contract GatewayCTMFromL1 is Script {
         }
 
         if (config.testnetVerifier) {
-            verifier = address(
+            if (config.isZKsyncOS) {
+                verifier = address(
                 _deployInternal(
-                    ContractsBytecodesLib.getCreationCode("TestnetVerifier"),
-                    abi.encode(verifierFflonk, verifierPlonk, config.governanceAddr, config.isZKsyncOS)
+                    ContractsBytecodesLib.getCreationCode("ZKsyncOSTestnetVerifier"),
+                    abi.encode(verifierFflonk, verifierPlonk, config.governanceAddr)
                 )
-            );
+                );
+            } else {
+                verifier = address(
+                _deployInternal(
+                    ContractsBytecodesLib.getCreationCode("EraTestnetVerifier"),
+                    abi.encode(verifierFflonk, verifierPlonk)
+                )
+                );
+            }
+            
         } else {
             if (config.isZKsyncOS) {
                 verifier = address(

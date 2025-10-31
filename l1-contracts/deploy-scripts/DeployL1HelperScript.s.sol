@@ -223,7 +223,7 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 return Utils.readZKFoundryBytecodeL1("ValidiumL1DAValidator.sol", "ValidiumL1DAValidator");
             } else if (compareStrings(contractName, "Verifier")) {
                 if (config.testnetVerifier) {
-                    return getCreationCode("TestnetVerifier", true);
+                    return getCreationCode("EraTestnetVerifier", true);
                 } else {
                     return getCreationCode("DualVerifier", true);
                 }
