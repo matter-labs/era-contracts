@@ -5,9 +5,9 @@ pragma solidity 0.8.28;
 import {UnknownVerifierVersion} from "../L1StateTransitionErrors.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {EmptyProofLength, Unauthorized, UnknownVerifierType, InvalidMockProofLength, UnsupportedChainIdForMockVerifier, InvalidProof} from "../../common/L1ContractErrors.sol";
-import {ZKsyncOSChainTypeManager} from "../../state-transition/ZKsyncOSChainTypeManager.sol";
+import {EmptyProofLength, UnknownVerifierType, InvalidMockProofLength, UnsupportedChainIdForMockVerifier, InvalidProof} from "../../common/L1ContractErrors.sol";
 import {IDualVerifier} from "../chain-interfaces/IDualVerifier.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 /// @title Dual Verifier
 /// @author Matter Labs
@@ -15,44 +15,32 @@ import {IDualVerifier} from "../chain-interfaces/IDualVerifier.sol";
 /// @notice This contract wraps ZKsync OS specific Plonk verifiers and routes zk-SNARK proof verification
 /// to the verifier based on the provided proof type. It reuses the same interface as on the original `Verifier`
 /// contract, while abusing on of the fields (`_recursiveAggregationInput`) for proof verification type.
-contract ZKsyncOSDualVerifier is IVerifier, IDualVerifier {
-    uint32 public constant DEFAULT_EXECUTION_VERSION = 3;
-
+contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier, IDualVerifier {
     /// @dev Type of verification for ZKsync OS PLONK verifier.
     uint256 internal constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
 
     // @notice This is proof-skipping verifier (mock), it's only checking the correctness of the public inputs.
     uint256 internal constant ZKSYNC_OS_MOCK_VERIFICATION_TYPE = 3;
 
-    /// @dev Address of the CTM, owner of which can also add or remove verifiers.
-    ZKsyncOSChainTypeManager public immutable CHAIN_TYPE_MANAGER;
-
     /// @notice Mapping of different verifiers dependant on their version.
     mapping(uint32 => IVerifierV2) public fflonkVerifiers;
     mapping(uint32 => IVerifier) public plonkVerifiers;
 
-    modifier onlyCtmOwner() {
-        if (msg.sender != CHAIN_TYPE_MANAGER.owner()) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
     /// @param _fflonkVerifier The address of the FFLONK verifier contract.
     /// @param _plonkVerifier The address of the PLONK verifier contract.
-    /// @param _chainTypeManager The address of the CTM, owner of which can add or remove verifiers.
-    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address _chainTypeManager) {
-        CHAIN_TYPE_MANAGER = ZKsyncOSChainTypeManager(_chainTypeManager);
-        fflonkVerifiers[DEFAULT_EXECUTION_VERSION] = _fflonkVerifier;
-        plonkVerifiers[DEFAULT_EXECUTION_VERSION] = _plonkVerifier;
+    /// @param _initialOwner The address of the initial owner of this contract.
+    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address _initialOwner) {
+        fflonkVerifiers[0] = _fflonkVerifier;
+        plonkVerifiers[0] = _plonkVerifier;
+        _transferOwnership(_initialOwner);
     }
 
-    function addVerifier(uint32 version, IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) external onlyCtmOwner {
+    function addVerifier(uint32 version, IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) external onlyOwner {
         fflonkVerifiers[version] = _fflonkVerifier;
         plonkVerifiers[version] = _plonkVerifier;
     }
 
-    function removeVerifier(uint32 version) external onlyCtmOwner {
+    function removeVerifier(uint32 version) external onlyOwner {
         delete fflonkVerifiers[version];
         delete plonkVerifiers[version];
     }
@@ -120,7 +108,7 @@ contract ZKsyncOSDualVerifier is IVerifier, IDualVerifier {
     /// @inheritdoc IVerifier
     /// @dev Used for backward compatibility with older Verifier implementation. Returns PLONK verification key hash.
     function verificationKeyHash() external view returns (bytes32) {
-        return plonkVerifiers[DEFAULT_EXECUTION_VERSION].verificationKeyHash();
+        return plonkVerifiers[0].verificationKeyHash();
     }
 
     /// @notice Calculates a keccak256 hash of the runtime loaded verification keys from the selected verifier.

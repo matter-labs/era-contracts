@@ -410,17 +410,16 @@ abstract contract DeployUtils is Create2FactoryUtils {
                     abi.encode(
                         addresses.stateTransition.verifierFflonk,
                         addresses.stateTransition.verifierPlonk,
-                        config.ownerAddress,
+                        msg.sender,
                         config.isZKsyncOS
                     );
             } else {
                 if (config.isZKsyncOS) {
-                    require(addresses.stateTransition.chainTypeManagerProxy != address(0), "ctm is zero");
                     return
                         abi.encode(
                             addresses.stateTransition.verifierFflonk,
                             addresses.stateTransition.verifierPlonk,
-                            addresses.stateTransition.chainTypeManagerProxy
+                            msg.sender
                         );
                 } else {
                     return

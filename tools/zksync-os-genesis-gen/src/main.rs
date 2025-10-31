@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 
 use structopt::StructOpt;
-use std::fs;
 use alloy::primitives::{Address, FixedBytes, B256};
 
 use crate::types::{build_genesis, InitialGenesisInput};
@@ -77,32 +76,11 @@ fn construct_additional_storage() -> BTreeMap<Address, BTreeMap<B256, B256>> {
 struct Opt {
     /// Output file path
     #[structopt(long = "output-file", default_value = "../../zksync-os-genesis.json")]
-    output_file: String,
-
-    /// Skip execution version check
-    #[structopt(long = "no-execution-version-check")]
-    no_execution_version_check: bool,
+    output_file: String
 }
-
-
-fn check_execution_version_in_solidity(path: &str, version: u32) -> anyhow::Result<bool> {
-    let content = fs::read_to_string(path)?;
-    let expected = format!("DEFAULT_EXECUTION_VERSION = {}", version);
-    Ok(content.contains(&expected))
-}
-
 
 fn main() -> anyhow::Result<()> {
     let opt = Opt::from_args();
-    if !opt.no_execution_version_check {
-        let verifier_path = "../../l1-contracts/contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
-        if !check_execution_version_in_solidity(verifier_path, EXECUTION_VERSION)? {
-            anyhow::bail!(
-                "ERROR: Could not find 'DEFAULT_EXECUTION_VERSION = {}' in {}.\nPlease ensure the Rust and Solidity execution versions are aligned.",
-                EXECUTION_VERSION, verifier_path
-            );
-        }
-    }
     println!("Output file: {}", opt.output_file);
 
     let initial_genesis_input = InitialGenesisInput {

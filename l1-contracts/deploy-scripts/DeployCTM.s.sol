@@ -56,8 +56,15 @@ import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVaultZKOS} from "contracts/bridge/ntv/L2NativeTokenVaultZKOS.sol";
 import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
+import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 
 import {Utils} from "./Utils.sol";
+
+// TODO: pass this value from zkstack_cli
+uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 3;
 
 contract DeployCTMScript is Script, DeployL1HelperScript {
     using stdToml for string;
@@ -207,6 +214,19 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             (addresses.stateTransition.verifierPlonk) = deploySimpleContract("EraVerifierPlonk", false);
         }
         (addresses.stateTransition.verifier) = deploySimpleContract("Verifier", false);
+
+        if (config.isZKsyncOS) {
+            ZKsyncOSDualVerifier verifierAddress = ZKsyncOSDualVerifier(getDualVerifierAddress());
+
+            // We add the verifier to the default execution version
+            // TODO: make it passed from zkstack_cli
+            vm.broadcast(msg.sender);
+            verifierAddress.addVerifier(
+                DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
+                IVerifierV2(addresses.stateTransition.verifierFflonk),
+                IVerifier(addresses.stateTransition.verifierPlonk)
+            );
+        }
     }
 
     function setChainTypeManagerInServerNotifier() internal {
@@ -284,6 +304,8 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
     }
 
     function updateOwners() internal {
+        address dualVerifierAddress = getDualVerifierAddress();
+
         vm.startBroadcast(msg.sender);
 
         ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.stateTransition.validatorTimelock);
@@ -297,6 +319,11 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
 
         IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
+
+        if (config.isZKsyncOS) {
+            // We need to transfer the ownership of the Verifier
+            ZKsyncOSDualVerifier(dualVerifierAddress).transferOwnership(addresses.governance);
+        }
 
         vm.stopBroadcast();
         console.log("Owners updated");
@@ -609,6 +636,14 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
     ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
         // This function is not used in this script
         revert("not implemented");
+    }
+
+    function getDualVerifierAddress() internal view returns (address) {
+        if (config.testnetVerifier) {
+            return address(TestnetVerifier(addresses.stateTransition.verifier).dualVerifier());
+        } else {
+            return addresses.stateTransition.verifier;
+        }
     }
 
     // add this to be excluded from coverage report
