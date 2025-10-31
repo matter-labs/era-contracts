@@ -51,11 +51,16 @@ library DataEncoding {
         (amount, receiver, maybeTokenAddress) = abi.decode(_data, (uint256, address, address));
     }
 
-    function encodeAssetRouterBridgehubDepositData(bytes32 _assetId, bytes memory _transferData) internal pure returns (bytes memory) {
+    function encodeAssetRouterBridgehubDepositData(
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) internal pure returns (bytes memory) {
         return bytes.concat(NEW_ENCODING_VERSION, abi.encode(_assetId, _transferData));
     }
 
-    function decodeAssetRouterBridgehubDepositData(bytes calldata _dataWithVersion) internal pure returns (bytes32 assetId, bytes memory transferData) {
+    function decodeAssetRouterBridgehubDepositData(
+        bytes calldata _dataWithVersion
+    ) internal pure returns (bytes32 assetId, bytes memory transferData) {
         require(_dataWithVersion.length >= 33, BadTransferDataLength());
         (assetId, transferData) = abi.decode(_dataWithVersion[1:], (bytes32, bytes));
     }

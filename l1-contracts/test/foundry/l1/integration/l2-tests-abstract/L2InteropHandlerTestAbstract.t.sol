@@ -47,7 +47,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         // assertTrue(success);
     }
 
-
     function test_requestNativeTokenTransferViaLibrary() public {
         uint256 destinationChainId = 271;
 
