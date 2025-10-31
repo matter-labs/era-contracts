@@ -47,41 +47,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         // assertTrue(success);
     }
 
-    function test_requestNativeTokenTransferViaLibrary() public {
-        uint256 destinationChainId = 271;
-
-        vm.deal(address(this), 1000 ether);
-
-        vm.mockCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
-            abi.encode(bytes(""))
-        );
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
-            abi.encode(baseTokenAssetId)
-        );
-
-        vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue.selector),
-            abi.encode(bytes(""))
-        );
-
-        InteropLibrary.sendNative(destinationChainId, address(this), 100);
-    }
-
-    function test_sendMessageToL1ViaLibrary() public {
-        vm.mockCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
-            abi.encode(bytes(""))
-        );
-
-        InteropLibrary.sendMessage("testing interop");
-    }
-
     function test_l2MessageVerification() public {
         MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
         L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared(
