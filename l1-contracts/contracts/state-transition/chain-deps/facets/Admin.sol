@@ -14,7 +14,8 @@ import {IL1Bridgehub} from "../../../bridgehub/IL1Bridgehub.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {AlreadyMigrated, PriorityQueueNotFullyProcessed, ContractNotDeployed, DepositsAlreadyPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
+import {IL1ChainAssetHandler} from "../../../bridgehub/IL1ChainAssetHandler.sol";
+import {AlreadyMigrated, PriorityQueueNotFullyProcessed, ContractNotDeployed, DepositsAlreadyPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted, MigrationInProgress} from "../../L1StateTransitionErrors.sol";
 import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, NotAZKChain, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
@@ -23,6 +24,7 @@ import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
+import {TxStatus} from "../../../common/Messaging.sol";
 
 /// @title Admin Contract controls access rights for contract management.
 /// @author Matter Labs
@@ -47,10 +49,14 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     modifier onlyL1() {
+        _onlyL1();
+        _;
+    }
+
+    function _onlyL1() internal {
         if (block.chainid != L1_CHAIN_ID) {
             revert NotL1(block.chainid);
         }
-        _;
     }
 
     /// @inheritdoc IAdmin
@@ -315,7 +321,18 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function unpauseDeposits() external onlyAdmin onlyL1 {
-        require(s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_END >= block.timestamp, DepositsNotPaused());
+        uint256 timestamp = s.pausedDepositsTimestamp;
+        bool inPausedWindow = timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START <= block.timestamp &&
+            block.timestamp < timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END;
+        require(inPausedWindow, DepositsNotPaused());
+        require(
+            !IL1ChainAssetHandler(IL1Bridgehub(s.bridgehub).chainAssetHandler()).isMigrationInProgress(s.chainId),
+            MigrationInProgress()
+        );
+        _unpauseDeposits();
+    }
+
+    function _unpauseDeposits() internal {
         s.pausedDepositsTimestamp = 0;
         emit DepositsUnpaused(s.chainId);
     }
@@ -461,12 +478,18 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function forwardedBridgeRecoverFailedTransfer(
+    function forwardedBridgeConfirmTransferResult(
         uint256 /* _chainId */,
+        TxStatus _txStatus,
         bytes32 /* _assetInfo */,
         address /* _depositSender */,
         bytes calldata _chainData
     ) external payable override onlyChainAssetHandler {
+        _unpauseDeposits();
+
+        if (_txStatus == TxStatus.Success) {
+            return;
+        }
         // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
         uint256 protocolVersion = abi.decode(_chainData, (uint256));
 

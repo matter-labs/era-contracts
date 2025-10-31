@@ -5,6 +5,7 @@ pragma solidity ^0.8.21;
 import {L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
+import {TxStatus} from "../common/Messaging.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -194,5 +195,8 @@ interface IBridgehubBase {
 
     function registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) external;
 
-    function forwardedBridgeRecoverFailedTransfer(uint256 _chainId) external returns (address zkChain, address ctm);
+    function forwardedBridgeConfirmTransferResult(
+        uint256 _chainId,
+        TxStatus _txStatus
+    ) external returns (address zkChain, address ctm);
 }

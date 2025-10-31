@@ -24,6 +24,7 @@ import {AlreadyCurrentSL, NotChainAssetHandler, NotInGatewayMode, NotRelayedSend
 import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdCantBeCurrentChain, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, MigrationPaused, NoCTMForAssetId, NotCurrentSettlementLayer, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
+import {TxStatus} from "../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -553,12 +554,15 @@ abstract contract BridgehubBase is
     /// @param _chainId The chain ID of the chain.
     /// @return zkChain The address of the ZK chain.
     /// @return ctm The address of the CTM of the chain.
-    function forwardedBridgeRecoverFailedTransfer(
-        uint256 _chainId
+    function forwardedBridgeConfirmTransferResult(
+        uint256 _chainId,
+        TxStatus _txStatus
     ) external onlyChainAssetHandler returns (address zkChain, address ctm) {
-        settlementLayer[_chainId] = block.chainid;
         zkChain = getZKChain(_chainId);
         ctm = chainTypeManager[_chainId];
+        if (_txStatus == TxStatus.Failure) {
+            settlementLayer[_chainId] = block.chainid;
+        }
     }
 
     /*////////////////////////////////////////////////////////////

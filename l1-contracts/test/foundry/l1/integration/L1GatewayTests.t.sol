@@ -16,7 +16,7 @@ import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {GatewayDeployer} from "./_SharedGatewayDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
-import {L2CanonicalTransaction, L2Message, TxStatus} from "contracts/common/Messaging.sol";
+import {L2CanonicalTransaction, L2Message, TxStatus, ConfirmTransferResultData} from "contracts/common/Messaging.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
@@ -28,10 +28,10 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
 import {NotInGatewayMode} from "contracts/bridgehub/L1BridgehubErrors.sol";
+import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
-import {SharedUtils} from "./utils/SharedUtils.sol";
 import {GatewayUtils} from "deploy-scripts/gateway/GatewayUtils.s.sol";
 import {Utils} from "../unit/concrete/Utils/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -49,7 +49,6 @@ contract L1GatewayTests is
     TokenDeployer,
     L2TxMocker,
     GatewayDeployer,
-    SharedUtils,
     ConfigSemaphore
 {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -85,10 +84,11 @@ contract L1GatewayTests is
         _registerNewTokens(tokens);
 
         _deployEra();
-        _deployZKChain(ETH_TOKEN_ADDRESS, migratingChainId);
+        _deployZKChainWithPausedDeposits(ETH_TOKEN_ADDRESS, migratingChainId);
         acceptPendingAdmin(migratingChainId);
         _deployZKChain(ETH_TOKEN_ADDRESS, gatewayChainId);
         acceptPendingAdmin(gatewayChainId);
+        vm.warp(block.timestamp + 1);
 
         // _deployZKChain(tokens[1]);
         // _deployZKChain(tokens[1]);
@@ -132,14 +132,71 @@ contract L1GatewayTests is
         // vm.deal(bridgehub, 100000000000000000000000000000000000);
     }
 
-    function _pauseDeposits(uint256 _chainId) public {
-        pauseDepositsBeforeInitiatingMigration(address(addresses.bridgehub), _chainId);
-    }
+    // Used for both successful and failed migrations.
+    function _confirmMigration(TxStatus txStatus) public {
+        bytes32 l2TxHash = keccak256("l2TxHash");
+        uint256 l2BatchNumber = 5;
+        uint256 l2MessageIndex = 0;
+        uint16 l2TxNumberInBatch = 0;
+        bytes32[] memory merkleProof = new bytes32[](1);
 
-    function _unpauseDeposits(uint256 _chainId) public {
-        IZKChain chain = IZKChain(IBridgehubBase(addresses.bridgehub).getZKChain(_chainId));
-        vm.startBroadcast(chain.getAdmin());
-        IAdmin(address(chain)).unpauseDeposits();
+        // Mock Call for Msg Inclusion
+        vm.mockCall(
+            address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
+            abi.encodeWithSelector(
+                IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
+                gatewayChainId,
+                l2TxHash,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2TxNumberInBatch,
+                merkleProof,
+                txStatus
+            ),
+            abi.encode(true)
+        );
+
+        IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
+        bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
+        address chainAdmin = IZKChain(addresses.bridgehub.getZKChain(migratingChainId)).getAdmin();
+
+        bytes memory transferData = abi.encode(
+            BridgehubBurnCTMAssetData({
+                chainId: migratingChainId,
+                ctmData: abi.encode(
+                    AddressAliasHelper.applyL1ToL2Alias(msg.sender),
+                    ecosystemConfig.contracts.diamondCutData
+                ),
+                chainData: abi.encode(IZKChain(addresses.bridgehub.getZKChain(migratingChainId)).getProtocolVersion())
+            })
+        );
+
+        // Set Deposit Happened
+        {
+            bytes32 txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(chainAdmin, assetId, transferData)));
+            vm.startBroadcast(address(addresses.bridgehub));
+            IL1AssetRouter(address(bridgehub.assetRouter())).bridgehubConfirmL2Transaction({
+                _chainId: gatewayChainId,
+                _txDataHash: txDataHash,
+                _txHash: l2TxHash
+            });
+            vm.stopBroadcast();
+        }
+
+        ConfirmTransferResultData memory transferResultData = ConfirmTransferResultData({
+            _chainId: gatewayChainId,
+            _depositSender: chainAdmin,
+            _assetId: assetId,
+            _assetData: transferData,
+            _l2TxHash: l2TxHash,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _merkleProof: merkleProof,
+            _txStatus: txStatus
+        });
+        vm.startBroadcast();
+        addresses.l1Nullifier.bridgeConfirmTransferResult(transferResultData);
         vm.stopBroadcast();
     }
 
@@ -167,29 +224,23 @@ contract L1GatewayTests is
     //
     function test_moveChainToGateway() public {
         _setUpGatewayWithFilterer();
-        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
-        _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
         require(addresses.bridgehub.settlementLayer(migratingChainId) == gatewayChainId, "Migration failed");
     }
 
     function test_l2Registration() public {
         _setUpGatewayWithFilterer();
-        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
-        _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
         gatewayScript.fullGatewayRegistration();
     }
 
     function test_startMessageToL2() public {
         _setUpGatewayWithFilterer();
-        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
-        _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
-        _unpauseDeposits(migratingChainId);
+        _confirmMigration(TxStatus.Success);
+
         IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
         uint256 expectedValue = 1000000000000000000000;
-
         L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect(
             migratingChainId,
             expectedValue,
@@ -203,85 +254,13 @@ contract L1GatewayTests is
 
     function test_recoverFromFailedChainMigration() public {
         _setUpGatewayWithFilterer();
-        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
-        _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
 
-        // Setup
-        IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
-        bytes32 assetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
-        bytes memory transferData;
-
-        {
-            IZKChain chain = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
-            bytes memory chainData = abi.encode(chain.getProtocolVersion());
-            bytes memory ctmData = abi.encode(
-                address(1),
-                msg.sender,
-                addresses.chainTypeManager.protocolVersion(),
-                ecosystemConfig.contracts.diamondCutData
-            );
-            BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({
-                chainId: migratingChainId,
-                ctmData: ctmData,
-                chainData: chainData
-            });
-            transferData = abi.encode(data);
-        }
-
-        address chainAdmin = IZKChain(addresses.bridgehub.getZKChain(migratingChainId)).getAdmin();
-        IL1AssetRouter assetRouter = IL1AssetRouter(address(addresses.bridgehub.assetRouter()));
-        bytes32 l2TxHash = keccak256("l2TxHash");
-        uint256 l2BatchNumber = 5;
-        uint256 l2MessageIndex = 0;
-        uint16 l2TxNumberInBatch = 0;
-        bytes32[] memory merkleProof = new bytes32[](1);
-        bytes32 txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(chainAdmin, assetId, transferData)));
-
-        // Mock Call for Msg Inclusion
-        vm.mockCall(
-            address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
-            abi.encodeWithSelector(
-                IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
-                migratingChainId,
-                l2TxHash,
-                l2BatchNumber,
-                l2MessageIndex,
-                l2TxNumberInBatch,
-                merkleProof,
-                TxStatus.Failure
-            ),
-            abi.encode(true)
-        );
-
-        // Set Deposit Happened
-        vm.startBroadcast(address(addresses.bridgehub));
-        assetRouter.bridgehubConfirmL2Transaction({
-            _chainId: migratingChainId,
-            _txDataHash: txDataHash,
-            _txHash: l2TxHash
-        });
-        vm.stopBroadcast();
-
-        vm.startBroadcast();
-        addresses.l1Nullifier.bridgeRecoverFailedTransfer({
-            _chainId: migratingChainId,
-            _depositSender: chainAdmin,
-            _assetId: assetId,
-            _assetData: transferData,
-            _l2TxHash: l2TxHash,
-            _l2BatchNumber: l2BatchNumber,
-            _l2MessageIndex: l2MessageIndex,
-            _l2TxNumberInBatch: l2TxNumberInBatch,
-            _merkleProof: merkleProof
-        });
-        vm.stopBroadcast();
+        _confirmMigration(TxStatus.Failure);
     }
 
     function test_finishMigrateBackChain() public {
         _setUpGatewayWithFilterer();
-        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
-        _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
         migrateBackChain();
     }
@@ -369,8 +348,6 @@ contract L1GatewayTests is
 
     function test_chainMigrationWithUpgrade() public {
         _setUpGatewayWithFilterer();
-        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
-        _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
 
         // Try to perform an upgrade
@@ -430,10 +407,7 @@ contract L1GatewayTests is
 
     function test_proveL2LogsInclusionFromData() public {
         _setUpGatewayWithFilterer();
-        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
-        _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
-        _unpauseDeposits(migratingChainId);
         IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
 
         bytes

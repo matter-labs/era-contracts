@@ -10,6 +10,8 @@ error EmptyToken();
 error EthAlreadyMigratedToL1NTV();
 // 0x1c55230b
 error NativeTokenVaultAlreadySet();
+// 0x7ec6d3a1
+error OnlyFailureStatusAllowed();
 // 0x84204265
 error TokenAlreadyInBridgedTokensList();
 // 0xb4aeddbc

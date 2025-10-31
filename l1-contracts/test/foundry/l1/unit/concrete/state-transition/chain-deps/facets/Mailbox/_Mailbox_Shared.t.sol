@@ -17,6 +17,7 @@ import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
+import {IL1ChainAssetHandler} from "contracts/bridgehub/IL1ChainAssetHandler.sol";
 
 contract MailboxTest is UtilsTest {
     IMailbox internal mailboxFacet;
@@ -40,7 +41,7 @@ contract MailboxTest is UtilsTest {
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(new MailboxFacet(eraChainId, block.chainid)),
+            facet: address(new MailboxFacet(eraChainId, block.chainid, address(chainAssetHandler))),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: Utils.getMailboxSelectors()
@@ -68,6 +69,11 @@ contract MailboxTest is UtilsTest {
             address(chainAssetHandler),
             abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
             abi.encode(1)
+        );
+        vm.mockCall(
+            address(chainAssetHandler),
+            abi.encodeWithSelector(IL1ChainAssetHandler.isMigrationInProgress.selector),
+            abi.encode(false)
         );
         proxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, bridgehub);
         utilsFacet = UtilsFacet(proxy);

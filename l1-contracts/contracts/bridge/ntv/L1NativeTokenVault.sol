@@ -23,9 +23,10 @@ import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
+import {TxStatus} from "../../common/Messaging.sol";
 
 import {NoFundsTransferred, OriginChainIdNotFound, Unauthorized, WithdrawFailed, ZeroAddress} from "../../common/L1ContractErrors.sol";
-import {ClaimFailedDepositFailed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
+import {ClaimFailedDepositFailed, WrongCounterpart, OnlyFailureStatusAllowed} from "../L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -222,12 +223,14 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     //////////////////////////////////////////////////////////////*/
 
     ///  @inheritdoc IL1AssetHandler
-    function bridgeRecoverFailedTransfer(
+    function bridgeConfirmTransferResult(
         uint256 _chainId,
+        TxStatus _txStatus,
         bytes32 _assetId,
         address _depositSender,
         bytes calldata _data
     ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenNotPaused {
+        require(_txStatus == TxStatus.Failure, OnlyFailureStatusAllowed());
         // slither-disable-next-line unused-return
         (uint256 _amount, , ) = DataEncoding.decodeBridgeBurnData(_data);
         address l1Token = tokenAddress[_assetId];

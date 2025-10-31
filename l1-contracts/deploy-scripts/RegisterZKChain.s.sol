@@ -110,6 +110,8 @@ contract RegisterZKChainScript is Script {
     function runForTest() public {
         console.log("Deploying ZKChain");
 
+        // Timestamp needs to be late enough for `pauseDepositsBeforeInitiatingMigration` time checks
+        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END + 1);
         initializeConfigTest();
         runInner(vm.envString("ZK_CHAIN_OUT"));
     }
