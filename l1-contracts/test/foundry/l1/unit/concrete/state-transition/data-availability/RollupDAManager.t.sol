@@ -15,11 +15,11 @@ contract RollupDAManagerTest is Test {
     RollupDAManager rollupDAManager;
 
     // Addresses used in tests
-    address owner = address(0x1);
-    address newOwner = address(0x2);
-    address nonOwner = address(0x3);
-    address l1DAValidator1 = address(0x4);
-    address l1DAValidator2 = address(0x6);
+    address owner;
+    address newOwner;
+    address nonOwner;
+    address l1DAValidator1;
+    address l1DAValidator2;
     address zeroAddress = address(0);
 
     // Events from the RollupDAManager contract
@@ -27,6 +27,12 @@ contract RollupDAManagerTest is Test {
 
     // setUp is run before each test
     function setUp() public {
+        owner = makeAddr("owner");
+        newOwner = makeAddr("newOwner");
+        nonOwner = makeAddr("nonOwner");
+        l1DAValidator1 = makeAddr("l1DAValidator1");
+        l1DAValidator2 = makeAddr("l1DAValidator2");
+
         // Deploy the contract as the owner
         vm.startPrank(owner);
         rollupDAManager = new RollupDAManager();

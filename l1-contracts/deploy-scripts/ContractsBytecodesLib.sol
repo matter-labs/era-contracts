@@ -27,16 +27,17 @@ library ContractsBytecodesLib {
     }
 
     function getCreationCodeEVM(string memory contractIdentifier) internal view returns (bytes memory) {
-        string[4] memory DA_CONTRACT_IDENTIFIERS = [
+        string[5] memory EVM_CONTRACT_IDENTIFIERS = [
             "RollupL1DAValidator",
             "BlobsL1DAValidatorZKsyncOS",
             "AvailL1DAValidator",
-            "DummyAvailBridge"
+            "DummyAvailBridge",
+            "EIP7702Checker"
         ];
 
-        uint256 DA_CONTRACT_IDENTIFIERS_LENGTH = DA_CONTRACT_IDENTIFIERS.length;
+        uint256 DA_CONTRACT_IDENTIFIERS_LENGTH = EVM_CONTRACT_IDENTIFIERS.length;
         for (uint i = 0; i < DA_CONTRACT_IDENTIFIERS_LENGTH; i++) {
-            if (Utils.compareStrings(DA_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
+            if (Utils.compareStrings(EVM_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
                 return Utils.readDAContractBytecode(contractIdentifier);
             }
         }

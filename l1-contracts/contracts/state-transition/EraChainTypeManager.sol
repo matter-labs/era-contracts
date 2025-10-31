@@ -7,6 +7,7 @@ import {Diamond} from "./libraries/Diamond.sol";
 import {ChainCreationParams} from "./IChainTypeManager.sol";
 import {GenesisIndexStorageZero, MigrationsNotPaused} from "../common/L1ContractErrors.sol";
 import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
+import {IChainAssetHandler} from "../bridgehub/IChainAssetHandler.sol";
 
 /// @title Era Chain Type Manager contract
 /// @author Matter Labs
@@ -42,7 +43,7 @@ contract EraChainTypeManager is ChainTypeManagerBase {
         uint256 _newProtocolVersion
     ) external override onlyOwner {
         // Era chains require migrations to be paused
-        if (!IL1Bridgehub(BRIDGE_HUB).migrationPaused()) {
+        if (!IChainAssetHandler(IL1Bridgehub(BRIDGE_HUB).chainAssetHandler()).migrationPaused()) {
             revert MigrationsNotPaused();
         }
 

@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {HashMismatch, Unauthorized, ZKChainLimitReached, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {HashMismatch, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 

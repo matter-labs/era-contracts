@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
-import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
+import {BridgedStandardERC20} from "./BridgedStandardERC20.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

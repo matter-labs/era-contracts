@@ -9,16 +9,15 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "contracts/bridgehub/IBridgehubBase.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+
 import {IAssetRouterBase, LEGACY_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
-import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
+
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract L1AssetRouterTestBase is L1AssetRouterTest {

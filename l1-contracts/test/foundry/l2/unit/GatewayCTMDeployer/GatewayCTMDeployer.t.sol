@@ -6,7 +6,9 @@ import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
 import {DAContracts, DeployedContracts, GatewayCTMDeployer, GatewayCTMDeployerConfig, StateTransitionContracts} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
+
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
@@ -61,7 +63,7 @@ contract GatewayCTMDeployerTest is Test {
 
     // This is done merely to publish the respective bytecodes.
     function _predeployContracts() internal {
-        new MailboxFacet(1, 1);
+        new MailboxFacet(1, 1, IEIP7702Checker(address(0)));
         new ExecutorFacet(1);
         new GettersFacet();
         new AdminFacet(1, RollupDAManager(address(0)));
@@ -95,6 +97,7 @@ contract GatewayCTMDeployerTest is Test {
             eraChainId: 1001,
             l1ChainId: 1,
             testnetVerifier: true,
+            isZKsyncOS: false,
             adminSelectors: new bytes4[](2),
             executorSelectors: new bytes4[](2),
             mailboxSelectors: new bytes4[](2),
@@ -121,8 +124,7 @@ contract GatewayCTMDeployerTest is Test {
             genesisRollupLeafIndex: 10,
             genesisBatchCommitment: bytes32(uint256(0x456)),
             forceDeploymentsData: hex"deadbeef",
-            protocolVersion: 1,
-            isZKsyncOS: false
+            protocolVersion: 1
         });
 
         // Initialize selectors with sample function selectors
@@ -172,6 +174,7 @@ contract GatewayCTMDeployerTest is Test {
 
 library DeployedContractsComparator {
     function compareDeployedContracts(DeployedContracts memory a, DeployedContracts memory b) internal pure {
+        require(a.multicall3 == b.multicall3, "multicall3 differs");
         compareStateTransitionContracts(a.stateTransition, b.stateTransition);
         compareDAContracts(a.daContracts, b.daContracts);
         compareBytes(a.diamondCutData, b.diamondCutData, "diamondCutData");

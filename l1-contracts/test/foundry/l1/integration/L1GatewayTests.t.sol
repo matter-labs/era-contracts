@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {Vm} from "forge-std/Vm.sol";
+
 import "forge-std/console.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
@@ -16,21 +16,18 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {GatewayDeployer} from "./_SharedGatewayDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
-import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction, L2Message, TxStatus} from "contracts/common/Messaging.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
+
 import {NotInGatewayMode} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
@@ -149,23 +146,22 @@ contract L1GatewayTests is
         gatewayScript.fullGatewayRegistration();
     }
 
-    // TODO: uncomment this test once free transactions are supported on GW.
-    // function test_startMessageToL2() public {
-    //     _setUpGatewayWithFilterer();
-    //     gatewayScript.migrateChainToGateway(migratingChainId);
-    //     IBridgehub bridgehub = IBridgehub(addresses.bridgehub);
-    //     uint256 expectedValue = 1000000000000000000000;
+    function test_startMessageToL2() public {
+        _setUpGatewayWithFilterer();
+        gatewayScript.migrateChainToGateway(migratingChainId);
+        IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub);
+        uint256 expectedValue = 1000000000000000000000;
 
-    //     L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect(
-    //         migratingChainId,
-    //         expectedValue,
-    //         0,
-    //         72000000,
-    //         800,
-    //         "0x"
-    //     );
-    //     addresses.bridgehub.requestL2TransactionDirect{value: expectedValue}(request);
-    // }
+        L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect(
+            migratingChainId,
+            expectedValue,
+            0,
+            72000000,
+            800,
+            "0x"
+        );
+        addresses.bridgehub.requestL2TransactionDirect{value: expectedValue}(request);
+    }
 
     function test_recoverFromFailedChainMigration() public {
         _setUpGatewayWithFilterer();

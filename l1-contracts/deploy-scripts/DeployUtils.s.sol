@@ -3,16 +3,16 @@ pragma solidity ^0.8.24;
 
 // solhint-disable no-console, gas-custom-errors
 
-import {Script, console2 as console} from "forge-std/Script.sol";
+import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {Create2AndTransfer} from "./Create2AndTransfer.sol";
+
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
 
 // solhint-disable-next-line gas-struct-packing
@@ -28,6 +28,7 @@ struct DeployedAddresses {
     address accessControlRestrictionAddress;
     address create2Factory;
     address chainRegistrar;
+    address eip7702Checker;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -404,6 +405,10 @@ abstract contract DeployUtils is Create2FactoryUtils {
             return abi.encode(addresses.daAddresses.availBridge);
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "EIP7702Checker")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "MockEIP7702Checker")) {
+            return abi.encode();
         } else if (compareStrings(contractName, "Verifier")) {
             if (config.isZKsyncOS) {
                 return
@@ -459,7 +464,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "AdminFacet")) {
             return abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager);
         } else if (compareStrings(contractName, "MailboxFacet")) {
-            return abi.encode(config.eraChainId, config.l1ChainId);
+            return abi.encode(config.eraChainId, config.l1ChainId, addresses.eip7702Checker);
         } else if (compareStrings(contractName, "GettersFacet")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ServerNotifier")) {

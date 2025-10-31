@@ -15,7 +15,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL2Bridgehub} from "contracts/bridgehub/IL2Bridgehub.sol";
@@ -35,7 +35,6 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {SystemContractsArgs} from "./Utils.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 
 abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
@@ -78,7 +77,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
 
     IChainTypeManager internal chainTypeManager;
 
-    function setUp() public {
+    function setUp() public virtual {
         standardErc20Impl = new BridgedStandardERC20();
         beacon = new UpgradeableBeacon(address(standardErc20Impl));
         beacon.transferOwnership(ownerWallet);
@@ -217,7 +216,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
 
         L2SharedBridgeLegacy bridge = new L2SharedBridgeLegacy();
         console.log("bridge", address(bridge));
-        address proxyAdmin = address(0x1);
+        address proxyAdmin = makeAddr("proxyAdmin");
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(bridge),
             proxyAdmin,

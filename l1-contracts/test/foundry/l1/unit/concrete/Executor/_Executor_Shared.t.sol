@@ -16,15 +16,16 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {FeeParams, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {TestExecutor} from "contracts/dev-contracts/test/TestExecutor.sol";
-import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
+
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {IL1DAValidator} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
+
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
@@ -32,7 +33,7 @@ import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
@@ -198,11 +199,12 @@ contract ExecutorTest is Test {
         l2ChainId = 9;
 
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
+        IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
 
         admin = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         getters = new GettersFacet();
         executor = new TestExecutor();
-        mailbox = new MailboxFacet(l2ChainId, block.chainid);
+        mailbox = new MailboxFacet(l2ChainId, block.chainid, eip7702Checker);
 
         DummyCTM chainTypeManager = new DummyCTM(owner, address(0));
         vm.mockCall(
