@@ -44,6 +44,8 @@ import {SharedUtils} from "../utils/SharedUtils.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
+import {IERC7786Recipient} from "contracts/interop/IERC7786Recipient.sol";
+
 
 abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegrationUtils, SharedUtils {
     L2WrappedBaseToken internal weth;
@@ -89,6 +91,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     address UNBUNDLER_ADDRESS;
     address EXECUTION_ADDRESS;
+    address interopTargetContract;
 
     function setUp() public virtual {
         setUpInner(false);
@@ -111,6 +114,8 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         }
         UNBUNDLER_ADDRESS = makeAddr("unbundlerAddress");
         EXECUTION_ADDRESS = makeAddr("executionAddress");
+
+        interopTargetContract = makeAddr("interopTargetContract");
 
         sharedBridgeLegacy = deployL2SharedBridgeLegacy(
             L1_CHAIN_ID,
@@ -171,6 +176,16 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue.selector),
             abi.encode(bytes(""))
+        );
+        vm.mockCall(
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
+            abi.encode(bytes(""))
+        );
+        vm.mockCall(
+            address(interopTargetContract),
+            abi.encodeWithSelector(IERC7786Recipient.receiveMessage.selector),
+            abi.encode(IERC7786Recipient.receiveMessage.selector)
         );
     }
 

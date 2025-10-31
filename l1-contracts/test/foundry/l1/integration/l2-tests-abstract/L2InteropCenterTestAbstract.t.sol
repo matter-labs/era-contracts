@@ -64,9 +64,9 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
             IERC7786Attributes.unbundlerAddress,
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
         );
+        l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(271), calls, bundleAttributes);
         vm.recordLogs();
 
-        l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(271), calls, bundleAttributes);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         extractAndExecuteBundles(logs, destinationChainId);
     }
@@ -74,16 +74,15 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
     function test_sendBundle_simple() public {
         bytes memory destinationChainIdBytes = InteroperableAddress.formatEvmV1(destinationChainId);
 
-        address targetContract = makeAddr("targetContract");
         vm.mockCall(
-            targetContract,
+            interopTargetContract,
             abi.encodeWithSelector(IERC7786Recipient.receiveMessage.selector),
             abi.encode(IERC7786Recipient.receiveMessage.selector)
         );
         InteropCallStarter[] memory callStarters = new InteropCallStarter[](1);
 
         callStarters[0] = InteropCallStarter({
-            to: InteroperableAddress.formatEvmV1(targetContract),
+            to: InteroperableAddress.formatEvmV1(interopTargetContract),
             data: abi.encodeWithSignature("simpleCall()"),
             callAttributes: new bytes[](0)
         });
@@ -160,10 +159,12 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
 
     function test_requestTokenTransferInteropViaLibrary() public {
         address l2TokenAddress = initializeTokenByDeposit();
-
         vm.deal(address(this), 1000 ether);
+        vm.recordLogs();
 
         InteropLibrary.sendToken(destinationChainId, l2TokenAddress, 100, address(this));
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        extractAndExecuteBundles(logs, destinationChainId);
     }
 
     function test_requestSendCallViaLibrary() public {
@@ -171,22 +172,26 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
         bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
         vm.deal(address(this), 1000 ether);
 
-        bytes memory secondBridgeCalldata = bytes.concat(
-            NEW_ENCODING_VERSION,
-            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), 0))
-        );
 
-        InteropLibrary.sendCall(destinationChainId, L2_ASSET_ROUTER_ADDR, address(0), secondBridgeCalldata);
+        vm.recordLogs();
+
+        InteropLibrary.sendCall(destinationChainId, interopTargetContract, EXECUTION_ADDRESS, abi.encodeWithSignature("simpleCall()"));
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        extractAndExecuteBundles(logs, destinationChainId);
     }
 
     function test_requestNativeTokenTransferViaLibrary() public {
         vm.deal(address(this), 1000 ether);
+        vm.recordLogs();
 
-        InteropLibrary.sendNative(destinationChainId, address(this), 100);
+
+        InteropLibrary.sendNative(destinationChainId, interopTargetContract, 100);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        extractAndExecuteBundles(logs, destinationChainId);
     }
 
     function test_sendMessageToL1ViaLibrary() public {
-
+        
         InteropLibrary.sendMessage("testing interop");
     }
 
