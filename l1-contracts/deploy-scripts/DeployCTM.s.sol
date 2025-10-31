@@ -8,6 +8,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
@@ -143,6 +144,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
         }
 
+        deployEIP7702Checker();
         deployDAValidators();
         deployIfNeededMulticall3();
 
@@ -214,6 +216,10 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         vm.broadcast(msg.sender);
         serverNotifier.setChainTypeManager(IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy));
         console.log("ChainTypeManager set in ServerNotifier");
+    }
+
+    function deployEIP7702Checker() internal {
+        addresses.eip7702Checker = deploySimpleContract("EIP7702Checker", false);
     }
 
     function deployDAValidators() internal {
@@ -544,7 +550,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
     function saveDiamondSelectors() public {
         AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)));
         GettersFacet gettersFacet = new GettersFacet();
-        MailboxFacet mailboxFacet = new MailboxFacet(1, 1);
+        MailboxFacet mailboxFacet = new MailboxFacet(1, 1, IEIP7702Checker(address(0)));
         ExecutorFacet executorFacet = new ExecutorFacet(1);
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);
         bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);

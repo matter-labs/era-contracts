@@ -20,6 +20,7 @@ import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyn
 import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
+import {IEIP7702Checker} from "../chain-interfaces/IEIP7702Checker.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {TestnetVerifier} from "../verifiers/TestnetVerifier.sol";
 import {ValidatorTimelock} from "../ValidatorTimelock.sol";
@@ -226,7 +227,7 @@ contract GatewayCTMDeployer {
         DeployedContracts memory _deployedContracts
     ) internal {
         _deployedContracts.stateTransition.mailboxFacet = address(
-            new MailboxFacet{salt: _salt}(_eraChainId, _l1ChainId)
+            new MailboxFacet{salt: _salt}(_eraChainId, _l1ChainId, IEIP7702Checker(address(0)))
         );
         _deployedContracts.stateTransition.executorFacet = address(new ExecutorFacet{salt: _salt}(_l1ChainId));
         _deployedContracts.stateTransition.gettersFacet = address(new GettersFacet{salt: _salt}());

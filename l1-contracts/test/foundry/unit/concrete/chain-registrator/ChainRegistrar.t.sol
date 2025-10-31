@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
 import "contracts/bridgehub/L1Bridgehub.sol";
 import "contracts/chain-registrar/ChainRegistrar.sol";
@@ -22,6 +23,8 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
+
+import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 
 contract ChainRegistrarTest is Test {
     DummyBridgehub private bridgeHub;
@@ -250,7 +253,8 @@ contract ChainRegistrarTest is Test {
     }
 
     function registerChainAndVerify(address author, uint256 chainId) internal {
-        DummyZKChain zkChain = new DummyZKChain(address(bridgeHub), 270, 6);
+        IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
+        DummyZKChain zkChain = new DummyZKChain(address(bridgeHub), 270, 6, eip7702Checker);
         vm.prank(admin);
         ctm.setZKChain(1, address(zkChain));
         vm.prank(admin);

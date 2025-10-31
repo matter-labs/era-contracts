@@ -58,6 +58,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         addresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
         addresses.stateTransition.verifier = deploySimpleContract("Verifier", true);
         addresses.stateTransition.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
+        addresses.eip7702Checker = address(0);
         deployStateTransitionDiamondFacets();
         string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
         (

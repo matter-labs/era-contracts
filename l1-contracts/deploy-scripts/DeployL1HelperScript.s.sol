@@ -34,6 +34,7 @@ import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
+import {MockEIP7702Checker} from "contracts/dev-contracts/MockEIP7702Checker.sol";
 import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
@@ -192,6 +193,10 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 return type(ServerNotifier).creationCode;
             } else if (compareStrings(contractName, "UpgradeStageValidator")) {
                 return type(UpgradeStageValidator).creationCode;
+            } else if (compareStrings(contractName, "MockEIP7702Checker")) {
+                return type(MockEIP7702Checker).creationCode;
+            } else if (compareStrings(contractName, "EIP7702Checker")) {
+                return ContractsBytecodesLib.getCreationCodeEVM(contractName);
             }
         } else {
             if (compareStrings(contractName, "L2Bridgehub")) {
