@@ -26,7 +26,7 @@ import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifier
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IL1DAValidator} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
@@ -226,12 +226,7 @@ contract ExecutorTest is Test {
             timestamp: 0,
             commitment: bytes32("")
         });
-        TestnetVerifier testnetVerifier = new TestnetVerifier(
-            IVerifierV2(address(0)),
-            IVerifier(address(0)),
-            address(0),
-            false
-        );
+        EraTestnetVerifier testnetVerifier = new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
 
         InitializeData memory params = InitializeData({
             // TODO REVIEW

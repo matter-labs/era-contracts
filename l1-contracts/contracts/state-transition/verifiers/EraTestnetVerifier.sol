@@ -3,10 +3,8 @@
 pragma solidity 0.8.28;
 
 import {EraDualVerifier} from "./EraDualVerifier.sol";
-import {ZKsyncOSDualVerifier} from "./ZKsyncOSDualVerifier.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {IDualVerifier} from "../chain-interfaces/IDualVerifier.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -14,22 +12,13 @@ import {IDualVerifier} from "../chain-interfaces/IDualVerifier.sol";
 /// @dev This contract is used to skip the zkp verification for the testnet environment.
 /// If the proof is not empty, it will verify it using the main verifier contract,
 /// otherwise, it will skip the verification.
-contract TestnetVerifier is IVerifier, IDualVerifier {
-    IDualVerifier public immutable dualVerifier;
+contract EraTestnetVerifier is IVerifier {
+    EraDualVerifier public immutable dualVerifier;
 
-    constructor(
-        IVerifierV2 _fflonkVerifier,
-        IVerifier _plonkVerifier,
-        address _zksyncOSVerifierOwner,
-        bool _isZKsyncOS
-    ) {
+    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) {
         assert(block.chainid != 1);
 
-        if (_isZKsyncOS) {
-            dualVerifier = new ZKsyncOSDualVerifier(_fflonkVerifier, _plonkVerifier, _zksyncOSVerifierOwner);
-        } else {
-            dualVerifier = new EraDualVerifier(_fflonkVerifier, _plonkVerifier);
-        }
+        dualVerifier = new EraDualVerifier(_fflonkVerifier, _plonkVerifier);
     }
 
     /// @dev Verifies a zk-SNARK proof, skipping the verification if the proof is empty.
@@ -47,17 +36,5 @@ contract TestnetVerifier is IVerifier, IDualVerifier {
     /// @inheritdoc IVerifier
     function verificationKeyHash() external view override returns (bytes32) {
         return dualVerifier.verificationKeyHash();
-    }
-
-    function verificationKeyHash(uint256 _verifierType) external view returns (bytes32) {
-        return dualVerifier.verificationKeyHash(_verifierType);
-    }
-
-    function plonkVerifiers(uint32 version) external view returns (IVerifier) {
-        return dualVerifier.plonkVerifiers(version);
-    }
-
-    function fflonkVerifiers(uint32 version) external view returns (IVerifierV2) {
-        return dualVerifier.fflonkVerifiers(version);
     }
 }

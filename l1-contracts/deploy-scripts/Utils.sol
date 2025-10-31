@@ -1318,7 +1318,7 @@ library Utils {
     function getZKOSProxyUpgradeBytecodeInfo(
         string memory fileName,
         string memory contractName
-    ) internal returns (bytes memory bytecodeInfo) {
+    ) internal returns (bytes memory) {
         bytes memory bytecodeInfo = getZKOSBytecodeInfoForContract(fileName, contractName);
         bytes memory proxyBytecodeInfo = getZKOSBytecodeInfoForContract(
             "SystemContractProxy.sol",

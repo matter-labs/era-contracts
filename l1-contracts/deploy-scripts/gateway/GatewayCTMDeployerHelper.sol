@@ -219,12 +219,21 @@ library GatewayCTMDeployerHelper {
         _deployedContracts.stateTransition.verifierPlonk = verifierPlonk;
 
         if (_testnetVerifier) {
-            _deployedContracts.stateTransition.verifier = _deployInternal(
-                "TestnetVerifier",
-                "TestnetVerifier.sol",
-                abi.encode(verifierFflonk, verifierPlonk, _verifierOwner, _isZKsyncOS),
-                innerConfig
-            );
+            if (_isZKsyncOS) {
+                _deployedContracts.stateTransition.verifier = _deployInternal(
+                    "ZKsyncOSTestnetVerifier",
+                    "ZKsyncOSTestnetVerifier.sol",
+                    abi.encode(verifierFflonk, verifierPlonk, _verifierOwner),
+                    innerConfig
+                );
+            } else {
+                _deployedContracts.stateTransition.verifier = _deployInternal(
+                    "EraTestnetVerifier",
+                    "EraTestnetVerifier.sol",
+                    abi.encode(verifierFflonk, verifierPlonk),
+                    innerConfig
+                );
+            }
         } else {
             if (_isZKsyncOS) {
                 _deployedContracts.stateTransition.verifier = _deployInternal(
@@ -413,7 +422,7 @@ library GatewayCTMDeployerHelper {
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraVerifierPlonk.sol", "EraVerifierPlonk");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSVerifierFflonk.sol", "ZKsyncOSVerifierFflonk");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSVerifierPlonk.sol", "ZKsyncOSVerifierPlonk");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("TestnetVerifier.sol", "TestnetVerifier");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraTestnetVerifier.sol", "EraTestnetVerifier");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraDualVerifier.sol", "EraDualVerifier");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSDualVerifier.sol", "ZKsyncOSDualVerifier");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ValidatorTimelock.sol", "ValidatorTimelock");

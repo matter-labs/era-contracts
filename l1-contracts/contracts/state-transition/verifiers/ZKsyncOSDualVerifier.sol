@@ -5,8 +5,7 @@ pragma solidity 0.8.28;
 import {UnknownVerifierVersion} from "../L1StateTransitionErrors.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {EmptyProofLength, UnknownVerifierType, InvalidMockProofLength, UnsupportedChainIdForMockVerifier, InvalidProof} from "../../common/L1ContractErrors.sol";
-import {IDualVerifier} from "../chain-interfaces/IDualVerifier.sol";
+import {EmptyProofLength, UnknownVerifierType, MockVerifierNotSupported} from "../../common/L1ContractErrors.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 /// @title Dual Verifier
@@ -15,7 +14,7 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 /// @notice This contract wraps ZKsync OS specific Plonk verifiers and routes zk-SNARK proof verification
 /// to the verifier based on the provided proof type. It reuses the same interface as on the original `Verifier`
 /// contract, while abusing on of the fields (`_recursiveAggregationInput`) for proof verification type.
-contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier, IDualVerifier {
+contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier {
     /// @dev Type of verification for ZKsync OS PLONK verifier.
     uint256 internal constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
 
@@ -75,11 +74,6 @@ contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier, IDualVerifier {
 
             return plonkVerifiers[verifierVersion].verify(args, _extractZKsyncOSProof(_proof));
         } else if (verifierType == ZKSYNC_OS_MOCK_VERIFICATION_TYPE) {
-            // just for safety - not allowing to use mock verifier on mainnet
-            if (block.chainid == 1) {
-                revert UnsupportedChainIdForMockVerifier();
-            }
-
             uint256[] memory args = new uint256[](1);
             args[0] = computeZKsyncOSHash(_proof[1], _publicInputs);
 
@@ -92,17 +86,8 @@ contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier, IDualVerifier {
     }
 
     /// @dev Verifies the correctness of public input, doesn't check the validity of proof itself.
-    function mockVerify(uint256[] memory _publicInputs, uint256[] memory _proof) public view virtual returns (bool) {
-        if (_proof.length != 2) {
-            revert InvalidMockProofLength();
-        }
-        if (_proof[0] != 13) {
-            revert InvalidProof();
-        }
-        if (_proof[1] != _publicInputs[0]) {
-            revert InvalidProof();
-        }
-        return true;
+    function mockVerify(uint256[] memory, uint256[] memory) public view virtual returns (bool) {
+        revert MockVerifierNotSupported();
     }
 
     /// @inheritdoc IVerifier

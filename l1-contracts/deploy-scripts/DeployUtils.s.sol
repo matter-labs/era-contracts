@@ -405,26 +405,15 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Verifier")) {
-            if (config.testnetVerifier) {
+            if (config.isZKsyncOS) {
                 return
                     abi.encode(
                         addresses.stateTransition.verifierFflonk,
                         addresses.stateTransition.verifierPlonk,
-                        msg.sender,
-                        config.isZKsyncOS
+                        msg.sender
                     );
             } else {
-                if (config.isZKsyncOS) {
-                    return
-                        abi.encode(
-                            addresses.stateTransition.verifierFflonk,
-                            addresses.stateTransition.verifierPlonk,
-                            msg.sender
-                        );
-                } else {
-                    return
-                        abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
-                }
+                return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
             }
         } else if (compareStrings(contractName, "EraVerifierFflonk")) {
             return abi.encode();
