@@ -2,12 +2,12 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
-import {Vm} from "forge-std/Vm.sol";
+
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
-import "contracts/bridgehub/Bridgehub.sol";
+import "contracts/bridgehub/L1Bridgehub.sol";
 import "contracts/chain-registrar/ChainRegistrar.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -23,6 +23,8 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
+
+import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 
 contract ChainRegistrarTest is Test {
     DummyBridgehub private bridgeHub;
@@ -45,13 +47,13 @@ contract ChainRegistrarTest is Test {
         vm.prank(admin);
 
         l1NullifierImpl = new L1NullifierDev({
-            _bridgehub: IBridgehub(address(bridgeHub)),
+            _bridgehub: IL1Bridgehub(address(bridgeHub)),
             _eraChainId: 270,
             _eraDiamondProxy: makeAddr("era")
         });
 
         assetRouter = new L1AssetRouter({
-            _l1WethAddress: makeAddr("weth"),
+            _l1WethToken: makeAddr("weth"),
             _bridgehub: address(bridgeHub),
             _l1Nullifier: address(l1NullifierImpl),
             _eraChainId: 270,
@@ -251,7 +253,8 @@ contract ChainRegistrarTest is Test {
     }
 
     function registerChainAndVerify(address author, uint256 chainId) internal {
-        DummyZKChain zkChain = new DummyZKChain(address(bridgeHub), 270, 6);
+        IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
+        DummyZKChain zkChain = new DummyZKChain(address(bridgeHub), 270, 6, eip7702Checker);
         vm.prank(admin);
         ctm.setZKChain(1, address(zkChain));
         vm.prank(admin);

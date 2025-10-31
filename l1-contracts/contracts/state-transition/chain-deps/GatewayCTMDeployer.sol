@@ -12,12 +12,18 @@ import {RollupDAManager} from "../data-availability/RollupDAManager.sol";
 import {RelayedSLDAValidator} from "../data-availability/RelayedSLDAValidator.sol";
 import {ValidiumL1DAValidator} from "../data-availability/ValidiumL1DAValidator.sol";
 
-import {DualVerifier} from "../verifiers/DualVerifier.sol";
-import {L1VerifierFflonk} from "../verifiers/L1VerifierFflonk.sol";
-import {L1VerifierPlonk} from "../verifiers/L1VerifierPlonk.sol";
+import {EraDualVerifier} from "../verifiers/EraDualVerifier.sol";
+import {ZKsyncOSDualVerifier} from "../verifiers/ZKsyncOSDualVerifier.sol";
+import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
+import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
+import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
+import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
-import {TestnetVerifier} from "../verifiers/TestnetVerifier.sol";
+import {IEIP7702Checker} from "../chain-interfaces/IEIP7702Checker.sol";
+import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
+import {EraTestnetVerifier} from "../verifiers/EraTestnetVerifier.sol";
+import {ZKsyncOSTestnetVerifier} from "../verifiers/ZKsyncOSTestnetVerifier.sol";
 import {ValidatorTimelock} from "../ValidatorTimelock.sol";
 import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
 
@@ -25,9 +31,11 @@ import {DiamondInit} from "./DiamondInit.sol";
 import {L1GenesisUpgrade} from "../../upgrades/L1GenesisUpgrade.sol";
 import {Diamond} from "../libraries/Diamond.sol";
 
-import {ChainTypeManager} from "../ChainTypeManager.sol";
+import {ZKsyncOSChainTypeManager} from "../ZKsyncOSChainTypeManager.sol";
+import {EraChainTypeManager} from "../EraChainTypeManager.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {ROLLUP_L2_DA_COMMITMENT_SCHEME} from "../../common/Config.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -36,6 +44,7 @@ import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} 
 import {ServerNotifier} from "../../governance/ServerNotifier.sol";
 
 /// @notice Configuration parameters for deploying the GatewayCTMDeployer contract.
+// solhint-disable-next-line gas-struct-packing
 struct GatewayCTMDeployerConfig {
     /// @notice Address of the aliased governance contract.
     address aliasedGovernanceAddress;
@@ -45,10 +54,10 @@ struct GatewayCTMDeployerConfig {
     uint256 eraChainId;
     /// @notice Chain ID of the L1 chain.
     uint256 l1ChainId;
-    /// @notice Address of the Rollup L2 Data Availability Validator.
-    address rollupL2DAValidatorAddress;
     /// @notice Flag indicating whether to use the testnet verifier.
     bool testnetVerifier;
+    /// @notice Flag indicating whether to use ZKsync OS mode.
+    bool isZKsyncOS;
     /// @notice Array of function selectors for the Admin facet.
     bytes4[] adminSelectors;
     /// @notice Array of function selectors for the Executor facet.
@@ -181,11 +190,11 @@ contract GatewayCTMDeployer {
             _salt: salt,
             _eraChainId: eraChainId,
             _l1ChainId: l1ChainId,
-            _rollupL2DAValidatorAddress: _config.rollupL2DAValidatorAddress,
             _aliasedGovernanceAddress: _config.aliasedGovernanceAddress,
             _deployedContracts: contracts
         });
-        _deployVerifier(salt, _config.testnetVerifier, contracts);
+        // solhint-disable-next-line func-named-parameters
+        _deployVerifier(salt, _config.testnetVerifier, _config.isZKsyncOS, contracts, _config.aliasedGovernanceAddress);
 
         _deployProxyAdmin(salt, _config.aliasedGovernanceAddress, contracts);
 
@@ -207,7 +216,6 @@ contract GatewayCTMDeployer {
     /// @param _salt Salt used for CREATE2 deployments.
     /// @param _eraChainId Era Chain ID.
     /// @param _l1ChainId L1 Chain ID.
-    /// @param _rollupL2DAValidatorAddress The expected L2 DA Validator to be
     /// used by permanent rollups.
     /// @param _aliasedGovernanceAddress The aliased address of the governnace.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
@@ -216,19 +224,17 @@ contract GatewayCTMDeployer {
         bytes32 _salt,
         uint256 _eraChainId,
         uint256 _l1ChainId,
-        address _rollupL2DAValidatorAddress,
         address _aliasedGovernanceAddress,
         DeployedContracts memory _deployedContracts
     ) internal {
         _deployedContracts.stateTransition.mailboxFacet = address(
-            new MailboxFacet{salt: _salt}(_eraChainId, _l1ChainId)
+            new MailboxFacet{salt: _salt}(_eraChainId, _l1ChainId, IEIP7702Checker(address(0)))
         );
         _deployedContracts.stateTransition.executorFacet = address(new ExecutorFacet{salt: _salt}(_l1ChainId));
         _deployedContracts.stateTransition.gettersFacet = address(new GettersFacet{salt: _salt}());
 
         RollupDAManager rollupDAManager = _deployRollupDAContracts(
             _salt,
-            _rollupL2DAValidatorAddress,
             _aliasedGovernanceAddress,
             _deployedContracts
         );
@@ -236,7 +242,7 @@ contract GatewayCTMDeployer {
             new AdminFacet{salt: _salt}(_l1ChainId, rollupDAManager)
         );
 
-        _deployedContracts.stateTransition.diamondInit = address(new DiamondInit{salt: _salt}());
+        _deployedContracts.stateTransition.diamondInit = address(new DiamondInit{salt: _salt}(false));
         _deployedContracts.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade{salt: _salt}());
     }
 
@@ -294,38 +300,69 @@ contract GatewayCTMDeployer {
     /// @notice Deploys verifier.
     /// @param _salt Salt used for CREATE2 deployments.
     /// @param _testnetVerifier Whether testnet verifier should be used.
+    /// @param _isZKsyncOS Whether ZKsync OS mode should be used.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
+    /// @param _verifierOwner The owner that can add additional verification keys.
     /// in the process of the execution of this function.
     function _deployVerifier(
         bytes32 _salt,
         bool _testnetVerifier,
-        DeployedContracts memory _deployedContracts
+        bool _isZKsyncOS,
+        DeployedContracts memory _deployedContracts,
+        address _verifierOwner
     ) internal {
-        L1VerifierFflonk fflonkVerifier = new L1VerifierFflonk{salt: _salt}();
-        _deployedContracts.stateTransition.verifierFflonk = address(fflonkVerifier);
-        L1VerifierPlonk verifierPlonk = new L1VerifierPlonk{salt: _salt}();
-        _deployedContracts.stateTransition.verifierPlonk = address(verifierPlonk);
-        if (_testnetVerifier) {
-            _deployedContracts.stateTransition.verifier = address(
-                new TestnetVerifier{salt: _salt}(fflonkVerifier, verifierPlonk)
-            );
+        address fflonkVerifier;
+        address verifierPlonk;
+
+        if (_isZKsyncOS) {
+            fflonkVerifier = address(new ZKsyncOSVerifierFflonk{salt: _salt}());
+            verifierPlonk = address(new ZKsyncOSVerifierPlonk{salt: _salt}());
         } else {
-            _deployedContracts.stateTransition.verifier = address(
-                new DualVerifier{salt: _salt}(fflonkVerifier, verifierPlonk)
-            );
+            fflonkVerifier = address(new EraVerifierFflonk{salt: _salt}());
+            verifierPlonk = address(new EraVerifierPlonk{salt: _salt}());
+        }
+
+        _deployedContracts.stateTransition.verifierFflonk = fflonkVerifier;
+        _deployedContracts.stateTransition.verifierPlonk = verifierPlonk;
+        if (_testnetVerifier) {
+            if (_isZKsyncOS) {
+                _deployedContracts.stateTransition.verifier = address(
+                    new ZKsyncOSTestnetVerifier{salt: _salt}(
+                        IVerifierV2(fflonkVerifier),
+                        IVerifier(verifierPlonk),
+                        _verifierOwner
+                    )
+                );
+            } else {
+                _deployedContracts.stateTransition.verifier = address(
+                    new EraTestnetVerifier{salt: _salt}(IVerifierV2(fflonkVerifier), IVerifier(verifierPlonk))
+                );
+            }
+        } else {
+            if (_isZKsyncOS) {
+                _deployedContracts.stateTransition.verifier = address(
+                    new ZKsyncOSDualVerifier{salt: _salt}(
+                        IVerifierV2(fflonkVerifier),
+                        IVerifier(verifierPlonk),
+                        _verifierOwner
+                    )
+                );
+            } else {
+                _deployedContracts.stateTransition.verifier = address(
+                    new EraDualVerifier{salt: _salt}(IVerifierV2(fflonkVerifier), IVerifier(verifierPlonk))
+                );
+            }
         }
     }
 
     /// @notice Deploys DA-related contracts.
     /// @param _salt Salt used for CREATE2 deployments.
-    /// @param _rollupL2DAValidatorAddress The expected L2 DA Validator to be
     /// used by permanent rollups.
     /// @param _aliasedGovernanceAddress The aliased address of the governnace.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
     /// in the process of the execution of this function.
     function _deployRollupDAContracts(
         bytes32 _salt,
-        address _rollupL2DAValidatorAddress,
         address _aliasedGovernanceAddress,
         DeployedContracts memory _deployedContracts
     ) internal returns (RollupDAManager rollupDAManager) {
@@ -334,7 +371,7 @@ contract GatewayCTMDeployer {
         ValidiumL1DAValidator validiumDAValidator = new ValidiumL1DAValidator{salt: _salt}();
 
         RelayedSLDAValidator relayedSLDAValidator = new RelayedSLDAValidator{salt: _salt}();
-        rollupDAManager.updateDAPair(address(relayedSLDAValidator), _rollupL2DAValidatorAddress, true);
+        rollupDAManager.updateDAPair(address(relayedSLDAValidator), ROLLUP_L2_DA_COMMITMENT_SCHEME, true);
 
         // Note, that the governance still has to accept it.
         // It will happen in a separate voting after the deployment is done.
@@ -355,9 +392,15 @@ contract GatewayCTMDeployer {
         GatewayCTMDeployerConfig memory _config,
         DeployedContracts memory _deployedContracts
     ) internal {
-        _deployedContracts.stateTransition.chainTypeManagerImplementation = address(
-            new ChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR)
-        );
+        if (_config.isZKsyncOS) {
+            _deployedContracts.stateTransition.chainTypeManagerImplementation = address(
+                new ZKsyncOSChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR)
+            );
+        } else {
+            _deployedContracts.stateTransition.chainTypeManagerImplementation = address(
+                new EraChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR)
+            );
+        }
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
@@ -421,11 +464,13 @@ contract GatewayCTMDeployer {
             serverNotifier: _deployedContracts.stateTransition.serverNotifierProxy
         });
 
+        bytes memory initCalldata = abi.encodeCall(IChainTypeManager.initialize, (diamondInitData));
+
         _deployedContracts.stateTransition.chainTypeManagerProxy = address(
             new TransparentUpgradeableProxy{salt: _salt}(
                 _deployedContracts.stateTransition.chainTypeManagerImplementation,
                 address(_deployedContracts.stateTransition.chainTypeManagerProxyAdmin),
-                abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))
+                initCalldata
             )
         );
     }

@@ -11,9 +11,15 @@ contract setNewVersionUpgradeTest is ChainTypeManagerTest {
 
     function test_SettingNewVersionUpgrade() public {
         assertEq(chainContractAddress.protocolVersion(), 0, "Initial protocol version is not correct");
-        vm.mockCall(address(bridgehub), abi.encodeWithSelector(bridgehub.migrationPaused.selector), abi.encode(true));
+        address mockChainAssetHandler = makeAddr("mockChainAssetHandler");
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSignature("chainAssetHandler()"),
+            abi.encode(mockChainAssetHandler)
+        );
+        vm.mockCall(mockChainAssetHandler, abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
 
-        address randomDiamondInit = address(0x303030303030303030303);
+        address randomDiamondInit = makeAddr("randomDiamondInit");
         Diamond.DiamondCutData memory newDiamondCutData = getDiamondCutData(address(randomDiamondInit));
         bytes32 newCutHash = keccak256(abi.encode(newDiamondCutData));
 

@@ -3,8 +3,8 @@ pragma solidity 0.8.28;
 
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {DiamondAlreadyFrozen} from "contracts/common/L1ContractErrors.sol";
 
 contract freezeChainTest is ChainTypeManagerTest {
@@ -17,7 +17,7 @@ contract freezeChainTest is ChainTypeManagerTest {
 
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector),
             abi.encode(newChainAddress)
         );
 
@@ -45,7 +45,7 @@ contract freezeChainTest is ChainTypeManagerTest {
 
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector),
             abi.encode(newChainAddress)
         );
 
