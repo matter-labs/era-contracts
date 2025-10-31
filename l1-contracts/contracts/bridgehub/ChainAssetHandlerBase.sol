@@ -37,6 +37,21 @@ abstract contract ChainAssetHandlerBase is
 {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
+    /// @dev The assetId of the ETH.
+    bytes32 internal DEPRECATED_ETH_TOKEN_ASSET_ID;
+
+    /// @dev The chain ID of L1.
+    uint256 internal DEPRECATED_L1_CHAIN_ID;
+
+    /// @dev The bridgehub contract.
+    IL1Bridgehub internal DEPRECATED_BRIDGEHUB;
+
+    /// @dev The message root contract.
+    IMessageRoot internal DEPRECATED_MESSAGE_ROOT;
+
+    /// @dev The asset router contract.
+    IAssetRouterBase internal DEPRECATED_ASSET_ROUTER;
+
     /*//////////////////////////////////////////////////////////////
                             EXTERNAL GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -78,7 +93,7 @@ abstract contract ChainAssetHandlerBase is
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[49] private __gap;
+    uint256[44] private __gap;
 
     /// @notice Only the asset router can call.
     modifier onlyAssetRouter() {

@@ -87,7 +87,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
 
     /// @dev Chain ID of L1.
     /// @dev Kept here for storage layout compatibility with previous versions.
-    uint256 internal l1ChainId;
+    uint256 internal DEPRECATED_l1ChainId;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new

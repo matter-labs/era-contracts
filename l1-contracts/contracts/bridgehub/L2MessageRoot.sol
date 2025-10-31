@@ -22,12 +22,19 @@ contract L2MessageRoot is MessageRootBase {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
+    /// @dev Chain ID of L1 for bridging reasons.
+    uint256 internal l1ChainId;
+
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
     function _bridgehub() internal view override returns (address) {
         return L2_BRIDGEHUB_ADDR;
+    }
+
+    function L1_CHAIN_ID() public view override returns (uint256) {
+        return l1ChainId;
     }
 
     // A method for backwards compatibility with the old implementation
