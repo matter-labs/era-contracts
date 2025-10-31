@@ -24,6 +24,9 @@ import {ICTMDeploymentTracker} from "../bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
 
 import {UpgradeableBeaconDeployer} from "../bridge/UpgradeableBeaconDeployer.sol";
+import {ISystemContractProxy} from "./ISystemContractProxy.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 
 import {FixedForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
