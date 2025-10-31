@@ -7,7 +7,7 @@ import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.so
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
@@ -141,7 +141,7 @@ library GatewayCTMDeployerHelper {
         _deployedContracts.stateTransition.mailboxFacet = _deployInternal(
             "MailboxFacet",
             "Mailbox.sol",
-            abi.encode(_eraChainId, _l1ChainId),
+            abi.encode(_eraChainId, _l1ChainId, L2_CHAIN_ASSET_HANDLER_ADDR),
             innerConfig
         );
 

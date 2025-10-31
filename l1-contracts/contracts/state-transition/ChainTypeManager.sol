@@ -21,6 +21,7 @@ import {SemVer} from "../common/libraries/SemVer.sol";
 import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+import {TxStatus} from "../common/Messaging.sol";
 
 /// @title Chain Type Manager contract
 /// @author Matter Labs
@@ -483,6 +484,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             _forceDeploymentData,
             _factoryDeps
         );
+        // Deposits start paused by default to allow immediate Gateway migration.
+        // Otherwise, any deposit would trigger the PAUSE_DEPOSITS_TIME_WINDOW_START delay.
+        IAdmin(zkChainAddress).pauseDepositsBeforeInitiatingMigration();
     }
 
     /// @param _chainId the chainId of the chain
@@ -550,8 +554,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// param _assetInfo the assetInfo of the chain
     /// param _depositSender the address of that sent the deposit
     /// param _ctmData the data of the migration
-    function forwardedBridgeRecoverFailedTransfer(
+    function forwardedBridgeConfirmTransferResult(
         uint256 /* _chainId */,
+        TxStatus /* _txStatus */,
         bytes32 /* _assetInfo */,
         address /* _depositSender */,
         bytes calldata /* _ctmData */

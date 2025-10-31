@@ -262,7 +262,7 @@ contract ChainRegistrarTest is Test {
     }
 
     function registerChainAndVerify(address author, uint256 chainId) internal {
-        DummyZKChain zkChain = new DummyZKChain(address(bridgeHub), 270, 6);
+        DummyZKChain zkChain = new DummyZKChain(address(bridgeHub), 270, 6, address(0));
         vm.prank(admin);
         ctm.setZKChain(1, address(zkChain));
         vm.prank(admin);

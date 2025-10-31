@@ -15,7 +15,7 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {IncorrectChainAssetId, IncorrectSender, MigrationNotToL1, MigrationNumberAlreadySet, MigrationNumberMismatch, NotSystemContext, OnlyAssetTrackerOrChain, OnlyChain, SLHasDifferentCTM, ZKChainNotRegistered, IteratedMigrationsNotSupported} from "./L1BridgehubErrors.sol";
-import {ChainIdNotRegistered, MigrationPaused, NotAssetRouter, NotL1} from "../common/L1ContractErrors.sol";
+import {ChainIdNotRegistered, MigrationPaused, NotAssetRouter} from "../common/L1ContractErrors.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
@@ -95,14 +95,6 @@ abstract contract ChainAssetHandlerBase is
     modifier whenMigrationsNotPaused() {
         if (migrationPaused) {
             revert MigrationPaused();
-        }
-        _;
-    }
-
-    /// @notice Only when the contract is deployed on L1.
-    modifier onlyL1() {
-        if (_l1ChainId() != block.chainid) {
-            revert NotL1(_l1ChainId(), block.chainid);
         }
         _;
     }
@@ -213,6 +205,7 @@ abstract contract ChainAssetHandlerBase is
             if (block.chainid != _l1ChainId()) {
                 require(_settlementChainId == _l1ChainId(), MigrationNotToL1());
             }
+            _setMigrationInProgressOnL1(bridgehubBurnData.chainId);
         }
         bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
             _settlementChainId == _l1ChainId()
@@ -243,6 +236,8 @@ abstract contract ChainAssetHandlerBase is
 
         emit MigrationStarted(bridgehubBurnData.chainId, _assetId, _settlementChainId);
     }
+
+    function _setMigrationInProgressOnL1(uint256 _chainId) internal virtual {}
 
     /// @dev IL1AssetHandler interface, used to receive a chain on the settlement layer.
     /// @param _assetId the assetId of the chain's CTM
@@ -298,41 +293,6 @@ abstract contract ChainAssetHandlerBase is
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);
 
         emit MigrationFinalized(bridgehubMintData.chainId, _assetId, zkChain);
-    }
-
-    /// @dev IL1AssetHandler interface, used to undo a failed migration of a chain.
-    // / @param _chainId the chainId of the chain
-    /// @param _assetId the assetId of the chain's CTM
-    /// @param _data the data for the recovery.
-    /// @param _depositSender the address of the entity that initiated the deposit.
-    // slither-disable-next-line locked-ether
-    function bridgeRecoverFailedTransfer(
-        uint256,
-        bytes32 _assetId,
-        address _depositSender,
-        bytes calldata _data
-    ) external payable override requireZeroValue(msg.value) onlyAssetRouter onlyL1 {
-        BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
-
-        (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeRecoverFailedTransfer(
-            bridgehubBurnData.chainId
-        );
-
-        IChainTypeManager(ctm).forwardedBridgeRecoverFailedTransfer({
-            _chainId: bridgehubBurnData.chainId,
-            _assetInfo: _assetId,
-            _depositSender: _depositSender,
-            _ctmData: bridgehubBurnData.ctmData
-        });
-
-        --migrationNumber[bridgehubBurnData.chainId];
-
-        IZKChain(zkChain).forwardedBridgeRecoverFailedTransfer({
-            _chainId: bridgehubBurnData.chainId,
-            _assetInfo: _assetId,
-            _originalCaller: _depositSender,
-            _chainData: bridgehubBurnData.chainData
-        });
     }
 
     /*//////////////////////////////////////////////////////////////

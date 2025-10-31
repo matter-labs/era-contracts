@@ -232,7 +232,7 @@ contract ExecutorTest is UtilsTest {
         admin = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         getters = new GettersFacet();
         executor = new TestExecutor();
-        mailbox = new MailboxFacet(eraChainId, block.chainid);
+        mailbox = new MailboxFacet(eraChainId, block.chainid, address(chainAssetHandler));
 
         DummyCTM chainTypeManager = new DummyCTM(owner, address(0));
         vm.mockCall(
