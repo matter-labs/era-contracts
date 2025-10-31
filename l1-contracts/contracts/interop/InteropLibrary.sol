@@ -226,7 +226,7 @@ library InteropLibrary {
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = buildSendCall({
-            destination: destination,
+            destinationChainId: destination,
             target: target,
             executionAddress: executionAddress,
             unbundlerAddress: unbundlerAddress,
