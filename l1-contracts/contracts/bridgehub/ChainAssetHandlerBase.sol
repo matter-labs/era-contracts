@@ -37,21 +37,6 @@ abstract contract ChainAssetHandlerBase is
 {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
-    /// @dev The assetId of the ETH.
-    bytes32 internal DEPRECATED_ETH_TOKEN_ASSET_ID;
-
-    /// @dev The chain ID of L1.
-    uint256 internal DEPRECATED_L1_CHAIN_ID;
-
-    /// @dev The bridgehub contract.
-    IL1Bridgehub internal DEPRECATED_BRIDGEHUB;
-
-    /// @dev The message root contract.
-    IMessageRoot internal DEPRECATED_MESSAGE_ROOT;
-
-    /// @dev The asset router contract.
-    IAssetRouterBase internal DEPRECATED_ASSET_ROUTER;
-
     /*//////////////////////////////////////////////////////////////
                             EXTERNAL GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -87,6 +72,26 @@ abstract contract ChainAssetHandlerBase is
 
     /// @notice Used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
+
+    /// @dev The assetId of the ETH.
+    /// @dev Kept here for storage layout compatibility with previous versions.
+    bytes32 internal DEPRECATED_ETH_TOKEN_ASSET_ID;
+
+    /// @dev The chain ID of L1.
+    /// @dev Kept here for storage layout compatibility with previous versions.
+    uint256 internal DEPRECATED_L1_CHAIN_ID;
+
+    /// @dev The bridgehub contract.
+    /// @dev Kept here for storage layout compatibility with previous versions.
+    IL1Bridgehub internal DEPRECATED_BRIDGEHUB;
+
+    /// @dev The message root contract.
+    /// @dev Kept here for storage layout compatibility with previous versions.
+    IMessageRoot internal DEPRECATED_MESSAGE_ROOT;
+
+    /// @dev The asset router contract.
+    /// @dev Kept here for storage layout compatibility with previous versions.
+    IAssetRouterBase internal DEPRECATED_ASSET_ROUTER;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
