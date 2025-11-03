@@ -234,7 +234,7 @@ contract L1GatewayTests is
         gatewayScript.fullGatewayRegistration();
     }
 
-    function test_startMessageToL2() public {
+    function test_requestL2TransactionDirect() public {
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChainId);
         _confirmMigration(TxStatus.Success);
