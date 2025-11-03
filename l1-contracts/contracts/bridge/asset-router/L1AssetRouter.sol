@@ -292,7 +292,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            CLAIM FAILED DEPOSIT Functions
+                            CONFIRM DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IL1AssetRouter
