@@ -50,6 +50,7 @@ import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
+import {DeployCTMUtils, DeployedAddresses} from "../DeployCTMUtils.s.sol";
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {TransitionaryOwner} from "contracts/governance/TransitionaryOwner.sol";
@@ -65,7 +66,6 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {BridgehubDeployedAddresses, L1NativeTokenVaultAddresses, BridgesDeployedAddresses} from "../DeployL1CoreUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
-import {DeployCTMUtils, DeployedAddresses} from "../DeployCTMUtils.s.sol";
 import {AddressIntrospector} from "../AddressIntrospector.sol";
 
 /// @notice Script used for default upgrade flow

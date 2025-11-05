@@ -15,8 +15,6 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {SystemContractsArgs} from "./Utils.sol";
 
-import {DeployCTMUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
-
 abstract contract L2WethTestAbstract is Test, SharedL2ContractDeployer {
     function test_shouldDepositWethByCallingDeposit() public {
         uint256 amount = 100;

@@ -12,7 +12,6 @@ import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDe
 import {L2GatewayTestAbstract} from "../l2-tests-abstract/L2GatewayTestAbstract.t.sol";
 import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
 
-import {DeployCTMUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
 import {L2GatewayTestAbstract} from "../l2-tests-abstract/L2GatewayTestAbstract.t.sol";
 
 import {StateTransitionDeployedAddresses} from "deploy-scripts/Types.sol";
