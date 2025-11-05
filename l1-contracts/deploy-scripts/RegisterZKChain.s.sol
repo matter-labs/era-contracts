@@ -117,7 +117,6 @@ contract RegisterZKChainScript is Script {
     }
 
     function runInner(string memory outputPath) internal {
-        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END + 1);
         string memory root = vm.projectRoot();
 
         outputPath = string.concat(root, outputPath);

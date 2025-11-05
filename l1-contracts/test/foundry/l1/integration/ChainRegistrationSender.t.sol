@@ -66,8 +66,6 @@ contract ChainRegistrationSenderTests is
 
             _addL2ChainContract(zkChainIds[i], contractAddress);
         }
-
-        vm.warp(block.timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START + 1);
     }
 
     function setUp() public {

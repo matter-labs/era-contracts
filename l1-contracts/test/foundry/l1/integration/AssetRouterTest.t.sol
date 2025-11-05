@@ -77,8 +77,6 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
 
             _addL2ChainContract(zkChainIds[i], contractAddress);
         }
-
-        vm.warp(block.timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START + 1);
     }
 
     function _setAssetTrackerChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
