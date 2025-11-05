@@ -24,7 +24,7 @@ contract AdminTest is UtilsTest {
     DummyBridgehub internal dummyBridgehub;
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](14);
+        bytes4[] memory selectors = new bytes4[](16);
         uint256 i = 0;
         selectors[i++] = IAdmin.setPendingAdmin.selector;
         selectors[i++] = IAdmin.acceptAdmin.selector;
@@ -37,6 +37,8 @@ contract AdminTest is UtilsTest {
         selectors[i++] = IAdmin.executeUpgrade.selector;
         selectors[i++] = IAdmin.freezeDiamond.selector;
         selectors[i++] = IAdmin.unfreezeDiamond.selector;
+        selectors[i++] = IAdmin.pauseDepositsBeforeInitiatingMigration.selector;
+        selectors[i++] = IAdmin.unpauseDeposits.selector;
         selectors[i++] = IAdmin.setTransactionFilterer.selector;
         selectors[i++] = IAdmin.setPubdataPricingMode.selector;
         selectors[i++] = IAdmin.setDAValidatorPair.selector;

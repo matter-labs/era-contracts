@@ -104,7 +104,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
         bytes32 _assetId,
         address _depositSender,
         bytes calldata _data
-    ) external payable override requireZeroValue(msg.value) onlyAssetRouter {
+    ) external payable requireZeroValue(msg.value) onlyAssetRouter {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
 
         (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeConfirmTransferResult(

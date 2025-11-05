@@ -195,9 +195,7 @@ contract L1GatewayTests is
             _merkleProof: merkleProof,
             _txStatus: txStatus
         });
-        vm.startBroadcast();
         addresses.l1Nullifier.bridgeConfirmTransferResult(transferResultData);
-        vm.stopBroadcast();
     }
 
     // This is a method to simplify porting the tests for now.
@@ -234,7 +232,7 @@ contract L1GatewayTests is
         gatewayScript.fullGatewayRegistration();
     }
 
-    function test_startMessageToL2() public {
+    function test_requestL2TransactionDirect() public {
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChainId);
         _confirmMigration(TxStatus.Success);

@@ -292,7 +292,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            CLAIM FAILED DEPOSIT Functions
+                            CONFIRM DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IL1AssetRouter
@@ -311,7 +311,9 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             _data: _assetData
         });
 
-        emit ClaimedFailedDepositAssetRouter(_chainId, _assetId, _assetData);
+        if (_txStatus == TxStatus.Failure) {
+            emit ClaimedFailedDepositAssetRouter(_chainId, _assetId, _assetData);
+        }
     }
 
     function bridgeRecoverFailedTransfer(
