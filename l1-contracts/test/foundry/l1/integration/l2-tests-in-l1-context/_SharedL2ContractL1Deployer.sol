@@ -53,7 +53,6 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         );
         initializeConfig(inputPath);
         discoveredBridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
-        discoveredBridgehub.transparentProxyAdmin = address(0x1);
         discoveredBridgehub.assetRouter = L2_ASSET_ROUTER_ADDR;
         discoveredBridgehub.assetRouterAddresses.nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
         discoveredBridgehub.interopCenterProxy = L2_INTEROP_CENTER_ADDR;
@@ -63,6 +62,8 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
             instantiateCreate2Factory();
         }
 
+        // TODO refactor
+        addresses.transparentProxyAdmin = address(0x1);
         addresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
         addresses.stateTransition.verifier = deploySimpleContract("Verifier", true);
         addresses.stateTransition.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
