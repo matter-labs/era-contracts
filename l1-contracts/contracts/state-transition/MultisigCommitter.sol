@@ -134,14 +134,22 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
 
 	/// @inheritdoc IMultisigCommitter
 	function addSharedVerifier(address verifier) external override onlyOwner {
-		sharedVerifiers.add(verifier);
-		emit SharedVerifierAdded(verifier);
+		if (!sharedVerifiers.contains(verifier)) {
+			// slither-disable-next-line unused-return
+			sharedVerifiers.add(verifier);
+			emit SharedVerifierAdded(verifier);
+		}
+		// no-op if verifier is already in the set
 	}
 
 	/// @inheritdoc IMultisigCommitter
 	function removeSharedVerifier(address verifier) external override onlyOwner {
-		sharedVerifiers.remove(verifier);
-		emit SharedVerifierRemoved(verifier);
+		if (sharedVerifiers.contains(verifier)) {
+			// slither-disable-next-line unused-return
+			sharedVerifiers.remove(verifier);
+			emit SharedVerifierRemoved(verifier);
+		}
+		// no-op if verifier is not in the set
 	}
 
 	/// @inheritdoc IMultisigCommitter
