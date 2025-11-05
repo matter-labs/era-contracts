@@ -162,6 +162,11 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
 		return sharedVerifiers.at(index);
 	}
 
+	/// @inheritdoc IMultisigCommitter
+	function isSharedVerifier(address verifier) external override view returns (bool) {
+		return sharedVerifiers.contains(verifier);
+	}
+
 	function _checkSignatures(address chainAddress, address[] calldata signers, bytes[] calldata signatures, bytes32 digest) internal view {
 		if (signers.length != signatures.length) 
 			revert SignaturesLengthMismatch(signers.length, signatures.length);

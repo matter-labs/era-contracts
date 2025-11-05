@@ -29,7 +29,7 @@ contract MultisigCommiterTest is Test {
 	address sequencer;
 	address verifier1Shared;
 	address verifier2Shared;
-	address verifier3Custom;
+	address verifier1Custom;
 	uint256 chainId;
 	uint256 lastBatchNumber;
 	uint32 executionDelay;
@@ -44,7 +44,7 @@ contract MultisigCommiterTest is Test {
 		sequencer = makeAddr("sequencer");
 		verifier1Shared = makeAddr("verifier1Shared");
 		verifier2Shared = makeAddr("verifier2Shared");
-		verifier3Custom = makeAddr("verifier3Custom");
+		verifier1Custom = makeAddr("verifier1Custom");
 
         chainId = 1;
         lastBatchNumber = 123;
@@ -65,7 +65,7 @@ contract MultisigCommiterTest is Test {
         vm.prank(chainAdmin);
         multisigCommitter.addValidatorForChainId(chainId, sequencer);
 		vm.prank(chainAdmin);
-		multisigCommitter.grantRole(chainAddress, verifierRole, verifier3Custom);
+		multisigCommitter.grantRole(chainAddress, verifierRole, verifier1Custom);
 		vm.prank(ecosystemOwner);
 		multisigCommitter.addSharedVerifier(verifier1Shared);
 		vm.prank(ecosystemOwner);
@@ -108,5 +108,48 @@ contract MultisigCommiterTest is Test {
 		multisigCommitter.useSharedSigningSet(chainAddress);
 		assertEq(multisigCommitter.getSigningThreshold(chainAddress), 2);
 		assertEq(multisigCommitter.getVerifiersCount(chainAddress), 2);
+	}
+
+	function test_addingRemovingSharedVerifiers() public {
+		address verifier3Shared = makeAddr("verifier3Shared");
+		vm.prank(ecosystemOwner);
+		multisigCommitter.addSharedVerifier(verifier3Shared);
+		assertEq(multisigCommitter.sharedVerifiersCount(), 3);
+		assertEq(multisigCommitter.getVerifiersCount(chainAddress), 3);
+		assertTrue(multisigCommitter.isSharedVerifier(verifier3Shared));
+		assertTrue(multisigCommitter.isVerifier(chainAddress, verifier3Shared));
+		
+		vm.prank(ecosystemOwner);
+		multisigCommitter.removeSharedVerifier(verifier1Shared);
+		assertEq(multisigCommitter.sharedVerifiersCount(), 2);
+		assertEq(multisigCommitter.getVerifiersCount(chainAddress), 2);
+		assertFalse(multisigCommitter.isSharedVerifier(verifier1Shared));
+		assertFalse(multisigCommitter.isVerifier(chainAddress, verifier1Shared));
+
+		vm.prank(ecosystemOwner);
+		multisigCommitter.removeSharedVerifier(verifier3Shared);
+		assertEq(multisigCommitter.sharedVerifiersCount(), 1);
+		assertEq(multisigCommitter.getVerifiersCount(chainAddress), 1);
+		assertFalse(multisigCommitter.isSharedVerifier(verifier3Shared));
+		assertFalse(multisigCommitter.isVerifier(chainAddress, verifier3Shared));
+
+		vm.prank(ecosystemOwner);
+		multisigCommitter.addSharedVerifier(verifier1Shared);
+		assertEq(multisigCommitter.sharedVerifiersCount(), 2);
+		assertEq(multisigCommitter.getVerifiersCount(chainAddress), 2);
+		assertTrue(multisigCommitter.isSharedVerifier(verifier1Shared));
+		assertTrue(multisigCommitter.isVerifier(chainAddress, verifier1Shared));
+	}
+
+	function test_changeSharedSigningThreshold() public {
+		vm.prank(ecosystemOwner);
+		multisigCommitter.setSharedSigningThreshold(4);
+		assertEq(multisigCommitter.sharedSigningThreshold(), 4);
+		assertEq(multisigCommitter.getSigningThreshold(chainAddress), 4);
+
+		vm.prank(ecosystemOwner);
+		multisigCommitter.setSharedSigningThreshold(2);
+		assertEq(multisigCommitter.sharedSigningThreshold(), 2);
+		assertEq(multisigCommitter.getSigningThreshold(chainAddress), 2);
 	}
 }

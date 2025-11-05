@@ -78,4 +78,7 @@ interface IMultisigCommitter is IValidatorTimelock {
 
 	/// @notice Returns the shared verifier at the given index.
 	function sharedVerifiersMember(uint256 index) external view returns (address);
+
+	/// @notice Returns true if the verifier is an shared verifier
+	function isSharedVerifier(address verifier) external view returns (bool);
 }
