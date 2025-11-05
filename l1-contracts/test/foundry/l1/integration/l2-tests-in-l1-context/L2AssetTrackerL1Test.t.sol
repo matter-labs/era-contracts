@@ -9,8 +9,6 @@ import "forge-std/console.sol";
 
 import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
-
 import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
 import {L2AssetTrackerTest} from "../l2-tests-abstract/L2AssetTracker.t.sol";
 
@@ -43,5 +41,11 @@ contract L2AssetTrackerL1Test is Test, SharedL2ContractL1Deployer, L2AssetTracke
         StateTransitionDeployedAddresses memory stateTransition
     ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
         return super.getUpgradeAddedFacetCuts(stateTransition);
+    }
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
+        return super.getInitializeCalldata(contractName, isZKBytecode);
     }
 }

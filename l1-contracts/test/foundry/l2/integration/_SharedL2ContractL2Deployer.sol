@@ -85,7 +85,6 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         );
     }
 
-
     function deployViaCreate2(
         bytes memory creationCode,
         bytes memory constructorArgs

@@ -7,8 +7,6 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
-
 import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {L2InteropTestAbstract} from "../l2-tests-abstract/L2InteropTestAbstract.t.sol";
 
@@ -42,5 +40,12 @@ contract L2InteropL1Test is Test, SharedL2ContractL1Deployer, L2InteropTestAbstr
         StateTransitionDeployedAddresses memory stateTransition
     ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
         return super.getUpgradeAddedFacetCuts(stateTransition);
+    }
+
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
+        return super.getInitializeCalldata(contractName, isZKBytecode);
     }
 }

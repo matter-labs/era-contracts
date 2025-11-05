@@ -15,6 +15,13 @@ abstract contract DeployIntegrationUtils is Script, DeployCTMUtils {
 
     function test() internal virtual override {}
 
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual override returns (bytes memory) {
+        return super.getInitializeCalldata(contractName, isZKBytecode);
+    }
+
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {

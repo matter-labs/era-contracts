@@ -15,7 +15,7 @@ import {DeployCTMIntegrationScript} from "../deploy-scripts/DeployCTMIntegration
 import {SharedL2ContractDeployer, SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 import {L2UtilsBase} from "./L2UtilsBase.sol";
-
+import {DeployCTMUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {L2UtilsBase} from "./L2UtilsBase.sol";
 
@@ -94,5 +94,11 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         returns (Diamond.FacetCut[] memory)
     {
         return super.getUpgradeAddedFacetCuts(stateTransition);
+    }
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual override(DeployIntegrationUtils, DeployCTMUtils) returns (bytes memory) {
+        return super.getInitializeCalldata(contractName, isZKBytecode);
     }
 }

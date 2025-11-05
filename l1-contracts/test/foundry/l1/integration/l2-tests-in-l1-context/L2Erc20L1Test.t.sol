@@ -50,4 +50,10 @@ contract L2Erc20L1Test is Test, SharedL2ContractL1Deployer, L2Erc20TestAbstract 
     ) internal view virtual override returns (bytes memory) {
         return super.getCreationCode(contractName, false);
     }
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
+        return super.getInitializeCalldata(contractName, isZKBytecode);
+    }
 }
