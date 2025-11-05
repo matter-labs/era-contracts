@@ -111,19 +111,6 @@ struct FacetToSelectors {
     uint16 facetPosition;
 }
 
-struct FacetCut {
-    address facet;
-    Action action;
-    bool isFreezable;
-    bytes4[] selectors;
-}
-
-enum Action {
-    Add,
-    Replace,
-    Remove
-}
-
 struct ChainInfoFromBridgehub {
     address diamondProxy;
     address admin;
@@ -1326,6 +1313,19 @@ library Utils {
     ) internal returns (bytes memory bytecodeInfo) {
         bytes memory bytecode = readFoundryDeployedBytecodeL1(fileName, contractName);
         bytecodeInfo = getZKOSBytecodeInfo(bytecode);
+    }
+
+    function getZKOSProxyUpgradeBytecodeInfo(
+        string memory fileName,
+        string memory contractName
+    ) internal returns (bytes memory) {
+        bytes memory bytecodeInfo = getZKOSBytecodeInfoForContract(fileName, contractName);
+        bytes memory proxyBytecodeInfo = getZKOSBytecodeInfoForContract(
+            "SystemContractProxy.sol",
+            "SystemContractProxy"
+        );
+
+        return abi.encode(bytecodeInfo, proxyBytecodeInfo);
     }
 
     function mergeCalls(Call[] memory a, Call[] memory b) public pure returns (Call[] memory result) {

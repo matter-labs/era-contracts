@@ -78,6 +78,7 @@
     "deploy-testkit": "ts-node scripts/deploy-testkit.ts",
     "verify": "hardhat run --network env scripts/verify.ts",
     "verify-on-l2-explorer": "yarn ts-node scripts/verify-on-l2-explorer.ts",
+    "verify-contracts": "ts-node scripts/verify-contracts.ts",
     "read-variable": "ts-node scripts/read-variable.ts",
     "initialize-bridges": "ts-node scripts/initialize-bridges.ts",
     "initialize-validator": "ts-node scripts/initialize-validator.ts",
@@ -93,7 +94,8 @@
     "governance-accept-ownership": "ts-node scripts/governance-accept-ownership.ts",
     "sync-layer": "ts-node scripts/sync-layer.ts",
     "size": "hardhat size-contracts",
-    "errors-lint": "ts-node scripts/errors-lint.ts"
+    "errors-lint": "ts-node scripts/errors-lint.ts",
+    "zksync-os-genesis": "ts-node scripts/zksync-os-genesis.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3",

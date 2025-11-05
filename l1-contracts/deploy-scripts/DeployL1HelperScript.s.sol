@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {Action, FacetCut, StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
+import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -43,7 +43,8 @@ import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifie
 import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
 import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
 import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
-import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
+import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
@@ -150,7 +151,11 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 return type(ValidiumL1DAValidator).creationCode;
             } else if (compareStrings(contractName, "Verifier")) {
                 if (config.testnetVerifier) {
-                    return type(TestnetVerifier).creationCode;
+                    if (config.isZKsyncOS) {
+                        return type(ZKsyncOSTestnetVerifier).creationCode;
+                    } else {
+                        return type(EraTestnetVerifier).creationCode;
+                    }
                 } else {
                     if (config.isZKsyncOS) {
                         return type(ZKsyncOSDualVerifier).creationCode;
@@ -218,7 +223,7 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 return Utils.readZKFoundryBytecodeL1("ValidiumL1DAValidator.sol", "ValidiumL1DAValidator");
             } else if (compareStrings(contractName, "Verifier")) {
                 if (config.testnetVerifier) {
-                    return getCreationCode("TestnetVerifier", true);
+                    return getCreationCode("EraTestnetVerifier", true);
                 } else {
                     return getCreationCode("DualVerifier", true);
                 }
