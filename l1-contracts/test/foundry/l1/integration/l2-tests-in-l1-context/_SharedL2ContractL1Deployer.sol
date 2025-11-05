@@ -17,7 +17,6 @@ import {SharedL2ContractDeployer, SystemContractsArgs} from "../l2-tests-abstrac
 import {L2UtilsBase} from "./L2UtilsBase.sol";
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-import {DeployCTMScript} from "deploy-scripts/DeployCTM.s.sol";
 import {L2UtilsBase} from "./L2UtilsBase.sol";
 
 contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegrationScript {
