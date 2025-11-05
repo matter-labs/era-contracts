@@ -67,6 +67,8 @@ error ChainIdMismatch();
 error ChainIdNotRegistered(uint256 chainId);
 // 0x8f620a06
 error ChainIdTooBig();
+// 0xd336951d
+error ChainRequiresVerifiersSignaturesForCommit();
 // 0x8746f42f
 error ConstructorsNotSupported();
 // 0xec273439
@@ -244,6 +246,8 @@ error NoLegacySharedBridge();
 error NonEmptyCalldata();
 // 0x536ec84b
 error NonEmptyMsgValue();
+// 0x230f9d11
+error NotEnoughSigners(uint256 provided, uint256 expected);
 // 0xd018e08e
 error NonIncreasingTimestamp();
 // 0x0105f9c0
@@ -316,6 +320,8 @@ error SettlementLayersMustSettleOnL1();
 error SharedBridgeNotSet();
 // 0x7774d2f9
 error SharedBridgeValueNotSet(SharedBridgeKey);
+// 0xa665a34d
+error SignaturesLengthMismatch(uint256 expected, uint256 actual);
 // 0xa7781cbb
 error SignersNotSorted();
 // 0x3b94fe24
