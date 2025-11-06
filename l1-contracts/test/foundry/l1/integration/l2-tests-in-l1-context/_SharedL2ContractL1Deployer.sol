@@ -32,7 +32,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         L2UtilsBase.initSystemContracts(_args);
         vm.mockCall(
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(ISystemContext.getSettlementLayerChainId.selector),
+            abi.encodeWithSelector(ISystemContext.currentSettlementLayerChainId.selector),
             abi.encode(9)
         );
     }
