@@ -66,9 +66,28 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
         extractAndExecuteSingleBundle(logs, destinationChainId, EXECUTION_ADDRESS);
     }
 
-    function test_requestNativeTokenTransferViaLibrary() public {
+    function test_requestNativeTokenTransferViaLibrary_SameBaseToken() public {
         vm.deal(address(this), 1000 ether);
         vm.recordLogs();
+
+        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        extractAndExecuteSingleBundle(logs, destinationChainId, EXECUTION_ADDRESS);
+    }
+
+    function test_requestNativeTokenTransferViaLibrary_DifferentBaseToken() public {
+        vm.deal(address(this), 1000 ether);
+        vm.recordLogs();
+
+        bytes32 otherBaseTokenAssetId = bytes32(uint256(uint160(makeAddr("otherBaseToken"))));
+
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, destinationChainId),
+            abi.encode(otherBaseTokenAssetId)
+        );
+
+        
 
         InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100);
         Vm.Log[] memory logs = vm.getRecordedLogs();

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_ROUTER, L2_BRIDGEHUB, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 // import {IInteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
@@ -82,16 +82,28 @@ library InteropLibrary {
 
     /// @notice Build a single InteropCallStarter with provided attributes for sending native tokens.
     function buildSendNativeCall(
+        uint256 destination,
         address recipient,
         uint256 amount
-    ) internal pure returns (InteropCallStarter memory call) {
-        bytes[] memory callAttributes = new bytes[](1);
-        callAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (amount));
+    ) internal view returns (InteropCallStarter memory call) {
+        bytes32 destinationBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(destination);
+        bytes32 thisChainBaseTokenAssetId = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
+        bool indirectCall = destinationBaseTokenAssetId != thisChainBaseTokenAssetId;
+
+        uint256 attributesLength = indirectCall ? 2 : 1;
+        bytes[] memory callAttributes = new bytes[](attributesLength);
+        callAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (indirectCall ? 0 : amount));
+        if (indirectCall) {
+            callAttributes[1] = abi.encodeCall(IERC7786Attributes.indirectCall, (amount));
+        }
+        bytes memory empty = hex"";
+
+        address destinationAddress = indirectCall ? L2_ASSET_ROUTER_ADDR : recipient;
 
         return
             InteropCallStarter({
-                to: InteroperableAddress.formatEvmV1(recipient),
-                data: hex"",
+                to: InteroperableAddress.formatEvmV1(destinationAddress),
+                data: indirectCall ? buildSecondBridgeCalldata(thisChainBaseTokenAssetId, amount, recipient, address(0)) : empty,
                 callAttributes: callAttributes
             });
     }
@@ -249,7 +261,7 @@ library InteropLibrary {
     }
 
     /// @notice Build and send a call to receive native tokens on remote chain in one go.
-    /// @param  destination       Interoperable chain identifier (e.g., InteroperableAddress.formatEvmV1(271))
+    /// @param  destination       The normal chain id of the destination chain
     /// @param  recipient         Address that will receive the tokens on remote chain
     /// @param  amount            Amount to transfer
     /// @return bundleHash Hash of the sent bundle
@@ -267,7 +279,7 @@ library InteropLibrary {
         }
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
-        calls[0] = buildSendNativeCall(recipient, amount);
+        calls[0] = buildSendNativeCall(destination, recipient, amount);
         bytes[] memory bundleAttributes = buildBundleAttributes(unbundlerAddress);
 
         return
