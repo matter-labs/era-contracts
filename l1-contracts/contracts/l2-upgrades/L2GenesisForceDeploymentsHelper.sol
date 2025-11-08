@@ -146,7 +146,7 @@ library L2GenesisForceDeploymentsHelper {
                 fixedForceDeploymentsData.eraChainId,
                 fixedForceDeploymentsData.l1AssetRouter,
                 l2LegacySharedBridge,
-                additionalForceDeploymentsData.baseTokenAssetId,
+                additionalForceDeploymentsData.baseTokenBridgingData.assetId,
                 fixedForceDeploymentsData.aliasedL1Governance
             );
         } else {
@@ -156,7 +156,7 @@ library L2GenesisForceDeploymentsHelper {
                 fixedForceDeploymentsData.eraChainId,
                 fixedForceDeploymentsData.l1AssetRouter,
                 l2LegacySharedBridge,
-                additionalForceDeploymentsData.baseTokenAssetId
+                additionalForceDeploymentsData.baseTokenBridgingData.assetId
             );
         }
 
@@ -172,9 +172,9 @@ library L2GenesisForceDeploymentsHelper {
             _predeployedWethToken: predeployedL2WethAddress,
             _aliasedL1Governance: fixedForceDeploymentsData.aliasedL1Governance,
             _baseTokenL1Address: additionalForceDeploymentsData.baseTokenL1Address,
-            _baseTokenAssetId: additionalForceDeploymentsData.baseTokenAssetId,
-            _baseTokenName: additionalForceDeploymentsData.baseTokenName,
-            _baseTokenSymbol: additionalForceDeploymentsData.baseTokenSymbol
+            _baseTokenAssetId: additionalForceDeploymentsData.baseTokenBridgingData.assetId,
+            _baseTokenName: additionalForceDeploymentsData.baseTokenMetadata.name,
+            _baseTokenSymbol: additionalForceDeploymentsData.baseTokenMetadata.symbol
         });
 
         // Now initializing the upgradeable token beacon
@@ -208,9 +208,8 @@ library L2GenesisForceDeploymentsHelper {
                 additionalForceDeploymentsData.l2LegacySharedBridge,
                 deployedTokenBeacon,
                 wrappedBaseTokenAddress,
-                additionalForceDeploymentsData.baseTokenAssetId,
-                additionalForceDeploymentsData.baseTokenOriginAddress,
-                additionalForceDeploymentsData.baseTokenOriginChainId
+                additionalForceDeploymentsData.baseTokenBridgingData,
+                additionalForceDeploymentsData.baseTokenMetadata
             );
         } else {
             // solhint-disable-next-line func-named-parameters
@@ -219,9 +218,8 @@ library L2GenesisForceDeploymentsHelper {
                 previousL2TokenProxyBytecodeHash,
                 l2LegacySharedBridge,
                 wrappedBaseTokenAddress,
-                additionalForceDeploymentsData.baseTokenAssetId,
-                additionalForceDeploymentsData.baseTokenOriginAddress,
-                additionalForceDeploymentsData.baseTokenOriginChainId
+                additionalForceDeploymentsData.baseTokenBridgingData,
+                additionalForceDeploymentsData.baseTokenMetadata
             );
         }
 
@@ -261,13 +259,13 @@ library L2GenesisForceDeploymentsHelper {
 
         L2AssetTracker(L2_ASSET_TRACKER_ADDR).setAddresses(
             fixedForceDeploymentsData.l1ChainId,
-            additionalForceDeploymentsData.baseTokenAssetId
+            additionalForceDeploymentsData.baseTokenBridgingData.assetId
         );
 
         GWAssetTracker(GW_ASSET_TRACKER_ADDR).setAddresses(fixedForceDeploymentsData.l1ChainId);
 
         L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setAddresses(
-            additionalForceDeploymentsData.baseTokenOriginChainId
+            additionalForceDeploymentsData.baseTokenBridgingData.originChainId
         );
 
         InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
