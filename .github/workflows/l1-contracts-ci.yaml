@@ -178,12 +178,17 @@ jobs:
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
       - name: Check selectors
-        working-directory: l1-contracts
-        run: |
-          forge selectors list > /tmp/selectors
-          echo "Comparing generated selectors with l1-contracts/selectors"
-          diff -u /tmp/selectors selectors
+        run: yarn l1 selectors --check
 
   test-foundry:
     needs: [build, lint]
