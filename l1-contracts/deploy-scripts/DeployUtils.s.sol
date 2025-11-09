@@ -40,6 +40,7 @@ struct L1NativeTokenVaultAddresses {
 struct DataAvailabilityDeployedAddresses {
     address rollupDAManager;
     address l1RollupDAValidator;
+    address l1BlobsDAValidatorZKsyncOS;
     address noDAValidiumL1DAValidator;
     address availBridge;
     address availL1DAValidator;
@@ -396,6 +397,8 @@ abstract contract DeployUtils is Create2FactoryUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "RollupL1DAValidator")) {
             return abi.encode(addresses.daAddresses.l1RollupDAValidator);
+        } else if (compareStrings(contractName, "BlobsL1DAValidatorZKsyncOS")) {
+            return abi.encode();
         } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
             return abi.encode();
         } else if (compareStrings(contractName, "AvailL1DAValidator")) {
@@ -407,26 +410,15 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "MockEIP7702Checker")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Verifier")) {
-            if (config.testnetVerifier) {
+            if (config.isZKsyncOS) {
                 return
                     abi.encode(
                         addresses.stateTransition.verifierFflonk,
                         addresses.stateTransition.verifierPlonk,
-                        config.ownerAddress,
-                        config.isZKsyncOS
+                        msg.sender
                     );
             } else {
-                if (config.isZKsyncOS) {
-                    return
-                        abi.encode(
-                            addresses.stateTransition.verifierFflonk,
-                            addresses.stateTransition.verifierPlonk,
-                            config.ownerAddress
-                        );
-                } else {
-                    return
-                        abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
-                }
+                return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
             }
         } else if (compareStrings(contractName, "EraVerifierFflonk")) {
             return abi.encode();
@@ -458,6 +450,10 @@ abstract contract DeployUtils is Create2FactoryUtils {
             restrictions[0] = addresses.accessControlRestrictionAddress;
             return abi.encode(restrictions);
         } else if (compareStrings(contractName, "ChainTypeManager")) {
+            return abi.encode(addresses.bridgehub.bridgehubProxy);
+        } else if (compareStrings(contractName, "EraChainTypeManager")) {
+            return abi.encode(addresses.bridgehub.bridgehubProxy);
+        } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
             return abi.encode();

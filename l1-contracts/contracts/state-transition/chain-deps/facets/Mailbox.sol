@@ -7,7 +7,7 @@ import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
 import {IBridgehubBase} from "../../../bridgehub/IBridgehubBase.sol";
-import {BridgehubBase} from "../../../bridgehub/BridgehubBase.sol";
+import {L2Bridgehub} from "../../../bridgehub/L2Bridgehub.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
 import {IEIP7702Checker} from "../../chain-interfaces/IEIP7702Checker.sol";
@@ -356,7 +356,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) internal view returns (BridgehubL2TransactionRequest memory) {
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encodeCall(
-            BridgehubBase.forwardTransactionOnGateway,
+            L2Bridgehub.forwardTransactionOnGateway,
             (_chainId, _canonicalTxHash, _expirationTimestamp)
         );
         return
@@ -444,7 +444,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     function _requestL2Transaction(WritePriorityOpParams memory _params) internal returns (bytes32 canonicalTxHash) {
         BridgehubL2TransactionRequest memory request = _params.request;
 
-        // Factory deps are not used in ZKsync OS in non-upgrade transactions.
+        // For ZKsync OS factory deps will be ignored
         if (request.factoryDeps.length > MAX_NEW_FACTORY_DEPS) {
             revert TooManyFactoryDeps();
         }
@@ -588,7 +588,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (s.chainId != ERA_CHAIN_ID) {
             revert OnlyEraSupported();
         }
-        address sharedBridge = IBridgehubBase(s.bridgehub).assetRouter();
+        address sharedBridge = address(IBridgehubBase(s.bridgehub).assetRouter());
         IL1AssetRouter(sharedBridge).finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
             _l2BatchNumber: _l2BatchNumber,
@@ -625,7 +625,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 refundRecipient: _refundRecipient
             })
         );
-        address sharedBridge = IBridgehubBase(s.bridgehub).assetRouter();
+        address sharedBridge = address(IBridgehubBase(s.bridgehub).assetRouter());
         IL1AssetRouter(sharedBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
             s.baseTokenAssetId,

@@ -16,7 +16,7 @@ import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2ChainAssetHandler} from "contracts/bridgehub/L2ChainAssetHandler.sol";
-import {UpgradeableBeaconDeployer} from "contracts/bridge/ntv/UpgradeableBeaconDeployer.sol";
+import {UpgradeableBeaconDeployer} from "contracts/bridge/UpgradeableBeaconDeployer.sol";
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
 import {SystemContractsArgs} from "./L2Utils.sol";
@@ -25,6 +25,8 @@ import {ISystemContext} from "contracts/state-transition/l2-deps/ISystemContext.
 import {L2GatewayTestAbstract} from "../../l1/integration/l2-tests-abstract/L2GatewayTestAbstract.t.sol";
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {Create2FactoryUtils} from "deploy-scripts/Create2FactoryUtils.s.sol";
+import {SystemContractProxyAdmin} from "contracts/l2-upgrades/SystemContractProxyAdmin.sol";
+import {L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2ContractL2Deployer {
     uint256 constant CHAIN_ID = 270;
@@ -87,6 +89,13 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
             "UpgradeableBeaconDeployer"
         );
         vm.etch(L2_NTV_BEACON_DEPLOYER_ADDR, upgradeableBeaconDeployerCode);
+
+        // Deploy and etch SystemContractProxyAdmin
+        bytes memory systemContractProxyAdminCode = Utils.readZKFoundryBytecodeL1(
+            "SystemContractProxyAdmin.sol",
+            "SystemContractProxyAdmin"
+        );
+        vm.etch(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, systemContractProxyAdminCode);
 
         additionalForceDeploymentsData = abi.encode(
             ZKChainSpecificForceDeploymentsData({
@@ -161,6 +170,13 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
             L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(bytes4(keccak256("getMarker(bytes32)"))),
             abi.encode(1)
+        );
+
+        // Mock SystemContractProxyAdmin.owner() to return the complex upgrader address
+        vm.mockCall(
+            L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
+            abi.encodeWithSignature("owner()"),
+            abi.encode(L2_COMPLEX_UPGRADER_ADDR)
         );
     }
 

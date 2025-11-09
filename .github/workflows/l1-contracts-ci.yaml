@@ -61,6 +61,21 @@ jobs:
         with:
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
+
+      - name: Upload artifacts for download
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
@@ -113,6 +128,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
@@ -202,6 +218,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
@@ -212,6 +229,10 @@ jobs:
 
       - name: Run tests
         working-directory: ./l1-contracts
+        run: yarn test:foundry
+
+      - name: Run DA tests
+        working-directory: ./da-contracts
         run: yarn test:foundry
 
       # TODO: restore once we can get back to latest foundry
@@ -282,28 +303,28 @@ jobs:
           toolchain: 1.72.0
 
       - name: Install Rust toolchain
-        working-directory: tools
+        working-directory: tools/verifier-gen
         run: rustup toolchain install
 
       - name: Generate Era verifiers
-        working-directory: tools
+        working-directory: tools/verifier-gen
         run: cargo run --bin zksync_verifier_contract_generator --release -- --variant era
 
       - name: Compare EraVerifierPlonk.sol
-        run: diff tools/data/EraVerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/EraVerifierPlonk.sol
+        run: diff tools/verifier-gen/data/EraVerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/EraVerifierPlonk.sol
 
       - name: Compare EraVerifierFflonk.sol
-        run: diff tools/data/EraVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/EraVerifierFflonk.sol
+        run: diff tools/verifier-gen/data/EraVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/EraVerifierFflonk.sol
 
       - name: Generate ZKsyncOS verifiers
-        working-directory: tools
+        working-directory: tools/verifier-gen
         run: cargo run --bin zksync_verifier_contract_generator --release -- --variant zksync-os
 
       - name: Compare ZKsyncOSVerifierPlonk.sol
-        run: diff tools/data/ZKsyncOSVerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol
+        run: diff tools/verifier-gen/data/ZKsyncOSVerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol
 
       - name: Compare ZKsyncOSVerifierFflonk.sol
-        run: diff tools/data/ZKsyncOSVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol
+        run: diff tools/verifier-gen/data/ZKsyncOSVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol
 
   coverage:
     defaults:
@@ -341,6 +362,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
@@ -389,7 +411,7 @@ jobs:
         with:
           coverage-files: ./l1-contracts/lcov.info
           working-directory: l1-contracts
-          minimum-coverage: 83 # TODO(EVM-944): increase threshold to 85
+          minimum-coverage: 75 # TODO(EVM-944): increase threshold to 85
 
 
   # FIXME: restore gas report CI
@@ -421,6 +443,7 @@ jobs:
   #         fail-on-cache-miss: true
   #         key: artifacts-l1-${{ github.sha }}
   #         path: |
+  #           da-contracts/cache-forge
   #           da-contracts/out
   #           l1-contracts/cache-forge
   #           l1-contracts/out

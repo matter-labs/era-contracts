@@ -11,6 +11,7 @@ import {IL2Bridgehub} from "./IL2Bridgehub.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
+import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {NotInGatewayMode, NotRelayedSender} from "./L1BridgehubErrors.sol";
 
 /// @author Matter Labs
@@ -18,11 +19,12 @@ import {NotInGatewayMode, NotRelayedSender} from "./L1BridgehubErrors.sol";
 /// @dev The Bridgehub contract serves as the primary entry point for L1->L2 communication,
 /// facilitating interactions between end user and bridges.
 /// It also manages state transition managers, base tokens, and chain registrations.
-/// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains
-/// between different settlement layers (for example from L1 to Gateway).
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
+
+    // Reserved to preserve storage offsets after adjusting BridgehubBase.__gap.
+    uint256 private __bridgehubBaseGapPadding;
 
     /// @dev The asset ID of ETH token.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
@@ -103,7 +105,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         uint256 _chainId,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) external override onlySettlementLayerRelayedSender {
+    ) external onlySettlementLayerRelayedSender {
         if (L1_CHAIN_ID == block.chainid) {
             revert NotInGatewayMode();
         }
@@ -118,7 +120,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         IMessageRoot _messageRoot,
         address _chainAssetHandler
     ) external override onlyOwnerOrUpgrader {
-        assetRouter = _assetRouter;
+        assetRouter = IAssetRouterBase(_assetRouter);
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;
         chainAssetHandler = _chainAssetHandler;

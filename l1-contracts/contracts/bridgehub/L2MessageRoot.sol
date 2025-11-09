@@ -22,11 +22,6 @@ contract L2MessageRoot is MessageRootBase {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
-    /// @dev Chain ID of L1 for bridging reasons.
-    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
-    /// the old version where it was an immutable.
-    uint256 internal l1ChainId;
-
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -38,10 +33,6 @@ contract L2MessageRoot is MessageRootBase {
     // A method for backwards compatibility with the old implementation
     function BRIDGE_HUB() public view returns (address) {
         return L2_BRIDGEHUB_ADDR;
-    }
-
-    function L1_CHAIN_ID() public view override returns (uint256) {
-        return l1ChainId;
     }
 
     /// @dev Only allows calls from the complex upgrader contract on L2.
@@ -69,7 +60,7 @@ contract L2MessageRoot is MessageRootBase {
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
-    ) external override onlyChain(_chainId) {
+    ) external onlyChain(_chainId) {
         // Make sure that chain is registered.
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();

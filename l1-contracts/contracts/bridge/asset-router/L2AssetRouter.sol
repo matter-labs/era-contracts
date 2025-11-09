@@ -4,17 +4,19 @@ pragma solidity 0.8.28;
 
 import {IL2AssetRouter} from "./IL2AssetRouter.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
+import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 
 import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
 import {NativeTokenVaultBase} from "../ntv/NativeTokenVaultBase.sol";
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
+import {IL2Bridgehub} from "../../bridgehub/IL2Bridgehub.sol";
 
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
-import {L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
@@ -25,6 +27,11 @@ import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidC
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
+    /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
+    IL2Bridgehub public BRIDGE_HUB;
+
     /// @dev Chain ID of L1 for bridging reasons.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
@@ -38,12 +45,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     /// @dev The address of the L1 asset router counterpart.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    address public L1_ASSET_ROUTER;
+    IL1AssetRouter public L1_ASSET_ROUTER;
 
     /// @dev The address of the L2 legacy shared bridge.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    address public L2_LEGACY_SHARED_BRIDGE;
+    IL2SharedBridgeLegacy public L2_LEGACY_SHARED_BRIDGE;
 
     /// @dev The asset id of the base token.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
@@ -54,7 +61,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     modifier onlyAssetRouterCounterpart(uint256 _originChainId) {
         if (_originChainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-            if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) {
+            if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != address(L1_ASSET_ROUTER)) {
                 revert InvalidCaller(msg.sender);
             }
         } else {
@@ -67,7 +74,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     modifier onlyAssetRouterCounterpartOrSelf(uint256 _chainId) {
         if (_chainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-            if ((AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) && (msg.sender != address(this))) {
+            if (
+                (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != address(L1_ASSET_ROUTER)) &&
+                (msg.sender != address(this))
+            ) {
                 revert InvalidCaller(msg.sender);
             }
         } else {
@@ -78,7 +88,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
 
     /// @notice Checks that the message sender is the legacy L2 bridge.
     modifier onlyLegacyBridge() {
-        if (msg.sender != L2_LEGACY_SHARED_BRIDGE) {
+        if (msg.sender != address(L2_LEGACY_SHARED_BRIDGE)) {
             revert InvalidCaller(msg.sender);
         }
         _;
@@ -110,11 +120,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     function initL2(
         uint256 _l1ChainId,
         uint256 _eraChainId,
-        address _l1AssetRouter,
-        address _legacySharedBridge,
+        IL1AssetRouter _l1AssetRouter,
+        IL2SharedBridgeLegacy _legacySharedBridge,
         bytes32 _baseTokenAssetId,
         address _aliasedOwner
     ) public reentrancyGuardInitializer onlyUpgrader {
+        BRIDGE_HUB = IL2Bridgehub(L2_BRIDGEHUB_ADDR);
         _disableInitializers();
         // solhint-disable-next-line func-named-parameters
         updateL2(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, _baseTokenAssetId);
@@ -133,12 +144,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     function updateL2(
         uint256 _l1ChainId,
         uint256 _eraChainId,
-        address _l1AssetRouter,
-        address _legacySharedBridge,
+        IL1AssetRouter _l1AssetRouter,
+        IL2SharedBridgeLegacy _legacySharedBridge,
         bytes32 _baseTokenAssetId
     ) public onlyUpgrader {
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
-        if (_l1AssetRouter == address(0)) {
+        if (address(_l1AssetRouter) == address(0)) {
             revert EmptyAddress();
         }
         L1_CHAIN_ID = _l1ChainId;
@@ -231,7 +242,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         });
 
         bytes memory message;
-        if (_alwaysNewMessageFormat || L2_LEGACY_SHARED_BRIDGE == address(0)) {
+        if (_alwaysNewMessageFormat || address(L2_LEGACY_SHARED_BRIDGE) == address(0)) {
             message = _getAssetRouterWithdrawMessage(_assetId, l1bridgeMintData);
             // slither-disable-next-line unused-return
             txHash = L2ContractHelper.sendMessageToL1(message);
@@ -404,6 +415,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     /// @notice Returns the address of the L1 asset router.
     /// @dev The old name is kept for backward compatibility.
     function l1Bridge() external view returns (address) {
-        return L1_ASSET_ROUTER;
+        return address(L1_ASSET_ROUTER);
     }
 }

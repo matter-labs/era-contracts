@@ -25,16 +25,18 @@ import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifie
 import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
 import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
 import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
-import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
+import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -71,13 +73,14 @@ contract GatewayCTMDeployerTest is Test {
         new RollupDAManager();
         new ValidiumL1DAValidator();
         new RelayedSLDAValidator();
-        new ChainTypeManager(address(0));
+        new ZKsyncOSChainTypeManager(address(0));
+        new EraChainTypeManager(address(0));
         new ProxyAdmin();
 
         new EraVerifierFflonk();
         new EraVerifierPlonk();
 
-        new TestnetVerifier(EraVerifierFflonk(address(0)), EraVerifierPlonk(address(0)), address(0), false);
+        new EraTestnetVerifier(EraVerifierFflonk(address(0)), EraVerifierPlonk(address(0)));
 
         new ValidatorTimelock(L2_BRIDGEHUB_ADDR);
         new ServerNotifier();

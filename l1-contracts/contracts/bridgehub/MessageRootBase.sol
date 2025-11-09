@@ -34,7 +34,9 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
 
     function _bridgehub() internal view virtual returns (address);
 
-    function L1_CHAIN_ID() public view virtual returns (uint256);
+    function L1_CHAIN_ID() public view virtual returns (uint256) {
+        return l1ChainId;
+    }
 
     /// @notice Emitted when a new chain is added to the MessageRoot.
     /// @param chainId The ID of the chain that is being added to the MessageRoot.
@@ -83,12 +85,16 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
     /// from the earlier ones.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
+    /// @dev Chain ID of L1.
+    /// @dev Kept here for storage layout compatibility with previous versions.
+    uint256 internal l1ChainId;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[41] private __gap;
+    uint256[40] private __gap;
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
@@ -118,12 +124,6 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
         }
         _;
     }
-
-    /// @notice Adds a new chainBatchRoot to the chainTree.
-    /// @param _chainId The ID of the chain whose chainBatchRoot is being added to the chainTree.
-    /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
-    /// @param _chainBatchRoot The value of chainBatchRoot which is being added.
-    function addChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external virtual {}
 
     /// @notice Adds a single chain to the message root.
     /// @param _chainId The ID of the chain that is being added to the message root.

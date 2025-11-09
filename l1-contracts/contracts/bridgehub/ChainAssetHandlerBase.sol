@@ -11,10 +11,13 @@ import {IBridgehubBase, BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData} fr
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
+import {IL1Bridgehub} from "./IL1Bridgehub.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
+import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, NotAssetRouter, NotL1, SLHasDifferentCTM} from "./L1BridgehubErrors.sol";
+import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, NotAssetRouter, SLHasDifferentCTM} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused} from "../common/L1ContractErrors.sol";
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
@@ -45,13 +48,13 @@ abstract contract ChainAssetHandlerBase is
     function L1_CHAIN_ID() external view virtual returns (uint256);
 
     /// @notice The bridgehub contract
-    function BRIDGEHUB() external view virtual returns (address);
+    function BRIDGEHUB() external view virtual returns (IL1Bridgehub);
 
     /// @notice The message root contract
-    function MESSAGE_ROOT() external view virtual returns (address);
+    function MESSAGE_ROOT() external view virtual returns (IMessageRoot);
 
     /// @notice The asset router contract
-    function ASSET_ROUTER() external view virtual returns (address);
+    function ASSET_ROUTER() external view virtual returns (IAssetRouterBase);
 
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
@@ -61,11 +64,11 @@ abstract contract ChainAssetHandlerBase is
 
     function _l1ChainId() internal view virtual returns (uint256);
 
-    function _bridgehub() internal view virtual returns (address);
+    function _bridgehub() internal view virtual returns (IL1Bridgehub);
 
-    function _messageRoot() internal view virtual returns (address);
+    function _messageRoot() internal view virtual returns (IMessageRoot);
 
-    function _assetRouter() internal view virtual returns (address);
+    function _assetRouter() internal view virtual returns (IAssetRouterBase);
 
     /// @notice Used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
@@ -79,8 +82,8 @@ abstract contract ChainAssetHandlerBase is
 
     /// @notice Only the asset router can call.
     modifier onlyAssetRouter() {
-        if (msg.sender != _assetRouter()) {
-            revert NotAssetRouter(msg.sender, _assetRouter());
+        if (msg.sender != address(_assetRouter())) {
+            revert NotAssetRouter(msg.sender, address(_assetRouter()));
         }
         _;
     }
@@ -89,14 +92,6 @@ abstract contract ChainAssetHandlerBase is
     modifier whenMigrationsNotPaused() {
         if (migrationPaused) {
             revert MigrationPaused();
-        }
-        _;
-    }
-
-    /// @notice Only when the contract is deployed on L1.
-    modifier onlyL1() {
-        if (_l1ChainId() != block.chainid) {
-            revert NotL1(_l1ChainId(), block.chainid);
         }
         _;
     }
@@ -123,6 +118,7 @@ abstract contract ChainAssetHandlerBase is
         override
         requireZeroValue(_l2MsgValue + msg.value)
         onlyAssetRouter
+        whenNotPaused
         whenMigrationsNotPaused
         returns (bytes memory bridgehubMintData)
     {
@@ -190,7 +186,7 @@ abstract contract ChainAssetHandlerBase is
         uint256, // originChainId
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
-    ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenMigrationsNotPaused {
+    ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenNotPaused whenMigrationsNotPaused {
         BridgehubMintCTMAssetData memory bridgehubMintData = abi.decode(
             _bridgehubMintData,
             (BridgehubMintCTMAssetData)
@@ -218,39 +214,6 @@ abstract contract ChainAssetHandlerBase is
         emit MigrationFinalized(bridgehubMintData.chainId, _assetId, zkChain);
     }
 
-    /// @dev IL1AssetHandler interface, used to undo a failed migration of a chain.
-    // / @param _chainId the chainId of the chain
-    /// @param _assetId the assetId of the chain's CTM
-    /// @param _data the data for the recovery.
-    /// @param _depositSender the address of the entity that initiated the deposit.
-    // slither-disable-next-line locked-ether
-    function bridgeRecoverFailedTransfer(
-        uint256,
-        bytes32 _assetId,
-        address _depositSender,
-        bytes calldata _data
-    ) external payable override requireZeroValue(msg.value) onlyAssetRouter onlyL1 {
-        BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
-
-        (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeRecoverFailedTransfer(
-            bridgehubBurnData.chainId
-        );
-
-        IChainTypeManager(ctm).forwardedBridgeRecoverFailedTransfer({
-            _chainId: bridgehubBurnData.chainId,
-            _assetInfo: _assetId,
-            _depositSender: _depositSender,
-            _ctmData: bridgehubBurnData.ctmData
-        });
-
-        IZKChain(zkChain).forwardedBridgeRecoverFailedTransfer({
-            _chainId: bridgehubBurnData.chainId,
-            _assetInfo: _assetId,
-            _originalCaller: _depositSender,
-            _chainData: bridgehubBurnData.chainData
-        });
-    }
-
     /*//////////////////////////////////////////////////////////////
                             PAUSE
     //////////////////////////////////////////////////////////////*/
@@ -263,5 +226,15 @@ abstract contract ChainAssetHandlerBase is
     /// @notice Unpauses migration functions.
     function unpauseMigration() external onlyOwner {
         migrationPaused = false;
+    }
+
+    /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
+    function unpause() external onlyOwner {
+        _unpause();
     }
 }
