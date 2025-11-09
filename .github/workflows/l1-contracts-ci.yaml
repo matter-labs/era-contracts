@@ -153,8 +153,14 @@ jobs:
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
         with:
-          submodules: recursive
+          node-version: 18.18.0
+          cache: yarn
+      - name: Install dependencies
+        run: yarn
 
       - name: Restore artifacts cache
         uses: actions/cache/restore@v3
@@ -162,13 +168,9 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
-            da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
             l1-contracts/zkout
-            l2-contracts/cache-forge
-            l2-contracts/zkout
-            system-contracts/zkout
 
       - name: Install foundry-zksync
         run: |
@@ -177,15 +179,6 @@ jobs:
           tar zxf foundry_zksync_v0.0.30_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
-
-      - name: Install Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
 
       - name: Check selectors
         run: yarn l1 selectors --check
