@@ -153,6 +153,8 @@ jobs:
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Use Node.js
         uses: actions/setup-node@v3
