@@ -216,7 +216,7 @@ A call to a contract with invalid bytecode can not be proven. That is why it is 
 
 ## Account abstraction
 
-One of the other important features of ZKsync is the support of account abstraction. It is highly recommended to read the documentation on our AA protocol here: [https://docs.zksync.io/zksync-network/unique-features/account-abstraction](https://docs.zksync.io/zksync-network/unique-features/account-abstraction)
+One of the other important features of ZKsync is the support of account abstraction. It is highly recommended to read the documentation on our AA protocol here: [https://docs.zksync.io/zksync-network/zksync-era/unique-features#native-account-abstraction](https://docs.zksync.io/zksync-network/zksync-era/unique-features#native-account-abstraction)
 
 #### Account versioning
 
@@ -386,7 +386,7 @@ On ZKsync, every address is a contract. Users can start transactions from their 
 
 Note, that if you call an account that is in kernel space and does not have any code deployed there, right now, the transaction will revert.
 
-We process the L2 transactions according to our account abstraction protocol: [https://docs.zksync.io/zksync-network/unique-features/account-abstraction](https://docs.zksync.io/zksync-network/unique-features/account-abstraction).
+We process the L2 transactions according to our account abstraction protocol: [https://docs.zksync.io/zksync-network/zksync-era/unique-features#native-account-abstraction](https://docs.zksync.io/zksync-network/zksync-era/unique-features#native-account-abstraction).
 
 1. We [deduct](../../system-contracts/bootloader/bootloader.yul#L1263) the transaction’s upfront payment for the overhead for the block’s processing. You can read more on how that works in the fee model [description](./zksync_fee_model.md).
 2. Then we calculate the gasPrice for these transactions according to the EIP1559 rules.
