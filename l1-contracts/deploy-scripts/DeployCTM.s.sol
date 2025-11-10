@@ -484,6 +484,13 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             "no_da_validium_l1_validator_addr",
             addresses.daAddresses.noDAValidiumL1DAValidator
         );
+        if (config.isZKsyncOS) {
+            vm.serializeAddress(
+                "deployed_addresses",
+                "l1_blobs_da_validator_zksync_os_addr",
+                addresses.daAddresses.l1BlobsDAValidatorZKsyncOS
+            );
+        }
         vm.serializeAddress(
             "deployed_addresses",
             "avail_l1_da_validator_addr",
