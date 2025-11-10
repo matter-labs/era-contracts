@@ -23,6 +23,10 @@ error IndirectCallValueMismatch(uint256 expected, uint256 actual);
 error InteroperableAddressChainReferenceNotEmpty(bytes interoperableAddress);
 // 0x884f49ba
 error InteroperableAddressNotEmpty(bytes interoperableAddress);
+// 0xeae192ef
+error InvalidInteropBundleVersion();
+// 0xd5f13973
+error InvalidInteropCallVersion();
 // 0x32c2e156
 error MessageNotIncluded();
 // 0x89fd2c76
@@ -35,5 +39,3 @@ error WrongCallStatusLength(uint256 bundleCallsLength, uint256 providedCallStatu
 error WrongDestinationChainId(bytes32 bundleHash, uint256 expected, uint256 actual);
 // 0x534ab1b2
 error WrongSourceChainId(bytes32 bundleHash, uint256 expected, uint256 actual);
-error InvalidInteropBundleVersion();
-error InvalidInteropCallVersion();
