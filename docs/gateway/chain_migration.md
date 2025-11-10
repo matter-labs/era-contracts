@@ -22,7 +22,7 @@ Currently, it can only be done by the owner of the CTMDeployer, but in the futur
 
 ## Chain migration GW → L1
 
-Chain migration from from L1 to GW works similar to how NFT bridging from L1 to another chain would work. Migrating back will use the same mechanism as for withdrawals.
+Chain migration from L1 to GW works similar to how NFT bridging from L1 to another chain would work. Migrating back will use the same mechanism as for withdrawals.
 
 Note, that for L2→L1 withdrawals via bridges we never provide a recovery mechanism. The same is the case with GW → L1 messaging, i.e. it is assumed that such migrations are always executable on L1.
 
