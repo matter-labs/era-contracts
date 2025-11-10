@@ -7,7 +7,7 @@ import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {ISystemContextDeprecated} from "./interfaces/ISystemContextDeprecated.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {BOOTLOADER_FORMAL_ADDRESS, COMPLEX_UPGRADER_CONTRACT, L2_ASSET_TRACKER_ADDRESS, L2_CHAIN_ASSET_HANDLER, L2_INTEROP_CENTER_ADDRESS, L2_INTEROP_HANDLER_ADDRESS, SystemLogKey} from "./Constants.sol";
-import {CannotInitializeFirstVirtualBlock, CannotReuseL2BlockNumberFromPreviousBatch, CurrentBatchNumberMustBeGreaterThanZero, DeprecatedFunction, InconsistentNewBatchTimestamp, IncorrectL2BlockHash, IncorrectSameL2BlockPrevBlockHash, IncorrectSameL2BlockTimestamp, IncorrectVirtualBlockInsideMiniblock, InvalidNewL2BlockNumber, L2BlockAndBatchTimestampMismatch, L2BlockNumberZero, NoVirtualBlocks, NonMonotonicL2BlockTimestamp, PreviousL2BlockHashIsIncorrect, ProvidedBatchNumberIsNotCorrect, TimestampsShouldBeIncremental, UpgradeTransactionMustBeFirst} from "contracts/SystemContractErrors.sol";
+import {CannotInitializeFirstVirtualBlock, CannotReuseL2BlockNumberFromPreviousBatch, CurrentBatchNumberMustBeGreaterThanZero, DeprecatedFunction, InconsistentNewBatchTimestamp, IncorrectL2BlockHash, IncorrectSameL2BlockPrevBlockHash, IncorrectSameL2BlockTimestamp, IncorrectVirtualBlockInsideMiniblock, InvalidNewL2BlockNumber, L2BlockAndBatchTimestampMismatch, L2BlockNumberZero, NoVirtualBlocks, NonMonotonicL2BlockTimestamp, PreviousL2BlockHashIsIncorrect, ProvidedBatchNumberIsNotCorrect, TimestampsShouldBeIncremental, UpgradeTransactionMustBeFirst, OnlyL2AssetTrackerOrInteropCenterOrInteropHandler} from "contracts/SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -85,11 +85,13 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
 
     uint256 internal currentSettlementLayerChainId;
 
-    error OnlyL2AssetTrackerOrInteropCenter();
-
-    modifier onlyL2AssetTrackerOrInteropCenter() {
-        if (msg.sender != L2_ASSET_TRACKER_ADDRESS && msg.sender != L2_INTEROP_CENTER_ADDRESS && msg.sender != L2_INTEROP_HANDLER_ADDRESS) {
-            revert OnlyL2AssetTrackerOrInteropCenter();
+    modifier onlyL2AssetTrackerOrInteropCenterOrInteropHandler() {
+        if (
+            msg.sender != L2_ASSET_TRACKER_ADDRESS &&
+            msg.sender != L2_INTEROP_CENTER_ADDRESS &&
+            msg.sender != L2_INTEROP_HANDLER_ADDRESS
+        ) {
+            revert OnlyL2AssetTrackerOrInteropCenterOrInteropHandler();
         }
         _;
     }
