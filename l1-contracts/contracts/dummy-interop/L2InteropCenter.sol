@@ -4,6 +4,16 @@ pragma solidity 0.8.28;
 
 
 import {L2_BRIDGEHUB_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_COMPLEX_UPGRADER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {Create2Address} from "./Create2Address.sol";
+import {L1ShadowAccount} from "./L1ShadowAccount.sol";
+
+struct ShadowAccountOp {
+    address target;
+    uint256 value;
+    bytes data;
+}
+
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -12,23 +22,33 @@ contract L2InteropCenter {
 
     address public l1InteropHandlerAddress;
 
+    bytes32 public shadowAccountBytecodeHash;
+
+    constructor(){
+        shadowAccountBytecodeHash = keccak256(type(L1ShadowAccount).creationCode);
+    }
+
+
+
     /// send bundle to L1
     /// 1. withdraw token to L1 shadow account
     /// 2. deploy shadow account if needed on L1. 
     /// 3+. arbitrary calls from shadow account to arbitrary L1 contracts. 
 
 
-    function sendTokenWithdrawalAndBundleToL1(
-        bytes32 assetId,
-        uint256 amount,
+    function sendBundleToL1(
         ShadowAccountOp[] memory shadowAccountOps
     ) external {
+
+        bytes memory data = abi.encode(shadowAccountOps);
+        bytes32 bundleWithdrawalHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(data);
 
     }
 
     function l1ShadowAccount(
         address _l2CallerAddress
-    ) returns (address) {
-        // get create2 address from l1 interop handler and shadow account bytecode
+    ) public view returns (address) {
+        bytes32 salt = keccak256(abi.encode(_l2CallerAddress));
+        return Create2Address.getNewAddressCreate2EVM(address(this), salt, shadowAccountBytecodeHash);
     }
 }
