@@ -8,13 +8,13 @@ import {stdToml} from "forge-std/StdToml.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {Utils, ADDRESS_ONE} from "./Utils.sol";
+import {ADDRESS_ONE, Utils} from "./Utils.sol";
 
 /**
  * @title Prepare ZKChain Registration Calldata

@@ -9,7 +9,7 @@ import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 /// @notice FFT inspired version of PlonK to optimize on-chain gas cost
 /// @dev For better understanding of the protocol follow the below papers:
 /// * Fflonk Paper: https://eprint.iacr.org/2021/1167
-/// @dev Contract was generated from a verification key with a hash of 0x6f36a08c517b060fa97308cdb3e23b04842ff839d451a753ec8fae1a5408304a
+/// @dev Contract was generated from a verification key with a hash of 0x49eae0bf5c7ea580f4979b366e52b386adc5f42e2ce50fc1d3c4de9a86052bff
 /// @custom:security-contact security@matterlabs.dev
 contract L1VerifierFflonk is IVerifierV2 {
     // ================Constants================
@@ -24,8 +24,8 @@ contract L1VerifierFflonk is IVerifierV2 {
     // ================Verification Key================
     uint256 internal constant VK_NUM_INPUTS = 1;
     // [C0]1 = qL(X^8)+ X*qR(X^8)+ X^2*qO(X^8)+ X^3*qM(X^8)+ X^4*qC(X^8)+ X^5*Sσ1(X^8)+ X^6*Sσ2(X^8)+ X^7*Sσ3(X^8)
-    uint256 internal constant VK_C0_G1_X = 0x183ae375b758fc764f96e7846c43499f62282531a6b717e789179c6da8cfef41;
-    uint256 internal constant VK_C0_G1_Y = 0x088d7b4d525ea29bfc5a6f0464589e4eaa4d85d9dd6849a5708b29002626ca36;
+    uint256 internal constant VK_C0_G1_X = 0x196013309322dc5ce901c20b2d8079da2a3d68cd8b98c943785298ead0b2ba4d;
+    uint256 internal constant VK_C0_G1_Y = 0x1d08f60c613bfe68af690cecb6f2232c28b7eaa8fc582f76cd7112a164211890;
 
     // k1 = 5, k2 = 7
     uint256 internal constant VK_NON_RESIDUES_0 = 0x05;
@@ -115,7 +115,7 @@ contract L1VerifierFflonk is IVerifierV2 {
     uint256 internal constant TOTAL_LAGRANGE_BASIS_INVERSES_LENGTH = 18;
 
     /// @inheritdoc IVerifierV2
-    function verificationKeyHash() external pure returns (bytes32 vkHash) {
+    function verificationKeyHash() external pure returns (bytes32) {
         return
             keccak256(
                 // solhint-disable-next-line func-named-parameters
@@ -125,15 +125,25 @@ contract L1VerifierFflonk is IVerifierV2 {
                     VK_C0_G1_Y,
                     VK_NON_RESIDUES_0,
                     VK_NON_RESIDUES_1,
-                    VK_G2_ELEMENT_0_X1,
-                    VK_G2_ELEMENT_0_X2,
-                    VK_G2_ELEMENT_0_Y1,
-                    VK_G2_ELEMENT_0_Y2,
-                    VK_G2_ELEMENT_1_X1,
-                    VK_G2_ELEMENT_1_X2,
-                    VK_G2_ELEMENT_1_Y1,
-                    VK_G2_ELEMENT_1_Y2
+                    _getG2Elements()
                 )
+            );
+    }
+
+    /// @dev This breakdown is done to avoid stack-too-deep error
+    /// @return bytes memory The G2 elements
+    function _getG2Elements() internal pure returns (bytes memory) {
+        return
+            // solhint-disable-next-line func-named-parameters
+            abi.encodePacked(
+                VK_G2_ELEMENT_0_X1,
+                VK_G2_ELEMENT_0_X2,
+                VK_G2_ELEMENT_0_Y1,
+                VK_G2_ELEMENT_0_Y2,
+                VK_G2_ELEMENT_1_X1,
+                VK_G2_ELEMENT_1_X2,
+                VK_G2_ELEMENT_1_Y1,
+                VK_G2_ELEMENT_1_Y2
             );
     }
 
@@ -525,33 +535,9 @@ contract L1VerifierFflonk is IVerifierV2 {
             }
 
             /**
-             * @dev Computes partial lagrange basis evaluations Li(y)_numerator = {i = [start..(start+num_polys))} & Li(y)_numerator {i = [(start+num_polys)..(start+(2*num_polys)))} using montgomery lagrange basis inverses sent with proof.
-             * For Li(y)_numerator{i = [start..(start+num_polys))}:
-             * Li(y)_numerator = w_i * (y^{2*num_polys} + (h^{num_polys} * h_s^{num_polys}) - (y^{num_polys} * (h^{num_polys} + h_s^{num_polys})))
-             * Li(y)_denominator = (num_polys * (h^{(2*num_polys)-1}-(h^{num_polys-1} * h_s^{num_polys})) * (y-(h*w_i)))
-             * Li(y) = Li(y)_numerator / Li(y)_denominator =  (w_i * (y^{2*num_polys} + (h^{num_polys} * h_s^{num_polys}) - (y^{num_polys} * (h^{num_polys} + h_s^{num_polys})))) / (num_polys * (h^{(2*num_polys)-1}-(h^{num_polys-1} * h_s^{num_polys})) * (y-(h*w_i)))
-             *
-             * For Li(y)_numerator{i = [(start+num_polys)..(start+(2*num_polys)))}
-             * Li(y)_numerator = w_i * (y^{2*num_polys} + (h^{num_polys} * h_s^{num_polys}) - (y^{num_polys} * (h^{num_polys} + h_s^{num_polys})))
-             * Li(y)_denominator = (num_polys * (h_s^{(2*num_polys)-1}-(h_s^{num_polys-1} * h^{num_polys})) * (y-(h_s*w_i)))
-             * Li(y) = Li(y)_numerator / Li(y)_denominator =  (w_i * (y^{2*num_polys} + (h^{num_polys} * h_s^{num_polys}) - (y^{num_polys} * (h^{num_polys} + h_s^{num_polys}))) ) / (num_polys * (h_s^{(2*num_polys)-1}-(h_s^{num_polys-1} * h^{num_polys})) * (y-(h_s*w_i)))
-             *
-             * Also calculates the products of the denominators of the lagrange basis evaluations:
-             * Li(y)_denominators_product = Li(y)_previous_denominators_product * (∏(Li(y)_denominator {i = [start..(start+num_polys))})) * (∏(Li(y)_denominator {i = [(start+num_polys)..(start+(2*num_polys)))}))
+             * sma: TODO add description
              */
-
-            function precompute_partial_lagrange_basis_evaluations_for_union_set(
-                start,
-                num_polys,
-                y,
-                omega,
-                h,
-                h_shifted,
-                product
-            ) -> final_product {
-                if gt(add(start, mul(2, num_polys)), TOTAL_LAGRANGE_BASIS_INVERSES_LENGTH) {
-                    revertWithMessage(32, "Precompute Eval. Error [PLBEIU1]")
-                }
+            function temp_name_inner_function(num_polys, h, h_shifted) -> constant_parts_0, constant_parts_1, t_0, t_1 {
                 let h_pows_0 := h
                 let h_pows_1 := h_shifted
                 let loop_length := sub(num_polys, 2)
@@ -564,8 +550,8 @@ contract L1VerifierFflonk is IVerifierV2 {
                     h_pows_0 := mulmod(h_pows_0, h, R_MOD)
                     h_pows_1 := mulmod(h_pows_1, h_shifted, R_MOD)
                 }
-                let constant_parts_0 := h_pows_0
-                let constant_parts_1 := h_pows_1
+                constant_parts_0 := h_pows_0
+                constant_parts_1 := h_pows_1
                 // h^{num_polys}
                 h_pows_0 := mulmod(h_pows_0, h, R_MOD)
                 // h_s^{num_polys}
@@ -583,9 +569,9 @@ contract L1VerifierFflonk is IVerifierV2 {
                 // y^{num_polys}
                 let t_2 := mload(add(OPS_Y_POWS, mul(num_polys, 0x20)))
                 // h^{num_polys} * h_s^{num_polys}
-                let t_1 := mulmod(h_pows_0, h_pows_1, R_MOD)
+                t_1 := mulmod(h_pows_0, h_pows_1, R_MOD)
                 // h^{num_polys} + h_s^{num_polys}
-                let t_0 := addmod(h_pows_0, h_pows_1, R_MOD)
+                t_0 := addmod(h_pows_0, h_pows_1, R_MOD)
                 // y^{num_polys} * (h^{num_polys} + h_s^{num_polys})
                 t_0 := mulmod(t_0, t_2, R_MOD)
                 // - (y^{num_polys} * (h^{num_polys} + h_s^{num_polys}))
@@ -614,9 +600,40 @@ contract L1VerifierFflonk is IVerifierV2 {
                 constant_parts_1 := addmod(constant_parts_1, h_pows_1, R_MOD)
                 // num_polys * (h_s^{(2*num_polys)-1}-(h_s^{num_polys-1} * h^{num_polys}))
                 constant_parts_1 := mulmod(constant_parts_1, num_polys, R_MOD)
+            }
+
+            /**
+             * @dev Computes partial lagrange basis evaluations Li(y)_numerator = {i = [start..(start+num_polys))} & Li(y)_numerator {i = [(start+num_polys)..(start+(2*num_polys)))} using montgomery lagrange basis inverses sent with proof.
+             * For Li(y)_numerator{i = [start..(start+num_polys))}:
+             * Li(y)_numerator = w_i * (y^{2*num_polys} + (h^{num_polys} * h_s^{num_polys}) - (y^{num_polys} * (h^{num_polys} + h_s^{num_polys})))
+             * Li(y)_denominator = (num_polys * (h^{(2*num_polys)-1}-(h^{num_polys-1} * h_s^{num_polys})) * (y-(h*w_i)))
+             * Li(y) = Li(y)_numerator / Li(y)_denominator =  (w_i * (y^{2*num_polys} + (h^{num_polys} * h_s^{num_polys}) - (y^{num_polys} * (h^{num_polys} + h_s^{num_polys})))) / (num_polys * (h^{(2*num_polys)-1}-(h^{num_polys-1} * h_s^{num_polys})) * (y-(h*w_i)))
+             *
+             * For Li(y)_numerator{i = [(start+num_polys)..(start+(2*num_polys)))}
+             * Li(y)_numerator = w_i * (y^{2*num_polys} + (h^{num_polys} * h_s^{num_polys}) - (y^{num_polys} * (h^{num_polys} + h_s^{num_polys})))
+             * Li(y)_denominator = (num_polys * (h_s^{(2*num_polys)-1}-(h_s^{num_polys-1} * h^{num_polys})) * (y-(h_s*w_i)))
+             * Li(y) = Li(y)_numerator / Li(y)_denominator =  (w_i * (y^{2*num_polys} + (h^{num_polys} * h_s^{num_polys}) - (y^{num_polys} * (h^{num_polys} + h_s^{num_polys}))) ) / (num_polys * (h_s^{(2*num_polys)-1}-(h_s^{num_polys-1} * h^{num_polys})) * (y-(h_s*w_i)))
+             *
+             * Also calculates the products of the denominators of the lagrange basis evaluations:
+             * Li(y)_denominators_product = Li(y)_previous_denominators_product * (∏(Li(y)_denominator {i = [start..(start+num_polys))})) * (∏(Li(y)_denominator {i = [(start+num_polys)..(start+(2*num_polys)))}))
+             */
+
+            function precompute_partial_lagrange_basis_evaluations_for_union_set(
+                start,
+                num_polys,
+                y,
+                omega,
+                h,
+                h_shifted,
+                interim_product
+            ) -> final_product {
+                if gt(add(start, mul(2, num_polys)), TOTAL_LAGRANGE_BASIS_INVERSES_LENGTH) {
+                    revertWithMessage(32, "Precompute Eval. Error [PLBEIU1]")
+                }
+
+                let constant_parts_0, constant_parts_1, t_0, t_1 := temp_name_inner_function(num_polys, h, h_shifted)
 
                 let current_omega := 1
-                let interim_product := product
                 for {
                     let i := 0
                 } lt(i, num_polys) {
