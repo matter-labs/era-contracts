@@ -4,7 +4,8 @@ pragma solidity 0.8.28;
 
 import {AlreadyWhitelisted, CallNotAllowed, NotAllowed, RemovingPermanentRestriction, TooHighDeploymentNonce, UnallowedImplementation, ZeroAddress} from "../common/L1ContractErrors.sol";
 
-import {BridgehubBurnCTMAssetData, IBridgehub, L2TransactionRequestTwoBridgesOuter} from "../bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
+import {BridgehubBurnCTMAssetData, L2TransactionRequestTwoBridgesOuter} from "../bridgehub/IBridgehubBase.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {IAssetRouterBase, NEW_ENCODING_VERSION} from "../bridge/asset-router/IAssetRouterBase.sol";
@@ -32,7 +33,7 @@ uint256 constant MAX_ALLOWED_NONCE = (1 << 48);
 /// @dev Once of the instances of such contract is to ensure that a ZkSyncHyperchain is a rollup forever.
 contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2StepUpgradeable {
     /// @notice The address of the Bridgehub contract.
-    IBridgehub public immutable BRIDGE_HUB;
+    IL1Bridgehub public immutable BRIDGE_HUB;
 
     /// @notice The address of the L2 admin factory that should be used to deploy the chain admins
     /// for chains that migrated on top of an L2 settlement layer.
@@ -52,7 +53,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @notice The mapping of whitelisted L2 admins.
     mapping(address adminAddress => bool isWhitelisted) public allowedL2Admins;
 
-    constructor(IBridgehub _bridgehub, address _l2AdminFactory) {
+    constructor(IL1Bridgehub _bridgehub, address _l2AdminFactory) {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
         L2_ADMIN_FACTORY = _l2AdminFactory;
@@ -287,11 +288,11 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return (address(0), false);
         }
 
-        if (bytes4(_call.data[:4]) != IBridgehub.requestL2TransactionTwoBridges.selector) {
+        if (bytes4(_call.data[:4]) != IL1Bridgehub.requestL2TransactionTwoBridges.selector) {
             return (address(0), false);
         }
 
-        address sharedBridge = BRIDGE_HUB.assetRouter();
+        address sharedBridge = address(BRIDGE_HUB.assetRouter());
 
         // Assuming that correctly encoded calldata is provided, the following line must never fail,
         // since the correct selector was checked before.

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 
 /// @author Matter Labs
@@ -51,7 +51,7 @@ interface IValidatorTimelock is IExecutor {
     function OPTIONAL_EXECUTOR_ADMIN_ROLE() external view returns (bytes32);
 
     /// @notice The address of the bridgehub
-    function BRIDGE_HUB() external view returns (IBridgehub);
+    function BRIDGE_HUB() external view returns (IL1Bridgehub);
     /// @dev The delay between committing and executing batches.
     function executionDelay() external view returns (uint32);
     /// @dev Part of the IBase interface. Not used in this contract.

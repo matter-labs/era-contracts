@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {IL1DAValidator, L1DAValidatorOutput, PubdataSource} from "../chain-interfaces/IL1DAValidator.sol";
 import {CalldataDAGateway} from "./CalldataDAGateway.sol";
 
-import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {IL2Bridgehub} from "../../bridgehub/IL2Bridgehub.sol";
 import {L2_BRIDGEHUB_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {BlobHashBlobCommitmentMismatchValue, InvalidPubdataSource, L1DAValidatorInvalidSender} from "../L1StateTransitionErrors.sol";
 
@@ -23,7 +23,7 @@ contract RelayedSLDAValidator is IL1DAValidator, CalldataDAGateway {
     function _ensureOnlyChainSender(uint256 _chainId) internal view {
         // Note that this contract is only supposed to be deployed on L2, where the
         // bridgehub is predeployed at `L2_BRIDGEHUB_ADDR` address.
-        if (IBridgehub(L2_BRIDGEHUB_ADDR).getZKChain(_chainId) != msg.sender) {
+        if (IL2Bridgehub(L2_BRIDGEHUB_ADDR).getZKChain(_chainId) != msg.sender) {
             revert L1DAValidatorInvalidSender(msg.sender);
         }
     }
