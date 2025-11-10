@@ -487,7 +487,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         if (config.isZKsyncOS) {
             vm.serializeAddress(
                 "deployed_addresses",
-                "l1_blobs_da_validator_zksync_os_addr",
+                "blobs_zksync_os_l1_da_validator_addr",
                 addresses.daAddresses.l1BlobsDAValidatorZKsyncOS
             );
         }
