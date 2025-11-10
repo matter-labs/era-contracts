@@ -133,13 +133,24 @@ contract DeployL1CoreUtils is DeployUtils {
                     addresses.bridgehub.messageRootProxy
                 );
         } else if (compareStrings(contractName, "L1Nullifier")) {
-            return
-                abi.encode(
-                    addresses.bridgehub.bridgehubProxy,
-                    addresses.bridgehub.messageRootProxy,
-                    config.eraChainId,
-                    config.eraDiamondProxyAddress
-                );
+            if (config.supportL2LegacySharedBridgeTest) {
+                return
+                    abi.encode(
+                        addresses.bridgehub.bridgehubProxy,
+                        addresses.bridgehub.messageRootProxy,
+                        addresses.bridgehub.interopCenterProxy,
+                        config.eraChainId,
+                        config.eraDiamondProxyAddress
+                    );
+            } else {
+                return
+                    abi.encode(
+                        addresses.bridgehub.bridgehubProxy,
+                        addresses.bridgehub.messageRootProxy,
+                        config.eraChainId,
+                        config.eraDiamondProxyAddress
+                    );
+            }
         } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
             return
                 abi.encode(
