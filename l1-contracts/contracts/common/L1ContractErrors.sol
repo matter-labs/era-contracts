@@ -393,6 +393,8 @@ error ZKChainLimitReached();
 // 0x646ac57e
 error ZKsyncOSNotForceDeployForExistingContract(address);
 
+error InvalidBlockRange(uint256 batchNumber, uint256 from, uint256 to);
+
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
     LegacyBridgeFirstBatch,

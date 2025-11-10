@@ -332,7 +332,9 @@ contract ExecutorTest is Test {
             daCommitmentScheme: L2_DA_COMMITMENT_SCHEME,
             daCommitment: bytes32(""),
             firstBlockTimestamp: uint64(currentTimestamp),
+            firstBlockNumber: uint256(1),
             lastBlockTimestamp: uint64(currentTimestamp),
+            lastBlockNumber: uint256(2),
             chainId: l2ChainId,
             operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
