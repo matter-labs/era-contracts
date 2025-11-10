@@ -3,63 +3,40 @@ pragma solidity 0.8.28;
 
 // solhint-disable no-console, gas-custom-errors, reason-string
 
-import {Script, console2 as console} from "forge-std/Script.sol";
-// import {Vm} from "forge-std/Vm.sol";
-import {stdToml} from "forge-std/StdToml.sol";
+import {console2 as console} from "forge-std/Script.sol";
 
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
-import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehub, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+
 import {L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {IAssetRouterBase, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {IL2AssetRouter, L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+
 import {Call} from "contracts/governance/Common.sol";
-import {IGovernance} from "contracts/governance/IGovernance.sol";
+
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
+
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
-import {Create2AndTransfer} from "../Create2AndTransfer.sol";
-import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
-
-import {DeployL1Script} from "../DeployL1.s.sol";
+import {DeployCTMScript} from "../DeployCTM.s.sol";
 
 import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
 import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {FeeParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 
 import {GatewayGovernanceUtils} from "./GatewayGovernanceUtils.s.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
-contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
+contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
     using stdToml for string;
 
     struct GatewayCTMOutput {
@@ -75,10 +52,8 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
 
     uint256 constant EXPECTED_MAX_L1_GAS_PRICE = 50 gwei;
 
-    address internal rollupL2DAValidator;
-    address internal oldRollupL2DAValidator;
-
     uint256 internal eraChainId;
+
     uint256 internal gatewayChainId;
     bytes internal forceDeploymentsData;
 
@@ -87,22 +62,19 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
 
     GatewayCTMDeployerConfig internal gatewayCTMDeployerConfig;
 
-    function initializeConfig(string memory configPath, uint256 ctmChainId) internal virtual {
+    function initializeConfig(string memory configPath, uint256 ctmRepresentativeChainId) internal virtual {
         super.initializeConfig(configPath);
         string memory toml = vm.readFile(configPath);
 
         addresses.bridgehub.bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
         refundRecipient = toml.readAddress("$.refund_recipient");
 
-        // The "new" and "old" rollup L2 DA validators are those that were set in v27 and v26 respectively
-        rollupL2DAValidator = toml.readAddress("$.rollup_l2_da_validator");
-        oldRollupL2DAValidator = toml.readAddress("$.old_rollup_l2_da_validator");
-
         eraChainId = toml.readUint("$.era_chain_id");
+
         gatewayChainId = toml.readUint("$.gateway_chain_id");
         forceDeploymentsData = toml.readBytes(".force_deployments_data");
 
-        setAddressesBasedOnBridgehub(ctmChainId);
+        setAddressesBasedOnBridgehub(ctmRepresentativeChainId);
 
         address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
@@ -110,8 +82,8 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
             salt: bytes32(0),
             eraChainId: config.eraChainId,
             l1ChainId: config.l1ChainId,
-            rollupL2DAValidatorAddress: rollupL2DAValidator,
             testnetVerifier: config.testnetVerifier,
+            isZKsyncOS: config.isZKsyncOS,
             adminSelectors: Utils.getAllSelectorsForFacet("Admin"),
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
@@ -141,13 +113,13 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         });
     }
 
-    function setAddressesBasedOnBridgehub(uint256 ctmChainId) internal {
-        config.ownerAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
+    function setAddressesBasedOnBridgehub(uint256 ctmRepresentativeChainId) internal {
+        config.ownerAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
         address ctm;
-        if (ctmChainId != 0) {
-            ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(ctmChainId);
+        if (ctmRepresentativeChainId != 0) {
+            ctm = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(ctmRepresentativeChainId);
         } else {
-            ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(gatewayChainId);
+            ctm = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(gatewayChainId);
         }
         addresses.stateTransition.chainTypeManagerProxy = ctm;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
@@ -256,13 +228,13 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         prepareForGWVoting(0);
     }
 
-    function prepareForGWVoting(uint256 ctmChainId) public {
+    function prepareForGWVoting(uint256 ctmRepresentativeChainId) public {
         console.log("Setting up the Gateway script");
 
         string memory root = vm.projectRoot();
         string memory configPath = string.concat(root, vm.envString("GATEWAY_VOTE_PREPARATION_INPUT"));
 
-        initializeConfig(configPath, ctmChainId);
+        initializeConfig(configPath, ctmRepresentativeChainId);
         _initializeGatewayGovernanceConfig(
             GatewayGovernanceConfig({
                 bridgehubProxy: addresses.bridgehub.bridgehubProxy,
@@ -309,30 +281,9 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
                 _gatewayValidatorTimelock: output.gatewayStateTransition.validatorTimelock,
                 _gatewayServerNotifier: output.gatewayStateTransition.serverNotifierProxy,
                 _refundRecipient: refundRecipient,
-                _ctmChainId: ctmChainId
+                _ctmRepresentativeChainId: ctmRepresentativeChainId
             })
         );
-
-        // We need to also whitelist the old L2 rollup address
-        if (oldRollupL2DAValidator != address(0)) {
-            governanceCalls = Utils.mergeCalls(
-                governanceCalls,
-                Utils.prepareGovernanceL1L2DirectTransaction(
-                    EXPECTED_MAX_L1_GAS_PRICE,
-                    abi.encodeCall(
-                        RollupDAManager.updateDAPair,
-                        (output.relayedSLDAValidator, oldRollupL2DAValidator, true)
-                    ),
-                    Utils.MAX_PRIORITY_TX_GAS,
-                    new bytes[](0),
-                    output.rollupDAManager,
-                    gatewayChainId,
-                    addresses.bridgehub.bridgehubProxy,
-                    addresses.bridges.l1AssetRouterProxy,
-                    refundRecipient
-                )
-            );
-        }
 
         saveOutput(governanceCalls, ecosystemAdminCalls);
     }

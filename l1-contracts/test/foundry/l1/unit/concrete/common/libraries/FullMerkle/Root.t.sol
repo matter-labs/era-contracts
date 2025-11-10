@@ -2,20 +2,30 @@
 pragma solidity ^0.8.24;
 
 import {FullMerkleTest} from "./_FullMerkle_Shared.t.sol";
+import {FullMerkleMemory} from "contracts/common/libraries/FullMerkleMemory.sol";
 
 contract RootTest is FullMerkleTest {
+    using FullMerkleMemory for FullMerkleMemory.FullTree;
+
     function test_emptyTree() public view {
+        FullMerkleMemory.FullTree memory merkleTestMemory = _setupMemoryTree(1);
+
         // Initially tree is empty, root is the zero hash
         assertEq(merkleTest.root(), zeroHash, "Root should be zero hash initially");
+        assertEq(merkleTestMemory.root(), zeroHash, "Root 0,0 should be zero hash initially");
     }
 
     function test_oneLeaf() public {
+        FullMerkleMemory.FullTree memory merkleTestMemory = _setupMemoryTree(1);
+
         // Inserting one leaf
         bytes32 leaf = keccak256("Leaf 0");
         merkleTest.pushNewLeaf(leaf);
+        merkleTestMemory.pushNewLeaf(leaf);
 
         // With one leaf, root is the leaf itself
         assertEq(merkleTest.root(), leaf, "Root should be the leaf hash");
+        assertEq(merkleTestMemory.root(), leaf, "Root 0,0 should be the leaf hash");
     }
 
     function test_twoLeaves() public {

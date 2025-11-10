@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
 import {DAContracts, DeployedContracts, GatewayCTMDeployer, GatewayCTMDeployerConfig, StateTransitionContracts} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
@@ -19,9 +19,10 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {RelayedSLDAValidator} from "contracts/state-transition/data-availability/RelayedSLDAValidator.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 
-import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
-import {L1VerifierFflonk} from "contracts/state-transition/verifiers/L1VerifierFflonk.sol";
-import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
+import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
+import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
+import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
+import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
@@ -63,19 +64,18 @@ contract GatewayCTMDeployerTest is Test {
         new GettersFacet();
         new AdminFacet(1, RollupDAManager(address(0)));
 
-        new DiamondInit();
+        new DiamondInit(false);
         new L1GenesisUpgrade();
         new RollupDAManager();
         new ValidiumL1DAValidator();
         new RelayedSLDAValidator();
-        new ChainTypeManager(address(0));
+        new ChainTypeManager(address(0), address(0));
         new ProxyAdmin();
 
-        new L1VerifierFflonk();
-        new L1VerifierPlonk();
+        new EraVerifierFflonk();
+        new EraVerifierPlonk();
 
-        new TestnetVerifier(L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)));
-        new DualVerifier(L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)));
+        new TestnetVerifier(EraVerifierFflonk(address(0)), EraVerifierPlonk(address(0)), address(0), false);
 
         new ValidatorTimelock(L2_BRIDGEHUB_ADDR);
         new ServerNotifier();
@@ -91,8 +91,8 @@ contract GatewayCTMDeployerTest is Test {
             salt: keccak256("test-salt"),
             eraChainId: 1001,
             l1ChainId: 1,
-            rollupL2DAValidatorAddress: address(0x456),
             testnetVerifier: true,
+            isZKsyncOS: false,
             adminSelectors: new bytes4[](2),
             executorSelectors: new bytes4[](2),
             mailboxSelectors: new bytes4[](2),

@@ -7,41 +7,45 @@ import {Test} from "forge-std/Test.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_DA_VALIDATOR_ADDRESS} from "../Utils/Utils.sol";
-import {TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_DA_COMMITMENT_SCHEME, Utils} from "../Utils/Utils.sol";
+import {ETH_TOKEN_ADDRESS, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
+import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {DummyChainTypeManagerForValidatorTimelock as DummyCTM} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {FeeParams, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {TestExecutor} from "contracts/dev-contracts/test/TestExecutor.sol";
-import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
+
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {IL1DAValidator} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
+
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {MessageRootBase} from "contracts/bridgehub/MessageRootBase.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-
-import {MessageRootBase} from "contracts/bridgehub/MessageRootBase.sol";
+import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 
 bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
 bytes constant POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000100073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
 
-contract ExecutorTest is Test {
+contract ExecutorTest is UtilsTest {
     address internal owner;
     address internal validator;
     address internal randomSigner;
@@ -59,6 +63,9 @@ contract ExecutorTest is Test {
     ValidatorTimelock internal validatorTimelock;
     address internal rollupL1DAValidator;
     L1MessageRoot internal messageRoot;
+    DummyBridgehub dummyBridgehub;
+    L1ChainAssetHandler internal chainAssetHandler;
+    bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
 
     uint256 eraChainId;
 
@@ -98,7 +105,7 @@ contract ExecutorTest is Test {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](32);
+        bytes4[] memory selectors = new bytes4[](33);
         uint256 i = 0;
         selectors[i++] = getters.getVerifier.selector;
         selectors[i++] = getters.getAdmin.selector;
@@ -132,6 +139,7 @@ contract ExecutorTest is Test {
         selectors[i++] = getters.isPriorityQueueActive.selector;
         selectors[i++] = getters.getChainTypeManager.selector;
         selectors[i++] = getters.getChainId.selector;
+        selectors[i++] = getters.getSemverProtocolVersion.selector;
         return selectors;
     }
 
@@ -180,10 +188,34 @@ contract ExecutorTest is Test {
         owner = makeAddr("owner");
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
-        DummyBridgehub dummyBridgehub = new DummyBridgehub();
-        messageRoot = new L1MessageRoot(IBridgehub(address(dummyBridgehub)));
+        dummyBridgehub = new DummyBridgehub();
+        vm.mockCall(address(dummyBridgehub), abi.encodeWithSelector(IL1Bridgehub.L1_CHAIN_ID.selector), abi.encode(1));
+        uint256[] memory allZKChainChainIDs = new uint256[](1);
+        allZKChainChainIDs[0] = 271;
+        vm.mockCall(
+            address(dummyBridgehub),
+            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
+            abi.encode(allZKChainChainIDs)
+        );
+        vm.mockCall(
+            address(dummyBridgehub),
+            abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector),
+            abi.encode(makeAddr("chainTypeManager"))
+        );
+        address interopCenter = makeAddr("interopCenter");
+        messageRoot = new L1MessageRoot(address(dummyBridgehub), 1);
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
+        address assetTracker = makeAddr("assetTracker");
+        chainAssetHandler = new L1ChainAssetHandler(
+            owner,
+            address(dummyBridgehub),
+            address(sharedBridge),
+            address(messageRoot),
+            address(assetTracker),
+            IL1Nullifier(address(0))
+        );
+        dummyBridgehub.setChainAssetHandler(address(chainAssetHandler));
 
         dummyBridgehub.setSharedBridge(address(sharedBridge));
 
@@ -208,7 +240,7 @@ contract ExecutorTest is Test {
             abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector),
             abi.encode(bool(true))
         );
-        DiamondInit diamondInit = new DiamondInit();
+        DiamondInit diamondInit = new DiamondInit(false);
         validatorTimelock = ValidatorTimelock(deployValidatorTimelock(address(dummyBridgehub), owner, 0));
 
         bytes8 dummyHash = 0x1234567890123456;
@@ -224,17 +256,23 @@ contract ExecutorTest is Test {
             timestamp: 0,
             commitment: bytes32("")
         });
-        TestnetVerifier testnetVerifier = new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
+        TestnetVerifier testnetVerifier = new TestnetVerifier(
+            IVerifierV2(address(0)),
+            IVerifier(address(0)),
+            address(0),
+            false
+        );
 
         InitializeData memory params = InitializeData({
             // TODO REVIEW
             chainId: eraChainId,
             bridgehub: address(dummyBridgehub),
+            interopCenter: interopCenter,
             chainTypeManager: address(chainTypeManager),
             protocolVersion: 0,
             admin: owner,
             validatorTimelock: address(validatorTimelock),
-            baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS),
+            baseTokenAssetId: baseTokenAssetId,
             storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
             verifier: IVerifier(testnetVerifier), // verifier
             verifierParams: VerifierParams({
@@ -248,6 +286,7 @@ contract ExecutorTest is Test {
             priorityTxMaxGasLimit: 1000000,
             feeParams: defaultFeeParams()
         });
+        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), baseTokenAssetId);
 
         bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 
@@ -296,7 +335,7 @@ contract ExecutorTest is Test {
         vm.prank(address(chainTypeManager));
         admin.setTokenMultiplier(1, 1);
         vm.prank(address(owner));
-        admin.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_VALIDATOR_ADDRESS);
+        admin.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_COMMITMENT_SCHEME);
 
         // Allow to call executor directly, without going through ValidatorTimelock
         vm.prank(address(chainTypeManager));
@@ -328,11 +367,11 @@ contract ExecutorTest is Test {
 
         vm.mockCall(
             address(sharedBridge),
-            abi.encodeWithSelector(IL1AssetRouter.bridgehubDepositBaseToken.selector),
+            abi.encodeWithSelector(IAssetRouterBase.bridgehubDepositBaseToken.selector),
             abi.encode(true)
         );
     }
 
     // add this to be excluded from coverage report
-    function test() internal virtual {}
+    function test() internal virtual override {}
 }

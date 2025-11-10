@@ -2,12 +2,12 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-// 0x86bb51b8
-error AddressHasNoCode(address);
 // 0xefce78c7
 error CallerMustBeBootloader();
 // 0xbe4bf9e4
 error CallerMustBeEvmContract();
+// 0x775f8864
+error CallerMustBeInteropCenter();
 // 0x9eedbd2b
 error CallerMustBeSystemContract();
 // 0xee455381
@@ -30,6 +30,8 @@ error CompressorEnumIndexNotEqual(uint256 expected, uint256 actual);
 error CompressorInitialWritesProcessedNotEqual(uint256 expected, uint256 actual);
 // 0x6ad429e8
 error CurrentBatchNumberMustBeGreaterThanZero();
+// 0x01e6c91e
+error DeprecatedFunction(bytes4 selector);
 // 0x9be48d8d
 error DerivedKeyNotEqualToCompressedValue(bytes32 expected, bytes32 provided);
 // 0xe223db5e
@@ -72,10 +74,10 @@ error IndexSizeError();
 error InsufficientFunds(uint256 required, uint256 actual);
 // 0xae962d4e
 error InvalidCall();
-// 0x7a47c9a2
-error InvalidChainId();
 // 0x6a84bc39
 error InvalidCodeHash(CodeHashReason);
+// 0xc74537a1
+error InvalidDACommitmentScheme(uint256);
 // 0xb4fa3fb3
 error InvalidInput();
 // 0x8c13f15d
@@ -106,6 +108,12 @@ error L2BlockNumberZero();
 error LegacyBridgeNotProxy();
 // 0x43e266b0
 error MalformedBytecode(BytecodeError);
+// 0x9bb54c35
+error MerkleIndexOutOfBounds();
+// 0x8e23ac1a
+error MerklePathEmpty();
+// 0x1c500385
+error MerklePathOutOfBounds();
 // 0xe90aded4
 error NonceAlreadyUsed(address account, uint256 nonce);
 // 0xbac091ee
@@ -132,7 +140,8 @@ error PreviousBytecodeUnknown();
 error PreviousL2BlockHashIsIncorrect(bytes32 correctPrevBlockHash, bytes32 expectedPrevL2BlockHash);
 // 0x33cb1485
 error ProvidedBatchNumberIsNotCorrect(uint128 previousBatchNumber, uint128 _expectedNewNumber);
-// 0x7f7b0cf7
+// Note: enum should be encoded as uint8 to calculate selector!
+// skip-errors-lint 0x7f7b0cf7
 error ReconstructionMismatch(PubdataField, bytes32 expected, bytes32 actual);
 // 0x26772295
 error ReturnedBytecodeDoesNotMatchExpectedHash(bytes32 returnedBytecode, bytes32 expectedBytecodeHash);
@@ -193,7 +202,9 @@ enum PubdataField {
     InputMsgsHash,
     InputBytecodeHash,
     Offset,
-    Length
+    Length,
+    StateDiffCompressionVersion,
+    ExtraData
 }
 
 enum BytecodeError {

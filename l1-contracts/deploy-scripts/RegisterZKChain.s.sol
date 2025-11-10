@@ -4,14 +4,16 @@ pragma solidity 0.8.28;
 // solhint-disable no-console, gas-custom-errors, reason-string
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {Vm} from "forge-std/Vm.sol";
+
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IChainRegistrationSender} from "contracts/bridgehub/IChainRegistrationSender.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {IValidatorTimelock} from "contracts/state-transition/IValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
@@ -20,18 +22,17 @@ import {AccessControlRestriction} from "contracts/governance/AccessControlRestri
 import {ADDRESS_ONE, Utils} from "./Utils.sol";
 import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
+
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
-import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
+
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 
@@ -42,8 +43,12 @@ struct Config {
     uint256 chainChainId;
     bool validiumMode;
     uint256 bridgehubCreateNewChainSalt;
-    address validatorSenderOperatorCommitEth;
+    address validatorSenderOperatorEth;
     address validatorSenderOperatorBlobsEth;
+    // optional - if not set, then equal to 0
+    address validatorSenderOperatorProve;
+    // optional - if not set, then equal to 0
+    address validatorSenderOperatorExecute;
     address baseToken;
     bytes32 baseTokenAssetId;
     uint128 baseTokenGasPriceMultiplierNominator;
@@ -128,6 +133,7 @@ contract RegisterZKChainScript is Script {
         addValidators();
         configureZkSyncStateTransition();
         setPendingAdmin();
+        registerOnOtherChains();
 
         if (config.initializeLegacyBridge) {
             deployLegacySharedBridge();
@@ -176,8 +182,22 @@ contract RegisterZKChainScript is Script {
         config.governanceMinDelay = uint256(toml.readUint("$.chain.governance_min_delay"));
         config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
         config.validiumMode = toml.readBool("$.chain.validium_mode");
-        config.validatorSenderOperatorCommitEth = toml.readAddress("$.chain.validator_sender_operator_commit_eth");
+        config.validatorSenderOperatorEth = toml.readAddress("$.chain.validator_sender_operator_eth");
         config.validatorSenderOperatorBlobsEth = toml.readAddress("$.chain.validator_sender_operator_blobs_eth");
+
+        // These were added to zkstack tool recently (9th Sept 2025).
+        // So doing this for backwards compatibility.
+        if (vm.keyExistsToml(toml, "$.chain.validator_sender_operator_prove")) {
+            config.validatorSenderOperatorProve = toml.readAddress("$.chain.validator_sender_operator_prove");
+        } else {
+            config.validatorSenderOperatorProve = address(0);
+        }
+        if (vm.keyExistsToml(toml, "$.chain.validator_sender_operator_execute")) {
+            config.validatorSenderOperatorExecute = toml.readAddress("$.chain.validator_sender_operator_execute");
+        } else {
+            config.validatorSenderOperatorExecute = address(0);
+        }
+
         config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
 
         config.governance = toml.readAddress("$.governance");
@@ -229,8 +249,12 @@ contract RegisterZKChainScript is Script {
         config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
         config.baseToken = toml.readAddress("$.chain.base_token_addr");
         config.validiumMode = toml.readBool("$.chain.validium_mode");
-        config.validatorSenderOperatorCommitEth = toml.readAddress("$.chain.validator_sender_operator_commit_eth");
+        config.validatorSenderOperatorEth = toml.readAddress("$.chain.validator_sender_operator_eth");
         config.validatorSenderOperatorBlobsEth = toml.readAddress("$.chain.validator_sender_operator_blobs_eth");
+        // These were added to zkstack tool recently (9th Sept 2025).
+        config.validatorSenderOperatorProve = toml.readAddress("$.chain.validator_sender_operator_prove");
+        config.validatorSenderOperatorExecute = toml.readAddress("$.chain.validator_sender_operator_execute");
+
         config.baseTokenGasPriceMultiplierNominator = uint128(
             toml.readUint("$.chain.base_token_gas_price_multiplier_nominator")
         );
@@ -276,9 +300,9 @@ contract RegisterZKChainScript is Script {
     }
 
     function registerAssetIdOnBridgehub() internal {
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehub);
         ChainAdminOwnable admin = ChainAdminOwnable(payable(bridgehub.admin()));
-        INativeTokenVault ntv = INativeTokenVault(config.nativeTokenVault);
+        INativeTokenVaultBase ntv = INativeTokenVaultBase(config.nativeTokenVault);
         bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
         uint256 baseTokenOriginChain = ntv.originChainId(baseTokenAssetId);
 
@@ -303,7 +327,7 @@ contract RegisterZKChainScript is Script {
     }
 
     function registerTokenOnNTV() internal {
-        INativeTokenVault ntv = INativeTokenVault(config.nativeTokenVault);
+        INativeTokenVaultBase ntv = INativeTokenVaultBase(config.nativeTokenVault);
         bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
         uint256 baseTokenOriginChain = ntv.originChainId(baseTokenAssetId);
 
@@ -381,7 +405,7 @@ contract RegisterZKChainScript is Script {
     }
 
     function registerZKChain() internal {
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehub);
         ChainAdminOwnable admin = ChainAdminOwnable(payable(bridgehub.admin()));
 
         IChainAdminOwnable.Call[] memory calls = new IChainAdminOwnable.Call[](1);
@@ -416,13 +440,71 @@ contract RegisterZKChainScript is Script {
 
     function addValidators() internal {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(config.validatorTimelock);
+        address chainAddress = validatorTimelock.BRIDGE_HUB().getZKChain(config.chainChainId);
 
         vm.startBroadcast(msg.sender);
-        validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorCommitEth);
-        validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorBlobsEth);
+
+        // Add committer role to the first two addresses (commit operators)
+
+        // We give all roles to the committer, the reason is because the separate prover/executer roles
+        // are only provided in ZKsync OS, while on Era all of them are filled by committer.
+        validatorTimelock.addValidatorRoles(
+            chainAddress,
+            config.validatorSenderOperatorEth,
+            IValidatorTimelock.ValidatorRotationParams({
+                rotatePrecommitterRole: true,
+                rotateCommitterRole: false,
+                rotateReverterRole: true,
+                rotateProverRole: true,
+                rotateExecutorRole: true
+            })
+        );
+
+        validatorTimelock.addValidatorRoles(
+            chainAddress,
+            config.validatorSenderOperatorBlobsEth,
+            IValidatorTimelock.ValidatorRotationParams({
+                rotatePrecommitterRole: false,
+                rotateCommitterRole: true,
+                rotateReverterRole: false,
+                rotateProverRole: false,
+                rotateExecutorRole: false
+            })
+        );
+
+        // Add prover role to the third address, only if set
+        if (config.validatorSenderOperatorProve != address(0)) {
+            validatorTimelock.addValidatorRoles(
+                chainAddress,
+                config.validatorSenderOperatorProve,
+                IValidatorTimelock.ValidatorRotationParams({
+                    rotatePrecommitterRole: false,
+                    rotateCommitterRole: false,
+                    rotateReverterRole: false,
+                    rotateProverRole: true,
+                    rotateExecutorRole: false
+                })
+            );
+        }
+
+        // Add executor role to the fourth address, only if set
+        if (config.validatorSenderOperatorExecute != address(0)) {
+            validatorTimelock.addValidatorRoles(
+                chainAddress,
+                config.validatorSenderOperatorExecute,
+                IValidatorTimelock.ValidatorRotationParams({
+                    rotatePrecommitterRole: false,
+                    rotateCommitterRole: false,
+                    rotateReverterRole: false,
+                    rotateProverRole: false,
+                    rotateExecutorRole: true
+                })
+            );
+        }
+
         vm.stopBroadcast();
 
-        console.log("Validators added");
+        console.log("Validators added with specific roles");
     }
 
     function configureZkSyncStateTransition() internal {
@@ -449,6 +531,27 @@ contract RegisterZKChainScript is Script {
         zkChain.setPendingAdmin(output.chainAdmin);
         vm.stopBroadcast();
         console.log("Owner for ", output.diamondProxy, "set to", output.chainAdmin);
+    }
+
+    function registerOnOtherChains() internal {
+        IBridgehubBase bridgehub = IBridgehubBase(config.bridgehub);
+        uint256[] memory chainsToRegisterOn = bridgehub.getAllZKChainChainIDs();
+        IChainRegistrationSender chainRegistrationSender = IChainRegistrationSender(
+            bridgehub.chainRegistrationSender()
+        );
+        for (uint256 i = 0; i < chainsToRegisterOn.length; i++) {
+            vm.startBroadcast();
+            chainRegistrationSender.registerChain(chainsToRegisterOn[i], config.chainChainId);
+            vm.stopBroadcast();
+        }
+        for (uint256 i = 0; i < chainsToRegisterOn.length; i++) {
+            if (chainsToRegisterOn[i] == config.chainChainId) {
+                continue;
+            }
+            vm.startBroadcast();
+            chainRegistrationSender.registerChain(config.chainChainId, chainsToRegisterOn[i]);
+            vm.stopBroadcast();
+        }
     }
 
     function deployChainProxyAddress() internal {
@@ -494,11 +597,7 @@ contract RegisterZKChainScript is Script {
     }
 
     function getFactoryDeps() internal view returns (bytes[] memory) {
-        bytes[] memory factoryDeps = new bytes[](4);
-        factoryDeps[0] = Utils.readFoundryDeployedBytecodeL1("L2Bridgehub.sol", "L2Bridgehub");
-        factoryDeps[1] = Utils.readFoundryDeployedBytecodeL1("L2AssetRouter.sol", "L2AssetRouter");
-        factoryDeps[2] = Utils.readFoundryDeployedBytecodeL1("L2MessageRoot.sol", "L2MessageRoot");
-        factoryDeps[3] = Utils.readFoundryDeployedBytecodeL1("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer");
+        bytes[] memory factoryDeps = new bytes[](0);
         return factoryDeps;
     }
 

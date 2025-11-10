@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.21;
 
-// 0x388b6f68
-error GatewayUpgradeFailed();
 // 0xb334f781
 error GenesisUpgradeExpectedOnSettlementLayer();
 // 0x5cb29523
@@ -36,3 +34,5 @@ error ProtocolVersionDeltaTooLarge(uint256 _proposedDelta, uint256 _maxDelta);
 error ProtocolVersionMinorDeltaTooBig(uint256 limit, uint256 proposed);
 // 0x88d7b498
 error ProtocolVersionTooSmall();
+// 0x364b6f8b
+error SettlementLayerUpgradeMustPrecedeChainUpgrade();

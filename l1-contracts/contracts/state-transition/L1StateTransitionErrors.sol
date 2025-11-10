@@ -14,14 +14,16 @@ error CommitBasedInteropNotSupported();
 error ContractNotDeployed();
 // 0xdf2c5fa5
 error DependencyRootsRollingHashMismatch(bytes32 _expected, bytes32 _actual);
+// 0xacf542ab
+error DepositsAlreadyPaused();
+// 0xa4d3098c
+error DepositsNotPaused();
 // 0xedae13f3
 error ExecutedIsNotConsistentWithVerified(uint256 batchesExecuted, uint256 batchesVerified);
 // 0xc866ff2c
 error InitialForceDeploymentMismatch(bytes32 forceDeploymentHash, bytes32 initialForceDeploymentHash);
 // 0xfbd630b8
 error InvalidBatchesDataLength(uint256 batchesDataLength, uint256 priorityOpsDataLength);
-// 0x7a47c9a2
-error InvalidChainId();
 // 0xc06789fa
 error InvalidCommitment();
 // 0xd2531c15
@@ -44,16 +46,14 @@ error InvalidUnprocessedIndex(uint256 treeUnprocessedIndex, uint256 commitmentUn
 error L1DAValidatorAddressIsZero();
 // 0x7fbff2dd
 error L1DAValidatorInvalidSender(address msgSender);
-// 0x944bc075
-error L2DAValidatorAddressIsZero();
 // 0xa969e486
 error LocalRootIsZero();
 // 0xbdaf7d42
 error LocalRootMustBeZero();
 // 0x9b5f85eb
 error MessageRootIsZero();
-// 0x2237c426
-error MismatchL2DAValidator();
+// 0x32fff278
+error MismatchL2DACommitmentScheme(uint256 operatorProvidedScheme, uint256 expectedScheme);
 // 0x2c01a4af
 error MismatchNumberOfLayer1Txs(uint256 numberOfLayer1Txs, uint256 expectedLength);
 // 0xf9ba09d6
@@ -72,18 +72,28 @@ error NotL1(uint256 blockChainId);
 error NotMigrated();
 // 0xd0266e26
 error NotSettlementLayer();
+// 0xeee8a4d9
+error OnlyCtmOwner();
 // 0x04e05fd1
 error OnlyOneBlobWithCalldataAllowed();
 // 0x885ae069
 error OperatorDAInputTooSmall(uint256 operatorDAInputLength, uint256 minAllowedLength);
 // 0x681150be
 error OutdatedProtocolVersion(uint256 protocolVersion, uint256 currentProtocolVersion);
+// 0xfe26193e
+error PriorityQueueNotFullyProcessed();
 // 0xc59d372c
 error ProtocolVersionNotUpToDate(uint256 currentProtocolVersion, uint256 protocolVersion);
 // 0x2dc9747d
 error PubdataInputTooSmall(uint256 pubdataInputLength, uint256 totalBlobsCommitmentSize);
 // 0x9044dff9
 error PubdataLengthTooBig(uint256 pubdataLength, uint256 totalBlobSizeBytes);
+// 0x1cbfa1b9
+error RequireDepositsPaused();
+// 0x89935a14
+error SettlementLayerChainIdMismatch();
+// 0x0baf1d48
+error UnknownVerifierVersion();
 // 0x79274f04
 error UnsupportedProofMetadataVersion(uint256 metadataVersion);
 // 0x52595598

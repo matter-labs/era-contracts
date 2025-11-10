@@ -165,9 +165,9 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
   },
   complexUpgrader: {
     address: "0x000000000000000000000000000000000000800f",
-    codeName: "ComplexUpgrader",
+    codeName: "L2ComplexUpgrader",
     lang: Language.Solidity,
-    location: SourceLocation.SystemContracts,
+    location: SourceLocation.L1Contracts,
   },
   keccak256: {
     address: "0x0000000000000000000000000000000000008010",
@@ -209,7 +209,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     address: "0x0000000000000000000000000000000000010001",
     codeName: "L2GenesisUpgrade",
     lang: Language.Solidity,
-    location: SourceLocation.SystemContracts,
+    location: SourceLocation.L1Contracts,
   },
   L2BridgeHub: {
     // This is explicitly a non-system-contract address.
@@ -262,6 +262,30 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     // this is a zkEVM create2 factory.
     address: "0x0000000000000000000000000000000000010007",
     codeName: "L2WrappedBaseToken",
+    lang: Language.Solidity,
+    location: SourceLocation.L1Contracts,
+  },
+  L2InteropRootStorage: {
+    address: "0x000000000000000000000000000000000001000b",
+    codeName: "L2InteropRootStorage",
+    lang: Language.Solidity,
+    location: SourceLocation.L1Contracts,
+  },
+  L2InteropCenter: {
+    // This is explicitly a non-system-contract address.
+    // We do not use the same address as create2 factories on EVM, since
+    // this is a zkEVM create2 factory.
+    address: "0x0000000000000000000000000000000000010008",
+    codeName: "InteropCenter",
+    lang: Language.Solidity,
+    location: SourceLocation.L1Contracts,
+  },
+  L2InteropHandler: {
+    // This is explicitly a non-system-contract address.
+    // We do not use the same address as create2 factories on EVM, since
+    // this is a zkEVM create2 factory.
+    address: "0x0000000000000000000000000000000000010009",
+    codeName: "InteropHandler",
     lang: Language.Solidity,
     location: SourceLocation.L1Contracts,
   },

@@ -5,9 +5,8 @@ import {Test} from "forge-std/Test.sol";
 
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
-import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 
 import {AMOUNT_UPPER_BOUND, L1_TOKEN_ADDRESS, TOKEN_DEFAULT_DECIMALS, TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL} from "../common/Constants.sol";
 import {UserActorHandler} from "./UserActorHandler.sol";

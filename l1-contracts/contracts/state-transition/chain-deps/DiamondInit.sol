@@ -4,11 +4,15 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {ZKChainBase} from "./facets/ZKChainBase.sol";
-import {L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH} from "../../common/Config.sol";
+import {DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION} from "../../common/Config.sol";
 import {IDiamondInit, InitializeData} from "../chain-interfaces/IDiamondInit.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
 import {EmptyAssetId, EmptyBytes32, TooMuchGas, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
+import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
+import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 
 /// @author Matter Labs
 /// @dev The contract is used only once to initialize the diamond proxy.
@@ -17,8 +21,12 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
     using PriorityTree for PriorityTree.Tree;
     using PriorityQueue for PriorityQueue.Queue;
 
+    bool public immutable IS_ZKSYNC_OS;
+
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
-    constructor() reentrancyGuardInitializer {}
+    constructor(bool _isZKOS) reentrancyGuardInitializer {
+        IS_ZKSYNC_OS = _isZKOS;
+    }
 
     /// @notice ZK chain diamond contract initialization
     /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
@@ -63,6 +71,16 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.chainId = _initializeData.chainId;
         s.bridgehub = _initializeData.bridgehub;
         s.chainTypeManager = _initializeData.chainTypeManager;
+        if (_initializeData.bridgehub == L2_BRIDGEHUB_ADDR) {
+            s.nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
+            s.assetTracker = L2_ASSET_TRACKER_ADDR;
+        } else {
+            address nativeTokenVault = address(
+                IL1AssetRouter(IBridgehubBase(_initializeData.bridgehub).assetRouter()).nativeTokenVault()
+            );
+            s.nativeTokenVault = nativeTokenVault;
+            s.assetTracker = address(IL1NativeTokenVault(nativeTokenVault).l1AssetTracker());
+        }
         s.baseTokenAssetId = _initializeData.baseTokenAssetId;
         s.protocolVersion = _initializeData.protocolVersion;
 
@@ -79,6 +97,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.feeParams = _initializeData.feeParams;
         s.priorityTree.setup(s.__DEPRECATED_priorityQueue.getTotalPriorityTxs());
         s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
+        s.zksyncOS = IS_ZKSYNC_OS;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages

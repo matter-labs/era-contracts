@@ -14,11 +14,11 @@ import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} 
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
-import {InitialForceDeploymentMismatch, AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
-import {ChainAlreadyLive, Unauthorized, ZeroAddress, HashMismatch, GenesisUpgradeZero, GenesisBatchHashZero, GenesisBatchCommitmentZero, MigrationsNotPaused} from "../common/L1ContractErrors.sol";
+import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE} from "../common/Config.sol";
+import {AdminZero, InitialForceDeploymentMismatch, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
+import {ChainAlreadyLive, GenesisBatchCommitmentZero, GenesisBatchHashZero, GenesisUpgradeZero, HashMismatch, MigrationsNotPaused, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
@@ -30,6 +30,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @notice Address of the bridgehub
     address public immutable BRIDGE_HUB;
+
+    /// @notice Address of the interop center
+    address public immutable INTEROP_CENTER;
 
     /// @notice The map from chainId => zkChain contract
     EnumerableMap.UintToAddressMap internal __DEPRECATED_zkChainMap;
@@ -79,8 +82,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// - It prevents the function from being called twice (including in the proxy impl).
     /// - It makes the local version consistent with the one in production, which already had the reentrancy guard
     /// initialized.
-    constructor(address _bridgehub) reentrancyGuardInitializer {
+    constructor(address _bridgehub, address _interopCenter) reentrancyGuardInitializer {
         BRIDGE_HUB = _bridgehub;
+        INTEROP_CENTER = _interopCenter;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
@@ -107,7 +111,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @notice only the chain asset handler can call
     modifier onlyChainAssetHandler() {
-        if (msg.sender != IBridgehub(BRIDGE_HUB).chainAssetHandler()) {
+        if (msg.sender != IL1Bridgehub(BRIDGE_HUB).chainAssetHandler()) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -121,7 +125,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @notice return the chain contract address for a chainId
     function getZKChain(uint256 _chainId) public view returns (address) {
-        return IBridgehub(BRIDGE_HUB).getZKChain(_chainId);
+        return IL1Bridgehub(BRIDGE_HUB).getZKChain(_chainId);
     }
 
     /// @notice return the chain contract address for a chainId
@@ -275,7 +279,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion
     ) external onlyOwner {
-        if (!IBridgehub(BRIDGE_HUB).migrationPaused()) {
+        if (!IL1Bridgehub(BRIDGE_HUB).migrationPaused()) {
             revert MigrationsNotPaused();
         }
 
@@ -427,6 +431,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             IDiamondInit.initialize.selector,
             bytes32(_chainId),
             bytes32(uint256(uint160(BRIDGE_HUB))),
+            bytes32(uint256(uint160(INTEROP_CENTER))),
             bytes32(uint256(uint160(address(this)))),
             bytes32(protocolVersion),
             bytes32(uint256(uint160(_admin))),
@@ -474,7 +479,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         // genesis upgrade, deploys some contracts, sets chainId
         IAdmin(zkChainAddress).genesisUpgrade(
             l1GenesisUpgrade,
-            address(IBridgehub(BRIDGE_HUB).l1CtmDeployer()),
+            address(IL1Bridgehub(BRIDGE_HUB).l1CtmDeployer()),
             _forceDeploymentData,
             _factoryDeps
         );
@@ -508,7 +513,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
         return
             abi.encode(
-                IBridgehub(BRIDGE_HUB).baseTokenAssetId(_chainId),
+                IL1Bridgehub(BRIDGE_HUB).baseTokenAssetId(_chainId),
                 _newSettlementLayerAdmin,
                 protocolVersion,
                 _diamondCut

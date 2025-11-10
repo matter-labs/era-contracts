@@ -4,40 +4,29 @@ pragma solidity 0.8.28;
 // solhint-disable no-console, gas-custom-errors, reason-string
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-// import {Vm} from "forge-std/Vm.sol";
-import {stdToml} from "forge-std/StdToml.sol";
 
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
+import {BridgehubBurnCTMAssetData, IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
-import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS} from "../Utils.sol";
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {ETH_TOKEN_ADDRESS, L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDRESS, Utils} from "../Utils.sol";
+
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {L2AssetRouter, IL2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+
+import {IL2AssetRouter, L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {BridgehubMintCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -220,7 +209,7 @@ contract GatewayPreparation is Script {
     function governanceRegisterGateway() public {
         initializeConfig();
 
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehub);
 
         if (bridgehub.whitelistedSettlementLayers(config.gatewayChainId)) {
             console.log("Chain already whitelisted as settlement layer");
@@ -244,7 +233,7 @@ contract GatewayPreparation is Script {
     function governanceWhitelistGatewayCTM(address gatewayCTMAddress, bytes32 governanoceOperationSalt) public {
         initializeConfig();
 
-        bytes memory data = abi.encodeCall(IBridgehub.addChainTypeManager, (gatewayCTMAddress));
+        bytes memory data = abi.encodeCall(IBridgehubBase.addChainTypeManager, (gatewayCTMAddress));
 
         bytes32 l2TxHash = Utils.runGovernanceL1L2DirectTransaction(
             _getL1GasPrice(),
@@ -290,11 +279,11 @@ contract GatewayPreparation is Script {
             _delay: 0
         });
 
-        bytes32 assetId = IBridgehub(config.bridgehub).ctmAssetIdFromAddress(config.chainTypeManagerProxy);
+        bytes32 assetId = IL1Bridgehub(config.bridgehub).ctmAssetIdFromAddress(config.chainTypeManagerProxy);
 
         // This should be equivalent to `config.chainTypeManagerProxy`, but we just double checking to ensure that
         // bridgehub was initialized correctly
-        address ctmAddress = IBridgehub(config.bridgehub).ctmAssetIdToAddress(assetId);
+        address ctmAddress = IL1Bridgehub(config.bridgehub).ctmAssetIdToAddress(assetId);
         require(ctmAddress == config.chainTypeManagerProxy, "CTM asset id does not match the expected CTM address");
 
         bytes memory secondBridgeData = abi.encodePacked(
@@ -369,7 +358,7 @@ contract GatewayPreparation is Script {
     ) public {
         initializeConfig();
 
-        IBridgehub bridgehubContract = IBridgehub(config.bridgehub);
+        IL1Bridgehub bridgehubContract = IL1Bridgehub(config.bridgehub);
         bytes32 gatewayBaseTokenAssetId = bridgehubContract.baseTokenAssetId(config.gatewayChainId);
         bytes32 ethTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
 
@@ -396,9 +385,9 @@ contract GatewayPreparation is Script {
 
         console.log("Chain Admin address:", chainAdmin);
 
-        bytes32 chainAssetId = IBridgehub(config.bridgehub).ctmAssetIdFromChainId(chainId);
+        bytes32 chainAssetId = IL1Bridgehub(config.bridgehub).ctmAssetIdFromChainId(chainId);
 
-        uint256 currentSettlementLayer = IBridgehub(config.bridgehub).settlementLayer(chainId);
+        uint256 currentSettlementLayer = IL1Bridgehub(config.bridgehub).settlementLayer(chainId);
         if (currentSettlementLayer == config.gatewayChainId) {
             console.log("Chain already using gateway as its settlement layer");
             saveOutput(bytes32(0));
@@ -409,7 +398,7 @@ contract GatewayPreparation is Script {
             BridgehubBurnCTMAssetData({
                 chainId: chainId,
                 ctmData: abi.encode(l2ChainAdmin, config.gatewayDiamondCutData),
-                chainData: abi.encode(IZKChain(IBridgehub(config.bridgehub).getZKChain(chainId)).getProtocolVersion())
+                chainData: abi.encode(IZKChain(IL1Bridgehub(config.bridgehub).getZKChain(chainId)).getProtocolVersion())
             })
         );
 
@@ -440,7 +429,7 @@ contract GatewayPreparation is Script {
         uint256 chainId
     ) public {
         initializeConfig();
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehub);
 
         uint256 currentSettlementLayer = bridgehub.settlementLayer(chainId);
         if (currentSettlementLayer != config.gatewayChainId) {
@@ -499,7 +488,7 @@ contract GatewayPreparation is Script {
         initializeConfig();
 
         L1Nullifier l1Nullifier = L1Nullifier(config.l1NullifierProxy);
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehub);
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
         vm.broadcast();
         l1Nullifier.finalizeDeposit(
@@ -521,13 +510,13 @@ contract GatewayPreparation is Script {
         address accessControlRestriction,
         uint256 chainId,
         address l1DAValidator,
-        address l2DAValidator,
+        L2DACommitmentScheme l2DACommitmentScheme,
         address chainDiamondProxyOnGateway,
         address chainAdminOnGateway
     ) public {
         initializeConfig();
 
-        bytes memory data = abi.encodeCall(IAdmin.setDAValidatorPair, (l1DAValidator, l2DAValidator));
+        bytes memory data = abi.encodeCall(IAdmin.setDAValidatorPair, (l1DAValidator, l2DACommitmentScheme));
 
         bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
             _getL1GasPrice(),
@@ -604,7 +593,7 @@ contract GatewayPreparation is Script {
 
         vm.broadcast();
         GatewayTransactionFilterer impl = new GatewayTransactionFilterer(
-            IBridgehub(config.bridgehub),
+            IL1Bridgehub(config.bridgehub),
             config.sharedBridgeProxy
         );
 
@@ -617,7 +606,7 @@ contract GatewayPreparation is Script {
 
         GatewayTransactionFilterer proxyAsFilterer = GatewayTransactionFilterer(address(proxy));
 
-        IZKChain chain = IZKChain(IBridgehub(config.bridgehub).getZKChain(config.gatewayChainId));
+        IZKChain chain = IZKChain(IL1Bridgehub(config.bridgehub).getZKChain(config.gatewayChainId));
 
         // Firstly, we set the filterer
         Utils.adminExecute({

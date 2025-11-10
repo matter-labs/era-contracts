@@ -10,6 +10,8 @@ import {IImmutableSimulator} from "./interfaces/IImmutableSimulator.sol";
 import {IBaseToken} from "./interfaces/IBaseToken.sol";
 import {IBridgehub} from "./interfaces/IBridgehub.sol";
 import {IL1Messenger} from "./interfaces/IL1Messenger.sol";
+import {IMessageVerification} from "./interfaces/IMessageVerification.sol";
+import {IChainAssetHandler} from "./interfaces/IChainAssetHandler.sol";
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {ICompressor} from "./interfaces/ICompressor.sol";
 import {IComplexUpgrader} from "./interfaces/IComplexUpgrader.sol";
@@ -19,7 +21,12 @@ import {IMessageRoot} from "./interfaces/IMessageRoot.sol";
 import {ICreate2Factory} from "./interfaces/ICreate2Factory.sol";
 import {IEvmHashesStorage} from "./interfaces/IEvmHashesStorage.sol";
 import {IL2AssetRouter} from "./interfaces/IL2AssetRouter.sol";
+import {IL2AssetTracker} from "./interfaces/IL2AssetTracker.sol";
+import {IGWAssetTracker} from "./interfaces/IGWAssetTracker.sol";
 import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
+import {IInteropHandler} from "./interfaces/IInteropHandler.sol";
+import {IInteropCenter} from "./interfaces/IInteropCenter.sol";
+import {IL2InteropRootStorage} from "./interfaces/IL2InteropRootStorage.sol";
 
 /// @dev All the system contracts introduced by ZKsync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
@@ -108,18 +115,32 @@ address constant EVM_GAS_MANAGER = address(SYSTEM_CONTRACTS_OFFSET + 0x13);
 address constant EVM_PREDEPLOYS_MANAGER = address(SYSTEM_CONTRACTS_OFFSET + 0x14);
 IEvmHashesStorage constant EVM_HASHES_STORAGE = IEvmHashesStorage(address(SYSTEM_CONTRACTS_OFFSET + 0x15));
 
+address constant L2_DA_VALIDATOR = address(SYSTEM_CONTRACTS_OFFSET + 0x16);
+
 ICreate2Factory constant L2_CREATE2_FACTORY = ICreate2Factory(address(USER_CONTRACTS_OFFSET));
 IL2AssetRouter constant L2_ASSET_ROUTER = IL2AssetRouter(address(USER_CONTRACTS_OFFSET + 0x03));
 IBridgehub constant L2_BRIDGE_HUB = IBridgehub(address(USER_CONTRACTS_OFFSET + 0x02));
-IL2NativeTokenVault constant L2_NATIVE_TOKEN_VAULT = IL2NativeTokenVault(address(USER_CONTRACTS_OFFSET + 0x04));
+address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x04);
+IL2NativeTokenVault constant L2_NATIVE_TOKEN_VAULT = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(address(USER_CONTRACTS_OFFSET + 0x05));
 // Note, that on its own this contract does not provide much functionality, but having it on a constant address
 // serves as a convenient storage for its bytecode to be accessible via `extcodehash`.
 address constant SLOAD_CONTRACT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x06);
 
 address constant WRAPPED_BASE_TOKEN_IMPL_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x07);
+IL2InteropRootStorage constant L2_INTEROP_ROOT_STORAGE = IL2InteropRootStorage(address(USER_CONTRACTS_OFFSET + 0x08));
+IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(address(USER_CONTRACTS_OFFSET + 0x09));
+address constant L2_CHAIN_ASSET_HANDLER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0a);
+IChainAssetHandler constant L2_CHAIN_ASSET_HANDLER = IChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDRESS);
+address constant L2_UPGRADEABLE_BEACON_DEPLOYER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0b);
+address constant L2_INTEROP_CENTER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0c);
+IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(L2_INTEROP_CENTER_ADDRESS);
+IInteropHandler constant L2_INTEROP_HANDLER = IInteropHandler(address(USER_CONTRACTS_OFFSET + 0x0d));
+address constant L2_ASSET_TRACKER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0e);
+IL2AssetTracker constant L2_ASSET_TRACKER = IL2AssetTracker(address(L2_ASSET_TRACKER_ADDRESS));
+address constant GW_ASSET_TRACKER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0f);
+IGWAssetTracker constant GW_ASSET_TRACKER = IGWAssetTracker(address(GW_ASSET_TRACKER_ADDRESS));
 
-address constant L2_CHAIN_ASSET_HANDLER = address(USER_CONTRACTS_OFFSET + 0x0a);
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.
@@ -141,6 +162,18 @@ bytes1 constant CREATE2_EVM_PREFIX = 0xff;
 /// @dev Each state diff consists of 156 bytes of actual data and 116 bytes of unused padding, needed for circuit efficiency.
 uint256 constant STATE_DIFF_ENTRY_SIZE = 272;
 
+/// @dev Bytes in raw L2 to L1 log
+/// @dev Equal to the bytes size of the tuple - (uint8 ShardId, bool isService, uint16 txNumberInBlock, address sender, bytes32 key, bytes32 value)
+uint256 constant L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
+
+/// @dev The value of default leaf hash for L2 to L1 logs Merkle tree
+/// @dev An incomplete fixed-size tree is filled with this value to be a full binary tree
+/// @dev Actually equal to the `keccak256(new bytes(L2_TO_L1_LOG_SERIALIZE_SIZE))`
+bytes32 constant L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = 0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba;
+
+/// @dev The current version of state diff compression being used.
+uint256 constant STATE_DIFF_COMPRESSION_VERSION_NUMBER = 1;
+
 enum SystemLogKey {
     L2_TO_L1_LOGS_TREE_ROOT_KEY,
     PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
@@ -151,15 +184,18 @@ enum SystemLogKey {
     // it is the only one that is emitted before the system contracts are upgraded.
     PREV_BATCH_HASH_KEY,
     L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
-    USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+    USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY,
     MESSAGE_ROOT_ROLLING_HASH_KEY,
     L2_TXS_STATUS_ROLLING_HASH_KEY,
+    SETTLEMENT_LAYER_CHAIN_ID_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
 /// @dev The number of leaves in the L2->L1 log Merkle tree.
 /// While formally a tree of any length is acceptable, the node supports only a constant length of 16384 leaves.
 uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 16_384;
+
+uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_DEPTH = 14 + 1;
 
 /// @dev The length of the derived key in bytes inside compressed state diffs.
 uint256 constant DERIVED_KEY_LENGTH = 32;
@@ -199,3 +235,18 @@ uint8 constant ERA_VM_BYTECODE_FLAG = 1;
 uint8 constant EVM_BYTECODE_FLAG = 2;
 
 address constant SERVICE_CALL_PSEUDO_CALLER = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
+
+/// @dev Pubdata commitment scheme used for DA.
+/// @param NONE Invalid option.
+/// @param EMPTY_NO_DA No DA commitment, used by Validiums.
+/// @param PUBDATA_KECCAK256 Keccak of stateDiffHash and keccak(pubdata). Can be used by custom DA solutions.
+/// @param BLOBS_AND_PUBDATA_KECCAK256 This commitment includes EIP-4844 blobs data. Used by default RollupL1DAValidator.
+enum L2DACommitmentScheme {
+    NONE,
+    EMPTY_NO_DA,
+    PUBDATA_KECCAK256,
+    BLOBS_AND_PUBDATA_KECCAK256
+}
+
+/// @dev The metadata version that is supported by the ZK Chains to prove that an L2->L1 log was included in a batch.
+uint256 constant SUPPORTED_PROOF_METADATA_VERSION = 1;

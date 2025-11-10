@@ -25,6 +25,9 @@ struct ZKChainSpecificForceDeploymentsData {
     /// needed to deploy weth token in case it is not present
     string baseTokenName;
     string baseTokenSymbol;
+    uint256 baseTokenOriginChainId;
+    /// The address of the base token on the origin chain.
+    address baseTokenOriginAddress;
 }
 
 /// @notice The structure that describes force deployments that are the same for each chain.
@@ -33,6 +36,7 @@ struct ZKChainSpecificForceDeploymentsData {
 // solhint-disable-next-line gas-struct-packing
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
+    uint256 gatewayChainId;
     uint256 eraChainId;
     address l1AssetRouter;
     bytes32 l2TokenProxyBytecodeHash;
@@ -43,9 +47,13 @@ struct FixedForceDeploymentsData {
     bytes l2NtvBytecodeInfo;
     bytes messageRootBytecodeInfo;
     bytes chainAssetHandlerBytecodeInfo;
+    bytes interopCenterBytecodeInfo;
+    bytes interopHandlerBytecodeInfo;
+    bytes assetTrackerBytecodeInfo;
     bytes beaconDeployerInfo;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
+    address aliasedChainRegistrationSender;
     // The forced beacon address. It is needed only for internal testing.
     // MUST be equal to 0 in production.
     // It will be the job of the governance to ensure that this value is set correctly.
@@ -58,9 +66,10 @@ interface IL2GenesisUpgrade {
     event UpgradeComplete(uint256 _chainId);
 
     function genesisUpgrade(
+        bool _isZKsyncOS,
         uint256 _chainId,
         address _ctmDeployer,
         bytes calldata _fixedForceDeploymentsData,
         bytes calldata _additionalForceDeploymentsData
-    ) external payable;
+    ) external;
 }

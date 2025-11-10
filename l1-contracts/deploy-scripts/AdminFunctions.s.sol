@@ -8,13 +8,12 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {ChainInfoFromBridgehub, Utils} from "./Utils.sol";
-import {IGovernance} from "contracts/governance/IGovernance.sol";
+
 import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
@@ -24,10 +23,12 @@ import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainS
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
-import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehubBase.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
@@ -428,7 +429,7 @@ contract AdminFunctions is Script {
         address _bridgehub,
         uint256 _chainId,
         address _l1DaValidator,
-        address _l2DaValidator,
+        L2DACommitmentScheme _l2DaCommitmentScheme,
         bool _shouldSend
     ) public {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
@@ -437,7 +438,7 @@ contract AdminFunctions is Script {
         calls[0] = Call({
             target: chainInfo.diamondProxy,
             value: 0,
-            data: abi.encodeCall(IAdmin.setDAValidatorPair, (_l1DaValidator, _l2DaValidator))
+            data: abi.encodeCall(IAdmin.setDAValidatorPair, (_l1DaValidator, _l2DaCommitmentScheme))
         });
 
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
@@ -538,7 +539,7 @@ contract AdminFunctions is Script {
         uint256 l2ChainId;
         uint256 gatewayChainId;
         address l1DAValidator;
-        address l2DAValidator;
+        L2DACommitmentScheme l2DACommitmentScheme;
         address chainDiamondProxyOnGateway;
         address refundRecipient;
         bool _shouldSend;
@@ -551,7 +552,10 @@ contract AdminFunctions is Script {
             data.bridgehub,
             data.l2ChainId
         );
-        bytes memory callData = abi.encodeCall(IAdmin.setDAValidatorPair, (data.l1DAValidator, data.l2DAValidator));
+        bytes memory callData = abi.encodeCall(
+            IAdmin.setDAValidatorPair,
+            (data.l1DAValidator, data.l2DACommitmentScheme)
+        );
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
             callData,
@@ -574,7 +578,7 @@ contract AdminFunctions is Script {
         uint256 l2ChainId,
         uint256 gatewayChainId,
         address l1DAValidator,
-        address l2DAValidator,
+        L2DACommitmentScheme l2DACommitmentScheme,
         address chainDiamondProxyOnGateway,
         address refundRecipient,
         bool _shouldSend
@@ -586,7 +590,7 @@ contract AdminFunctions is Script {
                 l2ChainId: l2ChainId,
                 gatewayChainId: gatewayChainId,
                 l1DAValidator: l1DAValidator,
-                l2DAValidator: l2DAValidator,
+                l2DACommitmentScheme: l2DACommitmentScheme,
                 chainDiamondProxyOnGateway: chainDiamondProxyOnGateway,
                 refundRecipient: refundRecipient,
                 _shouldSend: _shouldSend
@@ -707,7 +711,7 @@ contract AdminFunctions is Script {
             })
         );
 
-        bytes32 ctmAssetId = IBridgehub(data.bridgehub).ctmAssetIdFromChainId(data.l2ChainId);
+        bytes32 ctmAssetId = IL1Bridgehub(data.bridgehub).ctmAssetIdFromChainId(data.l2ChainId);
         bytes memory l2Calldata = abi.encodeCall(IL2AssetRouter.withdraw, (ctmAssetId, bridgehubBurnData));
 
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(

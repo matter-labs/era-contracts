@@ -2,12 +2,14 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
-import {Vm} from "forge-std/Vm.sol";
+
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 
+import {InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import "contracts/bridgehub/L1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import "contracts/chain-registrar/ChainRegistrar.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -22,10 +24,13 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 
 contract ChainRegistrarTest is Test {
     DummyBridgehub private bridgeHub;
+    InteropCenter private interopCenter;
+    L1MessageRoot private messageRoot;
     DummyChainTypeManagerWBH private ctm;
     address private admin;
     address private deployer;
@@ -39,19 +44,25 @@ contract ChainRegistrarTest is Test {
 
     constructor() {
         bridgeHub = new DummyBridgehub();
+        interopCenter = new InteropCenter();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        interopCenter.initL2(block.chainid, makeAddr("admin"));
+        messageRoot = new L1MessageRoot(address(bridgeHub), 1);
         ctm = new DummyChainTypeManagerWBH(address(bridgeHub));
         admin = makeAddr("admin");
         deployer = makeAddr("deployer");
         vm.prank(admin);
 
         l1NullifierImpl = new L1NullifierDev({
-            _bridgehub: IBridgehub(address(bridgeHub)),
+            _bridgehub: IL1Bridgehub(address(bridgeHub)),
+            _messageRoot: IMessageRoot(address(messageRoot)),
+            _interopCenter: (interopCenter),
             _eraChainId: 270,
             _eraDiamondProxy: makeAddr("era")
         });
 
         assetRouter = new L1AssetRouter({
-            _l1WethAddress: makeAddr("weth"),
+            _l1WethToken: makeAddr("weth"),
             _bridgehub: address(bridgeHub),
             _l1Nullifier: address(l1NullifierImpl),
             _eraChainId: 270,

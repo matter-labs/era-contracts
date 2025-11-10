@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
-import {GenesisBatchCommitmentZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisUpgradeZero} from "contracts/common/L1ContractErrors.sol";
+import {GenesisBatchCommitmentZero, GenesisBatchHashZero, GenesisUpgradeZero} from "contracts/common/L1ContractErrors.sol";
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
 contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
@@ -28,7 +28,7 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             serverNotifier: serverNotifier
         });
 
-        ChainTypeManager ctm = new ChainTypeManager(address(bridgehub));
+        ChainTypeManager ctm = new ChainTypeManager(address(bridgehub), interopCenterAddress);
 
         vm.expectRevert(err);
         TransparentUpgradeableProxy transparentUpgradeableProxy = new TransparentUpgradeableProxy(
@@ -62,19 +62,6 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
         });
 
         _deployCtmWithParams(chainCreationParams, GenesisBatchHashZero.selector);
-    }
-
-    function test_RevertWhen_genesisIndexRepeatedStorageChangesIsZero() public asBridgeHub {
-        ChainCreationParams memory chainCreationParams = ChainCreationParams({
-            genesisUpgrade: address(genesisUpgradeContract),
-            genesisBatchHash: bytes32(uint256(0x01)),
-            genesisIndexRepeatedStorageChanges: 0,
-            genesisBatchCommitment: bytes32(uint256(0x01)),
-            diamondCut: getDiamondCutData(address(diamondInit)),
-            forceDeploymentsData: bytes("")
-        });
-
-        _deployCtmWithParams(chainCreationParams, GenesisIndexStorageZero.selector);
     }
 
     function test_RevertWhen_genesisBatchCommitmentIsZero() public asBridgeHub {

@@ -14,7 +14,7 @@ contract CustomUpgradeTest is BaseZkSyncUpgrade {
     /// @notice Placeholder function for custom logic for upgrading L1 contract.
     /// Typically this function will never be used.
     /// @param _customCallDataForUpgrade Custom data for upgrade, which may be interpreted differently for each upgrade.
-    function _upgradeL1Contract(bytes calldata _customCallDataForUpgrade) internal override {
+    function _upgradeL1Contract(bytes memory _customCallDataForUpgrade) internal override {
         keccak256(_customCallDataForUpgrade); // called to suppress compilation warning
         emit Test();
     }
@@ -23,11 +23,11 @@ contract CustomUpgradeTest is BaseZkSyncUpgrade {
     /// Typically this function will never be used.
     /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each
     /// upgrade.
-    function _postUpgrade(bytes calldata _customCallDataForUpgrade) internal override {}
+    function _postUpgrade(bytes memory _customCallDataForUpgrade) internal override {}
 
     /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
-    function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
+    function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
         (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion, true);
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
         _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);

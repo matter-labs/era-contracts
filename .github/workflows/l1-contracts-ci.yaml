@@ -246,49 +246,31 @@ jobs:
         working-directory: tools
         run: rustup toolchain install
 
-      - name: Generate verifiers
+      - name: Generate Era verifiers
         working-directory: tools
-        run: cargo run
+        run: cargo run --bin zksync_verifier_contract_generator --release -- --variant era
 
-      - name: Compare L1VerifierPlonk.sol
-        run: diff tools/data/VerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/L1VerifierPlonk.sol
+      - name: Compare EraVerifierPlonk.sol
+        run: diff tools/data/EraVerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/EraVerifierPlonk.sol
 
-      - name: Compare VerifierFflonk.sol
-        run: diff tools/data/VerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/L1VerifierFflonk.sol
+      - name: Compare EraVerifierFflonk.sol
+        run: diff tools/data/EraVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/EraVerifierFflonk.sol
 
-  check-verifier-generator-l2:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: 1.72.0
-
-      - name: Install Rust toolchain
+      - name: Generate ZKsyncOS verifiers
         working-directory: tools
-        run: rustup toolchain install
+        run: cargo run --bin zksync_verifier_contract_generator --release -- --variant zksync-os
 
-      - name: Generate verifiers
-        working-directory: tools
-        run: cargo run -- --l2_mode
+      - name: Compare ZKsyncOSVerifierPlonk.sol
+        run: diff tools/data/ZKsyncOSVerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol
 
-      - name: Compare L2VerifierPlonk.sol
-        run: diff tools/data/VerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/L2VerifierPlonk.sol
-
-      - name: Compare L2VerifierFflonk.sol
-        run: diff tools/data/VerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/L2VerifierFflonk.sol
+      - name: Compare ZKsyncOSVerifierFflonk.sol
+        run: diff tools/data/ZKsyncOSVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol
 
   coverage:
     defaults:
       run:
         working-directory: l1-contracts
-    needs: [build, lint]
+    needs: [build] # TODO return lint into dependencies when it's fully fixed
     runs-on: ubuntu-latest
 
     steps:
@@ -329,7 +311,7 @@ jobs:
             system-contracts/zkout
 
       - name: Run coverage
-        run: yarn test:foundry && yarn coverage:foundry --report summary --report lcov
+        run: yarn test:foundry --no-match-path 'test/foundry/l1/unit/concrete/Executor/*' && yarn coverage:foundry --report summary --report lcov
 
       # Installing the specific version of `lcov` because of
       # the `genhtml: ERROR: line ... of ... has branchcov but no linecov data` error.

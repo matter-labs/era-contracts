@@ -10,10 +10,16 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
-contract DiamondInitTest is Test {
+contract DiamondInitTest is UtilsTest {
     Diamond.FacetCut[] internal facetCuts;
-    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier =
+        address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0), false));
+    DummyBridgehub internal dummyBridgehub;
+    InitializeData internal initializeData;
 
     function setUp() public virtual {
         facetCuts.push(
@@ -24,8 +30,12 @@ contract DiamondInitTest is Test {
                 selectors: Utils.getUtilsFacetSelectors()
             })
         );
+        dummyBridgehub = new DummyBridgehub();
+        initializeData = Utils.makeInitializeData(testnetVerifier, address(dummyBridgehub));
+
+        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), bytes32(0));
     }
 
     // add this to be excluded from coverage report
-    function test() internal virtual {}
+    function test() internal virtual override {}
 }

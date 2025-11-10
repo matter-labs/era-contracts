@@ -3,9 +3,18 @@
 pragma solidity 0.8.28;
 
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
-import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {SERVICE_TRANSACTION_SENDER} from "../common/Config.sol";
+import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
+import {Unauthorized} from "../common/L1ContractErrors.sol";
+import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
+import {IL2Bridgehub} from "./IL2Bridgehub.sol";
+import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
+import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
+import {NotInGatewayMode, NotRelayedSender} from "./L1BridgehubErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -14,25 +23,39 @@ import {BridgehubBase} from "./BridgehubBase.sol";
 /// It also manages state transition managers, base tokens, and chain registrations.
 /// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
-/// @dev Important: L2 contracts are not allowed to have any constructor. This is needed for compatibility with ZKsyncOS.
-contract L2Bridgehub is BridgehubBase {
-    /// @notice the asset id of Eth. This is only used on L1.
-    bytes32 internal ETH_TOKEN_ASSET_ID;
+/// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
+contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
+    using EnumerableMap for EnumerableMap.UintToAddressMap;
 
-    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
+    /// @dev The asset ID of ETH token.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
+    bytes32 public ETH_TOKEN_ASSET_ID;
+
+    /// @dev The chain ID of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
     uint256 public L1_CHAIN_ID;
 
     /// @notice The total number of ZK chains can be created/connected to this CTM.
-    /// This is the temporary security measure.
+    /// This is a temporary security measure.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
     uint256 public MAX_NUMBER_OF_ZK_CHAINS;
 
-    /// @notice to avoid parity hack
-    constructor() {}
+    modifier onlyChainRegistrationSender() {
+        if (
+            msg.sender != AddressAliasHelper.undoL1ToL2Alias(chainRegistrationSender) &&
+            msg.sender != SERVICE_TRANSACTION_SENDER
+        ) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
 
-    /// @notice Initializes the contract
+    /// @notice Initializes the contract.
     /// @dev This function is used to initialize the contract with the initial values.
-    /// @dev This function is called both for new chains.
     /// @param _l1ChainId The chain id of L1.
     /// @param _owner The owner of the contract.
     /// @param _maxNumberOfZKChains The maximum number of ZK chains that can be created.
@@ -62,15 +85,68 @@ contract L2Bridgehub is BridgehubBase {
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
     }
 
+    /// @notice used to register chains on L2 for the purpose of interop.
+    /// @param _chainId the chainId of the chain to be registered.
+    /// @param _baseTokenAssetId the base token asset id of the chain.
+    function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external onlyChainRegistrationSender {
+        baseTokenAssetId[_chainId] = _baseTokenAssetId;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            IMMUTABLE GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Returns the asset ID of ETH token for internal use.
     function _ethTokenAssetId() internal view override returns (bytes32) {
         return ETH_TOKEN_ASSET_ID;
     }
 
+    /// @dev Returns the maximum number of ZK chains for internal use.
+    function _maxNumberOfZKChains() internal view override returns (uint256) {
+        return MAX_NUMBER_OF_ZK_CHAINS;
+    }
+
+    /// @dev Returns the L1 chain ID for internal use.
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
 
-    function _maxNumberOfZKChains() internal view override returns (uint256) {
-        return MAX_NUMBER_OF_ZK_CHAINS;
+    modifier onlySettlementLayerRelayedSender() override {
+        /// There is no sender for the wrapping, we use a virtual address.
+        if (msg.sender != SETTLEMENT_LAYER_RELAY_SENDER) {
+            revert NotRelayedSender(msg.sender, SETTLEMENT_LAYER_RELAY_SENDER);
+        }
+        _;
+    }
+
+    /// @notice Used to forward a transaction on the gateway to the chains mailbox.
+    /// @param _chainId the chainId of the chain
+    /// @param _canonicalTxHash the canonical transaction hash
+    /// @param _expirationTimestamp the expiration timestamp for the transaction
+    function forwardTransactionOnGateway(
+        uint256 _chainId,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external override onlySettlementLayerRelayedSender {
+        if (L1_CHAIN_ID == block.chainid) {
+            revert NotInGatewayMode();
+        }
+        address zkChain = zkChainMap.get(_chainId);
+        IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
+    }
+
+    /// @notice Set addresses
+    function setAddresses(
+        address _assetRouter,
+        ICTMDeploymentTracker _l1CtmDeployer,
+        IMessageRoot _messageRoot,
+        address _chainAssetHandler,
+        address _chainRegistrationSender
+    ) external override onlyOwnerOrUpgrader {
+        assetRouter = _assetRouter;
+        l1CtmDeployer = _l1CtmDeployer;
+        messageRoot = _messageRoot;
+        chainAssetHandler = _chainAssetHandler;
+        chainRegistrationSender = _chainRegistrationSender;
     }
 }

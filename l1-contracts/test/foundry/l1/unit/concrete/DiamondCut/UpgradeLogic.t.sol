@@ -24,9 +24,11 @@ contract UpgradeLogicTest is DiamondCutTest {
     AdminFacet private adminFacet;
     AdminFacet private proxyAsAdmin;
     GettersFacet private proxyAsGetters;
+    address interopCenter = makeAddr("interopCenter");
     address private admin;
     address private chainTypeManager;
     address private randomSigner;
+    bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(1, (makeAddr("baseToken")));
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](11);
@@ -52,7 +54,7 @@ contract UpgradeLogicTest is DiamondCutTest {
         DummyBridgehub dummyBridgehub = new DummyBridgehub();
 
         diamondCutTestContract = new DiamondCutTestContract();
-        diamondInit = new DiamondInit();
+        diamondInit = new DiamondInit(false);
         adminFacet = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         gettersFacet = new GettersFacet();
 
@@ -81,10 +83,11 @@ contract UpgradeLogicTest is DiamondCutTest {
             chainId: 1,
             bridgehub: address(dummyBridgehub),
             chainTypeManager: chainTypeManager,
+            interopCenter: interopCenter,
             protocolVersion: 0,
             admin: admin,
             validatorTimelock: makeAddr("validatorTimelock"),
-            baseTokenAssetId: DataEncoding.encodeNTVAssetId(1, (makeAddr("baseToken"))),
+            baseTokenAssetId: baseTokenAssetId,
             storedBatchZero: bytes32(0),
             // genesisBatchHash: 0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,
             // genesisIndexRepeatedStorageChanges: 0,
@@ -115,6 +118,7 @@ contract UpgradeLogicTest is DiamondCutTest {
             initCalldata: diamondInitCalldata
         });
 
+        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), baseTokenAssetId);
         diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
         proxyAsAdmin = AdminFacet(address(diamondProxy));
         proxyAsGetters = GettersFacet(address(diamondProxy));

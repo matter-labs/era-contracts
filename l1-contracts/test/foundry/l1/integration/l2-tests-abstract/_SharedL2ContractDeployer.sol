@@ -14,30 +14,37 @@ import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
+import {IL2NativeTokenVault} from "../../../../../contracts/bridge/ntv/IL2NativeTokenVault.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {BridgehubMintCTMAssetData, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
-import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {L2WrappedBaseToken} from "contracts/bridge/L2WrappedBaseToken.sol";
-import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
-import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
+import {IL2Bridgehub} from "contracts/bridgehub/IL2Bridgehub.sol";
+import {BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+
+import {IL2AssetRouter} from "../../../../../contracts/bridge/asset-router/IL2AssetRouter.sol";
+import {IL1Nullifier} from "../../../../../contracts/bridge/interfaces/IL1Nullifier.sol";
+import {IL1AssetRouter} from "../../../../../contracts/bridge/asset-router/IL1AssetRouter.sol";
+
+import {BridgehubL2TransactionRequest} from "../../../../../contracts/common/Messaging.sol";
+import {IInteropCenter, InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
+import {L2WrappedBaseToken} from "../../../../../contracts/bridge/L2WrappedBaseToken.sol";
+import {L2SharedBridgeLegacy} from "../../../../../contracts/bridge/L2SharedBridgeLegacy.sol";
+import {MailboxFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {AdminFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Admin.sol";
+import {DataEncoding} from "../../../../../contracts/common/libraries/DataEncoding.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {SystemContractsArgs} from "./Utils.sol";
+import {SharedUtils} from "../utils/SharedUtils.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
+import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
+import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
-abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
+abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegrationUtils, SharedUtils {
     L2WrappedBaseToken internal weth;
     address internal l1WethAddress = address(4);
 
@@ -50,10 +57,13 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
     BeaconProxy internal proxy;
 
     IL2AssetRouter l2AssetRouter = IL2AssetRouter(L2_ASSET_ROUTER_ADDR);
-    IBridgehub l2Bridgehub = IBridgehub(L2_BRIDGEHUB_ADDR);
+    IL2Bridgehub l2Bridgehub = IL2Bridgehub(L2_BRIDGEHUB_ADDR);
+    IInteropCenter l2InteropCenter = IInteropCenter(L2_INTEROP_CENTER_ADDR);
+    IL2NativeTokenVault l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
     uint256 internal constant L1_CHAIN_ID = 10; // it cannot be 9, the default block.chainid
     uint256 internal ERA_CHAIN_ID = 270;
+    uint256 internal GATEWAY_CHAIN_ID = 506;
     uint256 internal mintChainId = 300;
     address internal l1AssetRouter = makeAddr("l1AssetRouter");
     address internal aliasedL1AssetRouter = AddressAliasHelper.applyL1ToL2Alias(l1AssetRouter);
@@ -68,8 +78,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
     address internal l1CTM = makeAddr("l1CTM");
     bytes32 internal ctmAssetId = keccak256(abi.encode(L1_CHAIN_ID, l1CTMDeployer, bytes32(uint256(uint160(l1CTM)))));
 
-    bytes32 internal baseTokenAssetId =
-        keccak256(abi.encode(L1_CHAIN_ID, L2_NATIVE_TOKEN_VAULT_ADDR, abi.encode(ETH_TOKEN_ADDRESS)));
+    bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
 
     bytes internal exampleChainCommitment;
 
@@ -77,10 +86,17 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
 
     IChainTypeManager internal chainTypeManager;
 
-    function setUp() public {
+    function setUp() public virtual {
+        setUpInner(false);
+    }
+
+    function setUpInner(bool _skip) public virtual {
+        if (_skip) {
+            vm.startBroadcast();
+        }
         standardErc20Impl = new BridgedStandardERC20();
         beacon = new UpgradeableBeacon(address(standardErc20Impl));
-        beacon.transferOwnership(ownerWallet);
+        // beacon.transferOwnership(ownerWallet);
 
         // One of the purposes of deploying it here is to publish its bytecode
         BeaconProxy beaconProxy = new BeaconProxy(address(beacon), new bytes(0));
@@ -99,33 +115,40 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
         );
 
         L2WrappedBaseToken weth = deployL2Weth();
-
+        if (_skip) {
+            vm.stopBroadcast();
+        }
         initSystemContracts(
             SystemContractsArgs({
+                broadcast: _skip,
                 l1ChainId: L1_CHAIN_ID,
                 eraChainId: ERA_CHAIN_ID,
+                gatewayChainId: GATEWAY_CHAIN_ID,
                 l1AssetRouter: l1AssetRouter,
                 legacySharedBridge: sharedBridgeLegacy,
                 l2TokenBeacon: address(beacon),
                 l2TokenProxyBytecodeHash: beaconProxyBytecodeHash,
                 aliasedOwner: ownerWallet,
                 contractsDeployedAlready: false,
-                l1CtmDeployer: l1CTMDeployer
+                l1CtmDeployer: l1CTMDeployer,
+                maxNumberOfZKChains: 100
             })
         );
-        deployL2Contracts(L1_CHAIN_ID);
+        if (!_skip) {
+            deployL2Contracts(L1_CHAIN_ID);
 
-        vm.prank(aliasedL1AssetRouter);
-        l2AssetRouter.setAssetHandlerAddress(L1_CHAIN_ID, ctmAssetId, L2_CHAIN_ASSET_HANDLER_ADDR);
-        vm.prank(ownerWallet);
-        l2Bridgehub.addChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
-        vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1CTMDeployer));
-        l2Bridgehub.setCTMAssetAddress(
-            bytes32(uint256(uint160(l1CTM))),
-            address(addresses.stateTransition.chainTypeManagerProxy)
-        );
-        chainTypeManager = IChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
-        getExampleChainCommitment();
+            vm.prank(aliasedL1AssetRouter);
+            l2AssetRouter.setAssetHandlerAddress(L1_CHAIN_ID, ctmAssetId, L2_CHAIN_ASSET_HANDLER_ADDR);
+            vm.prank(ownerWallet);
+            l2Bridgehub.addChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
+            vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1CTMDeployer));
+            l2Bridgehub.setCTMAssetAddress(
+                bytes32(uint256(uint160(l1CTM))),
+                address(addresses.stateTransition.chainTypeManagerProxy)
+            );
+            chainTypeManager = IChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
+            getExampleChainCommitment();
+        }
     }
 
     function getExampleChainCommitment() internal returns (bytes memory) {
@@ -143,11 +166,18 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
         );
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehub.baseToken.selector, ERA_CHAIN_ID + 1),
+            abi.encodeWithSelector(IBridgehubBase.baseToken.selector, ERA_CHAIN_ID + 1),
             abi.encode(address(uint160(1)))
         );
-
+        vm.mockCall(
+            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
+            abi.encode(block.chainid)
+        );
         vm.prank(L2_BRIDGEHUB_ADDR);
+        mockDiamondInitInteropCenterCallsWithAddress(L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, baseTokenAssetId);
+        uint256 currentChainId = block.chainid;
+        vm.chainId(L1_CHAIN_ID);
         address chainAddress = chainTypeManager.createNewChain(
             ERA_CHAIN_ID + 1,
             baseTokenAssetId,
@@ -155,8 +185,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
             abi.encode(config.contracts.diamondCutData, generatedData.forceDeploymentsData),
             new bytes[](0)
         );
-
-        uint256 currentChainId = block.chainid;
+        vm.chainId(currentChainId);
 
         // This function is available only on L1 (and it is correct),
         // but inside testing we need to call this function to recreate commitment
@@ -238,8 +267,41 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
         return weth;
     }
 
+    function finalizeDeposit() public {
+        finalizeDepositWithCustomCommitment(exampleChainCommitment);
+    }
+
+    function finalizeDepositWithChainId(uint256 _chainId) public {
+        finalizeDepositWithCustomCommitmentAndChainId(_chainId, exampleChainCommitment);
+    }
+
+    function finalizeDepositWithCustomCommitment(bytes memory chainCommitment) public {
+        finalizeDepositWithCustomCommitmentAndChainId(mintChainId, chainCommitment);
+    }
+
+    function finalizeDepositWithCustomCommitmentAndChainId(uint256 _chainId, bytes memory chainCommitment) public {
+        bytes memory chainData = chainCommitment;
+        bytes memory ctmData = abi.encode(
+            baseTokenAssetId,
+            ownerWallet,
+            chainTypeManager.protocolVersion(),
+            config.contracts.diamondCutData
+        );
+        BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
+            chainId: _chainId,
+            baseTokenAssetId: baseTokenAssetId,
+            batchNumber: 0,
+            ctmData: ctmData,
+            chainData: chainData,
+            migrationNumber: 0,
+            v30UpgradeChainBatchNumber: 0
+        });
+        vm.prank(aliasedL1AssetRouter);
+        AssetRouterBase(address(l2AssetRouter)).finalizeDeposit(L1_CHAIN_ID, ctmAssetId, abi.encode(data));
+    }
+
     function initSystemContracts(SystemContractsArgs memory _args) internal virtual;
     function deployL2Contracts(uint256 _l1ChainId) public virtual;
 
-    function test() internal virtual override {}
+    function test() internal virtual override(DeployIntegrationUtils, UtilsCallMockerTest) {}
 }
