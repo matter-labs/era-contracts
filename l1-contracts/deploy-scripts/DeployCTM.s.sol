@@ -349,7 +349,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
     function _buildForceDeploymentsData(
         address dangerousTestOnlyForcedBeacon
     ) private returns (FixedForceDeploymentsData memory data) {
-        FixedForceDeploymentsData memory data = FixedForceDeploymentsData({
+        data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             gatewayChainId: config.gatewayChainId,
             eraChainId: config.eraChainId,
