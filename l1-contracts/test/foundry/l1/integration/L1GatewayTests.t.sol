@@ -196,6 +196,9 @@ contract L1GatewayTests is
             _txStatus: txStatus
         });
         addresses.l1Nullifier.bridgeConfirmTransferResult(transferResultData);
+
+        // Check that value in `depositHappened` mapping was cleared
+        assertEq(addresses.l1Nullifier.depositHappened(migratingChainId, l2TxHash), 0x00);
     }
 
     // This is a method to simplify porting the tests for now.
