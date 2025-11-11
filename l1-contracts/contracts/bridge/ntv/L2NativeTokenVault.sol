@@ -35,17 +35,17 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// @dev The address of the WETH token.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    address public override WETH_TOKEN;
+    address public WETH_TOKEN;
 
     /// @dev The assetId of the base token.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    bytes32 public override BASE_TOKEN_ASSET_ID;
+    bytes32 public BASE_TOKEN_ASSET_ID;
 
     /// @dev Chain ID of L1 for bridging reasons.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    uint256 public override L1_CHAIN_ID;
+    uint256 public L1_CHAIN_ID;
 
     /// @dev The address of the L2 legacy shared bridge
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
@@ -60,7 +60,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// @dev The address of the L2 asset router.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    IAssetRouterBase public override ASSET_ROUTER;
+    IAssetRouterBase public ASSET_ROUTER;
 
     /// @dev The address of the base token on its origin chain
     address public BASE_TOKEN_ORIGIN_TOKEN;
@@ -129,7 +129,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         WETH_TOKEN = _wethToken;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         L1_CHAIN_ID = _l1ChainId;
-        ASSET_ROUTER = IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
         BASE_TOKEN_ORIGIN_TOKEN = _baseTokenOriginToken;
 
@@ -288,7 +287,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
 
     /// @dev Returns the L2 asset router for internal use.
     function _assetRouter() internal view override returns (IAssetRouterBase) {
-        return IAssetRouterBase(ASSET_ROUTER);
+        return IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
     }
 
     /// @dev Returns the L1 chain ID for internal use.

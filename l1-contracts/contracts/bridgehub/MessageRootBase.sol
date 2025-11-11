@@ -60,6 +60,10 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// from the earlier ones.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
+    /// @dev Chain ID of L1.
+    /// @dev Kept here for storage layout compatibility with previous versions.
+    uint256 internal DEPRECATED_l1ChainId;
+
     /// @notice The mapping from chainId to its current executed batch number.
     /// @dev We store the current batch number for each chain once it upgrades to v30. This value is moved between settlement layers
     /// during migration to ensure consistency. For now, only using a settlement layer from the same CTM is allowed,
@@ -88,12 +92,13 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// to a settlement layer and then finalize messages that were not actually approved by the settlement layer. However, since before v30 release chains can only migrate within the same CTM,
     /// this attack is not considered viable as the chains belong to the same CTM as the settlement layer and so the SL can trust their `getTotalBatchesExecuted` value.
     mapping(uint256 chainId => uint256 batchNumber) public v30UpgradeChainBatchNumber;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[38] private __gap;
+    uint256[37] private __gap;
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {

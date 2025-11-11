@@ -14,6 +14,10 @@ error ChainBatchRootAlreadyExists(uint256 chainId, uint256 batchNumber);
 error ChainBatchRootZero();
 // 0x65e8a019
 error ChainExists();
+// 0x5de72107
+error ChainNotLegacy();
+// 0x4bd4ae07
+error ChainNotPresentInCTM();
 // 0x5d03f19d
 error CurrentBatchNumberAlreadySet();
 // 0x68d91b49

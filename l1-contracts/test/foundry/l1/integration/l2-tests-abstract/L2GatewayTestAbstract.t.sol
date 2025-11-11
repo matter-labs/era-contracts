@@ -13,6 +13,7 @@ import {SETTLEMENT_LAYER_RELAY_SENDER, ZKChainCommitment} from "contracts/common
 
 import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {BridgehubBase} from "contracts/bridgehub/BridgehubBase.sol";
+import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
 
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
@@ -76,7 +77,8 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         finalizeDeposit();
         clearPriorityQueue(address(addresses.bridgehub.bridgehubProxy), mintChainId);
         _pauseDeposits(L2_BRIDGEHUB_ADDR, mintChainId);
-        address newAdmin = address(0x1);
+        address newAdmin = makeAddr("newAdmin");
+        //vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20.totalSupply, ()), abi.encode(amount));
         bytes memory newDiamondCut = abi.encode();
         BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({
             chainId: mintChainId,

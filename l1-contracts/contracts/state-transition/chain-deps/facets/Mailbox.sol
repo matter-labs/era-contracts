@@ -10,6 +10,7 @@ import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
 import {IBridgehubBase} from "../../../bridgehub/IBridgehubBase.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
+import {IEIP7702Checker} from "../../chain-interfaces/IEIP7702Checker.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {BalanceChange, BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Log, L2Message, TxStatus, WritePriorityOpParams} from "../../../common/Messaging.sol";
@@ -24,7 +25,7 @@ import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddre
 
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 
-import {BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, NotAssetRouter, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed} from "../../../common/L1ContractErrors.sol";
+import {AddressNotZero, BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, NotAssetRouter, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {RequireDepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 import {DepthMoreThanOneForRecursiveMerkleProof} from "../../../bridgehub/L1BridgehubErrors.sol";
 
@@ -48,6 +49,9 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     /// @inheritdoc IZKChainBase
     string public constant override getName = "MailboxFacet";
 
+    /// @dev Deployed utility contract to check that account is EIP7702 one
+    IEIP7702Checker internal immutable EIP_7702_CHECKER;
+
     /// @dev Era's chainID
     uint256 internal immutable ERA_CHAIN_ID;
 
@@ -69,9 +73,15 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         _;
     }
 
-    constructor(uint256 _eraChainId, uint256 _l1ChainId) {
+    constructor(uint256 _eraChainId, uint256 _l1ChainId, IEIP7702Checker _eip7702Checker) {
+        if (address(_eip7702Checker) == address(0) && block.chainid == _l1ChainId) {
+            revert ZeroAddress();
+        } else if (address(_eip7702Checker) != address(0) && block.chainid != _l1ChainId) {
+            revert AddressNotZero();
+        }
         ERA_CHAIN_ID = _eraChainId;
         L1_CHAIN_ID = _l1ChainId;
+        EIP_7702_CHECKER = _eip7702Checker;
     }
 
     /// @inheritdoc IMailboxImpl
@@ -485,7 +495,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     function _requestL2Transaction(WritePriorityOpParams memory _params) internal returns (bytes32 canonicalTxHash) {
         BridgehubL2TransactionRequest memory request = _params.request;
 
-        // Factory deps are not used in ZKsync OS in non-upgrade transactions.
+        // For ZKsync OS factory deps will be ignored
         if (request.factoryDeps.length > MAX_NEW_FACTORY_DEPS) {
             revert TooManyFactoryDeps();
         }
@@ -498,24 +508,35 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             revert MsgValueTooLow(baseCost + request.l2Value, request.mintValue);
         }
 
-        request.refundRecipient = AddressAliasHelper.actualRefundRecipient(request.refundRecipient, request.sender);
+        bool is7702AccountRefundRecipient = false;
+        bool is7702AccountSender = false;
+
+        if (block.chainid == L1_CHAIN_ID) {
+            is7702AccountRefundRecipient = EIP_7702_CHECKER.isEIP7702Account(request.refundRecipient);
+            is7702AccountSender = EIP_7702_CHECKER.isEIP7702Account(request.sender); // This is not the same as refundRecipient, as it appears to be the AR during TwoBridges.
+        }
+
+        request.refundRecipient = AddressAliasHelper.actualRefundRecipientMailbox(
+            request.refundRecipient,
+            request.sender,
+            is7702AccountRefundRecipient,
+            is7702AccountSender
+        );
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently ZKsync address derivation is different from Ethereum one, but it may be changed in the future.
         // solhint-disable avoid-tx-origin
         // slither-disable-next-line tx-origin
-        if (request.sender != tx.origin) {
+        if (request.sender != tx.origin && !is7702AccountSender) {
             request.sender = AddressAliasHelper.applyL1ToL2Alias(request.sender);
         }
-
         // populate missing fields
         _params.expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast
-
         L2CanonicalTransaction memory transaction;
         (transaction, canonicalTxHash) = _validateTx(_params);
 
         _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
         if (s.settlementLayer != address(0)) {
-            address assetRouter = IBridgehubBase(s.bridgehub).assetRouter();
+            address assetRouter = address(IBridgehubBase(s.bridgehub).assetRouter());
             bool getBalanceChange = _params.request.sender == AddressAliasHelper.applyL1ToL2Alias(assetRouter);
 
             // slither-disable-next-line unused-return
@@ -653,7 +674,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (s.chainId != ERA_CHAIN_ID) {
             revert OnlyEraSupported();
         }
-        address sharedBridge = IBridgehubBase(s.bridgehub).assetRouter();
+        address sharedBridge = address(IBridgehubBase(s.bridgehub).assetRouter());
         IL1AssetRouter(sharedBridge).finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
             _l2BatchNumber: _l2BatchNumber,
@@ -677,7 +698,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (s.chainId != ERA_CHAIN_ID) {
             revert OnlyEraSupported();
         }
-        address assetRouter = IBridgehubBase(s.bridgehub).assetRouter();
+        address assetRouter = address(IBridgehubBase(s.bridgehub).assetRouter());
         require(msg.sender != assetRouter, NotAssetRouter(msg.sender, assetRouter));
         canonicalTxHash = _requestL2TransactionSender(
             BridgehubL2TransactionRequest({
@@ -692,7 +713,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 refundRecipient: _refundRecipient
             })
         );
-        address sharedBridge = IBridgehubBase(s.bridgehub).assetRouter();
+        address sharedBridge = address(IBridgehubBase(s.bridgehub).assetRouter());
         IL1AssetRouter(sharedBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
             s.baseTokenAssetId,

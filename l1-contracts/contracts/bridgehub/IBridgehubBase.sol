@@ -5,6 +5,7 @@ pragma solidity ^0.8.21;
 import {L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
+import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -109,11 +110,9 @@ interface IBridgehubBase {
 
     function getAllZKChainChainIDs() external view returns (uint256[] memory);
 
-    function migrationPaused() external view returns (bool);
-
     function admin() external view returns (address);
 
-    function assetRouter() external view returns (address);
+    function assetRouter() external view returns (IAssetRouterBase);
 
     function chainRegistrationSender() external view returns (address);
 
@@ -175,10 +174,6 @@ interface IBridgehubBase {
     function setChainAssetHandler(address _chainAssetHandler) external;
 
     function setCTMAssetAddress(bytes32 _additionalData, address _assetAddress) external;
-
-    function pauseMigration() external;
-
-    function unpauseMigration() external;
 
     /// Asset Handler functions
     function forwardedBridgeBurnSetSettlementLayer(

@@ -240,11 +240,13 @@ address constant SERVICE_CALL_PSEUDO_CALLER = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFfff
 /// @param EMPTY_NO_DA No DA commitment, used by Validiums.
 /// @param PUBDATA_KECCAK256 Keccak of stateDiffHash and keccak(pubdata). Can be used by custom DA solutions.
 /// @param BLOBS_AND_PUBDATA_KECCAK256 This commitment includes EIP-4844 blobs data. Used by default RollupL1DAValidator.
+/// @param BLOBS_ZKSYNC_OS Keccak of blob versioned hashes filled with pubdata. This commitment scheme is used only for ZKsyncOS.
 enum L2DACommitmentScheme {
     NONE,
     EMPTY_NO_DA,
     PUBDATA_KECCAK256,
-    BLOBS_AND_PUBDATA_KECCAK256
+    BLOBS_AND_PUBDATA_KECCAK256,
+    BLOBS_ZKSYNC_OS
 }
 
 /// @dev The metadata version that is supported by the ZK Chains to prove that an L2->L1 log was included in a batch.

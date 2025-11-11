@@ -244,7 +244,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
         L2SharedBridgeLegacy bridge = new L2SharedBridgeLegacy();
         console.log("bridge", address(bridge));
-        address proxyAdmin = address(0x1);
+        address proxyAdmin = makeAddr("proxyAdmin");
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(bridge),
             proxyAdmin,

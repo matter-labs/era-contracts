@@ -11,7 +11,9 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {Utils} from "../Utils.sol";
 
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
 import {FinalizeL1DepositParams, IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
@@ -30,7 +32,7 @@ contract GatewayUtils is Script {
     ) public {
         IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddr);
 
-        address assetRouter = bridgehub.assetRouter();
+        address assetRouter = address(bridgehub.assetRouter());
         IL1Nullifier l1Nullifier = L1AssetRouter(assetRouter).L1_NULLIFIER();
 
         vm.broadcast();
