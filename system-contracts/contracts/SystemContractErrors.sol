@@ -96,6 +96,8 @@ error KeccakResultIsNotCorrect(bytes32 result);
 error KeccakReturnDataSizeShouldBe32Bytes(uint256 returnDataSize);
 // 0x262f4984
 error KeccakShouldStartWorkingAgain();
+// 0xf801b069
+error L1MessengerHookFailed();
 // 0x5e9ad9b0
 error L2BlockAndBatchTimestampMismatch(uint128 l2BlockTimestamp, uint128 currentBatchTimestamp);
 // 0x543f4c07
