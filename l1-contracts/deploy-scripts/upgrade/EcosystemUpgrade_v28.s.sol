@@ -8,55 +8,46 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy, TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {PrepareL1L2TransactionParams, StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_WETH_IMPL_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IBridgehub, L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
-import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
-import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
-import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
-import {L1VerifierFflonk} from "contracts/state-transition/verifiers/L1VerifierFflonk.sol";
-import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+
+import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
+import {L2_BRIDGEHUB_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+
+import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
+import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
+import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {GatewayUpgrade, GatewayUpgradeEncodedInput} from "contracts/upgrades/GatewayUpgrade.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {GatewayUpgrade} from "contracts/upgrades/GatewayUpgrade.sol";
+
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
+
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
-import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {ChainCreationParams, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
-import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
-import {AddressHasNoCode} from "../ZkSyncScriptErrors.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
+
+import {SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
+
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
-import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+
 import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -66,17 +57,16 @@ import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+
 import {TransitionaryOwner} from "contracts/governance/TransitionaryOwner.sol";
 import {SystemContractsProcessing} from "./SystemContractsProcessing.s.sol";
 import {BytecodePublisher} from "./BytecodePublisher.s.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
-import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.sol";
-import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 
-import {ContractsConfig, DeployedAddresses, TokensConfig} from "../DeployUtils.s.sol";
+import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
+
+import {DeployedAddresses} from "../DeployUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {DeployCTMScript} from "../DeployCTM.s.sol";
@@ -197,14 +187,14 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade", false);
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
 
-        addresses.bridgehub.bridgehubImplementation = deploySimpleContract("Bridgehub", false);
+        addresses.bridgehub.bridgehubImplementation = deploySimpleContract("L1Bridgehub", false);
 
         addresses.bridges.l1NullifierImplementation = deploySimpleContract("L1Nullifier", false);
         addresses.bridges.l1AssetRouterImplementation = deploySimpleContract("L1AssetRouter", false);
         addresses.vaults.l1NativeTokenVaultImplementation = deploySimpleContract("L1NativeTokenVault", false);
 
         upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
-        addresses.bridgehub.messageRootImplementation = deploySimpleContract("MessageRoot", false);
+        addresses.bridgehub.messageRootImplementation = deploySimpleContract("L1MessageRoot", false);
 
         deployStateTransitionDiamondFacets();
 
@@ -288,8 +278,9 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
 
         bytes memory data = abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (forceDeployments));
 
+        uint256 txType = config.isZKsyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
         transaction = L2CanonicalTransaction({
-            txType: SYSTEM_UPGRADE_L2_TX_TYPE,
+            txType: txType,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
             to: uint256(uint160(address(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR))),
             // TODO: dont use hardcoded values
@@ -416,6 +407,13 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         addresses.transparentProxyAdmin = address(
             uint160(uint256(vm.load(addresses.bridgehub.bridgehubProxy, ADMIN_SLOT)))
         );
+        addresses.protocolUpgradeHandlerProxy = toml.readAddress("$.contracts.protocol_upgrade_handler_proxy_address");
+
+        require(
+            Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() ==
+                addresses.protocolUpgradeHandlerProxy,
+            "Incorrect ProtocolUpgradeHandlerProxy"
+        );
         require(
             Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() == config.ownerAddress,
             "Incorrect owner"
@@ -454,20 +452,22 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
     }
 
     function getBridgehubAdmin() public virtual returns (address admin) {
-        admin = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
+        admin = L1Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
     }
 
     /// @notice This function is meant to only be used in tests
     function prepareCreateNewChainCall(uint256 chainId) public view virtual returns (Call[] memory result) {
         require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
 
-        bytes32 newChainAssetId = Bridgehub(addresses.bridgehub.bridgehubProxy).baseTokenAssetId(gatewayConfig.chainId);
+        bytes32 newChainAssetId = L1Bridgehub(addresses.bridgehub.bridgehubProxy).baseTokenAssetId(
+            gatewayConfig.chainId
+        );
         result = new Call[](1);
         result[0] = Call({
             target: addresses.bridgehub.bridgehubProxy,
             value: 0,
             data: abi.encodeCall(
-                IBridgehub.createNewChain,
+                IL1Bridgehub.createNewChain,
                 (
                     chainId,
                     addresses.stateTransition.chainTypeManagerProxy,
@@ -482,11 +482,11 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
     }
 
     function setAddressesBasedOnBridgehub() internal virtual {
-        config.ownerAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
-        address ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(config.eraChainId);
+        config.ownerAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
+        address ctm = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(config.eraChainId);
         addresses.stateTransition.chainTypeManagerProxy = ctm;
         // We have to set the diamondProxy address here - as it is used by multiple constructors (for example L1Nullifier etc)
-        addresses.stateTransition.diamondProxy = IBridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
+        addresses.stateTransition.diamondProxy = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
             config.eraChainId
         );
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
@@ -494,7 +494,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
             ctmProtocolVersion != getNewProtocolVersion(),
             "The new protocol version is already present on the ChainTypeManager"
         );
-        addresses.bridges.l1AssetRouterProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
+        addresses.bridges.l1AssetRouterProxy = L1Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
 
         addresses.vaults.l1NativeTokenVaultProxy = address(
             L1AssetRouter(addresses.bridges.l1AssetRouterProxy).nativeTokenVault()
@@ -504,10 +504,10 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         );
 
         addresses.bridgehub.ctmDeploymentTrackerProxy = address(
-            Bridgehub(addresses.bridgehub.bridgehubProxy).l1CtmDeployer()
+            L1Bridgehub(addresses.bridgehub.bridgehubProxy).l1CtmDeployer()
         );
 
-        addresses.bridgehub.messageRootProxy = address(Bridgehub(addresses.bridgehub.bridgehubProxy).messageRoot());
+        addresses.bridgehub.messageRootProxy = address(L1Bridgehub(addresses.bridgehub.bridgehubProxy).messageRoot());
 
         addresses.bridges.erc20BridgeProxy = address(
             L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
@@ -515,9 +515,9 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         newConfig.oldValidatorTimelock = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy)
             .validatorTimelock();
 
-        newConfig.ecosystemAdminAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
+        newConfig.ecosystemAdminAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
 
-        address eraDiamondProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(config.eraChainId);
+        address eraDiamondProxy = L1Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(config.eraChainId);
         (addresses.daAddresses.l1RollupDAValidator, ) = GettersFacet(eraDiamondProxy).getDAValidatorPair();
     }
 
@@ -550,7 +550,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         additionalDependencies[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
         additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
         additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
-        additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("DiamondProxy");
+        additionalDependencies[4] = ContractsBytecodesLib.getCreationCode("DiamondProxy");
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, additionalDependencies);
         factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
@@ -865,6 +865,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         vm.serializeString("root", "gateway", gateway);
 
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
+        vm.serializeAddress("root", "protocol_upgrade_handler_proxy_address", addresses.protocolUpgradeHandlerProxy);
         vm.serializeUint(
             "root",
             "governance_upgrade_timer_initial_delay",
@@ -996,7 +997,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         result[0] = Call({
             target: addresses.bridgehub.bridgehubProxy,
             value: 0,
-            data: abi.encodeCall(IBridgehub.pauseMigration, ())
+            data: abi.encodeCall(IL1Bridgehub.pauseMigration, ())
         });
     }
 
@@ -1007,7 +1008,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         result[0] = Call({
             target: addresses.bridgehub.bridgehubProxy,
             value: 0,
-            data: abi.encodeCall(IBridgehub.unpauseMigration, ())
+            data: abi.encodeCall(IL1Bridgehub.unpauseMigration, ())
         });
     }
 
@@ -1103,7 +1104,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeCall(IBridgehub.pauseMigration, ());
+        bytes memory l2Calldata = abi.encodeCall(IL1Bridgehub.pauseMigration, ());
 
         calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDR);
     }
@@ -1112,7 +1113,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeCall(IBridgehub.unpauseMigration, ());
+        bytes memory l2Calldata = abi.encodeCall(IL1Bridgehub.unpauseMigration, ());
 
         calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDR);
     }
@@ -1192,7 +1193,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         address spender,
         uint256 amount
     ) public virtual returns (Call[] memory calls) {
-        address token = IBridgehub(addresses.bridgehub.bridgehubProxy).baseToken(gatewayConfig.chainId);
+        address token = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).baseToken(gatewayConfig.chainId);
         require(token != address(0), "Base token for Gateway is zero");
         calls = new Call[](1);
         calls[0] = Call({target: token, data: abi.encodeCall(IERC20.approve, (spender, amount)), value: 0});
@@ -1339,7 +1340,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
             target: addresses.daAddresses.rollupDAManager,
             data: abi.encodeCall(
                 RollupDAManager.updateDAPair,
-                (addresses.daAddresses.l1RollupDAValidator, getExpectedL2Address("RollupL2DAValidator"), true)
+                (addresses.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true)
             ),
             value: 0
         });
@@ -1351,11 +1352,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(
             RollupDAManager.updateDAPair,
-            (
-                gatewayConfig.gatewayStateTransition.rollupSLDAValidator,
-                getExpectedL2Address("RollupL2DAValidator"),
-                true
-            )
+            (gatewayConfig.gatewayStateTransition.rollupSLDAValidator, getRollupL2DACommitmentScheme(), true)
         );
 
         calls = _prepareL1ToGatewayCall(

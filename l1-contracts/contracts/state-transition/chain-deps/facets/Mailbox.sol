@@ -6,7 +6,8 @@ import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
-import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "../../../bridgehub/IBridgehubBase.sol";
+import {L2Bridgehub} from "../../../bridgehub/L2Bridgehub.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
@@ -18,13 +19,13 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
-import {L1_GAS_PER_PUBDATA_BYTE, MAX_NEW_FACTORY_DEPS, PRIORITY_EXPIRATION, PRIORITY_OPERATION_L2_TX_TYPE, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER} from "../../../common/Config.sol";
+import {L1_GAS_PER_PUBDATA_BYTE, MAX_NEW_FACTORY_DEPS, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER} from "../../../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 
-import {BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed} from "../../../common/L1ContractErrors.sol";
-import {InvalidChainId, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
+import {BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed} from "../../../common/L1ContractErrors.sol";
+import {LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -254,10 +255,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         // to a chain's message root only if the chain has indeed executed its batch on top of it.
         //
         // We trust all chains whitelisted by the Bridgehub governance.
-        if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(proofData.settlementLayerChainId)) {
+        if (!IBridgehubBase(s.bridgehub).whitelistedSettlementLayers(proofData.settlementLayerChainId)) {
             revert NotSettlementLayer();
         }
-        address settlementLayerAddress = IBridgehub(s.bridgehub).getZKChain(proofData.settlementLayerChainId);
+        address settlementLayerAddress = IBridgehubBase(s.bridgehub).getZKChain(proofData.settlementLayerChainId);
 
         return
             IMailbox(settlementLayerAddress).proveL2LeafInclusion(
@@ -313,10 +314,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external override onlyL1 returns (bytes32 canonicalTxHash) {
-        if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId)) {
+        if (!IBridgehubBase(s.bridgehub).whitelistedSettlementLayers(s.chainId)) {
             revert NotSettlementLayer();
         }
-        if (IBridgehub(s.bridgehub).getZKChain(_chainId) != msg.sender) {
+        if (IBridgehubBase(s.bridgehub).getZKChain(_chainId) != msg.sender) {
             revert NotHyperchain();
         }
 
@@ -345,7 +346,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) internal view returns (BridgehubL2TransactionRequest memory) {
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encodeCall(
-            IBridgehub.forwardTransactionOnGateway,
+            L2Bridgehub.forwardTransactionOnGateway,
             (_chainId, _canonicalTxHash, _expirationTimestamp)
         );
         return
@@ -433,6 +434,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     function _requestL2Transaction(WritePriorityOpParams memory _params) internal returns (bytes32 canonicalTxHash) {
         BridgehubL2TransactionRequest memory request = _params.request;
 
+        // Factory deps are not used in ZKsync OS in non-upgrade transactions.
         if (request.factoryDeps.length > MAX_NEW_FACTORY_DEPS) {
             revert TooManyFactoryDeps();
         }
@@ -492,10 +494,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
     function _serializeL2Transaction(
         WritePriorityOpParams memory _priorityOpParams
-    ) internal pure returns (L2CanonicalTransaction memory transaction) {
+    ) internal view returns (L2CanonicalTransaction memory transaction) {
         BridgehubL2TransactionRequest memory request = _priorityOpParams.request;
         transaction = L2CanonicalTransaction({
-            txType: PRIORITY_OPERATION_L2_TX_TYPE,
+            txType: _getPriorityTxType(),
             from: uint256(uint160(request.sender)),
             to: uint256(uint160(request.contractL2)),
             gasLimit: request.l2GasLimit,
@@ -520,11 +522,13 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) internal view returns (L2CanonicalTransaction memory transaction, bytes32 canonicalTxHash) {
         transaction = _serializeL2Transaction(_priorityOpParams);
         bytes memory transactionEncoding = abi.encode(transaction);
+        // solhint-disable-next-line func-named-parameters
         TransactionValidator.validateL1ToL2Transaction(
             transaction,
             transactionEncoding,
             s.priorityTxMaxGasLimit,
-            s.feeParams.priorityTxMaxPubdata
+            s.feeParams.priorityTxMaxPubdata,
+            s.zksyncOS
         );
         canonicalTxHash = keccak256(transactionEncoding);
     }
@@ -563,7 +567,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (s.chainId != ERA_CHAIN_ID) {
             revert OnlyEraSupported();
         }
-        address sharedBridge = IBridgehub(s.bridgehub).assetRouter();
+        address sharedBridge = IBridgehubBase(s.bridgehub).assetRouter();
         IL1AssetRouter(sharedBridge).finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
             _l2BatchNumber: _l2BatchNumber,
@@ -600,7 +604,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 refundRecipient: _refundRecipient
             })
         );
-        address sharedBridge = IBridgehub(s.bridgehub).assetRouter();
+        address sharedBridge = IBridgehubBase(s.bridgehub).assetRouter();
         IL1AssetRouter(sharedBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
             s.baseTokenAssetId,

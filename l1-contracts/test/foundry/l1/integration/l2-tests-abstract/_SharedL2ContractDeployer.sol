@@ -18,8 +18,9 @@ import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {BridgehubMintCTMAssetData, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IL2Bridgehub} from "contracts/bridgehub/IL2Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -50,7 +51,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
     BeaconProxy internal proxy;
 
     IL2AssetRouter l2AssetRouter = IL2AssetRouter(L2_ASSET_ROUTER_ADDR);
-    IBridgehub l2Bridgehub = IBridgehub(L2_BRIDGEHUB_ADDR);
+    IL2Bridgehub l2Bridgehub = IL2Bridgehub(L2_BRIDGEHUB_ADDR);
 
     uint256 internal constant L1_CHAIN_ID = 10; // it cannot be 9, the default block.chainid
     uint256 internal ERA_CHAIN_ID = 270;
@@ -110,7 +111,8 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
                 l2TokenProxyBytecodeHash: beaconProxyBytecodeHash,
                 aliasedOwner: ownerWallet,
                 contractsDeployedAlready: false,
-                l1CtmDeployer: l1CTMDeployer
+                l1CtmDeployer: l1CTMDeployer,
+                maxNumberOfZKChains: 100
             })
         );
         deployL2Contracts(L1_CHAIN_ID);
@@ -143,7 +145,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
         );
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehub.baseToken.selector, ERA_CHAIN_ID + 1),
+            abi.encodeWithSelector(IBridgehubBase.baseToken.selector, ERA_CHAIN_ID + 1),
             abi.encode(address(uint160(1)))
         );
 

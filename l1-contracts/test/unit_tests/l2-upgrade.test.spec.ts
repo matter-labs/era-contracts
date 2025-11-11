@@ -387,7 +387,7 @@ describe("L2 upgrade test", function () {
     const bootloaderHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
     const defaultAccountHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
     const evmEmulatorHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
-    const testnetVerifierFactory = await hardhat.ethers.getContractFactory("TestnetVerifier");
+    const testnetVerifierFactory = await hardhat.ethers.getContractFactory("EraTestnetVerifier");
     const testnetVerifierContract = await testnetVerifierFactory.deploy();
     const newVerifier = testnetVerifierContract.address;
     const newerVerifierParams = buildVerifierParams({
@@ -483,7 +483,7 @@ describe("L2 upgrade test", function () {
     const currentL2DefaultAccountBytecodeHash = await proxyGetters.getL2DefaultAccountBytecodeHash();
     const currentL2EvmEmulatorBytecodeHash = await proxyGetters.getL2EvmEmulatorBytecodeHash();
 
-    const testnetVerifierFactory = await hardhat.ethers.getContractFactory("TestnetVerifier");
+    const testnetVerifierFactory = await hardhat.ethers.getContractFactory("EraTestnetVerifier");
     const testnetVerifierContract = await testnetVerifierFactory.deploy();
     const newVerifier = testnetVerifierContract.address;
     const newerVerifierParams = buildVerifierParams({

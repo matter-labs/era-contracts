@@ -2,6 +2,7 @@ era_chain_id = 9
 owner_address = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
 testnet_verifier = true
 support_l2_legacy_shared_bridge_test = false
+is_zk_sync_os = true
 
 [gateway]
 chain_id = 123

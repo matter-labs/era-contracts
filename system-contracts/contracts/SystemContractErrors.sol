@@ -2,8 +2,6 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-// 0x86bb51b8
-error AddressHasNoCode(address);
 // 0xefce78c7
 error CallerMustBeBootloader();
 // 0xbe4bf9e4
@@ -72,10 +70,10 @@ error IndexSizeError();
 error InsufficientFunds(uint256 required, uint256 actual);
 // 0xae962d4e
 error InvalidCall();
-// 0x7a47c9a2
-error InvalidChainId();
 // 0x6a84bc39
 error InvalidCodeHash(CodeHashReason);
+// 0xc74537a1
+error InvalidDACommitmentScheme(uint256);
 // 0xb4fa3fb3
 error InvalidInput();
 // 0x8c13f15d
@@ -132,7 +130,8 @@ error PreviousBytecodeUnknown();
 error PreviousL2BlockHashIsIncorrect(bytes32 correctPrevBlockHash, bytes32 expectedPrevL2BlockHash);
 // 0x33cb1485
 error ProvidedBatchNumberIsNotCorrect(uint128 previousBatchNumber, uint128 _expectedNewNumber);
-// 0x7f7b0cf7
+// Note: enum should be encoded as uint8 to calculate selector!
+// skip-errors-lint 0x7f7b0cf7
 error ReconstructionMismatch(PubdataField, bytes32 expected, bytes32 actual);
 // 0x26772295
 error ReturnedBytecodeDoesNotMatchExpectedHash(bytes32 returnedBytecode, bytes32 expectedBytecodeHash);
@@ -193,7 +192,9 @@ enum PubdataField {
     InputMsgsHash,
     InputBytecodeHash,
     Offset,
-    Length
+    Length,
+    StateDiffCompressionVersion,
+    ExtraData
 }
 
 enum BytecodeError {

@@ -165,9 +165,9 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
   },
   complexUpgrader: {
     address: "0x000000000000000000000000000000000000800f",
-    codeName: "ComplexUpgrader",
+    codeName: "L2ComplexUpgrader",
     lang: Language.Solidity,
-    location: SourceLocation.SystemContracts,
+    location: SourceLocation.L1Contracts,
   },
   keccak256: {
     address: "0x0000000000000000000000000000000000008010",
@@ -209,7 +209,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     address: "0x0000000000000000000000000000000000010001",
     codeName: "L2GenesisUpgrade",
     lang: Language.Solidity,
-    location: SourceLocation.SystemContracts,
+    location: SourceLocation.L1Contracts,
   },
   L2BridgeHub: {
     // This is explicitly a non-system-contract address.

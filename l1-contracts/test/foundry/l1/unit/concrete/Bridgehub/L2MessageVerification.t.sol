@@ -3,8 +3,7 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {MessageRootNotRegistered, OnlyBridgehub} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";

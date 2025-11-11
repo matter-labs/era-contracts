@@ -7,7 +7,7 @@ import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainT
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 
-import "contracts/bridgehub/Bridgehub.sol";
+import "contracts/bridgehub/L1Bridgehub.sol";
 import "contracts/chain-registrar/ChainRegistrar.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -45,13 +45,13 @@ contract ChainRegistrarTest is Test {
         vm.prank(admin);
 
         l1NullifierImpl = new L1NullifierDev({
-            _bridgehub: IBridgehub(address(bridgeHub)),
+            _bridgehub: IL1Bridgehub(address(bridgeHub)),
             _eraChainId: 270,
             _eraDiamondProxy: makeAddr("era")
         });
 
         assetRouter = new L1AssetRouter({
-            _l1WethAddress: makeAddr("weth"),
+            _l1WethToken: makeAddr("weth"),
             _bridgehub: address(bridgeHub),
             _l1Nullifier: address(l1NullifierImpl),
             _eraChainId: 270,

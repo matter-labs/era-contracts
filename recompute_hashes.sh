@@ -37,6 +37,7 @@ git submodule update --init --recursive
 yarn
 
 # Cleanup everything and recompile
+yarn --cwd da-contracts clean
 forge clean --root da-contracts
 yarn --cwd l1-contracts clean
 forge clean --root l1-contracts

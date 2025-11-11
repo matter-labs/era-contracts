@@ -6,34 +6,20 @@ pragma solidity 0.8.28;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {ITransparentUpgradeableProxy, TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {PrepareL1L2TransactionParams, StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
-import {IBridgehub, L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
-import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
-import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
-import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
-import {L1VerifierFflonk} from "contracts/state-transition/verifiers/L1VerifierFflonk.sol";
-import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
+
+import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+
 import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {GatewayUpgrade, GatewayUpgradeEncodedInput} from "contracts/upgrades/GatewayUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
-import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -43,7 +29,6 @@ import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {AddressHasNoCode} from "../ZkSyncScriptErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
@@ -219,7 +204,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         (
             addresses.bridgehub.chainAssetHandlerImplementation,
             addresses.bridgehub.chainAssetHandlerProxy
-        ) = deployTuppWithContract("ChainAssetHandler", false);
+        ) = deployTuppWithContract("L1ChainAssetHandler", false);
 
         (
             addresses.stateTransition.validatorTimelockImplementation,
@@ -336,7 +321,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         calls = new Call[](1);
         calls[0] = Call({
             target: addresses.bridgehub.bridgehubProxy,
-            data: abi.encodeCall(Bridgehub.setChainAssetHandler, (addresses.bridgehub.chainAssetHandlerProxy)),
+            data: abi.encodeCall(IBridgehubBase.setChainAssetHandler, (addresses.bridgehub.chainAssetHandlerProxy)),
             value: 0
         });
     }
@@ -367,7 +352,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
 
         calls[0] = Call({
             target: addresses.stateTransition.chainTypeManagerProxy,
-            data: abi.encodeCall(ChainTypeManager.setUpgradeDiamondCut, (upgradeCut, oldProtocolVersion)),
+            data: abi.encodeCall(IChainTypeManager.setUpgradeDiamondCut, (upgradeCut, oldProtocolVersion)),
             value: 0
         });
     }
@@ -425,39 +410,5 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
 
     function deployUsedUpgradeContractGW() internal override returns (address) {
         return deployGWContract("L1V29Upgrade");
-    }
-
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "ValidatorTimelock")) {
-            if (!isZKBytecode) {
-                return
-                    abi.encodeCall(
-                        ValidatorTimelock.initialize,
-                        (config.ownerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
-                    );
-            } else {
-                // On Gateway, the delay is always 0.
-                return
-                    abi.encodeCall(
-                        ValidatorTimelock.initialize,
-                        (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), uint32(0))
-                    );
-            }
-        } else if (compareStrings(contractName, "ChainAssetHandler")) {
-            if (!isZKBytecode) {
-                return abi.encodeCall(ChainAssetHandler.initialize, (config.ownerAddress));
-            } else {
-                return
-                    abi.encodeCall(
-                        ChainAssetHandler.initialize,
-                        AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress)
-                    );
-            }
-        } else {
-            return super.getInitializeCalldata(contractName, isZKBytecode);
-        }
     }
 }

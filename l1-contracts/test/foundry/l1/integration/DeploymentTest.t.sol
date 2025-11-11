@@ -6,7 +6,6 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -25,7 +24,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 
 contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
@@ -117,7 +116,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         assertEq(addresses.bridgehub.settlementLayer(randomChainId), block.chainid);
 
         address messageRoot = address(addresses.bridgehub.messageRoot());
-        assertTrue(MessageRoot(messageRoot).chainIndex(randomChainId) != 0);
+        assertTrue(L1MessageRoot(messageRoot).chainIndex(randomChainId) != 0);
     }
 
     function test_registerAlreadyDeployedZKChain() public {

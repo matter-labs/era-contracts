@@ -10,7 +10,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
@@ -49,7 +49,7 @@ contract RegisterCTM is Script {
         address chainTypeManagerProxy,
         bool shouldSend
     ) internal {
-        IBridgehub bridgehub = IBridgehub(bridgehubProxy);
+        IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubProxy);
         address ctmDeploymentTrackerProxy = address(bridgehub.l1CtmDeployer());
         address l1AssetRouterProxy = bridgehub.assetRouter();
 
@@ -102,7 +102,7 @@ contract RegisterCTM is Script {
     }
 
     function registerChainTypeManagerForTest(address bridgehubProxy, address chainTypeManagerProxy) internal {
-        IBridgehub bridgehub = IBridgehub(bridgehubProxy);
+        IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubProxy);
         vm.startBroadcast(msg.sender);
         bridgehub.addChainTypeManager(chainTypeManagerProxy);
         console.log("ChainTypeManager registered");

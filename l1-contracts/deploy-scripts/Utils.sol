@@ -8,7 +8,7 @@ import {console2 as console} from "forge-std/Script.sol";
 
 import {IAccessControlDefaultAdminRules} from "@openzeppelin/contracts-v4/access/IAccessControlDefaultAdminRules.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
@@ -24,8 +24,8 @@ import {ISecurityCouncil} from "./interfaces/ISecurityCouncil.sol";
 import {IMultisig} from "./interfaces/IMultisig.sol";
 import {ISafe} from "./interfaces/ISafe.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
 /// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the guardians.
@@ -394,7 +394,7 @@ library Utils {
         view
         returns (L2TransactionRequestDirect memory l2TransactionRequestDirect, uint256 requiredValueToDeploy)
     {
-        IBridgehub bridgehub = IBridgehub(params.bridgehubAddress);
+        IL1Bridgehub bridgehub = IL1Bridgehub(params.bridgehubAddress);
 
         requiredValueToDeploy =
             bridgehub.l2TransactionBaseCost(
@@ -433,7 +433,7 @@ library Utils {
         view
         returns (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy)
     {
-        IBridgehub bridgehub = IBridgehub(bridgehubAddress);
+        IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddress);
 
         requiredValueToDeploy =
             bridgehub.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
@@ -466,7 +466,7 @@ library Utils {
         address l1SharedBridgeProxy,
         address refundRecipient
     ) internal returns (bytes32 txHash) {
-        IBridgehub bridgehub = IBridgehub(bridgehubAddress);
+        IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddress);
         (
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
             uint256 requiredValueToDeploy
@@ -499,7 +499,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getZKChain(chainId);
+        address expectedDiamondProxyAddress = IL1Bridgehub(bridgehubAddress).getZKChain(chainId);
 
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
@@ -537,7 +537,7 @@ library Utils {
             );
 
         (uint256 ethAmountToPass, Call[] memory newCalls) = prepareApproveBaseTokenGovernanceCalls(
-            IBridgehub(bridgehubAddress),
+            IL1Bridgehub(bridgehubAddress),
             l1SharedBridgeProxy,
             chainId,
             requiredValueToDeploy
@@ -546,7 +546,7 @@ library Utils {
         calls = mergeCalls(calls, newCalls);
 
         bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            IBridgehub.requestL2TransactionDirect,
+            IL1Bridgehub.requestL2TransactionDirect,
             (l2TransactionRequestDirect)
         );
 
@@ -582,7 +582,7 @@ library Utils {
             );
 
         (uint256 ethAmountToPass, Call[] memory newCalls) = prepareApproveBaseTokenGovernanceCalls(
-            IBridgehub(bridgehubAddress),
+            IL1Bridgehub(bridgehubAddress),
             l1SharedBridgeProxy,
             chainId,
             requiredValueToDeploy
@@ -591,7 +591,7 @@ library Utils {
         calls = mergeCalls(calls, newCalls);
 
         bytes memory l2TransactionRequestCalldata = abi.encodeCall(
-            IBridgehub.requestL2TransactionTwoBridges,
+            IL1Bridgehub.requestL2TransactionTwoBridges,
             (l2TransactionRequest)
         );
 
@@ -602,7 +602,7 @@ library Utils {
     }
 
     function prepareApproveBaseTokenGovernanceCalls(
-        IBridgehub bridgehub,
+        IL1Bridgehub bridgehub,
         address l1SharedBridgeProxy,
         uint256 chainId,
         uint256 amountToApprove
@@ -657,7 +657,7 @@ library Utils {
 
         // 2) Prepare approval calls if base token != ETH
         (uint256 ethAmountToPass, Call[] memory approvalCalls) = prepareApproveBaseTokenAdminCalls(
-            IBridgehub(bridgehubAddress),
+            IL1Bridgehub(bridgehubAddress),
             l1SharedBridgeProxy,
             chainId,
             requiredValueToDeploy
@@ -668,7 +668,7 @@ library Utils {
 
         // 4) Add the actual requestL2TransactionDirect call to the Bridgehub
         bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            IBridgehub.requestL2TransactionDirect,
+            IL1Bridgehub.requestL2TransactionDirect,
             (l2TransactionRequestDirect)
         );
 
@@ -708,7 +708,7 @@ library Utils {
 
         // 2) Prepare approval calls if base token != ETH
         (uint256 ethAmountToPass, Call[] memory approvalCalls) = prepareApproveBaseTokenAdminCalls(
-            IBridgehub(bridgehubAddress),
+            IL1Bridgehub(bridgehubAddress),
             l1SharedBridgeProxy,
             chainId,
             requiredValueToDeploy
@@ -719,7 +719,7 @@ library Utils {
 
         // 4) Add the actual requestL2TransactionTwoBridges call to the Bridgehub
         bytes memory l2TransactionRequestCalldata = abi.encodeCall(
-            IBridgehub.requestL2TransactionTwoBridges,
+            IL1Bridgehub.requestL2TransactionTwoBridges,
             (l2TransactionRequest)
         );
 
@@ -769,7 +769,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed successfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getZKChain(chainId);
+        address expectedDiamondProxyAddress = IL1Bridgehub(bridgehubAddress).getZKChain(chainId);
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
         console.log("L2 Transaction hash is ");
@@ -813,7 +813,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed successfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getZKChain(chainId);
+        address expectedDiamondProxyAddress = IL1Bridgehub(bridgehubAddress).getZKChain(chainId);
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
         console.log("L2 Transaction hash is ");
@@ -821,7 +821,7 @@ library Utils {
     }
 
     function prepareApproveBaseTokenAdminCalls(
-        IBridgehub bridgehub,
+        IL1Bridgehub bridgehub,
         address l1SharedBridgeProxy,
         uint256 chainId,
         uint256 amountToApprove
@@ -975,6 +975,15 @@ library Utils {
         return bytecode;
     }
 
+    function readFoundryDeployedBytecodeL1(
+        string memory fileName,
+        string memory contractName
+    ) internal view returns (bytes memory) {
+        string memory path = string.concat("/../l1-contracts/out/", fileName, "/", contractName, ".json");
+        bytes memory bytecode = readFoundryDeployedBytecode(path);
+        return bytecode;
+    }
+
     function readZKFoundryBytecodeL2(
         string memory fileName,
         string memory contractName
@@ -1002,6 +1011,16 @@ library Utils {
         string memory json = vm.readFile(path);
         bytes memory bytecode = vm.parseJsonBytes(json, ".deployedBytecode.object");
         return bytecode;
+    }
+
+    function blakeHashBytecode(bytes memory bytecode) internal returns (bytes32 hashedBytecode) {
+        string[] memory input = new string[](5);
+        input[0] = "yarn";
+        input[1] = "--silent";
+        input[2] = "ts-node";
+        input[3] = "./scripts/blake2s256.ts";
+        input[4] = vm.toString(bytecode);
+        hashedBytecode = bytes32(vm.ffi(input));
     }
 
     function executeUpgrade(
@@ -1275,11 +1294,38 @@ library Utils {
         address _bridgehub,
         uint256 _chainId
     ) internal view returns (ChainInfoFromBridgehub memory info) {
-        info.l1AssetRouterProxy = Bridgehub(_bridgehub).assetRouter();
-        info.diamondProxy = Bridgehub(_bridgehub).getZKChain(_chainId);
+        info.l1AssetRouterProxy = L1Bridgehub(_bridgehub).assetRouter();
+        info.diamondProxy = L1Bridgehub(_bridgehub).getZKChain(_chainId);
         info.admin = IGetters(info.diamondProxy).getAdmin();
-        info.ctm = Bridgehub(_bridgehub).chainTypeManager(_chainId);
-        info.serverNotifier = ChainTypeManager(info.ctm).serverNotifierAddress();
+        info.ctm = L1Bridgehub(_bridgehub).chainTypeManager(_chainId);
+        info.serverNotifier = IChainTypeManager(info.ctm).serverNotifierAddress();
+    }
+
+    function getZKOSBytecodeInfo(bytes memory bytecode) internal returns (bytes memory bytecodeInfo) {
+        bytes32 bytecodeBlakeHash = blakeHashBytecode(bytecode);
+        bytes32 observableBytecodeBlakeHash = keccak256(bytecode);
+        bytecodeInfo = abi.encode(bytecodeBlakeHash, bytecode.length, observableBytecodeBlakeHash);
+    }
+
+    function getZKOSBytecodeInfoForContract(
+        string memory fileName,
+        string memory contractName
+    ) internal returns (bytes memory bytecodeInfo) {
+        bytes memory bytecode = readFoundryDeployedBytecodeL1(fileName, contractName);
+        bytecodeInfo = getZKOSBytecodeInfo(bytecode);
+    }
+
+    function getZKOSProxyUpgradeBytecodeInfo(
+        string memory fileName,
+        string memory contractName
+    ) internal returns (bytes memory) {
+        bytes memory bytecodeInfo = getZKOSBytecodeInfoForContract(fileName, contractName);
+        bytes memory proxyBytecodeInfo = getZKOSBytecodeInfoForContract(
+            "SystemContractProxy.sol",
+            "SystemContractProxy"
+        );
+
+        return abi.encode(bytecodeInfo, proxyBytecodeInfo);
     }
 
     function mergeCalls(Call[] memory a, Call[] memory b) public pure returns (Call[] memory result) {

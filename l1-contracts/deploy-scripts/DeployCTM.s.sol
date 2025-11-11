@@ -8,7 +8,11 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+
+import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
+import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -26,9 +30,6 @@ import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -36,7 +37,8 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
+import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
@@ -49,6 +51,20 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {Config, DeployedAddresses, GeneratedData} from "./DeployUtils.s.sol";
 import {DeployL1HelperScript} from "./DeployL1HelperScript.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+
+import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {L2NativeTokenVaultZKOS} from "contracts/bridge/ntv/L2NativeTokenVaultZKOS.sol";
+import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
+import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
+import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
+
+import {Utils} from "./Utils.sol";
+
+// TODO: pass this value from zkstack_cli
+uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 3;
 
 contract DeployCTMScript is Script, DeployL1HelperScript {
     using stdToml for string;
@@ -97,7 +113,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         instantiateCreate2Factory();
 
         console.log("Initializing core contracts from BH");
-        IBridgehub bridgehubProxy = IBridgehub(bridgehub);
+        IL1Bridgehub bridgehubProxy = IL1Bridgehub(bridgehub);
         L1AssetRouter assetRouter = L1AssetRouter(bridgehubProxy.assetRouter());
         address messageRoot = address(bridgehubProxy.messageRoot());
         address l1CtmDeployer = address(bridgehubProxy.l1CtmDeployer());
@@ -158,10 +174,11 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         initializeGeneratedData();
 
         deployStateTransitionDiamondFacets();
+        string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
         (
             addresses.stateTransition.chainTypeManagerImplementation,
             addresses.stateTransition.chainTypeManagerProxy
-        ) = deployTuppWithContract("ChainTypeManager", false);
+        ) = deployTuppWithContract(ctmContractName, false);
         setChainTypeManagerInServerNotifier();
 
         updateOwners();
@@ -184,10 +201,29 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         }
     }
 
+    function getRollupL2DACommitmentScheme() internal returns (L2DACommitmentScheme) {
+        return ROLLUP_L2_DA_COMMITMENT_SCHEME;
+    }
+
     function deployVerifiers() internal {
-        (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk", false);
-        (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk", false);
+        if (config.isZKsyncOS) {
+            (addresses.stateTransition.verifierFflonk) = deploySimpleContract("ZKsyncOSVerifierFflonk", false);
+            (addresses.stateTransition.verifierPlonk) = deploySimpleContract("ZKsyncOSVerifierPlonk", false);
+        } else {
+            (addresses.stateTransition.verifierFflonk) = deploySimpleContract("EraVerifierFflonk", false);
+            (addresses.stateTransition.verifierPlonk) = deploySimpleContract("EraVerifierPlonk", false);
+        }
         (addresses.stateTransition.verifier) = deploySimpleContract("Verifier", false);
+
+        if (config.isZKsyncOS) {
+            // We add the verifier to the default execution version
+            vm.broadcast(msg.sender);
+            ZKsyncOSDualVerifier(addresses.stateTransition.verifier).addVerifier(
+                DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
+                IVerifierV2(addresses.stateTransition.verifierFflonk),
+                IVerifier(addresses.stateTransition.verifierPlonk)
+            );
+        }
     }
 
     function setChainTypeManagerInServerNotifier() internal {
@@ -203,6 +239,12 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
 
         // This contract is located in the `da-contracts` folder, we output it the same way for consistency/ease of use.
         addresses.daAddresses.l1RollupDAValidator = deploySimpleContract("RollupL1DAValidator", false);
+        if (config.isZKsyncOS) {
+            addresses.daAddresses.l1BlobsDAValidatorZKsyncOS = deploySimpleContract(
+                "BlobsL1DAValidatorZKsyncOS",
+                false
+            );
+        }
 
         addresses.daAddresses.noDAValidiumL1DAValidator = deploySimpleContract("ValidiumL1DAValidator", false);
 
@@ -214,11 +256,14 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         }
         vm.startBroadcast(msg.sender);
         IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
-        rollupDAManager.updateDAPair(
-            addresses.daAddresses.l1RollupDAValidator,
-            calculateExpectedL2Address("RollupL2DAValidator"),
-            true
-        );
+        rollupDAManager.updateDAPair(addresses.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true);
+        if (config.isZKsyncOS) {
+            rollupDAManager.updateDAPair(
+                addresses.daAddresses.l1BlobsDAValidatorZKsyncOS,
+                L2DACommitmentScheme.BLOBS_ZKSYNC_OS,
+                true
+            );
+        }
         vm.stopBroadcast();
     }
 
@@ -266,8 +311,14 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         ctm.setPendingAdmin(addresses.chainAdmin);
 
         IOwnable(addresses.stateTransition.serverNotifierProxy).transferOwnership(addresses.chainAdmin);
+        IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
 
         IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
+
+        if (config.isZKsyncOS) {
+            // We need to transfer the ownership of the Verifier
+            ZKsyncOSDualVerifier(addresses.stateTransition.verifier).transferOwnership(addresses.governance);
+        }
 
         vm.stopBroadcast();
         console.log("Owners updated");
@@ -453,27 +504,12 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_config", contractsConfig);
-        vm.serializeAddress(
-            "root",
-            "expected_rollup_l2_da_validator_addr",
-            calculateExpectedL2Address("RollupL2DAValidator")
-        );
-        vm.serializeAddress(
-            "root",
-            "expected_no_da_validium_l2_validator_addr",
-            calculateExpectedL2Address("ValidiumL2DAValidator")
-        );
-        vm.serializeAddress(
-            "root",
-            "expected_avail_l2_da_validator_addr",
-            calculateExpectedL2Address("AvailL2DAValidator")
-        );
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
     }
 
-    function prepareForceDeploymentsData() internal view returns (bytes memory) {
+    function prepareForceDeploymentsData() internal returns (bytes memory) {
         require(addresses.governance != address(0), "Governance address is not set");
 
         address dangerousTestOnlyForcedBeacon;
@@ -492,11 +528,24 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeHash: getL2BytecodeHash("Bridgehub"),
-            l2AssetRouterBytecodeHash: getL2BytecodeHash("L2AssetRouter"),
-            l2NtvBytecodeHash: getL2BytecodeHash("L2NativeTokenVault"),
-            messageRootBytecodeHash: getL2BytecodeHash("MessageRoot"),
-            chainAssetHandlerBytecodeHash: getL2BytecodeHash("ChainAssetHandler"),
+            bridgehubBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2Bridgehub.sol", "L2Bridgehub")
+                : abi.encode(getL2BytecodeHash("L2Bridgehub")),
+            l2AssetRouterBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2AssetRouter.sol", "L2AssetRouter")
+                : abi.encode(getL2BytecodeHash("L2AssetRouter")),
+            l2NtvBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2NativeTokenVaultZKOS.sol", "L2NativeTokenVaultZKOS")
+                : abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
+            messageRootBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2MessageRoot.sol", "L2MessageRoot")
+                : abi.encode(getL2BytecodeHash("L2MessageRoot")),
+            beaconDeployerInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer")
+                : abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
+            chainAssetHandlerBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2ChainAssetHandler.sol", "L2ChainAssetHandler")
+                : abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
@@ -580,7 +629,8 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
     function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
-        return getChainCreationFacetCuts(stateTransition);
+        // This function is not used in this script
+        revert("not implemented");
     }
 
     // add this to be excluded from coverage report

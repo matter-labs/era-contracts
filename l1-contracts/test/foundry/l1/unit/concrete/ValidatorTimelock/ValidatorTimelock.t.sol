@@ -12,7 +12,6 @@ import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Unauthorized, TimeNotReached, RoleAccessDenied} from "contracts/common/L1ContractErrors.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
 
 contract ValidatorTimelockTest is Test {
