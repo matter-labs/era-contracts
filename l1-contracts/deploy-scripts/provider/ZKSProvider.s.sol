@@ -276,10 +276,14 @@ contract ZKSProvider is Script {
 
         bytes memory nullProofBytes = "0x7b226a736f6e727063223a22322e30222c226964223a312c22726573756c74223a6e756c6c7d";
         string memory nullProofString2 = '{"jsonrpc":"2.0","id":1,"result":null}';
+        string memory nullProofString3 = "0x7b226a736f6e727063223a22322e30222c226964223a312c226572726f72223a7b22636f6465223a2d33323630332c226d657373616765223a224c3120626174636820636f6e7461696e696e6720746865207472616e73616374696f6e20686173206e6f74206265656e20657865637574656420796574227d7d";
+        string memory nullProofString4 = '{"jsonrpc":"2.0","id":1,"error":{"code":-32603,"message":"L1 batch containing the transaction has not been executed yet"}}';
         bytes memory result = nullProofBytes;
         while (
             compareStrings(string(result), string(nullProofBytes)) ||
-            compareStrings(string(result), string(nullProofString2))
+            compareStrings(string(result), string(nullProofString2)) ||
+            compareStrings(string(result), string(nullProofString3)) ||
+            compareStrings(string(result), string(nullProofString4))
         ) {
             result = vm.ffi(args);
             vm.sleep(4000);

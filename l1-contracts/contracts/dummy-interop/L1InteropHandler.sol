@@ -7,14 +7,15 @@ import {L2_BRIDGEHUB_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {FinalizeL1DepositParams} from "../bridge/interfaces/IL1Nullifier.sol";
 import {L2Message, TxStatus} from "../common/Messaging.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
-import {EthTransferFailed, NativeTokenVaultAlreadySet, WrongL2Sender, WrongMsgLength} from "../bridge/L1BridgeContractErrors.sol";
+import {WrongL2Sender, WrongMsgLength} from "../bridge/L1BridgeContractErrors.sol";
 import {AddressAlreadySet, DepositDoesNotExist, DepositExists, InvalidProof, InvalidSelector, L2WithdrawalMessageWrongLength, LegacyBridgeNotSet, LegacyMethodForNonL1Token, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotLegacy, Unauthorized, WithdrawalAlreadyFinalized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IL1ERC20Bridge} from "../bridge/interfaces/IL1ERC20Bridge.sol";
 import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {AssetRouterBase} from "../bridge/asset-router/AssetRouterBase.sol";
 import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {L1ShadowAccount} from "./L1ShadowAccount.sol";
@@ -30,33 +31,32 @@ contract L1InteropHandler {
 
     IL1NativeTokenVault public  l1NativeTokenVault;
 
-    IBridgehub public  BRIDGE_HUB;
+    IBridgehubBase public  BRIDGE_HUB;
 
-    function receiveInteropFromL2(
-        FinalizeL1DepositParams memory _tokenWithdrawalParams,
-        FinalizeL1DepositParams memory _bundleWithdrawalParams
-    ) external {
-        (bytes32 assetId, bytes memory transferData) = _parseL2WithdrawalMessage(_tokenWithdrawalParams.chainId, _tokenWithdrawalParams.message);
-        _verifyWithdrawal(_tokenWithdrawalParams, _isBaseTokenWithdrawal(assetId, _tokenWithdrawalParams.chainId), true);
-        _verifyWithdrawal(_bundleWithdrawalParams, false, false);
-
-        address receiver;
-        uint256 amount;
-        bytes memory erc20Data;
-        (, receiver,, amount, erc20Data) = DataEncoding.decodeBridgeMintData(transferData);
-
-
-
-        // deploy shadow account if needed
-        address shadowAccount = _deployShadowAccount(_tokenWithdrawalParams.l2Sender);
-
-        // execute bundle withdrawal
-        _executeBundleWithdrawal(shadowAccount, _bundleWithdrawalParams.message);
+    constructor(address _bridgehubAddress) {
+        BRIDGE_HUB = IBridgehubBase(_bridgehubAddress);
     }
 
-    function _deployShadowAccount(
+    function receiveInteropFromL2(
+        // FinalizeL1DepositParams memory _tokenWithdrawalParams,
+        FinalizeL1DepositParams memory _bundleWithdrawalParams
+    ) external {
+        _verifyWithdrawal(_bundleWithdrawalParams, false, false);
+
+        // The _bundleWithdrawalParams.message is expected to be an abi-encoded array of ShadowAccountOp structs.
+        // Decode the bytes contained in _bundleWithdrawalParams.message to retrieve the calls for the shadow account.
+        (address l2Sender, ShadowAccountOp[] memory ops) = abi.decode(_bundleWithdrawalParams.message, (address, ShadowAccountOp[]));
+
+        // deploy shadow account if needed
+        address shadowAccount = deployShadowAccount(l2Sender);
+
+        // execute bundle withdrawal
+        _executeBundleWithdrawal(shadowAccount, ops);
+    }
+
+    function deployShadowAccount(
         address _l2CallerAddress
-    ) internal returns (address) {
+    ) public returns (address) {
         bytes32 salt = keccak256(abi.encode(_l2CallerAddress));
         bytes32 bytecodeHash = keccak256(type(L1ShadowAccount).creationCode);
         address shadowAccountAddress = Create2Address.getNewAddressCreate2EVM(address(this), salt, bytecodeHash);
@@ -69,12 +69,8 @@ contract L1InteropHandler {
 
     function _executeBundleWithdrawal(
         address _shadowAccount,
-        bytes memory _bundleWithdrawalMessage
+        ShadowAccountOp[] memory ops
     ) internal {
-        // The _bundleWithdrawalParams.message is expected to be an abi-encoded array of ShadowAccountOp structs.
-        // Decode the bytes contained in _bundleWithdrawalParams.message to retrieve the calls for the shadow account.
-        ShadowAccountOp[] memory ops = abi.decode(_bundleWithdrawalMessage, (ShadowAccountOp[]));
-
         for (uint256 i = 0; i < ops.length; i++) {
             L1ShadowAccount(_shadowAccount).executeFromIH(ops[i].target, ops[i].value, ops[i].data);
         }
@@ -96,7 +92,7 @@ contract L1InteropHandler {
         FinalizeL1DepositParams memory _finalizeWithdrawalParams,
         bool _baseTokenWithdrawal,
         bool overrideL2Sender
-    ) internal {
+    ) internal view {
         L2Message memory l2ToL1Message;
         {
             address l2Sender = _finalizeWithdrawalParams.l2Sender;
@@ -174,7 +170,7 @@ contract L1InteropHandler {
             // this message is a token withdrawal
 
             revert LegacyBridgeMessageNotSupported();
-        } else if (bytes4(functionSignature) == IAssetRouterBase.finalizeDeposit.selector) {
+        } else if (bytes4(functionSignature) == AssetRouterBase.finalizeDeposit.selector) {
             // The data is expected to be at least 68 bytes long to contain assetId.
             if (_l2ToL1message.length < 68) {
                 revert WrongMsgLength(68, _l2ToL1message.length);

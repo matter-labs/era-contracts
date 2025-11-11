@@ -24,11 +24,10 @@ contract L2InteropCenter {
 
     bytes32 public shadowAccountBytecodeHash;
 
-    constructor(){
+    constructor(address _l1InteropHandlerAddress){
+        l1InteropHandlerAddress = _l1InteropHandlerAddress;
         shadowAccountBytecodeHash = keccak256(type(L1ShadowAccount).creationCode);
     }
-
-
 
     /// send bundle to L1
     /// 1. withdraw token to L1 shadow account
@@ -40,15 +39,16 @@ contract L2InteropCenter {
         ShadowAccountOp[] memory shadowAccountOps
     ) external {
 
-        bytes memory data = abi.encode(shadowAccountOps);
-        bytes32 bundleWithdrawalHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(data);
-
+        bytes memory data = abi.encode(msg.sender, shadowAccountOps);
+        /// low level call as there is an issue with zksync os
+        (bool success, ) = address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT).call(abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector, data));
+        require(success, "Send bundle to L1 failed");
     }
 
     function l1ShadowAccount(
         address _l2CallerAddress
     ) public view returns (address) {
         bytes32 salt = keccak256(abi.encode(_l2CallerAddress));
-        return Create2Address.getNewAddressCreate2EVM(address(this), salt, shadowAccountBytecodeHash);
+        return Create2Address.getNewAddressCreate2EVM(address(l1InteropHandlerAddress), salt, shadowAccountBytecodeHash);
     }
 }

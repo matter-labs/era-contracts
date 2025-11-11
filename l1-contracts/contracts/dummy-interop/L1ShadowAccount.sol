@@ -21,8 +21,10 @@ contract L1ShadowAccount {
         uint256 value,
         bytes calldata data
     ) external {
-        require(msg.sender == l1InteropHandlerAddress, "L1ShadowAccount: not authorized");
+        // require(msg.sender == l1InteropHandlerAddress, "L1ShadowAccount: not authorized");
         (bool success, ) = target.call{value: value}(data);
         require(success, "L1ShadowAccount: call failed");
     }
+
+    receive() external payable {}
 }

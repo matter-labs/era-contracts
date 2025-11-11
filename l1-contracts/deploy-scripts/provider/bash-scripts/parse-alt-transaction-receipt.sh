@@ -6,7 +6,12 @@ modify_json_address() {
     
     # Use jq to remove logs and l2ToL1Logs fields, then use sed to replace "address" with "addr" and "type" with "txType"
     # First remove the unwanted fields using jq, then apply the field replacements
-    echo "$json_string" | jq 'del(.result.logs, .result.l2ToL1Logs, .result.logsBloom, .result.contractAddress) | .result |= (to_entries | sort_by(.key) | from_entries)' | sed -e 's/"address":/"addr":/g' -e 's/"type":/"txType":/g' | jq 'walk(if type == "string" and test("^0x[0-9a-fA-F]+$") then if (length < 66) then "0x" + ("0" * (64 - (length - 2))) + .[2:] else . end else . end)'
+    echo "$json_string" | jq '
+        del(.result.logs, .result.l2ToL1Logs, .result.logsBloom, .result.contractAddress)
+        | .result.l1BatchNumber //= 0
+        | .result.l1BatchTxIndex //= 0
+        | .result |= (to_entries | sort_by(.key) | from_entries)
+    ' | sed -e 's/"address":/"addr":/g' -e 's/"type":/"txType":/g' | jq 'walk(if type == "string" and test("^0x[0-9a-fA-F]+$") then if (length < 66) then "0x" + ("0" * (64 - (length - 2))) + .[2:] else . end else . end)'
 }
 
 # Check if JSON string is provided as argument
