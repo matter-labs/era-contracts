@@ -11,11 +11,12 @@ import {IL1Bridgehub} from "./IL1Bridgehub.sol";
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehubBase.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {BridgehubL2TransactionRequest} from "../common/Messaging.sol";
-import {NotL1Bridgehub, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
+import {SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
 import {SettlementLayersMustSettleOnL1} from "../common/L1ContractErrors.sol";
 import {ChainIdAlreadyExists, ChainIdMismatch, IncorrectBridgeHubAddress, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {IL1CrossChainSender} from "../bridge/interfaces/IL1CrossChainSender.sol";
@@ -25,8 +26,6 @@ import {IL1CrossChainSender} from "../bridge/interfaces/IL1CrossChainSender.sol"
 /// @dev The Bridgehub contract serves as the primary entry point for L1->L2 communication,
 /// facilitating interactions between end user and bridges.
 /// It also manages state transition managers, base tokens, and chain registrations.
-/// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains
-/// between different settlement layers (for example from L1 to Gateway).
 contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
@@ -47,7 +46,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         MAX_NUMBER_OF_ZK_CHAINS = _maxNumberOfZKChains;
 
         // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
-        // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
+        // This is indeed true, since the only methods where this immutable is used are the ones on L1Bridgehub.
         // We will change this with interop.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
@@ -82,20 +81,10 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         return L1_CHAIN_ID;
     }
 
-    modifier onlyL1() {
-        if (block.chainid != L1_CHAIN_ID) {
-            revert NotL1Bridgehub(block.chainid, L1_CHAIN_ID);
-        }
-        _;
-    }
-
     /// @notice Used to register a chain as a settlement layer.
     /// @param _newSettlementLayerChainId the chainId of the chain
     /// @param _isWhitelisted whether the chain is a whitelisted settlement layer
-    function registerSettlementLayer(
-        uint256 _newSettlementLayerChainId,
-        bool _isWhitelisted
-    ) external onlyOwner onlyL1 {
+    function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external onlyOwner {
         if (settlementLayer[_newSettlementLayerChainId] != block.chainid) {
             revert SettlementLayersMustSettleOnL1();
         }
@@ -121,7 +110,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         address _admin,
         bytes calldata _initData,
         bytes[] calldata _factoryDeps
-    ) external onlyOwnerOrAdmin nonReentrant whenNotPaused onlyL1 returns (uint256) {
+    ) external onlyOwnerOrAdmin nonReentrant whenNotPaused returns (uint256) {
         _validateChainParams({_chainId: _chainId, _assetId: _baseTokenAssetId, _chainTypeManager: _chainTypeManager});
 
         chainTypeManager[_chainId] = _chainTypeManager;
@@ -150,7 +139,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     /// In case allowance is provided to the Asset Router, then it will be transferred to NTV.
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
-    ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
+    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
         // Note: If the ZK chain with corresponding `chainId` is not yet created,
         // the transaction will revert on `bridgehubRequestL2Transaction` as call to zero address.
         {
@@ -166,7 +155,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             }
 
             // slither-disable-next-line arbitrary-send-eth
-            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: msg.value}(
+            IL1AssetRouter(address(assetRouter)).bridgehubDepositBaseToken{value: msg.value}(
                 _request.chainId,
                 tokenAssetId,
                 msg.sender,
@@ -204,7 +193,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     /// @param _request the request for the L2 transaction
     function requestL2TransactionTwoBridges(
         L2TransactionRequestTwoBridgesOuter calldata _request
-    ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
+    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
         if (_request.secondBridgeAddress <= BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS) {
             revert SecondBridgeAddressTooLow(_request.secondBridgeAddress, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS);
         }
@@ -225,7 +214,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             }
 
             // slither-disable-next-line arbitrary-send-eth
-            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
+            IL1AssetRouter(address(assetRouter)).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
                 _request.chainId,
                 tokenAssetId,
                 msg.sender,
@@ -277,7 +266,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         address _chainAssetHandler,
         address _chainRegistrationSender
     ) external override onlyOwnerOrUpgrader {
-        assetRouter = _assetRouter;
+        assetRouter = IAssetRouterBase(_assetRouter);
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;
         chainAssetHandler = _chainAssetHandler;
@@ -287,7 +276,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     /// @dev Registers an already deployed chain with the bridgehub
     /// @param _chainId The chain Id of the chain
     /// @param _zkChain Address of the zkChain
-    function registerAlreadyDeployedZKChain(uint256 _chainId, address _zkChain) external onlyOwner onlyL1 {
+    function registerAlreadyDeployedZKChain(uint256 _chainId, address _zkChain) external onlyOwner {
         if (_zkChain == address(0)) {
             revert ZeroAddress();
         }

@@ -181,7 +181,7 @@ contract ExecutingTest is ExecutorTest {
             abi.encode()
         );
 
-        vm.store(address(messageRoot), getV30UpgradeChainBatchNumberLocation(bytes32(eraChainId)), bytes32(uint256(1)));
+        vm.store(address(messageRoot), getV30UpgradeChainBatchNumberLocation(bytes32(l2ChainId)), bytes32(uint256(1)));
         executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData);
     }
 
