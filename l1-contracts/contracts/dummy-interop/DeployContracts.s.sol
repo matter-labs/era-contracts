@@ -15,6 +15,14 @@ import {IWrappedTokenGatewayV3} from "./IWrappedTokenGatewayV3.sol";
 
 import {ZKSProvider} from "../../deploy-scripts/provider/ZKSProvider.s.sol";
 import {IPool} from "./IPool.sol";
+import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+
+
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
+import {L2TransactionRequestTwoBridgesOuter} from "../bridgehub/IBridgehubBase.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../common/Config.sol";
 
 contract DeployContracts is Script, ZKSProvider {
     using stdToml for string;
@@ -23,6 +31,9 @@ contract DeployContracts is Script, ZKSProvider {
 
     IL1Nullifier public l1Nullifier = IL1Nullifier(0x9e24E2c23933d30eF2DEB70A0D977Fb1Ca20AbEa);
     address public bridgehubAddress = 0xc4FD2580C3487bba18D63f50301020132342fdbD;
+    address public l1AssetRouterAddress = 0xB5d9C3F41E434b91295BD7962db5c873cEcCE2be;
+    address public l1NativeTokenVaultAddress = 0xF8d4A5195737043f45F998539D5C62Eee02E3426; 
+    address public chainMailBoxAddress = 0x02B1ac1Cf0A592aefD3C2246B2431388365dB272;
 
     address public aaveWeth = 0x387d311e47e80b498169e6fb51d3193167d89F7D;
     address public aavePool = 0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951;
@@ -35,6 +46,10 @@ contract DeployContracts is Script, ZKSProvider {
     bytes32 public baseTokenAssetId = 0x6337a96bd2cd359fa0bae3bbedfca736753213c95037ae158c5fa7c048ae2112;
 
     address public sender = 0x5d71d5f805e35DB4F870c64e3C655ed2222d5E39;
+
+    uint256 public chainId = 8022833;
+    uint256 public l1ChainId = 11155111;
+
 
     function run(string memory l1RpcUrl, string memory l2RpcUrl) public {
         console.log("Deploying contracts");
@@ -52,8 +67,8 @@ contract DeployContracts is Script, ZKSProvider {
         console.log("L2InteropCenter deployed to", address(l2InteropCenter));
     }
 
-    function withdrawTokenAndSendBundleToL1(string memory, string memory l2RpcUrl) public {
-        uint256 amount = 100000000000000;
+    function withdrawTokenAndSendBundleToL1(string memory l1RpcUrl, string memory l2RpcUrl) public {
+        uint256 amount = 1000000000000000;
         uint256 ghoAmount = 1000;
 
         address shadowAccount = L2InteropCenter(deployedL2InteropCenter).l1ShadowAccount(sender);
@@ -61,12 +76,12 @@ contract DeployContracts is Script, ZKSProvider {
         vm.createSelectFork(l2RpcUrl);
         vm.broadcast();
         /// low level call as there is an issue with zksync os
-        (bool success, bytes memory data) = address(L2_BASE_TOKEN_SYSTEM_CONTRACT).call{value: amount}(
+        (bool success, bytes memory data) = address(L2_BASE_TOKEN_SYSTEM_CONTRACT).call{value: amount * 10}(
             abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.withdraw.selector, shadowAccount)
         );
         require(success, "Withdraw failed");
 
-        ShadowAccountOp[] memory shadowAccountOps = new ShadowAccountOp[](2);
+        ShadowAccountOp[] memory shadowAccountOps = new ShadowAccountOp[](4);
         shadowAccountOps[0] = ShadowAccountOp({
             target: address(aaveWeth),
             value: amount,
@@ -77,11 +92,40 @@ contract DeployContracts is Script, ZKSProvider {
             value: 0,
             data: abi.encodeCall(IPool.borrow, (ghoTokenAddress, ghoAmount, 2, 0, shadowAccount))
         });
-        // shadowAccountOps[2] = ShadowAccountOp({
-        //     target: address(bridgehubAddress),
-        //     value: 0,
-        //     data: abi.encodeCall(IL1Bridgehub.requestL2TransactionTwoBridges, L2TransactionRequestTwoBridgesOuter({chainId: chainId, mintValue: 0, l2Value: 0, l2GasLimit: 0, l2GasPerPubdataByteLimit: 0, refundRecipient: address(0), secondBridgeAddress: address(0), secondBridgeValue: 0, secondBridgeCalldata: abi.encodeCall(IPool.borrow, (ghoTokenAddress, ghoAmount, 2, 0, shadowAccount))}))
-        // });
+        shadowAccountOps[2] = ShadowAccountOp({
+            target: address(ghoTokenAddress),
+            value: 0,
+            data: abi.encodeCall(IERC20.approve, (l1NativeTokenVaultAddress, ghoAmount))
+        });
+        uint256 l2GasLimit = 1000000;
+        uint256 gasPrice = 10000000;
+        // vm.createSelectFork(l1RpcUrl);
+
+        uint256 mintValue = 1000000000000000;//IMailboxImpl(chainMailBoxAddress).l2TransactionBaseCost(gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
+        // vm.createSelectFork(l2RpcUrl);
+
+        bytes32 ghoTokenAssetId = DataEncoding.encodeNTVAssetId(l1ChainId, ghoTokenAddress);
+        bytes memory inner = DataEncoding.encodeBridgeBurnData(ghoAmount, sender, ghoTokenAddress);
+
+        bytes memory secondBridgeCalldata = DataEncoding.encodeAssetRouterBridgehubDepositData(ghoTokenAssetId, inner);
+        shadowAccountOps[3] = ShadowAccountOp({
+            target: address(bridgehubAddress),
+            value: mintValue,
+            data: abi.encodeCall(
+                IL1Bridgehub.requestL2TransactionTwoBridges,
+                L2TransactionRequestTwoBridgesOuter({
+                    chainId: chainId,
+                    mintValue: mintValue,
+                    l2Value: 0,
+                    l2GasLimit: l2GasLimit,
+                    l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                    refundRecipient: sender,
+                    secondBridgeAddress: l1AssetRouterAddress,
+                    secondBridgeValue: 0,
+                    secondBridgeCalldata: secondBridgeCalldata
+                })
+            )
+        });
         vm.broadcast();
         L2InteropCenter(deployedL2InteropCenter).sendBundleToL1(shadowAccountOps);
     }
@@ -92,7 +136,6 @@ contract DeployContracts is Script, ZKSProvider {
         bytes32 withdrawMsgHash,
         bytes32
     ) public {
-        uint256 chainId = 8022833;
         vm.createSelectFork(l1RpcUrl);
 
         FinalizeL1DepositParams memory withdrawFinalizeL1DepositParams = getFinalizeWithdrawalParams(
@@ -111,7 +154,6 @@ contract DeployContracts is Script, ZKSProvider {
         bytes32,
         bytes32 bundleMsgHash
     ) public {
-        uint256 chainId = 8022833;
         vm.createSelectFork(l1RpcUrl);
         FinalizeL1DepositParams memory bundleFinalizeL1DepositParams = getFinalizeWithdrawalParams(
             chainId,
