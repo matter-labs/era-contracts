@@ -2,19 +2,16 @@
 
 pragma solidity 0.8.28;
 
-
-import {L2_BRIDGEHUB_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {FinalizeL1DepositParams} from "../bridge/interfaces/IL1Nullifier.sol";
-import {L2Message, TxStatus} from "../common/Messaging.sol";
+import {L2Message} from "../common/Messaging.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {WrongL2Sender, WrongMsgLength} from "../bridge/L1BridgeContractErrors.sol";
-import {AddressAlreadySet, DepositDoesNotExist, DepositExists, InvalidProof, InvalidSelector, L2WithdrawalMessageWrongLength, LegacyBridgeNotSet, LegacyMethodForNonL1Token, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotLegacy, Unauthorized, WithdrawalAlreadyFinalized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {InvalidProof, InvalidSelector, L2WithdrawalMessageWrongLength} from "../common/L1ContractErrors.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IL1ERC20Bridge} from "../bridge/interfaces/IL1ERC20Bridge.sol";
-import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "../bridge/asset-router/AssetRouterBase.sol";
 import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 
@@ -26,12 +23,11 @@ import {ShadowAccountOp} from "./L2InteropCenter.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The L1InteropHandler contract is responsible for handling interops from L2.
 contract L1InteropHandler {
-
     address public l2InteropCenterAddress;
 
-    IL1NativeTokenVault public  l1NativeTokenVault;
+    IL1NativeTokenVault public l1NativeTokenVault;
 
-    IBridgehubBase public  BRIDGE_HUB;
+    IBridgehubBase public BRIDGE_HUB;
 
     constructor(address _bridgehubAddress) {
         BRIDGE_HUB = IBridgehubBase(_bridgehubAddress);
@@ -39,13 +35,16 @@ contract L1InteropHandler {
 
     function receiveInteropFromL2(
         // FinalizeL1DepositParams memory _tokenWithdrawalParams,
-        FinalizeL1DepositParams memory _bundleWithdrawalParams
+        FinalizeL1DepositParams calldata _bundleWithdrawalParams
     ) external {
         _verifyWithdrawal(_bundleWithdrawalParams, false, false);
 
         // The _bundleWithdrawalParams.message is expected to be an abi-encoded array of ShadowAccountOp structs.
         // Decode the bytes contained in _bundleWithdrawalParams.message to retrieve the calls for the shadow account.
-        (address l2Sender, ShadowAccountOp[] memory ops) = abi.decode(_bundleWithdrawalParams.message, (address, ShadowAccountOp[]));
+        (address l2Sender, ShadowAccountOp[] memory ops) = abi.decode(
+            _bundleWithdrawalParams.message,
+            (address, ShadowAccountOp[])
+        );
 
         // deploy shadow account if needed
         address shadowAccount = deployShadowAccount(l2Sender);
@@ -54,32 +53,26 @@ contract L1InteropHandler {
         _executeBundleWithdrawal(shadowAccount, ops);
     }
 
-    function deployShadowAccount(
-        address _l2CallerAddress
-    ) public returns (address) {
+    error ShadowAccountDeploymentFailed();
+    function deployShadowAccount(address _l2CallerAddress) public returns (address) {
         bytes32 salt = keccak256(abi.encode(_l2CallerAddress));
         bytes32 bytecodeHash = keccak256(type(L1ShadowAccount).creationCode);
         address shadowAccountAddress = Create2Address.getNewAddressCreate2EVM(address(this), salt, bytecodeHash);
         if (shadowAccountAddress.code.length == 0) {
             L1ShadowAccount shadowAccount = new L1ShadowAccount{salt: salt}();
-            require(shadowAccountAddress == address(shadowAccount), "L1InteropHandler: shadow account deployment failed");
+            require(shadowAccountAddress == address(shadowAccount), ShadowAccountDeploymentFailed());
         }
         return shadowAccountAddress;
     }
 
-    function _executeBundleWithdrawal(
-        address _shadowAccount,
-        ShadowAccountOp[] memory ops
-    ) internal {
-        for (uint256 i = 0; i < ops.length; i++) {
+    function _executeBundleWithdrawal(address _shadowAccount, ShadowAccountOp[] memory ops) internal {
+        uint256 length = ops.length;
+        for (uint256 i = 0; i < length; ++i) {
             L1ShadowAccount(payable(_shadowAccount)).executeFromIH(ops[i].target, ops[i].value, ops[i].data);
         }
     }
 
-    function _isBaseTokenWithdrawal(
-        bytes32 _assetId,
-        uint256 _chainId
-    ) internal view returns (bool) {
+    function _isBaseTokenWithdrawal(bytes32 _assetId, uint256 _chainId) internal view returns (bool) {
         return _assetId == BRIDGE_HUB.baseTokenAssetId(_chainId);
     }
 
@@ -97,8 +90,7 @@ contract L1InteropHandler {
         {
             address l2Sender = _finalizeWithdrawalParams.l2Sender;
 
-            bool isL2SenderCorrect = l2Sender == L2_ASSET_ROUTER_ADDR ||
-                l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
+            bool isL2SenderCorrect = l2Sender == L2_ASSET_ROUTER_ADDR || l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
             if (!isL2SenderCorrect && overrideL2Sender) {
                 revert WrongL2Sender(l2Sender);
             }
@@ -183,5 +175,4 @@ contract L1InteropHandler {
             revert InvalidSelector(bytes4(functionSignature));
         }
     }
-
 }
