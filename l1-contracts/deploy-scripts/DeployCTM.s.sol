@@ -353,7 +353,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
             l1ChainId: config.l1ChainId,
             gatewayChainId: config.gatewayChainId,
             eraChainId: config.eraChainId,
-            l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
+            l1AssetRouter: discoveredBridgehub.assetRouter,
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,

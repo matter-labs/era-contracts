@@ -57,7 +57,6 @@ import {StateTransitionDeployedAddresses, DataAvailabilityDeployedAddresses, Cha
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
     StateTransitionDeployedAddresses stateTransition;
-    BridgesDeployedAddresses bridges;
     DataAvailabilityDeployedAddresses daAddresses;
     address transparentProxyAdmin;
     address governance;
@@ -243,6 +242,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     function getChainCreationParams(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (ChainCreationParams memory) {
+        require(generatedData.forceDeploymentsData.length != 0, "force deployments data is empty");
         Diamond.DiamondCutData memory diamondCut = getChainCreationDiamondCutData(stateTransition);
         return
             ChainCreationParams({
@@ -478,7 +478,7 @@ abstract contract DeployCTMUtils is DeployUtils {
                 abi.encode(
                     config.l1ChainId,
                     discoveredBridgehub.bridgehubProxy,
-                    addresses.bridges.l1AssetRouterProxy,
+                    discoveredBridgehub.assetRouter,
                     discoveredBridgehub.assetRouterAddresses.nativeTokenVault,
                     discoveredBridgehub.messageRoot
                 );

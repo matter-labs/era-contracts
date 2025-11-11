@@ -750,29 +750,31 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
     function prepareFixedForceDeploymentsData() public view virtual returns (FixedForceDeploymentsData memory data) {
         require(config.ownerAddress != address(0), "owner not set");
 
-        data.l1ChainId = config.l1ChainId;
-        data.eraChainId = config.eraChainId;
-        data.gatewayChainId = config.gatewayChainId;
-        data.l1AssetRouter = bridges.l1AssetRouterProxy;
-        data.l2TokenProxyBytecodeHash = getL2BytecodeHash("BeaconProxy");
-        data.aliasedL1Governance = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
-        data.maxNumberOfZKChains = config.contracts.maxNumberOfChains;
-        data.bridgehubBytecodeInfo = abi.encode(getL2BytecodeHash("L2Bridgehub"));
-        data.l2AssetRouterBytecodeInfo = abi.encode(getL2BytecodeHash("L2AssetRouter"));
-        data.l2NtvBytecodeInfo = abi.encode(getL2BytecodeHash("L2NativeTokenVault"));
-        data.messageRootBytecodeInfo = abi.encode(getL2BytecodeHash("L2MessageRoot"));
-        data.chainAssetHandlerBytecodeInfo = abi.encode(getL2BytecodeHash("L2ChainAssetHandler"));
-        data.beaconDeployerInfo = abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer"));
-        data.interopCenterBytecodeInfo = abi.encode(getL2BytecodeHash("InteropCenter"));
-        data.interopHandlerBytecodeInfo = abi.encode(getL2BytecodeHash("InteropHandler"));
-        data.assetTrackerBytecodeInfo = abi.encode(getL2BytecodeHash("AssetTracker"));
-        data.l2SharedBridgeLegacyImpl = address(0);
-        data.l2BridgedStandardERC20Impl = address(0);
-        data.aliasedChainRegistrationSender = AddressAliasHelper.applyL1ToL2Alias(
-            discoveredBridgehub.chainRegistrationSenderProxy
-        );
-        // upgradeAddresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
-        data.dangerousTestOnlyForcedBeacon = address(0);
+        data = FixedForceDeploymentsData({
+            l1ChainId: config.l1ChainId,
+            eraChainId: config.eraChainId,
+            gatewayChainId: config.gatewayChainId,
+            l1AssetRouter: discoveredBridgehub.assetRouter,
+            l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
+            aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
+            maxNumberOfZKChains: config.contracts.maxNumberOfChains,
+            bridgehubBytecodeInfo: abi.encode(getL2BytecodeHash("L2Bridgehub")),
+            l2AssetRouterBytecodeInfo: abi.encode(getL2BytecodeHash("L2AssetRouter")),
+            l2NtvBytecodeInfo: abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
+            messageRootBytecodeInfo: abi.encode(getL2BytecodeHash("L2MessageRoot")),
+            chainAssetHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
+            beaconDeployerInfo: abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
+            interopCenterBytecodeInfo: abi.encode(getL2BytecodeHash("InteropCenter")),
+            interopHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("InteropHandler")),
+            assetTrackerBytecodeInfo: abi.encode(getL2BytecodeHash("AssetTracker")),
+            l2SharedBridgeLegacyImpl: address(0),
+            l2BridgedStandardERC20Impl: address(0),
+            aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
+                discoveredBridgehub.chainRegistrationSenderProxy
+            ),
+            // upgradeAddresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
+            dangerousTestOnlyForcedBeacon: address(0)
+        });
     }
 
     function saveOutputVersionSpecific() internal virtual {}
