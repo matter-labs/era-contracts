@@ -72,7 +72,7 @@ contract L1InteropHandler {
         ShadowAccountOp[] memory ops
     ) internal {
         for (uint256 i = 0; i < ops.length; i++) {
-            L1ShadowAccount(_shadowAccount).executeFromIH(ops[i].target, ops[i].value, ops[i].data);
+            L1ShadowAccount(payable(_shadowAccount)).executeFromIH(ops[i].target, ops[i].value, ops[i].data);
         }
     }
 
