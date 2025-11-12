@@ -31,6 +31,9 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
+import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
+import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
 import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
 import {Config, DeployUtils, DeployedAddresses} from "./DeployUtils.s.sol";
@@ -203,6 +206,8 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
             addresses.bridgehub.ctmDeploymentTrackerProxy
         );
         IOwnable(address(ctmDeploymentTracker)).transferOwnership(addresses.governance);
+
+        IOwnable(addresses.bridgehub.chainAssetHandlerProxy).transferOwnership(addresses.governance);
 
         vm.stopBroadcast();
         console.log("Owners updated");

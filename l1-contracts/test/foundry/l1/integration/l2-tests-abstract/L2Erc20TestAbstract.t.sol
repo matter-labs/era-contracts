@@ -15,6 +15,8 @@ import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
+import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";

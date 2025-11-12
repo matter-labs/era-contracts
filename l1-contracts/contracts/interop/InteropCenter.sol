@@ -295,7 +295,7 @@ contract InteropCenter is
         BundleAttributes memory _bundleAttributes,
         bytes[][] memory _originalCallAttributes
     ) internal returns (bytes32 bundleHash) {
-        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
+        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
 
         // Form an InteropBundle.
         InteropBundle memory bundle = InteropBundle({

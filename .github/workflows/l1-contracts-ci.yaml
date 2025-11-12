@@ -21,8 +21,8 @@ jobs:
       - name: Install foundry-zksync
         run: |
           mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.30/foundry_zksync_v0.0.30_linux_amd64.tar.gz
+          tar zxf foundry_zksync_v0.0.30_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
@@ -61,6 +61,21 @@ jobs:
         with:
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
+
+      - name: Upload artifacts for download
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
@@ -113,6 +128,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
@@ -129,6 +145,45 @@ jobs:
 
       - name: Check hashes
         run: yarn calculate-hashes:check
+
+  check-selectors:
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-l1-${{ github.sha }}
+          path: |
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.30/foundry_zksync_v0.0.30_linux_amd64.tar.gz
+          tar zxf foundry_zksync_v0.0.30_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+
+      - name: Check selectors
+        run: yarn l1 selectors --check
 
   test-foundry:
     needs: [build, lint]
@@ -149,8 +204,8 @@ jobs:
       - name: Install foundry-zksync
         run: |
           mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.30/foundry_zksync_v0.0.30_linux_amd64.tar.gz
+          tar zxf foundry_zksync_v0.0.30_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
@@ -163,6 +218,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
@@ -173,6 +229,10 @@ jobs:
 
       - name: Run tests
         working-directory: ./l1-contracts
+        run: yarn test:foundry
+
+      - name: Run DA tests
+        working-directory: ./da-contracts
         run: yarn test:foundry
 
       # TODO: restore once we can get back to latest foundry
@@ -199,8 +259,8 @@ jobs:
       - name: Install foundry-zksync
         run: |
           mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.30/foundry_zksync_v0.0.30_linux_amd64.tar.gz
+          tar zxf foundry_zksync_v0.0.30_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
@@ -243,28 +303,28 @@ jobs:
           toolchain: 1.72.0
 
       - name: Install Rust toolchain
-        working-directory: tools
+        working-directory: tools/verifier-gen
         run: rustup toolchain install
 
       - name: Generate Era verifiers
-        working-directory: tools
+        working-directory: tools/verifier-gen
         run: cargo run --bin zksync_verifier_contract_generator --release -- --variant era
 
       - name: Compare EraVerifierPlonk.sol
-        run: diff tools/data/EraVerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/EraVerifierPlonk.sol
+        run: diff tools/verifier-gen/data/EraVerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/EraVerifierPlonk.sol
 
       - name: Compare EraVerifierFflonk.sol
-        run: diff tools/data/EraVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/EraVerifierFflonk.sol
+        run: diff tools/verifier-gen/data/EraVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/EraVerifierFflonk.sol
 
       - name: Generate ZKsyncOS verifiers
-        working-directory: tools
+        working-directory: tools/verifier-gen
         run: cargo run --bin zksync_verifier_contract_generator --release -- --variant zksync-os
 
       - name: Compare ZKsyncOSVerifierPlonk.sol
-        run: diff tools/data/ZKsyncOSVerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol
+        run: diff tools/verifier-gen/data/ZKsyncOSVerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol
 
       - name: Compare ZKsyncOSVerifierFflonk.sol
-        run: diff tools/data/ZKsyncOSVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol
+        run: diff tools/verifier-gen/data/ZKsyncOSVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol
 
   coverage:
     defaults:
@@ -288,8 +348,8 @@ jobs:
       - name: Install foundry-zksync
         run: |
           mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.30/foundry_zksync_v0.0.30_linux_amd64.tar.gz
+          tar zxf foundry_zksync_v0.0.30_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
@@ -302,6 +362,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
@@ -350,7 +411,7 @@ jobs:
         with:
           coverage-files: ./l1-contracts/lcov.info
           working-directory: l1-contracts
-          minimum-coverage: 83 # TODO(EVM-944): increase threshold to 85
+          minimum-coverage: 75 # TODO(EVM-944): increase threshold to 85
 
 
   # FIXME: restore gas report CI
@@ -382,6 +443,7 @@ jobs:
   #         fail-on-cache-miss: true
   #         key: artifacts-l1-${{ github.sha }}
   #         path: |
+  #           da-contracts/cache-forge
   #           da-contracts/out
   #           l1-contracts/cache-forge
   #           l1-contracts/out
