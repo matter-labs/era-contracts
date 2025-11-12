@@ -242,13 +242,17 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             );
         }
 
-        if(_newBatch.firstBlockNumber > _newBatch.lastBlockNumber) {
+        if (_newBatch.firstBlockNumber > _newBatch.lastBlockNumber) {
             revert InvalidBlockRange(_newBatch.batchNumber, _newBatch.firstBlockNumber, _newBatch.lastBlockNumber);
         }
 
         // Emitting the block range for a batch. This is needed for indexing purposes.
         // Note, that in this release the data emitting here is provided by the operator and so not trusted.
-        emit ReportCommitedBatchRangeZKsyncOS(_newBatch.batchNumber, _newBatch.firstBlockNumber, _newBatch.lastBlockNumber);
+        emit ReportCommittedBatchRangeZKsyncOS(
+            _newBatch.batchNumber,
+            _newBatch.firstBlockNumber,
+            _newBatch.lastBlockNumber
+        );
     }
 
     /// @notice Verifies that a stored precommitment for a given batch matches the expected rolling hash.
