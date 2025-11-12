@@ -136,7 +136,11 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
         bytes32 destAssetIdSlot = keccak256(abi.encode(sourceBaseTokenAddress, uint256(204)));
         vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, destAssetIdSlot, baseTokenAssetId);
 
-        vm.mockCall(L2_BRIDGEHUB_ADDR, abi.encodeCall(IBridgehubBase.baseTokenAssetId, (destinationChainId)), abi.encode(otherBaseTokenAssetId));
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeCall(IBridgehubBase.baseTokenAssetId, (destinationChainId)),
+            abi.encode(otherBaseTokenAssetId)
+        );
 
         // Switch back to original chain before executing bundle
         vm.chainId(originalChainId);

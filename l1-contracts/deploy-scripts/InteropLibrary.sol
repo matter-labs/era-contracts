@@ -103,7 +103,9 @@ library InteropLibrary {
         return
             InteropCallStarter({
                 to: InteroperableAddress.formatEvmV1(destinationAddress),
-                data: indirectCall ? buildSecondBridgeCalldata(thisChainBaseTokenAssetId, amount, recipient, address(0)) : empty,
+                data: indirectCall
+                    ? buildSecondBridgeCalldata(thisChainBaseTokenAssetId, amount, recipient, address(0))
+                    : empty,
                 callAttributes: callAttributes
             });
     }
@@ -134,8 +136,8 @@ library InteropLibrary {
         }
         if (executionAddress != address(0)) {
             attributes[0] = abi.encodeCall(
-            IERC7786Attributes.executionAddress,
-            (InteroperableAddress.formatEvmV1(executionAddress))
+                IERC7786Attributes.executionAddress,
+                (InteroperableAddress.formatEvmV1(executionAddress))
             );
         }
         if (unbundlerAddress != address(0)) {
