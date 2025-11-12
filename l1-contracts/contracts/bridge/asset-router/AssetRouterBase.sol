@@ -181,7 +181,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes calldata _data
     ) internal virtual returns (bytes32 assetId, bytes memory transferData) {
         if (_encodingVersion == NEW_ENCODING_VERSION) {
-            // For better error handling.
             (assetId, transferData) = DataEncoding.decodeAssetRouterBridgehubDepositData(_data);
         } else {
             revert UnsupportedEncodingVersion();
