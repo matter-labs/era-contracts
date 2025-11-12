@@ -8,9 +8,12 @@ import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
-import {AmountMustBeGreaterThanZero, ArgumentsLengthNotIdentical, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {AmountMustBeGreaterThanZero, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
+
+// 0xa5cea466
+error ArgumentsLengthNotIdentical();
 
 library InteropLibrary {
     /*//////////////////////////////////////////////////////////////
