@@ -29,7 +29,7 @@ import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {InteropCall, InteropCallStarter} from "contracts/common/Messaging.sol";
 
-import {InteropLibrary} from "contracts/interop/InteropLibrary.sol";
+import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
 abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;

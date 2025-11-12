@@ -37,7 +37,7 @@ import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
 import {IERC7786Recipient} from "contracts/interop/IERC7786Recipient.sol";
 
-import {InteropLibrary} from "contracts/interop/InteropLibrary.sol";
+import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
 abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer {
     uint256 destinationChainId = 271;
