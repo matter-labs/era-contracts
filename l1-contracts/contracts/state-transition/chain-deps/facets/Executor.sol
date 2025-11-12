@@ -609,7 +609,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
-            // The upgrade transaction must only be included in the first batch.
             _lastCommittedBatchData = _commitOneBatch(
                 _lastCommittedBatchData,
                 _newBatchesData[i],
@@ -624,6 +623,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             );
 
             if (i == 0) {
+                // The upgrade transaction must only be included in the first batch.
                 _systemContractUpgradeTxHash = bytes32(0);
             }
         }
