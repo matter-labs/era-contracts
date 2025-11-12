@@ -142,6 +142,8 @@ error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
 error InsufficientChainBalance();
 // 0x9bf8b9aa
 error InvalidBatchNumber(uint256 provided, uint256 expected);
+// 0x3fe8c999
+error InvalidBlockRange(uint256 batchNumber, uint256 from, uint256 to);
 // 0xcbd9d2e0
 error InvalidCaller(address);
 // 0x7a47c9a2
@@ -393,7 +395,6 @@ error ZKChainLimitReached();
 // 0x646ac57e
 error ZKsyncOSNotForceDeployForExistingContract(address);
 
-error InvalidBlockRange(uint256 batchNumber, uint256 from, uint256 to);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
