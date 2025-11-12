@@ -105,8 +105,16 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
         // Deploy the other base token properly
         TestnetERC20Token otherBaseToken = new TestnetERC20Token("Other Base Token", "OBT", 18);
         address otherBaseTokenAddress = address(otherBaseToken);
-        vm.mockCall(otherBaseTokenAddress, abi.encodeWithSelector(BridgedStandardERC20.bridgeBurn.selector), abi.encode());
-        vm.mockCall(otherBaseTokenAddress, abi.encodeCall(IBridgedStandardToken.originToken, ()), abi.encode(address(otherBaseTokenAddress)));
+        vm.mockCall(
+            otherBaseTokenAddress,
+            abi.encodeWithSelector(BridgedStandardERC20.bridgeBurn.selector),
+            abi.encode()
+        );
+        vm.mockCall(
+            otherBaseTokenAddress,
+            abi.encodeCall(IBridgedStandardToken.originToken, ()),
+            abi.encode(address(otherBaseTokenAddress))
+        );
 
         // Register the token in NTV and set up asset handler
         // vm.prank is used to call from NTV context for setLegacyTokenAssetHandler

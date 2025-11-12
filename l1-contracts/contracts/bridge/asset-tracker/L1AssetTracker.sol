@@ -42,27 +42,15 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// Todo Deprecate after V30 is finished.
     mapping(bytes32 assetId => bool l1TotalSupplyMigrated) internal l1TotalSupplyMigrated;
 
-    function _l1ChainId() internal view override returns (uint256) {
-        return L1_CHAIN_ID;
-    }
-
-    function _bridgehub() internal view override returns (IBridgehubBase) {
-        return BRIDGE_HUB;
-    }
-
     function _nativeTokenVault() internal view override returns (INativeTokenVaultBase) {
         return NATIVE_TOKEN_VAULT;
     }
 
-    function _messageRoot() internal view override returns (IMessageRoot) {
-        return MESSAGE_ROOT;
-    }
-
     modifier onlyWhitelistedSettlementLayer(uint256 _callerChainId) {
         require(
-            _bridgehub().whitelistedSettlementLayers(_callerChainId) &&
-                _bridgehub().getZKChain(_callerChainId) == msg.sender,
-            OnlyWhitelistedSettlementLayer(_bridgehub().getZKChain(_callerChainId), msg.sender)
+            BRIDGE_HUB.whitelistedSettlementLayers(_callerChainId) &&
+                BRIDGE_HUB.getZKChain(_callerChainId) == msg.sender,
+            OnlyWhitelistedSettlementLayer(BRIDGE_HUB.getZKChain(_callerChainId), msg.sender)
         );
         _;
     }
@@ -80,16 +68,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                     Initialization
     //////////////////////////////////////////////////////////////*/
 
-    constructor(
-        uint256 _l1ChainId,
-        address _bridgehub,
-        address,
-        address _nativeTokenVault,
-        address _messageRoot
-    ) reentrancyGuardInitializer {
+    constructor(address _bridgehub, address _nativeTokenVault, address _messageRoot) reentrancyGuardInitializer {
         _disableInitializers();
 
-        L1_CHAIN_ID = _l1ChainId;
         BRIDGE_HUB = IBridgehubBase(_bridgehub);
         NATIVE_TOKEN_VAULT = INativeTokenVaultBase(_nativeTokenVault);
         MESSAGE_ROOT = IMessageRoot(_messageRoot);
@@ -157,7 +138,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _amount,
         uint256 // _tokenOriginChainId
     ) external onlyNativeTokenVault {
-        uint256 currentSettlementLayer = _bridgehub().settlementLayer(_chainId);
+        uint256 currentSettlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
         if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _assetId)) {
             _forceSetAssetMigrationNumber(_chainId, _assetId);
         }
@@ -275,7 +256,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             InvalidAssetMigrationNumber()
         );
 
-        uint256 currentSettlementLayer = _bridgehub().settlementLayer(data.chainId);
+        uint256 currentSettlementLayer = BRIDGE_HUB.settlementLayer(data.chainId);
         uint256 fromChainId;
         uint256 toChainId;
 
@@ -323,7 +304,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         } else {
             // In this case we trust the TokenBalanceMigrationData data and the settlement layer = Gateway to be honest.
             require(
-                _bridgehub().whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
+                BRIDGE_HUB.whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
                 InvalidWithdrawalChainId()
             );
             // The assetMigrationNumber on GW is set via forceSetAssetMigrationNumber to the chainMigrationNumber
@@ -410,7 +391,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @param _to The address of the contract to call on the target chain.
     /// @param _data The encoded function call data to send.
     function _sendToChain(uint256 _chainId, address _to, bytes memory _data) internal {
-        address zkChain = _bridgehub().getZKChain(_chainId);
+        address zkChain = BRIDGE_HUB.getZKChain(_chainId);
         // slither-disable-next-line unused-return
         IMailbox(zkChain).requestL2ServiceTransaction(_to, _data);
     }

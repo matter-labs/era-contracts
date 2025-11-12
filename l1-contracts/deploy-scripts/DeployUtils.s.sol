@@ -487,9 +487,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "L1AssetTracker")) {
             return
                 abi.encode(
-                    config.l1ChainId,
                     addresses.bridgehub.bridgehubProxy,
-                    addresses.bridges.l1AssetRouterProxy,
                     addresses.vaults.l1NativeTokenVaultProxy,
                     addresses.bridgehub.messageRootProxy
                 );
