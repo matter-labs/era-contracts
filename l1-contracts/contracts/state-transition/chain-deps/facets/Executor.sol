@@ -490,6 +490,25 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
+    /// @dev Checks that the batch hash is correct and matches the expected hash.
+    /// @param _lastCommittedBatchData The last committed batch.
+    /// @param _batchNumber The batch number to check.
+    /// @param _checkLegacy Whether to check the legacy hash.
+    function _checkBatchHashMismatch(
+        StoredBatchInfo memory _lastCommittedBatchData,
+        uint256 _batchNumber,
+        bool _checkLegacy
+    ) internal view {
+        bytes32 cachedStoredBatchHashes = s.storedBatchHashes[_batchNumber];
+        if (
+            cachedStoredBatchHashes != _hashStoredBatchInfo(_lastCommittedBatchData) &&
+            (!_checkLegacy || cachedStoredBatchHashes != _hashLegacyStoredBatchInfo(_lastCommittedBatchData))
+        ) {
+            // incorrect previous batch data
+            revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(_lastCommittedBatchData));
+        }
+    }
+
     function _commitBatchesSharedBridgeEra(
         uint256 _processFrom,
         uint256 _processTo,
@@ -504,25 +523,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert CanOnlyProcessOneBatch();
         }
         // Check that we commit batches after last committed batch
-        bytes32 cachedStoredBatchHashes = s.storedBatchHashes[s.totalBatchesCommitted];
-        if (
-            cachedStoredBatchHashes != _hashStoredBatchInfo(lastCommittedBatchData) &&
-            cachedStoredBatchHashes != _hashLegacyStoredBatchInfo(lastCommittedBatchData)
-        ) {
-            // incorrect previous batch data
-            revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(lastCommittedBatchData));
-        }
+        _checkBatchHashMismatch(lastCommittedBatchData, s.totalBatchesCommitted, true);
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         // Upgrades are rarely done so we optimize a case with no active system contracts upgrade.
         if (systemContractsUpgradeTxHash == bytes32(0) || s.l2SystemContractsUpgradeBatchNumber != 0) {
-            _commitBatchesWithoutSystemContractsUpgrade(lastCommittedBatchData, newBatchesData);
+            _commitBatchesEra(lastCommittedBatchData, newBatchesData, bytes32(0));
         } else {
-            _commitBatchesWithSystemContractsUpgrade(
-                lastCommittedBatchData,
-                newBatchesData,
-                systemContractsUpgradeTxHash
-            );
+            _commitBatchesEra(lastCommittedBatchData, newBatchesData, systemContractsUpgradeTxHash);
         }
 
         s.totalBatchesCommitted = s.totalBatchesCommitted + newBatchesData.length;
@@ -542,13 +550,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert CanOnlyProcessOneBatch();
         }
         // Check that we commit batches after last committed batch
-        if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
-            // incorrect previous batch data
-            revert BatchHashMismatch(
-                s.storedBatchHashes[s.totalBatchesCommitted],
-                _hashStoredBatchInfo(lastCommittedBatchData)
-            );
-        }
+        _checkBatchHashMismatch(lastCommittedBatchData, s.totalBatchesCommitted, false);
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         bool processSystemUpgradeTx = systemContractsUpgradeTxHash != bytes32(0) &&
@@ -582,48 +584,29 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
-    /// @dev Commits new batches without any system contracts upgrade.
+    /// @dev Commits new batches, optionally handling a system contracts upgrade transaction.
     /// @param _lastCommittedBatchData The data of the last committed batch.
     /// @param _newBatchesData An array of batch data that needs to be committed.
-    function _commitBatchesWithoutSystemContractsUpgrade(
-        StoredBatchInfo memory _lastCommittedBatchData,
-        CommitBatchInfo[] memory _newBatchesData
-    ) internal {
-        // We disable this check because calldata array length is cheap.
-        // solhint-disable-next-line gas-length-in-loops
-        for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
-            _lastCommittedBatchData = _commitOneBatch(_lastCommittedBatchData, _newBatchesData[i], bytes32(0));
-
-            s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(_lastCommittedBatchData);
-            emit BlockCommit(
-                _lastCommittedBatchData.batchNumber,
-                _lastCommittedBatchData.batchHash,
-                _lastCommittedBatchData.commitment
-            );
-        }
-    }
-
-    /// @dev Commits new batches with a system contracts upgrade transaction.
-    /// @param _lastCommittedBatchData The data of the last committed batch.
-    /// @param _newBatchesData An array of batch data that needs to be committed.
-    /// @param _systemContractUpgradeTxHash The transaction hash of the system contract upgrade.
-    function _commitBatchesWithSystemContractsUpgrade(
+    /// @param _systemContractUpgradeTxHash The transaction hash of the system contract upgrade (bytes32(0) if none).
+    function _commitBatchesEra(
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] memory _newBatchesData,
         bytes32 _systemContractUpgradeTxHash
     ) internal {
-        // The system contract upgrade is designed to be executed atomically with the new bootloader, a default account,
-        // ZKP verifier, and other system parameters. Hence, we ensure that the upgrade transaction is
-        // carried out within the first batch committed after the upgrade.
+        if (_systemContractUpgradeTxHash != bytes32(0)) {
+            // The system contract upgrade is designed to be executed atomically with the new bootloader, a default account,
+            // ZKP verifier, and other system parameters. Hence, we ensure that the upgrade transaction is
+            // carried out within the first batch committed after the upgrade.
 
-        // While the logic of the contract ensures that the s.l2SystemContractsUpgradeBatchNumber is 0 when this function is called,
-        // this check is added just in case. Since it is a hot read, it does not incur noticeable gas cost.
-        if (s.l2SystemContractsUpgradeBatchNumber != 0) {
-            revert UpgradeBatchNumberIsNotZero();
+            // While the logic of the contract ensures that the s.l2SystemContractsUpgradeBatchNumber is 0 when this branch is entered,
+            // this check is added just in case. Since it is a hot read, it does not incur noticeable gas cost.
+            if (s.l2SystemContractsUpgradeBatchNumber != 0) {
+                revert UpgradeBatchNumberIsNotZero();
+            }
+
+            // Save the batch number where the upgrade transaction was executed.
+            s.l2SystemContractsUpgradeBatchNumber = _newBatchesData[0].batchNumber;
         }
-
-        // Save the batch number where the upgrade transaction was executed.
-        s.l2SystemContractsUpgradeBatchNumber = _newBatchesData[0].batchNumber;
 
         // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
@@ -707,9 +690,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (currentBatchNumber != s.totalBatchesExecuted + _executedBatchIdx + 1) {
             revert NonSequentialBatch();
         }
-        if (_hashStoredBatchInfo(_storedBatch) != s.storedBatchHashes[currentBatchNumber]) {
-            revert BatchHashMismatch(s.storedBatchHashes[currentBatchNumber], _hashStoredBatchInfo(_storedBatch));
-        }
+        _checkBatchHashMismatch(_storedBatch, currentBatchNumber, false);
         if (_priorityOperationsHash != _storedBatch.priorityOperationsHash) {
             revert PriorityOperationsRollingHashMismatch();
         }
@@ -882,24 +863,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256[] memory proofPublicInput = new uint256[](committedBatchesLength);
 
         // Check that the batch passed by the validator is indeed the first unverified batch
-        bytes32 cachedStoredBatchHashes = s.storedBatchHashes[currentTotalBatchesVerified];
-        if (
-            _hashStoredBatchInfo(prevBatch) != cachedStoredBatchHashes &&
-            _hashLegacyStoredBatchInfo(prevBatch) != cachedStoredBatchHashes
-        ) {
-            revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(prevBatch));
-        }
+        _checkBatchHashMismatch(prevBatch, currentTotalBatchesVerified, true);
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
         bytes32 prevBatchStateCommitment = prevBatch.batchHash;
         for (uint256 i = 0; i < committedBatchesLength; i = i.uncheckedInc()) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
-            if (_hashStoredBatchInfo(committedBatches[i]) != s.storedBatchHashes[currentTotalBatchesVerified]) {
-                revert BatchHashMismatch(
-                    s.storedBatchHashes[currentTotalBatchesVerified],
-                    _hashStoredBatchInfo(committedBatches[i])
-                );
-            }
+            _checkBatchHashMismatch(committedBatches[i], currentTotalBatchesVerified, false);
 
             bytes32 currentBatchCommitment = committedBatches[i].commitment;
             bytes32 currentBatchStateCommitment = committedBatches[i].batchHash;
