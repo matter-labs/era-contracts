@@ -405,6 +405,8 @@ abstract contract DeployCTMUtils is DeployUtils {
     ) internal view virtual override returns (bytes memory) {
         if (compareStrings(contractName, "BridgedStandardERC20")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "EIP7702Checker")) {
+            return abi.encode();
         } else if (compareStrings(contractName, "RollupDAManager")) {
             return abi.encode();
         } else if (compareStrings(contractName, "RollupL1DAValidator")) {
