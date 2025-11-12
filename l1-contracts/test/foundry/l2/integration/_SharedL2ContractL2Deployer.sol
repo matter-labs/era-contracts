@@ -74,11 +74,11 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         // Deploy ChainTypeManager implementation
         if (config.isZKsyncOS) {
             addresses.stateTransition.chainTypeManagerImplementation = address(
-                new ZKsyncOSChainTypeManager(addresses.bridgehub.bridgehubProxy, addresses.bridgehub.interopCenterProxy)
+                new ZKsyncOSChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
             );
         } else {
             addresses.stateTransition.chainTypeManagerImplementation = address(
-                new EraChainTypeManager(addresses.bridgehub.bridgehubProxy, addresses.bridgehub.interopCenterProxy)
+                new EraChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
             );
         }
 

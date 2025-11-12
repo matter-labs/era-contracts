@@ -6,7 +6,7 @@ import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
@@ -96,7 +96,7 @@ library AddressIntrospector {
         info.transparentProxyAdmin = Utils.getProxyAdmin(info.bridgehubProxy);
     }
 
-    function getCTMAddresses(ChainTypeManager _ctm) public view returns (CTMAddresses memory info) {
+    function getCTMAddresses(ChainTypeManagerBase _ctm) public view returns (CTMAddresses memory info) {
         address ctmAddr = address(_ctm);
         info.ctmProxy = ctmAddr;
         info.l1GenesisUpgrade = _ctm.l1GenesisUpgrade();
@@ -142,8 +142,9 @@ library AddressIntrospector {
         uint256 _chainId
     ) public view returns (BaseTokenRoute memory info) {
         info.baseTokenAssetId = _bridgehub.baseTokenAssetId(_chainId);
-        address ar = _bridgehub.assetRouter();
-        info.assetHandlerAddress = IAssetRouterBase(ar).assetHandlerAddress(info.baseTokenAssetId);
+        info.assetHandlerAddress = IAssetRouterBase(_bridgehub.assetRouter()).assetHandlerAddress(
+            info.baseTokenAssetId
+        );
         if (info.assetHandlerAddress != address(0)) {
             info.baseTokenAddress = IL1BaseTokenAssetHandler(info.assetHandlerAddress).tokenAddress(
                 info.baseTokenAssetId
@@ -194,12 +195,12 @@ library AddressIntrospector {
         bh = getBridgehubAddresses(_bridgehub);
 
         address ctmAddr = _bridgehub.chainTypeManager(_chainId);
-        ctm = getCTMAddresses(ChainTypeManager(ctmAddr));
+        ctm = getCTMAddresses(ChainTypeManagerBase(ctmAddr));
 
         address zkAddr = _bridgehub.getZKChain(_chainId);
         zk = getZkChainAddresses(IZKChain(zkAddr));
 
-        ar = getAssetRouterAddresses(IL1AssetRouter(payable(_bridgehub.assetRouter())));
+        ar = getAssetRouterAddresses(IL1AssetRouter(payable(address(_bridgehub.assetRouter()))));
         baseRoute = getBaseTokenRoute(_bridgehub, _chainId);
         zkFacets = getZkChainFacetAddresses(IZKChain(zkAddr));
 

@@ -462,10 +462,7 @@ contract GatewayCTMFromL1 is Script {
 
         string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
         output.gatewayStateTransition.chainTypeManagerImplementation = address(
-            _deployInternal(
-                ContractsBytecodesLib.getCreationCode(ctmContractName),
-                abi.encode(L2_BRIDGEHUB_ADDR)
-            )
+            _deployInternal(ContractsBytecodesLib.getCreationCode(ctmContractName), abi.encode(L2_BRIDGEHUB_ADDR))
         );
         console.log(
             "StateTransitionImplementation deployed at",
