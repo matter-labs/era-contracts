@@ -48,7 +48,7 @@ library FullMerkleMemory {
 
         self._zeros = zeros;
         self._nodes = nodes;
-        self._height = height;
+        self._height = 0; // Start with height 0 like FullMerkle
         self._leafNumber = 0;
         self._nodesLengthMemory = height + 1;
         self._zerosLengthMemory = height + 1;
@@ -65,16 +65,19 @@ library FullMerkleMemory {
     function setup(FullTree memory self, bytes32 zero) internal view returns (bytes32 initialRoot) {
         self._zeros[0] = zero;
         bytes32 currentZero = zero;
-        for (uint256 i = 1; i <= self._height; ++i) {
+
+        // Pre-compute zeros for all possible heights
+        uint256 maxPossibleHeight = self._nodes.length - 1;
+        for (uint256 i = 1; i <= maxPossibleHeight; ++i) {
             currentZero = Merkle.efficientHash(currentZero, currentZero);
             self._zeros[i] = currentZero;
         }
-        self._zerosLengthMemory = self._height + 1;
-        self._nodesLengthMemory = self._height + 1;
 
-        self._nodes[self._height][0] = self._zeros[self._height];
+        self._zerosLengthMemory = maxPossibleHeight + 1;
+        self._nodesLengthMemory = maxPossibleHeight + 1;
 
-        return self._zeros[self._height];
+        // Don't pre-set root for empty tree to match FullMerkle behavior
+        return zero;
     }
 
     /**
@@ -82,20 +85,32 @@ library FullMerkleMemory {
      * @param _leaf The leaf to be added to the tree.
      */
     function pushNewLeaf(FullTree memory self, bytes32 _leaf) internal view returns (bytes32 newRoot) {
+        // Check capacity before proceeding using natural array bounds
+        if (self._leafNumber >= self._nodes[0].length) {
+            revert MerkleWrongIndex(self._leafNumber, self._nodes[0].length - 1);
+        }
+
         // solhint-disable-next-line gas-increment-by-one
         uint256 index = self._leafNumber++;
 
         if (index == 1 << self._height) {
             uint256 newHeight = self._height.uncheckedInc();
             self._height = newHeight;
-            bytes32 topZero = self._zeros[newHeight - 1];
-            bytes32 newZero = Merkle.efficientHash(topZero, topZero);
-            self._zeros[self._zerosLengthMemory] = newZero;
-            ++self._zerosLengthMemory;
-            bytes32[] memory newLevelZero = new bytes32[](1);
-            newLevelZero[0] = newZero;
-            self._nodes[self._nodesLengthMemory] = newLevelZero;
-            ++self._nodesLengthMemory;
+
+            // Only proceed if we have space for the new height
+            if (newHeight < self._nodes.length) {
+                bytes32 topZero = self._zeros[newHeight - 1];
+                bytes32 newZero = Merkle.efficientHash(topZero, topZero);
+                self._zeros[newHeight] = newZero;
+                self._zerosLengthMemory = newHeight + 1;
+
+                // Allocate new level if not already allocated
+                if (self._nodes[newHeight].length == 0) {
+                    self._nodes[newHeight] = new bytes32[](1);
+                }
+                self._nodes[newHeight][0] = newZero;
+                self._nodesLengthMemory = newHeight + 1;
+            }
         }
 
         if (index != 0) {
@@ -201,6 +216,16 @@ library FullMerkleMemory {
      * @dev Returns the root of the tree.
      */
     function root(FullTree memory self) internal view returns (bytes32) {
+        // Return zero value for empty trees like FullMerkle
+        if (self._leafNumber == 0) {
+            return self._zeros[0];
+        }
+
+        // For non-empty trees, return the actual root
+        if (self._height == 0 && self._leafNumber == 1) {
+            return self._nodes[0][0]; // Single leaf case
+        }
+
         return self._nodes[self._height][0];
     }
 }
