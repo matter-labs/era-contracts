@@ -11,6 +11,9 @@ import {IBridgehubBase, BridgehubBurnCTMAssetData} from "./IBridgehubBase.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
+import {IL1Bridgehub} from "./IL1Bridgehub.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
+import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -26,13 +29,13 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
     uint256 public immutable override L1_CHAIN_ID;
 
     /// @dev The bridgehub contract.
-    address public immutable override BRIDGEHUB;
+    IL1Bridgehub public immutable override BRIDGEHUB;
 
     /// @dev The message root contract.
-    address public immutable override MESSAGE_ROOT;
+    IMessageRoot public immutable override MESSAGE_ROOT;
 
     /// @dev The asset router contract.
-    address public immutable override ASSET_ROUTER;
+    IAssetRouterBase public immutable override ASSET_ROUTER;
 
     /// @dev The asset tracker contract.
     address internal immutable ASSET_TRACKER;
@@ -53,13 +56,13 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
-    function _bridgehub() internal view override returns (address) {
+    function _bridgehub() internal view override returns (IL1Bridgehub) {
         return BRIDGEHUB;
     }
-    function _messageRoot() internal view override returns (address) {
+    function _messageRoot() internal view override returns (IMessageRoot) {
         return MESSAGE_ROOT;
     }
-    function _assetRouter() internal view override returns (address) {
+    function _assetRouter() internal view override returns (IAssetRouterBase) {
         return ASSET_ROUTER;
     }
 
@@ -76,9 +79,9 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
         IL1Nullifier _l1Nullifier
     ) reentrancyGuardInitializer {
         _disableInitializers();
-        BRIDGEHUB = _bridgehub;
-        ASSET_ROUTER = _assetRouter;
-        MESSAGE_ROOT = _messageRoot;
+        BRIDGEHUB = IL1Bridgehub(_bridgehub);
+        ASSET_ROUTER = IAssetRouterBase(_assetRouter);
+        MESSAGE_ROOT = IMessageRoot(_messageRoot);
         L1_CHAIN_ID = block.chainid;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         ASSET_TRACKER = _assetTracker;
@@ -93,7 +96,6 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
     }
 
     /// @dev IL1AssetHandler interface, used to undo a failed migration of a chain.
-    // / @param _chainId the chainId of the chain
     /// @param _assetId the assetId of the chain's CTM
     /// @param _data the data for the recovery.
     /// @param _depositSender the address of the entity that initiated the deposit.

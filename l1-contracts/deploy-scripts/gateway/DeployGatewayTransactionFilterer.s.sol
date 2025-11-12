@@ -31,7 +31,7 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils {
         instantiateCreate2Factory();
 
         // Query the L1 asset router from the Bridgehub.
-        address l1AssetRouter = IL1Bridgehub(bridgehub).assetRouter();
+        address l1AssetRouter = address(IL1Bridgehub(bridgehub).assetRouter());
 
         // Deploy the GatewayTransactionFilterer implementation via Create2 with notify.
         // The constructor of GatewayTransactionFilterer expects (bridgehub, l1AssetRouter).

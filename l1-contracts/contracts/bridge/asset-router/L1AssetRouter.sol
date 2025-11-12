@@ -26,6 +26,7 @@ import {AddressAlreadySet, LegacyBridgeUsesNonNativeToken, LegacyEncodingUsedFor
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1Bridgehub} from "../../bridgehub/IL1Bridgehub.sol";
+import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
@@ -40,7 +41,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
-    address public immutable BRIDGE_HUB;
+    IL1Bridgehub public immutable BRIDGE_HUB;
 
     /// @dev Chain ID of Era for legacy reasons
     uint256 public immutable ERA_CHAIN_ID;
@@ -48,11 +49,11 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @dev The address of the WETH token on L1.
     address public immutable L1_WETH_TOKEN;
 
-    /// @dev The assetId of the base token.
+    /// @dev The assetId of the ETH.
     bytes32 public immutable ETH_TOKEN_ASSET_ID;
 
     /// @dev The address of ZKsync Era diamond proxy contract.
-    address public immutable ERA_DIAMOND_PROXY;
+    IZKChain public immutable ERA_DIAMOND_PROXY;
 
     /// @dev Address of nullifier.
     IL1Nullifier public immutable L1_NULLIFIER;
@@ -79,7 +80,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         require(
-            msg.sender == address(BRIDGE_HUB) || (_chainId == ERA_CHAIN_ID && msg.sender == ERA_DIAMOND_PROXY),
+            msg.sender == address(BRIDGE_HUB) || (_chainId == ERA_CHAIN_ID && msg.sender == address(ERA_DIAMOND_PROXY)),
             Unauthorized(msg.sender)
         );
         _;
@@ -119,10 +120,10 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         address _eraDiamondProxy
     ) reentrancyGuardInitializer {
         _disableInitializers();
-        BRIDGE_HUB = _bridgehub;
+        BRIDGE_HUB = IL1Bridgehub(_bridgehub);
         ERA_CHAIN_ID = _eraChainId;
         L1_WETH_TOKEN = _l1WethToken;
-        ERA_DIAMOND_PROXY = _eraDiamondProxy;
+        ERA_DIAMOND_PROXY = IZKChain(_eraDiamondProxy);
         L1_NULLIFIER = IL1Nullifier(_l1Nullifier);
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
     }
@@ -399,7 +400,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint256 _amount,
         address _originalCaller
     ) external onlyNativeTokenVault returns (bool) {
-        address l1TokenAddress = nativeTokenVault.tokenAddress(_assetId);
+        address l1TokenAddress = INativeTokenVaultBase(address(nativeTokenVault)).tokenAddress(_assetId);
         if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
             return false;
         }
@@ -531,7 +532,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                 factoryDeps: new bytes[](0),
                 refundRecipient: refundRecipient
             });
-            txHash = IL1Bridgehub(BRIDGE_HUB).requestL2TransactionDirect{value: msg.value}(request);
+            txHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
         }
 
         {

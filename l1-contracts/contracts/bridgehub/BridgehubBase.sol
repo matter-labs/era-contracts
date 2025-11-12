@@ -20,26 +20,16 @@ import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "../comm
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {AlreadyCurrentSL, NotChainAssetHandler, NotInGatewayMode, NotRelayedSender, SLNotWhitelisted} from "./L1BridgehubErrors.sol";
-import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdCantBeCurrentChain, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, MigrationPaused, NoCTMForAssetId, NotCurrentSettlementLayer, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
+import {AlreadyCurrentSL, NotChainAssetHandler, NotRelayedSender, SLNotWhitelisted} from "./L1BridgehubErrors.sol";
+import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdCantBeCurrentChain, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, NoCTMForAssetId, NotCurrentSettlementLayer, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
-import {TxStatus} from "../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The Bridgehub contract serves as the primary entry point for L1->L2 communication,
 /// facilitating interactions between end user and bridges.
 /// It also manages state transition managers, base tokens, and chain registrations.
-/// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains
-/// between different settlement layers (for example from L1 to Gateway).
-abstract contract BridgehubBase is
-    IBridgehubBase,
-    ReentrancyGuard,
-    Ownable2StepUpgradeable,
-    PausableUpgradeable,
-    AssetHandlerModifiers
-{
+abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /*//////////////////////////////////////////////////////////////
@@ -53,7 +43,7 @@ abstract contract BridgehubBase is
     function _l1ChainId() internal view virtual returns (uint256);
 
     /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by the asset router.
-    address public assetRouter;
+    IAssetRouterBase public assetRouter;
 
     /// @notice ChainTypeManagers that are registered, and ZKchains that use these CTMs can use this bridgehub as settlement layer.
     mapping(address chainTypeManager => bool) public chainTypeManagerIsRegistered;
@@ -107,7 +97,7 @@ abstract contract BridgehubBase is
     mapping(bytes32 baseTokenAssetId => bool) public assetIdIsRegistered;
 
     /// @notice used to pause the migrations of chains. Used for stopping migrations during upgrades.
-    bool public migrationPaused;
+    bool public __DEPRECATED_migrationPaused;
 
     /// @notice the chain asset handler used for chain migration.
     address public chainAssetHandler;
@@ -123,7 +113,7 @@ abstract contract BridgehubBase is
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[32] private __gap;
+    uint256[36] private __gap;
 
     modifier onlyOwnerOrAdmin() {
         if (msg.sender != admin && msg.sender != owner()) {
@@ -151,13 +141,6 @@ abstract contract BridgehubBase is
         /// There is no sender for the wrapping, we use a virtual address.
         if (msg.sender != SETTLEMENT_LAYER_RELAY_SENDER) {
             revert NotRelayedSender(msg.sender, SETTLEMENT_LAYER_RELAY_SENDER);
-        }
-        _;
-    }
-
-    modifier whenMigrationsNotPaused() {
-        if (migrationPaused) {
-            revert MigrationPaused();
         }
         _;
     }
@@ -379,27 +362,13 @@ abstract contract BridgehubBase is
         address _refundRecipient,
         BridgehubL2TransactionRequest memory _request
     ) internal returns (bytes32 canonicalTxHash) {
+        // Although the aliasing might happen in the Mailbox, we still want to determine the refund recipient
+        // in the BH, as the Mailbox won't have msg.sender
         address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, msg.sender);
         _request.refundRecipient = refundRecipient;
         address zkChain = zkChainMap.get(_chainId);
 
         canonicalTxHash = IZKChain(zkChain).bridgehubRequestL2Transaction(_request);
-    }
-
-    /// @notice Used to forward a transaction on the gateway to the chains mailbox (from L1).
-    /// @param _chainId the chainId of the chain
-    /// @param _canonicalTxHash the canonical transaction hash
-    /// @param _expirationTimestamp the expiration timestamp for the transaction
-    function forwardTransactionOnGateway(
-        uint256 _chainId,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
-    ) external virtual onlySettlementLayerRelayedSender {
-        if (_l1ChainId() == block.chainid) {
-            revert NotInGatewayMode();
-        }
-        address zkChain = zkChainMap.get(_chainId);
-        IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     }
 
     /// @notice forwards function call to Mailbox based on ChainId
@@ -614,7 +583,7 @@ abstract contract BridgehubBase is
             revert AssetIdNotSupported(_assetId);
         }
 
-        if (assetRouter == address(0)) {
+        if (address(assetRouter) == address(0)) {
             revert SharedBridgeNotSet();
         }
         if (chainTypeManager[_chainId] != address(0)) {
@@ -636,17 +605,6 @@ abstract contract BridgehubBase is
         _unpause();
     }
 
-    /// @notice Pauses migration functions.
-    /// @dev Remove this with V30, the functionality was moved to the ChainAssetHandler in V29.
-    function pauseMigration() external onlyOwner {
-        migrationPaused = true;
-    }
-
-    /// @notice Unpauses migration functions.
-    function unpauseMigration() external onlyOwner {
-        migrationPaused = false;
-    }
-
     /*//////////////////////////////////////////////////////////////
                             Legacy functions
     //////////////////////////////////////////////////////////////*/
@@ -658,6 +616,6 @@ abstract contract BridgehubBase is
 
     /// @notice return the asset router
     function sharedBridge() public view returns (address) {
-        return assetRouter;
+        return address(assetRouter);
     }
 }

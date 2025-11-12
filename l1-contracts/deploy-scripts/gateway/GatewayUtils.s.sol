@@ -64,7 +64,7 @@ contract GatewayUtils is Script {
     // The outer function does not expect it as input rightaway for easier encoding in zkstack Rust.
     function _finishMigrateChainToGatewayInner(FinishMigrateChainToGatewayParams memory data) private {
         IL1Bridgehub bridgehub = IL1Bridgehub(data.bridgehubAddr);
-        address assetRouter = bridgehub.assetRouter();
+        address assetRouter = address(bridgehub.assetRouter());
         IL1Nullifier l1Nullifier = L1AssetRouter(assetRouter).L1_NULLIFIER();
 
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(data.migratingChainId);
@@ -107,7 +107,7 @@ contract GatewayUtils is Script {
     ) public {
         IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddr);
 
-        address assetRouter = bridgehub.assetRouter();
+        address assetRouter = address(bridgehub.assetRouter());
         IL1Nullifier l1Nullifier = L1AssetRouter(assetRouter).L1_NULLIFIER();
 
         vm.broadcast();

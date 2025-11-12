@@ -3,9 +3,9 @@
 pragma solidity 0.8.28;
 
 import {ZKChainBase} from "./ZKChainBase.sol";
-import {IL1Bridgehub} from "../../../bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "../../../bridgehub/IBridgehubBase.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
-import {COMMIT_TIMESTAMP_APPROXIMATION_DELTA, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAINNET_CHAIN_ID, MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PACKED_L2_PRECOMMITMENT_LENGTH, PUBLIC_INPUT_SHIFT, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "../../../common/Config.sol";
+import {COMMIT_TIMESTAMP_APPROXIMATION_DELTA, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAINNET_CHAIN_ID, MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PACKED_L2_PRECOMMITMENT_LENGTH, PUBLIC_INPUT_SHIFT, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, PACKED_L2_PRECOMMITMENT_LENGTH} from "../../../common/Config.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, LogProcessingOutput, MAX_LOG_KEY, ProcessLogsInput, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
@@ -14,7 +14,7 @@ import {GW_ASSET_TRACKER, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_SYSTEM_CONTRA
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {BatchHashMismatch, BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, EmptyPrecommitData, HashMismatch, IncorrectBatchChainId, InvalidBatchNumber, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidPackedPrecommitmentLength, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, PrecommitmentMismatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches} from "../../../common/L1ContractErrors.sol";
+import {BatchHashMismatch, BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, EmptyPrecommitData, HashMismatch, IncorrectBatchChainId, InvalidBatchNumber, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidPackedPrecommitmentLength, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, PrecommitmentMismatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches, InvalidBatchNumber, EmptyPrecommitData, PrecommitmentMismatch, InvalidPackedPrecommitmentLength, NonZeroBlobToVerifyZKsyncOS} from "../../../common/L1ContractErrors.sol";
 import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MessageRootIsZero, MismatchL2DACommitmentScheme, MismatchNumberOfLayer1Txs, SettlementLayerChainIdMismatch} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -150,16 +150,38 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         // we can just ignore l1 da validator output with ZKsync OS:
-        // - used state diffs hash correctness verifier within state transition program
-        // - blobs not supported yet, and likely even once it's supported design will allow to ignore blobs related values anyway
-        // slither-disable-next-line unused-return
-        IL1DAValidator(s.l1DAValidator).checkDA({
+        // - used state diffs hash correctness verified within state transition program
+        // - blob commitments/linear hashes verification not supported, we use different way and custom DA validator for blobs with ZKsync OS
+        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
             _chainId: s.chainId,
             _batchNumber: uint256(_newBatch.batchNumber),
             _l2DAValidatorOutputHash: _newBatch.daCommitment,
             _operatorDAInput: _newBatch.operatorDAInput,
             _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
         });
+        // Theoretically, we can just ignore it, all the DA validators, except `RollupL1DAValidator`, always return a 0 array,
+        // and `RollupL1DAValidator` will fail if we try to submit blobs with ZKsync OS, so it also returns zeroes here.
+        // However, we are double-checking that the L1 DA validator doesn't rely on "EraVM like" blobs verification, just in case.
+        if (
+            daOutput.blobsLinearHashes.length != daOutput.blobsOpeningCommitments.length ||
+            (daOutput.blobsLinearHashes.length != 0 && daOutput.blobsLinearHashes.length != TOTAL_BLOBS_IN_COMMITMENT)
+        ) {
+            revert InvalidNumberOfBlobs(
+                TOTAL_BLOBS_IN_COMMITMENT,
+                daOutput.blobsOpeningCommitments.length,
+                daOutput.blobsLinearHashes.length
+            );
+        }
+        uint256 blobsNumber = daOutput.blobsLinearHashes.length;
+        for (uint256 i = 0; i < blobsNumber; ++i) {
+            if (daOutput.blobsLinearHashes[i] != bytes32(0) || daOutput.blobsOpeningCommitments[i] != bytes32(0)) {
+                revert NonZeroBlobToVerifyZKsyncOS(
+                    i,
+                    daOutput.blobsLinearHashes[i],
+                    daOutput.blobsOpeningCommitments[i]
+                );
+            }
+        }
 
         if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > _newBatch.firstBlockTimestamp) {
             revert TimeNotReached(_newBatch.firstBlockTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);
@@ -170,6 +192,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (_newBatch.chainId != s.chainId) {
             revert IncorrectBatchChainId(_newBatch.chainId, s.chainId);
         }
+        if (_newBatch.daCommitmentScheme != s.l2DACommitmentScheme) {
+            revert MismatchL2DACommitmentScheme(uint256(_newBatch.daCommitmentScheme), uint256(s.l2DACommitmentScheme));
+        }
 
         // The batch proof public input can be calculated as keccak256(state_commitment_before & state_commitment_after & batch_output_hash)
         // batch output hash commits to information about batch that needs to be opened on l1.
@@ -179,7 +204,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 _newBatch.chainId,
                 _newBatch.firstBlockTimestamp,
                 _newBatch.lastBlockTimestamp,
-                uint160(_newBatch.l2DaValidator),
+                uint256(_newBatch.daCommitmentScheme),
                 _newBatch.daCommitment,
                 _newBatch.numberOfLayer1Txs,
                 _newBatch.priorityOperationsHash,
@@ -725,7 +750,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         InteropRoot[] memory _dependencyRoots
     ) internal view returns (bytes32 dependencyRootsRollingHash) {
         uint256 length = _dependencyRoots.length;
-        IMessageRoot messageRootContract = IL1Bridgehub(s.bridgehub).messageRoot();
+        IMessageRoot messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
 
         for (uint256 i = 0; i < length; i = i.uncheckedInc()) {
             InteropRoot memory interopRoot = _dependencyRoots[i];
@@ -761,7 +786,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @dev We only call this function on L1.
     function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
         // Once the batch is executed, we include its message to the message root.
-        IMessageRoot messageRootContract = IL1Bridgehub(s.bridgehub).messageRoot();
+        IMessageRoot messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
         messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
     }
 
@@ -837,7 +862,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
-    // Warning: removed onlyValidator to make it permisionless.
     function proveBatchesSharedBridge(
         address, // _chainAddress
         uint256 _processBatchFrom,

@@ -680,7 +680,7 @@ export class Deployer {
     if (process.env.CHAIN_ETH_NETWORK === "mainnet") {
       contractAddress = await this.deployViaCreate2("Verifier", [], create2Salt, ethTxOptions);
     } else {
-      contractAddress = await this.deployViaCreate2("TestnetVerifier", [], create2Salt, ethTxOptions);
+      contractAddress = await this.deployViaCreate2("EraTestnetVerifier", [], create2Salt, ethTxOptions);
     }
 
     if (this.verbose) {

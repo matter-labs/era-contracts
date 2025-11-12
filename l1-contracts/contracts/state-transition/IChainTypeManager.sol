@@ -121,6 +121,10 @@ interface IChainTypeManager {
 
     function getProtocolVersion(uint256 _chainId) external view returns (uint256);
 
+    function serverNotifierAddress() external view returns (address);
+
+    function validatorTimelock() external view returns (address);
+
     function initialize(ChainTypeManagerInitializeData calldata _initializeData) external;
 
     function setLegacyValidatorTimelock(address _validatorTimelock) external;
