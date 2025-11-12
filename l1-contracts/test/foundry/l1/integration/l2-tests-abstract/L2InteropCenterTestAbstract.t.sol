@@ -112,8 +112,11 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
         InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // Set BASE_TOKEN_ASSET_ID on destination chain L2AssetRouter (slot 255)
-        vm.store(L2_ASSET_ROUTER_ADDR, bytes32(uint256(255)), otherBaseTokenAssetId);
+        // Switch to destination chain to set up storage
+        vm.chainId(destinationChainId);
+
+        // Set BASE_TOKEN_ASSET_ID on destination chain L2AssetRouter (slot 256)
+        vm.store(L2_ASSET_ROUTER_ADDR, bytes32(uint256(256)), otherBaseTokenAssetId);
 
         // Register asset handler on destination chain for source base token
         vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
@@ -132,6 +135,11 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
 
         bytes32 destAssetIdSlot = keccak256(abi.encode(sourceBaseTokenAddress, uint256(204)));
         vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, destAssetIdSlot, baseTokenAssetId);
+
+        vm.mockCall(L2_BRIDGEHUB_ADDR, abi.encodeCall(IBridgehubBase.baseTokenAssetId, (destinationChainId)), abi.encode(otherBaseTokenAssetId));
+
+        // Switch back to original chain before executing bundle
+        vm.chainId(originalChainId);
 
         extractAndExecuteSingleBundle(logs, destinationChainId, EXECUTION_ADDRESS);
     }
