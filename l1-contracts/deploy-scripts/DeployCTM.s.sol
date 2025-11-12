@@ -64,7 +64,7 @@ import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestne
 import {Utils} from "./Utils.sol";
 
 // TODO: pass this value from zkstack_cli
-uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 3;
+uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 5;
 
 contract DeployCTMScript is Script, DeployL1HelperScript {
     using stdToml for string;
