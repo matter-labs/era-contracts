@@ -530,6 +530,19 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (systemContractsUpgradeTxHash == bytes32(0) || s.l2SystemContractsUpgradeBatchNumber != 0) {
             _commitBatchesEra(lastCommittedBatchData, newBatchesData, bytes32(0));
         } else {
+            // The system contract upgrade is designed to be executed atomically with the new bootloader, a default account,
+            // ZKP verifier, and other system parameters. Hence, we ensure that the upgrade transaction is
+            // carried out within the first batch committed after the upgrade.
+
+            // While the logic of the contract ensures that the s.l2SystemContractsUpgradeBatchNumber is 0 when this branch is entered,
+            // this check is added just in case. Since it is a hot read, it does not incur noticeable gas cost.
+            if (s.l2SystemContractsUpgradeBatchNumber != 0) {
+                revert UpgradeBatchNumberIsNotZero();
+            }
+
+            // Save the batch number where the upgrade transaction was executed.
+            s.l2SystemContractsUpgradeBatchNumber = newBatchesData[0].batchNumber;
+
             _commitBatchesEra(lastCommittedBatchData, newBatchesData, systemContractsUpgradeTxHash);
         }
 
@@ -593,30 +606,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         CommitBatchInfo[] memory _newBatchesData,
         bytes32 _systemContractUpgradeTxHash
     ) internal {
-        if (_systemContractUpgradeTxHash != bytes32(0)) {
-            // The system contract upgrade is designed to be executed atomically with the new bootloader, a default account,
-            // ZKP verifier, and other system parameters. Hence, we ensure that the upgrade transaction is
-            // carried out within the first batch committed after the upgrade.
-
-            // While the logic of the contract ensures that the s.l2SystemContractsUpgradeBatchNumber is 0 when this branch is entered,
-            // this check is added just in case. Since it is a hot read, it does not incur noticeable gas cost.
-            if (s.l2SystemContractsUpgradeBatchNumber != 0) {
-                revert UpgradeBatchNumberIsNotZero();
-            }
-
-            // Save the batch number where the upgrade transaction was executed.
-            s.l2SystemContractsUpgradeBatchNumber = _newBatchesData[0].batchNumber;
-        }
-
         // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
             // The upgrade transaction must only be included in the first batch.
-            bytes32 expectedUpgradeTxHash = i == 0 ? _systemContractUpgradeTxHash : bytes32(0);
             _lastCommittedBatchData = _commitOneBatch(
                 _lastCommittedBatchData,
                 _newBatchesData[i],
-                expectedUpgradeTxHash
+                _systemContractUpgradeTxHash
             );
 
             s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(_lastCommittedBatchData);
@@ -625,6 +622,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 _lastCommittedBatchData.batchHash,
                 _lastCommittedBatchData.commitment
             );
+
+            if (i == 0) {
+                _systemContractUpgradeTxHash = bytes32(0);
+            }
         }
     }
 
