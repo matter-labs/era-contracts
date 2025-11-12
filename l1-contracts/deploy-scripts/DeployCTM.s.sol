@@ -9,17 +9,20 @@ import {StateTransitionDeployedAddresses} from "./Types.sol";
 import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
-import {Call} from "contracts/governance/Common.sol";
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IRollupDAManager} from "./interfaces/IRollupDAManager.sol";
+import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
@@ -28,14 +31,12 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
+import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-
-import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
-import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 
@@ -46,6 +47,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
+import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
@@ -54,6 +56,9 @@ import {Config, DeployedAddresses, DeployCTMUtils} from "./DeployCTMUtils.s.sol"
 import {AddressIntrospector} from "./AddressIntrospector.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+// TODO: pass this value from zkstack_cli
+uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 3;
+
 
 contract DeployCTMScript is Script, DeployCTMUtils {
     using stdToml for string;
@@ -120,6 +125,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
             addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
         }
 
+        deployEIP7702Checker();
         deployDAValidators();
         deployIfNeededMulticall3();
 
@@ -144,10 +150,11 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         initializeGeneratedData();
 
         deployStateTransitionDiamondFacets();
+        string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
         (
             addresses.stateTransition.chainTypeManagerImplementation,
             addresses.stateTransition.chainTypeManagerProxy
-        ) = deployTuppWithContract("ChainTypeManager", false);
+        ) = deployTuppWithContract(ctmContractName, false);
         setChainTypeManagerInServerNotifier();
 
         updateOwners();
@@ -183,6 +190,16 @@ contract DeployCTMScript is Script, DeployCTMUtils {
             (addresses.stateTransition.verifierPlonk) = deploySimpleContract("EraVerifierPlonk", false);
         }
         (addresses.stateTransition.verifier) = deploySimpleContract("Verifier", false);
+
+        if (config.isZKsyncOS) {
+            // We add the verifier to the default execution version
+            vm.broadcast(msg.sender);
+            ZKsyncOSDualVerifier(addresses.stateTransition.verifier).addVerifier(
+                DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
+                IVerifierV2(addresses.stateTransition.verifierFflonk),
+                IVerifier(addresses.stateTransition.verifierPlonk)
+            );
+        }
     }
 
     function setChainTypeManagerInServerNotifier() internal {
@@ -192,12 +209,22 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         console.log("ChainTypeManager set in ServerNotifier");
     }
 
+    function deployEIP7702Checker() internal {
+        addresses.eip7702Checker = deploySimpleContract("EIP7702Checker", false);
+    }
+
     function deployDAValidators() internal {
         addresses.daAddresses.rollupDAManager = deployWithCreate2AndOwner("RollupDAManager", msg.sender, false);
         updateRollupDAManager();
 
         // This contract is located in the `da-contracts` folder, we output it the same way for consistency/ease of use.
         addresses.daAddresses.l1RollupDAValidator = deploySimpleContract("RollupL1DAValidator", false);
+        if (config.isZKsyncOS) {
+            addresses.daAddresses.l1BlobsDAValidatorZKsyncOS = deploySimpleContract(
+                "BlobsL1DAValidatorZKsyncOS",
+                false
+            );
+        }
 
         addresses.daAddresses.noDAValidiumL1DAValidator = deploySimpleContract("ValidiumL1DAValidator", false);
 
@@ -210,6 +237,13 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         vm.startBroadcast(msg.sender);
         IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
         rollupDAManager.updateDAPair(addresses.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true);
+        if (config.isZKsyncOS) {
+            rollupDAManager.updateDAPair(
+                addresses.daAddresses.l1BlobsDAValidatorZKsyncOS,
+                L2DACommitmentScheme.BLOBS_ZKSYNC_OS,
+                true
+            );
+        }
         vm.stopBroadcast();
     }
 
@@ -239,6 +273,11 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
 
         IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
+
+        if (config.isZKsyncOS) {
+            // We need to transfer the ownership of the Verifier
+            ZKsyncOSDualVerifier(addresses.stateTransition.verifier).transferOwnership(addresses.governance);
+        }
 
         vm.stopBroadcast();
         console.log("Owners updated");
@@ -357,15 +396,33 @@ contract DeployCTMScript is Script, DeployCTMUtils {
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: abi.encode(getL2BytecodeHash("L2Bridgehub")),
-            l2AssetRouterBytecodeInfo: abi.encode(getL2BytecodeHash("L2AssetRouter")),
-            l2NtvBytecodeInfo: abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
-            messageRootBytecodeInfo: abi.encode(getL2BytecodeHash("L2MessageRoot")),
-            beaconDeployerInfo: abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
-            chainAssetHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
-            interopCenterBytecodeInfo: abi.encode(getL2BytecodeHash("InteropCenter")),
-            interopHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("InteropHandler")),
-            assetTrackerBytecodeInfo: abi.encode(getL2BytecodeHash("L2AssetTracker")),
+            bridgehubBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2Bridgehub.sol", "L2Bridgehub")
+                : abi.encode(getL2BytecodeHash("L2Bridgehub")),
+            l2AssetRouterBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2AssetRouter.sol", "L2AssetRouter")
+                : abi.encode(getL2BytecodeHash("L2AssetRouter")),
+            l2NtvBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2NativeTokenVaultZKOS.sol", "L2NativeTokenVaultZKOS")
+                : abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
+            messageRootBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2MessageRoot.sol", "L2MessageRoot")
+                : abi.encode(getL2BytecodeHash("L2MessageRoot")),
+            beaconDeployerInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer")
+                : abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
+            chainAssetHandlerBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2ChainAssetHandler.sol", "L2ChainAssetHandler")
+                : abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
+            interopCenterBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("InteropCenter.sol", "InteropCenter")
+                : abi.encode(getL2BytecodeHash("InteropCenter")),
+            interopHandlerBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("InteropHandler.sol", "InteropHandler")
+                : abi.encode(getL2BytecodeHash("InteropHandler")),
+            assetTrackerBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2AssetTracker.sol", "L2AssetTracker")
+                : abi.encode(getL2BytecodeHash("L2AssetTracker")),
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
@@ -387,7 +444,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
     function saveDiamondSelectors() public {
         AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)));
         GettersFacet gettersFacet = new GettersFacet();
-        MailboxFacet mailboxFacet = new MailboxFacet(1, 1);
+        MailboxFacet mailboxFacet = new MailboxFacet(1, 1, IEIP7702Checker(address(0)));
         ExecutorFacet executorFacet = new ExecutorFacet(1);
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);
         bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);

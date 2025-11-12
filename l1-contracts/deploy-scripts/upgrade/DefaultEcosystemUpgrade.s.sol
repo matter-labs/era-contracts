@@ -29,8 +29,7 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {ChainCreationParams, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -737,7 +736,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
         // TODO(refactor): do we need this?
         additionalDependencies[4] = ContractsBytecodesLib.getCreationCode("DiamondProxy");
         additionalDependencies[5] = ContractsBytecodesLib.getCreationCode("L2V29Upgrade");
-        additionalDependencies[6] = Utils.readSystemContractsBytecode("ProxyAdmin");
+        additionalDependencies[6] = ContractsBytecodesLib.getCreationCode("ProxyAdmin");
 
         for (uint256 i; i < additionalForceDeployments.length; i++) {
             additionalDependencies[6 + i] = ContractsBytecodesLib.getCreationCode(additionalForceDeployments[i]);
@@ -1177,7 +1176,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
         (Call[] memory testUpgradeChainCall, address ZKChainAdmin) = TESTONLY_prepareTestUpgradeChainCall();
         vm.serializeAddress("test_upgrade_calls", "test_upgrade_chain_caller", ZKChainAdmin);
         vm.serializeBytes("test_upgrade_calls", "test_upgrade_chain", abi.encode(testUpgradeChainCall));
-        (Call[] memory testCreateChainCall, address bridgehubAdmin) = TESTONLY_prepareTestCreateChainCall();
+        (Call[] memory testCreateChainCall, address bridgehubAdmin) = TESTONLY_prepareCreateChainCall();
         vm.serializeAddress("test_upgrade_calls", "test_create_chain_caller", bridgehubAdmin);
 
         string memory testUpgradeCallsSerialized = vm.serializeBytes(
@@ -1307,7 +1306,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
         Call memory ctmCall = Call({
             target: discoveredCTM.ctmProxy,
             data: abi.encodeCall(
-                ChainTypeManager.setNewVersionUpgrade,
+                IChainTypeManager.setNewVersionUpgrade,
                 (upgradeCut, previousProtocolVersion, deadline, newProtocolVersion)
             ),
             value: 0
@@ -1324,7 +1323,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
         result[0] = Call({
             target: discoveredBridgehub.bridgehubProxy,
             value: 0,
-            data: abi.encodeCall(IBridgehubBase.pauseMigration, ())
+            data: abi.encodeCall(IChainAssetHandler.pauseMigration, ())
         });
     }
 
@@ -1335,7 +1334,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
         result[0] = Call({
             target: discoveredBridgehub.bridgehubProxy,
             value: 0,
-            data: abi.encodeCall(IBridgehubBase.unpauseMigration, ())
+            data: abi.encodeCall(IChainAssetHandler.unpauseMigration, ())
         });
     }
 
@@ -1373,7 +1372,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
         gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
         gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
 
-        gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = deployGWContract("ChainTypeManager");
+        string memory gwCtmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
+        gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = deployGWContract(gwCtmContractName);
 
         deployUpgradeSpecificContractsGW();
     }
@@ -1430,7 +1430,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
         Diamond.DiamondCutData memory upgradeCut = generateUpgradeCutData(gatewayConfig.gatewayStateTransition);
 
         bytes memory l2Calldata = abi.encodeCall(
-            ChainTypeManager.setNewVersionUpgrade,
+            IChainTypeManager.setNewVersionUpgrade,
             (upgradeCut, previousProtocolVersion, deadline, newProtocolVersion)
         );
 
@@ -1446,18 +1446,18 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeCall(IBridgehubBase.pauseMigration, ());
+        bytes memory l2Calldata = abi.encodeCall(IChainAssetHandler.pauseMigration, ());
 
-        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDR);
+        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_CHAIN_ASSET_HANDLER_ADDR);
     }
 
     function prepareUnpauseMigrationCallForGateway(
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeCall(IBridgehubBase.unpauseMigration, ());
+        bytes memory l2Calldata = abi.encodeCall(IChainAssetHandler.unpauseMigration, ());
 
-        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDR);
+        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_CHAIN_ASSET_HANDLER_ADDR);
     }
 
     function prepareNewChainCreationParamsCallForGateway(
@@ -1470,7 +1470,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
         );
 
         bytes memory l2Calldata = abi.encodeCall(
-            ChainTypeManager.setChainCreationParams,
+            IChainTypeManager.setChainCreationParams,
             (getChainCreationParams(gatewayConfig.gatewayStateTransition))
         );
 
@@ -1573,7 +1573,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
         calls[0] = Call({
             target: discoveredCTM.ctmProxy,
             data: abi.encodeCall(
-                ChainTypeManager.setChainCreationParams,
+                IChainTypeManager.setChainCreationParams,
                 (getChainCreationParams(addresses.stateTransition))
             ),
             value: 0
@@ -1741,7 +1741,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
     }
 
     /// @notice Tests that it is possible to create a new chain with the new version
-    function TESTONLY_prepareTestCreateChainCall() private returns (Call[] memory calls, address admin) {
+    function TESTONLY_prepareCreateChainCall() private returns (Call[] memory calls, address admin) {
         admin = getBridgehubAdmin();
         calls = new Call[](1);
         calls[0] = prepareCreateNewChainCall(555)[0];

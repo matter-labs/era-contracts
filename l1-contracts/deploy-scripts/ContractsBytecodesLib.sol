@@ -27,11 +27,17 @@ library ContractsBytecodesLib {
     }
 
     function getCreationCodeEVM(string memory contractIdentifier) internal view returns (bytes memory) {
-        string[3] memory DA_CONTRACT_IDENTIFIERS = ["RollupL1DAValidator", "AvailL1DAValidator", "DummyAvailBridge"];
+        string[5] memory EVM_CONTRACT_IDENTIFIERS = [
+            "RollupL1DAValidator",
+            "BlobsL1DAValidatorZKsyncOS",
+            "AvailL1DAValidator",
+            "DummyAvailBridge",
+            "EIP7702Checker"
+        ];
 
-        uint256 DA_CONTRACT_IDENTIFIERS_LENGTH = DA_CONTRACT_IDENTIFIERS.length;
+        uint256 DA_CONTRACT_IDENTIFIERS_LENGTH = EVM_CONTRACT_IDENTIFIERS.length;
         for (uint i = 0; i < DA_CONTRACT_IDENTIFIERS_LENGTH; i++) {
-            if (Utils.compareStrings(DA_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
+            if (Utils.compareStrings(EVM_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
                 return Utils.readDAContractBytecode(contractIdentifier);
             }
         }
@@ -45,7 +51,7 @@ library ContractsBytecodesLib {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCode.
-        string[46] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[47] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction", /// ??
             "L2AssetTracker",
             "BeaconProxy",
@@ -59,7 +65,8 @@ library ContractsBytecodesLib {
             "L1ChainAssetHandler",
             "L2ChainAssetHandler",
             "ChainRegistrar",
-            "ChainTypeManager",
+            "EraChainTypeManager",
+            "ZKsyncOSChainTypeManager",
             "CTMDeploymentTracker",
             "DiamondInit",
             "DiamondProxy",
@@ -74,7 +81,7 @@ library ContractsBytecodesLib {
             "L2NativeTokenVault",
             "L2SharedBridgeLegacy",
             "L2SharedBridgeLegacyDev",
-            "TestnetVerifier",
+            "EraTestnetVerifier",
             "L2ProxyAdminDeployer",
             "L2WrappedBaseToken",
             "Multicall3",

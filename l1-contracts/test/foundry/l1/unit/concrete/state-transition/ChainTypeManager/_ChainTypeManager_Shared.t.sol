@@ -23,18 +23,18 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
-import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
-import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
-
+import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
+import {IChainTypeManager, ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
-
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -44,28 +44,27 @@ import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
 contract ChainTypeManagerTest is UtilsTest {
     using stdStorage for StdStorage;
 
-    ChainTypeManager internal chainTypeManager;
-    ChainTypeManager internal chainContractAddress;
+    EraChainTypeManager internal chainTypeManager;
+    EraChainTypeManager internal chainContractAddress;
     L1GenesisUpgrade internal genesisUpgradeContract;
     L1Bridgehub internal bridgehub;
     L1ChainAssetHandler internal chainAssetHandler;
-    address internal interopCenterAddress = address(0x1010101);
     L1MessageRoot internal messageroot;
     address internal rollupL1DAValidator;
     address internal diamondInit;
-    address internal constant governor = address(0x1010101);
-    address internal constant admin = address(0x2020202);
-    address internal constant baseToken = address(0x3030303);
-    address internal constant sharedBridge = address(0x4040404);
-    address internal constant validator = address(0x5050505);
-    address internal constant l1Nullifier = address(0x6060606);
-    address internal constant serverNotifier = address(0x7070707);
+    address internal interopCenterAddress;
+    address internal governor;
+    address internal admin;
+    address internal baseToken;
+    address internal sharedBridge;
+    address internal validator;
+    address internal l1Nullifier;
+    address internal serverNotifier;
     bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, baseToken);
     address internal newChainAdmin;
     uint256 l1ChainId = 5;
     uint256 chainId = 112;
-    address internal testnetVerifier =
-        address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0), false));
+    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
     bytes internal forceDeploymentsData = hex"";
 
     uint256 eraChainId = 9;
@@ -74,6 +73,14 @@ contract ChainTypeManagerTest is UtilsTest {
     Diamond.FacetCut[] internal facetCuts;
 
     function deploy() public {
+        interopCenterAddress = makeAddr("interopCenter");
+        governor = makeAddr("governor");
+        admin = makeAddr("admin");
+        baseToken = makeAddr("baseToken");
+        sharedBridge = makeAddr("sharedBridge");
+        validator = makeAddr("validator");
+        l1Nullifier = makeAddr("l1Nullifier");
+        serverNotifier = makeAddr("serverNotifier");
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
         messageroot = new L1MessageRoot(address(bridgehub), 1);
         chainAssetHandler = new L1ChainAssetHandler(
@@ -107,10 +114,7 @@ contract ChainTypeManagerTest is UtilsTest {
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(address(bridgehub));
-        chainTypeManager = new ChainTypeManager(
-            address(IBridgehubBase(address(bridgehub))),
-            address(interopCenterAddress)
-        );
+        chainTypeManager = new EraChainTypeManager(address(bridgehub), interopCenterAddress);
         diamondInit = address(new DiamondInit(false));
         genesisUpgradeContract = new L1GenesisUpgrade();
 
@@ -148,7 +152,9 @@ contract ChainTypeManagerTest is UtilsTest {
         );
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new MailboxFacet(eraChainId, block.chainid)),
+                facet: address(
+                    new MailboxFacet(eraChainId, block.chainid, IEIP7702Checker(makeAddr("eip7702Checker")))
+                ),
                 action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: Utils.getMailboxSelectors()
@@ -176,7 +182,7 @@ contract ChainTypeManagerTest is UtilsTest {
         new TransparentUpgradeableProxy(
             address(chainTypeManager),
             admin,
-            abi.encodeCall(ChainTypeManager.initialize, ctmInitializeDataNoGovernor)
+            abi.encodeCall(IChainTypeManager.initialize, ctmInitializeDataNoGovernor)
         );
 
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
@@ -190,9 +196,9 @@ contract ChainTypeManagerTest is UtilsTest {
         TransparentUpgradeableProxy transparentUpgradeableProxy = new TransparentUpgradeableProxy(
             address(chainTypeManager),
             admin,
-            abi.encodeCall(ChainTypeManager.initialize, ctmInitializeData)
+            abi.encodeCall(IChainTypeManager.initialize, ctmInitializeData)
         );
-        chainContractAddress = ChainTypeManager(address(transparentUpgradeableProxy));
+        chainContractAddress = EraChainTypeManager(address(transparentUpgradeableProxy));
 
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
 
@@ -247,7 +253,7 @@ contract ChainTypeManagerTest is UtilsTest {
         return
             chainContractAddress.createNewChain({
                 _chainId: chainId,
-                _baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, baseToken),
+                _baseTokenAssetId: baseTokenAssetId,
                 _admin: newChainAdmin,
                 _initData: abi.encode(abi.encode(_diamondCut), bytes("")),
                 _factoryDeps: new bytes[](0)
@@ -299,7 +305,13 @@ contract ChainTypeManagerTest is UtilsTest {
     }
 
     function _mockMigrationPausedFromBridgehub() internal {
-        vm.mockCall(address(bridgehub), abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
+        address mockChainAssetHandler = makeAddr("mockChainAssetHandler");
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSignature("chainAssetHandler()"),
+            abi.encode(mockChainAssetHandler)
+        );
+        vm.mockCall(mockChainAssetHandler, abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////

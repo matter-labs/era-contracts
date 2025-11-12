@@ -292,7 +292,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return (address(0), false);
         }
 
-        address sharedBridge = BRIDGE_HUB.assetRouter();
+        address sharedBridge = address(BRIDGE_HUB.assetRouter());
 
         // Assuming that correctly encoded calldata is provided, the following line must never fail,
         // since the correct selector was checked before.
