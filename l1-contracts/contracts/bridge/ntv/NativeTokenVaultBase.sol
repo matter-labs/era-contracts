@@ -52,9 +52,6 @@ abstract contract NativeTokenVaultBase is
     /// @notice The chain ID of the L1 chain
     function L1_CHAIN_ID() external view virtual returns (uint256);
 
-    /// @notice The base token asset ID
-    function BASE_TOKEN_ASSET_ID() external view virtual returns (bytes32);
-
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
