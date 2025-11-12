@@ -91,9 +91,22 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
             abi.encode(otherBaseTokenAssetId)
         );
 
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeCall(IBridgehubBase.baseTokenAssetId, (originalChainId)),
+            abi.encode(baseTokenAssetId)
+        );
+
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeCall(IBridgehubBase.baseTokenAssetId, (block.chainid)),
+            abi.encode(baseTokenAssetId)
+        );
         // Deploy the other base token properly
         TestnetERC20Token otherBaseToken = new TestnetERC20Token("Other Base Token", "OBT", 18);
         address otherBaseTokenAddress = address(otherBaseToken);
+        vm.mockCall(otherBaseTokenAddress, abi.encodeWithSelector(BridgedStandardERC20.bridgeBurn.selector), abi.encode());
+        vm.mockCall(otherBaseTokenAddress, abi.encodeCall(IBridgedStandardToken.originToken, ()), abi.encode(address(otherBaseTokenAddress)));
 
         // Register the token in NTV and set up asset handler
         // vm.prank is used to call from NTV context for setLegacyTokenAssetHandler
@@ -101,6 +114,9 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
         IL2AssetRouter(L2_ASSET_ROUTER_ADDR).setLegacyTokenAssetHandler(otherBaseTokenAssetId);
 
         // Set tokenAddress and assetId mappings in NTV (these are still internal storage)
+        bytes32 originChainIdSlot = keccak256(abi.encode(otherBaseTokenAssetId, uint256(202)));
+        vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, originChainIdSlot, bytes32(uint256(destinationChainId)));
+
         bytes32 tokenAddressSlot = keccak256(abi.encode(otherBaseTokenAssetId, uint256(203)));
         vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddressSlot, bytes32(uint256(uint160(otherBaseTokenAddress))));
 
@@ -109,7 +125,26 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
 
         vm.recordLogs();
 
-        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100);
+        uint256 amount = 100;
+
+        InteropCallStarter[] memory calls = new InteropCallStarter[](2);
+        calls[0] = InteropLibrary.buildSendNativeCall(destinationChainId, interopTargetContract, amount);
+        bytes memory empty = hex"";
+        bytes[] memory callAttributes = new bytes[](1);
+        callAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (amount));
+
+        calls[1] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(interopTargetContract),
+            data: empty,
+            callAttributes: callAttributes
+        });
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(UNBUNDLER_ADDRESS);
+
+        L2_INTEROP_CENTER.sendBundle{value: amount}(
+            InteroperableAddress.formatEvmV1(destinationChainId),
+            calls,
+            bundleAttributes
+        );
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         // Switch to destination chain to set up storage
@@ -130,17 +165,14 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
         vm.store(sourceBaseTokenAddress, bytes32(uint256(207)), bytes32(uint256(uint160(L2_NATIVE_TOKEN_VAULT_ADDR))));
 
         // Set token mappings in NTV
+        bytes32 destOriginChainIdSlot = keccak256(abi.encode(baseTokenAssetId, uint256(202)));
+        vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, destOriginChainIdSlot, bytes32(uint256(originalChainId)));
+
         bytes32 destTokenAddressSlot = keccak256(abi.encode(baseTokenAssetId, uint256(203)));
         vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, destTokenAddressSlot, bytes32(uint256(uint160(sourceBaseTokenAddress))));
 
         bytes32 destAssetIdSlot = keccak256(abi.encode(sourceBaseTokenAddress, uint256(204)));
         vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, destAssetIdSlot, baseTokenAssetId);
-
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeCall(IBridgehubBase.baseTokenAssetId, (destinationChainId)),
-            abi.encode(otherBaseTokenAssetId)
-        );
 
         // Switch back to original chain before executing bundle
         vm.chainId(originalChainId);

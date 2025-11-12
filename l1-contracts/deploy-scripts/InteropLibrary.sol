@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_ROUTER, L2_BRIDGEHUB, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_ROUTER, L2_BRIDGEHUB, L2_INTEROP_CENTER_ADDR, L2_INTEROP_CENTER, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 // import {IInteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
@@ -10,11 +10,9 @@ import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {AmountMustBeGreaterThanZero, ArgumentsLengthNotIdentical, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
 
 library InteropLibrary {
-    IL2NativeTokenVault internal constant l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-    InteropCenter internal constant l2InteropCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
-
     /*//////////////////////////////////////////////////////////////
                                BUILDERS
     //////////////////////////////////////////////////////////////*/
@@ -173,7 +171,7 @@ library InteropLibrary {
             revert ZeroAddress();
         }
 
-        bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
+        bytes32 l2TokenAssetId = L2_NATIVE_TOKEN_VAULT.assetId(l2TokenAddress);
         bytes memory secondBridgeCalldata = buildSecondBridgeCalldata(
             l2TokenAssetId,
             amount,
@@ -186,7 +184,7 @@ library InteropLibrary {
 
         bytes[] memory bundleAttrs = buildBundleAttributes(unbundlerAddress);
 
-        return l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(destination), calls, bundleAttrs);
+        return L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(destination), calls, bundleAttrs);
     }
 
     /// @notice Build and send a bundle of interop calls in one go.
@@ -226,7 +224,7 @@ library InteropLibrary {
 
         bytes[] memory bundleAttrs = buildBundleAttributes(unbundlerAddress);
 
-        return l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(destination), calls, bundleAttrs);
+        return L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(destination), calls, bundleAttrs);
     }
 
     /// @notice Build and send a call in one go.
@@ -259,16 +257,21 @@ library InteropLibrary {
             data: data
         });
 
-        return l2InteropCenter.sendMessage(calls[0].to, calls[0].data, calls[0].callAttributes);
+        return
+            IERC7786GatewaySource(address(L2_INTEROP_CENTER)).sendMessage(
+                calls[0].to,
+                calls[0].data,
+                calls[0].callAttributes
+            );
     }
 
     /// @notice Build and send a call to receive native tokens on remote chain in one go.
-    /// @param  destination       The normal chain id of the destination chain
+    /// @param  destinationChainId       The normal chain id of the destination chain
     /// @param  recipient         Address that will receive the tokens on remote chain
     /// @param  amount            Amount to transfer
     /// @return bundleHash Hash of the sent bundle
     function sendNative(
-        uint256 destination,
+        uint256 destinationChainId,
         address recipient,
         address unbundlerAddress,
         uint256 amount
@@ -281,12 +284,12 @@ library InteropLibrary {
         }
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
-        calls[0] = buildSendNativeCall(destination, recipient, amount);
+        calls[0] = buildSendNativeCall(destinationChainId, recipient, amount);
         bytes[] memory bundleAttributes = buildBundleAttributes(unbundlerAddress);
 
         return
-            l2InteropCenter.sendBundle{value: amount}(
-                InteroperableAddress.formatEvmV1(destination),
+            L2_INTEROP_CENTER.sendBundle{value: amount}(
+                InteroperableAddress.formatEvmV1(destinationChainId),
                 calls,
                 bundleAttributes
             );
