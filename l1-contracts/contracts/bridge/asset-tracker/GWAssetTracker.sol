@@ -641,6 +641,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         // We save the chainBalance for the previous migration number so that the chain balance can be migrated back to GW in case it was not migrated.
         // Note, that for this logic to be correct, we need to ensure that `_chainMigrationNumber` is odd, i.e. the chain actually
         // actively settles on top of Gateway.
+        // We can safely decrement the _chainMigrationNumber by one, since at the moment we have an invariant that all chains start on L1,
+        // and have to be migrated to GW, so _chainMigrationNumber will be positive. That includes chains that were on GW before v30, we will
+        // migrate them to L1 before v30 upgrade, and they will get migrated to GW after.
         _getOrSaveChainBalance(_chainId, _assetId, _chainMigrationNumber - 1);
         // we increase the chain balance of the token.
         if (_amount > 0) {
