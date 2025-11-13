@@ -57,7 +57,7 @@ contract GatewayMigrateTokenBalances is ZKSProvider {
         bool onlyWaitForFinalization,
         bytes32[] memory txHashes
     ) public {
-        IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
+        IL1AssetRouter assetRouter = IL1AssetRouter(address(bridgehub.assetRouter()));
         IL1NativeTokenVault l1NativeTokenVault = IL1NativeTokenVault(address(assetRouter.nativeTokenVault()));
 
         uint256 settlementLayer = IBridgehubBase(bridgehub).settlementLayer(chainId);
