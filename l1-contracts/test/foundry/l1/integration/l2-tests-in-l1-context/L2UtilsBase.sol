@@ -53,15 +53,11 @@ library L2UtilsBase {
         // Variables that will be used across multiple scopes
         bytes32 baseTokenAssetId;
         address wethToken;
-        address ntv;
-        address assetRouter;
 
         // Initialize variables in a scoped block to avoid stack too deep
         {
             baseTokenAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
             wethToken = address(0x1);
-            ntv = address(new L2NativeTokenVaultDev());
-            assetRouter = address(new L2AssetRouter());
         }
 
         {
@@ -150,6 +146,7 @@ library L2UtilsBase {
         // DummyL2L1Messenger dummyL2L1Messenger = new DummyL2L1Messenger();
         // vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(dummyL2L1Messenger).code);
         {
+            address assetRouter = address(new L2AssetRouter());
             vm.etch(L2_ASSET_ROUTER_ADDR, assetRouter.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
             L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
@@ -173,6 +170,7 @@ library L2UtilsBase {
         }
 
         {
+            address ntv = address(new L2NativeTokenVaultDev());
             vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, ntv.code);
 
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
