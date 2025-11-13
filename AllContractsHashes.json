@@ -1441,11 +1441,11 @@
   },
   {
     "contractName": "l1-contracts/ZKsyncOSVerifierPlonk",
-    "zkBytecodeHash": "0x01000dbbdd23d732ca844cd3a48bec80df92d17748cd0a30c256084fd830991a",
+    "zkBytecodeHash": "0x01000dbb7c1ea2bec922da6cccef5586d63e0e4b2b743e674a980f59656d5665",
     "zkBytecodePath": "/l1-contracts/zkout/ZKsyncOSVerifierPlonk.sol/ZKsyncOSVerifierPlonk.json",
-    "evmBytecodeHash": "0x4b608f7cc41a4e80802c50119b802c2fee640e4c85db8e6d924c2641ffc194d6",
+    "evmBytecodeHash": "0xed986d61cc88a2053cc5f1962654cfccb6244d1f34b20be6de8e05ffdee0d180",
     "evmBytecodePath": "/l1-contracts/out/ZKsyncOSVerifierPlonk.sol/ZKsyncOSVerifierPlonk.json",
-    "evmDeployedBytecodeHash": "0x11bf5544687390f0ef7643034e0ced7068bf1b7e4c727cdf0f242f867b1a465d"
+    "evmDeployedBytecodeHash": "0x88db5525b0260bc035abeafd92564825ac581780a5fa91ac931de7c8d8dd6241"
   },
   {
     "contractName": "l1-contracts/Create2AndTransfer",
