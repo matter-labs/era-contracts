@@ -17,6 +17,7 @@ import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
+import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -397,6 +398,11 @@ abstract contract DeployCTMUtils is DeployUtils {
             }
         }
         return ContractsBytecodesLib.getCreationCode(contractName, isZKBytecode);
+    }
+
+
+    function getRollupL2DACommitmentScheme() internal returns (L2DACommitmentScheme) {
+        return ROLLUP_L2_DA_COMMITMENT_SCHEME;
     }
 
     function getCreationCalldata(

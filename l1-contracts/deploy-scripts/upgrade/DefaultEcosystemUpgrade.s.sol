@@ -1321,7 +1321,10 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
     }
 
     function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
-        require(discoveredBridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
+        require(
+            discoveredBridgehub.chainAssetHandler!= address(0),
+            "chainAssetHandlerProxy is zero in newConfig"
+        );
 
         result = new Call[](1);
         result[0] = Call({
@@ -1695,7 +1698,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
             target: nonDisoverable.rollupDAManager,
             data: abi.encodeCall(
                 RollupDAManager.updateDAPair,
-                (addresses.daAddresses.l1RollupDAValidator, L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256, true)
+                (addresses.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true)
             ),
             value: 0
         });
@@ -1709,7 +1712,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
             RollupDAManager.updateDAPair,
             (
                 gatewayConfig.gatewayStateTransition.rollupSLDAValidator,
-                L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256,
+                getRollupL2DACommitmentScheme(),
                 true
             )
         );
