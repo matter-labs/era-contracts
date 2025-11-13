@@ -29,7 +29,7 @@ contract ZKSProvider is Script {
         FinalizeL1DepositParams memory params = getFinalizeWithdrawalParams(chainId, l2RpcUrl, withdrawalHash, index);
 
         IBridgehubBase bridgehub = IBridgehubBase(l1Bridgehub);
-        IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
+        IL1AssetRouter assetRouter = IL1AssetRouter(address(bridgehub.assetRouter()));
         IL1Nullifier nullifier = IL1Nullifier(assetRouter.L1_NULLIFIER());
 
         waitForBatchToBeExecuted(l1Bridgehub, chainId, params);
