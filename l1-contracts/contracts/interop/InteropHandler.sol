@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.24;
 
-import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
+import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_VERIFICATION, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
@@ -331,7 +331,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         bundleStatus[_bundleHash] = BundleStatus.Verified;
 
         /// We send the fact of verification to L1 so that the GWAssetTracker can process the chainBalance changes.
-        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
+        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
 
         // slither-disable-next-line reentrancy-no-eth,unused-return
         L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(this.verifyBundle.selector, _bundleHash));

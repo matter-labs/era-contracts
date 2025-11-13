@@ -150,6 +150,23 @@ library L2GenesisForceDeploymentsHelper {
             ? IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade
             : IComplexUpgrader.ContractUpgradeType.EraForceDeployment;
 
+        _setupProxyAdmin();
+        _deployCoreContracts(
+            expectedUpgradeType,
+            fixedForceDeploymentsData,
+            additionalForceDeploymentsData,
+            _isGenesisUpgrade
+        );
+        _deployTokenInfrastructure(
+            expectedUpgradeType,
+            fixedForceDeploymentsData,
+            additionalForceDeploymentsData,
+            _isGenesisUpgrade
+        );
+        _finalizeDeployments(_ctmDeployer, fixedForceDeploymentsData, additionalForceDeploymentsData);
+    }
+
+    function _setupProxyAdmin() private {
         // For Era chains, the SystemContractProxyAdmin is never used during deployment, but it is expected to be present
         // just in case. This line is just for consistency.
         // For ZKsyncOS chains, we expect that both the contract and the owner has been populated at the time of the genesis.
@@ -158,7 +175,14 @@ library L2GenesisForceDeploymentsHelper {
         if (SystemContractProxyAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR).owner() != address(this)) {
             SystemContractProxyAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR).forceSetOwner(address(this));
         }
+    }
 
+    function _deployCoreContracts(
+        IComplexUpgrader.ContractUpgradeType expectedUpgradeType,
+        FixedForceDeploymentsData memory fixedForceDeploymentsData,
+        ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData,
+        bool _isGenesisUpgrade
+    ) private {
         conductContractUpgrade(
             expectedUpgradeType,
             fixedForceDeploymentsData.messageRootBytecodeInfo,
@@ -222,7 +246,14 @@ library L2GenesisForceDeploymentsHelper {
                 additionalForceDeploymentsData.baseTokenAssetId
             );
         }
+    }
 
+    function _deployTokenInfrastructure(
+        IComplexUpgrader.ContractUpgradeType expectedUpgradeType,
+        FixedForceDeploymentsData memory fixedForceDeploymentsData,
+        ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData,
+        bool _isGenesisUpgrade
+    ) private {
         address predeployedL2WethAddress = _isGenesisUpgrade
             ? address(0)
             : L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN();
@@ -276,9 +307,11 @@ library L2GenesisForceDeploymentsHelper {
                 deployedTokenBeacon,
                 wrappedBaseTokenAddress,
                 additionalForceDeploymentsData.baseTokenAssetId,
-                additionalForceDeploymentsData.baseTokenOriginAddress
+                additionalForceDeploymentsData.baseTokenOriginAddress,
+                additionalForceDeploymentsData.baseTokenOriginChainId
             );
         } else {
+            address l2LegacySharedBridge = address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
             // solhint-disable-next-line func-named-parameters
             L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).updateL2(
                 fixedForceDeploymentsData.l1ChainId,
@@ -286,7 +319,8 @@ library L2GenesisForceDeploymentsHelper {
                 l2LegacySharedBridge,
                 wrappedBaseTokenAddress,
                 additionalForceDeploymentsData.baseTokenAssetId,
-                additionalForceDeploymentsData.baseTokenOriginAddress
+                additionalForceDeploymentsData.baseTokenOriginAddress,
+                additionalForceDeploymentsData.baseTokenOriginChainId
             );
         }
 
@@ -336,7 +370,13 @@ library L2GenesisForceDeploymentsHelper {
             fixedForceDeploymentsData.interopHandlerBytecodeInfo,
             L2_INTEROP_HANDLER_ADDR
         );
+    }
 
+    function _finalizeDeployments(
+        address _ctmDeployer,
+        FixedForceDeploymentsData memory fixedForceDeploymentsData,
+        ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData
+    ) private {
         // It is expected that either through the force deployments above
         // or upon initialization, both the L2 deployment of BridgeHub, AssetRouter, and MessageRoot are deployed.
         // However, there is still some follow-up finalization that needs to be done.

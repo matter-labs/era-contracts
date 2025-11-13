@@ -26,7 +26,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, ExecuteMessageFailed, InvalidSelector, PayloadTooShort, TokenNotLegacy, Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IERC7786Recipient} from "../../interop/IERC7786Recipient.sol";
 import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
-import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
+import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

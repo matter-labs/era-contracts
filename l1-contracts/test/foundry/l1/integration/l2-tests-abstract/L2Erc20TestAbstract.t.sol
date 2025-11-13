@@ -24,7 +24,7 @@ import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBa
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
-import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {InteropCall, InteropCallStarter} from "contracts/common/Messaging.sol";
