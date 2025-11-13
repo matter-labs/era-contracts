@@ -289,7 +289,9 @@ contract EcosystemUpgrade_v29_2_zksync_os is Script, DefaultEcosystemUpgrade {
                 newlyGeneratedData.fixedForceDeploymentsData,
                 Utils.getZKOSBytecodeInfoForContract(
                     "SystemContractProxyAdmin.sol",
-                    "SystemContractProxyAdmin")
+                    "SystemContractProxyAdmin"
+                ),
+                Utils.getZKOSProxyUpgradeBytecodeInfo("L2ComplexUpgrader.sol", "L2ComplexUpgrader")
             )
         );
 

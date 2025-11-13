@@ -40,7 +40,8 @@ contract L2SystemProxiesUpgrade {
     // slither-disable-next-line locked-ether
     function upgrade(
         bytes calldata _fixedForceDeploymentsData,
-        bytes calldata _systemContractProxyAdminBytecodeInfo
+        bytes calldata _systemContractProxyAdminBytecodeInfo,
+        bytes calldata _complexUpgraderProxyBytecodeInfo
     ) external {
         // Decode the fixed and additional force deployments data.
         FixedForceDeploymentsData memory fixedForceDeploymentsData = abi.decode(
@@ -86,6 +87,12 @@ contract L2SystemProxiesUpgrade {
         _initProxyOnAddress(
             L2_NTV_BEACON_DEPLOYER_ADDR,
             fixedForceDeploymentsData.beaconDeployerInfo,
+            bytecodeInfoSystemProxy
+        );
+        // Complex upgrader should also be upgraded to have the new implementation.
+        _initProxyOnAddress(
+            address(this),
+            _complexUpgraderProxyBytecodeInfo,
             bytecodeInfoSystemProxy
         );
     }

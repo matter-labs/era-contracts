@@ -12,7 +12,9 @@ const L2_COMPLEX_UPGRADER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::
 const L2_GENESIS_UPGRADE: Address = Address(FixedBytes::<20>(hex_literal::hex!("0000000000000000000000000000000000010001")));
 const L2_WRAPPED_BASE_TOKEN: Address = Address(FixedBytes::<20>(hex_literal::hex!("0000000000000000000000000000000000010007")));
 const SYSTEM_CONTRACT_PROXY_ADMIN: Address = Address(FixedBytes::<20>(hex_literal::hex!("000000000000000000000000000000000001000c")));
-const L2_COMPLEX_UPGRADER_IMPL_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!("504c4af171d1b5f31c8b8f181c21484b75110f87")));
+// keccak256("L2_COMPLEX_UPGRADER_IMPL_ADDR") - 1.
+// We need it predeployed to make the genesis upgrade work at all.
+const L2_COMPLEX_UPGRADER_IMPL_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!("0xd704e29df32c189b8613f79fcc043b2dc01d5f53")));
 
 const SYSTEM_PROXY_ADMIN_OWNER_SLOT: B256 = B256::ZERO;
 const EIP1967_IMPLEMENTATION_SLOT: B256 = FixedBytes::<32>(hex_literal::hex!(

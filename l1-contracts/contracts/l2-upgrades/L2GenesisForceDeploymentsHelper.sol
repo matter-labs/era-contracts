@@ -375,7 +375,7 @@ library L2GenesisForceDeploymentsHelper {
         );
 
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy{salt: bytes32(0)}(
-            // FIXME: try to replace with actual deployment of the implementation contract
+            // We could've deployed the implementation, but we keep it predeployed for consistency purposes with Era.
             L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
             _aliasedL1Governance,
             initData
