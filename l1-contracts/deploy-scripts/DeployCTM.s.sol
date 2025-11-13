@@ -178,7 +178,6 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         }
     }
 
-
     function deployVerifiers() internal {
         if (config.isZKsyncOS) {
             (addresses.stateTransition.verifierFflonk) = deploySimpleContract("ZKsyncOSVerifierFflonk", false);
@@ -375,7 +374,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         }
 
         L1AssetRouter assetRouter = L1AssetRouter(discoveredBridgehub.assetRouter);
-        (address beacon,) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
+        (address beacon, ) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
             address(assetRouter.legacyBridge()),
             discoveredBridgehub.assetRouterAddresses.l1Nullifier,
             addresses.governance
@@ -395,34 +394,34 @@ contract DeployCTMScript is Script, DeployCTMUtils {
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
             bridgehubBytecodeInfo: config.isZKsyncOS
-            ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2Bridgehub.sol", "L2Bridgehub")
-            : abi.encode(getL2BytecodeHash("L2Bridgehub")),
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2Bridgehub.sol", "L2Bridgehub")
+                : abi.encode(getL2BytecodeHash("L2Bridgehub")),
             l2AssetRouterBytecodeInfo: config.isZKsyncOS
-            ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2AssetRouter.sol", "L2AssetRouter")
-            : abi.encode(getL2BytecodeHash("L2AssetRouter")),
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2AssetRouter.sol", "L2AssetRouter")
+                : abi.encode(getL2BytecodeHash("L2AssetRouter")),
             l2NtvBytecodeInfo: config.isZKsyncOS
-            ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2NativeTokenVaultZKOS.sol", "L2NativeTokenVaultZKOS")
-            : abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2NativeTokenVaultZKOS.sol", "L2NativeTokenVaultZKOS")
+                : abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
             messageRootBytecodeInfo: config.isZKsyncOS
-            ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2MessageRoot.sol", "L2MessageRoot")
-            : abi.encode(getL2BytecodeHash("L2MessageRoot")),
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2MessageRoot.sol", "L2MessageRoot")
+                : abi.encode(getL2BytecodeHash("L2MessageRoot")),
             beaconDeployerInfo: config.isZKsyncOS
-            ? Utils.getZKOSProxyUpgradeBytecodeInfo("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer")
-            : abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer")
+                : abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
             chainAssetHandlerBytecodeInfo: config.isZKsyncOS
-            ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2ChainAssetHandler.sol", "L2ChainAssetHandler")
-            : abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2ChainAssetHandler.sol", "L2ChainAssetHandler")
+                : abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
             interopCenterBytecodeInfo: config.isZKsyncOS
-            ? Utils.getZKOSProxyUpgradeBytecodeInfo("InteropCenter.sol", "InteropCenter")
-            : abi.encode(getL2BytecodeHash("InteropCenter")),
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("InteropCenter.sol", "InteropCenter")
+                : abi.encode(getL2BytecodeHash("InteropCenter")),
             interopHandlerBytecodeInfo: config.isZKsyncOS
-            ? Utils.getZKOSProxyUpgradeBytecodeInfo("InteropHandler.sol", "InteropHandler")
-            : abi.encode(getL2BytecodeHash("InteropHandler")),
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("InteropHandler.sol", "InteropHandler")
+                : abi.encode(getL2BytecodeHash("InteropHandler")),
             assetTrackerBytecodeInfo: config.isZKsyncOS
-            ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2AssetTracker.sol", "L2AssetTracker")
-            : abi.encode(getL2BytecodeHash("L2AssetTracker")),
-        // For newly created chains it it is expected that the following bridges are not present at the moment
-        // of creation of the chain
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2AssetTracker.sol", "L2AssetTracker")
+                : abi.encode(getL2BytecodeHash("L2AssetTracker")),
+            // For newly created chains it it is expected that the following bridges are not present at the moment
+            // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(

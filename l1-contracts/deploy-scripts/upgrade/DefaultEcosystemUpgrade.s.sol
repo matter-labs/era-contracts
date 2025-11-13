@@ -1321,10 +1321,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
     }
 
     function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
-        require(
-            discoveredBridgehub.chainAssetHandler!= address(0),
-            "chainAssetHandlerProxy is zero in newConfig"
-        );
+        require(discoveredBridgehub.chainAssetHandler != address(0), "chainAssetHandlerProxy is zero in newConfig");
 
         result = new Call[](1);
         result[0] = Call({
@@ -1710,11 +1707,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(
             RollupDAManager.updateDAPair,
-            (
-                gatewayConfig.gatewayStateTransition.rollupSLDAValidator,
-                getRollupL2DACommitmentScheme(),
-                true
-            )
+            (gatewayConfig.gatewayStateTransition.rollupSLDAValidator, getRollupL2DACommitmentScheme(), true)
         );
 
         calls = _prepareL1ToGatewayCall(

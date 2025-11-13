@@ -400,7 +400,6 @@ abstract contract DeployCTMUtils is DeployUtils {
         return ContractsBytecodesLib.getCreationCode(contractName, isZKBytecode);
     }
 
-
     function getRollupL2DACommitmentScheme() internal returns (L2DACommitmentScheme) {
         return ROLLUP_L2_DA_COMMITMENT_SCHEME;
     }
