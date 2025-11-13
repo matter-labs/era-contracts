@@ -6,7 +6,7 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {ISystemContextDeprecated} from "./interfaces/ISystemContextDeprecated.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, COMPLEX_UPGRADER_CONTRACT, L2_ASSET_TRACKER_ADDRESS, L2_CHAIN_ASSET_HANDLER, L2_INTEROP_CENTER_ADDRESS, SystemLogKey} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, COMPLEX_UPGRADER_CONTRACT, L2_CHAIN_ASSET_HANDLER, SystemLogKey} from "./Constants.sol";
 import {CannotInitializeFirstVirtualBlock, CannotReuseL2BlockNumberFromPreviousBatch, CurrentBatchNumberMustBeGreaterThanZero, DeprecatedFunction, InconsistentNewBatchTimestamp, IncorrectL2BlockHash, IncorrectSameL2BlockPrevBlockHash, IncorrectSameL2BlockTimestamp, IncorrectVirtualBlockInsideMiniblock, InvalidNewL2BlockNumber, L2BlockAndBatchTimestampMismatch, L2BlockNumberZero, NoVirtualBlocks, NonMonotonicL2BlockTimestamp, PreviousL2BlockHashIsIncorrect, ProvidedBatchNumberIsNotCorrect, TimestampsShouldBeIncremental, UpgradeTransactionMustBeFirst} from "contracts/SystemContractErrors.sol";
 
 /**
@@ -83,16 +83,8 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     /// @notice The information about the virtual blocks upgrade, which tracks when the migration to the L2 blocks has started and finished.
     VirtualBlockUpgradeInfo internal virtualBlockUpgradeInfo;
 
-    uint256 internal currentSettlementLayerChainId;
-
-    error OnlyL2AssetTrackerOrInteropCenter();
-
-    modifier onlyL2AssetTrackerOrInteropCenter() {
-        if (msg.sender != L2_ASSET_TRACKER_ADDRESS && msg.sender != L2_INTEROP_CENTER_ADDRESS) {
-            revert OnlyL2AssetTrackerOrInteropCenter();
-        }
-        _;
-    }
+    /// @notice The chainId of the settlement layer.
+    uint256 public currentSettlementLayerChainId;
 
     /// @notice Set the chainId origin.
     /// @param _newChainId The chainId
@@ -105,10 +97,6 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
             L2_CHAIN_ASSET_HANDLER.setSettlementLayerChainId(currentSettlementLayerChainId, _newSettlementLayerChainId);
             currentSettlementLayerChainId = _newSettlementLayerChainId;
         }
-    }
-
-    function getSettlementLayerChainId() external view onlyL2AssetTrackerOrInteropCenter returns (uint256) {
-        return currentSettlementLayerChainId;
     }
 
     /// @notice Number of current transaction in block.

@@ -32,7 +32,8 @@ import {IRollupDAManager} from "./interfaces/IRollupDAManager.sol";
 import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
 import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
 import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
-import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
+import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
@@ -42,7 +43,10 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
+import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
+import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
@@ -62,6 +66,7 @@ struct DeployedAddresses {
     address governance;
     address chainAdmin;
     address accessControlRestrictionAddress;
+    address eip7702Checker;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -343,7 +348,11 @@ abstract contract DeployCTMUtils is DeployUtils {
                 return type(ValidiumL1DAValidator).creationCode;
             } else if (compareStrings(contractName, "Verifier")) {
                 if (config.testnetVerifier) {
-                    return type(TestnetVerifier).creationCode;
+                    if (config.isZKsyncOS) {
+                        return type(ZKsyncOSTestnetVerifier).creationCode;
+                    } else {
+                        return type(EraTestnetVerifier).creationCode;
+                    }
                 } else {
                     return type(EraDualVerifier).creationCode;
                 }
@@ -357,8 +366,10 @@ abstract contract DeployCTMUtils is DeployUtils {
                 return type(L1GenesisUpgrade).creationCode;
             } else if (compareStrings(contractName, "ValidatorTimelock")) {
                 return type(ValidatorTimelock).creationCode;
-            } else if (compareStrings(contractName, "ChainTypeManager")) {
-                return type(ChainTypeManager).creationCode;
+            } else if (compareStrings(contractName, "EraChainTypeManager")) {
+                return type(EraChainTypeManager).creationCode;
+            } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
+                return type(ZKsyncOSChainTypeManager).creationCode;
             } else if (compareStrings(contractName, "BytecodesSupplier")) {
                 return type(BytecodesSupplier).creationCode;
             } else if (compareStrings(contractName, "ExecutorFacet")) {
@@ -393,6 +404,8 @@ abstract contract DeployCTMUtils is DeployUtils {
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
         if (compareStrings(contractName, "BridgedStandardERC20")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "EIP7702Checker")) {
             return abi.encode();
         } else if (compareStrings(contractName, "RollupDAManager")) {
             return abi.encode();
@@ -455,7 +468,10 @@ abstract contract DeployCTMUtils is DeployUtils {
             address[] memory restrictions = new address[](1);
             restrictions[0] = addresses.accessControlRestrictionAddress;
             return abi.encode(restrictions);
-        } else if (compareStrings(contractName, "ChainTypeManager")) {
+        } else if (
+            compareStrings(contractName, "ZKsyncOSChainTypeManager") ||
+            compareStrings(contractName, "EraChainTypeManager")
+        ) {
             return abi.encode(discoveredBridgehub.bridgehubProxy, discoveredBridgehub.interopCenterProxy);
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
             return abi.encode();
@@ -466,7 +482,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (compareStrings(contractName, "AdminFacet")) {
             return abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager);
         } else if (compareStrings(contractName, "MailboxFacet")) {
-            return abi.encode(config.eraChainId, config.l1ChainId);
+            return abi.encode(config.eraChainId, config.l1ChainId, addresses.eip7702Checker);
         } else if (compareStrings(contractName, "GettersFacet")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ServerNotifier")) {
@@ -499,10 +515,16 @@ abstract contract DeployCTMUtils is DeployUtils {
         string memory contractName,
         bool isZKBytecode
     ) internal virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "ChainTypeManager")) {
+        if (compareStrings(contractName, "EraChainTypeManager")) {
             return
                 abi.encodeCall(
-                    ChainTypeManager.initialize,
+                    ChainTypeManagerBase.initialize,
+                    getChainTypeManagerInitializeData(addresses.stateTransition)
+                );
+        } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
+            return
+                abi.encodeCall(
+                    ChainTypeManagerBase.initialize,
                     getChainTypeManagerInitializeData(addresses.stateTransition)
                 );
         } else if (compareStrings(contractName, "ServerNotifier")) {

@@ -11,15 +11,17 @@ import {L2Utils} from "./L2Utils.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/Utils.sol";
 import {ADDRESS_ONE} from "deploy-scripts/Utils.sol";
 
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-
-import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
@@ -50,7 +52,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         instantiateCreate2Factory();
         addresses.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade());
         addresses.stateTransition.verifier = address(
-            new TestnetVerifier(IVerifierV2(ADDRESS_ONE), IVerifier(ADDRESS_ONE), address(0), false)
+            new EraTestnetVerifier(IVerifierV2(ADDRESS_ONE), IVerifier(ADDRESS_ONE))
         );
         uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
         addresses.stateTransition.validatorTimelock = address(
@@ -64,23 +66,33 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         addresses.stateTransition.adminFacet = address(
             new AdminFacet(config.l1ChainId, RollupDAManager(addresses.daAddresses.rollupDAManager))
         );
-        addresses.stateTransition.mailboxFacet = address(new MailboxFacet(config.eraChainId, config.l1ChainId));
+        addresses.stateTransition.mailboxFacet = address(
+            new MailboxFacet(config.eraChainId, config.l1ChainId, IEIP7702Checker(address(0)))
+        );
         addresses.stateTransition.gettersFacet = address(new GettersFacet());
         addresses.stateTransition.diamondInit = address(new DiamondInit(false));
         // Deploy ChainTypeManager implementation
-        addresses.stateTransition.chainTypeManagerImplementation = address(
-            new ChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
-        );
+        if (config.isZKsyncOS) {
+            addresses.stateTransition.chainTypeManagerImplementation = address(
+                new ZKsyncOSChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
+            );
+        } else {
+            addresses.stateTransition.chainTypeManagerImplementation = address(
+                new EraChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
+            );
+        }
 
         // Deploy TransparentUpgradeableProxy for ChainTypeManager
+        bytes memory initCalldata = abi.encodeCall(
+            IChainTypeManager.initialize,
+            getChainTypeManagerInitializeData(addresses.stateTransition)
+        );
+
         addresses.stateTransition.chainTypeManagerProxy = address(
             new TransparentUpgradeableProxy(
                 addresses.stateTransition.chainTypeManagerImplementation,
                 addresses.transparentProxyAdmin,
-                abi.encodeCall(
-                    ChainTypeManager.initialize,
-                    getChainTypeManagerInitializeData(addresses.stateTransition)
-                )
+                initCalldata
             )
         );
     }

@@ -29,7 +29,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         L2UtilsBase.initSystemContracts(_args);
         vm.mockCall(
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(ISystemContext.getSettlementLayerChainId.selector),
+            abi.encodeWithSelector(ISystemContext.currentSettlementLayerChainId.selector),
             abi.encode(9)
         );
     }
@@ -60,15 +60,17 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         }
 
         // TODO refactor
-        addresses.transparentProxyAdmin = address(0x1);
+        addresses.transparentProxyAdmin = makeAddr("transparentProxyAdmin");
         addresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
         addresses.stateTransition.verifier = deploySimpleContract("Verifier", true);
         addresses.stateTransition.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
+        addresses.eip7702Checker = address(0);
         deployStateTransitionDiamondFacets();
+        string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
         (
             addresses.stateTransition.chainTypeManagerImplementation,
             addresses.stateTransition.chainTypeManagerProxy
-        ) = deployTuppWithContract("ChainTypeManager", true);
+        ) = deployTuppWithContract(ctmContractName, true);
     }
 
     // add this to be excluded from coverage report

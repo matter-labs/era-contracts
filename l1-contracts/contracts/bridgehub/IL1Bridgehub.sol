@@ -45,7 +45,4 @@ interface IL1Bridgehub is IBridgehubBase {
 
     /// @notice Register already deployed ZK chain
     function registerAlreadyDeployedZKChain(uint256 _chainId, address _hyperchain) external;
-
-    /// @notice Register legacy chain
-    // function registerLegacyChain(uint256 _chainId) external;
 }

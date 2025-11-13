@@ -76,7 +76,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
             s.assetTracker = L2_ASSET_TRACKER_ADDR;
         } else {
             address nativeTokenVault = address(
-                IL1AssetRouter(IBridgehubBase(_initializeData.bridgehub).assetRouter()).nativeTokenVault()
+                IL1AssetRouter(address(IBridgehubBase(_initializeData.bridgehub).assetRouter())).nativeTokenVault()
             );
             s.nativeTokenVault = nativeTokenVault;
             s.assetTracker = address(IL1NativeTokenVault(nativeTokenVault).l1AssetTracker());

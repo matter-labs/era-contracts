@@ -19,6 +19,7 @@ import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 import {IL1AssetTracker} from "../asset-tracker/IL1AssetTracker.sol";
 import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
+import {IWETH9} from "../interfaces/IWETH9.sol";
 
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
@@ -35,19 +36,19 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token.
-    address public immutable override WETH_TOKEN;
+    IWETH9 public immutable WETH_TOKEN;
 
     /// @dev The L1 asset router contract.
-    IAssetRouterBase public immutable override ASSET_ROUTER;
+    IAssetRouterBase public immutable ASSET_ROUTER;
 
     /// @dev The assetId of the base token.
-    bytes32 public immutable override BASE_TOKEN_ASSET_ID;
+    bytes32 public immutable BASE_TOKEN_ASSET_ID;
 
     /// @dev The chain ID of L1.
-    uint256 public immutable override L1_CHAIN_ID;
+    uint256 public immutable L1_CHAIN_ID;
 
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
-    IL1Nullifier public immutable override L1_NULLIFIER;
+    IL1Nullifier public immutable L1_NULLIFIER;
 
     /// @notice AssetTracker component address on L1. On L2 the address is L2_ASSET_TRACKER_ADDR.
     ///         It adds one more layer of security on top of cross chain communication.
@@ -75,7 +76,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     /// @dev Returns the WETH token address for internal use.
     function _wethToken() internal view override returns (address) {
-        return WETH_TOKEN;
+        return address(WETH_TOKEN);
     }
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     ///      This mapping was deprecated in favor of AssetTracker component, now it will be responsible for tracking chain balances.
@@ -113,7 +114,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @param _assetRouter Address of Asset Router on L1.
     /// @param _l1Nullifier Address of the nullifier contract, which handles transaction progress between L1 and ZK chains.
     constructor(address _wethToken, address _assetRouter, IL1Nullifier _l1Nullifier) {
-        WETH_TOKEN = _wethToken;
+        WETH_TOKEN = IWETH9(_wethToken);
         ASSET_ROUTER = IAssetRouterBase(_assetRouter);
         L1_CHAIN_ID = block.chainid;
         BASE_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
@@ -227,7 +228,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         bytes32 _assetId,
         address _depositSender,
         bytes calldata _data
-    ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenNotPaused {
+    ) external payable requireZeroValue(msg.value) onlyAssetRouter whenNotPaused {
         // slither-disable-next-line unused-return
         (uint256 _amount, , ) = DataEncoding.decodeBridgeBurnData(_data);
         address l1Token = tokenAddress[_assetId];

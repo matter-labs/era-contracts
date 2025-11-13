@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import {EraDualVerifier} from "./EraDualVerifier.sol";
-import {ZKsyncOSDualVerifier} from "./ZKsyncOSDualVerifier.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 
@@ -13,18 +12,14 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 /// @dev This contract is used to skip the zkp verification for the testnet environment.
 /// If the proof is not empty, it will verify it using the main verifier contract,
 /// otherwise, it will skip the verification.
-contract TestnetVerifier is IVerifier {
-    IVerifier public immutable dualVerifier;
+contract EraTestnetVerifier is IVerifier {
+    EraDualVerifier public immutable dualVerifier;
     bool public constant isTestnetVerifier = true;
 
-    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address _ctmOwner, bool _isZKsyncOS) {
+    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) {
         assert(block.chainid != 1);
 
-        if (_isZKsyncOS) {
-            dualVerifier = new ZKsyncOSDualVerifier(_fflonkVerifier, _plonkVerifier, _ctmOwner);
-        } else {
-            dualVerifier = new EraDualVerifier(_fflonkVerifier, _plonkVerifier);
-        }
+        dualVerifier = new EraDualVerifier(_fflonkVerifier, _plonkVerifier);
     }
 
     /// @dev Verifies a zk-SNARK proof, skipping the verification if the proof is empty.

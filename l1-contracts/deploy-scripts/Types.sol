@@ -45,6 +45,7 @@ struct DataAvailabilityDeployedAddresses {
     address noDAValidiumL1DAValidator;
     address availBridge;
     address availL1DAValidator;
+    address l1BlobsDAValidatorZKsyncOS;
 }
 
 struct ZkChainAddresses {
