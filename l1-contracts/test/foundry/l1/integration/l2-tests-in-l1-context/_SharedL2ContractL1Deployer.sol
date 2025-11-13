@@ -61,10 +61,12 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
 
         // TODO refactor
         addresses.transparentProxyAdmin = makeAddr("transparentProxyAdmin");
+        addresses.governance = makeAddr("governance");
         addresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
         addresses.stateTransition.verifier = deploySimpleContract("Verifier", true);
         addresses.stateTransition.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
         addresses.eip7702Checker = address(0);
+        initializeGeneratedData();
         deployStateTransitionDiamondFacets();
         string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
         (
@@ -97,6 +99,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
     {
         return super.getUpgradeAddedFacetCuts(stateTransition);
     }
+
     function getInitializeCalldata(
         string memory contractName,
         bool isZKBytecode
