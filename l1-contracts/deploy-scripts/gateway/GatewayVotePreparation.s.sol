@@ -133,7 +133,7 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
             "The latest protocol version is not correct"
         );
         serverNotifier = ChainTypeManagerBase(ctm).serverNotifierAddress();
-        addresses.bridges.l1AssetRouterProxy = L1Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
+        addresses.bridges.l1AssetRouterProxy = address(L1Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter());
 
         addresses.vaults.l1NativeTokenVaultProxy = address(
             L1AssetRouter(addresses.bridges.l1AssetRouterProxy).nativeTokenVault()
