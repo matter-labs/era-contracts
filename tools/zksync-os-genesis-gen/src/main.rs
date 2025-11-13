@@ -6,8 +6,6 @@ use alloy::primitives::{Address, FixedBytes, B256};
 use crate::types::{build_genesis, InitialGenesisInput};
 mod types;
 
-const EXECUTION_VERSION: u32 = 3;
-
 const L2_COMPLEX_UPGRADER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!("000000000000000000000000000000000000800f")));
 const L2_GENESIS_UPGRADE: Address = Address(FixedBytes::<20>(hex_literal::hex!("0000000000000000000000000000000000010001")));
 const L2_WRAPPED_BASE_TOKEN: Address = Address(FixedBytes::<20>(hex_literal::hex!("0000000000000000000000000000000000010007")));
@@ -76,7 +74,10 @@ fn construct_additional_storage() -> BTreeMap<Address, BTreeMap<B256, B256>> {
 struct Opt {
     /// Output file path
     #[structopt(long = "output-file", default_value = "../../zksync-os-genesis.json")]
-    output_file: String
+    output_file: String,
+    /// Execution version (CLI > env > default)
+    #[structopt(long = "execution-version", env = "EXECUTION_VERSION", default_value = "3")]
+    execution_version: u32,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -93,10 +94,10 @@ fn main() -> anyhow::Result<()> {
             .collect(),
         additional_storage: construct_additional_storage(),
         additional_storage_raw: Default::default(),
-        execution_version: EXECUTION_VERSION
+        execution_version: opt.execution_version,
     };
 
-    let result = build_genesis(initial_genesis_input)?; 
+    let result = build_genesis(initial_genesis_input)?;
 
     let json = serde_json::to_string_pretty(&result)?;
     std::fs::write(&opt.output_file, json)?;

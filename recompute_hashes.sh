@@ -5,7 +5,7 @@ set -e
 
 # Expected Foundry version and commit
 EXPECTED_VERSION="forge 0.0.4"
-EXPECTED_COMMIT="ae913af65"
+EXPECTED_COMMIT="ae913af"
 
 # Check if Foundry is installed
 if ! command -V forge &> /dev/null; then
