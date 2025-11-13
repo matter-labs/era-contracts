@@ -84,6 +84,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     VirtualBlockUpgradeInfo internal virtualBlockUpgradeInfo;
 
     /// @notice The chainId of the settlement layer.
+    /// @notice This value will be deprecated in the future, it should not be used by external contracts.
     uint256 public currentSettlementLayerChainId;
 
     /// @notice Set the chainId origin.
