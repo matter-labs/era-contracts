@@ -67,17 +67,26 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     function forceDeployOnAddressZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
-        require(_newAddress.code.length == 0, ZKsyncOSNotForceDeployForExistingContract(_newAddress));
+        if (_newAddress.code.length != 0) {
+            // We assume that the provided address already has the identical bytecode.
+            // It is the job of the caller to ensure that the `_newAddress` is uniquely derived
+            // from the _bytecodeInfo.
+            return;
+        }
         unsafeForceDeployZKsyncOS(_bytecodeInfo, _newAddress);
+    }
+
+    /// @notice A random address in the user space derived from the bytecode info.
+    /// @dev The first 32 bytes of the preimage are 0s to ensure that the address will never collide with neither create nor create2.
+    /// This is the case, since for both create and create2 the preimage for hash starts with a non-zero byte.
+    function generateRandomAddress(bytes memory _bytecodeInfo) internal view returns (address) {
+        return address(uint160(uint256(keccak256(bytes.concat(bytes32(0), _bytecodeInfo)))));
     }
 
     function updateZKsyncOSContract(bytes memory _bytecodeInfo, address _newAddress) internal {
         (bytes memory bytecodeInfo, bytes memory bytecodeInfoSystemProxy) = abi.decode((_bytecodeInfo), (bytes, bytes));
 
-        // The address to force deploy the implementation to.
-        // The first 32 bytes are 0s to ensure that the address will never collide with neither create nor create2.
-        // This is the case, since for both create and create2 the preimage for hash starts with a non-zero byte.
-        address implAddress = address(uint160(uint256(keccak256(bytes.concat(bytes32(0), bytecodeInfo)))));
+        address implAddress = generateRandomAddress(bytecodeInfo);
         forceDeployOnAddressZKsyncOS(bytecodeInfo, implAddress);
 
         // If the address does not have any bytecode, we expect that it is a proxy
@@ -366,6 +375,7 @@ library L2GenesisForceDeploymentsHelper {
         );
 
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy{salt: bytes32(0)}(
+            // FIXME: try to replace with actual deployment of the implementation contract
             L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
             _aliasedL1Governance,
             initData

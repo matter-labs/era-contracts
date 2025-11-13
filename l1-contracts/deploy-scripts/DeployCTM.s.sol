@@ -205,6 +205,10 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         return ROLLUP_L2_DA_COMMITMENT_SCHEME;
     }
 
+    function getBlobZKsyncOSCommitmentScheme() internal pure returns (L2DACommitmentScheme) {
+        return L2DACommitmentScheme.BLOBS_ZKSYNC_OS;
+    }
+
     function deployVerifiers() internal {
         if (config.isZKsyncOS) {
             (addresses.stateTransition.verifierFflonk) = deploySimpleContract("ZKsyncOSVerifierFflonk", false);
@@ -532,6 +536,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
+            // FIXME: the naming should reflect that it should be only used for Era.
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,

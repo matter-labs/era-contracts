@@ -339,10 +339,17 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         return config.ownerAddress;
     }
 
+    /// @notice Returns a samlpe chain id for a chain that settles on L1.
+    /// @dev For Era upgrades we can use gateway, but
+    /// for zksync os we need to provide a custom chain id. 
+    function getSampleChainId() public virtual view returns (uint256) {
+        return gatewayConfig.chainId;
+    }
+
     /// @notice Get facet cuts that should be removed
     function getFacetCutsForDeletion() internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
         address diamondProxy = IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy).getHyperchain(
-            config.eraChainId
+            getSampleChainId()
         );
         IZKChain.Facet[] memory facets = IZKChain(diamondProxy).facets();
 
@@ -595,8 +602,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
 
         addresses.bridgehub.bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
 
-        setAddressesBasedOnBridgehub();
-
         addresses.transparentProxyAdmin = address(
             uint160(uint256(vm.load(addresses.bridgehub.bridgehubProxy, ADMIN_SLOT)))
         );
@@ -636,6 +641,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
 
         gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
         config.gatewayChainId = gatewayConfig.chainId;
+
+        setAddressesBasedOnBridgehub();
     }
 
     function getBridgehubAdmin() public virtual returns (address admin) {
@@ -647,7 +654,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
 
         bytes32 newChainAssetId = L1Bridgehub(addresses.bridgehub.bridgehubProxy).baseTokenAssetId(
-            gatewayConfig.chainId
+            getSampleChainId()
         );
         result = new Call[](1);
         result[0] = Call({
@@ -670,11 +677,11 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
 
     function setAddressesBasedOnBridgehub() internal virtual {
         config.ownerAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
-        address ctm = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(config.eraChainId);
+        address ctm = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(getSampleChainId());
         addresses.stateTransition.chainTypeManagerProxy = ctm;
         // We have to set the diamondProxy address here - as it is used by multiple constructors (for example L1Nullifier etc)
         addresses.stateTransition.diamondProxy = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
-            config.eraChainId
+            getSampleChainId()
         );
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         require(
@@ -766,22 +773,36 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
     }
 
-    function prepareFixedForceDeploymentsData() public view virtual returns (FixedForceDeploymentsData memory data) {
+    function prepareFixedForceDeploymentsData() public virtual returns (FixedForceDeploymentsData memory data) {
         require(config.ownerAddress != address(0), "owner not set");
 
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
+            // FIXME: we need to reflect the name here as this one is only usable
+            // for Era.
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: abi.encode(getL2BytecodeHash("L2Bridgehub")),
-            l2AssetRouterBytecodeInfo: abi.encode(getL2BytecodeHash("L2AssetRouter")),
-            l2NtvBytecodeInfo: abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
-            messageRootBytecodeInfo: abi.encode(getL2BytecodeHash("L2MessageRoot")),
-            chainAssetHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
-            beaconDeployerInfo: abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
+            bridgehubBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2Bridgehub.sol", "L2Bridgehub")
+                : abi.encode(getL2BytecodeHash("L2Bridgehub")),
+            l2AssetRouterBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2AssetRouter.sol", "L2AssetRouter")
+                : abi.encode(getL2BytecodeHash("L2AssetRouter")),
+            l2NtvBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2NativeTokenVaultZKOS.sol", "L2NativeTokenVaultZKOS")
+                : abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
+            messageRootBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2MessageRoot.sol", "L2MessageRoot")
+                : abi.encode(getL2BytecodeHash("L2MessageRoot")),
+            beaconDeployerInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer")
+                : abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
+            chainAssetHandlerBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2ChainAssetHandler.sol", "L2ChainAssetHandler")
+                : abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             dangerousTestOnlyForcedBeacon: address(0)
@@ -1722,16 +1743,38 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
 
     /// @notice Additional calls to newConfigure contracts
     function prepareDAValidatorCall() public virtual returns (Call[] memory calls) {
-        calls = new Call[](1);
+        if (config.isZKsyncOS) {
+            calls = new Call[](2);
 
-        calls[0] = Call({
-            target: addresses.daAddresses.rollupDAManager,
-            data: abi.encodeCall(
-                RollupDAManager.updateDAPair,
-                (addresses.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true)
-            ),
-            value: 0
-        });
+            calls[0] = Call({
+                target: addresses.daAddresses.rollupDAManager,
+                data: abi.encodeCall(
+                    RollupDAManager.updateDAPair,
+                    (addresses.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true)
+                ),
+                value: 0
+            });
+
+            calls[1] = Call({
+                target: addresses.daAddresses.rollupDAManager,
+                data: abi.encodeCall(
+                    RollupDAManager.updateDAPair,
+                    (addresses.daAddresses.l1BlobsDAValidatorZKsyncOS, getBlobZKsyncOSCommitmentScheme(), true)
+                ),
+                value: 0
+            });
+        } else {
+            calls = new Call[](1);
+
+            calls[0] = Call({
+                target: addresses.daAddresses.rollupDAManager,
+                data: abi.encodeCall(
+                    RollupDAManager.updateDAPair,
+                    (addresses.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true)
+                ),
+                value: 0
+            });
+        }
     }
 
     function prepareDAValidatorCallGW(
@@ -1868,7 +1911,15 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
             return abi.encode();
         } else if (compareStrings(contractName, "Verifier")) {
             if (!isZKBytecode) {
-                return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
+                if (config.isZKsyncOS) {
+                    return abi.encode(
+                        addresses.stateTransition.verifierFflonk,
+                        addresses.stateTransition.verifierPlonk,
+                        msg.sender
+                    );
+                } else {
+                    return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
+                }
             } else {
                 return
                     abi.encode(
