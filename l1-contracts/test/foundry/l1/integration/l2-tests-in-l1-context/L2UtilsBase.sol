@@ -145,7 +145,7 @@ library L2UtilsBase {
 
         // DummyL2L1Messenger dummyL2L1Messenger = new DummyL2L1Messenger();
         // vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(dummyL2L1Messenger).code);
-        {   
+        {
             address assetRouter = address(new L2AssetRouter());
             vm.etch(L2_ASSET_ROUTER_ADDR, assetRouter.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
