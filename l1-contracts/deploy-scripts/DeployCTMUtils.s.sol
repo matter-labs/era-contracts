@@ -482,7 +482,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (compareStrings(contractName, "AdminFacet")) {
             return abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager);
         } else if (compareStrings(contractName, "MailboxFacet")) {
-            return abi.encode(config.eraChainId, config.l1ChainId);
+            return abi.encode(config.eraChainId, config.l1ChainId, addresses.eip7702Checker);
         } else if (compareStrings(contractName, "GettersFacet")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ServerNotifier")) {
