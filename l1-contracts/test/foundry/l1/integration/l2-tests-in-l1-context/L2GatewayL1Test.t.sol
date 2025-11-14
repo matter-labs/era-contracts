@@ -30,7 +30,7 @@ import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2Contra
 
 import {L2GatewayTestAbstract} from "../l2-tests-abstract/L2GatewayTestAbstract.t.sol";
 
-import {StateTransitionDeployedAddresses} from "deploy-scripts/Types.sol";
+import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 
@@ -60,6 +60,7 @@ contract L2GatewayL1Test is Test, SharedL2ContractL1Deployer, L2GatewayTestAbstr
     ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
         return super.getUpgradeAddedFacetCuts(stateTransition);
     }
+
     function getInitializeCalldata(
         string memory contractName,
         bool isZKBytecode

@@ -12,7 +12,7 @@ import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {ChainInfoFromBridgehub, Utils} from "./Utils.sol";
+import {ChainInfoFromBridgehub, Utils} from "./utils/Utils.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";

@@ -21,9 +21,9 @@ import {InteropRoot, L2CanonicalTransaction, L2Log} from "contracts/common/Messa
 
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundry/L1TestsErrors.sol";
-import {Utils as DeployUtils} from "deploy-scripts/Utils.sol";
+import {Utils as DeployUtils} from "deploy-scripts/utils/Utils.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
-import {ContractsBytecodesLib} from "deploy-scripts/ContractsBytecodesLib.sol";
+import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;

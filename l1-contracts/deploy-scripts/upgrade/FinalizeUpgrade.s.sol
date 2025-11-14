@@ -12,7 +12,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {MulticallWithGas} from "./MulticallWithGas.sol";
+import {MulticallWithGas} from "../utils/MulticallWithGas.sol";
 
 /// @notice Script intended to help us finalize the governance upgrade
 contract FinalizeUpgrade is Script {

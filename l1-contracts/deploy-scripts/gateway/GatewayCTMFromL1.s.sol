@@ -12,7 +12,7 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {ADDRESS_ONE, StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
 import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
+import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 

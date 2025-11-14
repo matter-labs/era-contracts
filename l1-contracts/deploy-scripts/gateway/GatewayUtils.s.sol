@@ -11,7 +11,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {Utils} from "../Utils.sol";
+import {Utils} from "../utils/Utils.sol";
 
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";

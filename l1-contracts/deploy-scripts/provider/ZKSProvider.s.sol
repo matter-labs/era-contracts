@@ -8,7 +8,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {FinalizeL1DepositParams} from "contracts/common/Messaging.sol";
-import {Utils} from "../Utils.sol";
+import {Utils} from "../utils/Utils.sol";
 import {AltL2ToL1Log, AltLog, AltTransactionReceipt, L2ToL1Log, L2ToL1LogProof, Log, TransactionReceipt} from "./ReceipTypes.sol";
 
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";

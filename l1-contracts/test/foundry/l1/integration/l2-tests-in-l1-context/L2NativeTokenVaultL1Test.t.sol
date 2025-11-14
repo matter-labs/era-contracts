@@ -29,10 +29,10 @@ import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2Contra
 
 import {L2NativeTokenVaultTestAbstract} from "../l2-tests-abstract/L2NativeTokenVaultTestAbstract.t.sol";
 
-import {StateTransitionDeployedAddresses} from "deploy-scripts/Types.sol";
+import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-import {DeployCTMUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
+import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
 
 contract L2NativeTokenVaultL1Test is Test, SharedL2ContractL1Deployer, L2NativeTokenVaultTestAbstract {
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {}

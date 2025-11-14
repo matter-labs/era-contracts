@@ -9,7 +9,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {L2Utils} from "./L2Utils.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/Utils.sol";
-import {ADDRESS_ONE} from "deploy-scripts/Utils.sol";
+import {ADDRESS_ONE} from "deploy-scripts/utils/Utils.sol";
 
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
