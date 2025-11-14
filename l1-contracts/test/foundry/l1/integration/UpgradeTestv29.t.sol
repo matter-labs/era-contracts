@@ -5,8 +5,8 @@ pragma solidity ^0.8.24;
 
 import {console2 as console} from "forge-std/Script.sol";
 
-import {EcosystemUpgrade_v29} from "deploy-scripts/upgrade/EcosystemUpgrade_v29.s.sol";
-import {ChainUpgrade} from "deploy-scripts/upgrade/ChainUpgrade.s.sol";
+import {EcosystemUpgrade_v29} from "../../../../deploy-scripts/upgrade/v29/EcosystemUpgrade_v29.s.sol";
+import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default_upgrade/DefaultChainUpgrade.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
 
@@ -18,13 +18,13 @@ string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script
 
 contract UpgradeIntegrationTest is Test {
     EcosystemUpgrade_v29 ecosystemUpgrade;
-    ChainUpgrade chainUpgrade;
+    DefaultChainUpgrade chainUpgrade;
 
     function setUp() public {
         ecosystemUpgrade = new EcosystemUpgrade_v29();
         ecosystemUpgrade.initialize(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT);
         ecosystemUpgrade.deployNewEcosystemContractsL1();
-        chainUpgrade = new ChainUpgrade();
+        chainUpgrade = new DefaultChainUpgrade();
     }
 
     // NOTE: this test is currently testing "stage" - as mainnet is not upgraded yet.

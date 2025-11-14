@@ -13,7 +13,7 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 
 import {L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {Utils} from "../Utils.sol";
+import {Utils} from "../utils/Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
@@ -31,9 +31,9 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 
-import {DeployCTMScript} from "../DeployCTM.s.sol";
-import {StateTransitionDeployedAddresses} from "../Types.sol";
-import {AddressIntrospector} from "../AddressIntrospector.sol";
+import {DeployCTMScript} from "../ctm/DeployCTM.s.sol";
+import {StateTransitionDeployedAddresses} from "../utils/Types.sol";
+import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 
 import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
 import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
@@ -42,7 +42,7 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 
 import {GatewayGovernanceUtils} from "./GatewayGovernanceUtils.s.sol";
-import {DeployCTMUtils} from "../DeployCTMUtils.s.sol";
+import {DeployCTMUtils} from "../ctm/DeployCTMUtils.s.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {

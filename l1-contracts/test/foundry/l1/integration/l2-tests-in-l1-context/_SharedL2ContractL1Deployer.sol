@@ -7,7 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
 
-import {StateTransitionDeployedAddresses} from "deploy-scripts/Types.sol";
+import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {DeployCTMIntegrationScript} from "../deploy-scripts/DeployCTMIntegration.s.sol";
@@ -15,7 +15,7 @@ import {DeployCTMIntegrationScript} from "../deploy-scripts/DeployCTMIntegration
 import {SharedL2ContractDeployer, SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 import {L2UtilsBase} from "./L2UtilsBase.sol";
-import {DeployCTMUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
+import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {L2UtilsBase} from "./L2UtilsBase.sol";
 

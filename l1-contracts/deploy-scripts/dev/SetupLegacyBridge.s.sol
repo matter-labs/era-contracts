@@ -10,7 +10,7 @@ import {DummyL1ERC20Bridge} from "contracts/dev-contracts/DummyL1ERC20Bridge.sol
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {L2LegacySharedBridgeTestHelper} from "../L2LegacySharedBridgeTestHelper.sol";
+import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
