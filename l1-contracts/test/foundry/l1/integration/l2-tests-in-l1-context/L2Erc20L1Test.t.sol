@@ -66,6 +66,7 @@ contract L2Erc20L1Test is Test, SharedL2ContractL1Deployer, L2Erc20TestAbstract 
     ) internal view virtual override returns (bytes memory) {
         return super.getCreationCode(contractName, isZKBytecode);
     }
+
     function getInitializeCalldata(
         string memory contractName,
         bool isZKBytecode
