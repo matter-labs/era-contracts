@@ -82,8 +82,9 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
 
 	/// @inheritdoc IMultisigCommitter
 	function getSigningThreshold(address chainAddress) public override view returns (uint64) {
-		if(chainConfig[chainAddress].useCustomValidators)
-			return chainConfig[chainAddress].signingThreshold;
+		ChainConfig memory chainConfig = chainConfig[chainAddress];
+		if(chainConfig.useCustomValidators)
+			return chainConfig.signingThreshold;
 		else return sharedSigningThreshold;
 	}
 
