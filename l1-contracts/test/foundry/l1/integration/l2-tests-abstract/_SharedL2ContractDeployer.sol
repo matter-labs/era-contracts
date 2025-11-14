@@ -44,6 +44,9 @@ import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
+import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+
 abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegrationUtils, SharedUtils {
     L2WrappedBaseToken internal weth;
     address internal l1WethAddress = address(4);
@@ -175,6 +178,12 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
             abi.encode(block.chainid)
         );
+        vm.startBroadcast();
+        DiamondProxy diamondProxy = new DiamondProxy(block.chainid, Diamond.DiamondCutData({facetCuts: new Diamond.FacetCut[](0), initAddress: address(0), initCalldata: bytes("")}));
+        vm.stopBroadcast();
+        console.log("diamond proxy deployed");
+        console.log(address(diamondProxy).code.length);
+        console.log(L2_BRIDGEHUB_ADDR.code.length);
         vm.prank(L2_BRIDGEHUB_ADDR);
         mockDiamondInitInteropCenterCallsWithAddress(L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, baseTokenAssetId);
         uint256 currentChainId = block.chainid;

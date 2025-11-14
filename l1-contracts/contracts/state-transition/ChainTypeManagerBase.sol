@@ -2,6 +2,9 @@
 
 pragma solidity 0.8.28;
 
+
+import {console2 as console} from "forge-std/console2.sol";
+
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
@@ -459,9 +462,12 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         );
 
         diamondCut.initCalldata = initData;
+        console.log("before diamond proxy");
         // deploy zkChainContract
         // slither-disable-next-line reentrancy-no-eth
         DiamondProxy zkChainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
+        console.log("before diamond proxy");
+
         // save data
         zkChainAddress = address(zkChainContract);
         emit NewZKChain(_chainId, zkChainAddress);

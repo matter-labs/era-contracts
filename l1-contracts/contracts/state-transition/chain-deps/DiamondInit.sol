@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.28;
 
+import {console2 as console} from "forge-std/console2.sol";
+
 import {Diamond} from "../libraries/Diamond.sol";
 import {ZKChainBase} from "./facets/ZKChainBase.sol";
 import {DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION} from "../../common/Config.sol";
@@ -34,6 +36,8 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
     function initialize(
         InitializeData calldata _initializeData
     ) public virtual reentrancyGuardInitializer returns (bytes32) {
+        console.log("diamond init 0");
+
         if (address(_initializeData.verifier) == address(0)) {
             revert ZeroAddress();
         }
@@ -71,6 +75,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.chainId = _initializeData.chainId;
         s.bridgehub = _initializeData.bridgehub;
         s.chainTypeManager = _initializeData.chainTypeManager;
+        console.log("diamond init 1");
         if (_initializeData.bridgehub == L2_BRIDGEHUB_ADDR) {
             s.nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
             s.assetTracker = L2_ASSET_TRACKER_ADDR;

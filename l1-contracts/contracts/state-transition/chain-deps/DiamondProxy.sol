@@ -2,6 +2,9 @@
 
 pragma solidity 0.8.28;
 
+import {console2 as console} from "forge-std/console2.sol";
+
+
 // Note, that while we do try to make use of custom errors whenever possible,
 // we do not change it for `DiamondProxy`, since it is a contract that can not be
 // upgraded or changed, so we keep its code always consistent with the production version.
@@ -14,10 +17,11 @@ import {Diamond} from "../libraries/Diamond.sol";
 /// @custom:security-contact security@matterlabs.dev
 contract DiamondProxy {
     constructor(uint256 _chainId, Diamond.DiamondCutData memory _diamondCut) {
+        console.log("diamond proxy constructor");
         // Check that the contract is deployed on the expected chain.
         // Thus, the contract deployed by the same Create2 factory on the different chain will have different addresses!
-        require(_chainId == block.chainid, "pr");
-        Diamond.diamondCut(_diamondCut);
+        // require(_chainId == block.chainid, "pr");
+        // Diamond.diamondCut(_diamondCut);
     }
 
     /// @dev 1. Find the facet for the function that is called.
