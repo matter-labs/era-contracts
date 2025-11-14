@@ -305,4 +305,7 @@ contract ValidatorTimelock is
         // Now, we can extract the admin
         return IZKChain(_chainAddress).getAdmin();
     }
+
+    /// @dev Reserved storage space to allow for layout changes in future upgrades.
+    uint256[50] private __gap;
 }
