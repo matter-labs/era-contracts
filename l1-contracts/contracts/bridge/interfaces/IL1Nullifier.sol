@@ -6,7 +6,7 @@ import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 import {IL1Bridgehub} from "../../bridgehub/IL1Bridgehub.sol";
 import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
-import {FinalizeL1DepositParams} from "../../common/Messaging.sol";
+import {FinalizeL1DepositParams, ConfirmTransferResultData} from "../../common/Messaging.sol";
 
 /// @dev Transient storage slot for storing the settlement layer chain ID during proof verification.
 /// @dev This slot is used to temporarily store which settlement layer is processing the current proof,
@@ -79,6 +79,11 @@ interface IL1Nullifier {
     function transferTokenToNTV(address _token) external;
 
     function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external;
+
+    /// @notice Confirms the result of a deposit, whether it was successful or not.
+    /// @dev This function is used to confirm the migration of a chain to Gateway.
+    /// @param _confirmTransferResultData The data to confirm the deposit result.
+    function bridgeConfirmTransferResult(ConfirmTransferResultData calldata _confirmTransferResultData) external;
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
     /// @param _chainId The ZK chain id to which deposit was initiated.

@@ -12,6 +12,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 
 contract ZKChainDeployer is L1ContractDeployer {
     using stdStorage for StdStorage;
@@ -53,6 +54,9 @@ contract ZKChainDeployer is L1ContractDeployer {
         deployScript.runForTest();
         zkChainIds.push(eraZKChainId);
         eraConfig = deployScript.getConfig();
+
+        address chainAddress = getZKChainAddress(eraZKChainId);
+        IAdmin(chainAddress).unpauseDeposits();
     }
 
     function _deployZKChain(address _baseToken) internal {
@@ -60,7 +64,18 @@ contract ZKChainDeployer is L1ContractDeployer {
     }
 
     function _deployZKChain(address _baseToken, uint256 _chainId) internal {
-        uint256 chainId = _chainId == 0 ? currentZKChainId : _chainId;
+        uint256 chainId = _deployZKChainInner(_baseToken, _chainId);
+
+        address chainAddress = getZKChainAddress(chainId);
+        IAdmin(chainAddress).unpauseDeposits();
+    }
+
+    function _deployZKChainWithPausedDeposits(address _baseToken, uint256 _chainId) internal {
+        _deployZKChainInner(_baseToken, _chainId);
+    }
+
+    function _deployZKChainInner(address _baseToken, uint256 _chainId) internal returns (uint256 chainId) {
+        chainId = _chainId == 0 ? currentZKChainId : _chainId;
         vm.setEnv(
             "ZK_CHAIN_CONFIG",
             string.concat(

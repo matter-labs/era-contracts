@@ -20,7 +20,6 @@ import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol"
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 import {GW_ASSET_TRACKER, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {BroadcastUtils} from "../provider/BroadcastUtils.s.sol";
 import {ZKSProvider} from "../provider/ZKSProvider.s.sol";
 
 import {Utils} from "../Utils.sol";
@@ -28,41 +27,12 @@ import {Utils} from "../Utils.sol";
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 /// @dev IMPORTANT: this script is not intended to be used in production.
 /// TODO(EVM-925): support secure gateway deployment.
-contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
+contract GatewayMigrateTokenBalances is ZKSProvider {
     using stdJson for string;
 
     IAssetTrackerBase l2AssetTrackerBase = IAssetTrackerBase(L2_ASSET_TRACKER_ADDR);
     IL2AssetTracker l2AssetTracker = IL2AssetTracker(L2_ASSET_TRACKER_ADDR);
     INativeTokenVaultBase l2NativeTokenVault = INativeTokenVaultBase(L2_NATIVE_TOKEN_VAULT_ADDR);
-
-    function startTokenMigrationOnL2OrGateway(
-        bool toGateway,
-        uint256 chainId,
-        string memory l2RpcUrl,
-        string memory gwRpcUrl
-    ) public {
-        // string memory originalRpcUrl = vm.activeRpcUrl();
-        vm.createSelectFork(l2RpcUrl);
-        (uint256 bridgedTokenCount, bytes32[] memory assetIds) = getBridgedTokenAssetIds();
-        if (!toGateway) {
-            vm.createSelectFork(gwRpcUrl);
-            console.log("Forked to", gwRpcUrl);
-        }
-
-        // Set L2 RPC for each token and migrate balances
-        for (uint256 i = 0; i < bridgedTokenCount; i++) {
-            bytes32 assetId = assetIds[i];
-
-            console.log("Migrating token balance for assetId:", vm.toString(assetId));
-            vm.broadcast();
-            if (toGateway) {
-                l2AssetTracker.initiateL1ToGatewayMigrationOnL2(assetId);
-            } else {
-                // console.log(l2AssetTracker.chainBalance(chainId, assetId));
-                GW_ASSET_TRACKER.initiateGatewayToL1MigrationOnGateway(chainId, assetId);
-            }
-        }
-    }
 
     function getBridgedTokenAssetIds() public returns (uint256 bridgedTokenCountPlusOne, bytes32[] memory assetIds) {
         // Get all registered tokens
@@ -84,27 +54,27 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         uint256 gatewayChainId,
         string memory l2RpcUrl,
         string memory gwRpcUrl,
-        bool onlyWaitForFinalization
+        bool onlyWaitForFinalization,
+        bytes32[] memory txHashes
     ) public {
         IL1AssetRouter assetRouter = IL1AssetRouter(address(bridgehub.assetRouter()));
         IL1NativeTokenVault l1NativeTokenVault = IL1NativeTokenVault(address(assetRouter.nativeTokenVault()));
 
         uint256 settlementLayer = IBridgehubBase(bridgehub).settlementLayer(chainId);
-        bytes32[] memory msgHashes = loadHashesFromStartTokenMigrationFile(toGateway ? chainId : gatewayChainId);
 
-        if (msgHashes.length == 0) {
-            console.log("No messages found for chainId:", chainId);
+        if (txHashes.length == 0) {
+            console.log("No migration txs for chainId:", chainId);
             return;
         }
 
-        uint256 bridgedTokenCount = msgHashes.length;
+        uint256 bridgedTokenCount = txHashes.length;
         FinalizeL1DepositParams[] memory finalizeL1DepositParams = new FinalizeL1DepositParams[](bridgedTokenCount);
 
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
             finalizeL1DepositParams[i] = getFinalizeWithdrawalParams(
                 toGateway ? chainId : gatewayChainId,
                 toGateway ? l2RpcUrl : gwRpcUrl,
-                msgHashes[i],
+                txHashes[i],
                 0
             );
         }
@@ -149,14 +119,5 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
             bool migrated = l2AssetTrackerBase.tokenMigratedThisChain(assetId);
             require(migrated, "Token not migrated");
         }
-    }
-
-    function loadHashesFromStartTokenMigrationFile(uint256 chainOrGatewayChainId) public returns (bytes32[] memory) {
-        string memory selector = vm.toString(abi.encodeWithSelector(this.startTokenMigrationOnL2OrGateway.selector));
-        // string(bytes4(this.startTokenMigrationOnL2OrGateway.selector))[2:10];
-        string memory actualSelector = "0675d915";
-        require(compareStrings(selector, string.concat("0x", actualSelector)), "Selector mismatch");
-        string memory startMigrationSelector = string.concat("/", actualSelector, "-");
-        return getHashesForChainAndSelector(chainOrGatewayChainId, startMigrationSelector);
     }
 }

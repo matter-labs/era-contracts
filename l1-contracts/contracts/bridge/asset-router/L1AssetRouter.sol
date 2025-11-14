@@ -31,6 +31,7 @@ import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from ".
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
 import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
+import {TxStatus} from "../../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -292,24 +293,28 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            CLAIM FAILED DEPOSIT Functions
+                            CONFIRM DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IL1AssetRouter
-    function bridgeRecoverFailedTransfer(
+    function bridgeConfirmTransferResult(
         uint256 _chainId,
+        TxStatus _txStatus,
         address _depositSender,
         bytes32 _assetId,
         bytes calldata _assetData
     ) external override onlyNullifier nonReentrant whenNotPaused {
-        IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeRecoverFailedTransfer(
-            _chainId,
-            _assetId,
-            _depositSender,
-            _assetData
-        );
+        IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeConfirmTransferResult({
+            _chainId: _chainId,
+            _txStatus: _txStatus,
+            _assetId: _assetId,
+            _depositSender: _depositSender,
+            _data: _assetData
+        });
 
-        emit ClaimedFailedDepositAssetRouter(_chainId, _assetId, _assetData);
+        if (_txStatus == TxStatus.Failure) {
+            emit ClaimedFailedDepositAssetRouter(_chainId, _assetId, _assetData);
+        }
     }
 
     function bridgeRecoverFailedTransfer(

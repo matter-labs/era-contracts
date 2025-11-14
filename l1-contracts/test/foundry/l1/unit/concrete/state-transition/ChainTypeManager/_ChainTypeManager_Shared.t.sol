@@ -31,6 +31,8 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
+import {PAUSE_DEPOSITS_TIME_WINDOW_END} from "contracts/common/Config.sol";
+
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
@@ -73,6 +75,9 @@ contract ChainTypeManagerTest is UtilsTest {
     Diamond.FacetCut[] internal facetCuts;
 
     function deploy() public {
+        // Timestamp needs to be late enough for `pauseDepositsBeforeInitiatingMigration` time checks
+        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END + 1);
+
         interopCenterAddress = makeAddr("interopCenter");
         governor = makeAddr("governor");
         admin = makeAddr("admin");
@@ -153,7 +158,7 @@ contract ChainTypeManagerTest is UtilsTest {
         facetCuts.push(
             Diamond.FacetCut({
                 facet: address(
-                    new MailboxFacet(eraChainId, block.chainid, IEIP7702Checker(makeAddr("eip7702Checker")))
+                    new MailboxFacet(eraChainId, block.chainid, address(0), IEIP7702Checker(makeAddr("eip7702Checker")))
                 ),
                 action: Diamond.Action.Add,
                 isFreezable: false,

@@ -34,7 +34,7 @@ import {Diamond} from "../libraries/Diamond.sol";
 import {ZKsyncOSChainTypeManager} from "../ZKsyncOSChainTypeManager.sol";
 import {EraChainTypeManager} from "../EraChainTypeManager.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {ROLLUP_L2_DA_COMMITMENT_SCHEME} from "../../common/Config.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
@@ -228,7 +228,12 @@ contract GatewayCTMDeployer {
         DeployedContracts memory _deployedContracts
     ) internal {
         _deployedContracts.stateTransition.mailboxFacet = address(
-            new MailboxFacet{salt: _salt}(_eraChainId, _l1ChainId, IEIP7702Checker(address(0)))
+            new MailboxFacet{salt: _salt}(
+                _eraChainId,
+                _l1ChainId,
+                L2_CHAIN_ASSET_HANDLER_ADDR,
+                IEIP7702Checker(address(0))
+            )
         );
         _deployedContracts.stateTransition.executorFacet = address(new ExecutorFacet{salt: _salt}(_l1ChainId));
         _deployedContracts.stateTransition.gettersFacet = address(new GettersFacet{salt: _salt}());

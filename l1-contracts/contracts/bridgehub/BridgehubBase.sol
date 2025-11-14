@@ -523,12 +523,15 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     /// @param _chainId The chain ID of the chain.
     /// @return zkChain The address of the ZK chain.
     /// @return ctm The address of the CTM of the chain.
-    function forwardedBridgeRecoverFailedTransfer(
-        uint256 _chainId
+    function forwardedBridgeConfirmTransferResult(
+        uint256 _chainId,
+        TxStatus _txStatus
     ) external onlyChainAssetHandler returns (address zkChain, address ctm) {
-        settlementLayer[_chainId] = block.chainid;
         zkChain = getZKChain(_chainId);
         ctm = chainTypeManager[_chainId];
+        if (_txStatus == TxStatus.Failure) {
+            settlementLayer[_chainId] = block.chainid;
+        }
     }
 
     /*////////////////////////////////////////////////////////////

@@ -633,9 +633,10 @@ export class Deployer {
 
   public async deployMailboxFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
+    const chainAssetHandler = getAddressFromEnv("CONTRACTS_CHAIN_ASSET_HANDLER_ADDR");
     const contractAddress = await this.deployViaCreate2(
       "MailboxFacet",
-      [eraChainId, await this.getL1ChainId()],
+      [eraChainId, await this.getL1ChainId(), chainAssetHandler],
       create2Salt,
       ethTxOptions
     );
