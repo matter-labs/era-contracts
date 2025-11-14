@@ -6,11 +6,9 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
 import {ConfirmBalanceMigrationData, TokenBalanceMigrationData} from "../../common/Messaging.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {Unauthorized, InvalidChainId} from "../../common/L1ContractErrors.sol";
-import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
-import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 
 import {AssetIdNotRegistered, MissingBaseTokenAssetId, OnlyGatewaySettlementLayer, TokenBalanceNotMigratedToGateway, MaxChainBalanceAlreadyAssigned} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
@@ -63,20 +61,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
     }
 
-    function _l1ChainId() internal view override returns (uint256) {
+    function _l1ChainId() internal view returns (uint256) {
         return L1_CHAIN_ID;
-    }
-
-    function _bridgehub() internal view override returns (IBridgehubBase) {
-        return L2_BRIDGEHUB;
     }
 
     function _nativeTokenVault() internal view override returns (INativeTokenVaultBase) {
         return L2_NATIVE_TOKEN_VAULT;
-    }
-
-    function _messageRoot() internal view override returns (IMessageRoot) {
-        return L2_MESSAGE_ROOT;
     }
 
     function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {

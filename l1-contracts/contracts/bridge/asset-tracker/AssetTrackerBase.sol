@@ -8,14 +8,12 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IAssetTrackerBase, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
 import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
 
-import {L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
-import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
-import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 import {InsufficientChainBalance} from "./AssetTrackerErrors.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 
@@ -58,29 +56,10 @@ abstract contract AssetTrackerBase is
     /// NOTE: this mapping may be removed in the future, don't rely on it!
     mapping(bytes32 assetId => bool maxChainBalanceAssigned) internal maxChainBalanceAssigned;
 
-    function _l1ChainId() internal view virtual returns (uint256);
-
-    function _bridgehub() internal view virtual returns (IBridgehubBase);
-
     function _nativeTokenVault() internal view virtual returns (INativeTokenVaultBase);
-
-    function _messageRoot() internal view virtual returns (IMessageRoot);
-
-    modifier onlyL1() {
-        require(block.chainid == _l1ChainId(), Unauthorized(msg.sender));
-        _;
-    }
 
     modifier onlyServiceTransactionSender() {
         require(msg.sender == SERVICE_TRANSACTION_SENDER, Unauthorized(msg.sender));
-        _;
-    }
-
-    modifier onlyNativeTokenVaultOrInteropCenter() {
-        require(
-            msg.sender == address(_nativeTokenVault()) || msg.sender == L2_INTEROP_CENTER_ADDR,
-            Unauthorized(msg.sender)
-        );
         _;
     }
 
