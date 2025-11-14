@@ -132,17 +132,18 @@ library InteropLibrary {
         if (executionAddress != address(0)) ++length;
         if (unbundlerAddress != address(0)) ++length;
         bytes[] memory attributes = new bytes[](length);
+        uint attributesPointer = 0;
         if (indirectCall) {
-            attributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
+            attributes[attributesPointer++] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
         }
         if (executionAddress != address(0)) {
-            attributes[0] = abi.encodeCall(
+            attributes[attributesPointer++] = abi.encodeCall(
                 IERC7786Attributes.executionAddress,
                 (InteroperableAddress.formatEvmV1(executionAddress))
             );
         }
         if (unbundlerAddress != address(0)) {
-            attributes[1] = abi.encodeCall(
+            attributes[attributesPointer++] = abi.encodeCall(
                 IERC7786Attributes.unbundlerAddress,
                 (InteroperableAddress.formatEvmV1(unbundlerAddress))
             );
