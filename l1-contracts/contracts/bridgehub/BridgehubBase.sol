@@ -8,6 +8,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
 import {IBridgehubBase} from "./IBridgehubBase.sol";
+
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1BaseTokenAssetHandler} from "../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
@@ -19,8 +20,8 @@ import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "../comm
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {AlreadyCurrentSL, NotChainAssetHandler, NotCurrentSL, NotRelayedSender, SLNotWhitelisted} from "./L1BridgehubErrors.sol";
-import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdCantBeCurrentChain, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, NoCTMForAssetId, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
+import {AlreadyCurrentSL, NotChainAssetHandler, NotRelayedSender, SLNotWhitelisted} from "./L1BridgehubErrors.sol";
+import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdCantBeCurrentChain, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, NoCTMForAssetId, NotCurrentSettlementLayer, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @author Matter Labs
@@ -100,6 +101,12 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
 
     /// @notice the chain asset handler used for chain migration.
     address public chainAssetHandler;
+
+    /// @notice the chain registration sender used for chain registration.
+    /// @notice the chainRegistrationSender is only deployed on L1.
+    /// @dev If the Bridgehub is on L1 it is the address just the chainRegistrationSender address.
+    /// @dev If the Bridgehub is on L2 the address is aliased.
+    address public chainRegistrationSender;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
@@ -192,8 +199,13 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
         address _assetRouter,
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
-        address _chainAssetHandler
+        address _chainAssetHandler,
+        address _chainRegistrationSender
     ) external virtual;
+
+    function setAddressesV30(address _chainRegistrationSender) external onlyOwnerOrUpgrader {
+        chainRegistrationSender = _chainRegistrationSender;
+    }
 
     /// @notice Used to set the chain asset handler address.
     /// @dev Called during v29 upgrade.
@@ -257,7 +269,7 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
         //
         // For simpler handling we allow anyone to call this method. It is okay, since during bridging operations
         // it is double checked that `assetId` is indeed derived from the `l1CtmDeployer`.
-        // TODO(EVM-703): This logic should be revised once interchain communication is implemented.
+        // TODO(EVM-703): This logic should be revised once interchain communication with aliasing (either standard trigger or shadow accounts) is implemented.
 
         address sender = _l1ChainId() == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender);
         // This method can be accessed by l1CtmDeployer only
@@ -373,8 +385,14 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
         L2Message calldata _message,
         bytes32[] calldata _proof
     ) external view override returns (bool) {
-        address zkChain = zkChainMap.get(_chainId);
-        return IZKChain(zkChain).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
+        return
+            messageRoot.proveL2MessageInclusionShared({
+                _chainId: _chainId,
+                _blockOrBatchNumber: _batchNumber,
+                _index: _index,
+                _message: _message,
+                _proof: _proof
+            });
     }
 
     /// @notice forwards function call to Mailbox based on ChainId
@@ -391,8 +409,14 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
         L2Log calldata _log,
         bytes32[] calldata _proof
     ) external view override returns (bool) {
-        address zkChain = zkChainMap.get(_chainId);
-        return IZKChain(zkChain).proveL2LogInclusion(_batchNumber, _index, _log, _proof);
+        return
+            messageRoot.proveL2LogInclusionShared({
+                _chainId: _chainId,
+                _blockOrBatchNumber: _batchNumber,
+                _index: _index,
+                _log: _log,
+                _proof: _proof
+            });
     }
 
     /// @notice forwards function call to Mailbox based on ChainId
@@ -414,9 +438,9 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
         bytes32[] calldata _merkleProof,
         TxStatus _status
     ) external view override returns (bool) {
-        address zkChain = zkChainMap.get(_chainId);
         return
-            IZKChain(zkChain).proveL1ToL2TransactionStatus({
+            messageRoot.proveL1ToL2TransactionStatusShared({
+                _chainId: _chainId,
                 _l2TxHash: _l2TxHash,
                 _l2BatchNumber: _l2BatchNumber,
                 _l2MessageIndex: _l2MessageIndex,
@@ -455,7 +479,7 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
         }
 
         if (settlementLayer[_chainId] != block.chainid) {
-            revert NotCurrentSL(settlementLayer[_chainId], block.chainid);
+            revert NotCurrentSettlementLayer();
         }
         settlementLayer[_chainId] = _newSettlementLayerChainId;
 

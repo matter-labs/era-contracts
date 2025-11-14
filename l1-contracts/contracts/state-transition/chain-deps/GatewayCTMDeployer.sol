@@ -34,7 +34,7 @@ import {Diamond} from "../libraries/Diamond.sol";
 import {ZKsyncOSChainTypeManager} from "../ZKsyncOSChainTypeManager.sol";
 import {EraChainTypeManager} from "../EraChainTypeManager.sol";
 
-import {L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {ROLLUP_L2_DA_COMMITMENT_SCHEME} from "../../common/Config.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
@@ -394,11 +394,11 @@ contract GatewayCTMDeployer {
     ) internal {
         if (_config.isZKsyncOS) {
             _deployedContracts.stateTransition.chainTypeManagerImplementation = address(
-                new ZKsyncOSChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR)
+                new ZKsyncOSChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
             );
         } else {
             _deployedContracts.stateTransition.chainTypeManagerImplementation = address(
-                new EraChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR)
+                new EraChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
             );
         }
 

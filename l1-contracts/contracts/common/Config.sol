@@ -227,3 +227,19 @@ enum L2DACommitmentScheme {
 
 /// @dev The L2 data availability commitment scheme that permanent rollups are expected to use.
 L2DACommitmentScheme constant ROLLUP_L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256;
+
+uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 16_384;
+
+uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_DEPTH = 14 + 1;
+
+/// @dev The start of the pause deposits time window. We pause when migrating to/from gateway.
+uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_START = 3 days + 12 hours;
+
+/// @dev The start of the chain migration window, it equals the PAUSE_DEPOSITS_TIME_WINDOW_START.
+uint256 constant CHAIN_MIGRATION_TIME_WINDOW_START = 3 days + 12 hours;
+
+/// @dev The end of the chain migration window.
+uint256 constant CHAIN_MIGRATION_TIME_WINDOW_END = 4 days + 12 hours;
+
+/// @dev The end of the pause deposits time window. We pause when migrating to/from gateway.
+uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_END = 7 days;

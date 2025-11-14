@@ -10,7 +10,7 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
 import {IBridgehubBase, BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehubBase.sol";
-
+import {PAUSE_DEPOSITS_TIME_WINDOW_START, PAUSE_DEPOSITS_TIME_WINDOW_END, CHAIN_MIGRATION_TIME_WINDOW_START, CHAIN_MIGRATION_TIME_WINDOW_END} from "contracts/common/Config.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
@@ -23,7 +23,7 @@ import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {IGetters, IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
@@ -32,6 +32,7 @@ import {NotInGatewayMode} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
+import {SharedUtils} from "./utils/SharedUtils.sol";
 import {GatewayUtils} from "deploy-scripts/gateway/GatewayUtils.s.sol";
 import {Utils} from "../unit/concrete/Utils/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -39,6 +40,9 @@ import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
+import {IMessageRoot, IMessageVerification} from "contracts/bridgehub/IMessageRoot.sol";
 
 contract L1GatewayTests is
     L1ContractDeployer,
@@ -46,16 +50,17 @@ contract L1GatewayTests is
     TokenDeployer,
     L2TxMocker,
     GatewayDeployer,
+    SharedUtils,
     ConfigSemaphore
 {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
 
-    uint256 migratingChainId = 10;
+    uint256 migratingChainId = 271;
     IZKChain migratingChain;
 
-    uint256 gatewayChainId = 11;
+    uint256 gatewayChainId = 506;
     IZKChain gatewayChain;
 
     uint256 mintChainId = 12;
@@ -81,12 +86,11 @@ contract L1GatewayTests is
         _registerNewTokens(tokens);
 
         _deployEra();
-        _deployZKChain(ETH_TOKEN_ADDRESS);
-        acceptPendingAdmin();
-        _deployZKChain(ETH_TOKEN_ADDRESS);
-        acceptPendingAdmin();
-        // _deployZKChain(tokens[0]);
-        // _deployZKChain(tokens[0]);
+        _deployZKChain(ETH_TOKEN_ADDRESS, migratingChainId);
+        acceptPendingAdmin(migratingChainId);
+        _deployZKChain(ETH_TOKEN_ADDRESS, gatewayChainId);
+        acceptPendingAdmin(gatewayChainId);
+
         // _deployZKChain(tokens[1]);
         // _deployZKChain(tokens[1]);
 
@@ -108,8 +112,36 @@ contract L1GatewayTests is
         vm.deal(migratingChain.getAdmin(), 100000000000000000000000000000000000);
         vm.deal(gatewayChain.getAdmin(), 100000000000000000000000000000000000);
 
+        vm.mockCall(
+            address(ecosystemAddresses.bridgehub.messageRootProxy),
+            abi.encodeWithSelector(IMessageRoot.getProofData.selector),
+            abi.encode(
+                ProofData({
+                    settlementLayerChainId: 0,
+                    settlementLayerBatchNumber: 0,
+                    settlementLayerBatchRootMask: 0,
+                    batchLeafProofLen: 0,
+                    batchSettlementRoot: 0,
+                    chainIdLeaf: 0,
+                    ptr: 0,
+                    finalProofNode: false
+                })
+            )
+        );
+
         // vm.deal(msg.sender, 100000000000000000000000000000000000);
         // vm.deal(bridgehub, 100000000000000000000000000000000000);
+    }
+
+    function _pauseDeposits(uint256 _chainId) public {
+        _pauseDeposits(address(addresses.bridgehub), _chainId);
+    }
+
+    function _unpauseDeposits(uint256 _chainId) public {
+        IZKChain chain = IZKChain(IBridgehubBase(addresses.bridgehub).getZKChain(_chainId));
+        vm.startBroadcast(chain.getAdmin());
+        IAdmin(address(chain)).unpauseDeposits();
+        vm.stopBroadcast();
     }
 
     // This is a method to simplify porting the tests for now.
@@ -136,20 +168,27 @@ contract L1GatewayTests is
     //
     function test_moveChainToGateway() public {
         _setUpGatewayWithFilterer();
+        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
+        _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
         require(addresses.bridgehub.settlementLayer(migratingChainId) == gatewayChainId, "Migration failed");
     }
 
     function test_l2Registration() public {
         _setUpGatewayWithFilterer();
+        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
+        _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
         gatewayScript.fullGatewayRegistration();
     }
 
     function test_startMessageToL2() public {
         _setUpGatewayWithFilterer();
+        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
+        _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
-        IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub);
+        _unpauseDeposits(migratingChainId);
+        IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
         uint256 expectedValue = 1000000000000000000000;
 
         L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect(
@@ -165,10 +204,12 @@ contract L1GatewayTests is
 
     function test_recoverFromFailedChainMigration() public {
         _setUpGatewayWithFilterer();
+        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
+        _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
 
         // Setup
-        IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub);
+        IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
         bytes32 assetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
         bytes memory transferData;
 
@@ -200,9 +241,9 @@ contract L1GatewayTests is
 
         // Mock Call for Msg Inclusion
         vm.mockCall(
-            address(addresses.bridgehub),
+            address(ecosystemAddresses.bridgehub.messageRootProxy),
             abi.encodeWithSelector(
-                IBridgehubBase.proveL1ToL2TransactionStatus.selector,
+                IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
                 migratingChainId,
                 l2TxHash,
                 l2BatchNumber,
@@ -240,12 +281,14 @@ contract L1GatewayTests is
 
     function test_finishMigrateBackChain() public {
         _setUpGatewayWithFilterer();
+        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
+        _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
         migrateBackChain();
     }
 
     function migrateBackChain() public {
-        IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub);
+        IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
         IZKChain migratingChain = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
         bytes32 assetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
 
@@ -259,8 +302,8 @@ contract L1GatewayTests is
         // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId.
         vm.chainId(migratingChainId);
         vm.mockCall(
-            address(addresses.bridgehub),
-            abi.encodeWithSelector(IBridgehubBase.proveL2MessageInclusion.selector),
+            address(ecosystemAddresses.bridgehub.messageRootProxy),
+            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
             abi.encode(true)
         );
         vm.mockCall(
@@ -272,6 +315,11 @@ contract L1GatewayTests is
             address(addresses.chainTypeManager),
             abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
             abi.encode(addresses.chainTypeManager.protocolVersion())
+        );
+        vm.mockCall(
+            address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
+            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
+            abi.encode(2)
         );
 
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(migratingChainId);
@@ -286,8 +334,12 @@ contract L1GatewayTests is
         BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
             chainId: migratingChainId,
             baseTokenAssetId: baseTokenAssetId,
+            batchNumber: 0,
             ctmData: ctmData,
-            chainData: chainData
+            chainData: chainData,
+            migrationNumber: IChainAssetHandler(address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy))
+                .migrationNumber(migratingChainId),
+            v30UpgradeChainBatchNumber: 0
         });
         bytes memory bridgehubMintData = abi.encode(data);
         bytes memory message = abi.encodePacked(
@@ -318,6 +370,8 @@ contract L1GatewayTests is
 
     function test_chainMigrationWithUpgrade() public {
         _setUpGatewayWithFilterer();
+        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
+        _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
 
         // Try to perform an upgrade
@@ -325,6 +379,7 @@ contract L1GatewayTests is
         DefaultUpgrade upgradeImpl = new DefaultUpgrade();
         uint256 currentProtocolVersion = migratingChain.getProtocolVersion();
         (uint32 major, uint32 minor, uint32 patch) = SemVer.unpackSemVer(uint96(currentProtocolVersion));
+        uint256 newProtocolVersion = SemVer.packSemVer(major, minor + 1, patch);
 
         ProposedUpgrade memory upgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: Utils.makeEmptyL2CanonicalTransaction(),
@@ -340,7 +395,7 @@ contract L1GatewayTests is
             l1ContractsUpgradeCalldata: hex"",
             postUpgradeCalldata: hex"",
             upgradeTimestamp: 0,
-            newProtocolVersion: SemVer.packSemVer(major, minor + 1, patch)
+            newProtocolVersion: newProtocolVersion
         });
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
@@ -354,10 +409,30 @@ contract L1GatewayTests is
             abi.encodeCall(IChainTypeManager.upgradeCutHash, (currentProtocolVersion)),
             abi.encode(keccak256(abi.encode(diamondCut)))
         );
+        vm.mockCall(
+            address(gatewayChain),
+            abi.encodeCall(IGetters.getProtocolVersion, ()),
+            abi.encode(newProtocolVersion)
+        );
 
         vm.startBroadcast(migratingChain.getAdmin());
         migratingChain.upgradeChainFromVersion(currentProtocolVersion, diamondCut);
         vm.stopBroadcast();
+    }
+
+    function test_proveL2LogsInclusionFromData() public {
+        _setUpGatewayWithFilterer();
+        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
+        _pauseDeposits(migratingChainId);
+        gatewayScript.migrateChainToGateway(migratingChainId);
+        _unpauseDeposits(migratingChainId);
+        IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
+
+        bytes
+            memory data = hex"74beea820000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000010f000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010003000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000002e49c884fd1000000000000000000000000000000000000000000000000000000000000010f93d0008af83c021d815bd4e76d7297c69d7f4cc4cf0b8892f7f74f6e33e11829000000000000000000000000c71d126d294a5d2e4002a62d0017b7109f18ade9000000000000000000000000c71d126d294a5d2e4002a62d0017b7109f18ade900000000000000000000000058dc094d71c4c3740bc1ef43d46b58717fa3595a000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000001c101000000000000000000000000000000000000000000000000000000000000000900000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000457425443000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000045742544300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c0101030000000000000000000000000000000000000000000000000000000000e4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf7594400000000000000000000000000000000000000000000000000000000000000079ba301ae10c10e68bffcc2b466aac46d7c7cd6f87eb055e4d43897f303c7a03a21b22cb4099a976636357d5d1f46deeb36f60ec6557eef0da85abaa8222c8c018dba9883941a824d6545029e626b54bd10404b2b8fff432a39ad36d9a36fe3d6000000000000000000000000000000110000000000000000000000000000000500000000000000000000000000000000000000000000000000000000000001fa0103000100000000000000000000000000000000000000000000000000000000f84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f82823d18b4879c426cf1cb583e1102d9d7f4a5a3a2d01e3f7cc6d042de25409fef1178cf3cbada927540027845a799eab8cf1d788869a9cc11c0f3ebfec198ff347";
+        address eraAddress = bridgehub.getZKChain(migratingChainId);
+        vm.expectRevert();
+        address(addresses.l1Nullifier).call(data);
     }
 
     // add this to be excluded from coverage report

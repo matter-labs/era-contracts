@@ -13,7 +13,7 @@ import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Call} from "contracts/governance/Common.sol";
-//
+
 contract DeployL2Script is Script {
     using stdToml for string;
 

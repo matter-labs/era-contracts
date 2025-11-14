@@ -25,7 +25,7 @@ contract FinalizeUpgrade is Script {
 
             if (bh.baseTokenAssetId(chains[i]) == bytes32(0)) {
                 vm.broadcast();
-                L1Bridgehub(bridgehub).registerLegacyChain(chains[i]);
+                // L1Bridgehub(bridgehub).registerLegacyChain(chains[i]);
             }
         }
     }
@@ -151,19 +151,17 @@ contract FinalizeUpgrade is Script {
                 console.log("Processing chain: ", params.chains[i]);
                 if (bh.baseTokenAssetId(params.chains[i]) == bytes32(0)) {
                     // Register legacy chain if needed
-                    bytes memory data = abi.encodeWithSelector(
-                        L1Bridgehub.registerLegacyChain.selector,
-                        params.chains[i]
-                    );
-
+                    // bytes memory data = abi.encodeWithSelector(
+                    // L1Bridgehub.registerLegacyChain.selector,
+                    // params.chains[i]
+                    // );
                     // Add call to aggregator calls array
-                    callIndex = addCall(calls, callIndex, params.bridgehub, data);
-
+                    // callIndex = addCall(calls, callIndex, params.bridgehub, data);
                     // If we've hit max calls, flush
-                    if (callIndex == MAX_CALLS_PER_BATCH) {
-                        flushBatch(params.aggregator, calls, callIndex);
-                        callIndex = 0;
-                    }
+                    // if (callIndex == MAX_CALLS_PER_BATCH) {
+                    //     flushBatch(params.aggregator, calls, callIndex);
+                    //     callIndex = 0;
+                    // }
                 }
             }
 

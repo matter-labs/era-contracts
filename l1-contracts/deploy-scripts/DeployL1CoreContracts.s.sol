@@ -5,12 +5,11 @@ pragma solidity ^0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {StateTransitionDeployedAddresses} from "./Utils.sol";
 
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {BridgehubBase} from "contracts/bridgehub/BridgehubBase.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL1AssetTracker, L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
@@ -34,14 +33,13 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
-import {Config, DeployedAddresses} from "./DeployUtils.s.sol";
-import {DeployL1HelperScript} from "./DeployL1HelperScript.s.sol";
+import {Config, DeployedAddresses, DeployL1CoreUtils} from "./DeployL1CoreUtils.s.sol";
 
-contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
+contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
     using stdToml for string;
 
     function run() public virtual {
-        console.log("Deploying L1 contracts");
+        console.log("Deploying L1 core contracts");
 
         runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml");
     }
@@ -113,6 +111,10 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
             "L1ERC20Bridge",
             false
         );
+        (
+            addresses.bridgehub.assetTrackerImplementation,
+            addresses.bridgehub.assetTrackerProxy
+        ) = deployTuppWithContract("L1AssetTracker", false);
         updateSharedBridge();
         (
             addresses.bridgehub.ctmDeploymentTrackerImplementation,
@@ -123,6 +125,10 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
             addresses.bridgehub.chainAssetHandlerImplementation,
             addresses.bridgehub.chainAssetHandlerProxy
         ) = deployTuppWithContract("L1ChainAssetHandler", false);
+        (
+            addresses.bridgehub.chainRegistrationSenderImplementation,
+            addresses.bridgehub.chainRegistrationSenderProxy
+        ) = deployTuppWithContract("ChainRegistrationSender", false);
         setBridgehubParams();
 
         updateOwners();
@@ -132,14 +138,18 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
 
     function setBridgehubParams() internal {
         IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub.bridgehubProxy);
+        IMessageRoot messageRoot = IMessageRoot(addresses.bridgehub.messageRootProxy);
+        IL1AssetTracker assetTracker = L1AssetTracker(addresses.bridgehub.assetTrackerProxy);
         vm.startBroadcast(msg.sender);
         bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
         BridgehubBase(address(bridgehub)).setAddresses(
             addresses.bridges.l1AssetRouterProxy,
             ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
             IMessageRoot(addresses.bridgehub.messageRootProxy),
-            addresses.bridgehub.chainAssetHandlerProxy
+            addresses.bridgehub.chainAssetHandlerProxy,
+            addresses.bridgehub.chainRegistrationSenderProxy
         );
+        assetTracker.setAddresses();
         vm.stopBroadcast();
         console.log("SharedBridge registered");
     }
@@ -149,6 +159,14 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         vm.broadcast(msg.sender);
         sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(addresses.bridges.erc20BridgeProxy));
         console.log("SharedBridge updated with ERC20Bridge address");
+
+        L1NativeTokenVault ntv = L1NativeTokenVault(payable(addresses.vaults.l1NativeTokenVaultProxy));
+        vm.broadcast(msg.sender);
+        ntv.setAssetTracker(addresses.bridgehub.assetTrackerProxy);
+        console.log("L1NativeTokenVault updated with AssetTracker address");
+
+        vm.broadcast(msg.sender);
+        IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
     }
 
     function setL1NativeTokenVaultParams() internal {
@@ -161,9 +179,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
         vm.broadcast(msg.sender);
         l1Nullifier.setL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
-
-        vm.broadcast(msg.sender);
-        IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
     }
 
     function updateOwners() internal {
@@ -175,6 +190,12 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
 
         IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
         IOwnable(address(sharedBridge)).transferOwnership(addresses.governance);
+
+        IL1AssetTracker assetTracker = IL1AssetTracker(addresses.bridgehub.assetTrackerProxy);
+        IOwnable(address(assetTracker)).transferOwnership(addresses.governance);
+
+        L1NativeTokenVault l1NativeTokenVault = L1NativeTokenVault(payable(addresses.vaults.l1NativeTokenVaultProxy));
+        l1NativeTokenVault.transferOwnership(config.ownerAddress);
 
         ICTMDeploymentTracker ctmDeploymentTracker = ICTMDeploymentTracker(
             addresses.bridgehub.ctmDeploymentTrackerProxy
@@ -198,6 +219,16 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         vm.serializeAddress("bridgehub", "chain_asset_handler_proxy_addr", addresses.bridgehub.chainAssetHandlerProxy);
         vm.serializeAddress(
             "bridgehub",
+            "chain_registration_sender_proxy_addr",
+            addresses.bridgehub.chainRegistrationSenderProxy
+        );
+        vm.serializeAddress(
+            "bridgehub",
+            "chain_registration_sender_implementation_addr",
+            addresses.bridgehub.chainRegistrationSenderImplementation
+        );
+        vm.serializeAddress(
+            "bridgehub",
             "ctm_deployment_tracker_proxy_addr",
             addresses.bridgehub.ctmDeploymentTrackerProxy
         );
@@ -206,6 +237,18 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
             "ctm_deployment_tracker_implementation_addr",
             addresses.bridgehub.ctmDeploymentTrackerImplementation
         );
+        vm.serializeAddress("bridgehub", "chain_asset_handler_proxy_addr", addresses.bridgehub.chainAssetHandlerProxy);
+        vm.serializeAddress(
+            "bridgehub",
+            "chain_asset_handler_implementation_addr",
+            addresses.bridgehub.chainAssetHandlerImplementation
+        );
+        vm.serializeAddress(
+            "bridgehub",
+            "l1_asset_tracker_implementation_addr",
+            addresses.bridgehub.assetTrackerImplementation
+        );
+        vm.serializeAddress("bridgehub", "l1_asset_tracker_proxy_addr", addresses.bridgehub.assetTrackerProxy);
         vm.serializeAddress("bridgehub", "message_root_proxy_addr", addresses.bridgehub.messageRootProxy);
         string memory bridgehub = vm.serializeAddress(
             "bridgehub",
@@ -254,22 +297,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
-    }
-
-    /// @notice Get all four facet cuts
-    function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
-        // We still want to reuse DeployUtils, but this function is not used in this script
-        revert("not implemented");
-    }
-
-    /// @notice Get new facet cuts that were added in the upgrade
-    function getUpgradeAddedFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
-        // We still want to reuse DeployUtils, but this function is not used in this script
-        revert("not implemented");
     }
 
     // add this to be excluded from coverage report

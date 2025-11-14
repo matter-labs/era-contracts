@@ -13,6 +13,7 @@ import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol
 import {L2LegacySharedBridgeTestHelper} from "../L2LegacySharedBridgeTestHelper.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 
 /// This scripts is only for developer
 contract SetupLegacyBridge is Script {
@@ -99,9 +100,18 @@ contract SetupLegacyBridge is Script {
     }
 
     function deployL1NullifierImplementation() internal {
+        IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub);
+
         bytes memory bytecode = abi.encodePacked(
             type(L1NullifierDev).creationCode,
-            abi.encode(addresses.bridgehub, config.chainId, addresses.diamondProxy)
+            abi.encode(
+                addresses.bridgehub,
+                bridgehub.messageRoot(),
+                // This value ignored now, but supposed to be interop center
+                address(0),
+                config.chainId,
+                addresses.diamondProxy
+            )
         );
         address contractAddress = deployViaCreate2(bytecode);
 

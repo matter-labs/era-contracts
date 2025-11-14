@@ -8,7 +8,7 @@ import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChain
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
-import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -294,14 +294,14 @@ library GatewayCTMDeployerHelper {
             _deployedContracts.stateTransition.chainTypeManagerImplementation = _deployInternal(
                 "ZKsyncOSChainTypeManager",
                 "ZKsyncOSChainTypeManager.sol",
-                abi.encode(L2_BRIDGEHUB_ADDR),
+                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR),
                 innerConfig
             );
         } else {
             _deployedContracts.stateTransition.chainTypeManagerImplementation = _deployInternal(
                 "EraChainTypeManager",
                 "EraChainTypeManager.sol",
-                abi.encode(L2_BRIDGEHUB_ADDR),
+                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR),
                 innerConfig
             );
         }

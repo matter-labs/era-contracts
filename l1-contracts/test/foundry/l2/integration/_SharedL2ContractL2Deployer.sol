@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {Test, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L2Utils} from "./L2Utils.sol";
@@ -37,7 +37,8 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         L2Utils.initSystemContracts(_args);
     }
 
-    // note this is duplicate code, but the inheritance is already complex
+    /// @notice this is duplicate code, but the inheritance is already complex
+    /// here we have to deploy contracts manually with new Contract(), because that can be handled by the compiler.
     function deployL2Contracts(uint256 _l1ChainId) public virtual override {
         string memory root = vm.projectRoot();
         string memory inputPath = string.concat(
@@ -45,10 +46,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml"
         );
         initializeConfig(inputPath);
-        addresses.transparentProxyAdmin = makeAddr("transparentProxyAdmin");
-        addresses.bridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
-        addresses.bridges.l1AssetRouterProxy = L2_ASSET_ROUTER_ADDR;
-        addresses.vaults.l1NativeTokenVaultProxy = L2_NATIVE_TOKEN_VAULT_ADDR;
+        addresses.transparentProxyAdmin = address(0x1);
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         instantiateCreate2Factory();
@@ -76,11 +74,11 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         // Deploy ChainTypeManager implementation
         if (config.isZKsyncOS) {
             addresses.stateTransition.chainTypeManagerImplementation = address(
-                new ZKsyncOSChainTypeManager(addresses.bridgehub.bridgehubProxy)
+                new ZKsyncOSChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
             );
         } else {
             addresses.stateTransition.chainTypeManagerImplementation = address(
-                new EraChainTypeManager(addresses.bridgehub.bridgehubProxy)
+                new EraChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
             );
         }
 
@@ -109,28 +107,4 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
 
     // add this to be excluded from coverage report
     function test() internal virtual override {}
-
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        revert("Not implemented");
-    }
-
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (bytes memory) {
-        return ("Not implemented initialize calldata");
-    }
-
-    function deployTuppWithContract(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (address implementation, address proxy) {
-        revert("Not implemented tupp");
-    }
-
-    // function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
-    // }
 }

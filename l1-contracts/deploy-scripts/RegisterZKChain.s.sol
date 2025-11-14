@@ -8,14 +8,16 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
+import {IChainRegistrationSender} from "contracts/bridgehub/IChainRegistrationSender.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {IValidatorTimelock} from "contracts/state-transition/IValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ADDRESS_ONE, Utils} from "./Utils.sol";
@@ -34,6 +36,7 @@ import {Call} from "contracts/governance/Common.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
+import {ZkChainAddresses} from "./Types.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -76,15 +79,6 @@ contract RegisterZKChainScript is Script {
 
     bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewZKChain(uint256,address)");
 
-    struct Output {
-        address governance;
-        address diamondProxy;
-        address chainAdmin;
-        address l2LegacySharedBridge;
-        address accessControlRestrictionAddress;
-        address chainProxyAdmin;
-    }
-
     struct LegacySharedBridgeParams {
         bytes implementationConstructorParams;
         address implementationAddress;
@@ -95,7 +89,7 @@ contract RegisterZKChainScript is Script {
     LegacySharedBridgeParams internal legacySharedBridgeParams;
 
     Config internal config;
-    Output internal output;
+    ZkChainAddresses internal output;
 
     function run() public {
         console.log("Deploying ZKChain");
@@ -132,6 +126,7 @@ contract RegisterZKChainScript is Script {
         addValidators();
         configureZkSyncStateTransition();
         setPendingAdmin();
+        registerOnOtherChains();
 
         if (config.initializeLegacyBridge) {
             deployLegacySharedBridge();
@@ -222,6 +217,9 @@ contract RegisterZKChainScript is Script {
 
         config.bridgehub = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
         // TODO(EVM-744): name of the key is a bit inconsistent
+
+        path = string.concat(root, vm.envString("CTM_OUTPUT"));
+        toml = vm.readFile(path);
         config.chainTypeManagerProxy = toml.readAddress(
             "$.deployed_addresses.state_transition.state_transition_proxy_addr"
         );
@@ -529,6 +527,27 @@ contract RegisterZKChainScript is Script {
         zkChain.setPendingAdmin(output.chainAdmin);
         vm.stopBroadcast();
         console.log("Owner for ", output.diamondProxy, "set to", output.chainAdmin);
+    }
+
+    function registerOnOtherChains() internal {
+        IBridgehubBase bridgehub = IBridgehubBase(config.bridgehub);
+        uint256[] memory chainsToRegisterOn = bridgehub.getAllZKChainChainIDs();
+        IChainRegistrationSender chainRegistrationSender = IChainRegistrationSender(
+            bridgehub.chainRegistrationSender()
+        );
+        for (uint256 i = 0; i < chainsToRegisterOn.length; i++) {
+            vm.startBroadcast();
+            chainRegistrationSender.registerChain(chainsToRegisterOn[i], config.chainChainId);
+            vm.stopBroadcast();
+        }
+        for (uint256 i = 0; i < chainsToRegisterOn.length; i++) {
+            if (chainsToRegisterOn[i] == config.chainChainId) {
+                continue;
+            }
+            vm.startBroadcast();
+            chainRegistrationSender.registerChain(config.chainChainId, chainsToRegisterOn[i]);
+            vm.stopBroadcast();
+        }
     }
 
     function deployChainProxyAddress() internal {
