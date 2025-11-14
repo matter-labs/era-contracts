@@ -27,24 +27,24 @@ contract MultisigCommiterTest is Test {
 	address chainAdmin;
 	address chainAddress;
 	address sequencer;
-	address verifier1Shared;
-	address verifier2Shared;
-	address verifier1Custom;
+	address validator1Shared;
+	address validator2Shared;
+	address validator1Custom;
 	uint256 chainId;
 	uint256 lastBatchNumber;
 	uint32 executionDelay;
 
 	bytes32 committerRole;
-	bytes32 verifierRole;
+	bytes32 validatorRole;
 
     function setUp() public {
 		ecosystemOwner = makeAddr("ecosystemOwner");
         chainAdmin = makeAddr("chainAdmin");
         chainAddress = makeAddr("chainAddress");
 		sequencer = makeAddr("sequencer");
-		verifier1Shared = makeAddr("verifier1Shared");
-		verifier2Shared = makeAddr("verifier2Shared");
-		verifier1Custom = makeAddr("verifier1Custom");
+		validator1Shared = makeAddr("validator1Shared");
+		validator2Shared = makeAddr("validator2Shared");
+		validator1Custom = makeAddr("validator1Custom");
 
         chainId = 1;
         lastBatchNumber = 123;
@@ -60,16 +60,16 @@ contract MultisigCommiterTest is Test {
 
         multisigCommitter = MultisigCommitter(_deployMultisigCommitter(ecosystemOwner, executionDelay));
         committerRole = multisigCommitter.COMMITTER_ROLE();
-        verifierRole = multisigCommitter.COMMIT_VERIFIER_ROLE();
+        validatorRole = multisigCommitter.COMMIT_VALIDATOR_ROLE();
 
         vm.prank(chainAdmin);
         multisigCommitter.addValidatorForChainId(chainId, sequencer);
 		vm.prank(chainAdmin);
-		multisigCommitter.grantRole(chainAddress, verifierRole, verifier1Custom);
+		multisigCommitter.grantRole(chainAddress, validatorRole, validator1Custom);
 		vm.prank(ecosystemOwner);
-		multisigCommitter.addSharedVerifier(verifier1Shared);
+		multisigCommitter.addSharedValidator(validator1Shared);
 		vm.prank(ecosystemOwner);
-		multisigCommitter.addSharedVerifier(verifier2Shared);
+		multisigCommitter.addSharedValidator(validator2Shared);
 		vm.prank(ecosystemOwner);
 		multisigCommitter.setSharedSigningThreshold(2);
     }
@@ -95,50 +95,50 @@ contract MultisigCommiterTest is Test {
 
 	function test_customVsDefaultSigningSet() public {
 		assertEq(multisigCommitter.sharedSigningThreshold(), 2);
-		assertEq(multisigCommitter.sharedVerifiersCount(), 2);
+		assertEq(multisigCommitter.sharedValidatorsCount(), 2);
 		assertEq(multisigCommitter.getSigningThreshold(chainAddress), 2);
-		assertEq(multisigCommitter.getVerifiersCount(chainAddress), 2);
+		assertEq(multisigCommitter.getValidatorsCount(chainAddress), 2);
 		
 		vm.prank(chainAdmin);
 		multisigCommitter.setSigningThreshold(chainAddress, 1);
 		assertEq(multisigCommitter.getSigningThreshold(chainAddress), 1);
-		assertEq(multisigCommitter.getVerifiersCount(chainAddress), 1);
+		assertEq(multisigCommitter.getValidatorsCount(chainAddress), 1);
 
 		vm.prank(chainAdmin);
 		multisigCommitter.useSharedSigningSet(chainAddress);
 		assertEq(multisigCommitter.getSigningThreshold(chainAddress), 2);
-		assertEq(multisigCommitter.getVerifiersCount(chainAddress), 2);
+		assertEq(multisigCommitter.getValidatorsCount(chainAddress), 2);
 	}
 
-	function test_addingRemovingSharedVerifiers() public {
-		address verifier3Shared = makeAddr("verifier3Shared");
+	function test_addingRemovingSharedValidators() public {
+		address validator3Shared = makeAddr("validator3Shared");
 		vm.prank(ecosystemOwner);
-		multisigCommitter.addSharedVerifier(verifier3Shared);
-		assertEq(multisigCommitter.sharedVerifiersCount(), 3);
-		assertEq(multisigCommitter.getVerifiersCount(chainAddress), 3);
-		assertTrue(multisigCommitter.isSharedVerifier(verifier3Shared));
-		assertTrue(multisigCommitter.isVerifier(chainAddress, verifier3Shared));
+		multisigCommitter.addSharedValidator(validator3Shared);
+		assertEq(multisigCommitter.sharedValidatorsCount(), 3);
+		assertEq(multisigCommitter.getValidatorsCount(chainAddress), 3);
+		assertTrue(multisigCommitter.isSharedValidator(validator3Shared));
+		assertTrue(multisigCommitter.isValidator(chainAddress, validator3Shared));
 		
 		vm.prank(ecosystemOwner);
-		multisigCommitter.removeSharedVerifier(verifier1Shared);
-		assertEq(multisigCommitter.sharedVerifiersCount(), 2);
-		assertEq(multisigCommitter.getVerifiersCount(chainAddress), 2);
-		assertFalse(multisigCommitter.isSharedVerifier(verifier1Shared));
-		assertFalse(multisigCommitter.isVerifier(chainAddress, verifier1Shared));
+		multisigCommitter.removeSharedValidator(validator1Shared);
+		assertEq(multisigCommitter.sharedValidatorsCount(), 2);
+		assertEq(multisigCommitter.getValidatorsCount(chainAddress), 2);
+		assertFalse(multisigCommitter.isSharedValidator(validator1Shared));
+		assertFalse(multisigCommitter.isValidator(chainAddress, validator1Shared));
 
 		vm.prank(ecosystemOwner);
-		multisigCommitter.removeSharedVerifier(verifier3Shared);
-		assertEq(multisigCommitter.sharedVerifiersCount(), 1);
-		assertEq(multisigCommitter.getVerifiersCount(chainAddress), 1);
-		assertFalse(multisigCommitter.isSharedVerifier(verifier3Shared));
-		assertFalse(multisigCommitter.isVerifier(chainAddress, verifier3Shared));
+		multisigCommitter.removeSharedValidator(validator3Shared);
+		assertEq(multisigCommitter.sharedValidatorsCount(), 1);
+		assertEq(multisigCommitter.getValidatorsCount(chainAddress), 1);
+		assertFalse(multisigCommitter.isSharedValidator(validator3Shared));
+		assertFalse(multisigCommitter.isValidator(chainAddress, validator3Shared));
 
 		vm.prank(ecosystemOwner);
-		multisigCommitter.addSharedVerifier(verifier1Shared);
-		assertEq(multisigCommitter.sharedVerifiersCount(), 2);
-		assertEq(multisigCommitter.getVerifiersCount(chainAddress), 2);
-		assertTrue(multisigCommitter.isSharedVerifier(verifier1Shared));
-		assertTrue(multisigCommitter.isVerifier(chainAddress, verifier1Shared));
+		multisigCommitter.addSharedValidator(validator1Shared);
+		assertEq(multisigCommitter.sharedValidatorsCount(), 2);
+		assertEq(multisigCommitter.getValidatorsCount(chainAddress), 2);
+		assertTrue(multisigCommitter.isSharedValidator(validator1Shared));
+		assertTrue(multisigCommitter.isValidator(chainAddress, validator1Shared));
 	}
 
 	function test_changeSharedSigningThreshold() public {

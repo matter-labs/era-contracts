@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable-v4/utils/cryptography/EIP712Upgradeable.sol";
 import {SignatureCheckerUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/utils/cryptography/SignatureCheckerUpgradeable.sol";
 import {EnumerableSetUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/utils/structs/EnumerableSetUpgradeable.sol";
-import {SignersNotSorted, SignerNotAuthorized, SignatureNotValid, ChainRequiresVerifiersSignaturesForCommit, SignaturesLengthMismatch, NotEnoughSigners} from "../common/L1ContractErrors.sol";
+import {SignersNotSorted, SignerNotAuthorized, SignatureNotValid, ChainRequiresValidatorsSignaturesForCommit, SignaturesLengthMismatch, NotEnoughSigners} from "../common/L1ContractErrors.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {ValidatorTimelock} from "./ValidatorTimelock.sol";
 import {IValidatorTimelock} from "./IValidatorTimelock.sol";
@@ -13,11 +13,11 @@ import {IMultisigCommitter} from "./IMultisigCommitter.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Extended ValidatorTimelock with commit function (optionally) locked
-/// behind providing extra signatures from verifiers. By default a shared signing 
+/// behind providing extra signatures from validators. By default a shared signing 
 /// set is used. Custom signing set with custom threshold can be elected by 
 // chainAdmin instead.
-/// @dev The purpose of this contract is to require multiple verifiers check each
-/// commit operation before a sequencer can perform it. Verifiers cannot start 
+/// @dev The purpose of this contract is to require multiple validators check each
+/// commit operation before a sequencer can perform it. Validators cannot start 
 /// commit operations. Only Committer can call commitBatchesMultisig, but requires 
 /// providing extra signatures argument
 /// @dev Expected to be deployed as a TransparentUpgradeableProxy.
@@ -28,15 +28,15 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
     bytes32 internal constant COMMIT_BATCHES_MULTISIG_TYPEHASH =
         keccak256("CommitBatchesMultisig(address chainAddress,uint256 processBatchFrom,uint256 processBatchTo,bytes batchData)");
 
-	// per chain verifier role, only applies if useCustomVerifiers is set
-	bytes32 public constant override COMMIT_VERIFIER_ROLE = keccak256("COMMIT_VERIFIER_ROLE");
+	// per chain validator role, only applies if useCustomValidators is set
+	bytes32 public constant override COMMIT_VALIDATOR_ROLE = keccak256("COMMIT_VALIDATOR_ROLE");
 
-	EnumerableSetUpgradeable.AddressSet private sharedVerifiers;
+	EnumerableSetUpgradeable.AddressSet private sharedValidators;
 	uint64 public override sharedSigningThreshold;
 
 	struct ChainConfig {
-		bool useCustomVerifiers; // if we should use per chain COMMIT_VERIFIER_ROLE holders instead of the shared verifier set
-		uint64 signingThreshold; // only applies if useCustomVerifiers is true
+		bool useCustomValidators; // if we should use per chain COMMIT_VALIDATOR_ROLE holders instead of the shared validator set
+		uint64 signingThreshold; // only applies if useCustomValidators is true
 	}
 
 	mapping(address chainAddress => ChainConfig) public chainConfig;
@@ -59,7 +59,7 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
         bytes calldata _batchData
 	) public override(ValidatorTimelock, IValidatorTimelock) {
 		if (getSigningThreshold(_chainAddress) != 0) 
-			revert ChainRequiresVerifiersSignaturesForCommit();
+			revert ChainRequiresValidatorsSignaturesForCommit();
 		super.commitBatchesSharedBridge(_chainAddress, _processBatchFrom, _processBatchTo, _batchData);
 	}
 
@@ -82,45 +82,45 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
 
 	/// @inheritdoc IMultisigCommitter
 	function getSigningThreshold(address chainAddress) public override view returns (uint64) {
-		if(chainConfig[chainAddress].useCustomVerifiers)
+		if(chainConfig[chainAddress].useCustomValidators)
 			return chainConfig[chainAddress].signingThreshold;
 		else return sharedSigningThreshold;
 	}
 
 	/// @inheritdoc IMultisigCommitter
-	function isVerifier(address chainAddress, address verifier) public override view returns (bool) {
-		if (chainConfig[chainAddress].useCustomVerifiers) 
-		return hasRole(chainAddress, COMMIT_VERIFIER_ROLE, verifier);
-		else return sharedVerifiers.contains(verifier);
+	function isValidator(address chainAddress, address validator) public override view returns (bool) {
+		if (chainConfig[chainAddress].useCustomValidators) 
+		return hasRole(chainAddress, COMMIT_VALIDATOR_ROLE, validator);
+		else return sharedValidators.contains(validator);
 	}
 
 	/// @inheritdoc IMultisigCommitter
-	function getVerifiersCount(address chainAddress) external override view returns (uint256) {
-		if(chainConfig[chainAddress].useCustomVerifiers)
-			return getRoleMemberCount(chainAddress, COMMIT_VERIFIER_ROLE);
-		else return sharedVerifiers.length();
+	function getValidatorsCount(address chainAddress) external override view returns (uint256) {
+		if(chainConfig[chainAddress].useCustomValidators)
+			return getRoleMemberCount(chainAddress, COMMIT_VALIDATOR_ROLE);
+		else return sharedValidators.length();
 	}
 
 	/// @inheritdoc IMultisigCommitter
-	function getVerifiersMember(address chainAddress, uint256 index) external override view returns (address) {
-		if(chainConfig[chainAddress].useCustomVerifiers)
-			return getRoleMember(chainAddress, COMMIT_VERIFIER_ROLE, index);
-		else return sharedVerifiers.at(index);
+	function getValidatorsMember(address chainAddress, uint256 index) external override view returns (address) {
+		if(chainConfig[chainAddress].useCustomValidators)
+			return getRoleMember(chainAddress, COMMIT_VALIDATOR_ROLE, index);
+		else return sharedValidators.at(index);
 	}
 
 	/// @inheritdoc IMultisigCommitter
-	function setSigningThreshold(address chainAddress, uint64 _signingThreshold) external override onlyRole(chainAddress, getRoleAdmin(chainAddress, COMMIT_VERIFIER_ROLE)) {
+	function setSigningThreshold(address chainAddress, uint64 _signingThreshold) external override onlyRole(chainAddress, getRoleAdmin(chainAddress, COMMIT_VALIDATOR_ROLE)) {
 		chainConfig[chainAddress] = ChainConfig({
-			useCustomVerifiers: true,
+			useCustomValidators: true,
 			signingThreshold: _signingThreshold
 		});
 		emit NewSigningThreshold(chainAddress, _signingThreshold);
 	}
 
 	/// @inheritdoc IMultisigCommitter
-	function useSharedSigningSet(address chainAddress) external override onlyRole(chainAddress, getRoleAdmin(chainAddress, COMMIT_VERIFIER_ROLE)) {
+	function useSharedSigningSet(address chainAddress) external override onlyRole(chainAddress, getRoleAdmin(chainAddress, COMMIT_VALIDATOR_ROLE)) {
 		chainConfig[chainAddress] = ChainConfig({
-			useCustomVerifiers: false,
+			useCustomValidators: false,
 			signingThreshold: 0
 		});
 		emit UseSharedSigningSet(chainAddress);
@@ -133,38 +133,38 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
 	}
 
 	/// @inheritdoc IMultisigCommitter
-	function addSharedVerifier(address verifier) external override onlyOwner {
-		if (!sharedVerifiers.contains(verifier)) {
+	function addSharedValidator(address validator) external override onlyOwner {
+		if (!sharedValidators.contains(validator)) {
 			// slither-disable-next-line unused-return
-			sharedVerifiers.add(verifier);
-			emit SharedVerifierAdded(verifier);
+			sharedValidators.add(validator);
+			emit SharedValidatorAdded(validator);
 		}
-		// no-op if verifier is already in the set
+		// no-op if validator is already in the set
 	}
 
 	/// @inheritdoc IMultisigCommitter
-	function removeSharedVerifier(address verifier) external override onlyOwner {
-		if (sharedVerifiers.contains(verifier)) {
+	function removeSharedValidator(address validator) external override onlyOwner {
+		if (sharedValidators.contains(validator)) {
 			// slither-disable-next-line unused-return
-			sharedVerifiers.remove(verifier);
-			emit SharedVerifierRemoved(verifier);
+			sharedValidators.remove(validator);
+			emit SharedValidatorRemoved(validator);
 		}
-		// no-op if verifier is not in the set
+		// no-op if validator is not in the set
 	}
 
 	/// @inheritdoc IMultisigCommitter
-	function sharedVerifiersCount() external override view returns (uint256) {
-		return sharedVerifiers.length();
+	function sharedValidatorsCount() external override view returns (uint256) {
+		return sharedValidators.length();
 	}
 
 	/// @inheritdoc IMultisigCommitter
-	function sharedVerifiersMember(uint256 index) external override view returns (address) {
-		return sharedVerifiers.at(index);
+	function sharedValidatorsMember(uint256 index) external override view returns (address) {
+		return sharedValidators.at(index);
 	}
 
 	/// @inheritdoc IMultisigCommitter
-	function isSharedVerifier(address verifier) external override view returns (bool) {
-		return sharedVerifiers.contains(verifier);
+	function isSharedValidator(address validator) external override view returns (bool) {
+		return sharedValidators.contains(validator);
 	}
 
 	function _checkSignatures(address chainAddress, address[] calldata signers, bytes[] calldata signatures, bytes32 digest) internal view {
@@ -178,7 +178,7 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
 		for (uint256 i = 0; i < signers.length; i++) {
 			if(signers[i] <= previousSigner) 
 				revert SignersNotSorted();
-			if (!isVerifier(chainAddress, signers[i])) 
+			if (!isValidator(chainAddress, signers[i])) 
 				revert SignerNotAuthorized(signers[i]);
 			if (!SignatureCheckerUpgradeable.isValidSignatureNow(signers[i], digest, signatures[i])) 
 				revert SignatureNotValid(signers[i]);
