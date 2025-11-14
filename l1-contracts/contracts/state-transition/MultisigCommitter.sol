@@ -89,23 +89,29 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
 
 	/// @inheritdoc IMultisigCommitter
 	function isValidator(address chainAddress, address validator) public override view returns (bool) {
-		if (chainConfig[chainAddress].useCustomValidators) 
-		return hasRole(chainAddress, COMMIT_VALIDATOR_ROLE, validator);
-		else return sharedValidators.contains(validator);
+		if (chainConfig[chainAddress].useCustomValidators) {
+			return hasRole(chainAddress, COMMIT_VALIDATOR_ROLE, validator);
+		} else {
+			return sharedValidators.contains(validator);
+		}
 	}
 
 	/// @inheritdoc IMultisigCommitter
 	function getValidatorsCount(address chainAddress) external override view returns (uint256) {
-		if(chainConfig[chainAddress].useCustomValidators)
+		if(chainConfig[chainAddress].useCustomValidators) {
 			return getRoleMemberCount(chainAddress, COMMIT_VALIDATOR_ROLE);
-		else return sharedValidators.length();
+		} else {
+			return sharedValidators.length();
+		}
 	}
 
 	/// @inheritdoc IMultisigCommitter
 	function getValidatorsMember(address chainAddress, uint256 index) external override view returns (address) {
-		if(chainConfig[chainAddress].useCustomValidators)
+		if(chainConfig[chainAddress].useCustomValidators) {
 			return getRoleMember(chainAddress, COMMIT_VALIDATOR_ROLE, index);
-		else return sharedValidators.at(index);
+		} else {
+			return sharedValidators.at(index);
+		}
 	}
 
 	/// @inheritdoc IMultisigCommitter
@@ -176,12 +182,15 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
 		// signers must be sorted in order to cheaply validate they are not duplicated
 		address previousSigner = address(0);
 		for (uint256 i = 0; i < signers.length; i++) {
-			if(signers[i] <= previousSigner) 
+			if(signers[i] <= previousSigner) {
 				revert SignersNotSorted();
-			if (!isValidator(chainAddress, signers[i])) 
+			}
+			if (!isValidator(chainAddress, signers[i])) {
 				revert SignerNotAuthorized(signers[i]);
-			if (!SignatureCheckerUpgradeable.isValidSignatureNow(signers[i], digest, signatures[i])) 
+			}
+			if (!SignatureCheckerUpgradeable.isValidSignatureNow(signers[i], digest, signatures[i])) {
 				revert SignatureNotValid(signers[i]);
+			}
 			previousSigner = signers[i];
 		}
 	}
