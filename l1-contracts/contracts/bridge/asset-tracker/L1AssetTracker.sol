@@ -27,8 +27,6 @@ import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 
 contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
-    uint256 public immutable L1_CHAIN_ID;
-
     IBridgehubBase public immutable BRIDGE_HUB;
 
     INativeTokenVaultBase public immutable NATIVE_TOKEN_VAULT;
