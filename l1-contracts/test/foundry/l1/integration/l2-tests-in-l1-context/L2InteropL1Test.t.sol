@@ -7,13 +7,11 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-
 import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {L2InteropTestAbstract} from "../l2-tests-abstract/L2InteropTestAbstract.t.sol";
 
 import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
-import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {StateTransitionDeployedAddresses} from "deploy-scripts/Types.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
@@ -42,13 +40,6 @@ contract L2InteropL1Test is Test, SharedL2ContractL1Deployer, L2InteropTestAbstr
         StateTransitionDeployedAddresses memory stateTransition
     ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
         return super.getUpgradeAddedFacetCuts(stateTransition);
-    }
-
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override(DeployUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
-        return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function getInitializeCalldata(

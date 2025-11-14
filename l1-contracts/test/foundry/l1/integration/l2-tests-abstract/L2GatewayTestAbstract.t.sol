@@ -75,7 +75,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
 
     function test_withdrawFromGateway() public {
         finalizeDeposit();
-        clearPriorityQueue(address(addresses.bridgehub.bridgehubProxy), mintChainId);
+        clearPriorityQueue(address(discoveredBridgehub.bridgehubProxy), mintChainId);
         _pauseDeposits(L2_BRIDGEHUB_ADDR, mintChainId);
         address newAdmin = makeAddr("newAdmin");
         //vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20.totalSupply, ()), abi.encode(amount));

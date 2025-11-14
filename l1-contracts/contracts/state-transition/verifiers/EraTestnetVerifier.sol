@@ -14,6 +14,7 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 /// otherwise, it will skip the verification.
 contract EraTestnetVerifier is IVerifier {
     EraDualVerifier public immutable dualVerifier;
+    bool public constant isTestnetVerifier = true;
 
     constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) {
         assert(block.chainid != 1);
