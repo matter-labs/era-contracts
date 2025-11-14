@@ -293,7 +293,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             // for an individual chain as well as the fact that chains can only migrate once on top of Gateway.
             // Since `currentSettlementLayer != block.chainid` is checked above, it implies that the current
             // `data.chainMigrationNumber` is odd and so after this migration is processed once, it will not be able to be reprocessed,
-            // due to `assetMigrationNumber` being assigned later.H
+            // due to `assetMigrationNumber` being assigned later.
             require(
                 (assetMigrationNumber[data.chainId][data.assetId]) % 2 == 0,
                 InvalidMigrationNumber(chainMigrationNumber, assetMigrationNumber[data.chainId][data.assetId])
