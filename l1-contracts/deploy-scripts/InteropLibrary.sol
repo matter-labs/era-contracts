@@ -248,10 +248,6 @@ library InteropLibrary {
             revert ZeroAddress();
         }
 
-        if (executionAddress == address(0)) {
-            executionAddress = executionAddress;
-        }
-
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = buildSendCall({
             destinationChainId: destination,
