@@ -5,8 +5,6 @@ pragma solidity ^0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {StateTransitionDeployedAddresses} from "./Utils.sol";
 
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {BridgehubBase} from "contracts/bridgehub/BridgehubBase.sol";
@@ -35,12 +33,9 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
-import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
-import {Config, DeployUtils, DeployedAddresses} from "./DeployUtils.s.sol";
+import {Config, DeployedAddresses, DeployL1CoreUtils} from "./DeployL1CoreUtils.s.sol";
 
-import {DeployL1HelperScript} from "./DeployL1HelperScript.s.sol";
-
-contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
+contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
     using stdToml for string;
 
     function run() public virtual {
@@ -302,22 +297,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
-    }
-
-    /// @notice Get all four facet cuts
-    function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
-        // We still want to reuse DeployUtils, but this function is not used in this script
-        revert("not implemented");
-    }
-
-    /// @notice Get new facet cuts that were added in the upgrade
-    function getUpgradeAddedFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
-        // We still want to reuse DeployUtils, but this function is not used in this script
-        revert("not implemented");
     }
 
     // add this to be excluded from coverage report

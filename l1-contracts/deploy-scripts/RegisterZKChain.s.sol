@@ -17,6 +17,7 @@ import {IValidatorTimelock} from "contracts/state-transition/IValidatorTimelock.
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ADDRESS_ONE, Utils} from "./Utils.sol";
@@ -36,6 +37,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 import {PAUSE_DEPOSITS_TIME_WINDOW_END} from "contracts/common/Config.sol";
+import {ZkChainAddresses} from "./Types.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -78,15 +80,6 @@ contract RegisterZKChainScript is Script {
 
     bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewZKChain(uint256,address)");
 
-    struct Output {
-        address governance;
-        address diamondProxy;
-        address chainAdmin;
-        address l2LegacySharedBridge;
-        address accessControlRestrictionAddress;
-        address chainProxyAdmin;
-    }
-
     struct LegacySharedBridgeParams {
         bytes implementationConstructorParams;
         address implementationAddress;
@@ -97,7 +90,7 @@ contract RegisterZKChainScript is Script {
     LegacySharedBridgeParams internal legacySharedBridgeParams;
 
     Config internal config;
-    Output internal output;
+    ZkChainAddresses internal output;
 
     function run() public {
         console.log("Deploying ZKChain");
@@ -226,6 +219,9 @@ contract RegisterZKChainScript is Script {
 
         config.bridgehub = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
         // TODO(EVM-744): name of the key is a bit inconsistent
+
+        path = string.concat(root, vm.envString("CTM_OUTPUT"));
+        toml = vm.readFile(path);
         config.chainTypeManagerProxy = toml.readAddress(
             "$.deployed_addresses.state_transition.state_transition_proxy_addr"
         );

@@ -6,18 +6,17 @@ pragma solidity ^0.8.24;
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {DeployCTMUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
+import {StateTransitionDeployedAddresses} from "deploy-scripts/Types.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {GW_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-abstract contract DeployIntegrationUtils is Script, DeployUtils {
+abstract contract DeployIntegrationUtils is Script, DeployCTMUtils {
     using stdToml for string;
 
     function test() internal virtual override {}
@@ -25,7 +24,9 @@ abstract contract DeployIntegrationUtils is Script, DeployUtils {
     function getInitializeCalldata(
         string memory contractName,
         bool isZKBytecode
-    ) internal virtual override returns (bytes memory);
+    ) internal virtual override returns (bytes memory) {
+        return super.getInitializeCalldata(contractName, isZKBytecode);
+    }
 
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
@@ -75,7 +76,7 @@ abstract contract DeployIntegrationUtils is Script, DeployUtils {
 
     function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
+    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
         return getChainCreationFacetCuts(stateTransition);
     }
 

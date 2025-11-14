@@ -38,4 +38,11 @@ contract L2InteropTests is Test, L2InteropTestAbstract, SharedL2ContractL2Deploy
     ) public override(SharedL2ContractL2Deployer, SharedL2ContractDeployer) {
         super.deployL2Contracts(_l1ChainId);
     }
+
+    function getCreationCode(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view virtual override returns (bytes memory) {
+        return super.getCreationCode(contractName, false);
+    }
 }

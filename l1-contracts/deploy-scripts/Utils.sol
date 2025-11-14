@@ -62,32 +62,6 @@ address constant L2_CREATE2_FACTORY_ADDRESS = address(USER_CONTRACTS_OFFSET);
 
 uint256 constant SECURITY_COUNCIL_SIZE = 12;
 
-// solhint-disable-next-line gas-struct-packing
-struct StateTransitionDeployedAddresses {
-    address chainTypeManagerProxy;
-    address chainTypeManagerProxyAdmin;
-    address chainTypeManagerImplementation;
-    address verifier;
-    address verifierFflonk;
-    address verifierPlonk;
-    address adminFacet;
-    address mailboxFacet;
-    address executorFacet;
-    address gettersFacet;
-    address diamondInit;
-    address genesisUpgrade;
-    address defaultUpgrade;
-    address validatorTimelockImplementation;
-    address validatorTimelock;
-    address diamondProxy;
-    address bytecodesSupplier;
-    address serverNotifierProxy;
-    address serverNotifierImplementation;
-    address rollupDAManager;
-    address rollupSLDAValidator;
-    bool isOnGateway;
-}
-
 /// @dev We need to use a struct instead of list of params to prevent stack too deep error
 struct PrepareL1L2TransactionParams {
     uint256 l1GasPrice;
