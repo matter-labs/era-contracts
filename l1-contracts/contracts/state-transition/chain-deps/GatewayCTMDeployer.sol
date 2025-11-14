@@ -231,14 +231,14 @@ contract GatewayCTMDeployer {
         bool _testnetVerifier
     ) internal {
         _deployedContracts.stateTransition.mailboxFacet = address(
-            new MailboxFacet{salt: _salt}(
-                _eraChainId,
-                _l1ChainId,
-                L2_CHAIN_ASSET_HANDLER_ADDR,
-                IEIP7702Checker(address(0)),
-                _testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET,
-                _testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET
-            )
+            new MailboxFacet{salt: _salt}({
+                _eraChainId: _eraChainId,
+                _l1ChainId: _l1ChainId,
+                _chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
+                _eip7702Checker: IEIP7702Checker(address(0)),
+                _pauseDepositsTimeWindowStart: _testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET,
+                _pauseDepositsTimeWindowEnd: _testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET
+            })
         );
         _deployedContracts.stateTransition.executorFacet = address(new ExecutorFacet{salt: _salt}(_l1ChainId));
         _deployedContracts.stateTransition.gettersFacet = address(new GettersFacet{salt: _salt}());
@@ -249,7 +249,14 @@ contract GatewayCTMDeployer {
             _deployedContracts
         );
         _deployedContracts.stateTransition.adminFacet = address(
-            new AdminFacet{salt: _salt}(_l1ChainId, rollupDAManager, _testnetVerifier ? CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET : CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET, _testnetVerifier ? CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET : CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET, _testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, _testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET)
+            new AdminFacet{salt: _salt}({
+                _l1ChainId: _l1ChainId,
+                _rollupDAManager: rollupDAManager,
+                _chainMigrationTimeWindowStart: _testnetVerifier ? CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET : CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET,
+                _chainMigrationTimeWindowEnd: _testnetVerifier ? CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET : CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET,
+                _pauseDepositsTimeWindowStart: _testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET,
+                _pauseDepositsTimeWindowEnd: _testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET
+            })
         );
 
         _deployedContracts.stateTransition.diamondInit = address(new DiamondInit{salt: _salt}(false));
