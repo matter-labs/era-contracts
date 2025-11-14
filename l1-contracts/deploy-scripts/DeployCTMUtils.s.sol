@@ -55,6 +55,7 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {DeployUtils} from "./DeployUtils.sol";
 import {AddressIntrospector} from "./AddressIntrospector.sol";
+import {CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET, CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
 import {StateTransitionDeployedAddresses, DataAvailabilityDeployedAddresses, ChainCreationParamsConfig} from "./Types.sol";
@@ -485,14 +486,22 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (compareStrings(contractName, "ExecutorFacet")) {
             return abi.encode(config.l1ChainId);
         } else if (compareStrings(contractName, "AdminFacet")) {
-            return abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager);
+            uint256 chainMigrationTimeWindowStart = config.testnetVerifier ? CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET : CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET;
+            uint256 chainMigrationTimeWindowEnd = config.testnetVerifier ? CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET : CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET;
+            uint256 pauseDepositsTimeWindowStart = config.testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET;
+            uint256 pauseDepositsTimeWindowEnd = config.testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET;
+            return abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager, chainMigrationTimeWindowStart, chainMigrationTimeWindowEnd, pauseDepositsTimeWindowStart, pauseDepositsTimeWindowEnd);
         } else if (compareStrings(contractName, "MailboxFacet")) {
+            uint256 pauseDepositsTimeWindowStart = config.testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET;
+            uint256 pauseDepositsTimeWindowEnd = config.testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET;
             return
                 abi.encode(
                     config.eraChainId,
                     config.l1ChainId,
                     discoveredBridgehub.chainAssetHandler,
-                    addresses.eip7702Checker
+                    addresses.eip7702Checker,
+                    pauseDepositsTimeWindowStart,
+                    pauseDepositsTimeWindowEnd
                 );
         } else if (compareStrings(contractName, "GettersFacet")) {
             return abi.encode();

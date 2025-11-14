@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {IEIP7702Checker} from "../../state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {MailboxFacet} from "../../state-transition/chain-deps/facets/Mailbox.sol";
 import {FeeParams, PubdataPricingMode} from "../../state-transition/chain-deps/ZKChainStorage.sol";
+import {PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET} from "../../common/Config.sol";
 
 contract DummyZKChain is MailboxFacet {
     constructor(
@@ -12,7 +13,7 @@ contract DummyZKChain is MailboxFacet {
         uint256 _l1ChainId,
         address _chainAssetHandler,
         IEIP7702Checker _eip7702Checker
-    ) MailboxFacet(_eraChainId, _l1ChainId, _chainAssetHandler, _eip7702Checker) {
+    ) MailboxFacet(_eraChainId, _l1ChainId, _chainAssetHandler, _eip7702Checker, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET) {
         s.bridgehub = bridgeHubAddress;
     }
 

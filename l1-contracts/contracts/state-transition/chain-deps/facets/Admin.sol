@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, PAUSE_DEPOSITS_TIME_WINDOW_END, PAUSE_DEPOSITS_TIME_WINDOW_START, CHAIN_MIGRATION_TIME_WINDOW_START, CHAIN_MIGRATION_TIME_WINDOW_END, ZKChainCommitment} from "../../../common/Config.sol";
+import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, ZKChainCommitment} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
@@ -43,9 +43,21 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @notice The address that is responsible for determining whether a certain DA pair is allowed for rollups.
     RollupDAManager internal immutable ROLLUP_DA_MANAGER;
 
-    constructor(uint256 _l1ChainId, RollupDAManager _rollupDAManager) {
+    uint256 internal immutable CHAIN_MIGRATION_TIME_WINDOW_START;
+
+    uint256 internal immutable CHAIN_MIGRATION_TIME_WINDOW_END;
+
+    uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_START;
+
+    uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_END;
+
+    constructor(uint256 _l1ChainId, RollupDAManager _rollupDAManager, uint256 _chainMigrationTimeWindowStart, uint256 _chainMigrationTimeWindowEnd, uint256 _pauseDepositsTimeWindowStart, uint256 _pauseDepositsTimeWindowEnd) {
         L1_CHAIN_ID = _l1ChainId;
         ROLLUP_DA_MANAGER = _rollupDAManager;
+        CHAIN_MIGRATION_TIME_WINDOW_START = _chainMigrationTimeWindowStart;
+        CHAIN_MIGRATION_TIME_WINDOW_END = _chainMigrationTimeWindowEnd;
+        PAUSE_DEPOSITS_TIME_WINDOW_START = _pauseDepositsTimeWindowStart;
+        PAUSE_DEPOSITS_TIME_WINDOW_END = _pauseDepositsTimeWindowEnd;
     }
 
     modifier onlyL1() {

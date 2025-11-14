@@ -43,6 +43,7 @@ import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "../chain-
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "../IChainTypeManager.sol";
 import {ServerNotifier} from "../../governance/ServerNotifier.sol";
 
+import {CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET, CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 /// @notice Configuration parameters for deploying the GatewayCTMDeployer contract.
 // solhint-disable-next-line gas-struct-packing
 struct GatewayCTMDeployerConfig {
@@ -191,7 +192,8 @@ contract GatewayCTMDeployer {
             _eraChainId: eraChainId,
             _l1ChainId: l1ChainId,
             _aliasedGovernanceAddress: _config.aliasedGovernanceAddress,
-            _deployedContracts: contracts
+            _deployedContracts: contracts,
+            _testnetVerifier: _config.testnetVerifier
         });
         // solhint-disable-next-line func-named-parameters
         _deployVerifier(salt, _config.testnetVerifier, _config.isZKsyncOS, contracts, _config.aliasedGovernanceAddress);
@@ -225,14 +227,17 @@ contract GatewayCTMDeployer {
         uint256 _eraChainId,
         uint256 _l1ChainId,
         address _aliasedGovernanceAddress,
-        DeployedContracts memory _deployedContracts
+        DeployedContracts memory _deployedContracts,
+        bool _testnetVerifier
     ) internal {
         _deployedContracts.stateTransition.mailboxFacet = address(
             new MailboxFacet{salt: _salt}(
                 _eraChainId,
                 _l1ChainId,
                 L2_CHAIN_ASSET_HANDLER_ADDR,
-                IEIP7702Checker(address(0))
+                IEIP7702Checker(address(0)),
+                _testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET,
+                _testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET
             )
         );
         _deployedContracts.stateTransition.executorFacet = address(new ExecutorFacet{salt: _salt}(_l1ChainId));
@@ -244,7 +249,7 @@ contract GatewayCTMDeployer {
             _deployedContracts
         );
         _deployedContracts.stateTransition.adminFacet = address(
-            new AdminFacet{salt: _salt}(_l1ChainId, rollupDAManager)
+            new AdminFacet{salt: _salt}(_l1ChainId, rollupDAManager, _testnetVerifier ? CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET : CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET, _testnetVerifier ? CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET : CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET, _testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, _testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET)
         );
 
         _deployedContracts.stateTransition.diamondInit = address(new DiamondInit{salt: _salt}(false));
