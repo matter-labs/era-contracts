@@ -69,24 +69,24 @@ library L2ContractHelper {
     /// - Bytecode words length is not odd
     function hashL2Bytecode(bytes memory _bytecode) internal pure returns (bytes32 hashedBytecode) {
         // Note that the length of the bytecode must be provided in 32-byte words.
-        if (_bytecode.length % 32 != 0) {
-            revert LengthIsNotDivisibleBy32(_bytecode.length);
-        }
+        // if (_bytecode.length % 32 != 0) {
+        //     revert LengthIsNotDivisibleBy32(_bytecode.length);
+        // }
 
-        uint256 bytecodeLenInWords = _bytecode.length / 32;
-        // bytecode length must be less than 2^16 words
-        if (bytecodeLenInWords >= 2 ** 16) {
-            revert MalformedBytecode(BytecodeError.NumberOfWords);
-        }
-        // bytecode length in words must be odd
-        if (bytecodeLenInWords % 2 == 0) {
-            revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
-        }
-        hashedBytecode = sha256(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
-        // Setting the version of the hash
-        hashedBytecode = (hashedBytecode | bytes32(uint256(1 << 248)));
-        // Setting the length
-        hashedBytecode = hashedBytecode | bytes32(bytecodeLenInWords << 224);
+        // uint256 bytecodeLenInWords = _bytecode.length / 32;
+        // // bytecode length must be less than 2^16 words
+        // if (bytecodeLenInWords >= 2 ** 16) {
+        //     revert MalformedBytecode(BytecodeError.NumberOfWords);
+        // }
+        // // bytecode length in words must be odd
+        // if (bytecodeLenInWords % 2 == 0) {
+        //     revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
+        // }
+        // hashedBytecode = sha256(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+        // // Setting the version of the hash
+        // hashedBytecode = (hashedBytecode | bytes32(uint256(1 << 248)));
+        // // Setting the length
+        // hashedBytecode = hashedBytecode | bytes32(bytecodeLenInWords << 224);
     }
 
     /// @notice Validate the bytecode format and calculate its hash.

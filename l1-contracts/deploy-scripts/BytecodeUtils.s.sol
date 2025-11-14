@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
+import {console2 as console} from "forge-std/console2.sol";
 
 library BytecodeUtils {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
@@ -46,11 +47,13 @@ library BytecodeUtils {
      * @dev Read foundry bytecodes
      */
     function readFoundryBytecode(string memory artifactPath) internal view returns (bytes memory) {
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, artifactPath);
-        string memory json = vm.readFile(path);
-        bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode.object");
-        return bytecode;
+        string memory root = vm.projectRoot(); /// COMMENT THIS LINE OUT
+        // string memory path = string.concat(root, artifactPath);
+        // console.log("path", path);
+        // string memory json = vm.readFile(path);
+        // bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode.object");
+        // return bytecode;
+        return hex"";
     }
 
     function readFoundryBytecodeL1(

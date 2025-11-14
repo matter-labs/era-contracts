@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Utils as Utils_old} from "./Utils.sol";
 import {BytecodeUtils as Utils} from "./BytecodeUtils.s.sol";
 
 /// @title ContractsBytecodesLib
