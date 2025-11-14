@@ -80,7 +80,14 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         _;
     }
 
-    constructor(uint256 _eraChainId, uint256 _l1ChainId, address _chainAssetHandler, IEIP7702Checker _eip7702Checker, uint256 _pauseDepositsTimeWindowStart, uint256 _pauseDepositsTimeWindowEnd) {
+    constructor(
+        uint256 _eraChainId,
+        uint256 _l1ChainId,
+        address _chainAssetHandler,
+        IEIP7702Checker _eip7702Checker,
+        uint256 _pauseDepositsTimeWindowStart,
+        uint256 _pauseDepositsTimeWindowEnd
+    ) {
         if (address(_eip7702Checker) == address(0) && block.chainid == _l1ChainId) {
             revert ZeroAddress();
         } else if (address(_eip7702Checker) != address(0) && block.chainid != _l1ChainId) {

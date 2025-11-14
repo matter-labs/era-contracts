@@ -134,7 +134,16 @@ contract ChainTypeManagerTest is UtilsTest {
         );
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)), CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET)),
+                facet: address(
+                    new AdminFacet(
+                        block.chainid,
+                        RollupDAManager(address(0)),
+                        CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET,
+                        CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET,
+                        PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+                        PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+                    )
+                ),
                 action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: Utils.getAdminSelectors()
@@ -159,7 +168,14 @@ contract ChainTypeManagerTest is UtilsTest {
         facetCuts.push(
             Diamond.FacetCut({
                 facet: address(
-                    new MailboxFacet(eraChainId, block.chainid, address(0), IEIP7702Checker(makeAddr("eip7702Checker")), PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET)
+                    new MailboxFacet(
+                        eraChainId,
+                        block.chainid,
+                        address(0),
+                        IEIP7702Checker(makeAddr("eip7702Checker")),
+                        PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+                        PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+                    )
                 ),
                 action: Diamond.Action.Add,
                 isFreezable: false,

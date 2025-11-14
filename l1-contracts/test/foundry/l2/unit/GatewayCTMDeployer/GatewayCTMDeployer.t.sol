@@ -63,10 +63,24 @@ contract GatewayCTMDeployerTest is Test {
 
     // This is done merely to publish the respective bytecodes.
     function _predeployContracts() internal {
-        new MailboxFacet(1, 1, L2_CHAIN_ASSET_HANDLER_ADDR, IEIP7702Checker(address(0)), PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET);
+        new MailboxFacet(
+            1,
+            1,
+            L2_CHAIN_ASSET_HANDLER_ADDR,
+            IEIP7702Checker(address(0)),
+            PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+            PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+        );
         new ExecutorFacet(1);
         new GettersFacet();
-        new AdminFacet(1, RollupDAManager(address(0)), CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET);
+        new AdminFacet(
+            1,
+            RollupDAManager(address(0)),
+            CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET,
+            CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET,
+            PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+            PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+        );
 
         new DiamondInit(false);
         new L1GenesisUpgrade();

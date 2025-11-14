@@ -13,7 +13,16 @@ contract DummyZKChain is MailboxFacet {
         uint256 _l1ChainId,
         address _chainAssetHandler,
         IEIP7702Checker _eip7702Checker
-    ) MailboxFacet(_eraChainId, _l1ChainId, _chainAssetHandler, _eip7702Checker, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET) {
+    )
+        MailboxFacet(
+            _eraChainId,
+            _l1ChainId,
+            _chainAssetHandler,
+            _eip7702Checker,
+            PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+            PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+        )
+    {
         s.bridgehub = bridgeHubAddress;
     }
 

@@ -440,7 +440,14 @@ contract DeployCTMScript is Script, DeployCTMUtils {
     }
 
     function saveDiamondSelectors() public {
-        AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)), CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET);
+        AdminFacet adminFacet = new AdminFacet(
+            1,
+            RollupDAManager(address(0)),
+            CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET,
+            CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET,
+            PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+            PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+        );
         GettersFacet gettersFacet = new GettersFacet();
         MailboxFacet mailboxFacet = new MailboxFacet(
             1,

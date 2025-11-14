@@ -46,7 +46,16 @@ contract MailboxTest is UtilsTest {
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(new MailboxFacet(eraChainId, block.chainid, address(chainAssetHandler), eip7702Checker, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET)),
+            facet: address(
+                new MailboxFacet(
+                    eraChainId,
+                    block.chainid,
+                    address(chainAssetHandler),
+                    eip7702Checker,
+                    PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+                    PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+                )
+            ),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: Utils.getMailboxSelectors()

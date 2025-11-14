@@ -51,7 +51,14 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_END;
 
-    constructor(uint256 _l1ChainId, RollupDAManager _rollupDAManager, uint256 _chainMigrationTimeWindowStart, uint256 _chainMigrationTimeWindowEnd, uint256 _pauseDepositsTimeWindowStart, uint256 _pauseDepositsTimeWindowEnd) {
+    constructor(
+        uint256 _l1ChainId,
+        RollupDAManager _rollupDAManager,
+        uint256 _chainMigrationTimeWindowStart,
+        uint256 _chainMigrationTimeWindowEnd,
+        uint256 _pauseDepositsTimeWindowStart,
+        uint256 _pauseDepositsTimeWindowEnd
+    ) {
         L1_CHAIN_ID = _l1ChainId;
         ROLLUP_DA_MANAGER = _rollupDAManager;
         CHAIN_MIGRATION_TIME_WINDOW_START = _chainMigrationTimeWindowStart;

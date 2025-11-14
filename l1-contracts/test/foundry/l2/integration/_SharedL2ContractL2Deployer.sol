@@ -65,7 +65,14 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         );
         addresses.stateTransition.executorFacet = address(new ExecutorFacet(config.l1ChainId));
         addresses.stateTransition.adminFacet = address(
-            new AdminFacet(config.l1ChainId, RollupDAManager(addresses.daAddresses.rollupDAManager), CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET)
+            new AdminFacet(
+                config.l1ChainId,
+                RollupDAManager(addresses.daAddresses.rollupDAManager),
+                CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET,
+                CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET,
+                PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+                PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+            )
         );
         addresses.stateTransition.mailboxFacet = address(
             new MailboxFacet(

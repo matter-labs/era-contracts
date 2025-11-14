@@ -486,14 +486,34 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (compareStrings(contractName, "ExecutorFacet")) {
             return abi.encode(config.l1ChainId);
         } else if (compareStrings(contractName, "AdminFacet")) {
-            uint256 chainMigrationTimeWindowStart = config.testnetVerifier ? CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET : CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET;
-            uint256 chainMigrationTimeWindowEnd = config.testnetVerifier ? CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET : CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET;
-            uint256 pauseDepositsTimeWindowStart = config.testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET;
-            uint256 pauseDepositsTimeWindowEnd = config.testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET;
-            return abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager, chainMigrationTimeWindowStart, chainMigrationTimeWindowEnd, pauseDepositsTimeWindowStart, pauseDepositsTimeWindowEnd);
+            uint256 chainMigrationTimeWindowStart = config.testnetVerifier
+                ? CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET
+                : CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET;
+            uint256 chainMigrationTimeWindowEnd = config.testnetVerifier
+                ? CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET
+                : CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET;
+            uint256 pauseDepositsTimeWindowStart = config.testnetVerifier
+                ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET
+                : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET;
+            uint256 pauseDepositsTimeWindowEnd = config.testnetVerifier
+                ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+                : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET;
+            return
+                abi.encode(
+                    config.l1ChainId,
+                    addresses.daAddresses.rollupDAManager,
+                    chainMigrationTimeWindowStart,
+                    chainMigrationTimeWindowEnd,
+                    pauseDepositsTimeWindowStart,
+                    pauseDepositsTimeWindowEnd
+                );
         } else if (compareStrings(contractName, "MailboxFacet")) {
-            uint256 pauseDepositsTimeWindowStart = config.testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET;
-            uint256 pauseDepositsTimeWindowEnd = config.testnetVerifier ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET;
+            uint256 pauseDepositsTimeWindowStart = config.testnetVerifier
+                ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET
+                : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET;
+            uint256 pauseDepositsTimeWindowEnd = config.testnetVerifier
+                ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+                : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET;
             return
                 abi.encode(
                     config.eraChainId,

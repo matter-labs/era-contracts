@@ -56,7 +56,14 @@ contract UpgradeLogicTest is DiamondCutTest {
 
         diamondCutTestContract = new DiamondCutTestContract();
         diamondInit = new DiamondInit(false);
-        adminFacet = new AdminFacet(block.chainid, RollupDAManager(address(0)), CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET);
+        adminFacet = new AdminFacet(
+            block.chainid,
+            RollupDAManager(address(0)),
+            CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET,
+            CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET,
+            PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+            PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+        );
         gettersFacet = new GettersFacet();
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);

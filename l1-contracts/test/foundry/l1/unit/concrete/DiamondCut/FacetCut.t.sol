@@ -34,7 +34,14 @@ contract FacetCutTest is DiamondCutTest {
         eraChainId = 9;
         diamondCutTestContract = new DiamondCutTestContract();
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
-        mailboxFacet = new MailboxFacet(eraChainId, block.chainid, address(0), eip7702Checker, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET);
+        mailboxFacet = new MailboxFacet(
+            eraChainId,
+            block.chainid,
+            address(0),
+            eip7702Checker,
+            PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+            PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+        );
         gettersFacet = new GettersFacet();
         executorFacet1 = new ExecutorFacet(block.chainid);
         executorFacet2 = new ExecutorFacet(block.chainid);

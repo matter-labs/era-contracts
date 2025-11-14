@@ -10,7 +10,18 @@ contract AdminFacetTest is AdminFacet {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
-    constructor(uint256 _l1ChainId) AdminFacet(_l1ChainId, RollupDAManager(address(0)), CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET) {
+    constructor(
+        uint256 _l1ChainId
+    )
+        AdminFacet(
+            _l1ChainId,
+            RollupDAManager(address(0)),
+            CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET,
+            CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET,
+            PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+            PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+        )
+    {
         s.admin = msg.sender;
         s.chainTypeManager = msg.sender;
     }
