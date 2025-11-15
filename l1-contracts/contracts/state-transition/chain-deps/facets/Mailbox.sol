@@ -20,7 +20,7 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
-import {L1_GAS_PER_PUBDATA_BYTE, MAX_NEW_FACTORY_DEPS, PAUSE_DEPOSITS_TIME_WINDOW_END, PAUSE_DEPOSITS_TIME_WINDOW_START, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER} from "../../../common/Config.sol";
+import {L1_GAS_PER_PUBDATA_BYTE, MAX_NEW_FACTORY_DEPS, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER} from "../../../common/Config.sol";
 import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
@@ -62,6 +62,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
     address internal immutable CHAIN_ASSET_HANDLER;
 
+    uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_START;
+
+    uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_END;
+
     modifier onlyL1() {
         if (block.chainid != L1_CHAIN_ID) {
             revert NotL1(block.chainid);
@@ -76,7 +80,14 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         _;
     }
 
-    constructor(uint256 _eraChainId, uint256 _l1ChainId, address _chainAssetHandler, IEIP7702Checker _eip7702Checker) {
+    constructor(
+        uint256 _eraChainId,
+        uint256 _l1ChainId,
+        address _chainAssetHandler,
+        IEIP7702Checker _eip7702Checker,
+        uint256 _pauseDepositsTimeWindowStart,
+        uint256 _pauseDepositsTimeWindowEnd
+    ) {
         if (address(_eip7702Checker) == address(0) && block.chainid == _l1ChainId) {
             revert ZeroAddress();
         } else if (address(_eip7702Checker) != address(0) && block.chainid != _l1ChainId) {
@@ -86,6 +97,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         L1_CHAIN_ID = _l1ChainId;
         CHAIN_ASSET_HANDLER = _chainAssetHandler;
         EIP_7702_CHECKER = _eip7702Checker;
+        PAUSE_DEPOSITS_TIME_WINDOW_START = _pauseDepositsTimeWindowStart;
+        PAUSE_DEPOSITS_TIME_WINDOW_END = _pauseDepositsTimeWindowEnd;
     }
 
     /// @inheritdoc IMailboxImpl
@@ -610,7 +623,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     }
 
     /// @notice Deposits are paused when a chain migrates to/from GW.
-    function _depositsPaused() internal view returns (bool) {
+    function depositsPaused() public view returns (bool) {
         uint256 timestamp = s.pausedDepositsTimestamp;
         /// We provide 3.5 days window to process all deposits.
         /// After that, the deposits are not being processed for 3.5 days.
@@ -645,7 +658,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
         /// We only check deposits paused on L1 to keep the GW and L1 Priority queues the same.
         if (block.chainid == L1_CHAIN_ID) {
-            require(!_depositsPaused(), DepositsPaused());
+            require(!depositsPaused(), DepositsPaused());
         }
 
         // Data that is needed for the operator to simulate priority queue offchain
