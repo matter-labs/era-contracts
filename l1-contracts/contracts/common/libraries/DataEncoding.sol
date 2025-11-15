@@ -51,6 +51,14 @@ library DataEncoding {
         (amount, receiver, maybeTokenAddress) = abi.decode(_data, (uint256, address, address));
     }
 
+    function encodeAssetRouterBridgehubDepositData(
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) internal pure returns (bytes memory) {
+        return bytes.concat(NEW_ENCODING_VERSION, abi.encode(_assetId, _transferData));
+    }
+
+    
     /// @notice Abi.encodes the data required for bridgeMint on remote chain.
     /// @param _originalCaller The address which initiated the transfer.
     /// @param _remoteReceiver The address which to receive tokens on remote chain.
