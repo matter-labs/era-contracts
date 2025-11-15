@@ -6,6 +6,7 @@ import {Script} from "forge-std/Script.sol";
 import {console2 as console} from "forge-std/console2.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
+import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 
 contract RegisterOnAllChainsScript is Script {
     function registerOnOtherChains(address _bridgehub, uint256 _chainId) public {
@@ -45,7 +46,7 @@ contract RegisterOnAllChainsScript is Script {
 
     function _depositsPaused(IBridgehubBase bridgehub, uint256 chainToRegisterOn) internal view returns (bool) {
         address zkChain = bridgehub.getZKChain(chainToRegisterOn);
-        MailboxFacet mailbox = MailboxFacet(zkChain);
+        IMailbox mailbox = IMailbox(zkChain);
         return mailbox.depositsPaused();
     }
 }
