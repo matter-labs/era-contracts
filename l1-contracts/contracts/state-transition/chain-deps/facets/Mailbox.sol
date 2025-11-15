@@ -623,7 +623,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     }
 
     /// @notice Deposits are paused when a chain migrates to/from GW.
-    function _depositsPaused() internal view returns (bool) {
+    function depositsPaused() public view returns (bool) {
         uint256 timestamp = s.pausedDepositsTimestamp;
         /// We provide 3.5 days window to process all deposits.
         /// After that, the deposits are not being processed for 3.5 days.
@@ -658,7 +658,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
         /// We only check deposits paused on L1 to keep the GW and L1 Priority queues the same.
         if (block.chainid == L1_CHAIN_ID) {
-            require(!_depositsPaused(), DepositsPaused());
+            require(!depositsPaused(), DepositsPaused());
         }
 
         // Data that is needed for the operator to simulate priority queue offchain
