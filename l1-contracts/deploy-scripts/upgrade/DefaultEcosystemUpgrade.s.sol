@@ -1095,6 +1095,13 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
             "rollup_l1_da_validator_addr",
             addresses.daAddresses.l1RollupDAValidator
         );
+        if (config.isZKsyncOS) {
+            vm.serializeAddress(
+                "deployed_addresses",
+                "blobs_zksync_os_l1_da_validator_addr",
+                addresses.daAddresses.l1BlobsDAValidatorZKsyncOS
+            );
+        }
         vm.serializeAddress(
             "deployed_addresses",
             "validium_l1_da_validator_addr",
@@ -1797,7 +1804,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
     /// @notice Tests that it is possible to upgrade a chain to the new version
     function TESTONLY_prepareTestUpgradeChainCall() private returns (Call[] memory calls, address admin) {
         address chainDiamondProxyAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
-            config.gatewayChainId
+            getSampleChainId()
         );
         uint256 oldProtocolVersion = getOldProtocolVersion();
         Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutData(getAddresses().stateTransition);
@@ -1956,6 +1963,39 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
 
     function deployUpgradeStageValidator() internal {
         upgradeAddresses.upgradeStageValidator = deploySimpleContract("UpgradeStageValidator", false);
+    }
+    
+    /// @notice Get new facet cuts that were added in the upgrade
+    function getUpgradeAddedFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal override returns (Diamond.FacetCut[] memory facetCuts) {
+        // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.
+        // If we start to use different selectors for Gateway, we should change this.
+        facetCuts = new Diamond.FacetCut[](4);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: stateTransition.adminFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
+        });
+        facetCuts[1] = Diamond.FacetCut({
+            facet: stateTransition.mailboxFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
+        });
+        facetCuts[2] = Diamond.FacetCut({
+            facet: stateTransition.gettersFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.gettersFacet.code)
+        });
+        facetCuts[3] = Diamond.FacetCut({
+            facet: stateTransition.executorFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.executorFacet.code)
+        });
     }
 
     ////////////////////////////// Misc utils /////////////////////////////////
