@@ -85,6 +85,7 @@ import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2G
 
 import {DeployCTMScript} from "../DeployCTM.s.sol";
 import {DeployCTMAdditional} from "../DeployCTMAdditional.s.sol";
+import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 
 /// @notice Script used for default upgrade flow
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
@@ -229,6 +230,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract(ctmContractName, false);
 
         addresses.stateTransition.serverNotifierImplementation = deploySimpleContract("ServerNotifier", false);
+
+        addresses.stateTransition.validatorTimelockImplementation = deploySimpleContract("ValidatorTimelock", false);
 
         /// for forge verification.
         deploySimpleContract("DiamondProxy", false);
@@ -721,6 +724,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         ).serverNotifierAddress();
 
         newConfig.ecosystemAdminAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
+
+        addresses.stateTransition.validatorTimelock = ChainTypeManagerBase(ctm).validatorTimelockPostV29();
 
         address eraDiamondProxy = L1Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(config.eraChainId);
         (addresses.daAddresses.l1RollupDAValidator, ) = GettersFacet(eraDiamondProxy).getDAValidatorPair();
@@ -1428,6 +1433,9 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         string memory gwCtmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
         gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = deployGWContract(gwCtmContractName);
 
+        gatewayConfig.gatewayStateTransition.validatorTimelockImplementation = deployGWContract("ValidatorTimelock");
+
+
         deployUpgradeSpecificContractsGW();
     }
 
@@ -1560,6 +1568,31 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         );
     }
 
+    function prepareValidatorTimelockImplementationUpgrade(
+        uint256 l2GasLimit,
+        uint256 l1GasPrice
+    ) public virtual returns (Call[] memory calls) {
+        require(
+            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy != address(0),
+            "chainTypeManager on gateway is zero in newConfig"
+        );
+
+        bytes memory l2Calldata = abi.encodeCall(
+            ProxyAdmin.upgrade,
+            (
+                ITransparentUpgradeableProxy(payable(gatewayConfig.gatewayStateTransition.validatorTimelock)),
+                gatewayConfig.gatewayStateTransition.validatorTimelockImplementation
+            )
+        );
+
+        calls = _prepareL1ToGatewayCall(
+            l2Calldata,
+            l2GasLimit,
+            l1GasPrice,
+            gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin
+        );
+    }
+
     function _prepareL1ToGatewayCall(
         bytes memory l2Calldata,
         uint256 l2GasLimit,
@@ -1677,7 +1710,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
 
     /// @notice Update implementations in proxies
     function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
-        calls = new Call[](8);
+        calls = new Call[](9);
 
         calls[0] = _buildCallProxyUpgrade(
             addresses.stateTransition.chainTypeManagerProxy,
@@ -1718,6 +1751,11 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         calls[7] = _buildCallProxyUpgrade(
             addresses.bridges.erc20BridgeProxy,
             addresses.bridges.erc20BridgeImplementation
+        );
+
+        calls[8] = _buildCallProxyUpgrade(
+            addresses.stateTransition.validatorTimelock,
+            addresses.stateTransition.validatorTimelockImplementation
         );
     }
 
@@ -1964,7 +2002,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
     function deployUpgradeStageValidator() internal {
         upgradeAddresses.upgradeStageValidator = deploySimpleContract("UpgradeStageValidator", false);
     }
-    
+
     /// @notice Get new facet cuts that were added in the upgrade
     function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition

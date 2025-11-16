@@ -77,13 +77,15 @@ import {L2SystemProxiesUpgrade} from "contracts/l2-upgrades/L2SystemProxiesUpgra
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 import {IComplexUpgraderZKsyncOSV29} from "contracts/state-transition/l2-deps/IComplexUpgraderZKsyncOSV29.sol";
+import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";  
+
 
 /// @notice Script used for v30 zksync os upgrade flow.
 /// A few notes:
 /// - This upgrade is done for zksync os only and so only CTM is upgraded.
 /// - No gateway related parts are present, as zksync os does not use the gateway.
 /// - Stage0 and stage2 governance calls are skipped, as zksync os governance does not control the ecosystem.
-contract EcosystemUpgrade_v29_2_zksync_os is Script, DefaultEcosystemUpgrade {
+contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
     uint256 internal sampleChainId;
@@ -165,6 +167,8 @@ contract EcosystemUpgrade_v29_2_zksync_os is Script, DefaultEcosystemUpgrade {
         ).serverNotifierAddress();
 
         newConfig.ecosystemAdminAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
+
+        addresses.stateTransition.validatorTimelock = ChainTypeManagerBase(ctm).validatorTimelockPostV29();
     }
 
     // Unlike the original one, we only deploy L1 contracts (no Gateway) and generate the upgrade data.
@@ -218,15 +222,18 @@ contract EcosystemUpgrade_v29_2_zksync_os is Script, DefaultEcosystemUpgrade {
         // No stage 0 calls, since the zksync os governor does not control the ecosystem.
     }
     
-    // Unlike the original one, we only upgrade the CTM.
-    // FIXME: upgrade ValidatorTimelock as well.
+    // Unlike the original one, we only upgrade the CTM and ValidatorTimelock.
     function prepareUpgradeProxiesCalls() public override returns (Call[] memory calls) {
-        calls = new Call[](1);
+        calls = new Call[](2);
 
         // We can only upgrade the CTM
         calls[0] = _buildCallProxyUpgrade(
             addresses.stateTransition.chainTypeManagerProxy,
             addresses.stateTransition.chainTypeManagerImplementation
+        );
+        calls[1] = _buildCallProxyUpgrade(
+            addresses.stateTransition.validatorTimelock,
+            addresses.stateTransition.validatorTimelockImplementation
         );
     }
 
