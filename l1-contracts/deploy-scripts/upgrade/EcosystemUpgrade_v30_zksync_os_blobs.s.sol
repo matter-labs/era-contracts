@@ -73,7 +73,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
-import {L2SystemProxiesUpgrade} from "contracts/l2-upgrades/L2SystemProxiesUpgrade.sol";
+import {L2TestnetSystemProxiesUpgrade} from "contracts/l2-upgrades/L2TestnetSystemProxiesUpgrade.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 import {IComplexUpgraderZKsyncOSV29} from "contracts/state-transition/l2-deps/IComplexUpgraderZKsyncOSV29.sol";
@@ -274,8 +274,8 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         StateTransitionDeployedAddresses memory stateTransition
     ) public override returns (ProposedUpgrade memory proposedUpgrade) {
         bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract(
-            "L2SystemProxiesUpgrade.sol",
-            "L2SystemProxiesUpgrade"
+            "L2TestnetSystemProxiesUpgrade.sol",
+            "L2TestnetSystemProxiesUpgrade"
         );
 
         address upgradeImplAddress = L2GenesisForceDeploymentsHelper.generateRandomAddress(
@@ -291,7 +291,7 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         });
 
         bytes memory upgradeImplData = abi.encodeCall(
-            L2SystemProxiesUpgrade.upgrade,
+            L2TestnetSystemProxiesUpgrade.upgrade,
             (
                 newlyGeneratedData.fixedForceDeploymentsData,
                 Utils.getZKOSBytecodeInfoForContract(

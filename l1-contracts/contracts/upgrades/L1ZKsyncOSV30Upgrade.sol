@@ -8,6 +8,8 @@ import {L2DACommitmentScheme} from "../common/Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
+/// @notice The upgrade contract that performs the upgrade to ZKsync OS v0.30.0. It is expected
+/// to be only used on testnets, as mainnet will start directly from v0.30.0.
 contract L1ZKsyncOSV30Upgrade is BaseZkSyncUpgrade {
     /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.

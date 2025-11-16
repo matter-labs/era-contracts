@@ -49,7 +49,7 @@ async function main() {
                 "L2NativeTokenVaultZKOS",
                 "L2ChainAssetHandler",
                 "UpgradeableBeaconDeployer",
-                "L2SystemProxiesUpgrade"
+                "L2TestnetSystemProxiesUpgrade"
             ];
 
             const output: Record<string, { bytecode_hash: string; bytecode: string }> = {};

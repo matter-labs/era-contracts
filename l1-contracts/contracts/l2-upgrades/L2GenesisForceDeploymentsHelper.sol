@@ -27,6 +27,7 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 
 import {FixedForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {ZKSyncOSBytecodeInfo} from "../common/libraries/ZKSyncOSBytecodeInfo.sol";
 
 /// @title L2GenesisForceDeploymentsHelper
 /// @author Matter Labs
@@ -67,12 +68,7 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     function forceDeployOnAddressZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
-        if (_newAddress.code.length != 0) {
-            // We assume that the provided address already has the identical bytecode.
-            // It is the job of the caller to ensure that the `_newAddress` is uniquely derived
-            // from the _bytecodeInfo.
-            return;
-        }
+        require(_newAddress.code.length == 0, ZKsyncOSNotForceDeployForExistingContract(_newAddress));
         unsafeForceDeployZKsyncOS(_bytecodeInfo, _newAddress);
     }
 
@@ -87,7 +83,25 @@ library L2GenesisForceDeploymentsHelper {
         (bytes memory bytecodeInfo, bytes memory bytecodeInfoSystemProxy) = abi.decode((_bytecodeInfo), (bytes, bytes));
 
         address implAddress = generateRandomAddress(bytecodeInfo);
-        forceDeployOnAddressZKsyncOS(bytecodeInfo, implAddress);
+        // We need to allow not force deploying in to make upgrades simpler in case the bytecode has not changed.
+        if (implAddress.code.length == 0) {
+            forceDeployOnAddressZKsyncOS(bytecodeInfo, implAddress);
+        } else {
+            // Note, that we can not just assume the correct bytecode. Even though due to a new address derivation,
+            // the chances of this contract having a non-empty code that is not being the expected one, 
+            // are extremely low, but non-zero (in case a malicious person controls both the correct source code and the malicious one,
+            // they can perform a birthday attack). So we need to ensure that the code matches.
+            bytes32 currentCodeHash;
+            assembly {
+                currentCodeHash := extcodehash(_newAddress)
+            }
+
+            (,,bytes32 expectedCodeHash) = ZKSyncOSBytecodeInfo.decodeZKSyncOSBytecodeInfo(bytecodeInfo);
+
+            if (currentCodeHash != expectedCodeHash) {
+                revert ZKsyncOSNotForceDeployForExistingContract();
+            }
+        }
 
         // If the address does not have any bytecode, we expect that it is a proxy
         if (_newAddress.code.length == 0) {

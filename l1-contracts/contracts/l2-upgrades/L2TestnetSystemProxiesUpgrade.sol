@@ -17,8 +17,13 @@ import {SystemContractProxyAdmin} from "./SystemContractProxyAdmin.sol";
 
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
-/// @notice The l2 component of the genesis upgrade.
-contract L2SystemProxiesUpgrade {
+/// @notice The upgrade to be applied on testnets to ensure that they use system proxies for system contracts' upgradeability.
+/// @notice That it is not expected to be run on mainnet, as mainnet will use those from the start.
+contract L2TestnetSystemProxiesUpgrade {
+    /// @notice Initializes a system proxy on a specific address.
+    /// @param _address The address of the system contract proxy to initialize.
+    /// @param _fullBytecodeInfo The full bytecode info (implementation + proxy) to force deploy.
+    /// @param _bytecodeInfoSystemProxy The bytecode info of the system proxy to deploy on top of the existing contract.
     function _initProxyOnAddress(
         address _address,
         bytes memory _fullBytecodeInfo,
@@ -83,7 +88,7 @@ contract L2SystemProxiesUpgrade {
             bytecodeInfoSystemProxy
         );
         // Formally this is not needed, since the beacon deployer is used only once
-        // during genesis, but we keep it this way for consistency.
+        // during genesis, but we keep it this way for consistency with the genesis upgrade on mainnet.
         _initProxyOnAddress(
             L2_NTV_BEACON_DEPLOYER_ADDR,
             fixedForceDeploymentsData.beaconDeployerInfo,
