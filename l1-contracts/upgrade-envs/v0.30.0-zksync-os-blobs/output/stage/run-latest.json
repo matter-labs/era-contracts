@@ -85,11 +85,7 @@
       "contractName": "ZKsyncOSTestnetVerifier",
       "contractAddress": "0xedf7731ff03b499fcef702427c06e06f1c50905c",
       "function": "addVerifier(uint32,address,address)",
-      "arguments": [
-        "3",
-        "0x3d0896Bc2825B84dCFb853be6c832539f570F383",
-        "0xa5D3550b974C9b20664AE70B264ae9Ed1969b0B9"
-      ],
+      "arguments": ["3", "0x3d0896Bc2825B84dCFb853be6c832539f570F383", "0xa5D3550b974C9b20664AE70B264ae9Ed1969b0B9"],
       "transaction": {
         "from": "0x7921f9f70b754a014922aca94947e23f1a424164",
         "to": "0xedf7731ff03b499fcef702427c06e06f1c50905c",
@@ -108,10 +104,7 @@
       "contractName": "UpgradeStageValidator",
       "contractAddress": "0xb362be784d86cf0efbcc7be45afdd6ab400fa67f",
       "function": null,
-      "arguments": [
-        "0x73Bee414c6e006525F3CcEedf6d8004C0370502e",
-        "128849018880"
-      ],
+      "arguments": ["0x73Bee414c6e006525F3CcEedf6d8004C0370502e", "128849018880"],
       "transaction": {
         "from": "0x7921f9f70b754a014922aca94947e23f1a424164",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -168,10 +161,7 @@
       "contractName": "L1Bridgehub",
       "contractAddress": "0x344c9e220625a73378b49ad004c85df8de57198d",
       "function": null,
-      "arguments": [
-        "0x8f08627524aeD610192132A425D6b9C32a1727EF",
-        "100"
-      ],
+      "arguments": ["0x8f08627524aeD610192132A425D6b9C32a1727EF", "100"],
       "transaction": {
         "from": "0x7921f9f70b754a014922aca94947e23f1a424164",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -190,11 +180,7 @@
       "contractName": "L1Nullifier",
       "contractAddress": "0x182c84dd17c81b805736bfb5aafbd27a7760bd74",
       "function": null,
-      "arguments": [
-        "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE",
-        "270",
-        "0x98A0d85435A0e2834142bFD24a30e0c0B6866De2"
-      ],
+      "arguments": ["0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE", "270", "0x98A0d85435A0e2834142bFD24a30e0c0B6866De2"],
       "transaction": {
         "from": "0x7921f9f70b754a014922aca94947e23f1a424164",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -328,9 +314,7 @@
       "contractName": "L1MessageRoot",
       "contractAddress": "0x5ece6003127755c0ddbc7f42e5330444cc9bedce",
       "function": null,
-      "arguments": [
-        "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
-      ],
+      "arguments": ["0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"],
       "transaction": {
         "from": "0x7921f9f70b754a014922aca94947e23f1a424164",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -349,10 +333,7 @@
       "contractName": "CTMDeploymentTracker",
       "contractAddress": "0xdd1c50ad7cdae73b04dc2e4c8693e45a8c1c52e9",
       "function": null,
-      "arguments": [
-        "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE",
-        "0xfD3130Ea0e8B7Dd61Ac3663328a66d97eb02f84b"
-      ],
+      "arguments": ["0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE", "0xfD3130Ea0e8B7Dd61Ac3663328a66d97eb02f84b"],
       "transaction": {
         "from": "0x7921f9f70b754a014922aca94947e23f1a424164",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -371,9 +352,7 @@
       "contractName": "ExecutorFacet",
       "contractAddress": "0xa4481809d85f6161ee37efc1894a0f4ac2817d2b",
       "function": null,
-      "arguments": [
-        "11155111"
-      ],
+      "arguments": ["11155111"],
       "transaction": {
         "from": "0x7921f9f70b754a014922aca94947e23f1a424164",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -392,10 +371,7 @@
       "contractName": "AdminFacet",
       "contractAddress": "0x2807273578b9927a3792a0654722286001c52718",
       "function": null,
-      "arguments": [
-        "11155111",
-        "0xeb7c0DAAdDFb52AFa05400b489e7497b271d6122"
-      ],
+      "arguments": ["11155111", "0xeb7c0DAAdDFb52AFa05400b489e7497b271d6122"],
       "transaction": {
         "from": "0x7921f9f70b754a014922aca94947e23f1a424164",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -414,10 +390,7 @@
       "contractName": "MailboxFacet",
       "contractAddress": "0xa6e7f881ebb377295f361507267f6d5efc65b2f7",
       "function": null,
-      "arguments": [
-        "270",
-        "11155111"
-      ],
+      "arguments": ["270", "11155111"],
       "transaction": {
         "from": "0x7921f9f70b754a014922aca94947e23f1a424164",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -455,9 +428,7 @@
       "contractName": "DiamondInit",
       "contractAddress": "0xb3912261600e0c7460a8f0573ccf8688663156ce",
       "function": null,
-      "arguments": [
-        "true"
-      ],
+      "arguments": ["true"],
       "transaction": {
         "from": "0x7921f9f70b754a014922aca94947e23f1a424164",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -476,9 +447,7 @@
       "contractName": "ZKsyncOSChainTypeManager",
       "contractAddress": "0x5259f6258a73ca33b9d4d114a53777cc026f0cf3",
       "function": null,
-      "arguments": [
-        "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
-      ],
+      "arguments": ["0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"],
       "transaction": {
         "from": "0x7921f9f70b754a014922aca94947e23f1a424164",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -516,10 +485,7 @@
       "contractName": "DiamondProxy",
       "contractAddress": "0x165ac7b763a6b5e02cdcc3c2fffb1422842c4344",
       "function": null,
-      "arguments": [
-        "11155111",
-        "([], 0x0000000000000000000000000000000000000000, 0x)"
-      ],
+      "arguments": ["11155111", "([], 0x0000000000000000000000000000000000000000, 0x)"],
       "transaction": {
         "from": "0x7921f9f70b754a014922aca94947e23f1a424164",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -687,11 +653,7 @@
       "contractName": "RollupDAManager",
       "contractAddress": "0x8c07feb03eacd478203b8302fe8afd64c4bcb8a1",
       "function": "updateDAPair(address,uint8,bool)",
-      "arguments": [
-        "0x0b3b3C1c87f10e0a4fc9f14CdD6b960E5F5F4373",
-        "3",
-        "true"
-      ],
+      "arguments": ["0x0b3b3C1c87f10e0a4fc9f14CdD6b960E5F5F4373", "3", "true"],
       "transaction": {
         "from": "0x7921f9f70b754a014922aca94947e23f1a424164",
         "to": "0x8c07feb03eacd478203b8302fe8afd64c4bcb8a1",
@@ -710,11 +672,7 @@
       "contractName": "RollupDAManager",
       "contractAddress": "0x8c07feb03eacd478203b8302fe8afd64c4bcb8a1",
       "function": "updateDAPair(address,uint8,bool)",
-      "arguments": [
-        "0x0887dF2E84ff448eCE3eDB0Dd46cD4d4e50Cf9C1",
-        "4",
-        "true"
-      ],
+      "arguments": ["0x0887dF2E84ff448eCE3eDB0Dd46cD4d4e50Cf9C1", "4", "true"],
       "transaction": {
         "from": "0x7921f9f70b754a014922aca94947e23f1a424164",
         "to": "0x8c07feb03eacd478203b8302fe8afd64c4bcb8a1",

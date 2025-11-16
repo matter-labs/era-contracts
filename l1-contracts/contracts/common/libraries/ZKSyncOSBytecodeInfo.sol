@@ -27,15 +27,9 @@ library ZKSyncOSBytecodeInfo {
     /// @return bytecodeBlakeHash The Blake2b hash of the bytecode.
     /// @return bytecodeLength The length of the bytecode.
     /// @return observableBytecodeHash The observable hash of the bytecode (Keccak256
-    function decodeZKSyncOSBytecodeInfo(bytes memory _bytecodeInfo)
-        internal
-        pure
-        returns (
-            bytes32 bytecodeBlakeHash,
-            uint256 bytecodeLength,
-            bytes32 observableBytecodeHash
-        )
-    {
+    function decodeZKSyncOSBytecodeInfo(
+        bytes memory _bytecodeInfo
+    ) internal pure returns (bytes32 bytecodeBlakeHash, uint256 bytecodeLength, bytes32 observableBytecodeHash) {
         (bytecodeBlakeHash, bytecodeLength, observableBytecodeHash) = abi.decode(
             _bytecodeInfo,
             (bytes32, uint256, bytes32)

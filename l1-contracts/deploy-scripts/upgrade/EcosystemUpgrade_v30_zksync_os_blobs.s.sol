@@ -77,8 +77,7 @@ import {L2TestnetSystemProxiesUpgrade} from "contracts/l2-upgrades/L2TestnetSyst
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 import {IComplexUpgraderZKsyncOSV29} from "contracts/state-transition/l2-deps/IComplexUpgraderZKsyncOSV29.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";  
-
+import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 
 /// @notice Script used for v30 zksync os upgrade flow.
 /// A few notes:
@@ -114,7 +113,7 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
     function initialize(string memory newConfigPath, string memory _outputPath) public override {
         string memory root = vm.projectRoot();
         string memory fullPath = string.concat(root, newConfigPath);
-        
+
         string memory toml = vm.readFile(fullPath);
 
         sampleChainId = toml.readUint("$.zksync_os.sample_chain_id");
@@ -189,14 +188,12 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
 
     function transferDAValidatorOwnerships() public {
         vm.startBroadcast(msg.sender);
-        Ownable2StepUpgradeable(addresses.daAddresses.rollupDAManager).transferOwnership(
-            config.ownerAddress
-        );
+        Ownable2StepUpgradeable(addresses.daAddresses.rollupDAManager).transferOwnership(config.ownerAddress);
         vm.stopBroadcast();
     }
 
     // Factory deps are not supported yet, so we just mark those as published.
-    function publishBytecodes() public override  {
+    function publishBytecodes() public override {
         upgradeConfig.factoryDepsPublished = true;
     }
 
@@ -221,7 +218,7 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
     function prepareStage0GovernanceCalls() public override returns (Call[] memory calls) {
         // No stage 0 calls, since the zksync os governor does not control the ecosystem.
     }
-    
+
     // Unlike the original one, we only upgrade the CTM and ValidatorTimelock.
     function prepareUpgradeProxiesCalls() public override returns (Call[] memory calls) {
         calls = new Call[](2);
@@ -278,12 +275,11 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
             "L2TestnetSystemProxiesUpgrade"
         );
 
-        address upgradeImplAddress = L2GenesisForceDeploymentsHelper.generateRandomAddress(
-            bytecodeInfo
-        );
-    
+        address upgradeImplAddress = L2GenesisForceDeploymentsHelper.generateRandomAddress(bytecodeInfo);
+
         // Note, that for the upgrade we need to take into account the legacy interface.
-        IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[] memory forceDeployments = new IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[](1);
+        IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[]
+            memory forceDeployments = new IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[](1);
         forceDeployments[0] = IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo({
             isZKsyncOS: true,
             deployedBytecodeInfo: bytecodeInfo,
@@ -294,10 +290,7 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
             L2TestnetSystemProxiesUpgrade.upgrade,
             (
                 newlyGeneratedData.fixedForceDeploymentsData,
-                Utils.getZKOSBytecodeInfoForContract(
-                    "SystemContractProxyAdmin.sol",
-                    "SystemContractProxyAdmin"
-                ),
+                Utils.getZKOSBytecodeInfoForContract("SystemContractProxyAdmin.sol", "SystemContractProxyAdmin"),
                 Utils.getZKOSProxyUpgradeBytecodeInfo("L2ComplexUpgrader.sol", "L2ComplexUpgrader")
             )
         );
@@ -349,7 +342,7 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         });
     }
 
-    function deployUsedUpgradeContract() internal override virtual returns (address) {
+    function deployUsedUpgradeContract() internal virtual override returns (address) {
         return deploySimpleContract("L1ZKsyncOSV30Upgrade", false);
     }
 }

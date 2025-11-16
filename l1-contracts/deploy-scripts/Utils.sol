@@ -1305,7 +1305,11 @@ library Utils {
     function getZKOSBytecodeInfo(bytes memory bytecode) internal returns (bytes memory bytecodeInfo) {
         bytes32 bytecodeBlakeHash = blakeHashBytecode(bytecode);
         bytes32 observableBytecodeHash = keccak256(bytecode);
-        bytecodeInfo = ZKSyncOSBytecodeInfo.encodeZKSyncOSBytecodeInfo(bytecodeBlakeHash, bytecode.length, observableBytecodeHash);
+        bytecodeInfo = ZKSyncOSBytecodeInfo.encodeZKSyncOSBytecodeInfo(
+            bytecodeBlakeHash,
+            bytecode.length,
+            observableBytecodeHash
+        );
     }
 
     function getZKOSBytecodeInfoForContract(

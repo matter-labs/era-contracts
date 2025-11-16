@@ -88,7 +88,7 @@ library L2GenesisForceDeploymentsHelper {
             forceDeployOnAddressZKsyncOS(bytecodeInfo, implAddress);
         } else {
             // Note, that we can not just assume the correct bytecode. Even though due to a new address derivation,
-            // the chances of this contract having a non-empty code that is not being the expected one, 
+            // the chances of this contract having a non-empty code that is not being the expected one,
             // are extremely low, but non-zero (in case a malicious person controls both the correct source code and the malicious one,
             // they can perform a birthday attack). So we need to ensure that the code matches.
             bytes32 currentCodeHash;
@@ -96,7 +96,7 @@ library L2GenesisForceDeploymentsHelper {
                 currentCodeHash := extcodehash(_newAddress)
             }
 
-            (,,bytes32 expectedCodeHash) = ZKSyncOSBytecodeInfo.decodeZKSyncOSBytecodeInfo(bytecodeInfo);
+            (, , bytes32 expectedCodeHash) = ZKSyncOSBytecodeInfo.decodeZKSyncOSBytecodeInfo(bytecodeInfo);
 
             if (currentCodeHash != expectedCodeHash) {
                 revert ZKsyncOSNotForceDeployForExistingContract();

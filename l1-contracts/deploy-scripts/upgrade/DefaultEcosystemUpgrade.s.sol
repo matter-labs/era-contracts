@@ -344,8 +344,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
 
     /// @notice Returns a samlpe chain id for a chain that settles on L1.
     /// @dev For Era upgrades we can use gateway, but
-    /// for zksync os we need to provide a custom chain id. 
-    function getSampleChainId() public virtual view returns (uint256) {
+    /// for zksync os we need to provide a custom chain id.
+    function getSampleChainId() public view virtual returns (uint256) {
         return gatewayConfig.chainId;
     }
 
@@ -656,9 +656,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
     function prepareCreateNewChainCall(uint256 chainId) public view virtual returns (Call[] memory result) {
         require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
 
-        bytes32 newChainAssetId = L1Bridgehub(addresses.bridgehub.bridgehubProxy).baseTokenAssetId(
-            getSampleChainId()
-        );
+        bytes32 newChainAssetId = L1Bridgehub(addresses.bridgehub.bridgehubProxy).baseTokenAssetId(getSampleChainId());
         result = new Call[](1);
         result[0] = Call({
             target: addresses.bridgehub.bridgehubProxy,
@@ -1435,7 +1433,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
 
         gatewayConfig.gatewayStateTransition.validatorTimelockImplementation = deployGWContract("ValidatorTimelock");
 
-
         deployUpgradeSpecificContractsGW();
     }
 
@@ -1957,13 +1954,15 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         } else if (compareStrings(contractName, "Verifier")) {
             if (!isZKBytecode) {
                 if (config.isZKsyncOS) {
-                    return abi.encode(
-                        addresses.stateTransition.verifierFflonk,
-                        addresses.stateTransition.verifierPlonk,
-                        msg.sender
-                    );
+                    return
+                        abi.encode(
+                            addresses.stateTransition.verifierFflonk,
+                            addresses.stateTransition.verifierPlonk,
+                            msg.sender
+                        );
                 } else {
-                    return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
+                    return
+                        abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
                 }
             } else {
                 return

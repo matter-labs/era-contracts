@@ -2,16 +2,11 @@
 
 pragma solidity 0.8.28;
 
-import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {ISystemContext} from "../state-transition/l2-deps/ISystemContext.sol";
-import {IL2GenesisUpgrade} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
-
 import {L2GenesisForceDeploymentsHelper} from "./L2GenesisForceDeploymentsHelper.sol";
 
-import {InvalidChainId} from "../common/L1ContractErrors.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {ISystemContractProxy} from "./ISystemContractProxy.sol";
-import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {FixedForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {SystemContractProxyAdmin} from "./SystemContractProxyAdmin.sol";
 
@@ -54,13 +49,19 @@ contract L2TestnetSystemProxiesUpgrade {
             (FixedForceDeploymentsData)
         );
 
-        L2GenesisForceDeploymentsHelper.forceDeployOnAddressZKsyncOS(_systemContractProxyAdminBytecodeInfo, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR);
+        L2GenesisForceDeploymentsHelper.forceDeployOnAddressZKsyncOS(
+            _systemContractProxyAdminBytecodeInfo,
+            L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
+        );
         SystemContractProxyAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR).forceSetOwner(address(this));
-      
+
         // It is expected that all zksync os bytecodes infos contain two parts:
         // the abi-encoding of the implementation and the actual system proxy.
         // So we split the two here:
-        (, bytes memory bytecodeInfoSystemProxy) = abi.decode((fixedForceDeploymentsData.bridgehubBytecodeInfo), (bytes, bytes));
+        (, bytes memory bytecodeInfoSystemProxy) = abi.decode(
+            (fixedForceDeploymentsData.bridgehubBytecodeInfo),
+            (bytes, bytes)
+        );
 
         _initProxyOnAddress(
             L2_MESSAGE_ROOT_ADDR,
@@ -78,7 +79,7 @@ contract L2TestnetSystemProxiesUpgrade {
             bytecodeInfoSystemProxy
         );
         _initProxyOnAddress(
-            L2_NATIVE_TOKEN_VAULT_ADDR, 
+            L2_NATIVE_TOKEN_VAULT_ADDR,
             fixedForceDeploymentsData.l2NtvBytecodeInfo,
             bytecodeInfoSystemProxy
         );
@@ -95,10 +96,6 @@ contract L2TestnetSystemProxiesUpgrade {
             bytecodeInfoSystemProxy
         );
         // Complex upgrader should also be upgraded to have the new implementation.
-        _initProxyOnAddress(
-            address(this),
-            _complexUpgraderProxyBytecodeInfo,
-            bytecodeInfoSystemProxy
-        );
+        _initProxyOnAddress(address(this), _complexUpgraderProxyBytecodeInfo, bytecodeInfoSystemProxy);
     }
 }

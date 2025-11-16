@@ -268,6 +268,10 @@ interface IExecutor is IZKChainBase {
     );
 
     /// @notice Reports the block range for a zksync os batch.
-    /// @dev IMPORTANT: in this release this range is not trusted and provided by the operator. 
-    event ReportCommitedBatchRangeZKsyncOS(uint256 indexed batchNumber, uint256 indexed firstBlockNumber, uint256 indexed lastBlockNumber);
+    /// @dev IMPORTANT: in this release this range is not trusted and provided by the operator.
+    event ReportCommitedBatchRangeZKsyncOS(
+        uint256 indexed batchNumber,
+        uint256 indexed firstBlockNumber,
+        uint256 indexed lastBlockNumber
+    );
 }
