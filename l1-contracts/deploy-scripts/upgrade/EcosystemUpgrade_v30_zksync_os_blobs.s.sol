@@ -315,11 +315,11 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: transaction,
             // Unused in zksync os context
-            bootloaderHash: bytes32(0),
+            bootloaderHash: config.contracts.bootloaderHash,
             // Unused in zksync os context
-            defaultAccountHash: bytes32(0),
+            defaultAccountHash: config.contracts.defaultAAHash,
             // Unused in zksync os context
-            evmEmulatorHash: bytes32(0),
+            evmEmulatorHash: config.contracts.evmEmulatorHash,
             verifier: stateTransition.verifier,
             verifierParams: VerifierParams({
                 recursionNodeLevelVkHash: bytes32(0),
