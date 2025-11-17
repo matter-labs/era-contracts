@@ -590,7 +590,7 @@ contract ExperimentalBridgeTest is Test {
         address randomCTMDeployer,
         address randomMessageRoot
     ) public {
-        vm.assume(randomCaller != bridgeOwner);
+        vm.assume(randomCaller != bridgeOwner && randomCaller != L2_COMPLEX_UPGRADER_ADDR);
 
         vm.prank(randomCaller);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
