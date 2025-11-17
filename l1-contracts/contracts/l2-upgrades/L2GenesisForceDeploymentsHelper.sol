@@ -93,13 +93,13 @@ library L2GenesisForceDeploymentsHelper {
             // they can perform a birthday attack). So we need to ensure that the code matches.
             bytes32 currentCodeHash;
             assembly {
-                currentCodeHash := extcodehash(_newAddress)
+                currentCodeHash := extcodehash(implAddress)
             }
 
             (, , bytes32 expectedCodeHash) = ZKSyncOSBytecodeInfo.decodeZKSyncOSBytecodeInfo(bytecodeInfo);
 
             if (currentCodeHash != expectedCodeHash) {
-                revert ZKsyncOSNotForceDeployForExistingContract();
+                revert ZKsyncOSNotForceDeployForExistingContract(implAddress);
             }
         }
 
