@@ -12,7 +12,7 @@ import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.s
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {Unauthorized, TimeNotReached, RoleAccessDenied, ChainRequiresValidatorsSignaturesForCommit, NotEnoughSigners, SignerNotAuthorized} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, TimeNotReached, RoleAccessDenied, ChainRequiresValidatorsSignaturesForCommit, NotEnoughSigners, SignerNotAuthorized, SignersNotSorted} from "contracts/common/L1ContractErrors.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
 
@@ -294,6 +294,9 @@ contract MultisigCommiterTest is Test {
 	function test_commit_with_signatures_failure_cases() public {
 		(uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = prepareCommit();
 		bytes32 digest = hashCommitData(commitBatchFrom, commitBatchTo, commitData);
+
+		// Not enough signers case
+
 		address[] memory signers = new address[](1);
 		signers[0] = validator1Shared;
 		uint256[] memory keys = new uint256[](1);
@@ -312,6 +315,8 @@ contract MultisigCommiterTest is Test {
 			signatures
 		);
 
+		// Unauthorized signer case
+
 		signers = new address[](2);
 		signers[0] = validator1Shared;
 		signers[1] = validator1Custom;
@@ -324,6 +329,22 @@ contract MultisigCommiterTest is Test {
 
 		vm.prank(sequencer);
 		vm.expectRevert(abi.encodeWithSelector(SignerNotAuthorized.selector, validator1Custom));
+		multisigCommitter.commitBatchesMultisig(
+			chainAddress,
+			commitBatchFrom,
+			commitBatchTo,
+			commitData,
+			signers,
+			signatures
+		);
+
+		// Duplicated signer
+
+		signers[1] = signers[0];
+		signatures[1] = signatures[0];
+
+		vm.prank(sequencer);
+		vm.expectRevert(abi.encodeWithSelector(SignersNotSorted.selector));
 		multisigCommitter.commitBatchesMultisig(
 			chainAddress,
 			commitBatchFrom,
