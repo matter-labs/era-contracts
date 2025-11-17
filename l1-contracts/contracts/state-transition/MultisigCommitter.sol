@@ -82,14 +82,14 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
 
 	/// @inheritdoc IMultisigCommitter
 	function getSigningThreshold(address chainAddress) public override view returns (uint64) {
-		ChainConfig memory chainConfig = chainConfig[chainAddress];
-		if(chainConfig.useCustomValidators)
-			return chainConfig.signingThreshold;
+		ChainConfig memory config = chainConfig[chainAddress];
+		if(config.useCustomValidators)
+			return config.signingThreshold;
 		else return sharedSigningThreshold;
 	}
 
 	/// @inheritdoc IMultisigCommitter
-	function isValidator(address chainAddress, address validator) public override view returns (bool) {
+	function isValidator(address chainAddress, address validator) external override view returns (bool) {
 		if (chainConfig[chainAddress].useCustomValidators) {
 			return hasRole(chainAddress, COMMIT_VALIDATOR_ROLE, validator);
 		} else {
@@ -177,8 +177,18 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
 	function _checkSignatures(address chainAddress, address[] calldata signers, bytes[] calldata signatures, bytes32 digest) internal view {
 		if (signers.length != signatures.length) 
 			revert SignaturesLengthMismatch(signers.length, signatures.length);
-		if (signers.length < getSigningThreshold(chainAddress)) 
-			revert NotEnoughSigners(signers.length, getSigningThreshold(chainAddress));
+
+		ChainConfig memory config = chainConfig[chainAddress];
+		// splitting the logic here instead of using the getter function optimizes storage access
+		if (config.useCustomValidators) {
+			if (signers.length < config.signingThreshold) {
+				revert NotEnoughSigners(signers.length, config.signingThreshold);
+			}
+		} else {
+			if (signers.length < sharedSigningThreshold) {
+				revert NotEnoughSigners(signers.length, sharedSigningThreshold);
+			}
+		}
 
 		// signers must be sorted in order to cheaply validate they are not duplicated
 		address previousSigner = address(0);
@@ -186,8 +196,15 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
 			if(signers[i] <= previousSigner) {
 				revert SignersNotSorted();
 			}
-			if (!isValidator(chainAddress, signers[i])) {
-				revert SignerNotAuthorized(signers[i]);
+			// checking here instead of using the getter function optimizes storage access
+			if (config.useCustomValidators) {
+				if (!hasRole(chainAddress, COMMIT_VALIDATOR_ROLE, signers[i])) {
+					revert SignerNotAuthorized(signers[i]);
+				}
+			} else {
+				if (!sharedValidators.contains(signers[i])) {
+					revert SignerNotAuthorized(signers[i]);
+				}
 			}
 			if (!SignatureCheckerUpgradeable.isValidSignatureNow(signers[i], digest, signatures[i])) {
 				revert SignatureNotValid(signers[i]);
