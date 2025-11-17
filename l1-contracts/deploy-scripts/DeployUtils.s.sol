@@ -449,8 +449,6 @@ abstract contract DeployUtils is Create2FactoryUtils {
             address[] memory restrictions = new address[](1);
             restrictions[0] = addresses.accessControlRestrictionAddress;
             return abi.encode(restrictions);
-        } else if (compareStrings(contractName, "ChainTypeManager")) {
-            return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "EraChainTypeManager")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
