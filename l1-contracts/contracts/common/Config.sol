@@ -223,7 +223,8 @@ enum L2DACommitmentScheme {
     NONE,
     EMPTY_NO_DA,
     PUBDATA_KECCAK256,
-    BLOBS_AND_PUBDATA_KECCAK256
+    BLOBS_AND_PUBDATA_KECCAK256,
+    BLOBS
 }
 
 /// @dev The L2 data availability commitment scheme that permanent rollups are expected to use.
