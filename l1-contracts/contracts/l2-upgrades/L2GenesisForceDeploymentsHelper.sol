@@ -96,6 +96,7 @@ library L2GenesisForceDeploymentsHelper {
                 currentCodeHash := extcodehash(implAddress)
             }
 
+            // slither-disable-next-line unused-return
             (, , bytes32 expectedCodeHash) = ZKSyncOSBytecodeInfo.decodeZKSyncOSBytecodeInfo(bytecodeInfo);
 
             if (currentCodeHash != expectedCodeHash) {
