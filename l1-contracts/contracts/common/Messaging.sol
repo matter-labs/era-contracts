@@ -362,7 +362,7 @@ struct InteropBalanceChange {
 /// @param _depositSender The address of the entity that initiated the deposit.
 /// @param _assetId The unique identifier of the deposited L1 token.
 /// @param _assetData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
-/// @param _l2TxHash The L2 transaction hash of the failed deposit finalization.
+/// @param _l2TxHash The L2 transaction hash.
 /// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed.
 /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
 /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent.
