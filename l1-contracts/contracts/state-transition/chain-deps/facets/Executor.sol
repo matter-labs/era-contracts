@@ -247,8 +247,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         // Emitting the block range for a batch. This is needed for indexing purposes.
-        // Note, that in this release the data emitting here is provided by the operator and so not trusted.
-        emit ReportCommitedBatchRangeZKsyncOS(
+        // IMPORTANT:in this release this range is not trusted and provided by the operator while not being included to the proof.
+        emit ReportCommittedBatchRangeZKsyncOS(
             _newBatch.batchNumber,
             _newBatch.firstBlockNumber,
             _newBatch.lastBlockNumber
