@@ -107,7 +107,10 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         prepareDefaultTestUpgradeCalls();
         console.log("Default test upgrade calls prepared!");
 
-        require(Ownable2StepUpgradeable(addresses.stateTransition.verifier).pendingOwner() == config.ownerAddress, "Incorrect owner of the DA manager before transfer");
+        require(
+            Ownable2StepUpgradeable(addresses.stateTransition.verifier).pendingOwner() == config.ownerAddress,
+            "Incorrect owner of the DA manager before transfer"
+        );
     }
 
     function getSampleChainId() public view override returns (uint256) {
@@ -173,10 +176,7 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         newConfig.ecosystemAdminAddress = ChainTypeManagerBase(ctm).admin();
 
         addresses.stateTransition.validatorTimelock = ChainTypeManagerBase(ctm).validatorTimelockPostV29();
-        require(
-            Ownable2StepUpgradeable(ctm).owner() == config.ownerAddress,
-            "Incorrect owner"
-        );
+        require(Ownable2StepUpgradeable(ctm).owner() == config.ownerAddress, "Incorrect owner");
     }
 
     // Unlike the original one, we only deploy L1 contracts (no Gateway) and generate the upgrade data.

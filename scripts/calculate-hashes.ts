@@ -159,7 +159,7 @@ type EVMBytecodeInfo = {
   evmDeployedBytecodeHash: string;
   evmDeployedBytecodeBlakeHash: string;
   evmDeployedBytecodeLength: number;
-}
+};
 
 function defaultEVMBytecodeInfo(): EVMBytecodeInfo {
   return {
@@ -167,7 +167,7 @@ function defaultEVMBytecodeInfo(): EVMBytecodeInfo {
     evmDeployedBytecodeHash: "0x",
     evmDeployedBytecodeBlakeHash: "0x",
     evmDeployedBytecodeLength: 0,
-  }
+  };
 }
 
 const getBytecodeInfoFromEvmJson = (jsonFileContents: EvmJsonFileContents): EVMBytecodeInfo => {
@@ -185,9 +185,7 @@ const getBytecodeInfoFromEvmJson = (jsonFileContents: EvmJsonFileContents): EVMB
       evmDeployedBytecodeBlakeHash: ethers.utils.hexlify(
         blakejs.blake2s(ethers.utils.arrayify(jsonFileContents.deployedBytecode.object))
       ),
-      evmDeployedBytecodeLength: ethers.utils.arrayify(
-        jsonFileContents.deployedBytecode.object
-      ).length,
+      evmDeployedBytecodeLength: ethers.utils.arrayify(jsonFileContents.deployedBytecode.object).length,
     };
   } catch (err) {
     return defaultEVMBytecodeInfo();

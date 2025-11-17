@@ -206,7 +206,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         deployVerifiers();
         deployUpgradeStageValidator();
 
-        if(newConfig.redeployDAManager) {
+        if (newConfig.redeployDAManager) {
             deployDAValidators();
             transferDAValidatorOwnership();
         }
@@ -733,10 +733,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         address eraDiamondProxy = L1Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(config.eraChainId);
         (addresses.daAddresses.l1RollupDAValidator, ) = GettersFacet(eraDiamondProxy).getDAValidatorPair();
 
-        require(
-            Ownable2StepUpgradeable(ctm).owner() == config.ownerAddress,
-            "Incorrect owner"
-        );
+        require(Ownable2StepUpgradeable(ctm).owner() == config.ownerAddress, "Incorrect owner");
     }
 
     function generateFixedForceDeploymentsData() internal virtual {
@@ -1285,12 +1282,11 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         console.log("prepareStage1GovernanceCalls: provideSetNewVersionUpgradeCall");
         allCalls[4] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareDAValidatorCall");
-        allCalls[5] = newConfig.redeployDAManager ? acceptDAValidatorOwnershipCalls(): prepareDAValidatorCall();
+        allCalls[5] = newConfig.redeployDAManager ? acceptDAValidatorOwnershipCalls() : prepareDAValidatorCall();
         console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
         allCalls[6] = prepareVersionSpecificStage1GovernanceCallsL1();
         allCalls[7] = prepareGatewaySpecificStage1GovernanceCalls();
         allCalls[8] = config.isZKsyncOS ? acceptZKSyncOSVerifierOwnershipCalls() : new Call[](0);
-
 
         calls = mergeCallsArray(allCalls);
     }
