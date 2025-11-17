@@ -1377,7 +1377,7 @@
   },
   {
     "contractName": "l1-contracts/ZKsyncOSVerifierPlonk",
-    "zkBytecodeHash": "0x01000dbbdd23d732ca844cd3a48bec80df92d17748cd0a30c256084fd830991a",
+    "zkBytecodeHash": "0x01000dbb7c1ea2bec922da6cccef5586d63e0e4b2b743e674a980f59656d5665",
     "zkBytecodePath": "/l1-contracts/zkout/ZKsyncOSVerifierPlonk.sol/ZKsyncOSVerifierPlonk.json",
     "evmBytecodeHash": "0xe75ee6b02eea872b66c73fff34cb436eb2ec06d8a7d5fdf22a8cb582cc7d08ae",
     "evmBytecodePath": "/l1-contracts/out/ZKsyncOSVerifierPlonk.sol/ZKsyncOSVerifierPlonk.json",
