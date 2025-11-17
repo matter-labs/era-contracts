@@ -11,6 +11,8 @@ error AddressAlreadySet(address addr);
 error AddressHasNoCode(address);
 // 0x1f73225f
 error AddressMismatch(address expected, address supplied);
+// 0x42573d7a
+error AddressNotZero();
 // 0x2a5989a0
 error AlreadyPermanentRollup();
 // 0x0bfcef28

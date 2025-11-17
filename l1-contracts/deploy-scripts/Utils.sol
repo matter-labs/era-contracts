@@ -111,6 +111,19 @@ struct FacetToSelectors {
     uint16 facetPosition;
 }
 
+struct FacetCut {
+    address facet;
+    Action action;
+    bool isFreezable;
+    bytes4[] selectors;
+}
+
+enum Action {
+    Add,
+    Replace,
+    Remove
+}
+
 struct ChainInfoFromBridgehub {
     address diamondProxy;
     address admin;
@@ -1294,7 +1307,7 @@ library Utils {
         address _bridgehub,
         uint256 _chainId
     ) internal view returns (ChainInfoFromBridgehub memory info) {
-        info.l1AssetRouterProxy = L1Bridgehub(_bridgehub).assetRouter();
+        info.l1AssetRouterProxy = address(L1Bridgehub(_bridgehub).assetRouter());
         info.diamondProxy = L1Bridgehub(_bridgehub).getZKChain(_chainId);
         info.admin = IGetters(info.diamondProxy).getAdmin();
         info.ctm = L1Bridgehub(_bridgehub).chainTypeManager(_chainId);

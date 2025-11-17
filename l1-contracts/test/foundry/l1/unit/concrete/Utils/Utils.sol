@@ -672,6 +672,12 @@ library Utils {
         return deployViaCreate(bytecode);
     }
 
+    function deployEIP7702Checker() internal returns (address) {
+        bytes memory bytecode = ContractsBytecodesLib.getCreationCodeEVM("EIP7702Checker");
+
+        return deployViaCreate(bytecode);
+    }
+
     function deployBlobsL1DAValidatorZKsyncOSBytecode() internal returns (address) {
         bytes memory bytecode = ContractsBytecodesLib.getCreationCodeEVM("BlobsL1DAValidatorZKsyncOS");
 

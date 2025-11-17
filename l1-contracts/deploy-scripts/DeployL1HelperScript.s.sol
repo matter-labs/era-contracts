@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
+import {Action, FacetCut, StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -34,6 +34,7 @@ import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
+import {MockEIP7702Checker} from "contracts/dev-contracts/MockEIP7702Checker.sol";
 import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
@@ -197,12 +198,20 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 return type(ServerNotifier).creationCode;
             } else if (compareStrings(contractName, "UpgradeStageValidator")) {
                 return type(UpgradeStageValidator).creationCode;
+            } else if (compareStrings(contractName, "MockEIP7702Checker")) {
+                return type(MockEIP7702Checker).creationCode;
+            } else if (compareStrings(contractName, "EIP7702Checker")) {
+                return ContractsBytecodesLib.getCreationCodeEVM(contractName);
             }
         } else {
             if (compareStrings(contractName, "L2Bridgehub")) {
                 return Utils.readZKFoundryBytecodeL1("L2Bridgehub.sol", "L2Bridgehub");
             } else if (compareStrings(contractName, "L2MessageRoot")) {
                 return Utils.readZKFoundryBytecodeL1("L2MessageRoot.sol", "L2MessageRoot");
+            } else if (compareStrings(contractName, "L2ChainAssetHandler")) {
+                return Utils.readZKFoundryBytecodeL1("L2ChainAssetHandler.sol", "L2ChainAssetHandler");
+            } else if (compareStrings(contractName, "UpgradeableBeaconDeployer")) {
+                return Utils.readZKFoundryBytecodeL1("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer");
             } else if (compareStrings(contractName, "ICTMDeploymentTracker")) {
                 return Utils.readZKFoundryBytecodeL1("ICTMDeploymentTracker.sol", "ICTMDeploymentTracker");
             } else if (compareStrings(contractName, "L2AssetRouter")) {
@@ -304,13 +313,10 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                         L1NativeTokenVault.initialize,
                         (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
                     );
-            } else if (compareStrings(contractName, "EraChainTypeManager")) {
-                return
-                    abi.encodeCall(
-                        IChainTypeManager.initialize,
-                        getChainTypeManagerInitializeData(addresses.stateTransition)
-                    );
-            } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
+            } else if (
+                compareStrings(contractName, "EraChainTypeManager") ||
+                compareStrings(contractName, "ZKsyncOSChainTypeManager")
+            ) {
                 return
                     abi.encodeCall(
                         IChainTypeManager.initialize,

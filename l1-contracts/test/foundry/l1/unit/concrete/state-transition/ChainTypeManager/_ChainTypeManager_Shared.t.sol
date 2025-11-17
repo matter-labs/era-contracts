@@ -44,13 +44,13 @@ contract ChainTypeManagerTest is Test {
     L1MessageRoot internal messageRoot;
     address internal rollupL1DAValidator;
     address internal diamondInit;
-    address internal constant governor = address(0x1010101);
-    address internal constant admin = address(0x2020202);
-    address internal constant baseToken = address(0x3030303);
-    address internal constant sharedBridge = address(0x4040404);
-    address internal constant validator = address(0x5050505);
-    address internal constant l1Nullifier = address(0x6060606);
-    address internal constant serverNotifier = address(0x7070707);
+    address internal governor;
+    address internal admin;
+    address internal baseToken;
+    address internal sharedBridge;
+    address internal validator;
+    address internal l1Nullifier;
+    address internal serverNotifier;
     address internal newChainAdmin;
     uint256 l1ChainId = 5;
     uint256 chainId = 112;
@@ -63,6 +63,13 @@ contract ChainTypeManagerTest is Test {
     Diamond.FacetCut[] internal facetCuts;
 
     function deploy() public {
+        governor = makeAddr("governor");
+        admin = makeAddr("admin");
+        baseToken = makeAddr("baseToken");
+        sharedBridge = makeAddr("sharedBridge");
+        validator = makeAddr("validator");
+        l1Nullifier = makeAddr("l1Nullifier");
+        serverNotifier = makeAddr("serverNotifier");
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
         L1MessageRoot messageroot = new L1MessageRoot(address(bridgehub));
         vm.prank(governor);
@@ -257,7 +264,13 @@ contract ChainTypeManagerTest is Test {
     }
 
     function _mockMigrationPausedFromBridgehub() internal {
-        vm.mockCall(address(bridgehub), abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
+        address mockChainAssetHandler = makeAddr("mockChainAssetHandler");
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSignature("chainAssetHandler()"),
+            abi.encode(mockChainAssetHandler)
+        );
+        vm.mockCall(mockChainAssetHandler, abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////

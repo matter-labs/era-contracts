@@ -31,9 +31,9 @@ diamond_init_max_pubdata_per_batch = 120000
 diamond_init_max_l2_gas_per_batch = 80000000
 diamond_init_priority_tx_max_pubdata = 99000
 diamond_init_minimal_l2_gas_price = 250000000
-bootloader_hash = "0x0100099f5ca0a8b6327c30672e3e94fc56203860f4159d615463ab99cf0eeece"
-default_aa_hash = "0x010005f76ff9047aa9a0caabf27b4d40c44bafa64cbcda4bb85104a46fc6210c"
-evm_emulator_hash = "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63"
+bootloader_hash = "0x0100085f9382a7928dd83bfc529121827b5f29f18b9aa10d18aa68e1be7ddc35"
+default_aa_hash = "0x010005f72e443c94460f4583fb38ef5d0c5cd9897021c41df840f91465c0392e"
+evm_emulator_hash = "0x01000d83e0329d9144ad041430fafcbc2b388e5434db8cb8a96e80157738a1da"
 bridgehub_proxy_address = "0x35A54c8C757806eB6820629bc82d90E056394C92"
 rollup_da_manager = "0xB168490e38E5E7e1B8eB256a701Ee8314Cbf0E15"
 

@@ -5,17 +5,10 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-// import {Vm} from "forge-std/Vm.sol";
-import {stdToml} from "forge-std/StdToml.sol";
-
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IBridgehub, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {ADDRESS_ONE, StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
 import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -28,14 +21,11 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {EraChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
@@ -266,9 +256,7 @@ contract GatewayCTMFromL1 is Script {
             genesisRollupLeafIndex: uint64(config.genesisRollupLeafIndex),
             genesisBatchCommitment: config.genesisBatchCommitment,
             forceDeploymentsData: config.forceDeploymentsData,
-            protocolVersion: config.latestProtocolVersion,
-            // TODO: for now, zksync os on gateway is not supported
-            isZKsyncOS: false
+            protocolVersion: config.latestProtocolVersion
         });
     }
 
@@ -472,8 +460,9 @@ contract GatewayCTMFromL1 is Script {
         address dp = address(_deployInternal(ContractsBytecodesLib.getCreationCode("DiamondProxy"), hex""));
         console.log("Dummy diamond proxy deployed at", dp);
 
+        string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
         output.gatewayStateTransition.chainTypeManagerImplementation = address(
-            _deployInternal(ContractsBytecodesLib.getCreationCode("ChainTypeManager"), abi.encode(L2_BRIDGEHUB_ADDR))
+            _deployInternal(ContractsBytecodesLib.getCreationCode(ctmContractName), abi.encode(L2_BRIDGEHUB_ADDR))
         );
         console.log(
             "StateTransitionImplementation deployed at",
@@ -563,7 +552,7 @@ contract GatewayCTMFromL1 is Script {
             abi.encode(
                 output.gatewayStateTransition.chainTypeManagerImplementation,
                 deployerAddress,
-                abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))
+                abi.encodeCall(EraChainTypeManager.initialize, (diamondInitData))
             )
         );
 

@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Script} from "forge-std/Script.sol";
-import {StdStorage, stdStorage} from "forge-std/Test.sol";
+
 import {stdToml} from "forge-std/StdToml.sol";
 
 contract ConfigSemaphore is Script {

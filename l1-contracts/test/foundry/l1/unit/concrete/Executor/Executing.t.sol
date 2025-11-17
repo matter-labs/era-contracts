@@ -9,7 +9,7 @@ import {EMPTY_PREPUBLISHED_COMMITMENT, ExecutorTest, POINT_EVALUATION_PRECOMPILE
 import {POINT_EVALUATION_PRECOMPILE_ADDR, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {BatchHashMismatch, CantExecuteUnprovenBatches, NonSequentialBatch, PriorityOperationsRollingHashMismatch, QueueIsEmpty, TxHashMismatch} from "contracts/common/L1ContractErrors.sol";
+import {BatchHashMismatch, CantExecuteUnprovenBatches, NonSequentialBatch, PriorityOperationsRollingHashMismatch, QueueIsEmpty} from "contracts/common/L1ContractErrors.sol";
 
 contract ExecutingTest is ExecutorTest {
     bytes32 l2DAValidatorOutputHash;
@@ -461,7 +461,6 @@ contract ExecutingTest is ExecutorTest {
             Utils.generatePriorityOps(storedBatchInfoArray.length)
         );
         validatorTimelock.executeBatchesSharedBridge(address(executor), executeBatchFrom, executeBatchTo, executeData);
-        // FIXME: return snapshot back
-        // vm.snapshotGasLastCall("Executor", "execute");
+        vm.snapshotGasLastCall("Executor", "execute");
     }
 }

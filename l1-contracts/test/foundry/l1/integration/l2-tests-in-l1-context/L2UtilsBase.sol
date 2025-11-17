@@ -3,22 +3,20 @@ pragma solidity 0.8.28;
 
 import {Vm} from "forge-std/Vm.sol";
 
-import {StdStorage, Test, stdStorage, stdToml} from "forge-std/Test.sol";
-import {Script, console2 as console} from "forge-std/Script.sol";
+import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
+import {console2 as console} from "forge-std/Script.sol";
 
 import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
+
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {Config, DeployUtils, DeployedAddresses} from "deploy-scripts/DeployUtils.s.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {L2ChainAssetHandler} from "contracts/bridgehub/L2ChainAssetHandler.sol";
 import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
@@ -95,10 +93,16 @@ library L2UtilsBase {
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
             _args.l1ChainId,
             _args.eraChainId,
-            _args.l1AssetRouter,
-            _args.legacySharedBridge,
+            IL1AssetRouter(_args.l1AssetRouter),
+            IL2SharedBridgeLegacy(_args.legacySharedBridge),
             baseTokenAssetId,
             _args.aliasedOwner
+        );
+        // Initializing reentrancy guard
+        vm.store(
+            L2_ASSET_ROUTER_ADDR,
+            bytes32(0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4),
+            bytes32(uint256(1))
         );
 
         vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, ntv.code);

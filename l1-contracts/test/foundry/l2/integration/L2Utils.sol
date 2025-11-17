@@ -3,13 +3,15 @@
 pragma solidity ^0.8.20;
 
 import {Vm} from "forge-std/Vm.sol";
-import {StdStorage, Test, stdStorage, stdToml} from "forge-std/Test.sol";
+
 import "forge-std/console.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
@@ -21,10 +23,9 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-import {SystemContractsCaller} from "contracts/common/l2-helpers/SystemContractsCaller.sol";
 import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
-import {ContractsBytecodesLib} from "deploy-scripts/ContractsBytecodesLib.sol";
+
 import {Utils} from "deploy-scripts/Utils.sol";
 import {L2ChainAssetHandler} from "contracts/bridgehub/L2ChainAssetHandler.sol";
 
@@ -102,8 +103,8 @@ library L2Utils {
         assetRouter.initL2(
             _args.l1ChainId,
             _args.eraChainId,
-            _args.l1AssetRouter,
-            _args.legacySharedBridge,
+            IL1AssetRouter(_args.l1AssetRouter),
+            IL2SharedBridgeLegacy(_args.legacySharedBridge),
             ethAssetId,
             _args.aliasedOwner
         );
