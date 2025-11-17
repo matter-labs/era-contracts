@@ -113,8 +113,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
     }
 
     struct ExpectedL2Addresses {
-        address expectedRollupL2DAValidator;
-        address expectedValidiumL2DAValidator;
         address l2SharedBridgeLegacyImpl;
         address l2BridgedStandardERC20Impl;
     }
@@ -130,6 +128,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         address oldValidatorTimelock;
         uint256 priorityTxsL2GasLimit;
         uint256 maxExpectedL1GasPrice;
+        bool redeployDAManager;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -199,13 +198,18 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
     }
 
     /// @notice Deploy everything that should be deployed
-    function deployNewEcosystemContractsL1() public virtual {
+    function deployNewEcosystemContractsL1() internal {
         require(upgradeConfig.initialized, "Not initialized");
 
         instantiateCreate2Factory();
 
         deployVerifiers();
         deployUpgradeStageValidator();
+
+        if(newConfig.redeployDAManager) {
+            deployDAValidators();
+            transferDAValidatorOwnership();
+        }
 
         // Note, that this is the upgrade that will be used, despite the naming of the variable here.
         // To use the custom upgrade simply override the `deployUsedUpgradeContract` function.
@@ -239,6 +243,12 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         deployUpgradeSpecificContractsL1();
 
         upgradeConfig.ecosystemContractsDeployed = true;
+    }
+
+    function transferDAValidatorOwnership() public {
+        vm.startBroadcast(msg.sender);
+        Ownable2StepUpgradeable(addresses.daAddresses.rollupDAManager).transferOwnership(config.ownerAddress);
+        vm.stopBroadcast();
     }
 
     function deployUpgradeSpecificContractsL1() internal virtual {
@@ -608,12 +618,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         addresses.transparentProxyAdmin = address(
             uint160(uint256(vm.load(addresses.bridgehub.bridgehubProxy, ADMIN_SLOT)))
         );
-
-        require(
-            Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() == config.ownerAddress,
-            "Incorrect owner"
-        );
-
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
         newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
 
@@ -621,6 +625,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
 
         newConfig.priorityTxsL2GasLimit = toml.readUint("$.priority_txs_l2_gas_limit");
         newConfig.maxExpectedL1GasPrice = toml.readUint("$.max_expected_l1_gas_price");
+        newConfig.redeployDAManager = toml.readBool("$.redeploy_da_manager");
 
         addresses.daAddresses.rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
 
@@ -727,6 +732,11 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
 
         address eraDiamondProxy = L1Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(config.eraChainId);
         (addresses.daAddresses.l1RollupDAValidator, ) = GettersFacet(eraDiamondProxy).getDAValidatorPair();
+
+        require(
+            Ownable2StepUpgradeable(ctm).owner() == config.ownerAddress,
+            "Incorrect owner"
+        );
     }
 
     function generateFixedForceDeploymentsData() internal virtual {
@@ -738,7 +748,9 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
     }
 
     function getExpectedL2Address(string memory contractName) public virtual returns (address) {
-        string[2] memory expectedCreate2Deployed = ["RollupL2DAValidator", "NoDAL2DAValidator"];
+        // While no L2 contracts are supported for predeploy, we keep an empty array
+        // to ensure that in the future it will be easier to add ones.
+        string[] memory expectedCreate2Deployed = new string[](0);
 
         for (uint256 i; i < expectedCreate2Deployed.length; i++) {
             if (compareStrings(contractName, expectedCreate2Deployed[i])) {
@@ -761,15 +773,13 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         bytes[] memory additionalDependencies = new bytes[](7 + additionalForceDeployments.length); // Deps after Gateway upgrade
         additionalDependencies[0] = ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
         additionalDependencies[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
-        additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
-        additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
         // TODO(refactor): do we need this?
-        additionalDependencies[4] = ContractsBytecodesLib.getCreationCode("DiamondProxy");
-        additionalDependencies[5] = ContractsBytecodesLib.getCreationCode("L2V29Upgrade");
-        additionalDependencies[6] = ContractsBytecodesLib.getCreationCode("ProxyAdmin");
+        additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("DiamondProxy");
+        additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ProxyAdmin");
+        additionalDependencies[4] = ContractsBytecodesLib.getCreationCode("L2V29Upgrade");
 
         for (uint256 i; i < additionalForceDeployments.length; i++) {
-            additionalDependencies[6 + i] = ContractsBytecodesLib.getCreationCode(additionalForceDeployments[i]);
+            additionalDependencies[5 + i] = ContractsBytecodesLib.getCreationCode(additionalForceDeployments[i]);
         }
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, additionalDependencies);
@@ -1032,16 +1042,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
             config.contracts.recursionNodeLevelVkHash
         );
 
-        vm.serializeAddress(
-            "contracts_newConfig",
-            "expected_rollup_l2_da_validator",
-            getExpectedL2Address("RollupL2DAValidator")
-        );
-        vm.serializeAddress(
-            "contracts_newConfig",
-            "expected_validium_l2_da_validator",
-            getExpectedL2Address("NoDAL2DAValidator")
-        );
         vm.serializeBytes("contracts_newConfig", "diamond_cut_data", newlyGeneratedData.diamondCutData);
 
         vm.serializeBytes(
@@ -1274,7 +1274,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](8);
+        Call[][] memory allCalls = new Call[][](9);
 
         allCalls[0] = prepareGovernanceUpgradeTimerCheckCall();
         allCalls[1] = prepareCheckMigrationsPausedCalls();
@@ -1285,10 +1285,12 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         console.log("prepareStage1GovernanceCalls: provideSetNewVersionUpgradeCall");
         allCalls[4] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareDAValidatorCall");
-        allCalls[5] = prepareDAValidatorCall();
+        allCalls[5] = newConfig.redeployDAManager ? acceptDAValidatorOwnershipCalls(): prepareDAValidatorCall();
         console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
         allCalls[6] = prepareVersionSpecificStage1GovernanceCallsL1();
         allCalls[7] = prepareGatewaySpecificStage1GovernanceCalls();
+        allCalls[8] = config.isZKsyncOS ? acceptZKSyncOSVerifierOwnershipCalls() : new Call[](0);
+
 
         calls = mergeCallsArray(allCalls);
     }
@@ -1380,6 +1382,25 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
             target: addresses.bridgehub.bridgehubProxy,
             value: 0,
             data: abi.encodeCall(IBridgehubBase.pauseMigration, ())
+        });
+    }
+
+    // Since we redeploy the Rollup DA manager, the admin needs to accept ownership.
+    function acceptDAValidatorOwnershipCalls() public returns (Call[] memory calls) {
+        calls = new Call[](1);
+        calls[0] = Call({
+            target: addresses.daAddresses.rollupDAManager,
+            value: 0,
+            data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
+        });
+    }
+
+    function acceptZKSyncOSVerifierOwnershipCalls() public returns (Call[] memory calls) {
+        calls = new Call[](1);
+        calls[0] = Call({
+            target: addresses.stateTransition.verifier,
+            value: 0,
+            data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
         });
     }
 
@@ -1878,10 +1899,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
                 return type(GovernanceUpgradeTimer).creationCode;
             } else if (compareStrings(contractName, "L2StandardERC20")) {
                 return ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
-            } else if (compareStrings(contractName, "RollupL2DAValidator")) {
-                return ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
-            } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
-                return ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
             } else if (compareStrings(contractName, "ValidatorTimelock")) {
                 return type(ValidatorTimelock).creationCode;
             }
@@ -1900,10 +1917,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
                 return ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
             } else if (compareStrings(contractName, "L2StandardERC20")) {
                 return ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
-            } else if (compareStrings(contractName, "RollupL2DAValidator")) {
-                return ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
-            } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
-                return ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
             } else if (compareStrings(contractName, "ValidatorTimelock")) {
                 return ContractsBytecodesLib.getCreationCode("ValidatorTimelock");
             }
@@ -1929,10 +1942,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
             return abi.encode();
         } else if (compareStrings(contractName, "L2StandardERC20")) {
-            return abi.encode();
-        } else if (compareStrings(contractName, "RollupL2DAValidator")) {
-            return abi.encode();
-        } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
             return abi.encode();
         } else if (
             compareStrings(contractName, "EraChainTypeManager") ||

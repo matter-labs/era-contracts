@@ -1360,11 +1360,11 @@
     "evmDeployedBytecodeLength": 19685
   },
   {
-    "contractName": "l1-contracts/L2TestnetSystemProxiesUpgrade",
+    "contractName": "l1-contracts/L2V30TestnetSystemProxiesUpgrade",
     "zkBytecodeHash": "0x010001fd02a72633d0bd0d9c8de2cbdcead958a2d87db50b1905360ed877846e",
-    "zkBytecodePath": "/l1-contracts/zkout/L2TestnetSystemProxiesUpgrade.sol/L2TestnetSystemProxiesUpgrade.json",
+    "zkBytecodePath": "/l1-contracts/zkout/L2V30TestnetSystemProxiesUpgrade.sol/L2V30TestnetSystemProxiesUpgrade.json",
     "evmBytecodeHash": "0x44a63a030904de9b6e62befdfb016d60663c36a23ad85775161d3423d438a17b",
-    "evmBytecodePath": "/l1-contracts/out/L2TestnetSystemProxiesUpgrade.sol/L2TestnetSystemProxiesUpgrade.json",
+    "evmBytecodePath": "/l1-contracts/out/L2V30TestnetSystemProxiesUpgrade.sol/L2V30TestnetSystemProxiesUpgrade.json",
     "evmDeployedBytecodeHash": "0x99516d9727a243874f33e1e2f01c8645e78923de71427cd80810cc16c0dd3441",
     "evmDeployedBytecodeBlakeHash": "0x6a1b42d0e4e37b772649f7e2472b2535df9a285eee6618d0b5b97b0d01400009",
     "evmDeployedBytecodeLength": 3478

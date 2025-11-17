@@ -221,12 +221,14 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
 
         if (config.isZKsyncOS) {
             // We add the verifier to the default execution version
-            vm.broadcast(msg.sender);
+            vm.startBroadcast(msg.sender);
             ZKsyncOSDualVerifier(addresses.stateTransition.verifier).addVerifier(
                 DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
                 IVerifierV2(addresses.stateTransition.verifierFflonk),
                 IVerifier(addresses.stateTransition.verifierPlonk)
             );
+            ZKsyncOSDualVerifier(addresses.stateTransition.verifier).transferOwnership(config.ownerAddress);
+            vm.stopBroadcast();
         }
     }
 
@@ -318,12 +320,6 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
 
         IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
-
-        if (config.isZKsyncOS) {
-            // We need to transfer the ownership of the Verifier
-            ZKsyncOSDualVerifier(addresses.stateTransition.verifier).transferOwnership(addresses.governance);
-        }
-
         vm.stopBroadcast();
         console.log("Owners updated");
     }

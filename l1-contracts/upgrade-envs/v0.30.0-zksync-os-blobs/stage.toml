@@ -1,7 +1,8 @@
 era_chain_id = 270
 testnet_verifier = true
 governance_upgrade_timer_initial_delay = 1200
-owner_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
+# Note, that this is NOT the owner of the bridgehub, but the owner of the zksync os CTM.
+owner_address = "0xc66f0b45c05cf654eec093650fd67865e85e8566"
 
 # This should always be false for non-loadtest environments.
 support_l2_legacy_shared_bridge_test = false
@@ -11,15 +12,16 @@ old_protocol_version = "0x1d00000001"
 priority_txs_l2_gas_limit = 2000000
 max_expected_l1_gas_price = 50000000000
 is_zk_sync_os = true
+redeploy_da_manager = true
 
 [contracts]
 governance_min_delay = 0
 
 max_number_of_chains = 100
-create2_factory_salt = "0x55de3677ffea74c9815331db7f4c737a32c161db4cae7d47504a336c4c5bcfb5"
+create2_factory_salt = "0x55de3677ffea74c9815331db7f4c737a32c161db4cae7d47504a336c4c5bcfb9"
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 validator_timelock_execution_delay = 0
-genesis_root = "0x6ef70107782e23150da78ff573ce332747a988e77518739723924e4f5593be22"
+genesis_root = "0xc346a158cce093e99ab65a95c884a26629d0e4f8d00ae20bbca4bfc4b204eec2"
 genesis_rollup_leaf_index = 0
 genesis_batch_commitment = "0000000000000000000000000000000000000000000000000000000000000001"
 recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -39,14 +41,15 @@ bridgehub_proxy_address = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
 # Does not matter, a new one should be deployed
 rollup_da_manager = "0xeb7c0daaddfb52afa05400b489e7497b271d6122"
 
+# Does not matter
 governance_security_council_address = "0xed04b1ac422251851a3EC953Ff4395e5c2443647"
+
 latest_protocol_version = 0x1e00000000
+# Unused as bytecode supplier is not supported in this upgrade.
 l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
-protocol_upgrade_handler_proxy_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
 
 [tokens]
 token_weth_address = "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"
-
 
 # Note, that we actually dont contain the gateway on this env, but we need
 # for the script. We reuse era chain id.

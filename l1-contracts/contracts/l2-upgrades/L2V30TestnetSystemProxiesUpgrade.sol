@@ -14,7 +14,7 @@ import {SystemContractProxyAdmin} from "./SystemContractProxyAdmin.sol";
 /// @author Matter Labs
 /// @notice The upgrade to be applied on testnets to ensure that they use system proxies for system contracts' upgradeability.
 /// @notice That it is not expected to be run on mainnet, as mainnet will use those from the start.
-contract L2TestnetSystemProxiesUpgrade {
+contract L2V30TestnetSystemProxiesUpgrade {
     /// @notice Initializes a system proxy on a specific address.
     /// @param _address The address of the system contract proxy to initialize.
     /// @param _fullBytecodeInfo The full bytecode info (implementation + proxy) to force deploy.

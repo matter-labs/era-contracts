@@ -73,7 +73,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
-import {L2TestnetSystemProxiesUpgrade} from "contracts/l2-upgrades/L2TestnetSystemProxiesUpgrade.sol";
+import {L2V30TestnetSystemProxiesUpgrade} from "contracts/l2-upgrades/L2V30TestnetSystemProxiesUpgrade.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 import {IComplexUpgraderZKsyncOSV29} from "contracts/state-transition/l2-deps/IComplexUpgraderZKsyncOSV29.sol";
@@ -94,6 +94,8 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         config.isZKsyncOS = true;
         initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
 
+        require(newConfig.redeployDAManager, "This upgrade script requires redeploying the DA manager");
+
         prepareEcosystemUpgrade();
         console.log("Ecosystem upgrade prepared!");
 
@@ -104,6 +106,8 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
 
         prepareDefaultTestUpgradeCalls();
         console.log("Default test upgrade calls prepared!");
+
+        require(Ownable2StepUpgradeable(addresses.stateTransition.verifier).pendingOwner() == config.ownerAddress, "Incorrect owner of the DA manager before transfer");
     }
 
     function getSampleChainId() public view override returns (uint256) {
@@ -123,8 +127,9 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
 
     // Unlike the original one, we do not fetch the L1 da validator address
     function setAddressesBasedOnBridgehub() internal override {
-        config.ownerAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
         address ctm = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(getSampleChainId());
+        config.ownerAddress = Ownable2StepUpgradeable(ctm).owner();
+
         addresses.stateTransition.chainTypeManagerProxy = ctm;
         // We have to set the diamondProxy address here - as it is used by multiple constructors (for example L1Nullifier etc)
         addresses.stateTransition.diamondProxy = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
@@ -165,9 +170,13 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
             addresses.stateTransition.chainTypeManagerProxy
         ).serverNotifierAddress();
 
-        newConfig.ecosystemAdminAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
+        newConfig.ecosystemAdminAddress = ChainTypeManagerBase(ctm).admin();
 
         addresses.stateTransition.validatorTimelock = ChainTypeManagerBase(ctm).validatorTimelockPostV29();
+        require(
+            Ownable2StepUpgradeable(ctm).owner() == config.ownerAddress,
+            "Incorrect owner"
+        );
     }
 
     // Unlike the original one, we only deploy L1 contracts (no Gateway) and generate the upgrade data.
@@ -175,21 +184,11 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         deployNewEcosystemContractsL1();
         console.log("Ecosystem contracts are deployed!");
 
-        deployDAValidators();
-        transferDAValidatorOwnerships();
-        console.log("DA Validators deployed!");
-
         publishBytecodes();
         console.log("Bytecodes published!");
 
         generateUpgradeData();
         console.log("Upgrade data generated!");
-    }
-
-    function transferDAValidatorOwnerships() public {
-        vm.startBroadcast(msg.sender);
-        Ownable2StepUpgradeable(addresses.daAddresses.rollupDAManager).transferOwnership(config.ownerAddress);
-        vm.stopBroadcast();
     }
 
     // Factory deps are not supported yet, so we just mark those as published.
@@ -248,18 +247,10 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         allCalls[2] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareDAValidatorCall");
         allCalls[3] = acceptDAValidatorOwnershipCalls();
+        console.log("prepareStage1GovernanceCalls: acceptZKSyncOSVerifierOwnershipCalls");
+        allCalls[4] = acceptZKSyncOSVerifierOwnershipCalls();
 
         calls = mergeCallsArray(allCalls);
-    }
-
-    // Since we redeploy the Rollup DA manager, the admin needs to accept ownership.
-    function acceptDAValidatorOwnershipCalls() public returns (Call[] memory calls) {
-        calls = new Call[](1);
-        calls[0] = Call({
-            target: addresses.daAddresses.rollupDAManager,
-            value: 0,
-            data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
-        });
     }
 
     // Unlike the original one, we skip stage 0 and stage 2 calls.
@@ -271,8 +262,8 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         StateTransitionDeployedAddresses memory stateTransition
     ) public override returns (ProposedUpgrade memory proposedUpgrade) {
         bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract(
-            "L2TestnetSystemProxiesUpgrade.sol",
-            "L2TestnetSystemProxiesUpgrade"
+            "L2V30TestnetSystemProxiesUpgrade.sol",
+            "L2V30TestnetSystemProxiesUpgrade"
         );
 
         address upgradeImplAddress = L2GenesisForceDeploymentsHelper.generateRandomAddress(bytecodeInfo);
@@ -287,7 +278,7 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         });
 
         bytes memory upgradeImplData = abi.encodeCall(
-            L2TestnetSystemProxiesUpgrade.upgrade,
+            L2V30TestnetSystemProxiesUpgrade.upgrade,
             (
                 newlyGeneratedData.fixedForceDeploymentsData,
                 Utils.getZKOSBytecodeInfoForContract("SystemContractProxyAdmin.sol", "SystemContractProxyAdmin"),

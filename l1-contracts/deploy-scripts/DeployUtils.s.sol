@@ -395,7 +395,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "RollupDAManager")) {
             return abi.encode();
         } else if (compareStrings(contractName, "RollupL1DAValidator")) {
-            return abi.encode(addresses.daAddresses.l1RollupDAValidator);
+            return abi.encode();
         } else if (compareStrings(contractName, "BlobsL1DAValidatorZKsyncOS")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {

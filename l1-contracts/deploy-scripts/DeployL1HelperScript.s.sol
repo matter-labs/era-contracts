@@ -269,12 +269,6 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 return Utils.readZKFoundryBytecodeL1("ServerNotifier.sol", "ServerNotifier");
             } else if (compareStrings(contractName, "BeaconProxy")) {
                 return Utils.readZKFoundryBytecodeL1("BeaconProxy.sol", "BeaconProxy");
-            } else if (compareStrings(contractName, "RollupL2DAValidator")) {
-                return Utils.readZKFoundryBytecodeL2("RollupL2DAValidator.sol", "RollupL2DAValidator");
-            } else if (compareStrings(contractName, "ValidiumL2DAValidator")) {
-                return Utils.readZKFoundryBytecodeL2("ValidiumL2DAValidator.sol", "ValidiumL2DAValidator");
-            } else if (compareStrings(contractName, "AvailL2DAValidator")) {
-                return Utils.readZKFoundryBytecodeL2("AvailL2DAValidator.sol", "AvailL2DAValidator");
             } else {
                 revert(string.concat("Contract ", contractName, " creation code not set"));
             }
