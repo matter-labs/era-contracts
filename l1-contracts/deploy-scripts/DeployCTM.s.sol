@@ -58,6 +58,7 @@ import {Config, DeployedAddresses, DeployCTMUtils} from "./DeployCTMUtils.s.sol"
 import {AddressIntrospector} from "./AddressIntrospector.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET} from "contracts/common/Config.sol";
 // TODO: pass this value from zkstack_cli
 uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 3;
 
@@ -439,13 +440,22 @@ contract DeployCTMScript is Script, DeployCTMUtils {
     }
 
     function saveDiamondSelectors() public {
-        AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)));
+        AdminFacet adminFacet = new AdminFacet(
+            1,
+            RollupDAManager(address(0)),
+            CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET,
+            CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET,
+            PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+            PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+        );
         GettersFacet gettersFacet = new GettersFacet();
         MailboxFacet mailboxFacet = new MailboxFacet(
             1,
             1,
             discoveredBridgehub.chainAssetHandler,
-            IEIP7702Checker(address(0))
+            IEIP7702Checker(address(0)),
+            PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+            PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
         );
         ExecutorFacet executorFacet = new ExecutorFacet(1);
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);

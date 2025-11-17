@@ -5,6 +5,7 @@ import {Test, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET} from "contracts/common/Config.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L2Utils} from "./L2Utils.sol";
@@ -64,14 +65,23 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         );
         addresses.stateTransition.executorFacet = address(new ExecutorFacet(config.l1ChainId));
         addresses.stateTransition.adminFacet = address(
-            new AdminFacet(config.l1ChainId, RollupDAManager(addresses.daAddresses.rollupDAManager))
+            new AdminFacet(
+                config.l1ChainId,
+                RollupDAManager(addresses.daAddresses.rollupDAManager),
+                CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET,
+                CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET,
+                PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+                PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+            )
         );
         addresses.stateTransition.mailboxFacet = address(
             new MailboxFacet(
                 config.eraChainId,
                 config.l1ChainId,
                 L2_CHAIN_ASSET_HANDLER_ADDR,
-                IEIP7702Checker(address(0))
+                IEIP7702Checker(address(0)),
+                PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+                PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
             )
         );
         addresses.stateTransition.gettersFacet = address(new GettersFacet());
