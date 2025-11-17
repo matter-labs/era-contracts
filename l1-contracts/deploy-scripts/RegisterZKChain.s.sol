@@ -36,6 +36,7 @@ import {Call} from "contracts/governance/Common.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
+import {PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 import {ZkChainAddresses} from "./Types.sol";
 
 // solhint-disable-next-line gas-struct-packing
@@ -102,6 +103,8 @@ contract RegisterZKChainScript is Script {
     function runForTest() public {
         console.log("Deploying ZKChain");
 
+        // Timestamp needs to be late enough for `pauseDepositsBeforeInitiatingMigration` time checks
+        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET + 1);
         initializeConfigTest();
         runInner(vm.envString("ZK_CHAIN_OUT"));
     }
@@ -126,7 +129,6 @@ contract RegisterZKChainScript is Script {
         addValidators();
         configureZkSyncStateTransition();
         setPendingAdmin();
-        registerOnOtherChains();
 
         if (config.initializeLegacyBridge) {
             deployLegacySharedBridge();
@@ -527,27 +529,6 @@ contract RegisterZKChainScript is Script {
         zkChain.setPendingAdmin(output.chainAdmin);
         vm.stopBroadcast();
         console.log("Owner for ", output.diamondProxy, "set to", output.chainAdmin);
-    }
-
-    function registerOnOtherChains() internal {
-        IBridgehubBase bridgehub = IBridgehubBase(config.bridgehub);
-        uint256[] memory chainsToRegisterOn = bridgehub.getAllZKChainChainIDs();
-        IChainRegistrationSender chainRegistrationSender = IChainRegistrationSender(
-            bridgehub.chainRegistrationSender()
-        );
-        for (uint256 i = 0; i < chainsToRegisterOn.length; i++) {
-            vm.startBroadcast();
-            chainRegistrationSender.registerChain(chainsToRegisterOn[i], config.chainChainId);
-            vm.stopBroadcast();
-        }
-        for (uint256 i = 0; i < chainsToRegisterOn.length; i++) {
-            if (chainsToRegisterOn[i] == config.chainChainId) {
-                continue;
-            }
-            vm.startBroadcast();
-            chainRegistrationSender.registerChain(config.chainChainId, chainsToRegisterOn[i]);
-            vm.stopBroadcast();
-        }
     }
 
     function deployChainProxyAddress() internal {

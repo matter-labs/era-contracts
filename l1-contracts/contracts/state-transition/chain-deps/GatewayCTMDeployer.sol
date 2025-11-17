@@ -34,7 +34,7 @@ import {Diamond} from "../libraries/Diamond.sol";
 import {ZKsyncOSChainTypeManager} from "../ZKsyncOSChainTypeManager.sol";
 import {EraChainTypeManager} from "../EraChainTypeManager.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {ROLLUP_L2_DA_COMMITMENT_SCHEME} from "../../common/Config.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
@@ -43,6 +43,7 @@ import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "../chain-
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "../IChainTypeManager.sol";
 import {ServerNotifier} from "../../governance/ServerNotifier.sol";
 
+import {CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET, CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 /// @notice Configuration parameters for deploying the GatewayCTMDeployer contract.
 // solhint-disable-next-line gas-struct-packing
 struct GatewayCTMDeployerConfig {
@@ -191,7 +192,8 @@ contract GatewayCTMDeployer {
             _eraChainId: eraChainId,
             _l1ChainId: l1ChainId,
             _aliasedGovernanceAddress: _config.aliasedGovernanceAddress,
-            _deployedContracts: contracts
+            _deployedContracts: contracts,
+            _testnetVerifier: _config.testnetVerifier
         });
         // solhint-disable-next-line func-named-parameters
         _deployVerifier(salt, _config.testnetVerifier, _config.isZKsyncOS, contracts, _config.aliasedGovernanceAddress);
@@ -225,10 +227,22 @@ contract GatewayCTMDeployer {
         uint256 _eraChainId,
         uint256 _l1ChainId,
         address _aliasedGovernanceAddress,
-        DeployedContracts memory _deployedContracts
+        DeployedContracts memory _deployedContracts,
+        bool _testnetVerifier
     ) internal {
         _deployedContracts.stateTransition.mailboxFacet = address(
-            new MailboxFacet{salt: _salt}(_eraChainId, _l1ChainId, IEIP7702Checker(address(0)))
+            new MailboxFacet{salt: _salt}({
+                _eraChainId: _eraChainId,
+                _l1ChainId: _l1ChainId,
+                _chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
+                _eip7702Checker: IEIP7702Checker(address(0)),
+                _pauseDepositsTimeWindowStart: _testnetVerifier
+                    ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET
+                    : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET,
+                _pauseDepositsTimeWindowEnd: _testnetVerifier
+                    ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+                    : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET
+            })
         );
         _deployedContracts.stateTransition.executorFacet = address(new ExecutorFacet{salt: _salt}(_l1ChainId));
         _deployedContracts.stateTransition.gettersFacet = address(new GettersFacet{salt: _salt}());
@@ -239,7 +253,22 @@ contract GatewayCTMDeployer {
             _deployedContracts
         );
         _deployedContracts.stateTransition.adminFacet = address(
-            new AdminFacet{salt: _salt}(_l1ChainId, rollupDAManager)
+            new AdminFacet{salt: _salt}({
+                _l1ChainId: _l1ChainId,
+                _rollupDAManager: rollupDAManager,
+                _chainMigrationTimeWindowStart: _testnetVerifier
+                    ? CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET
+                    : CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET,
+                _chainMigrationTimeWindowEnd: _testnetVerifier
+                    ? CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET
+                    : CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET,
+                _pauseDepositsTimeWindowStart: _testnetVerifier
+                    ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET
+                    : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET,
+                _pauseDepositsTimeWindowEnd: _testnetVerifier
+                    ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+                    : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET
+            })
         );
 
         _deployedContracts.stateTransition.diamondInit = address(new DiamondInit{salt: _salt}(false));

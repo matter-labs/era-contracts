@@ -123,7 +123,7 @@ contract ExperimentalBridgeTest is Test {
         weth = makeAddr("WETH");
         mockCTM = new DummyChainTypeManagerWBH(address(bridgehub));
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
-        mockChainContract = new DummyZKChain(address(bridgehub), eraChainId, block.chainid, eip7702Checker);
+        mockChainContract = new DummyZKChain(address(bridgehub), eraChainId, block.chainid, address(0), eip7702Checker);
 
         mockL2Contract = makeAddr("mockL2Contract");
         // mocks to use in bridges instead of using a dummy one
@@ -590,7 +590,7 @@ contract ExperimentalBridgeTest is Test {
         address randomCTMDeployer,
         address randomMessageRoot
     ) public {
-        vm.assume(randomCaller != bridgeOwner);
+        vm.assume(randomCaller != bridgeOwner && randomCaller != L2_COMPLEX_UPGRADER_ADDR);
 
         vm.prank(randomCaller);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
