@@ -60,7 +60,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     /// L1 that is at the most base layer.
     uint256 internal immutable L1_CHAIN_ID;
 
-    /// @dev The address of the L1ChainAssetHandler system contract.
+    /// @dev The address of the L1ChainAssetHandler system contract. Only used on L1.
     address internal immutable CHAIN_ASSET_HANDLER;
 
     modifier onlyL1() {
