@@ -15,7 +15,7 @@ import {IMultisigCommitter} from "./IMultisigCommitter.sol";
 /// @notice Extended ValidatorTimelock with commit function (optionally) locked
 /// behind providing extra signatures from validators. By default a shared signing 
 /// set is used. Custom signing set with custom threshold can be elected by 
-// chainAdmin instead.
+/// chainAdmin instead if allowed by owner.
 /// @dev The purpose of this contract is to require multiple validators check each
 /// commit operation before a sequencer can perform it. Validators cannot start 
 /// commit operations. Only Committer can call commitBatchesMultisig, but requires 
@@ -117,20 +117,20 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
 
 	/// @inheritdoc IMultisigCommitter
 	function setSigningThreshold(address chainAddress, uint64 _signingThreshold) external override onlyRole(chainAddress, getRoleAdmin(chainAddress, COMMIT_VALIDATOR_ROLE)) {
-		chainConfig[chainAddress] = ChainConfig({
-			useCustomValidators: true,
-			signingThreshold: _signingThreshold
-		});
+		chainConfig[chainAddress].signingThreshold = _signingThreshold;
 		emit NewSigningThreshold(chainAddress, _signingThreshold);
 	}
 
 	/// @inheritdoc IMultisigCommitter
 	function useSharedSigningSet(address chainAddress) external override onlyRole(chainAddress, getRoleAdmin(chainAddress, COMMIT_VALIDATOR_ROLE)) {
-		chainConfig[chainAddress] = ChainConfig({
-			useCustomValidators: false,
-			signingThreshold: 0
-		});
-		emit UseSharedSigningSet(chainAddress);
+		chainConfig[chainAddress].useCustomValidators = false;
+		emit UseCustomValidators(chainAddress, false);
+	}
+
+	/// @inheritdoc IMultisigCommitter
+	function useCustomSigningSet(address chainAddress) external override onlyOwner {
+		chainConfig[chainAddress].useCustomValidators = true;
+		emit UseCustomValidators(chainAddress, true);
 	}
 
 	/// @inheritdoc IMultisigCommitter
