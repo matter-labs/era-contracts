@@ -198,7 +198,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
     }
 
     /// @notice Deploy everything that should be deployed
-    function deployNewEcosystemContractsL1() internal {
+    function deployNewEcosystemContractsL1() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
 
         instantiateCreate2Factory();
