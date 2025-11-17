@@ -9,7 +9,6 @@ import {stdToml} from "forge-std/StdToml.sol";
 
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
-import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
@@ -18,42 +17,27 @@ import {L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAdd
 import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {IAssetRouterBase, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {IL2AssetRouter, L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+
 import {Call} from "contracts/governance/Common.sol";
-import {IGovernance} from "contracts/governance/IGovernance.sol";
+
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
+
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
-
-import {Create2AndTransfer} from "../Create2AndTransfer.sol";
-import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
+import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 
 import {DeployCTMScript} from "../DeployCTM.s.sol";
 
 import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
 import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 
 import {GatewayGovernanceUtils} from "./GatewayGovernanceUtils.s.sol";
 
@@ -76,7 +60,6 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
 
     uint256 internal eraChainId;
 
-    uint256 internal eraChainId;
     uint256 internal gatewayChainId;
     bytes internal forceDeploymentsData;
 
@@ -94,7 +77,6 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
 
         eraChainId = toml.readUint("$.era_chain_id");
 
-        eraChainId = toml.readUint("$.era_chain_id");
         gatewayChainId = toml.readUint("$.gateway_chain_id");
         forceDeploymentsData = toml.readBytes(".force_deployments_data");
 
@@ -133,9 +115,7 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
             genesisRollupLeafIndex: uint64(config.contracts.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.genesisBatchCommitment,
             forceDeploymentsData: forceDeploymentsData,
-            protocolVersion: config.contracts.latestProtocolVersion,
-            // TODO: for now, zksync os on gateway is not supported
-            isZKsyncOS: false
+            protocolVersion: config.contracts.latestProtocolVersion
         });
     }
 
@@ -153,7 +133,7 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
             ctmProtocolVersion == config.contracts.latestProtocolVersion,
             "The latest protocol version is not correct"
         );
-        serverNotifier = ChainTypeManager(ctm).serverNotifierAddress();
+        serverNotifier = ChainTypeManagerBase(ctm).serverNotifierAddress();
         addresses.bridges.l1AssetRouterProxy = L1Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
 
         addresses.vaults.l1NativeTokenVaultProxy = address(
@@ -287,7 +267,7 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
             ecosystemAdminCalls[0] = Call({
                 target: addresses.stateTransition.chainTypeManagerProxy,
                 value: 0,
-                data: abi.encodeCall(ChainTypeManager.setServerNotifier, (serverNotifier))
+                data: abi.encodeCall(ChainTypeManagerBase.setServerNotifier, (serverNotifier))
             });
             ecosystemAdminCalls[1] = Call({
                 target: serverNotifier,

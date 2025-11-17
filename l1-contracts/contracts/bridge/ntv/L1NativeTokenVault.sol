@@ -17,6 +17,7 @@ import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
+import {IWETH9} from "../interfaces/IWETH9.sol";
 
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
@@ -33,7 +34,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token.
-    address public immutable WETH_TOKEN;
+    IWETH9 public immutable WETH_TOKEN;
 
     /// @dev The L1 asset router contract.
     IAssetRouterBase public immutable ASSET_ROUTER;
@@ -68,7 +69,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     /// @dev Returns the WETH token address for internal use.
     function _wethToken() internal view override returns (address) {
-        return WETH_TOKEN;
+        return address(WETH_TOKEN);
     }
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
@@ -81,7 +82,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @param _assetRouter Address of Asset Router on L1.
     /// @param _l1Nullifier Address of the nullifier contract, which handles transaction progress between L1 and ZK chains.
     constructor(address _wethToken, address _assetRouter, IL1Nullifier _l1Nullifier) {
-        WETH_TOKEN = _wethToken;
+        WETH_TOKEN = IWETH9(_wethToken);
         ASSET_ROUTER = IAssetRouterBase(_assetRouter);
         L1_CHAIN_ID = block.chainid;
         BASE_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);

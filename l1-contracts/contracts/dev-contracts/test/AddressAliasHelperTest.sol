@@ -19,4 +19,19 @@ contract AddressAliasHelperTest {
     function actualRefundRecipient(address _recipient, address _prevMessageSender) external view returns (address) {
         return AddressAliasHelper.actualRefundRecipient(_recipient, _prevMessageSender);
     }
+
+    function actualRefundRecipientMailbox(
+        address _recipient,
+        address _prevMessageSender,
+        bool _is7702AccountRefundRecipient,
+        bool _is7702AccountSender
+    ) external view returns (address) {
+        return
+            AddressAliasHelper.actualRefundRecipientMailbox(
+                _recipient,
+                _prevMessageSender,
+                _is7702AccountRefundRecipient,
+                _is7702AccountSender
+            );
+    }
 }

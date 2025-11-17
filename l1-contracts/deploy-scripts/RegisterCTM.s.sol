@@ -51,7 +51,7 @@ contract RegisterCTM is Script {
     ) internal {
         IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubProxy);
         address ctmDeploymentTrackerProxy = address(bridgehub.l1CtmDeployer());
-        address l1AssetRouterProxy = bridgehub.assetRouter();
+        address l1AssetRouterProxy = address(bridgehub.assetRouter());
 
         vm.startBroadcast(msg.sender);
         IGovernance governance = IGovernance(IOwnable(bridgehubProxy).owner());
@@ -107,7 +107,7 @@ contract RegisterCTM is Script {
         bridgehub.addChainTypeManager(chainTypeManagerProxy);
         console.log("ChainTypeManager registered");
         address ctmDeploymentTrackerProxy = address(bridgehub.l1CtmDeployer());
-        address l1AssetRouterProxy = bridgehub.assetRouter();
+        address l1AssetRouterProxy = address(bridgehub.assetRouter());
         ICTMDeploymentTracker ctmDT = ICTMDeploymentTracker(ctmDeploymentTrackerProxy);
         IL1AssetRouter sharedBridge = IL1AssetRouter(l1AssetRouterProxy);
         sharedBridge.setAssetDeploymentTracker(bytes32(uint256(uint160(chainTypeManagerProxy))), address(ctmDT));

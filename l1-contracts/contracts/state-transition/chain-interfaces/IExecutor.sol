@@ -131,7 +131,7 @@ interface IExecutor is IZKChainBase {
     /// @param newStateCommitment State commitment of the new state.
     /// @dev chain state commitment, this preimage is not opened on l1,
     /// it's guaranteed that this commitment commits to any state that needed for execution
-    /// (state root, block number, bloch hashes)
+    /// (state root, block number, block hashes)
     /// @param numberOfLayer1Txs Number of priority operations to be processed
     /// @param priorityOperationsHash Hash of all priority operations from this batch
     /// @param l2LogsTreeRoot Root hash of tree that contains L2 -> L1 messages from this batch

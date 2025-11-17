@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {StdStorage, Test, stdStorage, stdToml} from "forge-std/Test.sol";
+import {Test, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -12,6 +11,7 @@ import {L2Utils} from "./L2Utils.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/Utils.sol";
 import {ADDRESS_ONE} from "deploy-scripts/Utils.sol";
 
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -45,7 +45,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml"
         );
         initializeConfig(inputPath);
-        addresses.transparentProxyAdmin = address(0x1);
+        addresses.transparentProxyAdmin = makeAddr("transparentProxyAdmin");
         addresses.bridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
         addresses.bridges.l1AssetRouterProxy = L2_ASSET_ROUTER_ADDR;
         addresses.vaults.l1NativeTokenVaultProxy = L2_NATIVE_TOKEN_VAULT_ADDR;
@@ -68,7 +68,9 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         addresses.stateTransition.adminFacet = address(
             new AdminFacet(config.l1ChainId, RollupDAManager(addresses.daAddresses.rollupDAManager))
         );
-        addresses.stateTransition.mailboxFacet = address(new MailboxFacet(config.eraChainId, config.l1ChainId));
+        addresses.stateTransition.mailboxFacet = address(
+            new MailboxFacet(config.eraChainId, config.l1ChainId, IEIP7702Checker(address(0)))
+        );
         addresses.stateTransition.gettersFacet = address(new GettersFacet());
         addresses.stateTransition.diamondInit = address(new DiamondInit(false));
         // Deploy ChainTypeManager implementation
@@ -83,18 +85,10 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         }
 
         // Deploy TransparentUpgradeableProxy for ChainTypeManager
-        bytes memory initCalldata;
-        if (config.isZKsyncOS) {
-            initCalldata = abi.encodeCall(
-                IChainTypeManager.initialize,
-                getChainTypeManagerInitializeData(addresses.stateTransition)
-            );
-        } else {
-            initCalldata = abi.encodeCall(
-                IChainTypeManager.initialize,
-                getChainTypeManagerInitializeData(addresses.stateTransition)
-            );
-        }
+        bytes memory initCalldata = abi.encodeCall(
+            IChainTypeManager.initialize,
+            getChainTypeManagerInitializeData(addresses.stateTransition)
+        );
 
         addresses.stateTransition.chainTypeManagerProxy = address(
             new TransparentUpgradeableProxy(

@@ -28,6 +28,8 @@ error CompressorEnumIndexNotEqual(uint256 expected, uint256 actual);
 error CompressorInitialWritesProcessedNotEqual(uint256 expected, uint256 actual);
 // 0x6ad429e8
 error CurrentBatchNumberMustBeGreaterThanZero();
+// 0x01e6c91e
+error DeprecatedFunction(bytes4 selector);
 // 0x9be48d8d
 error DerivedKeyNotEqualToCompressedValue(bytes32 expected, bytes32 provided);
 // 0xe223db5e
@@ -72,6 +74,8 @@ error InsufficientFunds(uint256 required, uint256 actual);
 error InvalidCall();
 // 0x6a84bc39
 error InvalidCodeHash(CodeHashReason);
+// 0x9e3eb73e
+error InvalidCompressionMetadata();
 // 0xc74537a1
 error InvalidDACommitmentScheme(uint256);
 // 0xb4fa3fb3

@@ -20,6 +20,7 @@ import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyn
 import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
+import {IEIP7702Checker} from "../chain-interfaces/IEIP7702Checker.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {EraTestnetVerifier} from "../verifiers/EraTestnetVerifier.sol";
 import {ZKsyncOSTestnetVerifier} from "../verifiers/ZKsyncOSTestnetVerifier.sol";
@@ -55,6 +56,8 @@ struct GatewayCTMDeployerConfig {
     uint256 l1ChainId;
     /// @notice Flag indicating whether to use the testnet verifier.
     bool testnetVerifier;
+    /// @notice Flag indicating whether to use ZKsync OS mode.
+    bool isZKsyncOS;
     /// @notice Array of function selectors for the Admin facet.
     bytes4[] adminSelectors;
     /// @notice Array of function selectors for the Executor facet.
@@ -88,8 +91,6 @@ struct GatewayCTMDeployerConfig {
     bytes forceDeploymentsData;
     /// @notice The latest protocol version.
     uint256 protocolVersion;
-    /// @notice Whether the chain is ZKsyncOS.
-    bool isZKsyncOS;
 }
 
 /// @notice Addresses of state transition related contracts.
@@ -190,7 +191,6 @@ contract GatewayCTMDeployer {
             _eraChainId: eraChainId,
             _l1ChainId: l1ChainId,
             _aliasedGovernanceAddress: _config.aliasedGovernanceAddress,
-            _isZKsyncOS: _config.isZKsyncOS,
             _deployedContracts: contracts
         });
         // solhint-disable-next-line func-named-parameters
@@ -225,11 +225,10 @@ contract GatewayCTMDeployer {
         uint256 _eraChainId,
         uint256 _l1ChainId,
         address _aliasedGovernanceAddress,
-        bool _isZKsyncOS,
         DeployedContracts memory _deployedContracts
     ) internal {
         _deployedContracts.stateTransition.mailboxFacet = address(
-            new MailboxFacet{salt: _salt}(_eraChainId, _l1ChainId)
+            new MailboxFacet{salt: _salt}(_eraChainId, _l1ChainId, IEIP7702Checker(address(0)))
         );
         _deployedContracts.stateTransition.executorFacet = address(new ExecutorFacet{salt: _salt}(_l1ChainId));
         _deployedContracts.stateTransition.gettersFacet = address(new GettersFacet{salt: _salt}());
@@ -243,7 +242,7 @@ contract GatewayCTMDeployer {
             new AdminFacet{salt: _salt}(_l1ChainId, rollupDAManager)
         );
 
-        _deployedContracts.stateTransition.diamondInit = address(new DiamondInit{salt: _salt}(_isZKsyncOS));
+        _deployedContracts.stateTransition.diamondInit = address(new DiamondInit{salt: _salt}(false));
         _deployedContracts.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade{salt: _salt}());
     }
 
