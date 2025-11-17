@@ -27,6 +27,7 @@ import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 
 /// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the guardians.
 bytes32 constant EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH = keccak256(
@@ -1303,8 +1304,12 @@ library Utils {
 
     function getZKOSBytecodeInfo(bytes memory bytecode) internal returns (bytes memory bytecodeInfo) {
         bytes32 bytecodeBlakeHash = blakeHashBytecode(bytecode);
-        bytes32 observableBytecodeBlakeHash = keccak256(bytecode);
-        bytecodeInfo = abi.encode(bytecodeBlakeHash, bytecode.length, observableBytecodeBlakeHash);
+        bytes32 observableBytecodeHash = keccak256(bytecode);
+        bytecodeInfo = ZKSyncOSBytecodeInfo.encodeZKSyncOSBytecodeInfo(
+            bytecodeBlakeHash,
+            bytecode.length,
+            observableBytecodeHash
+        );
     }
 
     function getZKOSBytecodeInfoForContract(
