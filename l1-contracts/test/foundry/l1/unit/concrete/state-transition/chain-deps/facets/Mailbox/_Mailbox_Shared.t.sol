@@ -39,8 +39,6 @@ contract MailboxTest is UtilsTest {
         chainAssetHandler = makeAddr("chainAssetHandler");
         interopCenter = makeAddr("interopCenter");
         vm.deal(sender, 100 ether);
-        // Warp time past the initial pause deposits window (2 days for testnet)
-        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET + 1);
 
         eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
 
