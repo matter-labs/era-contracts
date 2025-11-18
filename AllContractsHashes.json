@@ -1061,12 +1061,12 @@
   },
   {
     "contractName": "l1-contracts/GatewayCTMDeployer",
-    "zkBytecodeHash": "0x0100042196e0e89d279d12c5bfe651e01fd05dd372860748fbbab0e628879955",
+    "zkBytecodeHash": "0x010004214ee9329e5ec86fb05faf746d6a5a25bc329dffb3be3f012cc57f4e16",
     "zkBytecodePath": "/l1-contracts/zkout/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
-    "evmBytecodeHash": "0xbf49d43a031e4cc8cc94439b4dd2d97037ecc7c3e66502311287a465e125b9df",
+    "evmBytecodeHash": "0x407312a52ee72bae3ca8ed2e746380d7e1e705d1cef4d0b6cf8ccface32587bf",
     "evmBytecodePath": "/l1-contracts/out/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
-    "evmDeployedBytecodeHash": "0x708dd4ce54d1fafe4771de61c9d716aebd3b33e2fe9d3920e7701c75fcb01f5f",
-    "evmDeployedBytecodeBlakeHash": "0x3570c176b91304a7d202dfc5b4801e2ddc48327ec6ad2b1cdcf8b6a62e3e6ffd",
+    "evmDeployedBytecodeHash": "0xb0f2ca50b72109ca2623d3f92b859f815f635e41bbd464434ca3bce71b91f814",
+    "evmDeployedBytecodeBlakeHash": "0x09d03d48568888ceb7110fa9ade452e76355f06333b48487cb8a7a4e995368aa",
     "evmDeployedBytecodeLength": 1645
   },
   {
@@ -1831,12 +1831,12 @@
   },
   {
     "contractName": "l1-contracts/ZKsyncOSVerifierPlonk",
-    "zkBytecodeHash": "0x01000dbb7c1ea2bec922da6cccef5586d63e0e4b2b743e674a980f59656d5665",
+    "zkBytecodeHash": "0x01000dbb54b7d1ec50f419251d841a50df93e34b892b9b19494a8a49f35034e8",
     "zkBytecodePath": "/l1-contracts/zkout/ZKsyncOSVerifierPlonk.sol/ZKsyncOSVerifierPlonk.json",
-    "evmBytecodeHash": "0xed986d61cc88a2053cc5f1962654cfccb6244d1f34b20be6de8e05ffdee0d180",
+    "evmBytecodeHash": "0xe679c3fa33616a8a3a59a75abd9b6b901fec2b72307a04a5d73d35921c54cf1b",
     "evmBytecodePath": "/l1-contracts/out/ZKsyncOSVerifierPlonk.sol/ZKsyncOSVerifierPlonk.json",
-    "evmDeployedBytecodeHash": "0x88db5525b0260bc035abeafd92564825ac581780a5fa91ac931de7c8d8dd6241",
-    "evmDeployedBytecodeBlakeHash": "0x387058d9a98b090313a95b738d9d7ad54330b85fda95e51c7aac3adbce003721",
+    "evmDeployedBytecodeHash": "0xf86423a546001e17e476075ca83819493ea5c4a57c55553fb0a2dfcda4a8e864",
+    "evmDeployedBytecodeBlakeHash": "0x9504346f5a21329f14c76479fc890e1f5452e46105ea44ce87218d2c372986bd",
     "evmDeployedBytecodeLength": 17226
   },
   {
