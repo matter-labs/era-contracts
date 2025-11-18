@@ -28,6 +28,8 @@ error CompressorEnumIndexNotEqual(uint256 expected, uint256 actual);
 error CompressorInitialWritesProcessedNotEqual(uint256 expected, uint256 actual);
 // 0x6ad429e8
 error CurrentBatchNumberMustBeGreaterThanZero();
+//
+error DeprecatedFunction(bytes4);
 // 0x9be48d8d
 error DerivedKeyNotEqualToCompressedValue(bytes32 expected, bytes32 provided);
 // 0xe223db5e
@@ -96,8 +98,6 @@ error KeccakResultIsNotCorrect(bytes32 result);
 error KeccakReturnDataSizeShouldBe32Bytes(uint256 returnDataSize);
 // 0x262f4984
 error KeccakShouldStartWorkingAgain();
-// 0xf801b069
-error L1MessengerHookFailed();
 // 0x5e9ad9b0
 error L2BlockAndBatchTimestampMismatch(uint128 l2BlockTimestamp, uint128 currentBatchTimestamp);
 // 0x543f4c07

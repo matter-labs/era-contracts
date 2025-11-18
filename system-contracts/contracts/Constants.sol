@@ -110,8 +110,6 @@ IEvmHashesStorage constant EVM_HASHES_STORAGE = IEvmHashesStorage(address(SYSTEM
 
 address constant L2_DA_VALIDATOR = address(SYSTEM_CONTRACTS_OFFSET + 0x16);
 
-address constant L1_MESSENGER_HOOK = address(SYSTEM_CONTRACTS_OFFSET + 0x17);
-
 ICreate2Factory constant L2_CREATE2_FACTORY = ICreate2Factory(address(USER_CONTRACTS_OFFSET));
 IL2AssetRouter constant L2_ASSET_ROUTER = IL2AssetRouter(address(USER_CONTRACTS_OFFSET + 0x03));
 IBridgehub constant L2_BRIDGE_HUB = IBridgehub(address(USER_CONTRACTS_OFFSET + 0x02));
