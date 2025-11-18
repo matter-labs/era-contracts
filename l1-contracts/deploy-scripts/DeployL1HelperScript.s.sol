@@ -70,6 +70,7 @@ import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVaultZKOS} from "contracts/bridge/ntv/L2NativeTokenVaultZKOS.sol";
 import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
+import {L1ZKsyncOSV30Upgrade} from "contracts/upgrades/L1ZKsyncOSV30Upgrade.sol";
 
 abstract contract DeployL1HelperScript is Script, DeployUtils {
     function deployTuppWithContract(
@@ -197,6 +198,8 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 return type(ServerNotifier).creationCode;
             } else if (compareStrings(contractName, "UpgradeStageValidator")) {
                 return type(UpgradeStageValidator).creationCode;
+            } else if (compareStrings(contractName, "L1ZKsyncOSV30Upgrade")) {
+                return type(L1ZKsyncOSV30Upgrade).creationCode;
             }
         } else {
             if (compareStrings(contractName, "L2Bridgehub")) {
@@ -266,12 +269,6 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 return Utils.readZKFoundryBytecodeL1("ServerNotifier.sol", "ServerNotifier");
             } else if (compareStrings(contractName, "BeaconProxy")) {
                 return Utils.readZKFoundryBytecodeL1("BeaconProxy.sol", "BeaconProxy");
-            } else if (compareStrings(contractName, "RollupL2DAValidator")) {
-                return Utils.readZKFoundryBytecodeL2("RollupL2DAValidator.sol", "RollupL2DAValidator");
-            } else if (compareStrings(contractName, "ValidiumL2DAValidator")) {
-                return Utils.readZKFoundryBytecodeL2("ValidiumL2DAValidator.sol", "ValidiumL2DAValidator");
-            } else if (compareStrings(contractName, "AvailL2DAValidator")) {
-                return Utils.readZKFoundryBytecodeL2("AvailL2DAValidator.sol", "AvailL2DAValidator");
             } else {
                 revert(string.concat("Contract ", contractName, " creation code not set"));
             }
