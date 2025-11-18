@@ -67,7 +67,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
             new AdminFacet(
                 config.l1ChainId,
                 RollupDAManager(addresses.daAddresses.rollupDAManager),
-                true,
+                false
             )
         );
         addresses.stateTransition.mailboxFacet = address(
@@ -76,7 +76,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
                 config.l1ChainId,
                 L2_CHAIN_ASSET_HANDLER_ADDR,
                 IEIP7702Checker(address(0)),
-                true
+                false
             )
         );
         addresses.stateTransition.gettersFacet = address(new GettersFacet());

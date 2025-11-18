@@ -443,7 +443,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         AdminFacet adminFacet = new AdminFacet(
             1,
             RollupDAManager(address(0)),
-            true
+            false
         );
         GettersFacet gettersFacet = new GettersFacet();
         MailboxFacet mailboxFacet = new MailboxFacet(
@@ -451,7 +451,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
             1,
             discoveredBridgehub.chainAssetHandler,
             IEIP7702Checker(address(0)),
-            true
+            false
         );
         ExecutorFacet executorFacet = new ExecutorFacet(1);
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);

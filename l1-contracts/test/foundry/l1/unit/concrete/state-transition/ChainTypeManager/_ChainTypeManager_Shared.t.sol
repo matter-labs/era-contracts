@@ -31,7 +31,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
-import {PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET} from "contracts/common/Config.sol";
+import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
@@ -76,7 +76,7 @@ contract ChainTypeManagerTest is UtilsTest {
 
     function deploy() public {
         // Timestamp needs to be late enough for `pauseDepositsBeforeInitiatingMigration` time checks
-        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET + 1);
+        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET + 1);
 
         interopCenterAddress = makeAddr("interopCenter");
         governor = makeAddr("governor");
@@ -137,7 +137,7 @@ contract ChainTypeManagerTest is UtilsTest {
                     new AdminFacet(
                         block.chainid,
                         RollupDAManager(address(0)),
-                        true,
+                        false
                     )
                 ),
                 action: Diamond.Action.Add,
@@ -169,7 +169,7 @@ contract ChainTypeManagerTest is UtilsTest {
                         block.chainid,
                         address(0),
                         IEIP7702Checker(makeAddr("eip7702Checker")),
-                        true
+                        false
                     )
                 ),
                 action: Diamond.Action.Add,

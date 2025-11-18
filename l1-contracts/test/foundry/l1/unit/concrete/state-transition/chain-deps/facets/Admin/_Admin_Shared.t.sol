@@ -47,7 +47,7 @@ contract AdminTest is UtilsTest {
     function setUp() public virtual {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)), true)),
+            facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)), false)),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: getAdminSelectors()

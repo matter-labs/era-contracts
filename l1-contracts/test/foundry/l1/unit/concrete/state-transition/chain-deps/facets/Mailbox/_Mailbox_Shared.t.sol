@@ -18,6 +18,7 @@ import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 import {IL1ChainAssetHandler} from "contracts/bridgehub/IL1ChainAssetHandler.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
+import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
 contract MailboxTest is UtilsTest {
     IMailbox internal mailboxFacet;
@@ -46,7 +47,7 @@ contract MailboxTest is UtilsTest {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(
-                new MailboxFacet(eraChainId, block.chainid, address(chainAssetHandler), eip7702Checker, true)
+                new MailboxFacet(eraChainId, block.chainid, address(chainAssetHandler), eip7702Checker, false)
             ),
             action: Diamond.Action.Add,
             isFreezable: true,
