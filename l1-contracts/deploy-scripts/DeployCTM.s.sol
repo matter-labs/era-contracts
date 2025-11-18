@@ -205,6 +205,10 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         return ROLLUP_L2_DA_COMMITMENT_SCHEME;
     }
 
+    function getBlobZKsyncOSCommitmentScheme() internal pure returns (L2DACommitmentScheme) {
+        return L2DACommitmentScheme.BLOBS_ZKSYNC_OS;
+    }
+
     function deployVerifiers() internal {
         if (config.isZKsyncOS) {
             (addresses.stateTransition.verifierFflonk) = deploySimpleContract("ZKsyncOSVerifierFflonk", false);
@@ -217,12 +221,14 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
 
         if (config.isZKsyncOS) {
             // We add the verifier to the default execution version
-            vm.broadcast(msg.sender);
+            vm.startBroadcast(msg.sender);
             ZKsyncOSDualVerifier(addresses.stateTransition.verifier).addVerifier(
                 DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
                 IVerifierV2(addresses.stateTransition.verifierFflonk),
                 IVerifier(addresses.stateTransition.verifierPlonk)
             );
+            ZKsyncOSDualVerifier(addresses.stateTransition.verifier).transferOwnership(config.ownerAddress);
+            vm.stopBroadcast();
         }
     }
 
@@ -314,12 +320,6 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
 
         IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
-
-        if (config.isZKsyncOS) {
-            // We need to transfer the ownership of the Verifier
-            ZKsyncOSDualVerifier(addresses.stateTransition.verifier).transferOwnership(addresses.governance);
-        }
-
         vm.stopBroadcast();
         console.log("Owners updated");
     }
@@ -484,6 +484,13 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             "no_da_validium_l1_validator_addr",
             addresses.daAddresses.noDAValidiumL1DAValidator
         );
+        if (config.isZKsyncOS) {
+            vm.serializeAddress(
+                "deployed_addresses",
+                "blobs_zksync_os_l1_da_validator_addr",
+                addresses.daAddresses.l1BlobsDAValidatorZKsyncOS
+            );
+        }
         vm.serializeAddress(
             "deployed_addresses",
             "avail_l1_da_validator_addr",
@@ -525,6 +532,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
+            // TODO: the naming should reflect that it should be only used for Era.
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
