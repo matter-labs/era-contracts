@@ -4,24 +4,12 @@ pragma solidity 0.8.28;
 
 import {AdminFacet} from "../../state-transition/chain-deps/facets/Admin.sol";
 import {RollupDAManager} from "../../state-transition/data-availability/RollupDAManager.sol";
-import {CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET} from "../../common/Config.sol";
 
 contract AdminFacetTest is AdminFacet {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
-    constructor(
-        uint256 _l1ChainId
-    )
-        AdminFacet(
-            _l1ChainId,
-            RollupDAManager(address(0)),
-            CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET,
-            CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET,
-            PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
-            PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
-        )
-    {
+    constructor(uint256 _l1ChainId) AdminFacet(_l1ChainId, RollupDAManager(address(0)), true) {
         s.admin = msg.sender;
         s.chainTypeManager = msg.sender;
     }

@@ -6,7 +6,6 @@ import {IEIP7702Checker} from "../../state-transition/chain-interfaces/IEIP7702C
 import {FeeParams} from "../../state-transition/chain-deps/ZKChainStorage.sol";
 import {MailboxFacet} from "../../state-transition/chain-deps/facets/Mailbox.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../common/Config.sol";
-import {PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET} from "../../common/Config.sol";
 
 contract MailboxFacetTest is MailboxFacet {
     // add this to be excluded from coverage report
@@ -17,16 +16,7 @@ contract MailboxFacetTest is MailboxFacet {
         uint256 _l1ChainId,
         address _chainAssetHandler,
         IEIP7702Checker _eip7702Checker
-    )
-        MailboxFacet(
-            _eraChainId,
-            _l1ChainId,
-            _chainAssetHandler,
-            _eip7702Checker,
-            PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
-            PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
-        )
-    {
+    ) MailboxFacet(_eraChainId, _l1ChainId, _chainAssetHandler, _eip7702Checker, true) {
         s.admin = msg.sender;
     }
 

@@ -42,7 +42,6 @@ import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifier
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
-import {CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET} from "contracts/common/Config.sol";
 
 contract ChainTypeManagerTest is UtilsTest {
     using stdStorage for StdStorage;
@@ -138,10 +137,7 @@ contract ChainTypeManagerTest is UtilsTest {
                     new AdminFacet(
                         block.chainid,
                         RollupDAManager(address(0)),
-                        CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET,
-                        CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET,
-                        PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
-                        PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+                        true,
                     )
                 ),
                 action: Diamond.Action.Add,
@@ -173,8 +169,7 @@ contract ChainTypeManagerTest is UtilsTest {
                         block.chainid,
                         address(0),
                         IEIP7702Checker(makeAddr("eip7702Checker")),
-                        PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
-                        PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+                        true
                     )
                 ),
                 action: Diamond.Action.Add,

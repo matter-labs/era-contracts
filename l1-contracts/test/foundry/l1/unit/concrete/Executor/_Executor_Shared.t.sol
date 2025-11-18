@@ -42,7 +42,6 @@ import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
-import {CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET} from "contracts/common/Config.sol";
 
 bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
 bytes constant POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000100073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
@@ -233,24 +232,10 @@ contract ExecutorTest is UtilsTest {
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
 
-        admin = new AdminFacet(
-            block.chainid,
-            RollupDAManager(address(0)),
-            CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET,
-            CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET,
-            PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
-            PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
-        );
+        admin = new AdminFacet(block.chainid, RollupDAManager(address(0)), true);
         getters = new GettersFacet();
         executor = new TestExecutor();
-        mailbox = new MailboxFacet(
-            l2ChainId,
-            block.chainid,
-            address(chainAssetHandler),
-            eip7702Checker,
-            PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
-            PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
-        );
+        mailbox = new MailboxFacet(l2ChainId, block.chainid, address(chainAssetHandler), eip7702Checker, true);
 
         DummyCTM chainTypeManager = new DummyCTM(owner, address(0));
         vm.mockCall(

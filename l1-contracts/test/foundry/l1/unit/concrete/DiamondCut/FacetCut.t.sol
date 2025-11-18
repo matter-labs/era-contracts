@@ -11,7 +11,6 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {AddressHasNoCode, FacetExists, NoFunctionsForDiamondCut, RemoveFunctionFacetAddressNotZero, RemoveFunctionFacetAddressZero, ReplaceFunctionFacetAddressZero, SelectorsMustAllHaveSameFreezability, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET} from "contracts/common/Config.sol";
 
 contract FacetCutTest is DiamondCutTest {
     MailboxFacet private mailboxFacet;
@@ -34,14 +33,7 @@ contract FacetCutTest is DiamondCutTest {
         eraChainId = 9;
         diamondCutTestContract = new DiamondCutTestContract();
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
-        mailboxFacet = new MailboxFacet(
-            eraChainId,
-            block.chainid,
-            address(0),
-            eip7702Checker,
-            PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
-            PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
-        );
+        mailboxFacet = new MailboxFacet(eraChainId, block.chainid, address(0), eip7702Checker, true);
         gettersFacet = new GettersFacet();
         executorFacet1 = new ExecutorFacet(block.chainid);
         executorFacet2 = new ExecutorFacet(block.chainid);

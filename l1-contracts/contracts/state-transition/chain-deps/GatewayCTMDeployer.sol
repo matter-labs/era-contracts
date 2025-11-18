@@ -43,7 +43,6 @@ import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "../chain-
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "../IChainTypeManager.sol";
 import {ServerNotifier} from "../../governance/ServerNotifier.sol";
 
-import {CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET, CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 /// @notice Configuration parameters for deploying the GatewayCTMDeployer contract.
 // solhint-disable-next-line gas-struct-packing
 struct GatewayCTMDeployerConfig {
@@ -236,12 +235,7 @@ contract GatewayCTMDeployer {
                 _l1ChainId: _l1ChainId,
                 _chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
                 _eip7702Checker: IEIP7702Checker(address(0)),
-                _pauseDepositsTimeWindowStart: _testnetVerifier
-                    ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET
-                    : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET,
-                _pauseDepositsTimeWindowEnd: _testnetVerifier
-                    ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
-                    : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET
+                _isTestnet: _testnetVerifier
             })
         );
         _deployedContracts.stateTransition.executorFacet = address(new ExecutorFacet{salt: _salt}(_l1ChainId));
@@ -256,18 +250,7 @@ contract GatewayCTMDeployer {
             new AdminFacet{salt: _salt}({
                 _l1ChainId: _l1ChainId,
                 _rollupDAManager: rollupDAManager,
-                _chainMigrationTimeWindowStart: _testnetVerifier
-                    ? CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET
-                    : CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET,
-                _chainMigrationTimeWindowEnd: _testnetVerifier
-                    ? CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET
-                    : CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET,
-                _pauseDepositsTimeWindowStart: _testnetVerifier
-                    ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET
-                    : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET,
-                _pauseDepositsTimeWindowEnd: _testnetVerifier
-                    ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
-                    : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET
+                _isTestnet: _testnetVerifier
             })
         );
 
