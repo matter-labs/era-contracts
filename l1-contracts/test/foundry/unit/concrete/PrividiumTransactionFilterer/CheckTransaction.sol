@@ -88,9 +88,7 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
 
     function test_ArbitraryTransactionNotAllowed() public view {
         address sender = address(0x12345678901234567890); // random address
-        bytes memory txCalladata = abi.encodeWithSelector(
-            bytes4(0xdeadbeef), "0x12345"
-        );
+        bytes memory txCalladata = abi.encodeWithSelector(bytes4(0xdeadbeef), "0x12345");
         bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
             sender,
             address(0),
@@ -104,9 +102,7 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
 
     function test_ArbitraryTransactionAllowedFromWhitelistedSender() public {
         address sender = address(0x12345678901234567890); // random address
-        bytes memory txCalladata = abi.encodeWithSelector(
-            bytes4(0xdeadbeef), "0x12345"
-        );
+        bytes memory txCalladata = abi.encodeWithSelector(bytes4(0xdeadbeef), "0x12345");
         vm.prank(owner);
         transactionFiltererProxy.grantWhitelist(sender);
         bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
@@ -120,7 +116,7 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
         assertTrue(isTxAllowed, "Transaction should be allowed");
     }
 
-    function test_TransactionRejectedWhenInvalidSelector() view public {
+    function test_TransactionRejectedWhenInvalidSelector() public view {
         bytes memory txCalladata = abi.encodeCall(
             AssetRouterBase.setAssetHandlerAddressThisChain,
             (bytes32("0x12345"), address(0x01234567890123456789))

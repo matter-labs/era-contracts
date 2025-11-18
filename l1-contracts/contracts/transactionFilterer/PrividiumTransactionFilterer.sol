@@ -90,9 +90,9 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
             // Non-base token deposit via `requestL2TransactionTwoBridges`
             bytes4 l2TxSelector = bytes4(l2Calldata[:4]);
             if (l2TxSelector == AssetRouterBase.finalizeDeposit.selector) {
-                (/* chainId */, bytes32 assetId, bytes memory data) = abi.decode(l2Calldata[4:], (uint256, bytes32, bytes));
-                (address depositor, /* receiver */, /* token */, uint256 amount, /* erc20Metadata */) = DataEncoding.decodeBridgeMintData(data);
-                return whitelistedSenders[depositor] || _isNotChain(assetId) && amount > 0;
+                (, bytes32 assetId, bytes memory data) = abi.decode(l2Calldata[4:], (uint256, bytes32, bytes));
+                (address depositor, , , uint256 amount, ) = DataEncoding.decodeBridgeMintData(data);
+                return whitelistedSenders[depositor] || (_isNotChain(assetId) && amount > 0);
             } else {
                 // Chains cannot be bridged using legacy interface, so just checking the selector is fine.
                 // In case later we need to filter by token/amount/receiver, use DataEncoding.decodeBridgeMintData on l2Calldata[4:]
