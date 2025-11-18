@@ -12,6 +12,8 @@ error InsufficientAllowance(uint256 providedAllowance, uint256 requiredAmount);
 error InvalidInput();
 // 0xf801b069
 error L1MessengerHookFailed();
+// 0xa3628b43
+error L1MessengerSendFailed();
 // 0x8e4a23d6
 error Unauthorized(address);
 // 0xff15b069

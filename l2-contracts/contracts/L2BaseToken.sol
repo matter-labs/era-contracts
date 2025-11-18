@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.28;
 
-import {L2_MESSENGER, BURN_NATIVE_TOKEN_HOOK, IBaseToken, IMailbox} from "./L2ContractHelper.sol";
-import {BurnFailed} from "./errors/L2ContractErrors.sol";
+import {BURN_NATIVE_TOKEN_HOOK, L2_MESSENGER, IBaseToken, IMailbox} from "./L2ContractHelper.sol";
+import {BurnFailed, L1MessengerSendFailed} from "./errors/L2ContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -21,7 +21,8 @@ contract L2BaseToken is IBaseToken {
 
         // Send the L2 log, a user could use it as proof of the withdrawal
         bytes memory message = _getL1WithdrawMessage(_l1Receiver, amount);
-        L2_MESSENGER.sendToL1(message);
+        bytes32 msgHash = L2_MESSENGER.sendToL1(message);
+        if (msgHash == bytes32(0)) revert L1MessengerSendFailed();
 
         emit Withdrawal(msg.sender, _l1Receiver, amount);
     }
@@ -34,7 +35,8 @@ contract L2BaseToken is IBaseToken {
 
         // Send the L2 log, a user could use it as proof of the withdrawal
         bytes memory message = _getExtendedWithdrawMessage(_l1Receiver, amount, msg.sender, _additionalData);
-        L2_MESSENGER.sendToL1(message);
+        bytes32 msgHash = L2_MESSENGER.sendToL1(message);
+        if (msgHash == bytes32(0)) revert L1MessengerSendFailed();
 
         emit WithdrawalWithMessage(msg.sender, _l1Receiver, amount, _additionalData);
     }
