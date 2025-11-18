@@ -70,6 +70,7 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
 
     /// @notice Checks if the transaction is allowed
     /// @param sender The sender of the transaction
+    /// @param l2Value The value sent with the L2 transaction
     /// @param l2Calldata The calldata of the L2 transaction
     /// @return Whether the transaction is allowed
     function isTransactionAllowed(
@@ -90,11 +91,11 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
             bytes4 l2TxSelector = bytes4(l2Calldata[:4]);
             if (l2TxSelector == AssetRouterBase.finalizeDeposit.selector) {
                 (/* chainId */, bytes32 assetId, bytes memory data) = abi.decode(l2Calldata[4:], (uint256, bytes32, bytes));
-                (address depositor, /* receiver */, /* token */, /* amount */, /* erc20Metadata */) = DataEncoding.decodeBridgeMintData(data);
-                return whitelistedSenders[depositor] || _isNotChain(assetId);
+                (address depositor, /* receiver */, /* token */, uint256 amount, /* erc20Metadata */) = DataEncoding.decodeBridgeMintData(data);
+                return whitelistedSenders[depositor] || _isNotChain(assetId) && amount > 0;
             } else {
+                // Chains cannot be bridged using legacy interface, so just checking the selector is fine.
                 // In case later we need to filter by token/amount/receiver, use DataEncoding.decodeBridgeMintData on l2Calldata[4:]
-                // Chains cannot be bridged using legacy interface, so this is fine.
                 return l2TxSelector == IL2SharedBridgeLegacyFunctions.finalizeDeposit.selector;
             }
         } else {
