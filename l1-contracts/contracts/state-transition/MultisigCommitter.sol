@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable-v4/utils/cryptography/EIP712Upgradeable.sol";
 import {SignatureCheckerUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/utils/cryptography/SignatureCheckerUpgradeable.sol";
 import {EnumerableSetUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/utils/structs/EnumerableSetUpgradeable.sol";
-import {SignersNotSorted, SignerNotAuthorized, SignatureNotValid, ChainRequiresValidatorsSignaturesForCommit, SignaturesLengthMismatch, NotEnoughSigners} from "../common/L1ContractErrors.sol";
+import {SignersNotSorted, SignerNotAuthorized, SignatureNotValid, ChainRequiresValidatorsSignaturesForCommit, SignaturesLengthMismatch, NotEnoughSigners, InvalidThreshold} from "../common/L1ContractErrors.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {ValidatorTimelock} from "./ValidatorTimelock.sol";
 import {IValidatorTimelock} from "./IValidatorTimelock.sol";
@@ -71,7 +71,7 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
         bytes calldata batchData,
 		address[] calldata signers,
 		bytes[] calldata signatures
-    ) external onlyRole(chainAddress, COMMITTER_ROLE) {
+    ) external override onlyRole(chainAddress, COMMITTER_ROLE) {
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(COMMIT_BATCHES_MULTISIG_TYPEHASH, chainAddress, processBatchFrom, processBatchTo, keccak256(batchData))));
 		_checkSignatures(chainAddress, signers, signatures, digest);
 		// signatures validated, follow normal commitBatchesSharedBridge flow
@@ -117,6 +117,8 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
 
 	/// @inheritdoc IMultisigCommitter
 	function setSigningThreshold(address chainAddress, uint64 _signingThreshold) external override onlyRole(chainAddress, getRoleAdmin(chainAddress, COMMIT_VALIDATOR_ROLE)) {
+		if(_signingThreshold > getRoleMemberCount(chainAddress, COMMIT_VALIDATOR_ROLE))
+			revert InvalidThreshold(getRoleMemberCount(chainAddress, COMMIT_VALIDATOR_ROLE), _signingThreshold);
 		chainConfig[chainAddress].signingThreshold = _signingThreshold;
 		emit NewSigningThreshold(chainAddress, _signingThreshold);
 	}
@@ -135,6 +137,8 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
 
 	/// @inheritdoc IMultisigCommitter
 	function setSharedSigningThreshold(uint64 _signingThreshold) external override onlyOwner {
+		if(_signingThreshold > sharedValidators.length())
+			revert InvalidThreshold(sharedValidators.length(), _signingThreshold);
 		sharedSigningThreshold = _signingThreshold;
 		emit NewSharedSigningThreshold(_signingThreshold);
 	}

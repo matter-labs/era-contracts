@@ -180,6 +180,8 @@ error InvalidPubdataPricingMode();
 error InvalidSelector(bytes4 func);
 // 0xbe7193d4
 error InvalidSystemLogsLength();
+// 0x7b7a98f1
+error InvalidThreshold(uint256 max, uint256 got);
 // 0x5f1aa154
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xfb5c22e6
@@ -406,6 +408,7 @@ error ZeroGasPriceL1TxZKsyncOS();
 error ZKChainLimitReached();
 // 0x646ac57e
 error ZKsyncOSNotForceDeployForExistingContract(address);
+
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

@@ -193,9 +193,9 @@ contract MultisigCommitterTest is Test {
 
 	function test_changeSharedSigningThreshold() public {
 		vm.prank(ecosystemOwner);
-		multisigCommitter.setSharedSigningThreshold(4);
-		assertEq(multisigCommitter.sharedSigningThreshold(), 4);
-		assertEq(multisigCommitter.getSigningThreshold(chainAddress), 4);
+		multisigCommitter.setSharedSigningThreshold(0);
+		assertEq(multisigCommitter.sharedSigningThreshold(), 0);
+		assertEq(multisigCommitter.getSigningThreshold(chainAddress), 0);
 
 		vm.prank(ecosystemOwner);
 		multisigCommitter.setSharedSigningThreshold(2);
