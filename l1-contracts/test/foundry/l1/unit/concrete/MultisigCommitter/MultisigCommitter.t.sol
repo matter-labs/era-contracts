@@ -17,7 +17,7 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
 
 
-contract MultisigCommiterTest is Test {
+contract MultisigCommitterTest is Test {
 	MultisigCommitter multisigCommitter;
     DummyChainTypeManagerForValidatorTimelock chainTypeManager;
     DummyBridgehub dummyBridgehub;
