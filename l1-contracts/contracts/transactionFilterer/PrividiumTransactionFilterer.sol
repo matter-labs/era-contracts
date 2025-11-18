@@ -91,6 +91,7 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
             bytes4 l2TxSelector = bytes4(l2Calldata[:4]);
             if (l2TxSelector == AssetRouterBase.finalizeDeposit.selector) {
                 (, bytes32 assetId, bytes memory data) = abi.decode(l2Calldata[4:], (uint256, bytes32, bytes));
+                // slither-disable-next-line unused-return
                 (address depositor, , , uint256 amount, ) = DataEncoding.decodeBridgeMintData(data);
                 return whitelistedSenders[depositor] || (_isNotChain(assetId) && amount > 0);
             } else {
