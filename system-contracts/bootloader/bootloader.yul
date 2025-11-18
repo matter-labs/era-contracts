@@ -1220,10 +1220,10 @@ object "Bootloader" {
 
                 debugLog("Send message to L1", success)
 
-                // Sending the L2->L1 log so users will be able to prove transaction execution result on L1.
-                sendL2LogUsingL1Messenger(true, canonicalL1TxHash, success)
-
                 if isPriorityOp {
+                    // Sending the L2->L1 log so users will be able to prove transaction execution result on L1.
+                    sendL2LogUsingL1Messenger(true, canonicalL1TxHash, success)
+
                     // Update priority txs L1 data
                     mstore(0, mload(PRIORITY_TXS_L1_DATA_BEGIN_BYTE()))
                     mstore(32, canonicalL1TxHash)

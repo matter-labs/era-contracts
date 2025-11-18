@@ -203,20 +203,21 @@ abstract contract GatewayGovernanceUtils is Script {
                     prepareGWGovCallsStruct._refundRecipient
                 )
             );
-            calls = Utils.mergeCalls(
-                calls,
-                Utils.prepareGovernanceL1L2DirectTransaction(
-                    prepareGWGovCallsStruct._l1GasPrice,
-                    data,
-                    Utils.MAX_PRIORITY_TX_GAS,
-                    new bytes[](0),
-                    prepareGWGovCallsStruct._gatewayValidatorTimelock,
-                    _gatewayGovernanceConfig.gatewayChainId,
-                    _gatewayGovernanceConfig.bridgehubProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    prepareGWGovCallsStruct._refundRecipient
-                )
-            );
+            // Todo: can probably delete since ValidatorTimelock is now TUPP.
+            // calls = Utils.mergeCalls(
+            //     calls,
+            //     Utils.prepareGovernanceL1L2DirectTransaction(
+            //         prepareGWGovCallsStruct._l1GasPrice,
+            //         data,
+            //         Utils.MAX_PRIORITY_TX_GAS,
+            //         new bytes[](0),
+            //         prepareGWGovCallsStruct._gatewayValidatorTimelock,
+            //         _gatewayGovernanceConfig.gatewayChainId,
+            //         _gatewayGovernanceConfig.bridgehubProxy,
+            //         _gatewayGovernanceConfig.l1AssetRouterProxy,
+            //         prepareGWGovCallsStruct._refundRecipient
+            //     )
+            // );
             calls = Utils.mergeCalls(
                 calls,
                 Utils.prepareGovernanceL1L2DirectTransaction(

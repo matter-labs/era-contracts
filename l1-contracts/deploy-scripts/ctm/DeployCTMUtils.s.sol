@@ -53,11 +53,14 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
+import {CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET, CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
 import {StateTransitionDeployedAddresses, DataAvailabilityDeployedAddresses, ChainCreationParamsConfig} from "../utils/Types.sol";
+
+import {DeployCTML1OrGateway, CTMCoreDeploymentConfig, CTMContract} from "./DeployCTML1OrGateway.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
@@ -422,28 +425,6 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode(addresses.daAddresses.availBridge);
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "Verifier")) {
-            if (config.testnetVerifier) {
-                return
-                    abi.encode(
-                        addresses.stateTransition.verifierFflonk,
-                        addresses.stateTransition.verifierPlonk,
-                        config.ownerAddress,
-                        config.isZKsyncOS
-                    );
-            } else {
-                if (config.isZKsyncOS) {
-                    return
-                        abi.encode(
-                            addresses.stateTransition.verifierFflonk,
-                            addresses.stateTransition.verifierPlonk,
-                            config.ownerAddress
-                        );
-                } else {
-                    return
-                        abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
-                }
-            }
         } else if (compareStrings(contractName, "EraVerifierFflonk")) {
             return abi.encode();
         } else if (compareStrings(contractName, "EraVerifierPlonk")) {
@@ -456,8 +437,6 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "ValidatorTimelock")) {
-            return abi.encode(discoveredBridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "Governance")) {
             return
                 abi.encode(
@@ -473,27 +452,14 @@ abstract contract DeployCTMUtils is DeployUtils {
             address[] memory restrictions = new address[](1);
             restrictions[0] = addresses.accessControlRestrictionAddress;
             return abi.encode(restrictions);
-        } else if (
-            compareStrings(contractName, "ZKsyncOSChainTypeManager") ||
-            compareStrings(contractName, "EraChainTypeManager")
-        ) {
-            return abi.encode(discoveredBridgehub.bridgehubProxy, discoveredBridgehub.interopCenterProxy);
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ProxyAdmin")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "ExecutorFacet")) {
-            return abi.encode(config.l1ChainId);
-        } else if (compareStrings(contractName, "AdminFacet")) {
-            return abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager);
-        } else if (compareStrings(contractName, "MailboxFacet")) {
-            return abi.encode(config.eraChainId, config.l1ChainId, addresses.eip7702Checker);
         } else if (compareStrings(contractName, "GettersFacet")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ServerNotifier")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "DiamondInit")) {
-            return abi.encode(config.isZKsyncOS);
         } else if (compareStrings(contractName, "L1AssetTracker")) {
             return
                 abi.encode(
@@ -504,8 +470,31 @@ abstract contract DeployCTMUtils is DeployUtils {
                     discoveredBridgehub.messageRoot
                 );
         } else {
-            revert(string.concat("Contract ", contractName, " creation calldata not set"));
+            return
+                DeployCTML1OrGateway.getCreationCalldata(
+                    getCTMCoreDeploymentConfig(config),
+                    DeployCTML1OrGateway.getCTMContractFromName(contractName),
+                    isZKBytecode
+                );
         }
+    }
+
+    function getCTMCoreDeploymentConfig(Config memory config) internal view returns (CTMCoreDeploymentConfig memory) {
+        return
+            CTMCoreDeploymentConfig({
+                isZKsyncOS: config.isZKsyncOS,
+                testnetVerifier: config.testnetVerifier,
+                eraChainId: config.eraChainId,
+                l1ChainId: config.l1ChainId,
+                bridgehubProxy: discoveredBridgehub.bridgehubProxy,
+                interopCenterProxy: discoveredBridgehub.interopCenterProxy,
+                rollupDAManager: addresses.daAddresses.rollupDAManager,
+                chainAssetHandler: discoveredBridgehub.chainAssetHandler,
+                eip7702Checker: addresses.eip7702Checker,
+                verifierFflonk: addresses.stateTransition.verifierFflonk,
+                verifierPlonk: addresses.stateTransition.verifierPlonk,
+                ownerAddress: config.ownerAddress
+            });
     }
 
     function calculateExpectedL2Address(string memory contractName) internal returns (address) {
