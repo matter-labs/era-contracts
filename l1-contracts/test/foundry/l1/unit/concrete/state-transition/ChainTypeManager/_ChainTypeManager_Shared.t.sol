@@ -133,13 +133,7 @@ contract ChainTypeManagerTest is UtilsTest {
         );
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(
-                    new AdminFacet(
-                        block.chainid,
-                        RollupDAManager(address(0)),
-                        false
-                    )
-                ),
+                facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)), false)),
                 action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: Utils.getAdminSelectors()

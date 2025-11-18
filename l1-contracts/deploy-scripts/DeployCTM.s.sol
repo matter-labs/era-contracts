@@ -440,11 +440,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
     }
 
     function saveDiamondSelectors() public {
-        AdminFacet adminFacet = new AdminFacet(
-            1,
-            RollupDAManager(address(0)),
-            false
-        );
+        AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)), false);
         GettersFacet gettersFacet = new GettersFacet();
         MailboxFacet mailboxFacet = new MailboxFacet(
             1,
