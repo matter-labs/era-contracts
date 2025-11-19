@@ -9,7 +9,7 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {Governance} from "contracts/governance/Governance.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Utils} from "../utils/Utils.sol";
-import {ProxyAdminIncorrect, ProxyAdminIncorrectOwner} from "./utils/ZkSyncScriptErrors.sol";
+import {ProxyAdminIncorrect, ProxyAdminIncorrectOwner} from "../utils/ZkSyncScriptErrors.sol";
 
 contract DecentralizeGovernanceUpgradeScript is Script {
     function upgradeCTM(

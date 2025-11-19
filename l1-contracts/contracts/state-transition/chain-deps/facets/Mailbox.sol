@@ -20,7 +20,7 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
-import {L1_GAS_PER_PUBDATA_BYTE, MAX_NEW_FACTORY_DEPS, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER} from "../../../common/Config.sol";
+import {L1_GAS_PER_PUBDATA_BYTE, MAX_NEW_FACTORY_DEPS, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "../../../common/Config.sol";
 import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
@@ -86,8 +86,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         uint256 _l1ChainId,
         address _chainAssetHandler,
         IEIP7702Checker _eip7702Checker,
-        uint256 _pauseDepositsTimeWindowStart,
-        uint256 _pauseDepositsTimeWindowEnd
+        bool _isTestnet
     ) {
         if (address(_eip7702Checker) == address(0) && block.chainid == _l1ChainId) {
             revert ZeroAddress();
@@ -98,8 +97,13 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         L1_CHAIN_ID = _l1ChainId;
         CHAIN_ASSET_HANDLER = _chainAssetHandler;
         EIP_7702_CHECKER = _eip7702Checker;
-        PAUSE_DEPOSITS_TIME_WINDOW_START = _pauseDepositsTimeWindowStart;
-        PAUSE_DEPOSITS_TIME_WINDOW_END = _pauseDepositsTimeWindowEnd;
+
+        PAUSE_DEPOSITS_TIME_WINDOW_START = _isTestnet
+            ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET
+            : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET;
+        PAUSE_DEPOSITS_TIME_WINDOW_END = _isTestnet
+            ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+            : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET;
     }
 
     /// @inheritdoc IMailboxImpl

@@ -7,7 +7,7 @@ import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {IL1ChainAssetHandler} from "contracts/bridgehub/IL1ChainAssetHandler.sol";
 import {DepositsNotPaused, MigrationInProgress} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET} from "contracts/common/Config.sol";
+import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
 contract UnpauseDepositsTest is AdminTest {
     event DepositsUnpaused(uint256 chainId);
@@ -17,7 +17,7 @@ contract UnpauseDepositsTest is AdminTest {
 
     function setUp() public override {
         // Timestamp needs to be late enough for `pauseDepositsBeforeInitiatingMigration` time checks
-        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET + 1);
+        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET + 1);
         super.setUp();
     }
 
@@ -55,7 +55,7 @@ contract UnpauseDepositsTest is AdminTest {
         vm.expectRevert(abi.encodeWithSelector(DepositsNotPaused.selector));
         adminFacet.unpauseDeposits();
         // Call also reverts after the paused window ends
-        vm.warp(block.timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET);
+        vm.warp(block.timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET);
         vm.expectRevert(abi.encodeWithSelector(DepositsNotPaused.selector));
         adminFacet.unpauseDeposits();
     }

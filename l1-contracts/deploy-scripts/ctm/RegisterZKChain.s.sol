@@ -37,7 +37,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Create2AndTransfer} from "../utils/deploy/Create2AndTransfer.sol";
 import {ZkChainAddresses} from "../utils/Types.sol";
-import {PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
+import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -104,7 +104,7 @@ contract RegisterZKChainScript is Script {
         console.log("Deploying ZKChain");
 
         // Timestamp needs to be late enough for `pauseDepositsBeforeInitiatingMigration` time checks
-        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET + 1);
+        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET + 1);
         initializeConfigTest();
         runInner(vm.envString("ZK_CHAIN_OUT"));
     }
