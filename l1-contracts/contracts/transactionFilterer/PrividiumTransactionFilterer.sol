@@ -75,7 +75,7 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
     /// @return Whether the transaction is allowed
     function isTransactionAllowed(
         address sender,
-        address,
+        address contractL2,
         uint256,
         uint256 l2Value,
         bytes calldata l2Calldata,
@@ -88,26 +88,25 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
 
         if (sender == L1_ASSET_ROUTER) {
             // Non-base token deposit via `requestL2TransactionTwoBridges`
+            if (l2Value != 0) {
+                return false;
+            }
             bytes4 l2TxSelector = bytes4(l2Calldata[:4]);
             if (l2TxSelector == AssetRouterBase.finalizeDeposit.selector) {
-                (, bytes32 assetId, bytes memory data) = abi.decode(l2Calldata[4:], (uint256, bytes32, bytes));
+                (, , bytes memory data) = abi.decode(l2Calldata[4:], (uint256, bytes32, bytes));
                 // slither-disable-next-line unused-return
-                (address depositor, , , uint256 amount, ) = DataEncoding.decodeBridgeMintData(data);
-                return whitelistedSenders[depositor] || (_isNotChain(assetId) && amount > 0);
+                (address depositor, address receiver, , uint256 amount, ) = DataEncoding.decodeBridgeMintData(data);
+                return (depositor == receiver && amount > 0) || whitelistedSenders[depositor];
+            } else if (l2TxSelector == IL2SharedBridgeLegacyFunctions.finalizeDeposit.selector) {
+                // slither-disable-next-line unused-return
+                (address depositor, address receiver, , uint256 amount, ) = DataEncoding.decodeBridgeMintData(l2Calldata[4:]);
+                return (depositor == receiver && amount > 0) || whitelistedSenders[depositor];
             } else {
-                // Chains cannot be bridged using legacy interface, so just checking the selector is fine.
-                // In case later we need to filter by token/amount/receiver, use DataEncoding.decodeBridgeMintData on l2Calldata[4:]
-                return l2TxSelector == IL2SharedBridgeLegacyFunctions.finalizeDeposit.selector;
+                return false;
             }
         } else {
             // Base token deposit via `requestL2TransactionDirect`
-            return l2Value > 0 && l2Calldata.length == 0;
+            return contractL2 == sender && l2Value > 0 && l2Calldata.length == 0;
         }
-    }
-
-    /// @return true if asset is NOT a chain (i.e. a token)
-    function _isNotChain(bytes32 assetId) internal view returns (bool) {
-        address ctmAddress = BRIDGE_HUB.ctmAssetIdToAddress(assetId);
-        return ctmAddress == address(0);
     }
 }

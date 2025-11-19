@@ -13,11 +13,11 @@ import {PrividiumTransactionFilterer} from "contracts/transactionFilterer/Privid
 contract PrividiumTransactionFiltererTest is Test {
     PrividiumTransactionFilterer internal transactionFiltererProxy;
     PrividiumTransactionFilterer internal transactionFiltererImplementation;
-    address internal constant owner = address(0x1010101);
-    address internal constant admin = address(0x2020202);
-    address internal constant sender = address(0x3030303);
-    address internal constant bridgehub = address(0x5050505);
-    address internal constant assetRouter = address(0x4040404);
+    address internal owner = makeAddr("owner");
+    address internal admin = makeAddr("admin");
+    address internal sender = makeAddr("sender");
+    address internal bridgehub = makeAddr("bridgehub");
+    address internal assetRouter = makeAddr("assetRouter");
 
     constructor() {
         transactionFiltererImplementation = new PrividiumTransactionFilterer(IBridgehubBase(bridgehub), assetRouter);

@@ -11,10 +11,9 @@ import {IL2SharedBridgeLegacyFunctions} from "contracts/bridge/interfaces/IL2Sha
 
 contract CheckTransactionTest is PrividiumTransactionFiltererTest {
     function test_TransactionAllowedBaseTokenDeposit() public view {
-        address depositor = address(0x12345678901234567890); // random address
         bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
-            depositor,
-            address(0),
+            sender,
+            sender,
             0,
             1 ether,
             "",
@@ -23,17 +22,23 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
         assertTrue(isTxAllowed, "Transaction should be allowed");
     }
 
-    function test_TransactonAllowedNonBaseTokenDeposit() public {
-        address depositor = address(0x12345678901234567890); // random address
-        bytes memory depositData = abi.encode(depositor, address(0), address(0), 1 ether, "");
+    function test_TransactionRejectedDepositNotToSelf() public {
+        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
+            sender,
+            makeAddr("random"),
+            0,
+            1 ether,
+            "",
+            address(0)
+        ); // Other arguments do not make a difference for the test
+        assertFalse(isTxAllowed, "Transaction should not be allowed");
+    }
+
+    function test_TransactonAllowedNonBaseTokenDeposit() public view {
+        bytes memory depositData = abi.encode(sender, sender, address(0), 1 ether, "");
         bytes memory txCalladata = abi.encodeCall(
             AssetRouterBase.finalizeDeposit,
             (uint256(10), bytes32("0x12345"), depositData)
-        );
-        vm.mockCall(
-            bridgehub,
-            abi.encodeWithSelector(IBridgehubBase.ctmAssetIdToAddress.selector),
-            abi.encode(address(0)) // asset is not a chain
         );
         bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
             assetRouter,
@@ -46,17 +51,11 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
         assertTrue(isTxAllowed, "Transaction should be allowed");
     }
 
-    function test_TransactonRejectedChainMigration() public {
-        address depositor = address(0x12345678901234567890); // random address
-        bytes memory depositData = abi.encode(depositor, address(0), address(0), 1 ether, "");
+    function test_TransactionRejectedNonBaseTokenDepositNotToSelf() public {
+        bytes memory depositData = abi.encode(sender, makeAddr("random"), address(0), 1 ether, "");
         bytes memory txCalladata = abi.encodeCall(
             AssetRouterBase.finalizeDeposit,
             (uint256(10), bytes32("0x12345"), depositData)
-        );
-        vm.mockCall(
-            bridgehub,
-            abi.encodeWithSelector(IBridgehubBase.ctmAssetIdToAddress.selector),
-            abi.encode(address(0x123123)) // asset IS a chain
         );
         bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
             assetRouter,
@@ -69,11 +68,32 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
         assertFalse(isTxAllowed, "Transaction should not be allowed");
     }
 
-    function test_TransactonAllowedNonBaseTokenDepositLegacyInterface() public view {
-        address depositor = address(0x12345678901234567890); // random address
+    // function test_TransactonRejectedChainMigration() public {
+    //     bytes memory depositData = abi.encode(sender, address(0), address(0), 1 ether, "");
+    //     bytes memory txCalladata = abi.encodeCall(
+    //         AssetRouterBase.finalizeDeposit,
+    //         (uint256(10), bytes32("0x12345"), depositData)
+    //     );
+    //     vm.mockCall(
+    //         bridgehub,
+    //         abi.encodeWithSelector(IBridgehubBase.ctmAssetIdToAddress.selector),
+    //         abi.encode(makeAddr("chain")) // asset IS a chain
+    //     );
+    //     bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
+    //         assetRouter,
+    //         address(0),
+    //         0,
+    //         0,
+    //         txCalladata,
+    //         address(0)
+    //     ); // Other arguments do not make a difference for the test
+    //     assertFalse(isTxAllowed, "Transaction should not be allowed");
+    // }
+
+    function test_TransactonAllowedNonBaseTokenDepositLegacyInterface() public {
         bytes memory txCalladata = abi.encodeCall(
             IL2SharedBridgeLegacyFunctions.finalizeDeposit,
-            (depositor, address(0), address(0), 1 ether, "")
+            (sender, sender, makeAddr("token"), 1 ether, "")
         );
         bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
             assetRouter,
@@ -86,12 +106,11 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
         assertTrue(isTxAllowed, "Transaction should be allowed");
     }
 
-    function test_ArbitraryTransactionNotAllowed() public view {
-        address sender = address(0x12345678901234567890); // random address
+    function test_ArbitraryTransactionNotAllowed() public {
         bytes memory txCalladata = abi.encodeWithSelector(bytes4(0xdeadbeef), "0x12345");
         bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
             sender,
-            address(0),
+            makeAddr("contract"),
             0,
             0,
             txCalladata,
@@ -101,7 +120,6 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
     }
 
     function test_ArbitraryTransactionAllowedFromWhitelistedSender() public {
-        address sender = address(0x12345678901234567890); // random address
         bytes memory txCalladata = abi.encodeWithSelector(bytes4(0xdeadbeef), "0x12345");
         vm.prank(owner);
         transactionFiltererProxy.grantWhitelist(sender);
@@ -116,10 +134,10 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
         assertTrue(isTxAllowed, "Transaction should be allowed");
     }
 
-    function test_TransactionRejectedWhenInvalidSelector() public view {
+    function test_TransactionRejectedWhenInvalidSelector() public {
         bytes memory txCalladata = abi.encodeCall(
             AssetRouterBase.setAssetHandlerAddressThisChain,
-            (bytes32("0x12345"), address(0x01234567890123456789))
+            (bytes32("0x12345"), makeAddr("random"))
         );
         bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
             assetRouter,
