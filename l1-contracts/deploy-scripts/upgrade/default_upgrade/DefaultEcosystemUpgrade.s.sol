@@ -7,65 +7,19 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
-import {ITransparentUpgradeableProxy, TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {Utils} from "../../utils/Utils.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {StateTransitionDeployedAddresses} from "../../utils/Types.sol";
-import {L2_BRIDGEHUB_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
-import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
-import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
-import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
-import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {ChainCreationParams, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {Governance} from "contracts/governance/Governance.sol";
-import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
-import {SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {ContractsBytecodesLib} from "../../utils/bytecode/ContractsBytecodesLib.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
-import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
-import {DeployL1CoreUtils, DeployedAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
-
-import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {TransitionaryOwner} from "contracts/governance/TransitionaryOwner.sol";
-import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
-import {BytecodePublisher} from "../../utils/bytecode/BytecodePublisher.s.sol";
-import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
+import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
-
-import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-
-import {BridgehubDeployedAddresses, L1NativeTokenVaultAddresses, BridgesDeployedAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
-import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {BridgehubDeployedAddresses, BridgesDeployedAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 
@@ -162,24 +116,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         console.log("Ecosystem contracts are deployed!");
     }
 
-    function deployUsedUpgradeContract() internal virtual returns (address) {
-        return deploySimpleContract("DefaultUpgrade", false);
-    }
-
     /// @notice Deploy everything that should be deployed
     function deployNewEcosystemContractsL1() public virtual {}
-
-    function deployUpgradeSpecificContractsL1() internal virtual {
-        // Empty by default.
-    }
-
-    /// @notice Encode calldata that will be passed to `_postUpgrade`
-    /// in the on‑chain contract. Override in concrete upgrades.
-    function encodePostUpgradeCalldata(
-        StateTransitionDeployedAddresses memory
-    ) internal virtual returns (bytes memory) {
-        return new bytes(0);
-    }
 
     /// @notice E2e upgrade generation
     function run() public virtual {
@@ -300,10 +238,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         // L2 transactions params
         newConfig.priorityTxsL2GasLimit = toml.readUint("$.priority_txs_l2_gas_limit");
         newConfig.maxExpectedL1GasPrice = toml.readUint("$.max_expected_l1_gas_price");
-    }
-
-    function getBridgehubAdmin() public virtual returns (address admin) {
-        admin = discoveredBridgehub.admin;
     }
 
     function setAddressesBasedOnBridgehub() internal virtual {
@@ -639,25 +573,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         });
     }
 
-    function getAddresses() public view returns (DeployedAddresses memory) {
-        return addresses;
-    }
-
-    function deployUpgradeStageValidator() internal {
-        upgradeAddresses.upgradeStageValidator = deploySimpleContract("UpgradeStageValidator", false);
-    }
-
     ////////////////////////////// Misc utils /////////////////////////////////
-
-    function mergeCalls(Call[] memory a, Call[] memory b) public pure returns (Call[] memory result) {
-        result = new Call[](a.length + b.length);
-        for (uint256 i = 0; i < a.length; i++) {
-            result[i] = a[i];
-        }
-        for (uint256 i = 0; i < b.length; i++) {
-            result[a.length + i] = b[i];
-        }
-    }
 
     function mergeCallsArray(Call[][] memory a) public pure returns (Call[] memory result) {
         uint256 resultLength;
