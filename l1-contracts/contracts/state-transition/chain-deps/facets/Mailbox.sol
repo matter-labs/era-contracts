@@ -553,28 +553,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     //////// Legacy Era functions
 
     /// @inheritdoc IMailboxImpl
-    function finalizeEthWithdrawal(
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external nonReentrant onlyL1 {
-        if (s.chainId != ERA_CHAIN_ID) {
-            revert OnlyEraSupported();
-        }
-        address sharedBridge = IBridgehub(s.bridgehub).assetRouter();
-        IL1AssetRouter(sharedBridge).finalizeWithdrawal({
-            _chainId: ERA_CHAIN_ID,
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _message: _message,
-            _merkleProof: _merkleProof
-        });
-    }
-
-    /// @inheritdoc IMailboxImpl
     function requestL2Transaction(
         address _contractL2,
         uint256 _l2Value,

@@ -285,16 +285,6 @@ describe("Legacy Era tests", function () {
       await proxyAsMockExecutor.saveL2LogsRootHash(BLOCK_NUMBER, L2_LOGS_TREE_ROOT);
     });
 
-    it("Reverts when proof is invalid", async () => {
-      const invalidProof = [...MERKLE_PROOF];
-      invalidProof[1] = "0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43bb";
-
-      const revertReason = await getCallRevertReason(
-        mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, invalidProof)
-      );
-      expect(revertReason).contains("InvalidProof");
-    });
-
     it("Successful deposit", async () => {
       const priorityQueueLengthBefore = await getter.getPriorityQueueSize();
       const amount = ethers.utils.parseEther("1");
@@ -312,18 +302,5 @@ describe("Legacy Era tests", function () {
       expect(priorityQueueLengthAfter.sub(priorityQueueLengthBefore)).equal(1);
     });
 
-    it("Successful withdrawal", async () => {
-      const balanceBefore = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
-      await mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF);
-      const balanceAfter = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
-      expect(balanceAfter.sub(balanceBefore)).equal(AMOUNT);
-    });
-
-    it("Reverts when withdrawal is already finalized", async () => {
-      const revertReason = await getCallRevertReason(
-        mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
-      );
-      expect(revertReason).contains("WithdrawalAlreadyFinalized");
-    });
   });
 });
