@@ -11,12 +11,13 @@ old_protocol_version = "0x1d00000000"
 priority_txs_l2_gas_limit = 2000000
 max_expected_l1_gas_price = 50000000000
 is_zk_sync_os = true
+redeploy_da_manager = true
 
 [contracts]
 governance_min_delay = 0
 
 max_number_of_chains = 100
-create2_factory_salt = "0x55de3677ffea74c9815331db7f4c737a32c161db4cae7d47504a336c4c5bcfb5"
+create2_factory_salt = "0x65de3677ffea74c9815331db7f4c737a32c161db4cae7d47504a336c4c5bcfb5"
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 validator_timelock_execution_delay = 0
 genesis_root = "0x6ef70107782e23150da78ff573ce332747a988e77518739723924e4f5593be22"
@@ -38,6 +39,7 @@ evm_emulator_hash = "0x000000000000000000000000000000000000000000000000000000000
 bridgehub_proxy_address = "0xfaf7f9079efe7e9b681aab926e7ca9801af4f993"
 # Does not matter, a new one should be deployed
 rollup_da_manager = "0xeb7c0daaddfb52afa05400b489e7497b271d6122"
+
 
 governance_security_council_address = "0xed04b1ac422251851a3EC953Ff4395e5c2443647"
 latest_protocol_version = 0x1e00000000

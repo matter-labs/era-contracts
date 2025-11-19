@@ -177,6 +177,10 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
 
         addresses.stateTransition.validatorTimelock = ChainTypeManagerBase(ctm).validatorTimelockPostV29();
         require(Ownable2StepUpgradeable(ctm).owner() == config.ownerAddress, "Incorrect owner");
+
+        addresses.transparentProxyAdmin = address(
+            uint160(uint256(vm.load(ctm, ADMIN_SLOT)))
+        );
     }
 
     // Unlike the original one, we only deploy L1 contracts (no Gateway) and generate the upgrade data.
@@ -314,12 +318,12 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
 
         proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: transaction,
-            // Unused in zksync os context
-            bootloaderHash: config.contracts.bootloaderHash,
-            // Unused in zksync os context
-            defaultAccountHash: config.contracts.defaultAAHash,
-            // Unused in zksync os context
-            evmEmulatorHash: config.contracts.evmEmulatorHash,
+            // Unused in zksync os context, so we dont change it
+            bootloaderHash: bytes32(0),
+            // Unused in zksync os context, so we dont change it
+            defaultAccountHash: bytes32(0),
+            // Unused in zksync os context, so we dont change it
+            evmEmulatorHash: bytes32(0),
             verifier: stateTransition.verifier,
             verifierParams: VerifierParams({
                 recursionNodeLevelVkHash: bytes32(0),
