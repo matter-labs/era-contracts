@@ -86,6 +86,8 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
             return true;
         }
 
+        // Since contract addresses are aliased and we require that depositor == receiver,
+        // only whitelisted contracts will be able to perform deposits.
         if (sender == L1_ASSET_ROUTER) {
             // Non-base token deposit via `requestL2TransactionTwoBridges`
             if (l2Value != 0) {
