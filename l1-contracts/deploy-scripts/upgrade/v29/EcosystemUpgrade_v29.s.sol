@@ -41,7 +41,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
-import {DefaultEcosystemUpgrade} from "../default_upgrade/DefaultEcosystemUpgrade.s.sol";
+import {DefaultCTMUpgrade} from "../default_upgrade/DefaultCTMUpgrade.s.sol";
 import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
@@ -54,7 +54,7 @@ interface ProxyAdminV5 {
 }
 
 /// @notice Script used for v29 upgrade flow
-contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
+contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
     using stdToml for string;
 
     address[] internal oldValidatorTimelocks;

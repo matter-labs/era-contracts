@@ -71,7 +71,7 @@ import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 
 /// @notice Script used for default upgrade flow
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract DefaultEcosystemUpgrade is Script, DeployCTMUtils {
+contract DefaultCTMUpgrade is Script, DeployCTMUtils {
     using stdToml for string;
 
     /**
