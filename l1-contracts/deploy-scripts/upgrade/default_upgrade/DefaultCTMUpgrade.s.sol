@@ -9,62 +9,46 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
-import {ITransparentUpgradeableProxy, TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Utils} from "../../utils/Utils.sol";
 import {StateTransitionDeployedAddresses} from "../../utils/Types.sol";
-import {L2_BRIDGEHUB_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
-import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
-import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
-import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {ChainCreationParams, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
-import {SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
+import {SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ContractsBytecodesLib} from "../../utils/bytecode/ContractsBytecodesLib.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {DeployCTMUtils, DeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
-
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {TransitionaryOwner} from "contracts/governance/TransitionaryOwner.sol";
 import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 import {BytecodePublisher} from "../../utils/bytecode/BytecodePublisher.s.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
-
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-
-import {BridgehubDeployedAddresses, L1NativeTokenVaultAddresses, BridgesDeployedAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
+import {BridgehubDeployedAddresses, BridgesDeployedAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
@@ -80,8 +64,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
      * validated in the constructor.
      */
     bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
-
-    uint256 internal constant MAX_ADDITIONAL_DELAY = 2 weeks;
 
     // solhint-disable-next-line gas-struct-packing
     struct UpgradeDeployedAddresses {
@@ -116,12 +98,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
 
     // solhint-disable-next-line gas-struct-packing
     struct Gateway {
-        StateTransitionDeployedAddresses gatewayStateTransition;
-        bytes facetCutsData;
-        bytes additionalForceDeployments;
         uint256 chainId;
-        address baseToken;
-        bytes upgradeCutData;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -134,9 +111,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
     /// @notice Internal state of the upgrade script
     struct EcosystemUpgradeConfig {
         bool initialized;
-        bool expectedL2AddressesInitialized;
         bool fixedForceDeploymentsDataGenerated;
-        bool diamondCutPrepared;
         bool upgradeCutPrepared;
         bool factoryDepsPublished;
         bool ecosystemContractsDeployed;
@@ -174,10 +149,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
     function prepareEcosystemUpgrade() public virtual {
         deployNewEcosystemContractsL1();
         console.log("Ecosystem contracts are deployed!");
-        deployNewEcosystemContractsGW();
-        console.log("Ecosystem contracts for GW are deployed!");
         publishBytecodes();
         console.log("Bytecodes published!");
+        // TODO should we deploy state transition diamond facets here again?
+        deployStateTransitionDiamondFacets();
         generateUpgradeData();
         console.log("Upgrade data generated!");
     }
@@ -201,60 +176,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         return new bytes(0);
     }
 
-    function deployGWContract(string memory contractName) internal returns (address contractAddress) {
-        bytes memory creationCalldata = getCreationCalldata(contractName, true);
-        contractAddress = Utils.deployThroughL1Deterministic(
-            getCreationCode(contractName, true),
-            creationCalldata,
-            0,
-            newConfig.priorityTxsL2GasLimit,
-            new bytes[](0),
-            gatewayConfig.chainId,
-            discoveredBridgehub.bridgehubProxy,
-            discoveredBridgehub.assetRouter
-        );
-        notifyAboutDeployment(contractAddress, contractName, creationCalldata, contractName, true);
-    }
-
-    function deployGWTuppWithContract(
-        string memory contractName
-    ) internal returns (address implementationAddress, address proxyAddress) {
-        bytes memory creationCalldata = getCreationCalldata(contractName, true);
-        address implementationAddress = Utils.deployThroughL1Deterministic(
-            getCreationCode(contractName, true),
-            creationCalldata,
-            0,
-            newConfig.priorityTxsL2GasLimit,
-            new bytes[](0),
-            gatewayConfig.chainId,
-            discoveredBridgehub.bridgehubProxy,
-            discoveredBridgehub.assetRouter
-        );
-        notifyAboutDeployment(implementationAddress, contractName, creationCalldata, contractName, true);
-
-        bytes memory proxyCreationCalldata = abi.encode(
-            implementationAddress,
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin,
-            getInitializeCalldata(contractName, true)
-        );
-        proxyAddress = Utils.deployThroughL1Deterministic(
-            ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy"),
-            proxyCreationCalldata,
-            0,
-            newConfig.priorityTxsL2GasLimit,
-            new bytes[](0),
-            gatewayConfig.chainId,
-            discoveredBridgehub.bridgehubProxy,
-            discoveredBridgehub.assetRouter
-        );
-        notifyAboutDeployment(
-            proxyAddress,
-            contractName,
-            proxyCreationCalldata,
-            string.concat(contractName, " Proxy"),
-            true
-        );
-    }
 
     /// @notice Generate data required for the upgrade
     function generateUpgradeData() public virtual {
@@ -266,10 +187,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         console.log("Generated fixed force deployments data");
         getChainCreationDiamondCutData(addresses.stateTransition);
         newlyGeneratedData.diamondCutData = config.contracts.diamondCutData;
-        gatewayConfig.facetCutsData = abi.encode(getChainCreationDiamondCutData(gatewayConfig.gatewayStateTransition));
         console.log("Prepared diamond cut data");
         generateUpgradeCutData(addresses.stateTransition);
-        generateUpgradeCutData(gatewayConfig.gatewayStateTransition);
         upgradeConfig.upgradeCutPrepared = true;
         console.log("UpgradeCutGenerated");
         saveOutput(upgradeConfig.outputPath);
@@ -288,10 +207,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
 
     function getOwnerAddress() public virtual returns (address) {
         return config.ownerAddress;
-    }
-
-    function getDiscoveredBridgehub() public view returns (AddressIntrospector.BridgehubAddresses memory) {
-        return discoveredBridgehub;
     }
 
     /// @notice Get facet cuts that should be removed
@@ -447,11 +362,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
             initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade))
         });
 
-        if (!stateTransition.isOnGateway) {
-            newlyGeneratedData.upgradeCutData = abi.encode(upgradeCutData);
-        } else {
-            gatewayConfig.upgradeCutData = abi.encode(upgradeCutData);
-        }
+        newlyGeneratedData.upgradeCutData = abi.encode(upgradeCutData);
     }
 
     function getProposedPatchUpgrade(
@@ -626,25 +537,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         // L2 transactions params
         newConfig.priorityTxsL2GasLimit = toml.readUint("$.priority_txs_l2_gas_limit");
         newConfig.maxExpectedL1GasPrice = toml.readUint("$.max_expected_l1_gas_price");
-
-        // Gateway params
-        gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
-        gatewayConfig.gatewayStateTransition.chainTypeManagerProxy = toml.readAddress(
-            "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
-        );
-
-        gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin = toml.readAddress(
-            "$.gateway.gateway_state_transition.chain_type_manager_proxy_admin"
-        );
-
-        gatewayConfig.gatewayStateTransition.rollupDAManager = toml.readAddress(
-            "$.gateway.gateway_state_transition.rollup_da_manager"
-        );
-
-        gatewayConfig.gatewayStateTransition.rollupSLDAValidator = toml.readAddress(
-            "$.gateway.gateway_state_transition.rollup_sl_da_validator"
-        );
-        gatewayConfig.gatewayStateTransition.isOnGateway = true;
     }
 
     function getBridgehubAdmin() public virtual returns (address admin) {
@@ -834,95 +726,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
             addresses.stateTransition.defaultUpgrade
         );
 
-        // Serialize gateway state transition addresses
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "chain_type_manager_implementation_addr",
-            gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "chain_type_manager_proxy",
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "chain_type_manager_proxy_admin",
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "rollup_da_manager",
-            gatewayConfig.gatewayStateTransition.rollupDAManager
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "rollup_l2_da_validator",
-            gatewayConfig.gatewayStateTransition.rollupSLDAValidator
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "admin_facet_addr",
-            gatewayConfig.gatewayStateTransition.adminFacet
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "mailbox_facet_addr",
-            gatewayConfig.gatewayStateTransition.mailboxFacet
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "executor_facet_addr",
-            gatewayConfig.gatewayStateTransition.executorFacet
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "getters_facet_addr",
-            gatewayConfig.gatewayStateTransition.gettersFacet
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "diamond_init_addr",
-            gatewayConfig.gatewayStateTransition.diamondInit
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "default_upgrade_addr",
-            gatewayConfig.gatewayStateTransition.defaultUpgrade
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "genesis_upgrade_addr",
-            gatewayConfig.gatewayStateTransition.genesisUpgrade
-        );
-        vm.serializeAddress("gateway_state_transition", "verifier_addr", gatewayConfig.gatewayStateTransition.verifier);
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "verifier_fflonk_addr",
-            gatewayConfig.gatewayStateTransition.verifierFflonk
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "validator_timelock_implementation_addr",
-            gatewayConfig.gatewayStateTransition.validatorTimelockImplementation
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "validator_timelock_addr",
-            gatewayConfig.gatewayStateTransition.validatorTimelock
-        );
-
-        string memory gateway_state_transition = vm.serializeAddress(
-            "gateway_state_transition",
-            "verifier_plonk_addr",
-            gatewayConfig.gatewayStateTransition.verifierPlonk
-        );
-
-        // Serialize gateway configuration
-        vm.serializeBytes("gateway", "diamond_cut_data", gatewayConfig.facetCutsData);
-        vm.serializeBytes("gateway", "upgrade_cut_data", gatewayConfig.upgradeCutData);
-        string memory gateway = vm.serializeString("gateway", "gateway_state_transition", gateway_state_transition);
-
         // Serialize root configuration
         vm.serializeUint("root", "gateway_chain_id", gatewayConfig.chainId);
         vm.serializeUint("root", "priority_txs_l2_gas_limit", newConfig.priorityTxsL2GasLimit);
@@ -1082,7 +885,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         vm.serializeString("root", "contracts_config", contractsConfig);
         vm.serializeAddress("root", "owner_address", config.ownerAddress);
         vm.serializeAddress("root", "transparent_proxy_admin", addresses.transparentProxyAdmin);
-        vm.serializeString("root", "gateway", gateway);
 
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
         vm.serializeBytes("root", "ecosystem_admin_calls", new bytes(0)); // Will be populated later
@@ -1144,11 +946,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         returns (Call[] memory stage0Calls, Call[] memory stage1Calls, Call[] memory stage2Calls)
     {
         // Default upgrade is done it 3 stages:
-        // 0. Pause migration to/from Gateway
         // 1. Perform upgrade
         // 2. Unpause migration to/from Gateway
-        stage0Calls = prepareStage0GovernanceCalls();
-        vm.serializeBytes("governance_calls", "stage0_calls", abi.encode(stage0Calls));
         stage1Calls = prepareStage1GovernanceCalls();
         vm.serializeBytes("governance_calls", "stage1_calls", abi.encode(stage1Calls));
         stage2Calls = prepareStage2GovernanceCalls();
@@ -1213,12 +1012,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
 
     /// @notice The zeroth step of upgrade. By default it just stops gateway migrations
     function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](4);
+        Call[][] memory allCalls = new Call[][](2);
 
-        allCalls[0] = preparePauseGatewayMigrationsCall();
-        allCalls[1] = prepareVersionSpecificStage0GovernanceCallsL1();
-        allCalls[2] = prepareGatewaySpecificStage0GovernanceCalls();
-        allCalls[3] = prepareGovernanceUpgradeTimerStartCall();
+        allCalls[0] = prepareVersionSpecificStage0GovernanceCallsL1();
+        allCalls[1] = prepareGovernanceUpgradeTimerStartCall();
 
         calls = mergeCallsArray(allCalls);
     }
@@ -1227,20 +1024,17 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](8);
 
-        allCalls[0] = prepareGovernanceUpgradeTimerCheckCall();
-        allCalls[1] = prepareCheckMigrationsPausedCalls();
+        allCalls[0] = prepareCheckMigrationsPausedCalls();
         console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
-        allCalls[2] = prepareUpgradeProxiesCalls();
+        allCalls[1] = prepareUpgradeCTMCalls();
         console.log("prepareStage1GovernanceCalls: prepareNewChainCreationParamsCall");
-        allCalls[3] = prepareNewChainCreationParamsCall();
+        allCalls[2] = prepareNewChainCreationParamsCall();
         console.log("prepareStage1GovernanceCalls: provideSetNewVersionUpgradeCall");
-        allCalls[4] = provideSetNewVersionUpgradeCall();
+        allCalls[3] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareDAValidatorCall");
-        allCalls[5] = prepareDAValidatorCall();
+        allCalls[4] = prepareDAValidatorCall();
         console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
-        allCalls[6] = prepareVersionSpecificStage1GovernanceCallsL1();
-        allCalls[7] = prepareGatewaySpecificStage1GovernanceCalls();
-
+        allCalls[5] = prepareVersionSpecificStage1GovernanceCallsL1();
         calls = mergeCallsArray(allCalls);
     }
 
@@ -1251,7 +1045,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         allCalls[0] = prepareCheckUpgradeIsPresent();
         allCalls[1] = prepareUnpauseGatewayMigrationsCall();
         allCalls[2] = prepareVersionSpecificStage2GovernanceCallsL1();
-        allCalls[3] = prepareGatewaySpecificStage2GovernanceCalls();
         allCalls[4] = prepareCheckMigrationsUnpausedCalls();
 
         calls = mergeCallsArray(allCalls);
@@ -1342,175 +1135,9 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         });
     }
 
-    function prepareGatewaySpecificStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
-        if (gatewayConfig.chainId == 0) return calls; // Gateway is unknown
 
-        // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
-        uint256 priorityTxsL2GasLimit = newConfig.priorityTxsL2GasLimit;
-        uint256 maxExpectedL1GasPrice = newConfig.maxExpectedL1GasPrice;
 
-        Call[][] memory allCalls = new Call[][](2);
-        allCalls[0] = preparePauseMigrationCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
-        allCalls[1] = prepareVersionSpecificStage0GovernanceCallsGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
-
-        calls = mergeCallsArray(allCalls);
-    }
-
-    function deployUsedUpgradeContractGW() internal virtual returns (address) {
-        return deployGWContract("DefaultUpgrade");
-    }
-
-    /// @notice Deploy everything that should be deployed for GW
-    function deployNewEcosystemContractsGW() public virtual {
-        require(upgradeConfig.initialized, "Not initialized");
-
-        gatewayConfig.gatewayStateTransition.verifierFflonk = deployGWContract("EraVerifierFflonk");
-        gatewayConfig.gatewayStateTransition.verifierPlonk = deployGWContract("EraVerifierPlonk");
-        gatewayConfig.gatewayStateTransition.verifier = deployGWContract("Verifier");
-
-        gatewayConfig.gatewayStateTransition.executorFacet = deployGWContract("ExecutorFacet");
-        gatewayConfig.gatewayStateTransition.adminFacet = deployGWContract("AdminFacet");
-        gatewayConfig.gatewayStateTransition.mailboxFacet = deployGWContract("MailboxFacet");
-        gatewayConfig.gatewayStateTransition.gettersFacet = deployGWContract("GettersFacet");
-        gatewayConfig.gatewayStateTransition.diamondInit = deployGWContract("DiamondInit");
-        gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
-        gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
-
-        string memory gwCtmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
-        gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = deployGWContract(gwCtmContractName);
-
-        deployUpgradeSpecificContractsGW();
-    }
-
-    function deployUpgradeSpecificContractsGW() internal virtual {
-        // Empty by default.
-    }
-
-    function prepareGatewaySpecificStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        if (gatewayConfig.chainId == 0) return calls; // Gateway is unknown
-
-        Call[][] memory allCalls = new Call[][](5);
-
-        // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
-        uint256 priorityTxsL2GasLimit = newConfig.priorityTxsL2GasLimit;
-        uint256 maxExpectedL1GasPrice = newConfig.maxExpectedL1GasPrice;
-
-        allCalls[0] = provideSetNewVersionUpgradeCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
-        allCalls[1] = prepareNewChainCreationParamsCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
-        allCalls[2] = prepareCTMImplementationUpgrade(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
-        allCalls[3] = prepareDAValidatorCallGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
-        allCalls[4] = prepareVersionSpecificStage1GovernanceCallsGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
-
-        calls = mergeCallsArray(allCalls);
-    }
-
-    function prepareGatewaySpecificStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
-        if (gatewayConfig.chainId == 0) return calls; // Gateway is unknown
-
-        Call[][] memory allCalls = new Call[][](2);
-
-        // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
-        uint256 priorityTxsL2GasLimit = newConfig.priorityTxsL2GasLimit;
-        uint256 maxExpectedL1GasPrice = newConfig.maxExpectedL1GasPrice;
-
-        allCalls[0] = prepareUnpauseMigrationCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
-        allCalls[1] = prepareVersionSpecificStage2GovernanceCallsGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
-
-        calls = mergeCallsArray(allCalls);
-    }
-
-    function provideSetNewVersionUpgradeCallForGateway(
-        uint256 l2GasLimit,
-        uint256 l1GasPrice
-    ) public virtual returns (Call[] memory calls) {
-        require(
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy != address(0),
-            "chainTypeManager on gateway is zero in newConfig"
-        );
-
-        uint256 previousProtocolVersion = getOldProtocolVersion();
-        uint256 deadline = getOldProtocolDeadline();
-        uint256 newProtocolVersion = getNewProtocolVersion();
-        Diamond.DiamondCutData memory upgradeCut = generateUpgradeCutData(gatewayConfig.gatewayStateTransition);
-
-        bytes memory l2Calldata = abi.encodeCall(
-            IChainTypeManager.setNewVersionUpgrade,
-            (upgradeCut, previousProtocolVersion, deadline, newProtocolVersion)
-        );
-
-        calls = _prepareL1ToGatewayCall(
-            l2Calldata,
-            l2GasLimit,
-            l1GasPrice,
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
-        );
-    }
-
-    function preparePauseMigrationCallForGateway(
-        uint256 l2GasLimit,
-        uint256 l1GasPrice
-    ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeCall(IChainAssetHandler.pauseMigration, ());
-
-        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_CHAIN_ASSET_HANDLER_ADDR);
-    }
-
-    function prepareUnpauseMigrationCallForGateway(
-        uint256 l2GasLimit,
-        uint256 l1GasPrice
-    ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeCall(IChainAssetHandler.unpauseMigration, ());
-
-        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_CHAIN_ASSET_HANDLER_ADDR);
-    }
-
-    function prepareNewChainCreationParamsCallForGateway(
-        uint256 l2GasLimit,
-        uint256 l1GasPrice
-    ) public virtual returns (Call[] memory calls) {
-        require(
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy != address(0),
-            "chainTypeManager on gateway is zero in newConfig"
-        );
-
-        bytes memory l2Calldata = abi.encodeCall(
-            IChainTypeManager.setChainCreationParams,
-            (getChainCreationParams(gatewayConfig.gatewayStateTransition))
-        );
-
-        calls = _prepareL1ToGatewayCall(
-            l2Calldata,
-            l2GasLimit,
-            l1GasPrice,
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
-        );
-    }
-
-    function prepareCTMImplementationUpgrade(
-        uint256 l2GasLimit,
-        uint256 l1GasPrice
-    ) public virtual returns (Call[] memory calls) {
-        require(
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy != address(0),
-            "chainTypeManager on gateway is zero in newConfig"
-        );
-
-        bytes memory l2Calldata = abi.encodeCall(
-            ProxyAdmin.upgrade,
-            (
-                ITransparentUpgradeableProxy(payable(gatewayConfig.gatewayStateTransition.chainTypeManagerProxy)),
-                gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation
-            )
-        );
-
-        calls = _prepareL1ToGatewayCall(
-            l2Calldata,
-            l2GasLimit,
-            l1GasPrice,
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin
-        );
-    }
-
+    // TODO Ecosystem v29 depends on it
     function _prepareL1ToGatewayCall(
         bytes memory l2Calldata,
         uint256 l2GasLimit,
@@ -1624,40 +1251,13 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
     }
 
     /// @notice Update implementations in proxies
-    function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
-        calls = new Call[](8);
+    function prepareUpgradeCTMCalls() public virtual returns (Call[] memory calls) {
+        calls = new Call[](1);
 
         calls[0] = _buildCallProxyUpgrade(
             discoveredCTM.ctmProxy,
             addresses.stateTransition.chainTypeManagerImplementation
         );
-
-        calls[1] = _buildCallProxyUpgrade(
-            discoveredBridgehub.bridgehubProxy,
-            bridgehubAddresses.bridgehubImplementation
-        );
-
-        // Note, that we do not need to run the initializer
-        calls[2] = _buildCallProxyUpgrade(bridges.l1NullifierProxy, bridges.l1NullifierImplementation);
-
-        calls[3] = _buildCallProxyUpgrade(bridges.l1AssetRouterProxy, bridges.l1AssetRouterImplementation);
-
-        calls[4] = _buildCallProxyUpgrade(
-            discoveredBridgehub.assetRouterAddresses.nativeTokenVault,
-            upgradeAddresses.nativeTokenVaultImplementation
-        );
-
-        calls[5] = _buildCallProxyUpgrade(
-            discoveredBridgehub.messageRoot,
-            bridgehubAddresses.messageRootImplementation
-        );
-
-        calls[6] = _buildCallProxyUpgrade(
-            discoveredBridgehub.l1CtmDeployer,
-            bridgehubAddresses.ctmDeploymentTrackerImplementation
-        );
-
-        calls[7] = _buildCallProxyUpgrade(bridges.erc20BridgeProxy, bridges.erc20BridgeImplementation);
     }
 
     function _buildCallProxyUpgrade(
@@ -1699,23 +1299,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
             ),
             value: 0
         });
-    }
-
-    function prepareDAValidatorCallGW(
-        uint256 l2GasLimit,
-        uint256 l1GasPrice
-    ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeCall(
-            RollupDAManager.updateDAPair,
-            (gatewayConfig.gatewayStateTransition.rollupSLDAValidator, getRollupL2DACommitmentScheme(), true)
-        );
-
-        calls = _prepareL1ToGatewayCall(
-            l2Calldata,
-            l2GasLimit,
-            l1GasPrice,
-            gatewayConfig.gatewayStateTransition.rollupDAManager
-        );
     }
 
     function getAddresses() public view returns (DeployedAddresses memory) {

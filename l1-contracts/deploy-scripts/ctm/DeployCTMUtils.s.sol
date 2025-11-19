@@ -243,9 +243,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             initAddress: stateTransition.diamondInit,
             initCalldata: abi.encode(initializeData)
         });
-        if (!stateTransition.isOnGateway) {
-            config.contracts.diamondCutData = abi.encode(diamondCut);
-        }
+        config.contracts.diamondCutData = abi.encode(diamondCut);
     }
 
     function getChainCreationParams(
