@@ -3,11 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {Test} from "forge-std/Test.sol";
-
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
-
 import {PrividiumTransactionFilterer} from "contracts/transactionFilterer/PrividiumTransactionFilterer.sol";
 
 contract PrividiumTransactionFiltererTest is Test {
@@ -16,11 +12,10 @@ contract PrividiumTransactionFiltererTest is Test {
     address internal owner = makeAddr("owner");
     address internal admin = makeAddr("admin");
     address internal sender = makeAddr("sender");
-    address internal bridgehub = makeAddr("bridgehub");
     address internal assetRouter = makeAddr("assetRouter");
 
     constructor() {
-        transactionFiltererImplementation = new PrividiumTransactionFilterer(IBridgehubBase(bridgehub), assetRouter);
+        transactionFiltererImplementation = new PrividiumTransactionFilterer(assetRouter);
 
         transactionFiltererProxy = PrividiumTransactionFilterer(
             address(

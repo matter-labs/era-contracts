@@ -6,7 +6,6 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 
 import {AlreadyWhitelisted, NotWhitelisted, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
-import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {AssetRouterBase} from "../bridge/asset-router/AssetRouterBase.sol";
 import {IL2SharedBridgeLegacyFunctions} from "../bridge/interfaces/IL2SharedBridgeLegacyFunctions.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
@@ -22,9 +21,6 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
     /// @notice Event emitted when sender is removed from whitelist
     event WhitelistRevoked(address indexed sender);
 
-    /// @notice The ecosystem's Bridgehub
-    IBridgehubBase public immutable BRIDGE_HUB;
-
     /// @notice The L1 asset router
     address public immutable L1_ASSET_ROUTER;
 
@@ -33,8 +29,7 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehubBase _bridgeHub, address _assetRouter) {
-        BRIDGE_HUB = _bridgeHub;
+    constructor(address _assetRouter) {
         L1_ASSET_ROUTER = _assetRouter;
         _disableInitializers();
     }
@@ -53,6 +48,9 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
     function grantWhitelist(address sender) external onlyOwner {
         if (whitelistedSenders[sender]) {
             revert AlreadyWhitelisted(sender);
+        }
+        if (sender == address(0)) {
+            revert ZeroAddress();
         }
         whitelistedSenders[sender] = true;
         emit WhitelistGranted(sender);
