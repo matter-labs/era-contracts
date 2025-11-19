@@ -2,42 +2,45 @@
 
 pragma solidity 0.8.28;
 
+import {Vm} from "forge-std/Vm.sol";
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehubBase.sol";
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
 import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {DummyBridgehubSetter} from "contracts/dev-contracts/test/DummyBridgehubSetter.sol";
+import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
 import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {Utils} from "../Utils/Utils.sol";
 
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, MAX_NEW_FACTORY_DEPS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
-import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+
 import {SecondBridgeAddressTooLow} from "contracts/bridgehub/L1BridgehubErrors.sol";
-import {AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdTooBig, MsgValueMismatch, NonEmptyMsgValue, SharedBridgeNotSet, SlotOccupied, Unauthorized, WrongMagicValue, ZeroChainId} from "contracts/common/L1ContractErrors.sol";
+import {AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdTooBig, MsgValueMismatch, SharedBridgeNotSet, SlotOccupied, Unauthorized, WrongMagicValue, ZeroChainId} from "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
 
     address weth;
-    Bridgehub bridgeHub;
+    L1Bridgehub bridgeHub;
     DummyBridgehubSetter dummyBridgehub;
     address public bridgeOwner;
     address public testTokenAddress;
@@ -54,6 +57,7 @@ contract ExperimentalBridgeTest is Test {
     L1NativeTokenVault ntv;
     IMessageRoot messageRoot;
     L1Nullifier l1Nullifier;
+    SimpleExecutor simpleExecutor;
 
     bytes32 tokenAssetId;
 
@@ -68,6 +72,7 @@ contract ExperimentalBridgeTest is Test {
 
     address mockL2Contract;
 
+    uint256 l1ChainId;
     uint256 eraChainId;
 
     address deployerAddress;
@@ -95,15 +100,16 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function setUp() public {
-        deployerAddress = makeAddr("DEPLOYER_ADDRESS");
+        l1ChainId = 1;
         eraChainId = 320;
-        uint256 l1ChainId = block.chainid;
+        deployerAddress = makeAddr("DEPLOYER_ADDRESS");
         bridgeOwner = makeAddr("BRIDGE_OWNER");
-        dummyBridgehub = new DummyBridgehubSetter(l1ChainId, bridgeOwner, type(uint256).max);
-        bridgeHub = Bridgehub(address(dummyBridgehub));
+        dummyBridgehub = new DummyBridgehubSetter(bridgeOwner, type(uint256).max);
+        bridgeHub = L1Bridgehub(address(dummyBridgehub));
         weth = makeAddr("WETH");
         mockCTM = new DummyChainTypeManagerWBH(address(bridgeHub));
-        mockChainContract = new DummyZKChain(address(bridgeHub), eraChainId, block.chainid);
+        IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
+        mockChainContract = new DummyZKChain(address(bridgeHub), eraChainId, block.chainid, eip7702Checker);
 
         mockL2Contract = makeAddr("mockL2Contract");
         // mocks to use in bridges instead of using a dummy one
@@ -125,7 +131,7 @@ contract ExperimentalBridgeTest is Test {
         ntv.registerToken(address(testToken));
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(testToken));
 
-        messageRoot = new MessageRoot(bridgeHub, l1ChainId);
+        messageRoot = new L1MessageRoot(address(bridgeHub));
 
         sharedBridge = new L1AssetRouter(
             mockL1WethAddress,
@@ -185,6 +191,8 @@ contract ExperimentalBridgeTest is Test {
 
         // Ownership should have changed
         assertEq(bridgeHub.owner(), bridgeOwner);
+
+        simpleExecutor = new SimpleExecutor();
     }
 
     function _deployNTV(address _sharedBridgeAddr) internal returns (L1NativeTokenVault addr) {
@@ -497,7 +505,7 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function test_setAddresses(address randomAssetRouter, address randomCTMDeployer, address randomMessageRoot) public {
-        assertTrue(bridgeHub.assetRouter() == address(0), "Shared bridge is already there");
+        assertTrue(address(bridgeHub.assetRouter()) == address(0), "Shared bridge is already there");
         assertTrue(bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
         assertTrue(bridgeHub.messageRoot() == IMessageRoot(address(0)), "Message root is already there");
 
@@ -509,7 +517,7 @@ contract ExperimentalBridgeTest is Test {
             address(0)
         );
 
-        assertTrue(bridgeHub.assetRouter() == randomAssetRouter, "Shared bridge is already there");
+        assertTrue(address(bridgeHub.assetRouter()) == randomAssetRouter, "Shared bridge is already there");
         assertTrue(
             bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(randomCTMDeployer),
             "L1 CTM deployer is already there"
@@ -526,7 +534,7 @@ contract ExperimentalBridgeTest is Test {
         vm.assume(randomCaller != bridgeOwner);
 
         vm.prank(randomCaller);
-        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
         bridgeHub.setAddresses(
             randomAssetRouter,
             ICTMDeploymentTracker(randomCTMDeployer),
@@ -534,7 +542,7 @@ contract ExperimentalBridgeTest is Test {
             address(0)
         );
 
-        assertTrue(bridgeHub.assetRouter() == address(0), "Shared bridge is already there");
+        assertTrue(address(bridgeHub.assetRouter()) == address(0), "Shared bridge is already there");
         assertTrue(bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
         assertTrue(bridgeHub.messageRoot() == IMessageRoot(address(0)), "Message root is already there");
     }
@@ -1034,7 +1042,7 @@ contract ExperimentalBridgeTest is Test {
         _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, true, address(0));
 
         assertTrue(bridgeHub.baseTokenAssetId(l2TxnReqDirect.chainId) == ETH_TOKEN_ASSET_ID);
-        console.log(IL1AssetRouter(bridgeHub.assetRouter()).assetHandlerAddress(ETH_TOKEN_ASSET_ID));
+        console.log(IL1AssetRouter(address(bridgeHub.assetRouter())).assetHandlerAddress(ETH_TOKEN_ASSET_ID));
         assertTrue(bridgeHub.baseToken(l2TxnReqDirect.chainId) == ETH_TOKEN_ADDRESS);
 
         assertTrue(bridgeHub.getZKChain(l2TxnReqDirect.chainId) == address(mockChainContract));
@@ -1196,6 +1204,82 @@ contract ExperimentalBridgeTest is Test {
         resultantHash = bridgeHub.requestL2TransactionDirect(l2TxnReqDirect);
 
         assertEq(canonicalHash, resultantHash);
+    }
+
+    // This is an example how to test behaviour of 7702. Keeping it, so the logic can be re-used in the future
+    function test_requestL2TransactionDirect_NonETHCase7702(
+        uint256 mockChainId,
+        uint256 mockMintValue,
+        address mockL2Contract,
+        uint256 mockL2Value,
+        bytes memory mockL2Calldata,
+        uint256 mockL2GasLimit,
+        uint256 mockL2GasPerPubdataByteLimit,
+        bytes[] memory mockFactoryDeps,
+        uint256 gasPrice,
+        uint256 randomValue
+    ) public useRandomToken(randomValue) {
+        _useFullSharedBridge();
+        _initializeBridgehub();
+
+        uint256 randomCallerPk = uint256(keccak256("RANDOM_CALLER"));
+        address payable randomCaller = payable(vm.addr(randomCallerPk));
+        mockChainId = bound(mockChainId, 1, type(uint48).max);
+
+        vm.assume(mockFactoryDeps.length <= MAX_NEW_FACTORY_DEPS);
+        vm.assume(mockMintValue > 0);
+
+        L2TransactionRequestDirect memory l2TxnReqDirect = _createMockL2TransactionRequestDirect({
+            mockChainId: mockChainId,
+            mockMintValue: mockMintValue,
+            mockL2Contract: mockL2Contract,
+            mockL2Value: mockL2Value,
+            mockL2Calldata: mockL2Calldata,
+            mockL2GasLimit: mockL2GasLimit,
+            mockL2GasPerPubdataByteLimit: mockL2GasPerPubdataByteLimit,
+            mockFactoryDeps: mockFactoryDeps,
+            mockRefundRecipient: randomCaller
+        });
+
+        l2TxnReqDirect.chainId = _setUpZKChainForChainId(l2TxnReqDirect.chainId);
+
+        _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, false, address(testToken));
+
+        assertTrue(bridgeHub.getZKChain(l2TxnReqDirect.chainId) == address(mockChainContract));
+        bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
+
+        vm.mockCall(
+            address(mockChainContract),
+            abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
+            abi.encode(canonicalHash)
+        );
+
+        mockChainContract.setFeeParams();
+        mockChainContract.setBaseTokenGasMultiplierPrice(uint128(1), uint128(1));
+        mockChainContract.setBridgeHubAddress(address(bridgeHub));
+        assertTrue(mockChainContract.getBridgeHubAddress() == address(bridgeHub));
+
+        gasPrice = bound(gasPrice, 1_000, 50_000_000);
+        vm.txGasPrice(gasPrice * 1 gwei);
+
+        vm.deal(randomCaller, 1 ether);
+
+        // Now, let's call the same function with zero msg.value
+        testToken.mint(randomCaller, l2TxnReqDirect.mintValue);
+        assertEq(testToken.balanceOf(randomCaller), l2TxnReqDirect.mintValue);
+
+        bytes memory calldataForExecutor = abi.encodeWithSelector(
+            bridgeHub.requestL2TransactionDirect.selector,
+            l2TxnReqDirect
+        );
+
+        vm.recordLogs(); // start recording all logs
+
+        vm.prank(randomCaller);
+        testToken.approve(sharedBridgeAddress, l2TxnReqDirect.mintValue);
+        assertEq(testToken.allowance(randomCaller, sharedBridgeAddress), l2TxnReqDirect.mintValue);
+        vm.signAndAttachDelegation(address(simpleExecutor), randomCallerPk);
+        SimpleExecutor(randomCaller).execute(address(bridgeHub), 0, calldataForExecutor);
     }
 
     function test_requestTransactionTwoBridgesChecksMagicValue(

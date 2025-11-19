@@ -8,9 +8,10 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {StateTransitionDeployedAddresses} from "./Utils.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {BridgehubBase} from "contracts/bridgehub/BridgehubBase.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
@@ -20,16 +21,18 @@ import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Governance} from "contracts/governance/Governance.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
+import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
+import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
 import {Config, DeployedAddresses} from "./DeployUtils.s.sol";
 import {DeployL1HelperScript} from "./DeployL1HelperScript.s.sol";
@@ -48,7 +51,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
 
         // In the production environment, there will be a separate script dedicated to accepting the adminship
         // but for testing purposes we'll have to do it here.
-        Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
+        L1Bridgehub bridgehub = L1Bridgehub(addresses.bridgehub.bridgehubProxy);
         vm.broadcast(addresses.chainAdmin);
         bridgehub.acceptAdmin();
     }
@@ -78,11 +81,11 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         // We set to it to zero explicitly so that it is clear to the reader.
         addresses.accessControlRestrictionAddress = address(0);
         (addresses.bridgehub.bridgehubImplementation, addresses.bridgehub.bridgehubProxy) = deployTuppWithContract(
-            "Bridgehub",
+            "L1Bridgehub",
             false
         );
         (addresses.bridgehub.messageRootImplementation, addresses.bridgehub.messageRootProxy) = deployTuppWithContract(
-            "MessageRoot",
+            "L1MessageRoot",
             false
         );
 
@@ -119,7 +122,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         (
             addresses.bridgehub.chainAssetHandlerImplementation,
             addresses.bridgehub.chainAssetHandlerProxy
-        ) = deployTuppWithContract("ChainAssetHandler", false);
+        ) = deployTuppWithContract("L1ChainAssetHandler", false);
         setBridgehubParams();
 
         updateOwners();
@@ -128,10 +131,10 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
     }
 
     function setBridgehubParams() internal {
-        IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
+        IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub.bridgehubProxy);
         vm.startBroadcast(msg.sender);
         bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
-        bridgehub.setAddresses(
+        BridgehubBase(address(bridgehub)).setAddresses(
             addresses.bridges.l1AssetRouterProxy,
             ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
             IMessageRoot(addresses.bridgehub.messageRootProxy),
@@ -153,7 +156,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         IL1Nullifier l1Nullifier = IL1Nullifier(addresses.bridges.l1NullifierProxy);
         // Ownable ownable = Ownable(addresses.bridges.l1AssetRouterProxy);
         vm.broadcast(msg.sender);
-        sharedBridge.setNativeTokenVault(INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
+        sharedBridge.setNativeTokenVault(INativeTokenVaultBase(addresses.vaults.l1NativeTokenVaultProxy));
         vm.broadcast(msg.sender);
         l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
         vm.broadcast(msg.sender);
@@ -166,7 +169,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
     function updateOwners() internal {
         vm.startBroadcast(msg.sender);
 
-        IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
+        IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub.bridgehubProxy);
         IOwnable(address(bridgehub)).transferOwnership(addresses.governance);
         bridgehub.setPendingAdmin(addresses.chainAdmin);
 
@@ -177,6 +180,8 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
             addresses.bridgehub.ctmDeploymentTrackerProxy
         );
         IOwnable(address(ctmDeploymentTracker)).transferOwnership(addresses.governance);
+
+        IOwnable(addresses.bridgehub.chainAssetHandlerProxy).transferOwnership(addresses.governance);
 
         vm.stopBroadcast();
         console.log("Owners updated");

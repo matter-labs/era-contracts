@@ -11,7 +11,7 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {IExecutor, LogProcessingOutput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 
 contract TestExecutorFacet is ExecutorFacet {
     constructor() ExecutorFacet(block.chainid) {}
@@ -47,7 +47,7 @@ contract TestExecutorFacet is ExecutorFacet {
 contract ExecutorProofTest is Test {
     UtilsFacet internal utilsFacet;
     TestExecutorFacet internal executor;
-    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
 
     function getTestExecutorFacetSelectors() private pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](3);
@@ -88,7 +88,7 @@ contract ExecutorProofTest is Test {
         utilsFacet.util_setL2BootloaderBytecodeHash(0x010008ddde4acc465cde1c420883701caadb41954567c0b4e3a0d1093a7afde7);
         utilsFacet.util_setZkPorterAvailability(false);
 
-        bytes[] memory mockSystemLogs = Utils.createSystemLogsWithEmptyDAValidator();
+        bytes[] memory mockSystemLogs = Utils.createSystemLogsWithNoneDAValidator();
 
         IExecutor.CommitBatchInfo memory nextBatch = IExecutor.CommitBatchInfo({
             // ignored

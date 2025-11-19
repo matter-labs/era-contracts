@@ -8,7 +8,7 @@ import {RelayedSLDAValidator} from "contracts/state-transition/data-availability
 import {L1DAValidatorOutput, PubdataSource} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {L2_BRIDGEHUB_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2ToL1Messenger} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {InvalidPubdataSource, L1DAValidatorInvalidSender, PubdataInputTooSmall} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract RelayedSLDAValidatorTest is Test {
@@ -26,7 +26,7 @@ contract RelayedSLDAValidatorTest is Test {
         );
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector, (CHAIN_ID)),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, (CHAIN_ID)),
             abi.encode(CHAIN_ADDRESS)
         );
     }

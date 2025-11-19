@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {L2AdminFactory} from "contracts/governance/L2AdminFactory.sol";
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
@@ -61,7 +61,7 @@ contract L2AdminFactoryTest is Test {
         address admin = factory.deployAdmin(additionalRestrictions);
 
         // Now, we need to check whether it would be able to accept such an admin
-        PermanentRestriction restriction = new PermanentRestriction(IBridgehub(address(0)), address(factory));
+        PermanentRestriction restriction = new PermanentRestriction(IL1Bridgehub(address(0)), address(factory));
 
         bytes32 codeHash;
         assembly {

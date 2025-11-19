@@ -7,14 +7,14 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IL2AssetRouter} from "./IL2AssetRouter.sol";
-import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
+import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
-import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol";
 
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
@@ -25,7 +25,9 @@ import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
 import {AddressAlreadySet, AssetHandlerDoesNotExist, AssetIdNotSupported, LegacyBridgeUsesNonNativeToken, LegacyEncodingUsedForNonL1Token, NonEmptyMsgValue, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, UnsupportedEncodingVersion, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "../../bridgehub/IL1Bridgehub.sol";
+import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
 
@@ -36,23 +38,36 @@ import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker
 contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    /// @dev The address of the WETH token on L1.
-    address public immutable override L1_WETH_TOKEN;
+    /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
+    IL1Bridgehub public immutable BRIDGE_HUB;
 
-    /// @dev The assetId of the base token.
+    /// @dev Chain ID of Era for legacy reasons
+    uint256 public immutable ERA_CHAIN_ID;
+
+    /// @dev The address of the WETH token on L1.
+    address public immutable L1_WETH_TOKEN;
+
+    /// @dev The assetId of the ETH.
     bytes32 public immutable ETH_TOKEN_ASSET_ID;
 
     /// @dev The address of ZKsync Era diamond proxy contract.
-    address internal immutable ERA_DIAMOND_PROXY;
+    IZKChain public immutable ERA_DIAMOND_PROXY;
 
     /// @dev Address of nullifier.
     IL1Nullifier public immutable L1_NULLIFIER;
 
     /// @dev Address of native token vault.
-    INativeTokenVault public nativeTokenVault;
+    INativeTokenVaultBase public nativeTokenVault;
 
     /// @dev Address of legacy bridge.
     IL1ERC20Bridge public legacyBridge;
+
+    /// @notice Legacy function to get the L2 shared bridge address for a chain.
+    /// @dev In case the chain has been deployed after the gateway release,
+    /// the returned value is 0.
+    function l2BridgeAddress(uint256 _chainId) external view override returns (address) {
+        return L1_NULLIFIER.l2BridgeAddress(_chainId);
+    }
 
     /// @notice Checks that the message sender is the nullifier.
     modifier onlyNullifier() {
@@ -64,7 +79,9 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
     /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
-        if (msg.sender != address(BRIDGE_HUB) && (_chainId != ERA_CHAIN_ID || msg.sender != ERA_DIAMOND_PROXY)) {
+        if (
+            msg.sender != address(BRIDGE_HUB) && (_chainId != ERA_CHAIN_ID || msg.sender != address(ERA_DIAMOND_PROXY))
+        ) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -86,18 +103,28 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         _;
     }
 
+    /// @notice Checks that the message sender is the bridgehub.
+    modifier onlyBridgehub() {
+        if (msg.sender != address(BRIDGE_HUB)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
-        address _l1WethAddress,
+        address _l1WethToken,
         address _bridgehub,
         address _l1Nullifier,
         uint256 _eraChainId,
         address _eraDiamondProxy
-    ) reentrancyGuardInitializer AssetRouterBase(block.chainid, _eraChainId, IBridgehub(_bridgehub)) {
+    ) reentrancyGuardInitializer {
         _disableInitializers();
-        L1_WETH_TOKEN = _l1WethAddress;
-        ERA_DIAMOND_PROXY = _eraDiamondProxy;
+        BRIDGE_HUB = IL1Bridgehub(_bridgehub);
+        ERA_CHAIN_ID = _eraChainId;
+        L1_WETH_TOKEN = _l1WethToken;
+        ERA_DIAMOND_PROXY = IZKChain(_eraDiamondProxy);
         L1_NULLIFIER = IL1Nullifier(_l1Nullifier);
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
     }
@@ -116,7 +143,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @notice Sets the NativeTokenVault contract address.
     /// @dev Should be called only once by the owner.
     /// @param _nativeTokenVault The address of the native token vault.
-    function setNativeTokenVault(INativeTokenVault _nativeTokenVault) external onlyOwner {
+    function setNativeTokenVault(INativeTokenVaultBase _nativeTokenVault) external onlyOwner {
         if (address(nativeTokenVault) != address(0)) {
             revert NativeTokenVaultAlreadySet();
         }
@@ -152,11 +179,11 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         emit AssetDeploymentTrackerSet(assetId, _assetDeploymentTracker, _assetRegistrationData);
     }
 
-    /// @inheritdoc IAssetRouterBase
+    /// @inheritdoc AssetRouterBase
     function setAssetHandlerAddressThisChain(
         bytes32 _assetRegistrationData,
         address _assetHandlerAddress
-    ) external override(AssetRouterBase, IAssetRouterBase) {
+    ) external override {
         _setAssetHandlerAddressThisChain(address(nativeTokenVault), _assetRegistrationData, _assetHandlerAddress);
     }
 
@@ -315,12 +342,12 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                             Receive transaction Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc IAssetRouterBase
+    /// @inheritdoc AssetRouterBase
     function finalizeDeposit(
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) public payable override(AssetRouterBase, IAssetRouterBase) onlyNullifier {
+    ) public payable override onlyNullifier {
         _finalizeDeposit(_chainId, _assetId, _transferData, address(nativeTokenVault));
         emit DepositFinalizedAssetRouter(_chainId, _assetId, _transferData);
     }
@@ -417,7 +444,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint256 _amount,
         address _originalCaller
     ) external onlyNativeTokenVault returns (bool) {
-        address l1TokenAddress = INativeTokenVault(address(nativeTokenVault)).tokenAddress(_assetId);
+        address l1TokenAddress = INativeTokenVaultBase(address(nativeTokenVault)).tokenAddress(_assetId);
         if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
             return false;
         }
@@ -485,7 +512,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             (nativeTokenVault.tokenAddress(_assetId) == address(0)) ||
             (nativeTokenVault.originChainId(_assetId) != block.chainid)
         ) {
-            return abi.encodeCall(IAssetRouterBase.finalizeDeposit, (block.chainid, _assetId, _assetData));
+            return abi.encodeCall(AssetRouterBase.finalizeDeposit, (block.chainid, _assetId, _assetData));
         } else {
             // slither-disable-next-line unused-return
             (, address _receiver, address _parsedNativeToken, uint256 _amount, bytes memory _gettersData) = DataEncoding
@@ -665,12 +692,5 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint256 _l2MessageIndex
     ) external view returns (bool) {
         return L1_NULLIFIER.isWithdrawalFinalized(_chainId, _l2BatchNumber, _l2MessageIndex);
-    }
-
-    /// @notice Legacy function to get the L2 shared bridge address for a chain.
-    /// @dev In case the chain has been deployed after the gateway release,
-    /// the returned value is 0.
-    function l2BridgeAddress(uint256 _chainId) external view override returns (address) {
-        return L1_NULLIFIER.l2BridgeAddress(_chainId);
     }
 }
