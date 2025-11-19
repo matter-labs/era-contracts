@@ -11,14 +11,7 @@ import {IL2SharedBridgeLegacyFunctions} from "contracts/bridge/interfaces/IL2Sha
 
 contract CheckTransactionTest is PrividiumTransactionFiltererTest {
     function test_TransactionAllowedBaseTokenDeposit() public view {
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
-            sender,
-            sender,
-            0,
-            1 ether,
-            "",
-            address(0)
-        ); // Other arguments do not make a difference for the test
+        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(sender, sender, 0, 1 ether, "", address(0));
         assertTrue(isTxAllowed, "Transaction should be allowed");
     }
 
@@ -67,28 +60,6 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
         ); // Other arguments do not make a difference for the test
         assertFalse(isTxAllowed, "Transaction should not be allowed");
     }
-
-    // function test_TransactonRejectedChainMigration() public {
-    //     bytes memory depositData = abi.encode(sender, address(0), address(0), 1 ether, "");
-    //     bytes memory txCalladata = abi.encodeCall(
-    //         AssetRouterBase.finalizeDeposit,
-    //         (uint256(10), bytes32("0x12345"), depositData)
-    //     );
-    //     vm.mockCall(
-    //         bridgehub,
-    //         abi.encodeWithSelector(IBridgehubBase.ctmAssetIdToAddress.selector),
-    //         abi.encode(makeAddr("chain")) // asset IS a chain
-    //     );
-    //     bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
-    //         assetRouter,
-    //         address(0),
-    //         0,
-    //         0,
-    //         txCalladata,
-    //         address(0)
-    //     ); // Other arguments do not make a difference for the test
-    //     assertFalse(isTxAllowed, "Transaction should not be allowed");
-    // }
 
     function test_TransactonAllowedNonBaseTokenDepositLegacyInterface() public {
         bytes memory txCalladata = abi.encodeCall(

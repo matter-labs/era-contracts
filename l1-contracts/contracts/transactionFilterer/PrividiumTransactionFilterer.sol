@@ -99,7 +99,9 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
                 return (depositor == receiver && amount > 0) || whitelistedSenders[depositor];
             } else if (l2TxSelector == IL2SharedBridgeLegacyFunctions.finalizeDeposit.selector) {
                 // slither-disable-next-line unused-return
-                (address depositor, address receiver, , uint256 amount, ) = DataEncoding.decodeBridgeMintData(l2Calldata[4:]);
+                (address depositor, address receiver, , uint256 amount, ) = DataEncoding.decodeBridgeMintData(
+                    l2Calldata[4:]
+                );
                 return (depositor == receiver && amount > 0) || whitelistedSenders[depositor];
             } else {
                 return false;
