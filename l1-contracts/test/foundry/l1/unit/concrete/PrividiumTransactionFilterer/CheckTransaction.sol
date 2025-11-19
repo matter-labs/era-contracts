@@ -8,6 +8,7 @@ import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.s
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {InvalidSelector} from "contracts/common/L1ContractErrors.sol";
 import {IL2SharedBridgeLegacyFunctions} from "contracts/bridge/interfaces/IL2SharedBridgeLegacyFunctions.sol";
+import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 contract CheckTransactionTest is PrividiumTransactionFiltererTest {
     function test_TransactionAllowedBaseTokenDeposit() public view {
@@ -35,7 +36,7 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
         );
         bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
             assetRouter,
-            address(0),
+            L2_ASSET_ROUTER_ADDR,
             0,
             0,
             txCalladata,
@@ -52,7 +53,7 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
         );
         bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
             assetRouter,
-            address(0),
+            L2_ASSET_ROUTER_ADDR,
             0,
             0,
             txCalladata,
@@ -68,7 +69,7 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
         );
         bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
             assetRouter,
-            address(0),
+            L2_ASSET_ROUTER_ADDR,
             0,
             0,
             txCalladata,
@@ -112,7 +113,7 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
         );
         bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
             assetRouter,
-            address(0),
+            L2_ASSET_ROUTER_ADDR,
             0,
             0,
             txCalladata,

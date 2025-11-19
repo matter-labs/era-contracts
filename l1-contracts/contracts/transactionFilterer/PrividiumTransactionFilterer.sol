@@ -9,6 +9,7 @@ import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransa
 import {AssetRouterBase} from "../bridge/asset-router/AssetRouterBase.sol";
 import {IL2SharedBridgeLegacyFunctions} from "../bridge/interfaces/IL2SharedBridgeLegacyFunctions.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {L2_ASSET_ROUTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -85,10 +86,10 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
         }
 
         // Since contract addresses are aliased and we require that depositor == receiver,
-        // only whitelisted contracts will be able to perform deposits.
+        // only EOAs, 7702 delegators, or whitelisted contracts will be able to perform deposits.
         if (sender == L1_ASSET_ROUTER) {
             // Non-base token deposit via `requestL2TransactionTwoBridges`
-            if (l2Value != 0) {
+            if (l2Value != 0 || contractL2 != L2_ASSET_ROUTER_ADDR) {
                 return false;
             }
             bytes4 l2TxSelector = bytes4(l2Calldata[:4]);
