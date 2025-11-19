@@ -19,8 +19,6 @@ import { Action, facetCut } from "../../src.ts/diamondCut";
 
 import {
   DEFAULT_REVERT_REASON,
-  L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-  L2_TO_L1_MESSENGER,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   defaultFeeParams,
   getCallRevertReason,
@@ -29,7 +27,6 @@ import {
 
 describe("Mailbox tests", function () {
   let mailbox: IMailbox;
-  let proxyAsMockExecutor: MockExecutorFacet;
   let bridgehub: Bridgehub;
   let owner: ethers.Signer;
   let forwarder: Forwarder;

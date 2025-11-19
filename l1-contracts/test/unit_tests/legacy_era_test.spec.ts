@@ -249,10 +249,7 @@ describe("Legacy Era tests", function () {
 
   describe("finalizeEthWithdrawal", function () {
     const BLOCK_NUMBER = 1;
-    const MESSAGE_INDEX = 0;
     const TX_NUMBER_IN_BLOCK = 0;
-    const L1_RECEIVER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
-    const AMOUNT = 1;
 
     const MESSAGE =
       "0x6c0960f9d8dA6BF26964aF9D7eEd9e03E53415D37aA960450000000000000000000000000000000000000000000000000000000000000001";
