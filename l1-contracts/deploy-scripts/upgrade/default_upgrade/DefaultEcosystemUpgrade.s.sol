@@ -9,11 +9,8 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {StateTransitionDeployedAddresses} from "../../utils/Types.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {Governance} from "contracts/governance/Governance.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
@@ -28,74 +25,24 @@ import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
     using stdToml for string;
 
-    /**
-     * @dev Storage slot with the admin of the contract.
-     * This is the keccak-256 hash of "eip1967.proxy.admin" subtracted by 1, and is
-     * validated in the constructor.
-     */
-    bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
-
-    uint256 internal constant MAX_ADDITIONAL_DELAY = 2 weeks;
-
     // solhint-disable-next-line gas-struct-packing
     struct UpgradeDeployedAddresses {
-        address transitionaryOwner;
-        address bridgehubImplementationAddress;
-    }
-
-    // solhint-disable-next-line gas-struct-packing
-    struct AdditionalConfig {
-        // This is the address of the ecosystem admin.
-        // Note, that it is not the owner, but rather the address that is responsible
-        // for facilitating partially trusted, but not critical tasks.
-        address ecosystemAdminAddress;
-        uint256 governanceUpgradeTimerInitialDelay;
-        uint256 oldProtocolVersion;
-        address oldValidatorTimelock;
-        uint256 priorityTxsL2GasLimit;
-        uint256 maxExpectedL1GasPrice;
-    }
-
-    // solhint-disable-next-line gas-struct-packing
-    struct Gateway {
-        StateTransitionDeployedAddresses gatewayStateTransition;
-        bytes facetCutsData;
-        bytes additionalForceDeployments;
-        uint256 chainId;
-        address baseToken;
-        bytes upgradeCutData;
-    }
-
-    // solhint-disable-next-line gas-struct-packing
-    struct NewlyGeneratedData {
-        bytes fixedForceDeploymentsData;
-        bytes diamondCutData;
-        bytes upgradeCutData;
+        address upgradeTimer;
+        address upgradeStageValidator;
+        address nativeTokenVaultImplementation;
     }
 
     /// @notice Internal state of the upgrade script
     struct EcosystemUpgradeConfig {
         bool initialized;
-        bool expectedL2AddressesInitialized;
-        bool fixedForceDeploymentsDataGenerated;
-        bool diamondCutPrepared;
-        bool upgradeCutPrepared;
-        bool factoryDepsPublished;
-        bool ecosystemContractsDeployed;
         string outputPath;
     }
 
-    AdditionalConfig internal newConfig;
-    NewlyGeneratedData internal newlyGeneratedData;
     UpgradeDeployedAddresses internal upgradeAddresses;
     BridgehubDeployedAddresses internal bridgehubAddresses;
     BridgesDeployedAddresses internal bridges;
     AddressIntrospector.BridgehubAddresses internal discoveredBridgehub;
-    AddressIntrospector.NonDisoverable internal nonDisoverable;
     L1Bridgehub internal bridgehub;
-
-    uint256[] internal factoryDepsHashes;
-    mapping(bytes32 => bool) internal isHashInFactoryDeps;
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
@@ -148,17 +95,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         return type(uint256).max;
     }
 
-    function getOldProtocolVersion() public virtual returns (uint256) {
-        return newConfig.oldProtocolVersion;
-    }
-
     function isPatchUpgrade() public virtual returns (bool) {
         (uint32 _major, uint32 _minor, uint32 patch) = SemVer.unpackSemVer(SafeCast.toUint96(getNewProtocolVersion()));
         return patch != 0;
-    }
-
-    function getEcosystemAdmin() external virtual returns (address) {
-        return newConfig.ecosystemAdminAddress;
     }
 
     function initializeConfig(string memory newConfigPath) internal virtual override {
@@ -171,89 +110,12 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         }
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
 
-        config.eraChainId = toml.readUint("$.era_chain_id");
-        nonDisoverable.bytecodesSupplier = toml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
-        nonDisoverable.rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
         bridgehub = L1Bridgehub(toml.readAddress("$.contracts.bridgehub_proxy_address"));
-        if (toml.keyExists("$.is_zk_sync_os")) {
-            config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
-        }
         setAddressesBasedOnBridgehub();
-
-        config.l1ChainId = block.chainid;
-        config.deployerAddress = msg.sender;
-        config.ownerAddress = discoveredBridgehub.governance;
-
-        config.contracts.governanceSecurityCouncilAddress = Governance(payable(discoveredBridgehub.governance))
-            .securityCouncil();
-        config.contracts.governanceMinDelay = Governance(payable(discoveredBridgehub.governance)).minDelay();
-        config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
-
-        // Default values for initializing the chain. They are part of the chain creation params,
-        // meanwhile they are not saved anywhere
-        config.contracts.chainCreationParams.latestProtocolVersion = toml.readUint(
-            "$.contracts.latest_protocol_version"
-        );
-        config.contracts.chainCreationParams.priorityTxMaxGasLimit = toml.readUint(
-            "$.contracts.priority_tx_max_gas_limit"
-        );
-
-        config.contracts.chainCreationParams.diamondInitPubdataPricingMode = PubdataPricingMode(
-            toml.readUint("$.contracts.diamond_init_pubdata_pricing_mode")
-        );
-        config.contracts.chainCreationParams.diamondInitBatchOverheadL1Gas = toml.readUint(
-            "$.contracts.diamond_init_batch_overhead_l1_gas"
-        );
-        config.contracts.chainCreationParams.diamondInitMaxPubdataPerBatch = toml.readUint(
-            "$.contracts.diamond_init_max_pubdata_per_batch"
-        );
-        config.contracts.chainCreationParams.diamondInitMaxL2GasPerBatch = toml.readUint(
-            "$.contracts.diamond_init_max_l2_gas_per_batch"
-        );
-        config.contracts.chainCreationParams.diamondInitPriorityTxMaxPubdata = toml.readUint(
-            "$.contracts.diamond_init_priority_tx_max_pubdata"
-        );
-        config.contracts.chainCreationParams.diamondInitMinimalL2GasPrice = toml.readUint(
-            "$.contracts.diamond_init_minimal_l2_gas_price"
-        );
-
-        // Protocol specific params for the entire CTM
-        config.contracts.chainCreationParams.genesisRoot = toml.readBytes32("$.contracts.genesis_root");
-        config.contracts.chainCreationParams.genesisRollupLeafIndex = toml.readUint(
-            "$.contracts.genesis_rollup_leaf_index"
-        );
-        config.contracts.chainCreationParams.genesisBatchCommitment = toml.readBytes32(
-            "$.contracts.genesis_batch_commitment"
-        );
-        config.contracts.chainCreationParams.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
-        config.contracts.chainCreationParams.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
-        config.contracts.chainCreationParams.evmEmulatorHash = toml.readBytes32("$.contracts.evm_emulator_hash");
-
-        if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
-            config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
-        }
-
-        newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
-
-        // L2 transactions params
-        newConfig.priorityTxsL2GasLimit = toml.readUint("$.priority_txs_l2_gas_limit");
-        newConfig.maxExpectedL1GasPrice = toml.readUint("$.max_expected_l1_gas_price");
     }
 
     function setAddressesBasedOnBridgehub() internal virtual {
         discoveredBridgehub = AddressIntrospector.getBridgehubAddresses(bridgehub);
-        config.ownerAddress = discoveredBridgehub.governance;
-
-        bridges.l1AssetRouterProxy = discoveredBridgehub.assetRouter;
-
-        bridges.l1NullifierProxy = address(L1AssetRouter(bridges.l1AssetRouterProxy).L1_NULLIFIER());
-        bridges.erc20BridgeProxy = address(L1AssetRouter(bridges.l1AssetRouterProxy).legacyBridge());
-
-        newConfig.ecosystemAdminAddress = discoveredBridgehub.admin;
-    }
-
-    function getGovernanceUpgradeInitialDelay() external view virtual returns (uint256) {
-        return newConfig.governanceUpgradeTimerInitialDelay;
     }
 
     function saveOutput(string memory outputPath) internal virtual {
@@ -265,18 +127,14 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
             "ctm_deployment_tracker_implementation_addr",
             bridgehubAddresses.ctmDeploymentTrackerImplementation
         );
-        vm.serializeAddress(
-            "bridgehub",
-            "ctm_deployment_tracker_proxy_addr",
-            bridgehubAddresses.ctmDeploymentTrackerProxy
-        );
+        vm.serializeAddress("bridgehub", "ctm_deployment_tracker_proxy_addr", discoveredBridgehub.l1CtmDeployer);
         vm.serializeAddress(
             "bridgehub",
             "chain_asset_handler_implementation_addr",
             bridgehubAddresses.chainAssetHandlerImplementation
         );
-        vm.serializeAddress("bridgehub", "chain_asset_handler_proxy_addr", bridgehubAddresses.chainAssetHandlerProxy);
-        vm.serializeAddress("bridgehub", "message_root_proxy_addr", bridgehubAddresses.messageRootProxy);
+        vm.serializeAddress("bridgehub", "chain_asset_handler_proxy_addr", discoveredBridgehub.chainAssetHandler);
+        vm.serializeAddress("bridgehub", "message_root_proxy_addr", discoveredBridgehub.messageRoot);
         string memory bridgehub = vm.serializeAddress(
             "bridgehub",
             "message_root_implementation_addr",
@@ -300,12 +158,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
             bridges.bridgedTokenBeacon
         );
 
-        vm.serializeAddress("deployed_addresses", "chain_admin", addresses.chainAdmin);
-        vm.serializeAddress(
-            "deployed_addresses",
-            "access_control_restriction_addr",
-            addresses.accessControlRestrictionAddress
-        );
         vm.serializeString("deployed_addresses", "bridgehub", bridgehub);
         vm.serializeString("deployed_addresses", "bridges", bridgesSerialized);
         vm.serializeAddress(
@@ -313,32 +165,13 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
             "native_token_vault_addr",
             discoveredBridgehub.assetRouterAddresses.nativeTokenVault
         );
-        vm.serializeAddress(
+        string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
             "native_token_vault_implementation_addr",
             upgradeAddresses.nativeTokenVaultImplementation
         );
 
-        vm.serializeAddress("root", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
-        vm.serializeBytes32("root", "create2_factory_salt", create2FactoryParams.factorySalt);
-        vm.serializeUint("root", "l1_chain_id", config.l1ChainId);
-        vm.serializeUint("root", "era_chain_id", config.eraChainId);
-        vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
-        vm.serializeAddress("root", "owner_address", config.ownerAddress);
-        vm.serializeAddress("root", "transparent_proxy_admin", addresses.transparentProxyAdmin);
-
-        vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
-        vm.serializeBytes("root", "ecosystem_admin_calls", new bytes(0)); // Will be populated later
-        vm.serializeBytes("root", "test_upgrade_calls", new bytes(0)); // Will be populated later
-        vm.serializeBytes("root", "v29", new bytes(0)); // Will be populated later
-
-        vm.serializeUint(
-            "root",
-            "governance_upgrade_timer_initial_delay",
-            newConfig.governanceUpgradeTimerInitialDelay
-        );
-
-        string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
+        string memory toml = vm.serializeString("root", "upgrade_addresses", deployedAddresses);
 
         vm.writeToml(toml, outputPath);
 
@@ -451,7 +284,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
     }
 
     function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
-        require(discoveredBridgehub.chainAssetHandler != address(0), "chainAssetHandlerProxy is zero in newConfig");
+        require(discoveredBridgehub.chainAssetHandler != address(0), "chainAssetHandlerProxy is zero");
 
         result = new Call[](1);
         result[0] = Call({
@@ -535,9 +368,12 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         );
 
         // Note, that we do not need to run the initializer
-        calls[1] = _buildCallProxyUpgrade(bridges.l1NullifierProxy, bridges.l1NullifierImplementation);
+        calls[1] = _buildCallProxyUpgrade(
+            discoveredBridgehub.assetRouterAddresses.l1Nullifier,
+            bridges.l1NullifierImplementation
+        );
 
-        calls[2] = _buildCallProxyUpgrade(bridges.l1AssetRouterProxy, bridges.l1AssetRouterImplementation);
+        calls[2] = _buildCallProxyUpgrade(discoveredBridgehub.assetRouter, bridges.l1AssetRouterImplementation);
 
         calls[3] = _buildCallProxyUpgrade(
             discoveredBridgehub.assetRouterAddresses.nativeTokenVault,
