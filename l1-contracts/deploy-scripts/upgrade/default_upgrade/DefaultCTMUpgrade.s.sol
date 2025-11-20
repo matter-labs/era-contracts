@@ -177,7 +177,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         return new bytes(0);
     }
 
-
     /// @notice Generate data required for the upgrade
     function generateUpgradeData() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
@@ -220,13 +219,14 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
     function _composeUpgradeTx(
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments
     ) internal virtual returns (L2CanonicalTransaction memory transaction) {
-        return UpgradeUtils.composeUpgradeTx(
-            forceDeployments,
-            isHashInFactoryDeps,
-            factoryDepsHashes,
-            UpgradeUtils.getProtocolUpgradeNonce(getNewProtocolVersion()),
-            config.isZKsyncOS
-        );
+        return
+            UpgradeUtils.composeUpgradeTx(
+                forceDeployments,
+                isHashInFactoryDeps,
+                factoryDepsHashes,
+                UpgradeUtils.getProtocolUpgradeNonce(getNewProtocolVersion()),
+                config.isZKsyncOS
+            );
     }
 
     function getNewProtocolVersion() public virtual returns (uint256) {
@@ -595,11 +595,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
             addresses.stateTransition.validatorTimelockImplementation
         );
         vm.serializeAddress("state_transition", "validator_timelock_addr", addresses.stateTransition.validatorTimelock);
-        vm.serializeAddress(
-            "state_transition",
-            "bytecodes_supplier_addr",
-            addresses.stateTransition.bytecodesSupplier
-        );
+        vm.serializeAddress("state_transition", "bytecodes_supplier_addr", addresses.stateTransition.bytecodesSupplier);
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
@@ -613,11 +609,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
             "access_control_restriction_addr",
             addresses.accessControlRestrictionAddress
         );
-        vm.serializeAddress(
-            "deployed_addresses",
-            "transparent_proxy_admin",
-            addresses.transparentProxyAdmin
-        );
+        vm.serializeAddress("deployed_addresses", "transparent_proxy_admin", addresses.transparentProxyAdmin);
         vm.serializeAddress(
             "deployed_addresses",
             "rollup_l1_da_validator_addr",
@@ -914,8 +906,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         });
     }
 
-
-
     // TODO Ecosystem v29 depends on it
     function _prepareL1ToGatewayCall(
         bytes memory l2Calldata,
@@ -939,16 +929,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
             discoveredBridgehub.assetRouter,
             msg.sender
         );
-    }
-
-    function prepareApproveGatewayBaseTokenCall(
-        address spender,
-        uint256 amount
-    ) public virtual returns (Call[] memory calls) {
-        address token = IL1Bridgehub(discoveredBridgehub.bridgehubProxy).baseToken(gatewayConfig.chainId);
-        require(token != address(0), "Base token for Gateway is zero");
-        calls = new Call[](1);
-        calls[0] = Call({target: token, data: abi.encodeCall(IERC20.approve, (spender, amount)), value: 0});
     }
 
     /// @notice Start the upgrade timer.
@@ -1113,48 +1093,28 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         string memory contractName,
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
-        if (!isZKBytecode) {
-            if (compareStrings(contractName, "DiamondProxy")) {
-                return type(DiamondProxy).creationCode;
-            } else if (compareStrings(contractName, "DefaultUpgrade")) {
-                return type(DefaultUpgrade).creationCode;
-            } else if (compareStrings(contractName, "BytecodesSupplier")) {
-                return type(BytecodesSupplier).creationCode;
-            } else if (compareStrings(contractName, "TransitionaryOwner")) {
-                return type(TransitionaryOwner).creationCode;
-            } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
-                return type(GovernanceUpgradeTimer).creationCode;
-            } else if (compareStrings(contractName, "L2StandardERC20")) {
-                return ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
-            } else if (compareStrings(contractName, "RollupL2DAValidator")) {
-                return ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
-            } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
-                return ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
-            } else if (compareStrings(contractName, "ValidatorTimelock")) {
-                return type(ValidatorTimelock).creationCode;
-            }
+        require(!isZKBytecode, "ZK bytecodes are not supported in CTM upgrade");
+        if (compareStrings(contractName, "DiamondProxy")) {
+            return type(DiamondProxy).creationCode;
+        } else if (compareStrings(contractName, "DefaultUpgrade")) {
+            return type(DefaultUpgrade).creationCode;
+        } else if (compareStrings(contractName, "BytecodesSupplier")) {
+            return type(BytecodesSupplier).creationCode;
+        } else if (compareStrings(contractName, "TransitionaryOwner")) {
+            return type(TransitionaryOwner).creationCode;
+        } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
+            return type(GovernanceUpgradeTimer).creationCode;
+        } else if (compareStrings(contractName, "L2StandardERC20")) {
+            return ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
+        } else if (compareStrings(contractName, "RollupL2DAValidator")) {
+            return ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
+        } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
+            return ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
+        } else if (compareStrings(contractName, "ValidatorTimelock")) {
+            return type(ValidatorTimelock).creationCode;
         } else {
-            if (compareStrings(contractName, "DefaultUpgrade")) {
-                return Utils.readZKFoundryBytecodeL1("DefaultUpgrade.sol", "DefaultUpgrade");
-            } else if (compareStrings(contractName, "BytecodesSupplier")) {
-                return Utils.readZKFoundryBytecodeL1("BytecodesSupplier.sol", "BytecodesSupplier");
-            } else if (compareStrings(contractName, "TransitionaryOwner")) {
-                return Utils.readZKFoundryBytecodeL1("TransitionaryOwner.sol", "TransitionaryOwner");
-            } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
-                return Utils.readZKFoundryBytecodeL1("GovernanceUpgradeTimer.sol", "GovernanceUpgradeTimer");
-            } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
-                return ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
-            } else if (compareStrings(contractName, "L2StandardERC20")) {
-                return ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
-            } else if (compareStrings(contractName, "RollupL2DAValidator")) {
-                return ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
-            } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
-                return ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
-            } else if (compareStrings(contractName, "ValidatorTimelock")) {
-                return ContractsBytecodesLib.getCreationCode("ValidatorTimelock");
-            }
+            return super.getCreationCode(contractName, isZKBytecode);
         }
-        return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function deployUpgradeStageValidator() internal {
@@ -1162,7 +1122,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
     }
 
     ////////////////////////////// Misc utils /////////////////////////////////
-
 
     // add this to be excluded from coverage report
     function test() internal override {}

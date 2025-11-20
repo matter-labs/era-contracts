@@ -151,9 +151,7 @@ library UpgradeUtils {
     }
 
     /// @notice Get facet cuts that should be removed
-    function getFacetCutsForDeletion(
-        IZKChain diamond
-    ) internal view returns (Diamond.FacetCut[] memory facetCuts) {
+    function getFacetCutsForDeletion(IZKChain diamond) internal view returns (Diamond.FacetCut[] memory facetCuts) {
         IZKChain.Facet[] memory facets = diamond.facets();
 
         // Freezability does not matter when deleting, so we just put false everywhere
@@ -168,4 +166,3 @@ library UpgradeUtils {
         }
     }
 }
-
