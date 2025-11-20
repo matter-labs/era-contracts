@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {ContractsBytecodesLib} from "deploy-scripts/ContractsBytecodesLib.sol";
+import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
 
 library Utils {
     function deployEIP7702Checker() internal returns (address) {

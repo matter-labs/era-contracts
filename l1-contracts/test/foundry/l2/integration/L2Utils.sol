@@ -34,7 +34,7 @@ import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
 
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
-import {Utils} from "deploy-scripts/Utils.sol";
+import {Utils} from "deploy-scripts/utils/Utils.sol";
 import {L2ChainAssetHandler} from "contracts/bridgehub/L2ChainAssetHandler.sol";
 
 library L2Utils {

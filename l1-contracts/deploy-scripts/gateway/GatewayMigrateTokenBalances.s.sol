@@ -22,7 +22,7 @@ import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.
 import {GW_ASSET_TRACKER, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ZKSProvider} from "../provider/ZKSProvider.s.sol";
 
-import {Utils} from "../Utils.sol";
+import {Utils} from "../utils/Utils.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 /// @dev IMPORTANT: this script is not intended to be used in production.

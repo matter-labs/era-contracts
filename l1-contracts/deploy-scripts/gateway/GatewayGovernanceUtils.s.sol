@@ -13,7 +13,7 @@ import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {Utils} from "../Utils.sol";
+import {Utils} from "../utils/Utils.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";

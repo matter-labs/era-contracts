@@ -13,6 +13,9 @@ import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {Utils} from "../utils/Utils.sol";
+
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {TxStatus, ConfirmTransferResultData} from "contracts/common/Messaging.sol";
