@@ -1855,7 +1855,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
     }
 
     /// @notice Tests that it is possible to upgrade a chain to the new version
-    function TESTONLY_prepareTestUpgradeChainCall() private returns (Call[] memory calls, address admin) {
+    function TESTONLY_prepareTestUpgradeChainCall() internal virtual returns (Call[] memory calls, address admin) {
         address chainDiamondProxyAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
             getSampleChainId()
         );
