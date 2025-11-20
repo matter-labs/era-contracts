@@ -15,7 +15,7 @@ const CONTRACTS_DIRECTORIES: Record<string, string[]> = {
     "state-transition/L1StateTransitionErrors.sol",
     "upgrades/ZkSyncUpgradeErrors.sol",
   ],
-  "deploy-scripts/utils": ["ZkSyncScriptErrors.sol"],
+  "./deploy-scripts": ["utils/ZkSyncScriptErrors.sol"],
   "../l2-contracts/contracts": ["errors/L2ContractErrors.sol"],
   "../system-contracts/contracts": ["SystemContractErrors.sol"],
   "../da-contracts/contracts": ["DAContractsErrors.sol"],
@@ -271,6 +271,7 @@ function escapeRegex(s: string): string {
 // - selector usage: ErrorName.selector
 // - abi.encodeWithSelector(ErrorName.selector, ...)
 function collectErrorUsages(directories: string[], usedErrors: Set<string>, declaredNames?: Set<string>) {
+  console.log("collectErrorUsages", directories, usedErrors);
   const nameAlternation =
     declaredNames && declaredNames.size > 0
       ? Array.from(declaredNames)
