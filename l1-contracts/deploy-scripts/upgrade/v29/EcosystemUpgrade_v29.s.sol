@@ -42,6 +42,7 @@ import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_VERSION_SPECIF
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
 import {DefaultCTMUpgrade} from "../default_upgrade/DefaultCTMUpgrade.s.sol";
+import {UpgradeUtils} from "../default_upgrade/UpgradeUtils.sol";
 import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
@@ -118,7 +119,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
 
     function _getL2UpgradeTargetAndData(
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
-    ) internal override returns (address, bytes memory) {
+    ) internal returns (address, bytes memory) {
         bytes32 ethAssetId = IL1AssetRouter(discoveredBridgehub.assetRouter).ETH_TOKEN_ASSET_ID();
         bytes memory v29UpgradeCalldata = abi.encodeCall(
             IL2V29Upgrade.upgrade,
@@ -225,13 +226,13 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
         allCalls[1] = prepareSetChainAssetHandlerOnBridgehubCall();
         allCalls[2] = prepareSetCtmAssetHandlerAddressOnL1Call();
         allCalls[3] = prepareSetUpgradeDiamondCutOnL1Call();
-        calls = mergeCallsArray(allCalls);
+        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     function prepareVersionSpecificStage2GovernanceCallsL1() public override returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](1);
         allCalls[0] = prepareUpgradePUHImplementationOnL1Call();
-        calls = mergeCallsArray(allCalls);
+        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     function prepareVersionSpecificStage1GovernanceCallsGW(
@@ -247,7 +248,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
         allCalls[1] = prepareSetValidatorTimelockPostV29GW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
         allCalls[2] = prepareSetUpgradeDiamondCutOnGWCall(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
 
-        calls = mergeCallsArray(allCalls);
+        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     function prepareSetValidatorTimelockPostV29L1() internal virtual returns (Call[] memory calls) {
