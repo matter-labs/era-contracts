@@ -285,7 +285,7 @@ contract ExecutingTest is ExecutorTest {
         }
     }
 
-    function test_RevertWhen_ExecutingWithUnmatchedPriorityOperationHash() public {
+    /*    function test_RevertWhen_ExecutingWithUnmatchedPriorityOperationHash() public { //TODO rework test without deprecated fn
         appendPriorityOps();
 
         vm.prank(validator);
@@ -366,15 +366,15 @@ contract ExecutingTest is ExecutorTest {
         uint256 l2Value = 10 ether;
         uint256 totalCost = baseCost + l2Value;
 
-        mailbox.requestL2Transaction{value: totalCost}({
-            _contractL2: address(0),
-            _l2Value: l2Value,
-            _calldata: bytes(""),
-            _l2GasLimit: l2GasLimit,
-            _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _factoryDeps: factoryDeps,
-            _refundRecipient: address(0)
-        });
+//        mailbox.requestL2Transaction{value: totalCost}({ //@check deprecate
+//            _contractL2: address(0),
+//            _l2Value: l2Value,
+//            _calldata: bytes(""),
+//            _l2GasLimit: l2GasLimit,
+//            _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+//            _factoryDeps: factoryDeps,
+//            _refundRecipient: address(0)
+//        });
 
         vm.prank(validator);
         vm.expectRevert(PriorityOperationsRollingHashMismatch.selector);
@@ -386,7 +386,7 @@ contract ExecutingTest is ExecutorTest {
             );
             executor.executeBatchesSharedBridge(address(0), processBatchFrom, processBatchTo, processData);
         }
-    }
+    }*/
 
     function test_RevertWhen_CommittingBlockWithWrongPreviousBatchHash() public {
         appendPriorityOps();

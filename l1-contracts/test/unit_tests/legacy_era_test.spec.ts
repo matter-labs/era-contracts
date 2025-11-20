@@ -249,10 +249,7 @@ describe("Legacy Era tests", function () {
 
   describe("finalizeEthWithdrawal", function () {
     const BLOCK_NUMBER = 1;
-    const MESSAGE_INDEX = 0;
     const TX_NUMBER_IN_BLOCK = 0;
-    const L1_RECEIVER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
-    const AMOUNT = 1;
 
     const MESSAGE =
       "0x6c0960f9d8dA6BF26964aF9D7eEd9e03E53415D37aA960450000000000000000000000000000000000000000000000000000000000000001";
@@ -285,16 +282,6 @@ describe("Legacy Era tests", function () {
       await proxyAsMockExecutor.saveL2LogsRootHash(BLOCK_NUMBER, L2_LOGS_TREE_ROOT);
     });
 
-    it("Reverts when proof is invalid", async () => {
-      const invalidProof = [...MERKLE_PROOF];
-      invalidProof[1] = "0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43bb";
-
-      const revertReason = await getCallRevertReason(
-        mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, invalidProof)
-      );
-      expect(revertReason).contains("InvalidProof");
-    });
-
     it("Successful deposit", async () => {
       const priorityQueueLengthBefore = await getter.getPriorityQueueSize();
       const amount = ethers.utils.parseEther("1");
@@ -310,20 +297,6 @@ describe("Legacy Era tests", function () {
       );
       const priorityQueueLengthAfter = await getter.getPriorityQueueSize();
       expect(priorityQueueLengthAfter.sub(priorityQueueLengthBefore)).equal(1);
-    });
-
-    it("Successful withdrawal", async () => {
-      const balanceBefore = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
-      await mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF);
-      const balanceAfter = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
-      expect(balanceAfter.sub(balanceBefore)).equal(AMOUNT);
-    });
-
-    it("Reverts when withdrawal is already finalized", async () => {
-      const revertReason = await getCallRevertReason(
-        mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
-      );
-      expect(revertReason).contains("WithdrawalAlreadyFinalized");
     });
   });
 });

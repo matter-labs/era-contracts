@@ -246,8 +246,6 @@ error NotAZKChain(address addr);
 error NotInitializedReentrancyGuard();
 // 0xdf17e316
 error NotWhitelisted(address);
-// 0xf3ed9dfa
-error OnlyEraSupported();
 // 0x6c167909
 error OnlySelfAllowed();
 // 0x1a21feed

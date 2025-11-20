@@ -17,7 +17,7 @@ import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
 
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
-import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
+import {IMailboxLegacy} from "../state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {L2Message, TxStatus} from "../common/Messaging.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
@@ -558,7 +558,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         address l1Receiver;
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
-        if (bytes4(functionSignature) == IMailboxImpl.finalizeEthWithdrawal.selector) {
+        if (bytes4(functionSignature) == IMailboxLegacy.finalizeEthWithdrawal.selector) {
             // The data is expected to be at least 56 bytes long.
             if (_l2ToL1message.length < 56) {
                 revert L2WithdrawalMessageWrongLength(_l2ToL1message.length);
