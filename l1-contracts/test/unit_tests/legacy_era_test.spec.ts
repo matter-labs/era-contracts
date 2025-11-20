@@ -298,6 +298,5 @@ describe("Legacy Era tests", function () {
       const priorityQueueLengthAfter = await getter.getPriorityQueueSize();
       expect(priorityQueueLengthAfter.sub(priorityQueueLengthBefore)).equal(1);
     });
-
   });
 });
