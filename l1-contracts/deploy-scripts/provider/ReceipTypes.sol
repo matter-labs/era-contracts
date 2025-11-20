@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 struct L2ToL1LogProof {
     uint64 id;
     bytes32[] proof;
+    uint256 batchNumber;
 }
 
 struct AltL2ToL1Log {

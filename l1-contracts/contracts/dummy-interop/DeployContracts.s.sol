@@ -33,7 +33,9 @@ contract DeployContracts is Script, ZKSProvider {
     address public bridgehubAddress = 0xc4FD2580C3487bba18D63f50301020132342fdbD;
     address public l1AssetRouterAddress = 0xB5d9C3F41E434b91295BD7962db5c873cEcCE2be;
     address public l1NativeTokenVaultAddress = 0xF8d4A5195737043f45F998539D5C62Eee02E3426; 
-    address public chainMailBoxAddress = 0x02B1ac1Cf0A592aefD3C2246B2431388365dB272;
+    address public chainMailBoxAddress = 0x02B1ac1Cf0A592aefD3C2246B2431388365dB272; // diamondProxy
+    // address public ctm = 0x54D55e74De9c6003E7a68a1fE70E633f05761eb5;
+    // address validatorTimelock = 0x73B668d8374DDB42c9e2f46fd5B754Ac215495bc;
 
     address public aaveWeth = 0x387d311e47e80b498169e6fb51d3193167d89F7D;
     address public aavePool = 0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951;
@@ -97,11 +99,11 @@ contract DeployContracts is Script, ZKSProvider {
             value: 0,
             data: abi.encodeCall(IERC20.approve, (l1NativeTokenVaultAddress, ghoAmount))
         });
-        uint256 l2GasLimit = 1000000;
+        uint256 l2GasLimit = 5000000;
         uint256 gasPrice = 10000000;
         // vm.createSelectFork(l1RpcUrl);
 
-        uint256 mintValue = 1000000000000000;//IMailboxImpl(chainMailBoxAddress).l2TransactionBaseCost(gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
+        uint256 mintValue = 5000000000000000;//IMailboxImpl(chainMailBoxAddress).l2TransactionBaseCost(gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
         // vm.createSelectFork(l2RpcUrl);
 
         bytes32 ghoTokenAssetId = DataEncoding.encodeNTVAssetId(l1ChainId, ghoTokenAddress);
