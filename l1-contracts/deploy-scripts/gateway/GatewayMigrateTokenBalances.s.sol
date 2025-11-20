@@ -81,6 +81,7 @@ contract GatewayMigrateTokenBalances is ZKSProvider {
 
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
             if (finalizeL1DepositParams[i].merkleProof.length == 0) {
+                console.log("No merkle proof for token", i, vm.toString(txHashes[i]));
                 continue;
             }
             waitForBatchToBeExecuted(address(bridgehub), chainId, finalizeL1DepositParams[i]);
@@ -96,6 +97,7 @@ contract GatewayMigrateTokenBalances is ZKSProvider {
 
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
             if (finalizeL1DepositParams[i].merkleProof.length == 0) {
+                console.log("No merkle proof 2 for token", i, vm.toString(txHashes[i]));
                 continue;
             }
             // console.logBytes(abi.encodeCall(l1AssetTracker.receiveMigrationOnL1, (finalizeL1DepositParams[i])));
@@ -108,6 +110,8 @@ contract GatewayMigrateTokenBalances is ZKSProvider {
             if (!l1AssetTrackerBase.tokenMigrated(data.chainId, data.assetId)) {
                 vm.broadcast();
                 l1AssetTracker.receiveMigrationOnL1(finalizeL1DepositParams[i]);
+            } else {
+                console.log("Token already migrated", i, vm.toString(txHashes[i]));
             }
         }
     }
