@@ -43,6 +43,7 @@ import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {BridgehubDeployedAddresses, BridgesDeployedAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
@@ -365,9 +366,6 @@ contract DefaultGatewayUpgrade is Script, DeployCTMUtils {
         config.contracts.chainCreationParams.latestProtocolVersion = toml.readUint(
             "$.contracts.latest_protocol_version"
         );
-        config.contracts.chainCreationParams.priorityTxMaxGasLimit = toml.readUint(
-            "$.contracts.priority_tx_max_gas_limit"
-        );
 
         config.contracts.chainCreationParams.diamondInitPubdataPricingMode = PubdataPricingMode(
             toml.readUint("$.contracts.diamond_init_pubdata_pricing_mode")
@@ -420,13 +418,43 @@ contract DefaultGatewayUpgrade is Script, DeployCTMUtils {
         config.gatewayChainId = gatewayConfig.chainId;
     }
 
+    function prepareFixedForceDeploymentsData() public view virtual returns (FixedForceDeploymentsData memory data) {
+        require(config.ownerAddress != address(0), "owner not set");
+
+        data = FixedForceDeploymentsData({
+            l1ChainId: config.l1ChainId,
+            eraChainId: config.eraChainId,
+            gatewayChainId: config.gatewayChainId,
+            l1AssetRouter: discoveredBridgehub.assetRouter,
+            l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
+            aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
+            maxNumberOfZKChains: config.contracts.maxNumberOfChains,
+            bridgehubBytecodeInfo: abi.encode(getL2BytecodeHash("L2Bridgehub")),
+            l2AssetRouterBytecodeInfo: abi.encode(getL2BytecodeHash("L2AssetRouter")),
+            l2NtvBytecodeInfo: abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
+            messageRootBytecodeInfo: abi.encode(getL2BytecodeHash("L2MessageRoot")),
+            chainAssetHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
+            beaconDeployerInfo: abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
+            interopCenterBytecodeInfo: abi.encode(getL2BytecodeHash("InteropCenter")),
+            interopHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("InteropHandler")),
+            assetTrackerBytecodeInfo: abi.encode(getL2BytecodeHash("AssetTracker")),
+            l2SharedBridgeLegacyImpl: address(0),
+            l2BridgedStandardERC20Impl: address(0),
+            aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
+                discoveredBridgehub.chainRegistrationSenderProxy
+            ),
+            // upgradeAddresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
+            dangerousTestOnlyForcedBeacon: address(0)
+        });
+    }
+
     function getBridgehubAdmin() public virtual returns (address admin) {
         admin = discoveredBridgehub.admin;
     }
 
     /// @notice This function is meant to only be used in tests
     function prepareCreateNewChainCall(uint256 chainId) public view virtual returns (Call[] memory result) {
-        require(bridgehubAddresses.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
+        require(discoveredBridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
 
         bytes32 newChainAssetId = L1Bridgehub(discoveredBridgehub.bridgehubProxy).baseTokenAssetId(
             gatewayConfig.chainId
@@ -468,9 +496,6 @@ contract DefaultGatewayUpgrade is Script, DeployCTMUtils {
         );
         bridges.l1AssetRouterProxy = discoveredBridgehub.assetRouter;
 
-        bridges.l1NullifierProxy = address(L1AssetRouter(bridges.l1AssetRouterProxy).L1_NULLIFIER());
-        bridges.erc20BridgeProxy = address(L1AssetRouter(bridges.l1AssetRouterProxy).legacyBridge());
-
         newConfig.oldValidatorTimelock = discoveredCTM.validatorTimelockPostV29;
         newConfig.ecosystemAdminAddress = discoveredBridgehub.admin;
     }
@@ -494,7 +519,6 @@ contract DefaultGatewayUpgrade is Script, DeployCTMUtils {
 
         revert(string.concat("No expected L2 address for: ", contractName));
     }
-
 
     function saveOutputVersionSpecific() internal virtual {}
 
@@ -781,8 +805,6 @@ contract DefaultGatewayUpgrade is Script, DeployCTMUtils {
         return calls;
     }
 
-
-
     function prepareGatewaySpecificStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
         if (gatewayConfig.chainId == 0) return calls; // Gateway is unknown
 
@@ -985,7 +1007,6 @@ contract DefaultGatewayUpgrade is Script, DeployCTMUtils {
         calls = new Call[](1);
         calls[0] = Call({target: token, data: abi.encodeCall(IERC20.approve, (spender, amount)), value: 0});
     }
-
 
     function prepareDAValidatorCallGW(
         uint256 l2GasLimit,

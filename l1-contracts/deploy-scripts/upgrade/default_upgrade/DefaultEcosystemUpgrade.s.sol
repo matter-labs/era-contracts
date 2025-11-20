@@ -17,6 +17,7 @@ import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 import {BridgehubDeployedAddresses, BridgesDeployedAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
+import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 
@@ -38,11 +39,16 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         string outputPath;
     }
 
+    struct AdditionalConfigParams {
+        uint256 newProtocolVersion;
+    }
+
     UpgradeDeployedAddresses internal upgradeAddresses;
     BridgehubDeployedAddresses internal bridgehubAddresses;
     BridgesDeployedAddresses internal bridges;
     AddressIntrospector.BridgehubAddresses internal discoveredBridgehub;
     L1Bridgehub internal bridgehub;
+    AdditionalConfigParams internal additionalConfig;
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
@@ -82,7 +88,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
     }
 
     function getNewProtocolVersion() public virtual returns (uint256) {
-        return config.contracts.chainCreationParams.latestProtocolVersion;
+        return additionalConfig.newProtocolVersion;
     }
 
     function getProtocolUpgradeNonce() public virtual returns (uint256) {
@@ -95,11 +101,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         return type(uint256).max;
     }
 
-    function isPatchUpgrade() public virtual returns (bool) {
-        (uint32 _major, uint32 _minor, uint32 patch) = SemVer.unpackSemVer(SafeCast.toUint96(getNewProtocolVersion()));
-        return patch != 0;
-    }
-
     function initializeConfig(string memory newConfigPath) internal virtual override {
         string memory toml = vm.readFile(newConfigPath);
 
@@ -109,6 +110,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
             create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
         }
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
+
+        additionalConfig.newProtocolVersion = toml.readUint("$.contracts.new_protocol_version");
 
         bridgehub = L1Bridgehub(toml.readAddress("$.contracts.bridgehub_proxy_address"));
         setAddressesBasedOnBridgehub();

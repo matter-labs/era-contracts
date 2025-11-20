@@ -365,31 +365,14 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         setAddressesBasedOnBridgehub();
 
         config.l1ChainId = block.chainid;
-        config.deployerAddress = msg.sender;
         config.ownerAddress = discoveredBridgehub.governance;
 
-        (bool ok, bytes memory data) = discoveredEraZkChain.verifier.staticcall(
-            abi.encodeWithSignature("isTestnetVerifier()")
-        );
-        if (ok) {
-            config.testnetVerifier = abi.decode(data, (bool));
-        }
-
-        config.contracts.governanceSecurityCouncilAddress = Governance(payable(discoveredBridgehub.governance))
-            .securityCouncil();
-        config.contracts.governanceMinDelay = Governance(payable(discoveredBridgehub.governance)).minDelay();
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
-
-        config.contracts.validatorTimelockExecutionDelay = ValidatorTimelock(discoveredCTM.validatorTimelockPostV29)
-            .executionDelay();
 
         // Default values for initializing the chain. They are part of the chain creation params,
         // meanwhile they are not saved anywhere
         config.contracts.chainCreationParams.latestProtocolVersion = toml.readUint(
             "$.contracts.latest_protocol_version"
-        );
-        config.contracts.chainCreationParams.priorityTxMaxGasLimit = toml.readUint(
-            "$.contracts.priority_tx_max_gas_limit"
         );
 
         config.contracts.chainCreationParams.diamondInitPubdataPricingMode = PubdataPricingMode(
@@ -423,15 +406,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         config.contracts.chainCreationParams.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
         config.contracts.chainCreationParams.evmEmulatorHash = toml.readBytes32("$.contracts.evm_emulator_hash");
 
-        if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
-            config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
-        }
-
         newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
-
-        // L2 transactions params
-        newConfig.priorityTxsL2GasLimit = toml.readUint("$.priority_txs_l2_gas_limit");
-        newConfig.maxExpectedL1GasPrice = toml.readUint("$.max_expected_l1_gas_price");
     }
 
     function getBridgehubAdmin() public virtual returns (address admin) {
@@ -440,7 +415,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
 
     /// @notice This function is meant to only be used in tests
     function prepareCreateNewChainCall(uint256 chainId) public view virtual returns (Call[] memory result) {
-        require(bridgehubAddresses.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
+        require(discoveredBridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
 
         bytes32 newChainAssetId = L1Bridgehub(discoveredBridgehub.bridgehubProxy).baseTokenAssetId(
             gatewayConfig.chainId
