@@ -5,6 +5,7 @@ pragma solidity ^0.8.21;
 import {L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
+import {TxStatus} from "../common/Messaging.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 struct L2TransactionRequestDirect {
@@ -42,8 +43,11 @@ struct L2TransactionRequestTwoBridgesInner {
 struct BridgehubMintCTMAssetData {
     uint256 chainId;
     bytes32 baseTokenAssetId;
+    uint256 batchNumber;
     bytes ctmData;
     bytes chainData;
+    uint256 migrationNumber;
+    uint256 v30UpgradeChainBatchNumber;
 }
 
 struct BridgehubBurnCTMAssetData {
@@ -110,6 +114,8 @@ interface IBridgehubBase {
     function admin() external view returns (address);
 
     function assetRouter() external view returns (IAssetRouterBase);
+
+    function chainRegistrationSender() external view returns (address);
 
     function whitelistedSettlementLayers(uint256 _chainId) external view returns (bool);
 
@@ -184,5 +190,8 @@ interface IBridgehubBase {
 
     function registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) external;
 
-    function forwardedBridgeRecoverFailedTransfer(uint256 _chainId) external returns (address zkChain, address ctm);
+    function forwardedBridgeConfirmTransferResult(
+        uint256 _chainId,
+        TxStatus _txStatus
+    ) external returns (address zkChain, address ctm);
 }

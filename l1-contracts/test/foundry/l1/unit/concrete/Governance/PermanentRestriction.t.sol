@@ -14,6 +14,8 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 
 import {ChainTypeManagerTest} from "test/foundry/l1/unit/concrete/state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
@@ -364,12 +366,14 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         vm.startPrank(governor);
         bridgehub.addChainTypeManager(address(chainContractAddress));
         bridgehub.addTokenAssetId(DataEncoding.encodeNTVAssetId(block.chainid, baseToken));
+        L1MessageRoot messageRootNew = new L1MessageRoot(address(bridgehub), 1);
         bridgehub.setAddresses(
             sharedBridge,
             ICTMDeploymentTracker(address(0)),
-            new L1MessageRoot(address(bridgehub)),
+            messageRootNew,
+            address(chainAssetHandler),
             address(0)
-        );
+        ); // kl todo maybe address(1)
         vm.stopPrank();
 
         // ctm deployer address is 0 in this test
@@ -396,14 +400,26 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             abi.encodeWithSelector(IBridgehubBase.baseToken.selector, chainId),
             abi.encode(baseToken)
         );
+        vm.mockCall(
+            address(messageRootNew),
+            abi.encodeWithSelector(IMessageRoot.v30UpgradeChainBatchNumber.selector),
+            abi.encode(0)
+        );
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(chainAssetHandler)
+        );
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
 
+        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, baseToken);
+        mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge, baseTokenAssetId);
         vm.startPrank(governor);
         bridgehub.createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(chainContractAddress),
-            _baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, baseToken),
+            _baseTokenAssetId: baseTokenAssetId,
             _salt: 0,
             _admin: newChainAdmin,
             _initData: getCTMInitData(),

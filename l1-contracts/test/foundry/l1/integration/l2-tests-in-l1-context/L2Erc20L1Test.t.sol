@@ -27,10 +27,9 @@ import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDe
 
 import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {L2Erc20TestAbstract} from "../l2-tests-abstract/L2Erc20TestAbstract.t.sol";
 
-import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 
@@ -64,8 +63,8 @@ contract L2Erc20L1Test is Test, SharedL2ContractL1Deployer, L2Erc20TestAbstract 
     function getCreationCode(
         string memory contractName,
         bool isZKBytecode
-    ) internal view virtual override(DeployUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
-        return super.getCreationCode(contractName, false);
+    ) internal view virtual override returns (bytes memory) {
+        return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function getInitializeCalldata(

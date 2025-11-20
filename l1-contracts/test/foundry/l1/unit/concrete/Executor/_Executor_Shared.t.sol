@@ -10,6 +10,7 @@ import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.so
 import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_DA_COMMITMENT_SCHEME} from "../Utils/Utils.sol";
 import {TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
+import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {DummyChainTypeManagerForValidatorTimelock as DummyCTM} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
@@ -30,19 +31,22 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
+import {MessageRootBase} from "contracts/bridgehub/MessageRootBase.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-
-import {MessageRootBase} from "contracts/bridgehub/MessageRootBase.sol";
+import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 
 bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
 bytes constant POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000100073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
 
-contract ExecutorTest is Test {
+contract ExecutorTest is UtilsTest {
     address internal owner;
     address internal validator;
     address internal randomSigner;
@@ -61,6 +65,9 @@ contract ExecutorTest is Test {
     ValidatorTimelock internal validatorTimelock;
     address internal rollupL1DAValidator;
     L1MessageRoot internal messageRoot;
+    DummyBridgehub dummyBridgehub;
+    L1ChainAssetHandler internal chainAssetHandler;
+    bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
 
     uint256 l2ChainId;
 
@@ -100,7 +107,7 @@ contract ExecutorTest is Test {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](32);
+        bytes4[] memory selectors = new bytes4[](33);
         uint256 i = 0;
         selectors[i++] = getters.getVerifier.selector;
         selectors[i++] = getters.getAdmin.selector;
@@ -134,6 +141,7 @@ contract ExecutorTest is Test {
         selectors[i++] = getters.isPriorityQueueActive.selector;
         selectors[i++] = getters.getChainTypeManager.selector;
         selectors[i++] = getters.getChainId.selector;
+        selectors[i++] = getters.getSemverProtocolVersion.selector;
         return selectors;
     }
 
@@ -182,29 +190,52 @@ contract ExecutorTest is Test {
         owner = makeAddr("owner");
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
-        DummyBridgehub dummyBridgehub = new DummyBridgehub();
-        messageRoot = new L1MessageRoot(address(dummyBridgehub));
+        dummyBridgehub = new DummyBridgehub();
+        vm.mockCall(address(dummyBridgehub), abi.encodeWithSelector(IL1Bridgehub.L1_CHAIN_ID.selector), abi.encode(1));
+        uint256[] memory allZKChainChainIDs = new uint256[](1);
+        allZKChainChainIDs[0] = 271;
+        vm.mockCall(
+            address(dummyBridgehub),
+            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
+            abi.encode(allZKChainChainIDs)
+        );
+        vm.mockCall(
+            address(dummyBridgehub),
+            abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector),
+            abi.encode(makeAddr("chainTypeManager"))
+        );
+        address interopCenter = makeAddr("interopCenter");
+        messageRoot = new L1MessageRoot(address(dummyBridgehub), 1);
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
+        address assetTracker = makeAddr("assetTracker");
+        chainAssetHandler = new L1ChainAssetHandler(
+            owner,
+            address(dummyBridgehub),
+            address(sharedBridge),
+            address(messageRoot),
+            address(assetTracker),
+            IL1Nullifier(address(0))
+        );
+        dummyBridgehub.setChainAssetHandler(address(chainAssetHandler));
 
         dummyBridgehub.setSharedBridge(address(sharedBridge));
 
-        // FIXME: amend the tests as appending chain batch roots is not allowed on L1.
-        // vm.mockCall(
-        //     address(messageRoot),
-        //     abi.encodeWithSelector(MessageRootBase.addChainBatchRoot.selector, 9, 1, bytes32(0)),
-        //     abi.encode()
-        // );
+        vm.mockCall(
+            address(messageRoot),
+            abi.encodeWithSelector(MessageRootBase.addChainBatchRoot.selector, 9, 1, bytes32(0)),
+            abi.encode()
+        );
 
         l2ChainId = 9;
 
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
 
-        admin = new AdminFacet(block.chainid, RollupDAManager(address(0)));
+        admin = new AdminFacet(block.chainid, RollupDAManager(address(0)), false);
         getters = new GettersFacet();
         executor = new TestExecutor();
-        mailbox = new MailboxFacet(l2ChainId, block.chainid, eip7702Checker);
+        mailbox = new MailboxFacet(l2ChainId, block.chainid, address(chainAssetHandler), eip7702Checker, false);
 
         DummyCTM chainTypeManager = new DummyCTM(owner, address(0));
         vm.mockCall(
@@ -234,11 +265,12 @@ contract ExecutorTest is Test {
             // TODO REVIEW
             chainId: l2ChainId,
             bridgehub: address(dummyBridgehub),
+            interopCenter: interopCenter,
             chainTypeManager: address(chainTypeManager),
             protocolVersion: 0,
             admin: owner,
             validatorTimelock: address(validatorTimelock),
-            baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS),
+            baseTokenAssetId: baseTokenAssetId,
             storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
             verifier: IVerifier(testnetVerifier), // verifier
             verifierParams: VerifierParams({
@@ -252,6 +284,7 @@ contract ExecutorTest is Test {
             priorityTxMaxGasLimit: 1000000,
             feeParams: defaultFeeParams()
         });
+        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), baseTokenAssetId);
 
         bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 
@@ -346,7 +379,7 @@ contract ExecutorTest is Test {
 
         vm.mockCall(
             address(sharedBridge),
-            abi.encodeWithSelector(IL1AssetRouter.bridgehubDepositBaseToken.selector),
+            abi.encodeWithSelector(IAssetRouterBase.bridgehubDepositBaseToken.selector),
             abi.encode(true)
         );
     }
@@ -356,5 +389,5 @@ contract ExecutorTest is Test {
     }
 
     // add this to be excluded from coverage report
-    function test() internal virtual {}
+    function test() internal virtual override {}
 }

@@ -12,7 +12,7 @@ import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {ChainInfoFromBridgehub, Utils} from "./Utils.sol";
+import {ChainInfoFromBridgehub, Utils} from "./utils/Utils.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -421,6 +421,28 @@ contract AdminFunctions is Script {
             value: 0,
             data: abi.encodeCall(IAdmin.setTransactionFilterer, (_transactionFiltererAddress))
         });
+
+        saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
+    }
+
+    function pauseDepositsBeforeInitiatingMigration(address _bridgehub, uint256 _chainId, bool _shouldSend) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IAdmin.pauseDepositsBeforeInitiatingMigration, ())
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
+    }
+
+    function unpauseDeposits(address _bridgehub, uint256 _chainId, bool _shouldSend) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: chainInfo.diamondProxy, value: 0, data: abi.encodeCall(IAdmin.unpauseDeposits, ())});
 
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }

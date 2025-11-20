@@ -5,6 +5,8 @@ pragma solidity 0.8.28;
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
+import {TxStatus} from "../common/Messaging.sol";
 import {IBridgehubBase, BridgehubBurnCTMAssetData} from "./IBridgehubBase.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
@@ -35,6 +37,15 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
     /// @dev The asset router contract.
     IAssetRouterBase public immutable override ASSET_ROUTER;
 
+    /// @dev The asset tracker contract.
+    address internal immutable ASSET_TRACKER;
+
+    /// @dev The L1 nullifier contract.
+    IL1Nullifier internal immutable L1_NULLIFIER;
+
+    /// @dev The mapping showing for each chain if migration is in progress or not, used for freezing deposits.abi
+    mapping(uint256 chainId => bool isMigrationInProgress) public isMigrationInProgress;
+
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -55,11 +66,17 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
         return ASSET_ROUTER;
     }
 
+    function _assetTracker() internal view override returns (address) {
+        return ASSET_TRACKER;
+    }
+
     constructor(
         address _owner,
         address _bridgehub,
         address _assetRouter,
-        address _messageRoot
+        address _messageRoot,
+        address _assetTracker,
+        IL1Nullifier _l1Nullifier
     ) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGEHUB = IL1Bridgehub(_bridgehub);
@@ -67,6 +84,8 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
         MESSAGE_ROOT = IMessageRoot(_messageRoot);
         L1_CHAIN_ID = block.chainid;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
+        ASSET_TRACKER = _assetTracker;
+        L1_NULLIFIER = _l1Nullifier;
         _transferOwnership(_owner);
     }
 
@@ -77,36 +96,48 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
     }
 
     /// @dev IL1AssetHandler interface, used to undo a failed migration of a chain.
-    /// @param _chainId the chainId of the chain
     /// @param _assetId the assetId of the chain's CTM
     /// @param _data the data for the recovery.
     /// @param _depositSender the address of the entity that initiated the deposit.
     // slither-disable-next-line locked-ether
-    function bridgeRecoverFailedTransfer(
-        // solhint-disable-next-line no-unused-vars
-        uint256 _chainId,
+    function bridgeConfirmTransferResult(
+        uint256,
+        TxStatus _txStatus,
         bytes32 _assetId,
         address _depositSender,
         bytes calldata _data
-    ) external payable override requireZeroValue(msg.value) onlyAssetRouter {
+    ) external payable requireZeroValue(msg.value) onlyAssetRouter {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
 
-        (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeRecoverFailedTransfer(
-            bridgehubBurnData.chainId
+        (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeConfirmTransferResult(
+            bridgehubBurnData.chainId,
+            _txStatus
         );
 
-        IChainTypeManager(ctm).forwardedBridgeRecoverFailedTransfer({
+        IChainTypeManager(ctm).forwardedBridgeConfirmTransferResult({
             _chainId: bridgehubBurnData.chainId,
+            _txStatus: _txStatus,
             _assetInfo: _assetId,
             _depositSender: _depositSender,
             _ctmData: bridgehubBurnData.ctmData
         });
 
-        IZKChain(zkChain).forwardedBridgeRecoverFailedTransfer({
+        if (_txStatus == TxStatus.Failure) {
+            --migrationNumber[bridgehubBurnData.chainId];
+        }
+
+        isMigrationInProgress[bridgehubBurnData.chainId] = false;
+
+        IZKChain(zkChain).forwardedBridgeConfirmTransferResult({
             _chainId: bridgehubBurnData.chainId,
+            _txStatus: _txStatus,
             _assetInfo: _assetId,
             _originalCaller: _depositSender,
             _chainData: bridgehubBurnData.chainData
         });
+    }
+
+    function _setMigrationInProgressOnL1(uint256 _chainId) internal override {
+        isMigrationInProgress[_chainId] = true;
     }
 }

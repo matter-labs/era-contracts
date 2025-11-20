@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 // solhint-disable no-console, gas-custom-errors, reason-string
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-//
+
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
 
@@ -13,7 +13,7 @@ import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {Utils} from "../Utils.sol";
+import {Utils} from "../utils/Utils.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
@@ -203,20 +203,21 @@ abstract contract GatewayGovernanceUtils is Script {
                     prepareGWGovCallsStruct._refundRecipient
                 )
             );
-            calls = Utils.mergeCalls(
-                calls,
-                Utils.prepareGovernanceL1L2DirectTransaction(
-                    prepareGWGovCallsStruct._l1GasPrice,
-                    data,
-                    Utils.MAX_PRIORITY_TX_GAS,
-                    new bytes[](0),
-                    prepareGWGovCallsStruct._gatewayValidatorTimelock,
-                    _gatewayGovernanceConfig.gatewayChainId,
-                    _gatewayGovernanceConfig.bridgehubProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    prepareGWGovCallsStruct._refundRecipient
-                )
-            );
+            // Todo: can probably delete since ValidatorTimelock is now TUPP.
+            // calls = Utils.mergeCalls(
+            //     calls,
+            //     Utils.prepareGovernanceL1L2DirectTransaction(
+            //         prepareGWGovCallsStruct._l1GasPrice,
+            //         data,
+            //         Utils.MAX_PRIORITY_TX_GAS,
+            //         new bytes[](0),
+            //         prepareGWGovCallsStruct._gatewayValidatorTimelock,
+            //         _gatewayGovernanceConfig.gatewayChainId,
+            //         _gatewayGovernanceConfig.bridgehubProxy,
+            //         _gatewayGovernanceConfig.l1AssetRouterProxy,
+            //         prepareGWGovCallsStruct._refundRecipient
+            //     )
+            // );
             calls = Utils.mergeCalls(
                 calls,
                 Utils.prepareGovernanceL1L2DirectTransaction(

@@ -64,6 +64,14 @@ library DynamicIncrementalMerkle {
      * @return initialRoot The initial root of the tree.
      */
     function reset(Bytes32PushTree storage self, bytes32 zero) internal returns (bytes32 initialRoot) {
+        clear(self);
+        setup(self, zero);
+    }
+
+    /**
+     * @dev Clears the trees internal state.
+     */
+    function clear(Bytes32PushTree storage self) internal {
         self._nextLeafIndex = 0;
         uint256 length = self._zeros.length;
         for (uint256 i = length; 0 < i; --i) {
@@ -73,9 +81,6 @@ library DynamicIncrementalMerkle {
         for (uint256 i = length; 0 < i; --i) {
             self._sides.pop();
         }
-        self._zeros.push(zero);
-        self._sides.push(bytes32(0));
-        return bytes32(0);
     }
 
     /**
@@ -129,6 +134,25 @@ library DynamicIncrementalMerkle {
 
         Arrays.unsafeAccess(self._sides, levels).value = currentLevelHash;
         return (index, currentLevelHash);
+    }
+
+    /**
+     * @dev Extend until end.
+     * @dev here we can extend the array, so the depth is not predetermined.
+     */
+    function extendUntilEnd(Bytes32PushTree storage self, uint256 finalDepth) internal {
+        bytes32 currentZero = self._zeros[self._zeros.length - 1];
+        if (self._nextLeafIndex == 0) {
+            self._sides[0] = currentZero;
+        }
+        bytes32 currentSide = self._sides[self._sides.length - 1];
+        for (uint256 i = self._sides.length; i < finalDepth; ++i) {
+            currentSide = Merkle.efficientHash(currentSide, currentZero);
+            currentZero = Merkle.efficientHash(currentZero, currentZero);
+            // at i
+            self._zeros.push(currentZero);
+            self._sides.push(currentSide);
+        }
     }
 
     /**

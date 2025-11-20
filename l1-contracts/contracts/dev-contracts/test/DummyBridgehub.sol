@@ -17,6 +17,8 @@ contract DummyBridgehub {
 
     address public sharedBridge;
 
+    address public chainAssetHandler;
+
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
@@ -36,6 +38,10 @@ contract DummyBridgehub {
         messageRoot = IMessageRoot(_messageRoot);
     }
 
+    function setChainAssetHandler(address _chainAssetHandler) public {
+        chainAssetHandler = _chainAssetHandler;
+    }
+
     function setZKChain(uint256, address _zkChain) external {
         zkChain = _zkChain;
     }
@@ -44,11 +50,21 @@ contract DummyBridgehub {
         return zkChain;
     }
 
+    function getAllZKChainChainIDs() external view returns (uint256[] memory) {
+        uint256[] memory allZKChainChainIDs = new uint256[](0);
+        // allZKChainChainIDs[0] = 271;
+        return allZKChainChainIDs;
+    }
+
     function setSharedBridge(address addr) external {
         sharedBridge = addr;
     }
 
     function assetRouter() external view returns (address) {
         return sharedBridge;
+    }
+
+    function settlementLayer(uint256) external view returns (uint256) {
+        return 0;
     }
 }

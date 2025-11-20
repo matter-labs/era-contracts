@@ -18,6 +18,9 @@ import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {SystemContractsArgs} from "./Utils.sol";
 
 abstract contract L2WethTestAbstract is Test, SharedL2ContractDeployer {
     function test_shouldDepositWethByCallingDeposit() public {

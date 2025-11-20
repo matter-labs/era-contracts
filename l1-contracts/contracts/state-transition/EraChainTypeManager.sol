@@ -14,7 +14,7 @@ import {IChainAssetHandler} from "../bridgehub/IChainAssetHandler.sol";
 /// @custom:security-contact security@matterlabs.dev
 contract EraChainTypeManager is ChainTypeManagerBase {
     /// @dev Contract is expected to be used as proxy implementation.
-    constructor(address _bridgehub) ChainTypeManagerBase(_bridgehub) {}
+    constructor(address _bridgehub, address _interopCenter) ChainTypeManagerBase(_bridgehub, _interopCenter) {}
 
     /// @notice Updates the parameters with which a new chain is created
     /// @param _chainCreationParams The new chain creation parameters
