@@ -271,7 +271,6 @@ function escapeRegex(s: string): string {
 // - selector usage: ErrorName.selector
 // - abi.encodeWithSelector(ErrorName.selector, ...)
 function collectErrorUsages(directories: string[], usedErrors: Set<string>, declaredNames?: Set<string>) {
-  console.log("collectErrorUsages", directories, usedErrors);
   const nameAlternation =
     declaredNames && declaredNames.size > 0
       ? Array.from(declaredNames)
