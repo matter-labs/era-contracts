@@ -21,9 +21,7 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {L1_GAS_PER_PUBDATA_BYTE, MAX_NEW_FACTORY_DEPS, PRIORITY_EXPIRATION, PRIORITY_OPERATION_L2_TX_TYPE, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER} from "../../../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
-
-import {BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed} from "../../../common/L1ContractErrors.sol";
+import {BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, MsgValueTooLow, TooManyFactoryDeps, TransactionNotAllowed} from "../../../common/L1ContractErrors.sol";
 import {InvalidChainId, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -547,43 +545,5 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     // solhint-disable-next-line no-unused-vars
     function _writePriorityOpHash(bytes32 _canonicalTxHash, uint64 _expirationTimestamp) internal {
         s.priorityTree.push(_canonicalTxHash);
-    }
-
-    ///////////////////////////////////////////////////////
-    //////// Legacy Era functions
-
-    /// @inheritdoc IMailboxImpl
-    function requestL2Transaction(
-        address _contractL2,
-        uint256 _l2Value,
-        bytes calldata _calldata,
-        uint256 _l2GasLimit,
-        uint256 _l2GasPerPubdataByteLimit,
-        bytes[] calldata _factoryDeps,
-        address _refundRecipient
-    ) external payable onlyL1 returns (bytes32 canonicalTxHash) {
-        if (s.chainId != ERA_CHAIN_ID) {
-            revert OnlyEraSupported();
-        }
-        canonicalTxHash = _requestL2TransactionSender(
-            BridgehubL2TransactionRequest({
-                sender: msg.sender,
-                contractL2: _contractL2,
-                mintValue: msg.value,
-                l2Value: _l2Value,
-                l2GasLimit: _l2GasLimit,
-                l2Calldata: _calldata,
-                l2GasPerPubdataByteLimit: _l2GasPerPubdataByteLimit,
-                factoryDeps: _factoryDeps,
-                refundRecipient: _refundRecipient
-            })
-        );
-        address sharedBridge = IBridgehub(s.bridgehub).assetRouter();
-        IL1AssetRouter(sharedBridge).bridgehubDepositBaseToken{value: msg.value}(
-            s.chainId,
-            s.baseTokenAssetId,
-            msg.sender,
-            msg.value
-        );
     }
 }
