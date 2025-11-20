@@ -17,7 +17,6 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {DiamondAlreadyFrozen, DiamondNotFrozen, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-import {CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET} from "contracts/common/Config.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {
     DiamondProxy private diamondProxy;
@@ -56,14 +55,7 @@ contract UpgradeLogicTest is DiamondCutTest {
 
         diamondCutTestContract = new DiamondCutTestContract();
         diamondInit = new DiamondInit(false);
-        adminFacet = new AdminFacet(
-            block.chainid,
-            RollupDAManager(address(0)),
-            CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET,
-            CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET,
-            PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
-            PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
-        );
+        adminFacet = new AdminFacet(block.chainid, RollupDAManager(address(0)), false);
         gettersFacet = new GettersFacet();
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);

@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {AdminTest} from "./_Admin_Shared.t.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {DepositsAlreadyPaused, NotL1} from "contracts/state-transition/L1StateTransitionErrors.sol";
-import {PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET} from "contracts/common/Config.sol";
+import {PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
 contract PauseDepositsTest is AdminTest {
     event DepositsPaused(uint256 chainId, uint256 pausedDepositsTimestamp);
@@ -15,7 +15,7 @@ contract PauseDepositsTest is AdminTest {
 
     function setUp() public override {
         // Timestamp needs to be late enough for `pauseDepositsBeforeInitiatingMigration` time checks
-        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET + 1);
+        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET + 1);
         super.setUp();
     }
 
@@ -39,7 +39,7 @@ contract PauseDepositsTest is AdminTest {
 
     function test_successfulCall_newChain() public {
         uint256 chainId = utilsFacet.util_getChainId();
-        uint256 expectedTimestamp = block.timestamp - PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET;
+        uint256 expectedTimestamp = block.timestamp - PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET;
         address admin = utilsFacet.util_getAdmin();
 
         vm.startPrank(admin);
