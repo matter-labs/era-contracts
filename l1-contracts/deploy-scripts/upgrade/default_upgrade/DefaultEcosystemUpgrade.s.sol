@@ -101,7 +101,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         return type(uint256).max;
     }
 
-    function initializeConfig(string memory newConfigPath) internal virtual override {
+    function initializeConfig(string memory newConfigPath) public virtual override {
         string memory toml = vm.readFile(newConfigPath);
 
         bytes32 create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");

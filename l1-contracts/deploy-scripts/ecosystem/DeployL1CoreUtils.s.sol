@@ -67,7 +67,7 @@ contract DeployL1CoreUtils is DeployUtils {
     Config public config;
     DeployedAddresses internal addresses;
 
-    function initializeConfig(string memory configPath) internal virtual {
+    function initializeConfig(string memory configPath) public virtual {
         string memory toml = vm.readFile(configPath);
 
         config.l1ChainId = block.chainid;
