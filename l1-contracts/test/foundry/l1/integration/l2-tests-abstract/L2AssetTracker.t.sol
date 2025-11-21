@@ -106,7 +106,6 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
                 .with_key(testData[i].chainId)
                 .with_key(assetId3)
                 .checked_write(balance3);
-    
 
             stdstore
                 .target(address(L2_CHAIN_ASSET_HANDLER))
