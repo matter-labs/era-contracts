@@ -12,7 +12,7 @@ import {L2InteropCenterTestAbstract} from "../../l1/integration/l2-tests-abstrac
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
 
-import {Create2FactoryUtils} from "deploy-scripts/Create2FactoryUtils.s.sol";
+import {Create2FactoryUtils} from "deploy-scripts/utils/deploy/Create2FactoryUtils.s.sol";
 
 contract L2InteropCenterTest is Test, L2InteropCenterTestAbstract, SharedL2ContractL2Deployer {
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL2Deployer) {}
