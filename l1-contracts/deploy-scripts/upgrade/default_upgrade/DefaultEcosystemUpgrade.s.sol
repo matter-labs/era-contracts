@@ -115,6 +115,27 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
 
         bridgehub = L1Bridgehub(toml.readAddress("$.contracts.bridgehub_proxy_address"));
         setAddressesBasedOnBridgehub();
+        initializeL1CoreUtilsConfig();
+    }
+
+    function initializeL1CoreUtilsConfig() internal virtual override {
+        L1AssetRouter assetRouter = L1AssetRouter(discoveredBridgehub.assetRouter);
+        Governance governance = Governance(discoveredBridgehub.governance);
+        config.l1ChainId = block.chainid;
+        config.deployerAddress = msg.sender;
+        config.eraChainId = assetRouter.ERA_CHAIN_ID();
+        config.eraDiamondProxyAddress = assetRouter.ERA_DIAMOND_PROXY();
+
+        config.ownerAddress = assetRouter.owner();
+
+        //        config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
+
+        config.contracts.governanceSecurityCouncilAddress = governance.securityCouncil();
+        config.contracts.governanceMinDelay = governance.minDelay();
+
+        config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
+
+        config.tokens.tokenWethAddress = assetRouter.L1_WETH_TOKEN();
     }
 
     function setAddressesBasedOnBridgehub() internal virtual {
