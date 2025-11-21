@@ -8,9 +8,7 @@ import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IL1ChainAssetHandler {
-    function isMigrationInProgress(uint256 _chainId) external view returns (bool);
-
+interface IL2ChainAssetHandler {
     /*//////////////////////////////////////////////////////////////
                             EXTERNAL GETTERS
     //////////////////////////////////////////////////////////////*/
