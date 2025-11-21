@@ -77,15 +77,36 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
                     .checked_write(testData[i].batchNumber - 1);
             }
 
-            bytes32 assetId = 0x444c07697a6b15219c574dcc0ee09b479f6171009a6afd65b93e6f028cfa031b;
-            uint256 balance = 100;
+            bytes32 assetId1 = 0x444c07697a6b15219c574dcc0ee09b479f6171009a6afd65b93e6f028cfa031b;
+            uint256 balance1 = 100;
 
             stdstore
                 .target(address(GW_ASSET_TRACKER))
                 .sig("chainBalance(uint256,bytes32)")
                 .with_key(testData[i].chainId)
-                .with_key(assetId)
-                .checked_write(balance);
+                .with_key(assetId1)
+                .checked_write(balance1);
+
+            bytes32 assetId2 = 0xa6203e30497f83b9f5f056745b6ff94f7e22d88bacea03d4dd4393d66217a86f;
+            uint256 balance2 = 100;
+
+            stdstore
+                .target(address(GW_ASSET_TRACKER))
+                .sig("chainBalance(uint256,bytes32)")
+                .with_key(testData[i].chainId)
+                .with_key(assetId2)
+                .checked_write(balance2);
+
+            bytes32 assetId3 = 0x8592bf3100a24d737aba8ba9895f6801b9ec30200dc016dd8369f3171cbd1921;
+            uint256 balance3 = 100;
+
+            stdstore
+                .target(address(GW_ASSET_TRACKER))
+                .sig("chainBalance(uint256,bytes32)")
+                .with_key(testData[i].chainId)
+                .with_key(assetId3)
+                .checked_write(balance3);
+    
 
             stdstore
                 .target(address(L2_CHAIN_ASSET_HANDLER))
