@@ -10,31 +10,66 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
-import {INativeTokenVault} from "./INativeTokenVault.sol";
-import {NativeTokenVault} from "./NativeTokenVault.sol";
+import {NativeTokenVaultBase} from "./NativeTokenVaultBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {OriginChainIdNotFound, Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance, WithdrawFailed} from "../../common/L1ContractErrors.sol";
-import {ClaimFailedDepositFailed, ZeroAmountToTransfer, WrongAmountTransferred, WrongCounterpart} from "../L1BridgeContractErrors.sol";
+import {InsufficientChainBalance, NoFundsTransferred, OriginChainIdNotFound, Unauthorized, WithdrawFailed, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {ClaimFailedDepositFailed, WrongAmountTransferred, WrongCounterpart, ZeroAmountToTransfer} from "../L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Vault holding L1 native ETH and ERC20 tokens bridged into the ZK chains.
 /// @dev Designed for use with a proxy for upgradability.
-contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeTokenVault {
+contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeTokenVaultBase {
     using SafeERC20 for IERC20;
 
-    /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
-    IL1Nullifier public immutable override L1_NULLIFIER;
+    /// @dev The address of the WETH token.
+    address public immutable WETH_TOKEN;
 
+    /// @dev The L1 asset router contract.
+    IAssetRouterBase public immutable ASSET_ROUTER;
+
+    /// @dev The assetId of the base token.
+    bytes32 public immutable BASE_TOKEN_ASSET_ID;
+
+    /// @dev The chain ID of L1.
+    uint256 public immutable L1_CHAIN_ID;
+
+    /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
+    IL1Nullifier public immutable L1_NULLIFIER;
+
+    /*//////////////////////////////////////////////////////////////
+                            INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Returns the L1 asset router for internal use.
+    function _assetRouter() internal view override returns (IAssetRouterBase) {
+        return ASSET_ROUTER;
+    }
+
+    /// @dev Returns the L1 chain ID for internal use.
+    function _l1ChainId() internal view override returns (uint256) {
+        return L1_CHAIN_ID;
+    }
+
+    /// @dev Returns the base token asset ID for internal use.
+    function _baseTokenAssetId() internal view override returns (bytes32) {
+        return BASE_TOKEN_ASSET_ID;
+    }
+
+    /// @dev Returns the WETH token address for internal use.
+    function _wethToken() internal view override returns (address) {
+        return WETH_TOKEN;
+    }
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
@@ -42,21 +77,14 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    /// @param _l1WethAddress Address of WETH on deployed chain
-    /// @param _l1AssetRouter Address of Asset Router on L1.
+    /// @param _wethToken Address of WETH on deployed chain
+    /// @param _assetRouter Address of Asset Router on L1.
     /// @param _l1Nullifier Address of the nullifier contract, which handles transaction progress between L1 and ZK chains.
-    constructor(
-        address _l1WethAddress,
-        address _l1AssetRouter,
-        IL1Nullifier _l1Nullifier
-    )
-        NativeTokenVault(
-            _l1WethAddress,
-            _l1AssetRouter,
-            DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS),
-            block.chainid
-        )
-    {
+    constructor(address _wethToken, address _assetRouter, IL1Nullifier _l1Nullifier) {
+        WETH_TOKEN = _wethToken;
+        ASSET_ROUTER = IAssetRouterBase(_assetRouter);
+        L1_CHAIN_ID = block.chainid;
+        BASE_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         L1_NULLIFIER = _l1Nullifier;
     }
 
@@ -236,11 +264,13 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return bytes32(0);
     }
 
-    // get the computed address before the contract DeployWithCreate2 deployed using Bytecode of contract DeployWithCreate2 and salt specified by the sender
+    /// @notice Used to get the expected bridged token address corresponding to its native counterpart.
+    /// @param _originChainId The chain id of the origin token.
+    /// @param _nonNativeToken The address of token on its origin chain.
     function calculateCreate2TokenAddress(
         uint256 _originChainId,
         address _nonNativeToken
-    ) public view override(INativeTokenVault, NativeTokenVault) returns (address) {
+    ) public view override returns (address) {
         bytes32 salt = _getCreate2Salt(_originChainId, _nonNativeToken);
         return
             Create2.computeAddress(

@@ -5,22 +5,21 @@ import {Vm} from "forge-std/Test.sol";
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
-import {Utils, L2_SYSTEM_CONTEXT_ADDRESS, L2_DA_VALIDATOR_ADDRESS} from "../../Utils/Utils.sol";
+import {L2_DA_COMMITMENT_SCHEME, L2_SYSTEM_CONTEXT_ADDRESS, Utils} from "../../Utils/Utils.sol";
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
-import {COMMIT_TIMESTAMP_NOT_OLDER, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, POINT_EVALUATION_PRECOMPILE_ADDR, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
-import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_GENESIS_UPGRADE_ADDR} from "contracts/common/L2ContractAddresses.sol"; //, COMPLEX_UPGRADER_ADDR, GENESIS_UPGRADE_ADDR
+import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, POINT_EVALUATION_PRECOMPILE_ADDR, PRIORITY_TX_MAX_GAS_LIMIT, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
+import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_GENESIS_UPGRADE_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {IExecutor, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IL2GenesisUpgrade} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 contract revertBatchesTest is ChainTypeManagerTest {
     // Items for logs & commits
@@ -65,10 +64,11 @@ contract revertBatchesTest is ChainTypeManagerTest {
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+            dependencyRootsRollingHash: bytes32(0),
             timestamp: 0,
             commitment: bytes32(uint256(0x01))
         });
-        vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
+        vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
         currentTimestamp = block.timestamp;
         newCommitBatchInfo = IExecutor.CommitBatchInfo({
             batchNumber: 1,
@@ -89,7 +89,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
             {
                 bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
                     IL2GenesisUpgrade.genesisUpgrade,
-                    (chainId, l1CtmDeployer, forceDeploymentsData, "0x")
+                    (true, chainId, l1CtmDeployer, forceDeploymentsData, "0x")
                 );
                 complexUpgraderCalldata = abi.encodeCall(
                     IComplexUpgrader.upgrade,
@@ -104,7 +104,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
         newChainAddress = createNewChain(getDiamondCutData(diamondInit));
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector),
             abi.encode(newChainAddress)
         );
 
@@ -114,7 +114,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
 
         vm.stopPrank();
         vm.prank(newChainAdmin);
-        adminFacet.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_VALIDATOR_ADDRESS);
+        adminFacet.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_COMMITMENT_SCHEME);
     }
 
     function test_SuccessfulBatchReverting() public {
@@ -143,7 +143,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
             blobsLinearHashes
         );
 
-        vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1);
+        vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1);
         currentTimestamp = block.timestamp;
         bytes32 expectedSystemContractUpgradeTxHash = gettersFacet.getL2SystemContractsUpgradeTxHash();
         bytes[] memory correctL2Logs = Utils.createSystemLogsWithUpgradeTransactionForCTM(
@@ -192,7 +192,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executorFacet.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
+        executorFacet.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
@@ -211,6 +211,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+            dependencyRootsRollingHash: bytes32(0),
             timestamp: currentTimestamp,
             commitment: entries[0].topics[3]
         });
@@ -224,7 +225,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
             proofInput
         );
 
-        executorFacet.proveBatchesSharedBridge(uint256(0), proveBatchFrom, proveBatchTo, proveData);
+        executorFacet.proveBatchesSharedBridge(address(0), proveBatchFrom, proveBatchTo, proveData);
 
         // Test batch revert triggered from CTM
         vm.stopPrank();

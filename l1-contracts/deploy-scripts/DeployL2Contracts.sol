@@ -6,10 +6,10 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "./Utils.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
-import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
+import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -44,7 +44,6 @@ contract DeployL2Script is Script {
     }
 
     struct DeployedContrats {
-        address l2DaValidatorAddress;
         address forceDeployUpgraderAddress;
         address consensusRegistryImplementation;
         address consensusRegistryProxy;
@@ -83,9 +82,6 @@ contract DeployL2Script is Script {
     }
 
     function deploy(bool legacyBridge) public {
-        // Note, that it is important that the first transaction is for setting the L2 DA validator
-        deployL2DaValidator();
-
         deployForceDeployer();
         deployConsensusRegistry();
         deployConsensusRegistryProxy();
@@ -128,14 +124,6 @@ contract DeployL2Script is Script {
         saveOutput();
     }
 
-    function runDeployL2DAValidator() public {
-        initializeConfig();
-
-        deployL2DaValidator();
-
-        saveOutput();
-    }
-
     function initializeConfig() internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/config-deploy-l2-contracts.toml");
@@ -156,7 +144,6 @@ contract DeployL2Script is Script {
     }
 
     function saveOutput() internal {
-        vm.serializeAddress("root", "l2_da_validator_address", deployed.l2DaValidatorAddress);
         vm.serializeAddress("root", "multicall3", deployed.multicall3);
         vm.serializeAddress("root", "consensus_registry_implementation", deployed.consensusRegistryImplementation);
         vm.serializeAddress("root", "consensus_registry_proxy", deployed.consensusRegistryProxy);
@@ -168,34 +155,10 @@ contract DeployL2Script is Script {
         vm.writeToml(toml, path);
     }
 
-    function deployL2DaValidator() internal {
-        bytes memory bytecode;
-        if (config.validatorType == DAValidatorType.Rollup) {
-            bytecode = L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
-        } else if (config.validatorType == DAValidatorType.NoDA) {
-            bytecode = L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
-        } else if (config.validatorType == DAValidatorType.Avail) {
-            bytecode = L2ContractsBytecodesLib.readAvailL2DAValidatorBytecode();
-        } else {
-            revert("Invalid DA validator type");
-        }
-
-        deployed.l2DaValidatorAddress = Utils.deployThroughL1Deterministic({
-            bytecode: bytecode,
-            constructorargs: bytes(""),
-            create2salt: "",
-            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-            factoryDeps: new bytes[](0),
-            chainId: config.chainId,
-            bridgehubAddress: config.bridgehubAddress,
-            l1SharedBridgeProxy: config.l1SharedBridgeProxy
-        });
-    }
-
     function deployForceDeployer() internal {
         bytes[] memory factoryDeps = new bytes[](0);
         deployed.forceDeployUpgraderAddress = Utils.deployThroughL1({
-            bytecode: L2ContractsBytecodesLib.readForceDeployUpgraderBytecode(),
+            bytecode: ContractsBytecodesLib.getCreationCode("ForceDeployUpgrader"),
             constructorargs: "",
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -212,7 +175,7 @@ contract DeployL2Script is Script {
         bytes memory constructorData = "";
 
         deployed.consensusRegistryImplementation = Utils.deployThroughL1({
-            bytecode: L2ContractsBytecodesLib.readConsensusRegistryBytecode(),
+            bytecode: ContractsBytecodesLib.getCreationCode("ConsensusRegistry"),
             constructorargs: constructorData,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -228,7 +191,7 @@ contract DeployL2Script is Script {
         bytes memory constructorData = "";
 
         deployed.multicall3 = Utils.deployThroughL1({
-            bytecode: L2ContractsBytecodesLib.readMulticall3Bytecode(),
+            bytecode: ContractsBytecodesLib.getCreationCode("Multicall3"),
             constructorargs: constructorData,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -241,7 +204,7 @@ contract DeployL2Script is Script {
 
     function deployTimestampAsserter() internal {
         deployed.timestampAsserter = Utils.deployThroughL1({
-            bytecode: L2ContractsBytecodesLib.readTimestampAsserterBytecode(),
+            bytecode: ContractsBytecodesLib.getCreationCode("TimestampAsserter"),
             constructorargs: "",
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -272,7 +235,7 @@ contract DeployL2Script is Script {
         );
 
         deployed.consensusRegistryProxy = Utils.deployThroughL1({
-            bytecode: L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecode(),
+            bytecode: ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy"),
             constructorargs: consensusRegistryProxyConstructorData,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
