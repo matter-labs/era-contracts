@@ -185,10 +185,10 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
     function deployUpgradeSpecificContractsL1() internal override {
         super.deployUpgradeSpecificContractsL1();
 
-        (
-            bridgehubAddresses.chainAssetHandlerImplementation,
-            bridgehubAddresses.chainAssetHandlerProxy
-        ) = deployTuppWithContract("L1ChainAssetHandler", false);
+        //        (
+        //            bridgehubAddresses.chainAssetHandlerImplementation,
+        //            bridgehubAddresses.chainAssetHandlerProxy
+        //        ) = deployTuppWithContract("L1ChainAssetHandler", false);
 
         (
             addresses.stateTransition.validatorTimelockImplementation,
@@ -305,22 +305,22 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
 
     function prepareSetChainAssetHandlerOnBridgehubCall() public virtual returns (Call[] memory calls) {
         calls = new Call[](1);
-        calls[0] = Call({
-            target: discoveredBridgehub.bridgehubProxy,
-            data: abi.encodeCall(IBridgehubBase.setChainAssetHandler, (bridgehubAddresses.chainAssetHandlerProxy)),
-            value: 0
-        });
+        //        calls[0] = Call({
+        //            target: discoveredBridgehub.bridgehubProxy,
+        //            data: abi.encodeCall(IBridgehubBase.setChainAssetHandler, (bridgehubAddresses.chainAssetHandlerProxy)),
+        //            value: 0
+        //        });
     }
 
     /// @notice Sets ctm asset handler address on L1. We need to update it because of ChainAssetHandler appearance.
     function prepareSetCtmAssetHandlerAddressOnL1Call() public virtual returns (Call[] memory calls) {
         calls = new Call[](1);
 
-        calls[0] = Call({
-            target: discoveredBridgehub.l1CtmDeployer,
-            data: abi.encodeCall(CTMDeploymentTracker.setCtmAssetHandlerAddressOnL1, (discoveredCTM.ctmProxy)),
-            value: 0
-        });
+        //        calls[0] = Call({
+        //            target: discoveredBridgehub.l1CtmDeployer,
+        //            data: abi.encodeCall(CTMDeploymentTracker.setCtmAssetHandlerAddressOnL1, (discoveredCTM.ctmProxy)),
+        //            value: 0
+        //        });
     }
 
     /// @notice Sets upgrade diamond cut the same for v28 version, as it is for v29.

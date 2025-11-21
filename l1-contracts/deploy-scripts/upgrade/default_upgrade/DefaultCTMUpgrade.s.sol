@@ -50,6 +50,8 @@ import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {BridgehubDeployedAddresses, BridgesDeployedAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {IValidatorTimelock} from "contracts/state-transition/IValidatorTimelock.sol";
+import {Governance} from "contracts/governance/Governance.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
@@ -86,11 +88,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
 
     // solhint-disable-next-line gas-struct-packing
     struct AdditionalConfig {
-        // This is the address of the ecosystem admin.
-        // Note, that it is not the owner, but rather the address that is responsible
-        // for facilitating partially trusted, but not critical tasks.
-        address ecosystemAdminAddress;
-        uint256 governanceUpgradeTimerInitialDelay;
+        address ctm;
         uint256 oldProtocolVersion;
         address oldValidatorTimelock;
         uint256 priorityTxsL2GasLimit;
@@ -119,12 +117,16 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         string outputPath;
     }
 
-    AdditionalConfig internal newConfig;
-    Gateway internal gatewayConfig;
+    // The output of the script
     NewlyGeneratedData internal newlyGeneratedData;
     UpgradeDeployedAddresses internal upgradeAddresses;
-    BridgehubDeployedAddresses internal bridgehubAddresses;
-    BridgesDeployedAddresses internal bridges;
+    EcosystemUpgradeConfig internal upgradeConfig;
+
+    // Input for the script
+    AdditionalConfig internal newConfig;
+    Gateway internal gatewayConfig;
+
+    // Discovered addresses
     AddressIntrospector.CTMAddresses internal discoveredCTM;
     AddressIntrospector.ZkChainAddresses internal discoveredEraZkChain;
     AddressIntrospector.NonDisoverable internal nonDisoverable;
@@ -132,8 +134,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
 
     uint256[] internal factoryDepsHashes;
     mapping(bytes32 => bool) internal isHashInFactoryDeps;
-
-    EcosystemUpgradeConfig internal upgradeConfig;
 
     function initialize(string memory newConfigPath, string memory _outputPath) public virtual {
         string memory root = vm.projectRoot();
@@ -341,10 +341,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         forceDeploymentNames = new string[](0);
     }
 
-    function getEcosystemAdmin() external virtual returns (address) {
-        return newConfig.ecosystemAdminAddress;
-    }
-
     function initializeConfig(string memory newConfigPath) internal virtual override {
         string memory toml = vm.readFile(newConfigPath);
 
@@ -355,26 +351,41 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         }
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
 
+        newConfig.ctm = toml.readAddress("$.contracts.ctm_proxy_address");
+        // Can we safely get it from the CTM? is it always exists even for zksync os ?
         config.eraChainId = toml.readUint("$.era_chain_id");
+
         nonDisoverable.bytecodesSupplier = toml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
         nonDisoverable.rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
-        bridgehub = L1Bridgehub(toml.readAddress("$.contracts.bridgehub_proxy_address"));
-        if (toml.keyExists("$.is_zk_sync_os")) {
-            config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
-        }
-        setAddressesBasedOnBridgehub();
+        setAddressesBasedOnCTM();
 
         config.l1ChainId = block.chainid;
         config.ownerAddress = discoveredBridgehub.governance;
 
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
 
+        // TODO IS IT TRUE?
+        config.ownerAddress = discoveredCTM.governance;
+        (bool ok, bytes memory data) = discoveredEraZkChain.verifier.staticcall(
+            abi.encodeWithSignature("isTestnetVerifier()")
+        );
+        config.testnetVerifier = ok;
+        // TODO can we discover it?
+        if (toml.keyExists("$.is_zk_sync_os")) {
+            config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
+        }
+
+        config.contracts.governanceSecurityCouncilAddress = Governance(payable(discoveredCTM.governance))
+            .securityCouncil();
+        config.contracts.governanceMinDelay = Governance(payable(discoveredCTM.governance)).minDelay();
+        config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(discoveredCTM.validatorTimelockPostV29)
+            .executionDelay();
+
         // Default values for initializing the chain. They are part of the chain creation params,
         // meanwhile they are not saved anywhere
         config.contracts.chainCreationParams.latestProtocolVersion = toml.readUint(
             "$.contracts.latest_protocol_version"
         );
-
         config.contracts.chainCreationParams.diamondInitPubdataPricingMode = PubdataPricingMode(
             toml.readUint("$.contracts.diamond_init_pubdata_pricing_mode")
         );
@@ -402,11 +413,17 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         config.contracts.chainCreationParams.genesisBatchCommitment = toml.readBytes32(
             "$.contracts.genesis_batch_commitment"
         );
-        config.contracts.chainCreationParams.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
-        config.contracts.chainCreationParams.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
-        config.contracts.chainCreationParams.evmEmulatorHash = toml.readBytes32("$.contracts.evm_emulator_hash");
 
-        newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
+        // These fields are redundant for zksync_os.
+        if (toml.keyExists("$.contracts.default_aa_hash")) {
+            config.contracts.chainCreationParams.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
+        }
+        if (toml.keyExists("$.contracts.bootloader_hash")) {
+            config.contracts.chainCreationParams.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
+        }
+        if (toml.keyExists("$.contracts.evm_emulator_hash")) {
+            config.contracts.chainCreationParams.evmEmulatorHash = toml.readBytes32("$.contracts.evm_emulator_hash");
+        }
     }
 
     function getBridgehubAdmin() public virtual returns (address admin) {
@@ -439,11 +456,12 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         });
     }
 
-    function setAddressesBasedOnBridgehub() internal virtual {
-        discoveredBridgehub = AddressIntrospector.getBridgehubAddresses(bridgehub);
-        config.ownerAddress = discoveredBridgehub.governance;
-        address ctm = bridgehub.chainTypeManager(config.eraChainId);
+    function setAddressesBasedOnCTM() internal virtual {
+        address ctm = newConfig.ctm;
         discoveredCTM = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
+        bridgehub = L1Bridgehub(ChainTypeManagerBase(ctm).BRIDGE_HUB());
+        discoveredBridgehub = AddressIntrospector.getBridgehubAddresses(bridgehub);
+        config.ownerAddress = discoveredCTM.governance;
         discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(
             IZKChain(bridgehub.getZKChain(config.eraChainId))
         );
@@ -455,13 +473,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
             ctmProtocolVersion != getNewProtocolVersion(),
             "The new protocol version is already present on the ChainTypeManager"
         );
-        bridges.l1AssetRouterProxy = discoveredBridgehub.assetRouter;
-
-        bridges.l1NullifierProxy = address(L1AssetRouter(bridges.l1AssetRouterProxy).L1_NULLIFIER());
-        bridges.erc20BridgeProxy = address(L1AssetRouter(bridges.l1AssetRouterProxy).legacyBridge());
 
         newConfig.oldValidatorTimelock = discoveredCTM.validatorTimelockPostV29;
-        newConfig.ecosystemAdminAddress = discoveredBridgehub.admin;
     }
 
     function generateFixedForceDeploymentsData() internal virtual {
@@ -482,10 +495,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         }
 
         revert(string.concat("No expected L2 address for: ", contractName));
-    }
-
-    function getGovernanceUpgradeInitialDelay() external view virtual returns (uint256) {
-        return newConfig.governanceUpgradeTimerInitialDelay;
     }
 
     function getFullListOfFactoryDependencies() internal virtual returns (bytes[] memory factoryDeps) {
