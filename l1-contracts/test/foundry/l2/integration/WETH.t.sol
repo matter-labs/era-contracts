@@ -10,7 +10,7 @@ import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_
 import {L2WethTestAbstract} from "../../l1/integration/l2-tests-abstract/L2WethTestAbstract.t.sol";
 
 import {SharedL2ContractL2Deployer, SystemContractsArgs} from "./_SharedL2ContractL2Deployer.sol";
-import {Create2FactoryUtils} from "deploy-scripts/Create2FactoryUtils.s.sol";
+import {Create2FactoryUtils} from "deploy-scripts/utils/deploy/Create2FactoryUtils.s.sol";
 
 contract WethTest is Test, L2WethTestAbstract, SharedL2ContractL2Deployer {
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL2Deployer) {}

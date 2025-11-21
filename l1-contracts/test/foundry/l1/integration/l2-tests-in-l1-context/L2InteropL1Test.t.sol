@@ -11,7 +11,7 @@ import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDe
 import {L2InteropHandlerTestAbstract} from "../l2-tests-abstract/L2InteropHandlerTestAbstract.t.sol";
 
 import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
-import {StateTransitionDeployedAddresses} from "deploy-scripts/Types.sol";
+import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
