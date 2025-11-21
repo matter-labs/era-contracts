@@ -39,6 +39,7 @@ library AddressIntrospector {
         address legacyValidatorTimelock;
         address admin;
         address serverNotifier;
+        address governance;
     }
 
     struct ZkChainAddresses {
@@ -103,6 +104,7 @@ library AddressIntrospector {
         info.validatorTimelockPostV29 = _tryAddress(ctmAddr, "validatorTimelockPostV29()");
         info.legacyValidatorTimelock = _ctm.validatorTimelock();
         info.admin = _ctm.admin();
+        info.governance = IOwnable(ctmAddr).owner();
         info.serverNotifier = _ctm.serverNotifierAddress();
     }
 
