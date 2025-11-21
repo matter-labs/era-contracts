@@ -1220,7 +1220,8 @@ object "Bootloader" {
 
                 debugLog("Send message to L1", success)
 
-                if isPriorityOp {
+                switch isPriorityOp
+                case 1 {
                     // Sending the L2->L1 log so users will be able to prove transaction execution result on L1.
                     sendL2LogUsingL1Messenger(true, canonicalL1TxHash, success)
 
@@ -1229,6 +1230,12 @@ object "Bootloader" {
                     mstore(32, canonicalL1TxHash)
                     mstore(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), keccak256(0, 64))
                     mstore(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32), add(mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)), 1))
+                } 
+                default {
+                    /// We need to set the settlement layer after the genesis upgrade, so we set it after all upgrade txs.
+                    /// @notice The settlement layer chain id.
+                    let SETTLEMENT_LAYER_CHAIN_ID := getSettlementLayerChainId()
+                    setSettlementLayerChainId(SETTLEMENT_LAYER_CHAIN_ID)
                 }
             }
 
@@ -4443,7 +4450,6 @@ object "Bootloader" {
                 }
 
                 setNewBatch(PREV_BATCH_HASH, NEW_BATCH_TIMESTAMP, NEW_BATCH_NUMBER, EXPECTED_BASE_FEE)
-
 
                 setSettlementLayerChainId(SETTLEMENT_LAYER_CHAIN_ID)
 

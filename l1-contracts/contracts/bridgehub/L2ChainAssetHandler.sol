@@ -5,11 +5,12 @@ pragma solidity 0.8.28;
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {L2_COMPLEX_UPGRADER_ADDR, L2_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {InvalidCaller} from "../common/L1ContractErrors.sol";
 import {IL1Bridgehub} from "./IL1Bridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {IL2ChainAssetHandler} from "./IL2ChainAssetHandler.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -17,7 +18,7 @@ import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 /// it is the IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
-contract L2ChainAssetHandler is ChainAssetHandlerBase {
+contract L2ChainAssetHandler is ChainAssetHandlerBase, IL2ChainAssetHandler {
     /// @dev The assetId of the ETH.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
@@ -47,10 +48,6 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _ethTokenAssetId() internal view override returns (bytes32) {
-        return ETH_TOKEN_ASSET_ID;
-    }
-
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
@@ -65,10 +62,6 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
 
     function _assetRouter() internal view override returns (IAssetRouterBase) {
         return ASSET_ROUTER;
-    }
-
-    function _assetTracker() internal view override returns (address) {
-        return L2_ASSET_TRACKER_ADDR;
     }
 
     /// @dev Only allows calls from the complex upgrader contract on L2.

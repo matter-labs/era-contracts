@@ -138,13 +138,7 @@ contract ExperimentalBridgeTest is Test {
 
         // kl todo: clean this up. NTV id deployed below in deployNTV. its was a mess before this upgrade.
         ntv = _deployNTVWithoutEthToken(address(mockSharedBridge));
-        assetTracker = new L1AssetTracker(
-            block.chainid,
-            address(bridgehub),
-            address(mockSharedBridge),
-            address(ntv),
-            address(0)
-        );
+        assetTracker = new L1AssetTracker(address(bridgehub), address(ntv), address(0));
 
         vm.prank(bridgeOwner);
         ntv.setAssetTracker(address(assetTracker));
@@ -245,13 +239,7 @@ contract ExperimentalBridgeTest is Test {
         vm.prank(bridgeOwner);
         addr.setAssetTracker(address(assetTracker));
 
-        L1AssetTracker assetTracker2 = new L1AssetTracker(
-            block.chainid,
-            address(bridgehub),
-            address(mockSharedBridge),
-            address(addr),
-            address(0)
-        );
+        L1AssetTracker assetTracker2 = new L1AssetTracker(address(bridgehub), address(addr), address(0));
 
         vm.etch(address(assetTracker), address(assetTracker2).code);
         console.log(address(ntv));
