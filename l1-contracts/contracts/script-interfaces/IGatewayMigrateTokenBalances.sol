@@ -34,5 +34,4 @@ interface IGatewayMigrateTokenBalances {
     /// @param chainId The chain ID.
     /// @param l2RpcUrl The L2 RPC URL.
     function checkAllMigrated(uint256 chainId, string memory l2RpcUrl) external;
-
 }
