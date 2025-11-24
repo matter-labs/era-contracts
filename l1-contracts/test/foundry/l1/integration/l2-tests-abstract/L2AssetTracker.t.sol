@@ -77,35 +77,36 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
                     .checked_write(testData[i].batchNumber - 1);
             }
 
-            bytes32 assetId1 = 0x444c07697a6b15219c574dcc0ee09b479f6171009a6afd65b93e6f028cfa031b;
-            uint256 balance1 = 100;
-
-            stdstore
-                .target(address(GW_ASSET_TRACKER))
-                .sig("chainBalance(uint256,bytes32)")
-                .with_key(testData[i].chainId)
-                .with_key(assetId1)
-                .checked_write(balance1);
-
-            bytes32 assetId2 = 0xa6203e30497f83b9f5f056745b6ff94f7e22d88bacea03d4dd4393d66217a86f;
-            uint256 balance2 = 100;
-
-            stdstore
-                .target(address(GW_ASSET_TRACKER))
-                .sig("chainBalance(uint256,bytes32)")
-                .with_key(testData[i].chainId)
-                .with_key(assetId2)
-                .checked_write(balance2);
-
-            bytes32 assetId3 = 0x8592bf3100a24d737aba8ba9895f6801b9ec30200dc016dd8369f3171cbd1921;
-            uint256 balance3 = 100;
-
-            stdstore
-                .target(address(GW_ASSET_TRACKER))
-                .sig("chainBalance(uint256,bytes32)")
-                .with_key(testData[i].chainId)
-                .with_key(assetId3)
-                .checked_write(balance3);
+            storeChainBalance(
+                testData[i].chainId,
+                0x444c07697a6b15219c574dcc0ee09b479f6171009a6afd65b93e6f028cfa031b,
+                100
+            );
+            storeChainBalance(
+                testData[i].chainId,
+                0xa6203e30497f83b9f5f056745b6ff94f7e22d88bacea03d4dd4393d66217a86f,
+                100
+            );
+            storeChainBalance(
+                testData[i].chainId,
+                0x8592bf3100a24d737aba8ba9895f6801b9ec30200dc016dd8369f3171cbd1921,
+                100
+            );
+            storeChainBalance(
+                testData[i].chainId,
+                0xb615cd4917043452e354e4797dc23e4d6106663f7a37249d54f5996dd2347710,
+                100
+            );
+            storeChainBalance(
+                testData[i].chainId,
+                0xb1f317b7effffcd4e3cf53784ae442ecc4e835c532aaf0e60a046fa8efb96e85,
+                100
+            );
+            storeChainBalance(
+                testData[i].chainId,
+                0xb5eab7cc8c9114c3115a034b49b3d87b0b352aa88c2a9d5ff7339cde105aa44c,
+                100
+            );
 
             stdstore
                 .target(address(L2_CHAIN_ASSET_HANDLER))
@@ -152,6 +153,15 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             }
         }
         return txHashes;
+    }
+
+    function storeChainBalance(uint256 chainId, bytes32 assetId, uint256 balance) public {
+        stdstore
+            .target(address(GW_ASSET_TRACKER))
+            .sig("chainBalance(uint256,bytes32)")
+            .with_key(chainId)
+            .with_key(assetId)
+            .checked_write(balance);
     }
 
     function printProcess(ProcessLogsInput memory) public {
