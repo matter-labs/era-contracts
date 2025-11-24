@@ -304,7 +304,16 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         internal
         returns (IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments)
     {
-        return new IL2ContractDeployer.ForceDeployment[](0);
+        string[] memory forceDeploymentNames = getForceDeploymentNames();
+        additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](forceDeploymentNames.length);
+        for (uint256 i; i < forceDeploymentNames.length; i++) {
+            additionalForceDeployments[i] = getForceDeployment(forceDeploymentNames[i]);
+        }
+        return additionalForceDeployments;
+    }
+
+    function getForceDeploymentNames() internal virtual returns (string[] memory) {
+        return new string[](0);
     }
 
     function initializeConfig(string memory newConfigPath) internal virtual override {
@@ -1015,6 +1024,23 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         } else {
             return super.getCreationCalldata(contractName, isZKBytecode);
         }
+    }
+
+    function getForceDeployment(
+        string memory contractName
+    ) public virtual returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
+        return
+            IL2ContractDeployer.ForceDeployment({
+                bytecodeHash: getL2BytecodeHash(contractName),
+                newAddress: getExpectedL2Address(contractName),
+                callConstructor: false,
+                value: 0,
+                input: ""
+            });
+    }
+
+    function getExpectedL2Address(string memory contractName) public virtual returns (address) {
+        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
     }
 
     ////////////////////////////// Misc utils /////////////////////////////////
