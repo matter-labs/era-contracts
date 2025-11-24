@@ -70,29 +70,14 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
 
     // solhint-disable-next-line gas-struct-packing
     struct UpgradeDeployedAddresses {
-        ExpectedL2Addresses expectedL2Addresses;
-        address transitionaryOwner;
         address upgradeTimer;
-        address bytecodesSupplier;
-        address l2WrappedBaseTokenStore;
         address upgradeStageValidator;
-        address nativeTokenVaultImplementation;
-    }
-
-    struct ExpectedL2Addresses {
-        address expectedRollupL2DAValidator;
-        address expectedValidiumL2DAValidator;
-        address l2SharedBridgeLegacyImpl;
-        address l2BridgedStandardERC20Impl;
     }
 
     // solhint-disable-next-line gas-struct-packing
     struct AdditionalConfig {
         address ctm;
         uint256 oldProtocolVersion;
-        address oldValidatorTimelock;
-        uint256 priorityTxsL2GasLimit;
-        uint256 maxExpectedL1GasPrice;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -113,6 +98,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         bool fixedForceDeploymentsDataGenerated;
         bool upgradeCutPrepared;
         bool factoryDepsPublished;
+        // TODO set it based on version of the BRIDGEHUB before upgrade
+
         bool ecosystemContractsDeployed;
         string outputPath;
     }
@@ -163,7 +150,9 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
     }
 
     /// @notice Deploy everything that should be deployed
-    function deployNewEcosystemContractsL1() public virtual {}
+    function deployNewEcosystemContractsL1() public virtual {
+        deployUpgradeStageValidator();
+    }
 
     function deployUpgradeSpecificContractsL1() internal virtual {
         // Empty by default.
@@ -180,7 +169,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
     /// @notice Generate data required for the upgrade
     function generateUpgradeData() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
-        require(upgradeConfig.ecosystemContractsDeployed, "Ecosystem contracts not deployed");
+        // TODO Return the require after getting the version from bridgehub
+        //        require(upgradeConfig.ecosystemContractsDeployed, "Ecosystem contracts not deployed");
 
         // Important, this must come after the initializeExpectedL2Addresses
         generateFixedForceDeploymentsData();
@@ -473,8 +463,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
             ctmProtocolVersion != getNewProtocolVersion(),
             "The new protocol version is already present on the ChainTypeManager"
         );
-
-        newConfig.oldValidatorTimelock = discoveredCTM.validatorTimelockPostV29;
     }
 
     function generateFixedForceDeploymentsData() internal virtual {
@@ -485,6 +473,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         upgradeConfig.fixedForceDeploymentsDataGenerated = true;
     }
 
+    // TODO is it only DaValidator Addresses ?
     function getExpectedL2Address(string memory contractName) public virtual returns (address) {
         string[2] memory expectedCreate2Deployed = ["RollupL2DAValidator", "NoDAL2DAValidator"];
 
@@ -605,18 +594,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
             addresses.daAddresses.noDAValidiumL1DAValidator
         );
         vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
-        vm.serializeAddress("deployed_addresses", "l1_transitionary_owner", upgradeAddresses.transitionaryOwner);
         vm.serializeAddress("deployed_addresses", "upgrade_stage_validator", upgradeAddresses.upgradeStageValidator);
-        vm.serializeAddress(
-            "deployed_addresses",
-            "l2_wrapped_base_token_store_addr",
-            upgradeAddresses.l2WrappedBaseTokenStore
-        );
-        vm.serializeAddress(
-            "deployed_addresses",
-            "native_token_vault_implementation_addr",
-            upgradeAddresses.nativeTokenVaultImplementation
-        );
+
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
             "l1_governance_upgrade_timer",
@@ -633,19 +612,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
 
         // Serialize protocol version info (needed for upgrade)
         vm.serializeUint("contracts_newConfig", "new_protocol_version", getNewProtocolVersion());
-        vm.serializeUint("contracts_newConfig", "old_protocol_version", newConfig.oldProtocolVersion);
-        vm.serializeAddress("contracts_newConfig", "old_validator_timelock", newConfig.oldValidatorTimelock);
-
-        // Serialize expected L2 addresses (computed during execution)
-        vm.serializeAddress(
+        string memory contractsConfig = vm.serializeUint(
             "contracts_newConfig",
-            "expected_rollup_l2_da_validator",
-            getExpectedL2Address("RollupL2DAValidator")
-        );
-        string memory contractsConfig = vm.serializeAddress(
-            "contracts_newConfig",
-            "expected_validium_l2_da_validator",
-            getExpectedL2Address("NoDAL2DAValidator")
+            "old_protocol_version",
+            newConfig.oldProtocolVersion
         );
 
         // Serialize root structure
@@ -698,7 +668,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
     function prepareDefaultGovernanceCalls()
         public
         virtual
-        returns (Call[] memory stage0Calls, Call[] memory stage1Calls, Call[] memory stage2Calls)
+        returns (Call[] memory stage1Calls, Call[] memory stage2Calls)
     {
         // Default upgrade is done it 3 stages:
         // 1. Perform upgrade
@@ -810,36 +780,12 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         return calls;
     }
 
-    function prepareVersionSpecificStage0GovernanceCallsGW(
-        uint256 priorityTxsL2GasLimit,
-        uint256 maxExpectedL1GasPrice
-    ) public virtual returns (Call[] memory calls) {
-        // Empty by default.
-        return calls;
-    }
-
     function prepareVersionSpecificStage1GovernanceCallsL1() public virtual returns (Call[] memory calls) {
         // Empty by default.
         return calls;
     }
 
-    function prepareVersionSpecificStage1GovernanceCallsGW(
-        uint256 priorityTxsL2GasLimit,
-        uint256 maxExpectedL1GasPrice
-    ) public virtual returns (Call[] memory calls) {
-        // Empty by default.
-        return calls;
-    }
-
     function prepareVersionSpecificStage2GovernanceCallsL1() public virtual returns (Call[] memory calls) {
-        // Empty by default.
-        return calls;
-    }
-
-    function prepareVersionSpecificStage2GovernanceCallsGW(
-        uint256 priorityTxsL2GasLimit,
-        uint256 maxExpectedL1GasPrice
-    ) public virtual returns (Call[] memory calls) {
         // Empty by default.
         return calls;
     }
@@ -1019,17 +965,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         });
     }
 
-    function _buildCallBeaconProxyUpgrade(
-        address proxyAddress,
-        address newImplementationAddress
-    ) internal virtual returns (Call memory call) {
-        call = Call({
-            target: proxyAddress,
-            data: abi.encodeCall(UpgradeableBeacon.upgradeTo, (newImplementationAddress)),
-            value: 0
-        });
-    }
-
     /// @notice Additional calls to newConfigure contracts
     function prepareDAValidatorCall() public virtual returns (Call[] memory calls) {
         calls = new Call[](1);
@@ -1082,20 +1017,23 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
             return type(DiamondProxy).creationCode;
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return type(DefaultUpgrade).creationCode;
-        } else if (compareStrings(contractName, "BytecodesSupplier")) {
-            return type(BytecodesSupplier).creationCode;
+            // TODO Calldata is not set and never called
         } else if (compareStrings(contractName, "TransitionaryOwner")) {
             return type(TransitionaryOwner).creationCode;
+            // TODO Calldata is not set and never called
         } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
             return type(GovernanceUpgradeTimer).creationCode;
+            // TODO Calldata is not set and never called
         } else if (compareStrings(contractName, "L2StandardERC20")) {
             return ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
+            // TODO Calldata is not set and never called
         } else if (compareStrings(contractName, "RollupL2DAValidator")) {
             return ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
+        } else if (compareStrings(contractName, "UpgradeStageValidator")) {
+            return type(UpgradeStageValidator).creationCode;
+            // TODO Calldata is not set and never called
         } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
             return ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
-        } else if (compareStrings(contractName, "ValidatorTimelock")) {
-            return type(ValidatorTimelock).creationCode;
         } else {
             return super.getCreationCode(contractName, isZKBytecode);
         }
@@ -1103,6 +1041,18 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
 
     function deployUpgradeStageValidator() internal {
         upgradeAddresses.upgradeStageValidator = deploySimpleContract("UpgradeStageValidator", false);
+    }
+
+    function getCreationCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view virtual override returns (bytes memory) {
+        require(!isZKBytecode, "ZK bytecodes are not supported in CTM upgrade");
+        if (compareStrings(contractName, "UpgradeStageValidator")) {
+            return abi.encode(discoveredCTM.ctmProxy, getNewProtocolVersion());
+        } else {
+            return super.getCreationCalldata(contractName, isZKBytecode);
+        }
     }
 
     ////////////////////////////// Misc utils /////////////////////////////////

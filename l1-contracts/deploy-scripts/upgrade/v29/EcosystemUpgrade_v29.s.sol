@@ -238,7 +238,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
     function prepareVersionSpecificStage1GovernanceCallsGW(
         uint256 priorityTxsL2GasLimit,
         uint256 maxExpectedL1GasPrice
-    ) public override returns (Call[] memory calls) {
+    ) public returns (Call[] memory calls) {
         // The below does not contain the call to set the chain asset handler address on Bridgehub on GW, because
         // it is done for all ZK Chains as part of the `L2V29Upgrade` upgrade.
 
