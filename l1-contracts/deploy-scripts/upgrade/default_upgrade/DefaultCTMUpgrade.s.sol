@@ -78,6 +78,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
     struct AdditionalConfig {
         address ctm;
         uint256 oldProtocolVersion;
+        address ecosystemAdminAddress;
+        uint256 governanceUpgradeTimerInitialDelay;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -298,37 +300,11 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         });
     }
 
-    function getForceDeployment(
-        string memory contractName
-    ) public virtual returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
-        return
-            IL2ContractDeployer.ForceDeployment({
-                bytecodeHash: getL2BytecodeHash(contractName),
-                newAddress: getExpectedL2Address(contractName),
-                callConstructor: false,
-                value: 0,
-                input: ""
-            });
-    }
-
     function getAdditionalForceDeployments()
         internal
         returns (IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments)
     {
-        string[] memory forceDeploymentNames = getForceDeploymentNames();
-        additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](forceDeploymentNames.length);
-        for (uint256 i; i < forceDeploymentNames.length; i++) {
-            additionalForceDeployments[i] = getForceDeployment(forceDeploymentNames[i]);
-        }
-        return additionalForceDeployments;
-    }
-
-    function getAdditionalDependenciesNames() internal virtual returns (string[] memory forceDeploymentNames) {
-        return new string[](0);
-    }
-
-    function getForceDeploymentNames() internal virtual returns (string[] memory forceDeploymentNames) {
-        forceDeploymentNames = new string[](0);
+        return new IL2ContractDeployer.ForceDeployment[](0);
     }
 
     function initializeConfig(string memory newConfigPath) internal virtual override {
@@ -350,17 +326,23 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         setAddressesBasedOnCTM();
 
         config.l1ChainId = block.chainid;
-        config.ownerAddress = discoveredBridgehub.governance;
 
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
 
-        // TODO IS IT TRUE?
-        config.ownerAddress = discoveredCTM.governance;
+        if (toml.keyExists("$.governance")) {
+            config.ownerAddress = toml.readAddress("$.governance");
+        } else {
+            config.ownerAddress = discoveredCTM.governance;
+        }
+
+        newConfig.ecosystemAdminAddress = discoveredCTM.governance;
+
         (bool ok, bytes memory data) = discoveredEraZkChain.verifier.staticcall(
             abi.encodeWithSignature("isTestnetVerifier()")
         );
         config.testnetVerifier = ok;
-        // TODO can we discover it?
+
+        // TODO can we discover it?. Try to get it from the chain
         if (toml.keyExists("$.is_zk_sync_os")) {
             config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
         }
@@ -473,39 +455,27 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         upgradeConfig.fixedForceDeploymentsDataGenerated = true;
     }
 
-    // TODO is it only DaValidator Addresses ?
-    function getExpectedL2Address(string memory contractName) public virtual returns (address) {
-        string[2] memory expectedCreate2Deployed = ["RollupL2DAValidator", "NoDAL2DAValidator"];
-
-        for (uint256 i; i < expectedCreate2Deployed.length; i++) {
-            if (compareStrings(contractName, expectedCreate2Deployed[i])) {
-                return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
-            }
-        }
-
-        revert(string.concat("No expected L2 address for: ", contractName));
-    }
-
     function getFullListOfFactoryDependencies() internal virtual returns (bytes[] memory factoryDeps) {
         bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
 
         string[] memory additionalForceDeployments = getAdditionalDependenciesNames();
 
-        bytes[] memory additionalDependencies = new bytes[](7 + additionalForceDeployments.length); // Deps after Gateway upgrade
+        bytes[] memory additionalDependencies = new bytes[](4 + additionalForceDeployments.length); // Deps after Gateway upgrade
         additionalDependencies[0] = ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
         additionalDependencies[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
-        additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
-        // TODO(refactor): do we need this?
-        additionalDependencies[4] = ContractsBytecodesLib.getCreationCode("DiamondProxy");
-        additionalDependencies[5] = ContractsBytecodesLib.getCreationCode("L2V29Upgrade");
-        additionalDependencies[6] = ContractsBytecodesLib.getCreationCode("ProxyAdmin");
+        additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("DiamondProxy");
+        additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ProxyAdmin");
 
         for (uint256 i; i < additionalForceDeployments.length; i++) {
-            additionalDependencies[6 + i] = ContractsBytecodesLib.getCreationCode(additionalForceDeployments[i]);
+            additionalDependencies[4 + i] = ContractsBytecodesLib.getCreationCode(additionalForceDeployments[i]);
         }
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, additionalDependencies);
         factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
+    }
+
+    function getAdditionalDependenciesNames() internal view virtual returns (string[] memory) {
+        return new string[](0);
     }
 
     function prepareFixedForceDeploymentsData() public view virtual returns (FixedForceDeploymentsData memory data) {
@@ -749,6 +719,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](8);
 
+        // TODO add deploy of GovernanceUpgradeTimer
         allCalls[0] = prepareCheckMigrationsPausedCalls();
         console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
         allCalls[1] = prepareUpgradeCTMCalls();
@@ -1017,23 +988,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
             return type(DiamondProxy).creationCode;
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return type(DefaultUpgrade).creationCode;
-            // TODO Calldata is not set and never called
-        } else if (compareStrings(contractName, "TransitionaryOwner")) {
-            return type(TransitionaryOwner).creationCode;
-            // TODO Calldata is not set and never called
         } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
             return type(GovernanceUpgradeTimer).creationCode;
-            // TODO Calldata is not set and never called
-        } else if (compareStrings(contractName, "L2StandardERC20")) {
-            return ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
-            // TODO Calldata is not set and never called
-        } else if (compareStrings(contractName, "RollupL2DAValidator")) {
-            return ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
         } else if (compareStrings(contractName, "UpgradeStageValidator")) {
             return type(UpgradeStageValidator).creationCode;
-            // TODO Calldata is not set and never called
-        } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
-            return ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
         } else {
             return super.getCreationCode(contractName, isZKBytecode);
         }
@@ -1050,6 +1008,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         require(!isZKBytecode, "ZK bytecodes are not supported in CTM upgrade");
         if (compareStrings(contractName, "UpgradeStageValidator")) {
             return abi.encode(discoveredCTM.ctmProxy, getNewProtocolVersion());
+        } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
+            uint256 initialDelay = newConfig.governanceUpgradeTimerInitialDelay;
+            uint256 maxAdditionalDelay = 2 weeks;
+            return abi.encode(initialDelay, maxAdditionalDelay, config.ownerAddress, newConfig.ecosystemAdminAddress);
         } else {
             return super.getCreationCalldata(contractName, isZKBytecode);
         }

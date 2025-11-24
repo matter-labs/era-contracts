@@ -37,10 +37,8 @@ contract UpgradeIntegrationTest is Test {
 
         // TODO : It's an artifact after splitting to Ecosystem upgrade stage
         Call[] memory upgradeGovernanceStage0Calls = new Call[](0);
-        (
-            Call[] memory upgradeGovernanceStage1Calls,
-            Call[] memory upgradeGovernanceStage2Calls
-        ) = ecosystemUpgrade.prepareDefaultGovernanceCalls();
+        (Call[] memory upgradeGovernanceStage1Calls, Call[] memory upgradeGovernanceStage2Calls) = ecosystemUpgrade
+            .prepareDefaultGovernanceCalls();
 
         console.log("Starting ecosystem upgrade stage 0!");
         governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage0Calls);
