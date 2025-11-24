@@ -238,7 +238,6 @@ contract GatewayCTMFromL1 is Script {
             bootloaderHash: config.bootloaderHash,
             defaultAccountHash: config.defaultAAHash,
             evmEmulatorHash: config.evmEmulatorHash,
-            priorityTxMaxGasLimit: config.priorityTxMaxGasLimit,
             genesisRoot: config.genesisRoot,
             genesisRollupLeafIndex: uint64(config.genesisRollupLeafIndex),
             genesisBatchCommitment: config.genesisBatchCommitment,

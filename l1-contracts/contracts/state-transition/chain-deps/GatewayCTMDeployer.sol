@@ -25,7 +25,6 @@ import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {EraTestnetVerifier} from "../verifiers/EraTestnetVerifier.sol";
 import {ZKsyncOSTestnetVerifier} from "../verifiers/ZKsyncOSTestnetVerifier.sol";
 import {ValidatorTimelock} from "../ValidatorTimelock.sol";
-import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
 
 import {DiamondInit} from "./DiamondInit.sol";
 import {L1GenesisUpgrade} from "../../upgrades/L1GenesisUpgrade.sol";

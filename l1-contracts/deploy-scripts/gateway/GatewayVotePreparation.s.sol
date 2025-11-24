@@ -98,23 +98,9 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
             gettersSelectors: Utils.getAllSelectorsForFacet("Getters"),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            }),
-            feeParams: FeeParams({
-                pubdataPricingMode: config.contracts.chainCreationParams.diamondInitPubdataPricingMode,
-                batchOverheadL1Gas: uint32(config.contracts.chainCreationParams.diamondInitBatchOverheadL1Gas),
-                maxPubdataPerBatch: uint32(config.contracts.chainCreationParams.diamondInitMaxPubdataPerBatch),
-                maxL2GasPerBatch: uint32(config.contracts.chainCreationParams.diamondInitMaxL2GasPerBatch),
-                priorityTxMaxPubdata: uint32(config.contracts.chainCreationParams.diamondInitPriorityTxMaxPubdata),
-                minimalL2GasPrice: uint64(config.contracts.chainCreationParams.diamondInitMinimalL2GasPrice)
-            }),
             bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
             defaultAccountHash: config.contracts.chainCreationParams.defaultAAHash,
             evmEmulatorHash: config.contracts.chainCreationParams.evmEmulatorHash,
-            priorityTxMaxGasLimit: config.contracts.chainCreationParams.priorityTxMaxGasLimit,
             genesisRoot: config.contracts.chainCreationParams.genesisRoot,
             genesisRollupLeafIndex: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
