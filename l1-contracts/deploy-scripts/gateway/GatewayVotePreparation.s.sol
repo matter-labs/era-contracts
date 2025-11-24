@@ -203,8 +203,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 // No need for default upgrade on gateway
                 defaultUpgrade: address(0),
                 diamondProxy: address(0),
-                bytecodesSupplier: address(0),
-                isOnGateway: true
+                bytecodesSupplier: address(0)
             }),
             multicall3: expectedGatewayContracts.multicall3,
             diamondCutData: expectedGatewayContracts.diamondCutData,

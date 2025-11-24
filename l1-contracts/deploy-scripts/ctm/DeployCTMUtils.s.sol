@@ -243,7 +243,6 @@ abstract contract DeployCTMUtils is DeployUtils {
             initAddress: stateTransition.diamondInit,
             initCalldata: abi.encode(initializeData)
         });
-        config.contracts.diamondCutData = abi.encode(diamondCut);
     }
 
     function getChainCreationParams(
@@ -251,6 +250,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     ) internal returns (ChainCreationParams memory) {
         require(generatedData.forceDeploymentsData.length != 0, "force deployments data is empty");
         Diamond.DiamondCutData memory diamondCut = getChainCreationDiamondCutData(stateTransition);
+        config.contracts.diamondCutData = abi.encode(diamondCut);
         return
             ChainCreationParams({
                 genesisUpgrade: stateTransition.genesisUpgrade,

@@ -208,9 +208,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
     function encodePostUpgradeCalldata(
         StateTransitionDeployedAddresses memory stateTransitionAddresses
     ) internal override returns (bytes memory) {
-        address[] memory oldValidatorTimelocks = stateTransitionAddresses.isOnGateway
-            ? oldGatewayValidatorTimelocks
-            : oldValidatorTimelocks;
+        address[] memory oldValidatorTimelocks = oldValidatorTimelocks;
         return
             abi.encode(
                 L1V29Upgrade.V29UpgradeParams({

@@ -21,7 +21,7 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 
-/// @notice Script used for default upgrade flow
+/// @notice Script used for default ecosystem upgrade flow should be run as a first for the upgrade.
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
 contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
     using stdToml for string;

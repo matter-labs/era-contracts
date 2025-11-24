@@ -80,7 +80,6 @@ struct StateTransitionDeployedAddresses {
     address serverNotifierImplementation;
     address rollupDAManager;
     address rollupSLDAValidator;
-    bool isOnGateway;
 }
 
 struct ChainCreationParamsConfig {
