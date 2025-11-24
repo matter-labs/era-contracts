@@ -10,6 +10,7 @@ import {POINT_EVALUATION_PRECOMPILE_ADDR, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, TES
 import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {BatchHashMismatch, CantExecuteUnprovenBatches, NonSequentialBatch, PriorityOperationsRollingHashMismatch, QueueIsEmpty, TxHashMismatch} from "contracts/common/L1ContractErrors.sol";
+import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
 
 contract ExecutingTest is ExecutorTest {
     bytes32 l2DAValidatorOutputHash;
@@ -285,7 +286,7 @@ contract ExecutingTest is ExecutorTest {
         }
     }
 
-    /*    function test_RevertWhen_ExecutingWithUnmatchedPriorityOperationHash() public { //TODO rework test without deprecated fn
+    function test_RevertWhen_ExecutingWithUnmatchedPriorityOperationHash() public { //TODO rework test without deprecated fn
         appendPriorityOps();
 
         vm.prank(validator);
@@ -366,7 +367,7 @@ contract ExecutingTest is ExecutorTest {
         uint256 l2Value = 10 ether;
         uint256 totalCost = baseCost + l2Value;
 
-//        mailbox.requestL2Transaction{value: totalCost}({ //@check deprecate
+//        mailbox.requestL2Transaction{value: totalCost}({ //@check deprecate mailbox.bridgehubRequestL2Transactio
 //            _contractL2: address(0),
 //            _l2Value: l2Value,
 //            _calldata: bytes(""),
@@ -375,6 +376,20 @@ contract ExecutingTest is ExecutorTest {
 //            _factoryDeps: factoryDeps,
 //            _refundRecipient: address(0)
 //        });
+
+        mailbox.bridgehubRequestL2Transaction( //@check BridgehubL2TransactionRequest calldata _request
+            BridgehubL2TransactionRequest({
+                sender: msg.sender,
+                contractL2: address(0),
+                mintValue: totalCost,
+                l2Value: l2Value,
+                l2GasLimit: l2GasLimit,
+                l2Calldata: bytes(""),
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                factoryDeps: factoryDeps,
+                refundRecipient: address(0)
+            })
+        );
 
         vm.prank(validator);
         vm.expectRevert(PriorityOperationsRollingHashMismatch.selector);
@@ -386,7 +401,7 @@ contract ExecutingTest is ExecutorTest {
             );
             executor.executeBatchesSharedBridge(address(0), processBatchFrom, processBatchTo, processData);
         }
-    }*/
+    }
 
     function test_RevertWhen_CommittingBlockWithWrongPreviousBatchHash() public {
         appendPriorityOps();
