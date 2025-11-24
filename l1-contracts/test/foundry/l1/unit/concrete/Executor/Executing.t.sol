@@ -286,7 +286,7 @@ contract ExecutingTest is ExecutorTest {
         }
     }
 
-    function test_RevertWhen_ExecutingWithUnmatchedPriorityOperationHash() public { //TODO rework test without deprecated fn
+    function test_RevertWhen_ExecutingWithUnmatchedPriorityOperationHash() public {
         appendPriorityOps();
 
         vm.prank(validator);
@@ -367,17 +367,8 @@ contract ExecutingTest is ExecutorTest {
         uint256 l2Value = 10 ether;
         uint256 totalCost = baseCost + l2Value;
 
-//        mailbox.requestL2Transaction{value: totalCost}({ //@check deprecate mailbox.bridgehubRequestL2Transactio
-//            _contractL2: address(0),
-//            _l2Value: l2Value,
-//            _calldata: bytes(""),
-//            _l2GasLimit: l2GasLimit,
-//            _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-//            _factoryDeps: factoryDeps,
-//            _refundRecipient: address(0)
-//        });
-
-        mailbox.bridgehubRequestL2Transaction( //@check BridgehubL2TransactionRequest calldata _request
+        vm.prank(bridgeHubAddr);
+        mailbox.bridgehubRequestL2Transaction(
             BridgehubL2TransactionRequest({
                 sender: msg.sender,
                 contractL2: address(0),

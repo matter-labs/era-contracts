@@ -44,6 +44,7 @@ contract ExecutorTest is Test {
     address internal validator;
     address internal randomSigner;
     address internal l1DAValidator;
+    address internal bridgeHubAddr;
     AdminFacet internal admin;
     TestExecutor internal executor;
     GettersFacet internal getters;
@@ -134,11 +135,12 @@ contract ExecutorTest is Test {
     }
 
     function getMailboxSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](4);
+        bytes4[] memory selectors = new bytes4[](5);
         uint256 i = 0;
         selectors[i++] = mailbox.proveL2MessageInclusion.selector;
         selectors[i++] = mailbox.proveL2LogInclusion.selector;
         selectors[i++] = mailbox.proveL1ToL2TransactionStatus.selector;
+        selectors[i++] = mailbox.bridgehubRequestL2Transaction.selector;
         selectors[i++] = mailbox.l2TransactionBaseCost.selector;
         return selectors;
     }
@@ -177,6 +179,7 @@ contract ExecutorTest is Test {
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
         DummyBridgehub dummyBridgehub = new DummyBridgehub();
+        bridgeHubAddr = address(dummyBridgehub);
         messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)), l1ChainID);
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
@@ -205,7 +208,7 @@ contract ExecutorTest is Test {
             abi.encode(bool(true))
         );
 
-        validatorTimelock = ValidatorTimelock(deployValidatorTimelock(address(dummyBridgehub), owner, 0));
+        validatorTimelock = ValidatorTimelock(deployValidatorTimelock(bridgeHubAddr, owner, 0));
 
         DiamondInit diamondInit = new DiamondInit();
 
