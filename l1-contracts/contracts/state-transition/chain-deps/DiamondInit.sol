@@ -4,15 +4,16 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {ZKChainBase} from "./facets/ZKChainBase.sol";
-import {DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION} from "../../common/Config.sol";
+import {DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, L2_TO_L1_LOG_SERIALIZE_SIZE, BATCH_OVERHEAD_L1_GAS_DEFAULT, MAX_PUBDATA_PER_BATCH_DEFAULT, MAX_L2_GAS_PER_BATCH_DEFAULT, PRIORITY_TX_MAX_PUBDATA_DEFAULT, MINIMAL_L2_GAS_PRICE_DEFAULT, PUBDATA_PRICING_MODE_DEFAULT, PRIORITY_TX_MAX_GAS_LIMIT_DEFAULT} from "../../common/Config.sol";
 import {IDiamondInit, InitializeData} from "../chain-interfaces/IDiamondInit.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
-import {EmptyAssetId, EmptyBytes32, TooMuchGas, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {EmptyAssetId, EmptyBytes32, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
+import {FeeParams} from "../../state-transition/chain-deps/ZKChainStorage.sol";
 
 /// @author Matter Labs
 /// @dev The contract is used only once to initialize the diamond proxy.
@@ -42,9 +43,6 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         }
         if (_initializeData.validatorTimelock == address(0)) {
             revert ZeroAddress();
-        }
-        if (_initializeData.priorityTxMaxGasLimit > MAX_GAS_PER_TRANSACTION) {
-            revert TooMuchGas();
         }
         if (_initializeData.bridgehub == address(0)) {
             revert ZeroAddress();
@@ -93,8 +91,15 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.l2BootloaderBytecodeHash = _initializeData.l2BootloaderBytecodeHash;
         s.l2DefaultAccountBytecodeHash = _initializeData.l2DefaultAccountBytecodeHash;
         s.l2EvmEmulatorBytecodeHash = _initializeData.l2EvmEmulatorBytecodeHash;
-        s.priorityTxMaxGasLimit = _initializeData.priorityTxMaxGasLimit;
-        s.feeParams = _initializeData.feeParams;
+        s.priorityTxMaxGasLimit = PRIORITY_TX_MAX_GAS_LIMIT_DEFAULT;
+        s.feeParams = FeeParams({
+            pubdataPricingMode: PUBDATA_PRICING_MODE_DEFAULT,
+            batchOverheadL1Gas: BATCH_OVERHEAD_L1_GAS_DEFAULT,
+            maxPubdataPerBatch: MAX_PUBDATA_PER_BATCH_DEFAULT,
+            maxL2GasPerBatch: MAX_L2_GAS_PER_BATCH_DEFAULT,
+            priorityTxMaxPubdata: PRIORITY_TX_MAX_PUBDATA_DEFAULT,
+            minimalL2GasPrice: MINIMAL_L2_GAS_PRICE_DEFAULT
+        });
         s.priorityTree.setup(s.__DEPRECATED_priorityQueue.getTotalPriorityTxs());
         s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
         s.zksyncOS = IS_ZKSYNC_OS;

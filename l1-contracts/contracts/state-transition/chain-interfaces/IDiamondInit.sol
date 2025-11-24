@@ -3,7 +3,6 @@
 pragma solidity ^0.8.21;
 
 import {IVerifier, VerifierParams} from "./IVerifier.sol";
-import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
 
 /// @param chainId the id of the chain
 /// @param bridgehub the address of the bridgehub contract
@@ -18,8 +17,6 @@ import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
 /// @param l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
 /// @param l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
 /// @param l2EvmEmulatorBytecodeHash The hash of EVM emulator L2 bytecode
-/// @param priorityTxMaxGasLimit maximum number of the L2 gas that a user can request for L1 -> L2 transactions
-/// @param feeParams Fee parameters to be used for L1->L2 transactions
 // solhint-disable-next-line gas-struct-packing
 struct InitializeData {
     uint256 chainId;
@@ -36,8 +33,6 @@ struct InitializeData {
     bytes32 l2BootloaderBytecodeHash;
     bytes32 l2DefaultAccountBytecodeHash;
     bytes32 l2EvmEmulatorBytecodeHash;
-    uint256 priorityTxMaxGasLimit;
-    FeeParams feeParams;
 }
 
 /// @param verifier address of Verifier contract
@@ -45,16 +40,12 @@ struct InitializeData {
 /// @param l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
 /// @param l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
 /// @param l2EvmEmulatorBytecodeHash The hash of EVM emulator L2 bytecode
-/// @param priorityTxMaxGasLimit maximum number of the L2 gas that a user can request for L1 -> L2 transactions
-/// @param feeParams Fee parameters to be used for L1->L2 transactions
 struct InitializeDataNewChain {
     IVerifier verifier;
     VerifierParams verifierParams;
     bytes32 l2BootloaderBytecodeHash;
     bytes32 l2DefaultAccountBytecodeHash;
     bytes32 l2EvmEmulatorBytecodeHash;
-    uint256 priorityTxMaxGasLimit;
-    FeeParams feeParams;
 }
 
 interface IDiamondInit {

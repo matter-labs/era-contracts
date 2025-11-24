@@ -89,16 +89,7 @@ contract ChainRegistrarTest is Test {
             }),
             l2BootloaderBytecodeHash: bytes32(0),
             l2DefaultAccountBytecodeHash: bytes32(0),
-            l2EvmEmulatorBytecodeHash: bytes32(0),
-            priorityTxMaxGasLimit: 10,
-            feeParams: FeeParams({
-                pubdataPricingMode: PubdataPricingMode.Rollup,
-                batchOverheadL1Gas: 1_000_000,
-                maxPubdataPerBatch: 110_000,
-                maxL2GasPerBatch: 80_000_000,
-                priorityTxMaxPubdata: 99_000,
-                minimalL2GasPrice: 250_000_000
-            })
+            l2EvmEmulatorBytecodeHash: bytes32(0)
         });
         initCalldata = abi.encode(initializeData);
 

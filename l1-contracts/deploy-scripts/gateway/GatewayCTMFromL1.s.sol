@@ -516,9 +516,7 @@ contract GatewayCTMFromL1 is Script {
             verifierParams: verifierParams,
             l2BootloaderBytecodeHash: config.bootloaderHash,
             l2DefaultAccountBytecodeHash: config.defaultAAHash,
-            l2EvmEmulatorBytecodeHash: config.evmEmulatorHash,
-            priorityTxMaxGasLimit: config.priorityTxMaxGasLimit,
-            feeParams: feeParams
+            l2EvmEmulatorBytecodeHash: config.evmEmulatorHash
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({

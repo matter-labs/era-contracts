@@ -251,3 +251,25 @@ uint256 constant CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET = 1;
 uint256 constant CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET = 1 days;
 
 uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET = 2 days;
+
+uint32 constant BATCH_OVERHEAD_L1_GAS_DEFAULT = 1_000_000;
+
+uint32 constant MAX_PUBDATA_PER_BATCH_DEFAULT = 120_000;
+
+uint32 constant MAX_L2_GAS_PER_BATCH_DEFAULT = 80_000_000;
+
+uint32 constant PRIORITY_TX_MAX_PUBDATA_DEFAULT = 99_000;
+
+uint64 constant MINIMAL_L2_GAS_PRICE_DEFAULT = 250_000_000;
+
+/// @notice The struct that describes whether users will be charged for pubdata for L1->L2 transactions.
+/// @param Rollup The users are charged for pubdata & it is priced based on the gas price on Ethereum.
+/// @param Validium The pubdata is considered free with regard to the L1 gas price.
+enum PubdataPricingMode {
+    Rollup,
+    Validium
+}
+
+PubdataPricingMode constant PUBDATA_PRICING_MODE_DEFAULT = PubdataPricingMode.Rollup;
+
+uint64 constant PRIORITY_TX_MAX_GAS_LIMIT_DEFAULT = 72_000_000;

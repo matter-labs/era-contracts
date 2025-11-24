@@ -280,9 +280,7 @@ contract ExecutorTest is UtilsTest {
             }),
             l2BootloaderBytecodeHash: dummyHash,
             l2DefaultAccountBytecodeHash: dummyHash,
-            l2EvmEmulatorBytecodeHash: dummyHash,
-            priorityTxMaxGasLimit: 1000000,
-            feeParams: defaultFeeParams()
+            l2EvmEmulatorBytecodeHash: dummyHash
         });
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), baseTokenAssetId);
 
