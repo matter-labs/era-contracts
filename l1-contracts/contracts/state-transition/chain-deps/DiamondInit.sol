@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {ZKChainBase} from "./facets/ZKChainBase.sol";
-import {DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, L2_TO_L1_LOG_SERIALIZE_SIZE, BATCH_OVERHEAD_L1_GAS_DEFAULT, MAX_PUBDATA_PER_BATCH_DEFAULT, MAX_L2_GAS_PER_BATCH_DEFAULT, PRIORITY_TX_MAX_PUBDATA_DEFAULT, MINIMAL_L2_GAS_PRICE_DEFAULT, PUBDATA_PRICING_MODE_DEFAULT, PRIORITY_TX_MAX_GAS_LIMIT_DEFAULT} from "../../common/Config.sol";
+import {DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_BATCH_OVERHEAD_L1_GAS, DEFAULT_MAX_PUBDATA_PER_BATCH, DEFAULT_MAX_L2_GAS_PER_BATCH, DEFAULT_PRIORITY_TX_MAX_PUBDATA, DEFAULT_MINIMAL_L2_GAS_PRICE, DEFAULT_PUBDATA_PRICING_MODE, DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT} from "../../common/Config.sol";
 import {IDiamondInit, InitializeData} from "../chain-interfaces/IDiamondInit.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
@@ -90,14 +90,14 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.l2BootloaderBytecodeHash = _initializeData.l2BootloaderBytecodeHash;
         s.l2DefaultAccountBytecodeHash = _initializeData.l2DefaultAccountBytecodeHash;
         s.l2EvmEmulatorBytecodeHash = _initializeData.l2EvmEmulatorBytecodeHash;
-        s.priorityTxMaxGasLimit = PRIORITY_TX_MAX_GAS_LIMIT_DEFAULT;
+        s.priorityTxMaxGasLimit = DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT;
         s.feeParams = FeeParams({
-            pubdataPricingMode: PUBDATA_PRICING_MODE_DEFAULT,
-            batchOverheadL1Gas: BATCH_OVERHEAD_L1_GAS_DEFAULT,
-            maxPubdataPerBatch: MAX_PUBDATA_PER_BATCH_DEFAULT,
-            maxL2GasPerBatch: MAX_L2_GAS_PER_BATCH_DEFAULT,
-            priorityTxMaxPubdata: PRIORITY_TX_MAX_PUBDATA_DEFAULT,
-            minimalL2GasPrice: MINIMAL_L2_GAS_PRICE_DEFAULT
+            pubdataPricingMode: DEFAULT_PUBDATA_PRICING_MODE,
+            batchOverheadL1Gas: DEFAULT_BATCH_OVERHEAD_L1_GAS,
+            maxPubdataPerBatch: DEFAULT_MAX_PUBDATA_PER_BATCH,
+            maxL2GasPerBatch: DEFAULT_MAX_L2_GAS_PER_BATCH,
+            priorityTxMaxPubdata: DEFAULT_PRIORITY_TX_MAX_PUBDATA,
+            minimalL2GasPrice: DEFAULT_MINIMAL_L2_GAS_PRICE
         });
         s.priorityTree.setup(s.__DEPRECATED_priorityQueue.getTotalPriorityTxs());
         s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
