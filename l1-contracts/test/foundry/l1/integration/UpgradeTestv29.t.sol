@@ -35,8 +35,9 @@ contract UpgradeIntegrationTest is Test {
         console.log("Preparing chain for the upgrade");
         chainUpgrade.prepareChain(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT, CHAIN_INPUT, CHAIN_OUTPUT);
 
+        // TODO : It's an artifact after splitting to Ecosystem upgrade stage
+        Call[] memory upgradeGovernanceStage0Calls = new Call[](0);
         (
-            Call[] memory upgradeGovernanceStage0Calls,
             Call[] memory upgradeGovernanceStage1Calls,
             Call[] memory upgradeGovernanceStage2Calls
         ) = ecosystemUpgrade.prepareDefaultGovernanceCalls();

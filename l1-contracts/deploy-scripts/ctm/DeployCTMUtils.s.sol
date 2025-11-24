@@ -53,6 +53,7 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET, CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
+import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";

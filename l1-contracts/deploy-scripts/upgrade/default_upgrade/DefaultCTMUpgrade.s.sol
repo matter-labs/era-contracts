@@ -219,11 +219,11 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
             );
     }
 
-    function getNewProtocolVersion() public virtual returns (uint256) {
+    function getNewProtocolVersion() public view virtual returns (uint256) {
         return config.contracts.chainCreationParams.latestProtocolVersion;
     }
 
-    function getOldProtocolVersion() public virtual returns (uint256) {
+    function getOldProtocolVersion() public view virtual returns (uint256) {
         return newConfig.oldProtocolVersion;
     }
 
