@@ -235,19 +235,6 @@ contract GatewayCTMFromL1 is Script {
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
             gettersSelectors: Utils.getAllSelectorsForFacet("Getters"),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: config.recursionNodeLevelVkHash,
-                recursionLeafLevelVkHash: config.recursionLeafLevelVkHash,
-                recursionCircuitsSetVksHash: config.recursionCircuitsSetVksHash
-            }),
-            feeParams: FeeParams({
-                pubdataPricingMode: config.diamondInitPubdataPricingMode,
-                batchOverheadL1Gas: uint32(config.diamondInitBatchOverheadL1Gas),
-                maxPubdataPerBatch: uint32(config.diamondInitMaxPubdataPerBatch),
-                maxL2GasPerBatch: uint32(config.diamondInitMaxL2GasPerBatch),
-                priorityTxMaxPubdata: uint32(config.diamondInitPriorityTxMaxPubdata),
-                minimalL2GasPrice: uint64(config.diamondInitMinimalL2GasPrice)
-            }),
             bootloaderHash: config.bootloaderHash,
             defaultAccountHash: config.defaultAAHash,
             evmEmulatorHash: config.evmEmulatorHash,
@@ -496,12 +483,6 @@ contract GatewayCTMFromL1 is Script {
             selectors: Utils.getAllSelectorsForFacet("Executor")
         });
 
-        VerifierParams memory verifierParams = VerifierParams({
-            recursionNodeLevelVkHash: config.recursionNodeLevelVkHash,
-            recursionLeafLevelVkHash: config.recursionLeafLevelVkHash,
-            recursionCircuitsSetVksHash: config.recursionCircuitsSetVksHash
-        });
-
         FeeParams memory feeParams = FeeParams({
             pubdataPricingMode: config.diamondInitPubdataPricingMode,
             batchOverheadL1Gas: uint32(config.diamondInitBatchOverheadL1Gas),
@@ -513,7 +494,6 @@ contract GatewayCTMFromL1 is Script {
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(output.gatewayStateTransition.verifier),
-            verifierParams: verifierParams,
             l2BootloaderBytecodeHash: config.bootloaderHash,
             l2DefaultAccountBytecodeHash: config.defaultAAHash,
             l2EvmEmulatorBytecodeHash: config.evmEmulatorHash

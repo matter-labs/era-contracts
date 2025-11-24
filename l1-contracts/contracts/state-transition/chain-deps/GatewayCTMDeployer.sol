@@ -19,7 +19,7 @@ import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifier
 import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
 import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 
-import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
+import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IEIP7702Checker} from "../chain-interfaces/IEIP7702Checker.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {EraTestnetVerifier} from "../verifiers/EraTestnetVerifier.sol";
@@ -66,21 +66,12 @@ struct GatewayCTMDeployerConfig {
     bytes4[] mailboxSelectors;
     /// @notice Array of function selectors for the Getters facet.
     bytes4[] gettersSelectors;
-    /// @notice Parameters for the verifier contract.
-    VerifierParams verifierParams;
-    /// @notice Parameters related to fees.
-    /// @dev They are mainly related to the L1->L2 transactions, fees for
-    /// which are not processed on Gateway. However, we still need these
-    /// values to deploy new chain's instances on Gateway.
-    FeeParams feeParams;
     /// @notice Hash of the bootloader bytecode.
     bytes32 bootloaderHash;
     /// @notice Hash of the default account bytecode.
     bytes32 defaultAccountHash;
     /// @notice Hash of the EVM emulator bytecode.
     bytes32 evmEmulatorHash;
-    /// @notice Maximum gas limit for priority transactions.
-    uint256 priorityTxMaxGasLimit;
     /// @notice Root hash of the genesis state.
     bytes32 genesisRoot;
     /// @notice Leaf index in the genesis rollup.
@@ -442,7 +433,6 @@ contract GatewayCTMDeployer {
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(_deployedContracts.stateTransition.verifier),
-            verifierParams: _config.verifierParams,
             l2BootloaderBytecodeHash: _config.bootloaderHash,
             l2DefaultAccountBytecodeHash: _config.defaultAccountHash,
             l2EvmEmulatorBytecodeHash: _config.evmEmulatorHash

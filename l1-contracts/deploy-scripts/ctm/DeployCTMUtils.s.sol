@@ -268,8 +268,6 @@ abstract contract DeployCTMUtils is DeployUtils {
     function getInitializeData(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (DiamondInitializeDataNewChain memory) {
-        VerifierParams memory verifierParams = getVerifierParams();
-
         require(stateTransition.verifier != address(0), "verifier is zero");
         require(config.contracts.chainCreationParams.bootloaderHash != bytes32(0), "bootloader hash is zero");
         require(config.contracts.chainCreationParams.defaultAAHash != bytes32(0), "default aa hash is zero");
@@ -278,7 +276,6 @@ abstract contract DeployCTMUtils is DeployUtils {
         return
             DiamondInitializeDataNewChain({
                 verifier: IVerifier(stateTransition.verifier),
-                verifierParams: verifierParams,
                 l2BootloaderBytecodeHash: config.contracts.chainCreationParams.bootloaderHash,
                 l2DefaultAccountBytecodeHash: config.contracts.chainCreationParams.defaultAAHash,
                 l2EvmEmulatorBytecodeHash: config.contracts.chainCreationParams.evmEmulatorHash

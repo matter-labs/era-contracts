@@ -72,12 +72,6 @@ contract UpgradeLogicTest is DiamondCutTest {
             selectors: Utils.getGettersSelectors()
         });
 
-        VerifierParams memory dummyVerifierParams = VerifierParams({
-            recursionNodeLevelVkHash: 0,
-            recursionLeafLevelVkHash: 0,
-            recursionCircuitsSetVksHash: 0
-        });
-
         InitializeData memory params = InitializeData({
             // TODO REVIEW
             chainId: 1,
@@ -93,7 +87,6 @@ contract UpgradeLogicTest is DiamondCutTest {
             // genesisIndexRepeatedStorageChanges: 0,
             // genesisBatchCommitment: bytes32(0),
             verifier: IVerifier(0x03752D8252d67f99888E741E3fB642803B29B155), // verifier
-            verifierParams: dummyVerifierParams,
             // zkPorterIsAvailable: false,
             l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
             l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
