@@ -101,24 +101,9 @@ contract GatewayCTMDeployerTest is Test {
             executorSelectors: new bytes4[](2),
             mailboxSelectors: new bytes4[](2),
             gettersSelectors: new bytes4[](2),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            }),
-            feeParams: FeeParams({
-                // Just random values
-                pubdataPricingMode: PubdataPricingMode.Rollup,
-                batchOverheadL1Gas: uint32(1_000_000),
-                maxPubdataPerBatch: uint32(500_000),
-                maxL2GasPerBatch: uint32(2_000_000_000),
-                priorityTxMaxPubdata: uint32(99_000),
-                minimalL2GasPrice: uint64(20000000)
-            }),
             bootloaderHash: bytes32(uint256(0xabc)),
             defaultAccountHash: bytes32(uint256(0xdef)),
             evmEmulatorHash: bytes32(uint256(0xdef)),
-            priorityTxMaxGasLimit: 100000,
             genesisRoot: bytes32(uint256(0x123)),
             genesisRollupLeafIndex: 10,
             genesisBatchCommitment: bytes32(uint256(0x456)),

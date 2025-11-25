@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../state-transition/libraries/PriorityTree.sol";
-import {L2DACommitmentScheme} from "../../common/Config.sol";
+import {L2DACommitmentScheme, PubdataPricingMode} from "../../common/Config.sol";
 
 /// @notice Indicates whether an upgrade is initiated and if yes what type
 /// @param None Upgrade is NOT initiated
@@ -33,14 +33,6 @@ struct UpgradeStorage {
     bool approvedBySecurityCouncil;
     uint40 proposedUpgradeTimestamp;
     uint40 currentProposalId;
-}
-
-/// @notice The struct that describes whether users will be charged for pubdata for L1->L2 transactions.
-/// @param Rollup The users are charged for pubdata & it is priced based on the gas price on Ethereum.
-/// @param Validium The pubdata is considered free with regard to the L1 gas price.
-enum PubdataPricingMode {
-    Rollup,
-    Validium
 }
 
 /// @notice The fee params for L1->L2 transactions for the network.

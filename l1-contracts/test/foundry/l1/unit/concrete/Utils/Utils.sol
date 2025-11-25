@@ -448,23 +448,6 @@ library Utils {
         return IVerifier(testnetVerifier);
     }
 
-    function makeVerifierParams() public pure returns (VerifierParams memory) {
-        return
-            VerifierParams({recursionNodeLevelVkHash: 0, recursionLeafLevelVkHash: 0, recursionCircuitsSetVksHash: 0});
-    }
-
-    function makeFeeParams() public pure returns (FeeParams memory) {
-        return
-            FeeParams({
-                pubdataPricingMode: PubdataPricingMode.Rollup,
-                batchOverheadL1Gas: 1_000_000,
-                maxPubdataPerBatch: 110_000,
-                maxL2GasPerBatch: 80_000_000,
-                priorityTxMaxPubdata: 99_000,
-                minimalL2GasPrice: 250_000_000
-            });
-    }
-
     function makeInitializeData(address testnetVerifier, address bridgehub) public returns (InitializeData memory) {
         return
             InitializeData({
@@ -478,12 +461,9 @@ library Utils {
                 baseTokenAssetId: bytes32(uint256(0x923645439232223445)),
                 storedBatchZero: bytes32(0),
                 verifier: makeVerifier(testnetVerifier),
-                verifierParams: makeVerifierParams(),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                priorityTxMaxGasLimit: 500000,
-                feeParams: makeFeeParams()
+                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
             });
     }
 
@@ -493,12 +473,9 @@ library Utils {
         return
             InitializeDataNewChain({
                 verifier: makeVerifier(testnetVerifier),
-                verifierParams: makeVerifierParams(),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                priorityTxMaxGasLimit: 80000000,
-                feeParams: makeFeeParams()
+                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
             });
     }
 
