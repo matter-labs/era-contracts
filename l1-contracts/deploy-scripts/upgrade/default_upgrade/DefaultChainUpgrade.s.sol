@@ -29,34 +29,18 @@ contract DefaultChainUpgrade is Script {
     address currentChainAdmin;
     ChainConfig config;
 
-    function prepareChain(
-        string memory ecosystemInputPath,
-        string memory ecosystemOutputPath,
-        string memory configPath,
-        string memory outputPath
-    ) public {
+    function prepareChain(string memory configPath) public {
         string memory root = vm.projectRoot();
-        ecosystemInputPath = string.concat(root, ecosystemInputPath);
-        ecosystemOutputPath = string.concat(root, ecosystemOutputPath);
         configPath = string.concat(root, configPath);
-        outputPath = string.concat(root, outputPath);
 
-        initializeConfig(configPath, ecosystemInputPath, ecosystemOutputPath);
+        initializeConfig(configPath);
 
         // This script does nothing, it only checks that the provided inputs are correct.
         // It is just a wrapper to easily call `upgradeChain`
     }
 
     function run() public {
-        // TODO: maybe make it read from 1 exact input file,
-        // for now doing it this way is just faster
-
-        prepareChain(
-            "/script-config/gateway-upgrade-ecosystem.toml",
-            "/script-out/gateway-upgrade-ecosystem.toml",
-            "/script-config/gateway-upgrade-chain.toml",
-            "/script-out/gateway-upgrade-chain.toml"
-        );
+        prepareChain("/script-config/chain-upgrade.toml");
     }
 
     function upgradeChain(uint256 oldProtocolVersion, Diamond.DiamondCutData memory upgradeCutData) public {
@@ -77,11 +61,7 @@ contract DefaultChainUpgrade is Script {
         IChainAdminOwnable(admin).setUpgradeTimestamp(newProtocolVersion, timestamp);
     }
 
-    function initializeConfig(
-        string memory configPath,
-        string memory ecosystemInputPath,
-        string memory ecosystemOutputPath
-    ) internal {
+    function initializeConfig(string memory configPath) internal {
         config.deployerAddress = msg.sender;
 
         // Grab config from output of l1 deployment
@@ -92,9 +72,7 @@ contract DefaultChainUpgrade is Script {
         // https://book.getfoundry.sh/cheatcodes/parse-toml
 
         config.chainChainId = toml.readUint("$.chain.chain_id");
-
-        toml = vm.readFile(ecosystemInputPath);
-        config.bridgehubProxyAddress = toml.readAddress("$.contracts.bridgehub_proxy_address");
+        config.bridgehubProxyAddress = toml.readAddress("$.bridgehub_proxy_address");
 
         config.chainDiamondProxyAddress = L1Bridgehub(config.bridgehubProxyAddress).getZKChain(config.chainChainId);
     }

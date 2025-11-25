@@ -30,7 +30,7 @@ contract UpgradeLocalDevnet is Script, EcosystemUpgrade {
         prepareEcosystemUpgrade();
 
         console.log("Preparing chain for the upgrade");
-        chainUpgrade.prepareChain(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT, CHAIN_INPUT, CHAIN_OUTPUT);
+        chainUpgrade.prepareChain(CHAIN_INPUT);
 
         (
             Call[] memory upgradeGovernanceStage1Calls,
