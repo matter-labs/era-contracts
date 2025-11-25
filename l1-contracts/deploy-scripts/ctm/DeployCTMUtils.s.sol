@@ -434,13 +434,13 @@ abstract contract DeployCTMUtils is DeployUtils {
         }
     }
 
-    function getCTMCoreDeploymentConfig(Config memory config) internal view returns (CTMCoreDeploymentConfig memory) {
+    function getCTMCoreDeploymentConfig(Config memory _config) internal view returns (CTMCoreDeploymentConfig memory) {
         return
             CTMCoreDeploymentConfig({
-                isZKsyncOS: config.isZKsyncOS,
-                testnetVerifier: config.testnetVerifier,
-                eraChainId: config.eraChainId,
-                l1ChainId: config.l1ChainId,
+                isZKsyncOS: _config.isZKsyncOS,
+                testnetVerifier: _config.testnetVerifier,
+                eraChainId: _config.eraChainId,
+                l1ChainId: _config.l1ChainId,
                 bridgehubProxy: discoveredBridgehub.bridgehubProxy,
                 interopCenterProxy: discoveredBridgehub.interopCenterProxy,
                 rollupDAManager: addresses.daAddresses.rollupDAManager,

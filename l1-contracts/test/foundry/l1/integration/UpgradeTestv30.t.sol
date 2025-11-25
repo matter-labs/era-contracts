@@ -5,10 +5,11 @@ pragma solidity ^0.8.24;
 
 import {console2 as console} from "forge-std/Script.sol";
 
-import {EcosystemUpgrade_v29} from "../../../../deploy-scripts/upgrade/v29/EcosystemUpgrade_v29.s.sol";
+import {EcosystemUpgrade_v30} from "../../../../deploy-scripts/upgrade/v30/EcosystemUpgrade_v30.s.sol";
 import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default_upgrade/DefaultChainUpgrade.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
+import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default_upgrade/DefaultCTMUpgrade.s.sol";
 
 // For now, this test is testing "stage" - as mainnet wasn't updated yet.
 string constant ECOSYSTEM_INPUT = "/upgrade-envs/v0.29.2-interopA-ff/mainnet.toml";
@@ -17,14 +18,17 @@ string constant CHAIN_INPUT = "/upgrade-envs/v0.29.2-interopA-ff/mainnet-gateway
 string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet-gateway.toml";
 
 contract UpgradeIntegrationTest is Test {
-    EcosystemUpgrade_v29 ecosystemUpgrade;
+    EcosystemUpgrade_v30 ecosystemUpgrade;
+    DefaultCTMUpgrade ctmUpgrade;
     DefaultChainUpgrade chainUpgrade;
 
     function setUp() public {
-        ecosystemUpgrade = new EcosystemUpgrade_v29();
+        ecosystemUpgrade = new EcosystemUpgrade_v30();
         ecosystemUpgrade.initialize(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT);
         ecosystemUpgrade.deployNewEcosystemContractsL1();
         chainUpgrade = new DefaultChainUpgrade();
+        ctmUpgrade = new DefaultCTMUpgrade();
+        ctmUpgrade.initialize(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT);
     }
 
     // NOTE: this test is currently testing "stage" - as mainnet is not upgraded yet.
@@ -35,10 +39,11 @@ contract UpgradeIntegrationTest is Test {
         console.log("Preparing chain for the upgrade");
         chainUpgrade.prepareChain(CHAIN_INPUT);
 
-        // TODO : It's an artifact after splitting to Ecosystem upgrade stage
-        Call[] memory upgradeGovernanceStage0Calls = new Call[](0);
-        (Call[] memory upgradeGovernanceStage1Calls, Call[] memory upgradeGovernanceStage2Calls) = ecosystemUpgrade
-            .prepareDefaultGovernanceCalls();
+        (
+            Call[] memory upgradeGovernanceStage0Calls,
+            Call[] memory upgradeGovernanceStage1Calls,
+            Call[] memory upgradeGovernanceStage2Calls
+        ) = ecosystemUpgrade.prepareDefaultGovernanceCalls();
 
         console.log("Starting ecosystem upgrade stage 0!");
         governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage0Calls);
@@ -57,14 +62,14 @@ contract UpgradeIntegrationTest is Test {
         // Now, the admin of the Era needs to call the upgrade function.
         // TODO: We do not include calls that ensure that the server is ready for the sake of brevity.
         chainUpgrade.upgradeChain(
-            ecosystemUpgrade.getOldProtocolVersion(),
-            ecosystemUpgrade.generateUpgradeCutData(ecosystemUpgrade.getAddresses().stateTransition)
+            ctmUpgrade.getOldProtocolVersion(),
+            ctmUpgrade.generateUpgradeCutData(ctmUpgrade.getAddresses().stateTransition)
         );
 
         console.log("Creating new chain");
-        address admin = ecosystemUpgrade.getBridgehubAdmin();
+        address admin = ctmUpgrade.getBridgehubAdmin();
         vm.startPrank(admin);
-        Call memory createNewChainCall = ecosystemUpgrade.prepareCreateNewChainCall(555)[0];
+        Call memory createNewChainCall = ctmUpgrade.prepareCreateNewChainCall(555)[0];
         (bool success, bytes memory data) = payable(createNewChainCall.target).call{value: createNewChainCall.value}(
             createNewChainCall.data
         );

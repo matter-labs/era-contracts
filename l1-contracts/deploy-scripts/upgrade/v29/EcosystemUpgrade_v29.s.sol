@@ -385,7 +385,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
         );
     }
 
-    function deployUsedUpgradeContract() internal override returns (address) {
+    function deployUsedUpgradeContract() internal returns (address) {
         return deploySimpleContract("L1V29Upgrade", false);
     }
 

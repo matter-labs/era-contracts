@@ -15,6 +15,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
+import {Governance} from "contracts/governance/Governance.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 import {BridgehubDeployedAddresses, BridgesDeployedAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
@@ -118,13 +119,13 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         initializeL1CoreUtilsConfig();
     }
 
-    function initializeL1CoreUtilsConfig() internal virtual override {
+    function initializeL1CoreUtilsConfig() internal virtual {
         L1AssetRouter assetRouter = L1AssetRouter(discoveredBridgehub.assetRouter);
-        Governance governance = Governance(discoveredBridgehub.governance);
+        Governance governance = Governance(payable(discoveredBridgehub.governance));
         config.l1ChainId = block.chainid;
         config.deployerAddress = msg.sender;
         config.eraChainId = assetRouter.ERA_CHAIN_ID();
-        config.eraDiamondProxyAddress = assetRouter.ERA_DIAMOND_PROXY();
+        config.eraDiamondProxyAddress = address(assetRouter.ERA_DIAMOND_PROXY());
 
         config.ownerAddress = assetRouter.owner();
 
@@ -159,7 +160,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         );
         vm.serializeAddress("bridgehub", "chain_asset_handler_proxy_addr", discoveredBridgehub.chainAssetHandler);
         vm.serializeAddress("bridgehub", "message_root_proxy_addr", discoveredBridgehub.messageRoot);
-        string memory bridgehub = vm.serializeAddress(
+        string memory bridgehubAddressesSerialized = vm.serializeAddress(
             "bridgehub",
             "message_root_implementation_addr",
             bridgehubAddresses.messageRootImplementation
@@ -182,7 +183,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
             bridges.bridgedTokenBeacon
         );
 
-        vm.serializeString("deployed_addresses", "bridgehub", bridgehub);
+        vm.serializeString("deployed_addresses", "bridgehub", bridgehubAddressesSerialized);
         vm.serializeString("deployed_addresses", "bridges", bridgesSerialized);
         vm.serializeAddress(
             "deployed_addresses",

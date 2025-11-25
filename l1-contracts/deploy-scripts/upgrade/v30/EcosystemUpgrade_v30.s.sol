@@ -6,18 +6,18 @@ pragma solidity 0.8.28;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
 
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 
@@ -25,7 +25,7 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 
-import {L2_COMPLEX_UPGRADER_ADDR, L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
 import {DefaultEcosystemUpgrade} from "../default_upgrade/DefaultEcosystemUpgrade.s.sol";
@@ -53,12 +53,15 @@ contract EcosystemUpgrade_v30 is Script, DefaultEcosystemUpgrade {
     // }
 
     function registerBridgedTokensInNTV(address _bridgehub) public {
-        INativeTokenVault ntv = INativeTokenVaultBase(IBridgehubBase(_bridgehub).assetRouter().nativeTokenVault());
+        NativeTokenVaultBase ntv = NativeTokenVaultBase(
+            address(IL1AssetRouter(address(IBridgehubBase(_bridgehub).assetRouter())).nativeTokenVault())
+        );
         address[] memory savedBridgedTokens;
         /// todo get save bridged tokens.
         /// for tokens in the bridged token list
         for (uint256 i = 0; i < savedBridgedTokens.length; ++i) {
-            address token = ntv.bridgedTokens(i);
+            // TODO it's cludge to convert from bytes32 to address, need to have proper solution
+            address token = address(uint160(uint256(ntv.bridgedTokens(i))));
             ntv.addLegacyTokenToBridgedTokensList(token);
         }
     }
@@ -69,7 +72,7 @@ contract EcosystemUpgrade_v30 is Script, DefaultEcosystemUpgrade {
 
     function _getL2UpgradeTargetAndData(
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
-    ) internal override returns (address, bytes memory) {
+    ) internal returns (address, bytes memory) {
         bytes32 ethAssetId = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy).ETH_TOKEN_ASSET_ID();
         bytes memory v29UpgradeCalldata = abi.encodeCall(
             IL2V29Upgrade.upgrade,
@@ -82,19 +85,6 @@ contract EcosystemUpgrade_v30 is Script, DefaultEcosystemUpgrade {
                 (_forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, v29UpgradeCalldata)
             )
         );
-    }
-
-    function getForceDeploymentNames() internal override returns (string[] memory forceDeploymentNames) {
-        forceDeploymentNames = new string[](1);
-        forceDeploymentNames[0] = "L2V29Upgrade";
-    }
-
-    function getExpectedL2Address(string memory contractName) public override returns (address) {
-        if (compareStrings(contractName, "L2V29Upgrade")) {
-            return address(L2_VERSION_SPECIFIC_UPGRADER_ADDR);
-        }
-
-        return super.getExpectedL2Address(contractName);
     }
 
     function getCreationCode(
@@ -117,14 +107,28 @@ contract EcosystemUpgrade_v30 is Script, DefaultEcosystemUpgrade {
         return super.getCreationCalldata(contractName, isZKBytecode);
     }
 
-    function deployUsedUpgradeContract() internal override returns (address) {
+    function deployUsedUpgradeContract() internal returns (address) {
         return deploySimpleContract("L1V29Upgrade", false);
     }
 
-    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "MessageRoot")) {
-            return abi.encodeCall(MessageRoot.initializeL1V30Upgrade, ());
-        }
-        return super.getInitializeCalldata(contractName);
-    }
+    // CTM Upgrade Functions
+    //    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
+    //        if (compareStrings(contractName, "MessageRoot")) {
+    //            return abi.encodeCall(L1MessageRoot.initializeL1V30Upgrade, ());
+    //        }
+    //        return super.getInitializeCalldata(contractName);
+    //    }
+
+    //    function getForceDeploymentNames() internal override returns (string[] memory forceDeploymentNames) {
+    //        forceDeploymentNames = new string[](1);
+    //        forceDeploymentNames[0] = "L2V29Upgrade";
+    //    }
+
+    //    function getExpectedL2Address(string memory contractName) public override returns (address) {
+    //        if (compareStrings(contractName, "L2V29Upgrade")) {
+    //            return address(L2_VERSION_SPECIFIC_UPGRADER_ADDR);
+    //        }
+    //
+    //        return super.getExpectedL2Address(contractName);
+    //    }
 }
