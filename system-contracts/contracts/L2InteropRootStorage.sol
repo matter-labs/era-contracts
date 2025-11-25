@@ -48,20 +48,20 @@ contract L2InteropRootStorage is SystemContractBase {
         uint256 chainId,
         uint256 blockOrBatchNumber,
         bytes32[] calldata sides
-    ) external onlyCallFromBootloader {
+    ) external onlyCallFromCoinbase {
         _addInteropRoot(chainId, blockOrBatchNumber, sides);
     }
 
     /// @dev Adds a message root to the L2InteropRootStorage contract.
     /// @dev Currently duplicates `addInteropRoot` for backward compatibility.
     /// @param interopRoot The interop root to be added. See the description of the corresponding struct above.
-    function addSingleInteropRoot(InteropRoot calldata interopRoot) external onlyCallFromBootloader {
+    function addSingleInteropRoot(InteropRoot calldata interopRoot) external onlyCallFromCoinbase {
         _addInteropRoot(interopRoot.chainId, interopRoot.blockOrBatchNumber, interopRoot.sides);
     }
 
     /// @dev Adds a group of interop roots to the L2InteropRootStorage contract.
     /// @param interopRootsInput The array of interop roots to be added. See the description of the corresponding struct above.
-    function addInteropRootsInBatch(InteropRoot[] calldata interopRootsInput) external onlyCallFromBootloader {
+    function addInteropRootsInBatch(InteropRoot[] calldata interopRootsInput) external onlyCallFromCoinbase {
         unchecked {
             uint256 amountOfRoots = interopRootsInput.length;
             for (uint256 i; i < amountOfRoots; ++i) {

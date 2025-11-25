@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
 import {BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
-import {CallerMustBeBootloader, CallerMustBeEvmContract, CallerMustBeSystemContract, SystemCallFlagRequired, Unauthorized} from "../SystemContractErrors.sol";
+import {CallerMustBeBootloader, CallerMustBeCoinbase, CallerMustBeEvmContract, CallerMustBeSystemContract, SystemCallFlagRequired, Unauthorized} from "../SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -57,6 +57,15 @@ abstract contract SystemContractBase {
     modifier onlySystemCallFromEvmEmulator() {
         if (!SystemContractHelper.isSystemCallFromEvmEmulator()) {
             revert CallerMustBeEvmContract();
+        }
+        _;
+    }
+
+    /// @notice Modifier that makes sure that the method
+    /// can only be called from the block's coinbase.
+    modifier onlyCallFromCoinbase() {
+        if (msg.sender != block.coinbase) {
+            revert CallerMustBeCoinbase();
         }
         _;
     }
