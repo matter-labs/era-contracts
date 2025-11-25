@@ -327,7 +327,13 @@ library DataEncoding {
         bytes memory _transferData
     ) internal pure returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IAssetRouterShared.finalizeDeposit.selector, _messageSourceChainId, _assetId, _transferData);
+        return
+            abi.encodePacked(
+                IAssetRouterShared.finalizeDeposit.selector,
+                _messageSourceChainId,
+                _assetId,
+                _transferData
+            );
     }
 
     function decodeAssetRouterFinalizeDepositData(

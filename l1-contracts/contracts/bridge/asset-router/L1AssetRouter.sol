@@ -32,7 +32,6 @@ import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from ".
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
 import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 import {TxStatus} from "../../common/Messaging.sol";
-import {IAssetRouterShared} from "./IAssetRouterShared.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -430,12 +429,11 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         return false;
     }
 
-    /// @inheritdoc IAssetRouterBase
     function getDepositCalldata(
         address _sender,
         bytes32 _assetId,
         bytes memory _assetData
-    ) public view override(AssetRouterBase, IAssetRouterBase) returns (bytes memory) {
+    ) public view override returns (bytes memory) {
         // First branch covers the case when asset is not registered with NTV (custom asset handler)
         // Second branch handles tokens registered with NTV and uses legacy calldata encoding
         // We need to use the legacy encoding to support the old SDK, which relies on a specific encoding of the data.

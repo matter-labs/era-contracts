@@ -295,12 +295,11 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         });
     }
 
-    /// @inheritdoc IAssetRouterBase
     function getDepositCalldata(
         address,
         bytes32 _assetId,
         bytes memory _assetData
-    ) public view virtual override returns (bytes memory) {
+    ) public view virtual returns (bytes memory) {
         return abi.encodeCall(AssetRouterBase.finalizeDeposit, (block.chainid, _assetId, _assetData));
     }
 

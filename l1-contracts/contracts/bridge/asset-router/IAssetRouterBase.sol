@@ -48,17 +48,4 @@ interface IAssetRouterBase {
     event DepositFinalizedAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
     function assetHandlerAddress(bytes32 _assetId) external view returns (address);
-
-    /// @notice Generates a calldata for calling the deposit finalization on the L2 native token contract.
-    /// @param _sender The address of the deposit initiator.
-    /// @param _assetId The deposited asset ID.
-    /// @param _assetData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
-    /// @return Returns calldata used on ZK chain.
-    function getDepositCalldata(
-        address _sender,
-        bytes32 _assetId,
-        bytes memory _assetData
-    ) external view returns (bytes memory);
-
-
 }
