@@ -101,7 +101,7 @@ contract ExperimentalBridgeTest is Test {
 
     function setUp() public {
         l1ChainId = 1;
-        eraChainId = 320;
+        eraChainId = 320;  //@check deprecate?
         deployerAddress = makeAddr("DEPLOYER_ADDRESS");
         bridgeOwner = makeAddr("BRIDGE_OWNER");
         dummyBridgehub = new DummyBridgehubSetter(bridgeOwner, type(uint256).max);
@@ -109,7 +109,7 @@ contract ExperimentalBridgeTest is Test {
         weth = makeAddr("WETH");
         mockCTM = new DummyChainTypeManagerWBH(address(bridgeHub));
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
-        mockChainContract = new DummyZKChain(address(bridgeHub), eraChainId, block.chainid, eip7702Checker);
+        mockChainContract = new DummyZKChain(address(bridgeHub), block.chainid, eip7702Checker);
 
         mockL2Contract = makeAddr("mockL2Contract");
         // mocks to use in bridges instead of using a dummy one

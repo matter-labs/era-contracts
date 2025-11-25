@@ -361,7 +361,7 @@ contract GatewayCTMFromL1 is Script {
         address mailboxFacet = address(
             _deployInternal(
                 ContractsBytecodesLib.getCreationCode("MailboxFacet"),
-                abi.encode(config.l1ChainId, config.eraChainId)
+                abi.encode(config.l1ChainId, config.eraChainId) // TODO incorrect, missing last argument  _eip7702Checker!
             )
         );
         console.log("Mailbox facet deployed at", mailboxFacet);

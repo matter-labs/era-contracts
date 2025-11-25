@@ -69,7 +69,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
             new AdminFacet(config.l1ChainId, RollupDAManager(addresses.daAddresses.rollupDAManager))
         );
         addresses.stateTransition.mailboxFacet = address(
-            new MailboxFacet(config.eraChainId, config.l1ChainId, IEIP7702Checker(address(0)))
+            new MailboxFacet(config.l1ChainId, IEIP7702Checker(address(0)))
         );
         addresses.stateTransition.gettersFacet = address(new GettersFacet());
         addresses.stateTransition.diamondInit = address(new DiamondInit(false));

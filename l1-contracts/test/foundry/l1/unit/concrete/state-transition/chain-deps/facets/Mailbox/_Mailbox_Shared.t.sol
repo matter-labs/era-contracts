@@ -20,7 +20,6 @@ contract MailboxTest is Test {
     UtilsFacet internal utilsFacet;
     IGetters internal gettersFacet;
     address sender;
-    uint256 constant eraChainId = 9;
     address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
     address diamondProxy;
     address bridgehub;
@@ -35,7 +34,7 @@ contract MailboxTest is Test {
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(new MailboxFacet(eraChainId, block.chainid, eip7702Checker)),
+            facet: address(new MailboxFacet(block.chainid, eip7702Checker)),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: Utils.getMailboxSelectors()

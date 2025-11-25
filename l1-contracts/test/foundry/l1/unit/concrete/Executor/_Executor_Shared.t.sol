@@ -204,7 +204,7 @@ contract ExecutorTest is Test {
         admin = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         getters = new GettersFacet();
         executor = new TestExecutor();
-        mailbox = new MailboxFacet(l2ChainId, block.chainid, eip7702Checker);
+        mailbox = new MailboxFacet(block.chainid, eip7702Checker);
 
         DummyCTM chainTypeManager = new DummyCTM(owner, address(0));
         vm.mockCall(
