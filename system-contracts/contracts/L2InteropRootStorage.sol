@@ -10,6 +10,12 @@ error InteropRootAlreadyExists();
 error MessageRootIsZero();
 error InteropRootAlreadyAddedThisBlock();
 
+// TODO: where should this live? Also, use a constant + offset.
+address constant INTEROP_ROOT_REPORTER_HOOK = address(0x7003);
+
+// TODO: where should this live?
+error InteropRootReporterHookFailed();
+
 /// @dev For both proof-based and commit-based interop, the `sides` parameter contains only the root.
 /// @dev Once pre-commit interop is introduced, `sides` will include both the root and its associated sides.
 /// @dev This interface is preserved now so that enabling pre-commit interop later requires no changes in interface.
@@ -102,9 +108,22 @@ contract L2InteropRootStorage is SystemContractBase {
             revert InteropRootAlreadyExists();
         }
 
-        // Set interopRoots for specified chainId and blockOrBatchNumber, emit event.
+        // Set interopRoots for specified chainId and blockOrBatchNumber.
         interopRoots[chainId][blockOrBatchNumber] = sides[0];
 
+        // Report the Interop Root to the corresponding system hook.
+        // ----- binary encoding -----
+        // Layout:
+        // [ 0..31] chainId
+        // [32..63] blockOrBatchNumber
+        // [64..95] root
+        bytes memory message = abi.encodePacked(chainId, blockOrBatchNumber, sides[0]);
+        (bool ok, ) = INTEROP_ROOT_REPORTER_HOOK.call(message);
+        if (!ok) {
+            revert InteropRootReporterHookFailed();
+        }
+
+        // Emit event.
         emit InteropRootAdded(chainId, blockOrBatchNumber, sides);
     }
 }
