@@ -61,16 +61,9 @@ contract GatewayCTMFromL1 is Script {
         bytes32 recursionNodeLevelVkHash;
         bytes32 recursionLeafLevelVkHash;
         bytes32 recursionCircuitsSetVksHash;
-        PubdataPricingMode diamondInitPubdataPricingMode;
-        uint256 diamondInitBatchOverheadL1Gas;
-        uint256 diamondInitMaxPubdataPerBatch;
-        uint256 diamondInitMaxL2GasPerBatch;
-        uint256 diamondInitPriorityTxMaxPubdata;
-        uint256 diamondInitMinimalL2GasPrice;
         bytes32 bootloaderHash;
         bytes32 defaultAAHash;
         bytes32 evmEmulatorHash;
-        uint256 priorityTxMaxGasLimit;
         bytes32 genesisRoot;
         uint256 genesisRollupLeafIndex;
         bytes32 genesisBatchCommitment;
@@ -204,16 +197,9 @@ contract GatewayCTMFromL1 is Script {
             recursionNodeLevelVkHash: toml.readBytes32("$.recursion_node_level_vk_hash"),
             recursionLeafLevelVkHash: toml.readBytes32("$.recursion_leaf_level_vk_hash"),
             recursionCircuitsSetVksHash: toml.readBytes32("$.recursion_circuits_set_vks_hash"),
-            diamondInitPubdataPricingMode: PubdataPricingMode(toml.readUint("$.diamond_init_pubdata_pricing_mode")),
-            diamondInitBatchOverheadL1Gas: toml.readUint("$.diamond_init_batch_overhead_l1_gas"),
-            diamondInitMaxPubdataPerBatch: toml.readUint("$.diamond_init_max_pubdata_per_batch"),
-            diamondInitMaxL2GasPerBatch: toml.readUint("$.diamond_init_max_l2_gas_per_batch"),
-            diamondInitPriorityTxMaxPubdata: toml.readUint("$.diamond_init_priority_tx_max_pubdata"),
-            diamondInitMinimalL2GasPrice: toml.readUint("$.diamond_init_minimal_l2_gas_price"),
             bootloaderHash: toml.readBytes32("$.bootloader_hash"),
             defaultAAHash: toml.readBytes32("$.default_aa_hash"),
             evmEmulatorHash: toml.readBytes32("$.evm_emulator_hash"),
-            priorityTxMaxGasLimit: toml.readUint("$.priority_tx_max_gas_limit"),
             genesisRoot: toml.readBytes32("$.genesis_root"),
             genesisRollupLeafIndex: toml.readUint("$.genesis_rollup_leaf_index"),
             genesisBatchCommitment: toml.readBytes32("$.genesis_batch_commitment"),
@@ -234,23 +220,9 @@ contract GatewayCTMFromL1 is Script {
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
             gettersSelectors: Utils.getAllSelectorsForFacet("Getters"),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: config.recursionNodeLevelVkHash,
-                recursionLeafLevelVkHash: config.recursionLeafLevelVkHash,
-                recursionCircuitsSetVksHash: config.recursionCircuitsSetVksHash
-            }),
-            feeParams: FeeParams({
-                pubdataPricingMode: config.diamondInitPubdataPricingMode,
-                batchOverheadL1Gas: uint32(config.diamondInitBatchOverheadL1Gas),
-                maxPubdataPerBatch: uint32(config.diamondInitMaxPubdataPerBatch),
-                maxL2GasPerBatch: uint32(config.diamondInitMaxL2GasPerBatch),
-                priorityTxMaxPubdata: uint32(config.diamondInitPriorityTxMaxPubdata),
-                minimalL2GasPrice: uint64(config.diamondInitMinimalL2GasPrice)
-            }),
             bootloaderHash: config.bootloaderHash,
             defaultAccountHash: config.defaultAAHash,
             evmEmulatorHash: config.evmEmulatorHash,
-            priorityTxMaxGasLimit: config.priorityTxMaxGasLimit,
             genesisRoot: config.genesisRoot,
             genesisRollupLeafIndex: uint64(config.genesisRollupLeafIndex),
             genesisBatchCommitment: config.genesisBatchCommitment,
@@ -495,29 +467,11 @@ contract GatewayCTMFromL1 is Script {
             selectors: Utils.getAllSelectorsForFacet("Executor")
         });
 
-        VerifierParams memory verifierParams = VerifierParams({
-            recursionNodeLevelVkHash: config.recursionNodeLevelVkHash,
-            recursionLeafLevelVkHash: config.recursionLeafLevelVkHash,
-            recursionCircuitsSetVksHash: config.recursionCircuitsSetVksHash
-        });
-
-        FeeParams memory feeParams = FeeParams({
-            pubdataPricingMode: config.diamondInitPubdataPricingMode,
-            batchOverheadL1Gas: uint32(config.diamondInitBatchOverheadL1Gas),
-            maxPubdataPerBatch: uint32(config.diamondInitMaxPubdataPerBatch),
-            maxL2GasPerBatch: uint32(config.diamondInitMaxL2GasPerBatch),
-            priorityTxMaxPubdata: uint32(config.diamondInitPriorityTxMaxPubdata),
-            minimalL2GasPrice: uint64(config.diamondInitMinimalL2GasPrice)
-        });
-
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(output.gatewayStateTransition.verifier),
-            verifierParams: verifierParams,
             l2BootloaderBytecodeHash: config.bootloaderHash,
             l2DefaultAccountBytecodeHash: config.defaultAAHash,
-            l2EvmEmulatorBytecodeHash: config.evmEmulatorHash,
-            priorityTxMaxGasLimit: config.priorityTxMaxGasLimit,
-            feeParams: feeParams
+            l2EvmEmulatorBytecodeHash: config.evmEmulatorHash
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({

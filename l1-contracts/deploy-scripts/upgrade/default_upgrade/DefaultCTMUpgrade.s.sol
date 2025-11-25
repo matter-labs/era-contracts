@@ -357,30 +357,9 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(discoveredCTM.validatorTimelockPostV29)
             .executionDelay();
 
-        // Default values for initializing the chain. They are part of the chain creation params,
-        // meanwhile they are not saved anywhere
         config.contracts.chainCreationParams.latestProtocolVersion = toml.readUint(
             "$.contracts.latest_protocol_version"
         );
-        config.contracts.chainCreationParams.diamondInitPubdataPricingMode = PubdataPricingMode(
-            toml.readUint("$.contracts.diamond_init_pubdata_pricing_mode")
-        );
-        config.contracts.chainCreationParams.diamondInitBatchOverheadL1Gas = toml.readUint(
-            "$.contracts.diamond_init_batch_overhead_l1_gas"
-        );
-        config.contracts.chainCreationParams.diamondInitMaxPubdataPerBatch = toml.readUint(
-            "$.contracts.diamond_init_max_pubdata_per_batch"
-        );
-        config.contracts.chainCreationParams.diamondInitMaxL2GasPerBatch = toml.readUint(
-            "$.contracts.diamond_init_max_l2_gas_per_batch"
-        );
-        config.contracts.chainCreationParams.diamondInitPriorityTxMaxPubdata = toml.readUint(
-            "$.contracts.diamond_init_priority_tx_max_pubdata"
-        );
-        config.contracts.chainCreationParams.diamondInitMinimalL2GasPrice = toml.readUint(
-            "$.contracts.diamond_init_minimal_l2_gas_price"
-        );
-
         // Protocol specific params for the entire CTM
         config.contracts.chainCreationParams.genesisRoot = toml.readBytes32("$.contracts.genesis_root");
         config.contracts.chainCreationParams.genesisRollupLeafIndex = toml.readUint(
