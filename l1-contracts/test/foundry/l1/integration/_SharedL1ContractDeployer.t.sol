@@ -2,7 +2,6 @@
 pragma solidity 0.8.28;
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
-import {console2 as console} from "forge-std/console2.sol";
 
 import {DeployL1CoreContractsIntegrationScript} from "./deploy-scripts/DeployL1CoreContractsIntegration.s.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
