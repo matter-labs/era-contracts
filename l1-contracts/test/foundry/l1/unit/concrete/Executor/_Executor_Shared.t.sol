@@ -273,16 +273,9 @@ contract ExecutorTest is UtilsTest {
             baseTokenAssetId: baseTokenAssetId,
             storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
             verifier: IVerifier(testnetVerifier), // verifier
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: 0,
-                recursionLeafLevelVkHash: 0,
-                recursionCircuitsSetVksHash: 0
-            }),
             l2BootloaderBytecodeHash: dummyHash,
             l2DefaultAccountBytecodeHash: dummyHash,
-            l2EvmEmulatorBytecodeHash: dummyHash,
-            priorityTxMaxGasLimit: 1000000,
-            feeParams: defaultFeeParams()
+            l2EvmEmulatorBytecodeHash: dummyHash
         });
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), baseTokenAssetId);
 

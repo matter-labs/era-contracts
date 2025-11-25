@@ -368,12 +368,9 @@ library GatewayCTMDeployerHelper {
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(_deployedContracts.stateTransition.verifier),
-            verifierParams: _config.verifierParams,
             l2BootloaderBytecodeHash: _config.bootloaderHash,
             l2DefaultAccountBytecodeHash: _config.defaultAccountHash,
-            l2EvmEmulatorBytecodeHash: _config.evmEmulatorHash,
-            priorityTxMaxGasLimit: _config.priorityTxMaxGasLimit,
-            feeParams: _config.feeParams
+            l2EvmEmulatorBytecodeHash: _config.evmEmulatorHash
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({

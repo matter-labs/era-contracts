@@ -88,13 +88,6 @@ struct ChainCreationParamsConfig {
     uint256 genesisRollupLeafIndex;
     bytes32 genesisBatchCommitment;
     uint256 latestProtocolVersion;
-    uint256 priorityTxMaxGasLimit;
-    PubdataPricingMode diamondInitPubdataPricingMode;
-    uint256 diamondInitBatchOverheadL1Gas;
-    uint256 diamondInitMaxPubdataPerBatch;
-    uint256 diamondInitMaxL2GasPerBatch;
-    uint256 diamondInitPriorityTxMaxPubdata;
-    uint256 diamondInitMinimalL2GasPrice;
     bytes32 bootloaderHash;
     bytes32 defaultAAHash;
     bytes32 evmEmulatorHash;

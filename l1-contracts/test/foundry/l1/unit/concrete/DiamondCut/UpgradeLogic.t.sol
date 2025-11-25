@@ -72,12 +72,6 @@ contract UpgradeLogicTest is DiamondCutTest {
             selectors: Utils.getGettersSelectors()
         });
 
-        VerifierParams memory dummyVerifierParams = VerifierParams({
-            recursionNodeLevelVkHash: 0,
-            recursionLeafLevelVkHash: 0,
-            recursionCircuitsSetVksHash: 0
-        });
-
         InitializeData memory params = InitializeData({
             // TODO REVIEW
             chainId: 1,
@@ -93,21 +87,11 @@ contract UpgradeLogicTest is DiamondCutTest {
             // genesisIndexRepeatedStorageChanges: 0,
             // genesisBatchCommitment: bytes32(0),
             verifier: IVerifier(0x03752D8252d67f99888E741E3fB642803B29B155), // verifier
-            verifierParams: dummyVerifierParams,
             // zkPorterIsAvailable: false,
             l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
             l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-            l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-            priorityTxMaxGasLimit: 500000, // priority tx max L2 gas limit
+            l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
             // initialProtocolVersion: 0,
-            feeParams: FeeParams({
-                pubdataPricingMode: PubdataPricingMode.Rollup,
-                batchOverheadL1Gas: 1_000_000,
-                maxPubdataPerBatch: 110_000,
-                maxL2GasPerBatch: 80_000_000,
-                priorityTxMaxPubdata: 99_000,
-                minimalL2GasPrice: 250_000_000
-            })
         });
 
         bytes memory diamondInitCalldata = abi.encodeWithSelector(diamondInit.initialize.selector, params);
