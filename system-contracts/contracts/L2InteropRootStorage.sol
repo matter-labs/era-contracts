@@ -8,6 +8,7 @@ event InteropRootAdded(uint256 indexed chainId, uint256 indexed blockNumber, byt
 error SidesLengthNotOne();
 error InteropRootAlreadyExists();
 error MessageRootIsZero();
+error InteropRootAlreadyAddedThisBlock();
 
 /// @dev For both proof-based and commit-based interop, the `sides` parameter contains only the root.
 /// @dev Once pre-commit interop is introduced, `sides` will include both the root and its associated sides.
@@ -33,6 +34,19 @@ contract L2InteropRootStorage is SystemContractBase {
     /// @notice Mapping of chain ID to block or batch number to message root.
     mapping(uint256 chainId => mapping(uint256 blockOrBatchNumber => bytes32 interopRoot)) public interopRoots;
 
+    /// @notice Last L2 block in which interop roots were added via any entrypoint.
+    uint256 public lastInteropRootAdditionBlock;
+
+    /// @dev Ensure interop roots can only be added once per block.
+    modifier onlyOncePerBlock() {
+        if (lastInteropRootAdditionBlock == block.number) {
+            revert InteropRootAlreadyAddedThisBlock();
+        }
+        lastInteropRootAdditionBlock = block.number;
+        _;
+    }
+
+
     /// @dev Adds a message root to the L2InteropRootStorage contract.
     /// @dev For both proof-based and commit-based interop, the `sides` parameter contains only the root.
     /// @dev Once pre-commit interop is introduced, `sides` will include both the root and its associated sides.
@@ -48,20 +62,20 @@ contract L2InteropRootStorage is SystemContractBase {
         uint256 chainId,
         uint256 blockOrBatchNumber,
         bytes32[] calldata sides
-    ) external onlyCallFromCoinbase {
+    ) external onlyCallFromCoinbase onlyOncePerBlock {
         _addInteropRoot(chainId, blockOrBatchNumber, sides);
     }
 
     /// @dev Adds a message root to the L2InteropRootStorage contract.
     /// @dev Currently duplicates `addInteropRoot` for backward compatibility.
     /// @param interopRoot The interop root to be added. See the description of the corresponding struct above.
-    function addSingleInteropRoot(InteropRoot calldata interopRoot) external onlyCallFromCoinbase {
+    function addSingleInteropRoot(InteropRoot calldata interopRoot) external onlyCallFromCoinbase onlyOncePerBlock {
         _addInteropRoot(interopRoot.chainId, interopRoot.blockOrBatchNumber, interopRoot.sides);
     }
 
     /// @dev Adds a group of interop roots to the L2InteropRootStorage contract.
     /// @param interopRootsInput The array of interop roots to be added. See the description of the corresponding struct above.
-    function addInteropRootsInBatch(InteropRoot[] calldata interopRootsInput) external onlyCallFromCoinbase {
+    function addInteropRootsInBatch(InteropRoot[] calldata interopRootsInput) external onlyCallFromCoinbase onlyOncePerBlock {
         unchecked {
             uint256 amountOfRoots = interopRootsInput.length;
             for (uint256 i; i < amountOfRoots; ++i) {
