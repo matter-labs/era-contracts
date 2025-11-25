@@ -10,7 +10,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IInteropCenter} from "./IInteropCenter.sol";
 
-import {GW_ASSET_TRACKER, L2_ASSET_ROUTER, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_COMPLEX_UPGRADER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_COMPLEX_UPGRADER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BUNDLE_IDENTIFIER, BalanceChange, BundleAttributes, CallAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal} from "../common/Messaging.sol";
@@ -25,6 +25,7 @@ import {AttributesDecoder} from "./AttributesDecoder.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 import {IL2CrossChainSender} from "../bridge/interfaces/IL2CrossChainSender.sol";
+import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol";
 
 /// @title InteropCenter
 /// @author Matter Labs
@@ -272,12 +273,14 @@ contract InteropCenter is
             L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalBurnedCallsValue}();
         } else {
             require(msg.value == _totalIndirectCallsValue, MsgValueMismatch(_totalIndirectCallsValue, msg.value));
-            L2_ASSET_ROUTER.bridgehubDepositBaseToken(
-                _destinationChainId,
-                destinationChainBaseTokenAssetId,
-                msg.sender,
-                _totalBurnedCallsValue
-            );
+            if (_totalBurnedCallsValue > 0) {
+                IAssetRouterShared(L2_ASSET_ROUTER_ADDR).bridgehubDepositBaseToken(
+                    _destinationChainId,
+                    destinationChainBaseTokenAssetId,
+                    msg.sender,
+                    _totalBurnedCallsValue
+                );
+            }
         }
     }
 

@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {IL2AssetRouter} from "./IL2AssetRouter.sol";
 import {IL2CrossChainSender} from "../interfaces/IL2CrossChainSender.sol";
-import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 
@@ -12,7 +11,6 @@ import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
 import {NativeTokenVaultBase} from "../ntv/NativeTokenVaultBase.sol";
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
-import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IL2Bridgehub} from "../../bridgehub/IL2Bridgehub.sol";
 
 import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
@@ -241,13 +239,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
                             INITIATE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc IAssetRouterBase
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         bytes32 _assetId,
         address _originalCaller,
         uint256 _amount
-    ) public payable virtual override(AssetRouterBase, IAssetRouterBase) onlyL2InteropCenter {
+    ) public payable virtual override onlyL2InteropCenter {
         _bridgehubDepositBaseToken(_chainId, _assetId, _originalCaller, _amount);
     }
 
@@ -375,8 +372,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         bytes32 _assetId,
         bytes memory _l1bridgeMintData
     ) internal view returns (bytes memory) {
-        // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(AssetRouterBase.finalizeDeposit.selector, block.chainid, _assetId, _l1bridgeMintData);
+        return DataEncoding.encodeAssetRouterFinalizeDepositData(block.chainid, _assetId, _l1bridgeMintData);
     }
 
     /// @notice Encodes the message for l2ToL1log sent during withdraw initialization.
@@ -385,8 +381,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         address _l1Token,
         uint256 _amount
     ) internal pure returns (bytes memory) {
-        // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _l1Receiver, _l1Token, _amount);
+        return DataEncoding.encodeL1ERC20BridgeFinalizeWithdrawalData(_l1Receiver, _l1Token, _amount);
     }
 
     /*//////////////////////////////////////////////////////////////

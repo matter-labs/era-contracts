@@ -380,3 +380,16 @@ struct ConfirmTransferResultData {
     uint256 _l2MessageIndex;
     bytes32[] _merkleProof;
 }
+
+struct TokenMetadata {
+    string name;
+    string symbol;
+    uint256 decimals;
+}
+
+struct TokenBridgingData {
+    bytes32 assetId;
+    uint256 originChainId;
+    /// The address of the base token on the origin chain.
+    address originToken;
+}
