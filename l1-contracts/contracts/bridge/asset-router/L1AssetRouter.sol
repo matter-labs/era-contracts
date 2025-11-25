@@ -32,6 +32,7 @@ import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from ".
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
 import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 import {TxStatus} from "../../common/Messaging.sol";
+import {IAssetRouterShared} from "./IAssetRouterShared.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -212,13 +213,12 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                             INITIATE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc IAssetRouterBase
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         bytes32 _assetId,
         address _originalCaller,
         uint256 _amount
-    ) public payable virtual override(AssetRouterBase, IAssetRouterBase) onlyBridgehubOrEra(_chainId) whenNotPaused {
+    ) public payable virtual override onlyBridgehubOrEra(_chainId) whenNotPaused {
         _bridgehubDepositBaseToken(_chainId, _assetId, _originalCaller, _amount);
     }
 

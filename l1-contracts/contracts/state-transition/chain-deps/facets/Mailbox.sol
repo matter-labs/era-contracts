@@ -24,6 +24,7 @@ import {L1_GAS_PER_PUBDATA_BYTE, MAX_NEW_FACTORY_DEPS, PRIORITY_EXPIRATION, REQU
 import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
+import {IAssetRouterShared} from "../../../bridge/asset-router/IAssetRouterShared.sol";
 
 import {AddressNotZero, BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, NotAssetRouter, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {DepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
@@ -731,7 +732,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             })
         );
         address sharedBridge = address(IBridgehubBase(s.bridgehub).assetRouter());
-        IL1AssetRouter(sharedBridge).bridgehubDepositBaseToken{value: msg.value}(
+        IAssetRouterShared(sharedBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
             s.baseTokenAssetId,
             msg.sender,

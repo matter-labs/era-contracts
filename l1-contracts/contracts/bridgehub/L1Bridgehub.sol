@@ -12,6 +12,7 @@ import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2Trans
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
@@ -155,7 +156,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             }
 
             // slither-disable-next-line arbitrary-send-eth
-            IL1AssetRouter(address(assetRouter)).bridgehubDepositBaseToken{value: msg.value}(
+            IAssetRouterShared(address(assetRouter)).bridgehubDepositBaseToken{value: msg.value}(
                 _request.chainId,
                 tokenAssetId,
                 msg.sender,
@@ -214,7 +215,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             }
 
             // slither-disable-next-line arbitrary-send-eth
-            IL1AssetRouter(address(assetRouter)).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
+            IAssetRouterShared(address(assetRouter)).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
                 _request.chainId,
                 tokenAssetId,
                 msg.sender,

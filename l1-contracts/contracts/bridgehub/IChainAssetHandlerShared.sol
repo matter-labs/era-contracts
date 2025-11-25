@@ -7,8 +7,9 @@ import {IMessageRoot} from "./IMessageRoot.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 /// @author Matter Labs
+/// Shared functions that are not inherited to avoid double inheritance.
 /// @custom:security-contact security@matterlabs.dev
-interface IL2ChainAssetHandler {
+interface IChainAssetHandlerShared {
     /*//////////////////////////////////////////////////////////////
                             EXTERNAL GETTERS
     //////////////////////////////////////////////////////////////*/

@@ -10,7 +10,7 @@ import {InvalidCaller} from "../common/L1ContractErrors.sol";
 import {IL1Bridgehub} from "./IL1Bridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
-import {IL2ChainAssetHandler} from "./IL2ChainAssetHandler.sol";
+import {IChainAssetHandlerShared} from "./IChainAssetHandlerShared.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -18,7 +18,7 @@ import {IL2ChainAssetHandler} from "./IL2ChainAssetHandler.sol";
 /// it is the IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
-contract L2ChainAssetHandler is ChainAssetHandlerBase, IL2ChainAssetHandler {
+contract L2ChainAssetHandler is ChainAssetHandlerBase, IChainAssetHandlerShared {
     /// @dev The assetId of the ETH.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
