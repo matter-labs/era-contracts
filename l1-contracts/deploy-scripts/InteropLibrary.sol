@@ -156,7 +156,7 @@ library InteropLibrary {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Build and send a token transfer bundle in one go.
-    /// @param  destination       Interoperable chain identifier (e.g., InteroperableAddress.formatEvmV1(271))
+    /// @param destination          Destination chain id (e.g., 271 for zkSync Era testnet), later wrapped via InteroperableAddress.formatEvmV1.
     /// @param  l2TokenAddress    Address of token on L2
     /// @param  amount            Amount to transfer
     /// @param  recipient          Recipient on destination chain
