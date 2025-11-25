@@ -16,26 +16,26 @@ library L2LegacySharedBridgeTestHelper {
         // During local testing, we will deploy `L2SharedBridgeLegacyDev` to each chain
         // that supports the legacy bridge.
 
-        // bytes32 implHash = L2ContractHelper.hashL2Bytecode(
-            ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacyDev");
-        // );
-        // address implAddress = Utils.getL2AddressViaCreate2Factory(bytes32(0), implHash, hex"");
+        bytes32 implHash = L2ContractHelper.hashL2Bytecode(
+            ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacyDev")
+        );
+        address implAddress = Utils.getL2AddressViaCreate2Factory(bytes32(0), implHash, hex"");
 
-        // bytes32 proxyHash = L2ContractHelper.hashL2Bytecode(
-        //     ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy")
-        // );
+        bytes32 proxyHash = L2ContractHelper.hashL2Bytecode(
+            ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy")
+        );
 
-        // return
-        //     Utils.getL2AddressViaCreate2Factory(
-        //         bytes32(0),
-        //         proxyHash,
-        //         getLegacySharedBridgeProxyConstructorParams(
-        //             implAddress,
-        //             l1Erc20BridgeProxy,
-        //             l1NullifierProxy,
-        //             ecosystemL1Governance
-        //         )
-        //     );
+        return
+            Utils.getL2AddressViaCreate2Factory(
+                bytes32(0),
+                proxyHash,
+                getLegacySharedBridgeProxyConstructorParams(
+                    implAddress,
+                    l1Erc20BridgeProxy,
+                    l1NullifierProxy,
+                    ecosystemL1Governance
+                )
+            );
     }
 
     function getLegacySharedBridgeProxyConstructorParams(
@@ -73,11 +73,10 @@ library L2LegacySharedBridgeTestHelper {
             l1NullifierProxy,
             ecosystemL1Governance
         );
-        bytes32 bridgedL2ERC20Hash = bytes32(0);
 
-        // bytes32 bridgedL2ERC20Hash = L2ContractHelper.hashL2Bytecode(
-        //     ContractsBytecodesLib.getCreationCode("BridgedStandardERC20")
-        // );
+        bytes32 bridgedL2ERC20Hash = L2ContractHelper.hashL2Bytecode(
+            ContractsBytecodesLib.getCreationCode("BridgedStandardERC20")
+        );
         address bridgeL2ERC20ImplAddress = L2ContractHelper.computeCreate2Address(
             l2SharedBridgeAddress,
             bytes32(0),
@@ -85,17 +84,17 @@ library L2LegacySharedBridgeTestHelper {
             keccak256(hex"")
         );
 
-        // bytes32 tokenBeaconBytecodeHash = L2ContractHelper.hashL2Bytecode(
-        //     ContractsBytecodesLib.getCreationCode("UpgradeableBeacon")
-        // );
-        // tokenBeaconProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(
-        //     ContractsBytecodesLib.getCreationCode("BeaconProxy")
-        // );
-        // tokenBeaconAddress = L2ContractHelper.computeCreate2Address(
-        //     l2SharedBridgeAddress,
-        //     bytes32(0),
-        //     tokenBeaconBytecodeHash,
-        //     keccak256(abi.encode(bridgeL2ERC20ImplAddress))
-        // );
+        bytes32 tokenBeaconBytecodeHash = L2ContractHelper.hashL2Bytecode(
+            ContractsBytecodesLib.getCreationCode("UpgradeableBeacon")
+        );
+        tokenBeaconProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(
+            ContractsBytecodesLib.getCreationCode("BeaconProxy")
+        );
+        tokenBeaconAddress = L2ContractHelper.computeCreate2Address(
+            l2SharedBridgeAddress,
+            bytes32(0),
+            tokenBeaconBytecodeHash,
+            keccak256(abi.encode(bridgeL2ERC20ImplAddress))
+        );
     }
 }

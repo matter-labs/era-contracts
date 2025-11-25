@@ -184,17 +184,17 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
 
         initializeGeneratedData();
 
-        // deployStateTransitionDiamondFacets();
+        deployStateTransitionDiamondFacets();
         string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
         (
             addresses.stateTransition.chainTypeManagerImplementation,
             addresses.stateTransition.chainTypeManagerProxy
         ) = deployTuppWithContract(ctmContractName, false);
-        // setChainTypeManagerInServerNotifier();
+        setChainTypeManagerInServerNotifier();
 
-        // updateOwners();
+        updateOwners();
 
-        // saveOutput(outputPath);
+        saveOutput(outputPath);
     }
 
     function initializeGeneratedData() internal {
@@ -203,13 +203,13 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
 
     function deployIfNeededMulticall3() internal {
         // Multicall3 is already deployed on public networks
-        // if (MULTICALL3_ADDRESS.code.length == 0) {
-        //     address contractAddress = deployViaCreate2(type(Multicall3).creationCode, "");
-        //     console.log("Multicall3 deployed at:", contractAddress);
-        //     config.contracts.multicall3Addr = contractAddress;
-        // } else {
-        //     config.contracts.multicall3Addr = MULTICALL3_ADDRESS;
-        // }
+        if (MULTICALL3_ADDRESS.code.length == 0) {
+            address contractAddress = deployViaCreate2(type(Multicall3).creationCode, "");
+            console.log("Multicall3 deployed at:", contractAddress);
+            config.contracts.multicall3Addr = contractAddress;
+        } else {
+            config.contracts.multicall3Addr = MULTICALL3_ADDRESS;
+        }
     }
 
     function getRollupL2DACommitmentScheme() internal returns (L2DACommitmentScheme) {
@@ -559,45 +559,52 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             );
         }
 
-        // FixedForceDeploymentsData memory data = FixedForceDeploymentsData({
-        //     l1ChainId: config.l1ChainId,
-        //     gatewayChainId: config.gatewayChainId,
-        //     eraChainId: config.eraChainId,
-        //     l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
-        //     l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
-        //     aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
-        //     maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-        //     bridgehubBytecodeInfo: getEraVMOrZKsyncOSBytecodeInfo("L2Bridgehub"),
-        //     l2AssetRouterBytecodeInfo: getEraVMOrZKsyncOSBytecodeInfo("L2AssetRouter"),
-        //     l2NtvBytecodeInfo: config.isZKsyncOS
-        //         ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2NativeTokenVaultZKOS.sol", "L2NativeTokenVaultZKOS")
-        //         : abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
-        //     messageRootBytecodeInfo: getEraVMOrZKsyncOSBytecodeInfo("L2MessageRoot"),
-        //     beaconDeployerInfo: getEraVMOrZKsyncOSBytecodeInfo("UpgradeableBeaconDeployer"),
-        //     chainAssetHandlerBytecodeInfo: getEraVMOrZKsyncOSBytecodeInfo("L2ChainAssetHandler"),
-        //     interopCenterBytecodeInfo: getEraVMOrZKsyncOSBytecodeInfo("InteropCenter"),
-        //     interopHandlerBytecodeInfo: getEraVMOrZKsyncOSBytecodeInfo("InteropHandler"),
-        //     assetTrackerBytecodeInfo: getEraVMOrZKsyncOSBytecodeInfo("L2AssetTracker"),
-        //     // For newly created chains it it is expected that the following bridges are not present at the moment
-        //     // of creation of the chain
-        //     l2SharedBridgeLegacyImpl: address(0),
-        //     l2BridgedStandardERC20Impl: address(0),
-        //     aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
-        //         addresses.bridgehub.chainRegistrationSenderProxy
-        //     ),
-        //     dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon
-        // });
+        FixedForceDeploymentsData memory data = FixedForceDeploymentsData({
+            l1ChainId: config.l1ChainId,
+            gatewayChainId: config.gatewayChainId,
+            eraChainId: config.eraChainId,
+            l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
+            l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
+            aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
+            maxNumberOfZKChains: config.contracts.maxNumberOfChains,
+            bridgehubBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2Bridgehub.sol", "L2Bridgehub")
+                : abi.encode(getL2BytecodeHash("L2Bridgehub")),
+            l2AssetRouterBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2AssetRouter.sol", "L2AssetRouter")
+                : abi.encode(getL2BytecodeHash("L2AssetRouter")),
+            l2NtvBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2NativeTokenVaultZKOS.sol", "L2NativeTokenVaultZKOS")
+                : abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
+            messageRootBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2MessageRoot.sol", "L2MessageRoot")
+                : abi.encode(getL2BytecodeHash("L2MessageRoot")),
+            beaconDeployerInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer")
+                : abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
+            chainAssetHandlerBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2ChainAssetHandler.sol", "L2ChainAssetHandler")
+                : abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
+            interopCenterBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("InteropCenter.sol", "InteropCenter")
+                : abi.encode(getL2BytecodeHash("InteropCenter")),
+            interopHandlerBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("InteropHandler.sol", "InteropHandler")
+                : abi.encode(getL2BytecodeHash("InteropHandler")),
+            assetTrackerBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2AssetTracker.sol", "L2AssetTracker")
+                : abi.encode(getL2BytecodeHash("L2AssetTracker")),
+            // For newly created chains it it is expected that the following bridges are not present at the moment
+            // of creation of the chain
+            l2SharedBridgeLegacyImpl: address(0),
+            l2BridgedStandardERC20Impl: address(0),
+            aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
+                addresses.bridgehub.chainRegistrationSenderProxy
+            ),
+            dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon
+        });
 
-        // return abi.encode(data);
-        return abi.encode();
-    }
-
-    function getEraVMOrZKsyncOSBytecodeInfo(string memory contractName) internal returns (bytes memory) {
-        if (config.isZKsyncOS) {
-            return Utils.getZKOSProxyUpgradeBytecodeInfo(string.concat(contractName, ".sol"), contractName);
-        } else {
-            return abi.encode(getL2BytecodeHash(contractName));
-        }
+        return abi.encode(data);
     }
 
     function deployServerNotifier() internal returns (address implementation, address proxy) {
@@ -608,33 +615,33 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
     }
 
     function saveDiamondSelectors() public {
-        // AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)));
-        // GettersFacet gettersFacet = new GettersFacet();
-        // MailboxFacet mailboxFacet = new MailboxFacet(1, 1, IEIP7702Checker(address(0)));
-        // ExecutorFacet executorFacet = new ExecutorFacet(1);
-        // bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);
-        // bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);
-        // bytes4[] memory mailboxFacetSelectors = Utils.getAllSelectors(address(mailboxFacet).code);
-        // bytes4[] memory executorFacetSelectors = Utils.getAllSelectors(address(executorFacet).code);
+        AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)));
+        GettersFacet gettersFacet = new GettersFacet();
+        MailboxFacet mailboxFacet = new MailboxFacet(1, 1, IEIP7702Checker(address(0)));
+        ExecutorFacet executorFacet = new ExecutorFacet(1);
+        bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);
+        bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);
+        bytes4[] memory mailboxFacetSelectors = Utils.getAllSelectors(address(mailboxFacet).code);
+        bytes4[] memory executorFacetSelectors = Utils.getAllSelectors(address(executorFacet).code);
 
-        // string memory root = vm.projectRoot();
-        // string memory outputPath = string.concat(root, "/script-out/diamond-selectors.toml");
+        string memory root = vm.projectRoot();
+        string memory outputPath = string.concat(root, "/script-out/diamond-selectors.toml");
 
-        // bytes memory adminFacetSelectorsBytes = abi.encode(adminFacetSelectors);
-        // bytes memory gettersFacetSelectorsBytes = abi.encode(gettersFacetSelectors);
-        // bytes memory mailboxFacetSelectorsBytes = abi.encode(mailboxFacetSelectors);
-        // bytes memory executorFacetSelectorsBytes = abi.encode(executorFacetSelectors);
+        bytes memory adminFacetSelectorsBytes = abi.encode(adminFacetSelectors);
+        bytes memory gettersFacetSelectorsBytes = abi.encode(gettersFacetSelectors);
+        bytes memory mailboxFacetSelectorsBytes = abi.encode(mailboxFacetSelectors);
+        bytes memory executorFacetSelectorsBytes = abi.encode(executorFacetSelectors);
 
-        // vm.serializeBytes("diamond_selectors", "admin_facet_selectors", adminFacetSelectorsBytes);
-        // vm.serializeBytes("diamond_selectors", "getters_facet_selectors", gettersFacetSelectorsBytes);
-        // vm.serializeBytes("diamond_selectors", "mailbox_facet_selectors", mailboxFacetSelectorsBytes);
-        // string memory toml = vm.serializeBytes(
-        //     "diamond_selectors",
-        //     "executor_facet_selectors",
-        //     executorFacetSelectorsBytes
-        // );
+        vm.serializeBytes("diamond_selectors", "admin_facet_selectors", adminFacetSelectorsBytes);
+        vm.serializeBytes("diamond_selectors", "getters_facet_selectors", gettersFacetSelectorsBytes);
+        vm.serializeBytes("diamond_selectors", "mailbox_facet_selectors", mailboxFacetSelectorsBytes);
+        string memory toml = vm.serializeBytes(
+            "diamond_selectors",
+            "executor_facet_selectors",
+            executorFacetSelectorsBytes
+        );
 
-        // vm.writeToml(toml, outputPath);
+        vm.writeToml(toml, outputPath);
     }
 
     /// @notice Get all four facet cuts
@@ -643,31 +650,31 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
     ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
         // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.
         // If we start to use different selectors for Gateway, we should change this.
-        // facetCuts = new Diamond.FacetCut[](4);
-        // facetCuts[0] = Diamond.FacetCut({
-        //     facet: stateTransition.adminFacet,
-        //     action: Diamond.Action.Add,
-        //     isFreezable: false,
-        //     selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
-        // });
-        // facetCuts[1] = Diamond.FacetCut({
-        //     facet: stateTransition.gettersFacet,
-        //     action: Diamond.Action.Add,
-        //     isFreezable: false,
-        //     selectors: Utils.getAllSelectors(addresses.stateTransition.gettersFacet.code)
-        // });
-        // facetCuts[2] = Diamond.FacetCut({
-        //     facet: stateTransition.mailboxFacet,
-        //     action: Diamond.Action.Add,
-        //     isFreezable: true,
-        //     selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
-        // });
-        // facetCuts[3] = Diamond.FacetCut({
-        //     facet: stateTransition.executorFacet,
-        //     action: Diamond.Action.Add,
-        //     isFreezable: true,
-        //     selectors: Utils.getAllSelectors(addresses.stateTransition.executorFacet.code)
-        // });
+        facetCuts = new Diamond.FacetCut[](4);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: stateTransition.adminFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
+        });
+        facetCuts[1] = Diamond.FacetCut({
+            facet: stateTransition.gettersFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.gettersFacet.code)
+        });
+        facetCuts[2] = Diamond.FacetCut({
+            facet: stateTransition.mailboxFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
+        });
+        facetCuts[3] = Diamond.FacetCut({
+            facet: stateTransition.executorFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.executorFacet.code)
+        });
     }
 
     function getUpgradeAddedFacetCuts(
