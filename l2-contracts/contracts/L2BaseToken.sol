@@ -2,8 +2,14 @@
 
 pragma solidity 0.8.28;
 
-import {BURN_NATIVE_TOKEN_HOOK, L2_MESSENGER, IBaseToken, IMailbox} from "./L2ContractHelper.sol";
-import {BurnFailed, L1MessengerSendFailed} from "./errors/L2ContractErrors.sol";
+import {L2_MESSENGER, IBaseToken, IMailbox} from "./L2ContractHelper.sol";
+import {L1MessengerSendFailed} from "./errors/L2ContractErrors.sol";
+
+contract Burner {
+    constructor() payable {
+        selfdestruct(payable(address(this)));
+    }
+}
 
 /**
  * @author Matter Labs
@@ -48,8 +54,8 @@ contract L2BaseToken is IBaseToken {
     function _burnMsgValue() internal returns (uint256 amount) {
         amount = msg.value;
 
-        (bool ok, bytes memory ret) = payable(BURN_NATIVE_TOKEN_HOOK).call{value: amount}("");
-        if (!ok || ret.length != 0) revert BurnFailed();
+        if (amount == 0) return 0;
+        new Burner{value: amount}();
     }
 
     /// @dev Get the message to be sent to L1 to initiate a withdrawal.

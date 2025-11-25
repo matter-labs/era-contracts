@@ -156,6 +156,7 @@ uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
 address constant BOOTLOADER_ADDRESS = address(SYSTEM_CONTRACTS_OFFSET + 0x01);
 address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x09);
 address constant DEPLOYER_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x06);
+address constant COMPLEX_UPGRADER_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x0f);
 
 address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
 
@@ -169,7 +170,7 @@ ICompressor constant COMPRESSOR_CONTRACT = ICompressor(address(SYSTEM_CONTRACTS_
 
 address constant L1_MESSENGER_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x01);
 
-address constant BURN_NATIVE_TOKEN_HOOK = address(SYSTEM_CONTRACTS_OFFSET + 0x02);
+address constant SET_BYTECODE_ON_ADDRESS_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x02);
 
 IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher(
     address(SYSTEM_CONTRACTS_OFFSET + 0x11)

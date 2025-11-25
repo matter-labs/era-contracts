@@ -24,7 +24,7 @@ contract L1Messenger is IL1Messenger {
     function sendToL1(bytes calldata _message) external returns (bytes32 hash) {
         // Call system hook at the known system address.
         // Calldata to the hook is exactly `message`.
-        (bool ok, bytes memory ret) = L1_MESSENGER_HOOK.call(_message);
+        (bool ok, bytes memory ret) = L1_MESSENGER_HOOK.call(abi.encode(msg.sender, _message));
         if (!ok || ret.length != 32) {
             revert L1MessengerHookFailed();
         }
