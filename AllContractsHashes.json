@@ -953,7 +953,7 @@
   },
   {
     "contractName": "l1-contracts/GatewayCTMDeployer",
-    "zkBytecodeHash": "0x01000405580d46715595619884ad8133b88ed209dccfe3682066db6cab2aa74d",
+    "zkBytecodeHash": "0x0100040526d82edb8f18dc91d9f0bd3629db5f760e1857efd062d1a374c4b9c5",
     "zkBytecodePath": "/l1-contracts/zkout/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
     "evmBytecodeHash": "0xca5acc88f8e629a7a32ec5816e4a4ee42891ee0bec5bc7e10c25968e80e3d437",
     "evmBytecodePath": "/l1-contracts/out/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
@@ -1692,14 +1692,6 @@
     "evmBytecodeHash": "0xf731655f2f9e05709fea68ca343a6c3ecbf73bf0e41bdf3a00c7e0397b9031cc",
     "evmBytecodePath": "/l1-contracts/out/StdToml.sol/stdToml.json",
     "evmDeployedBytecodeHash": "0x9bcf7a9d8c63b7ab752b523366d1f5b5ea93480a674e0a9a068134f611d54ea6",
-    "zkBytecodeHash": null,
-    "zkBytecodePath": null
-  },
-  {
-    "contractName": "l1-contracts/UpgradeUtils",
-    "evmBytecodeHash": "0x2c1d49f56f4998599298a79312800d3a1fb7650f469dc8636e969ca1cfb156e6",
-    "evmBytecodePath": "/l1-contracts/out/UpgradeUtils.sol/UpgradeUtils.json",
-    "evmDeployedBytecodeHash": "0x6e74639306742b54f256b8a539507776c6cbf6bde9f41ca3a1fef8a6e54ca443",
     "zkBytecodeHash": null,
     "zkBytecodePath": null
   },
