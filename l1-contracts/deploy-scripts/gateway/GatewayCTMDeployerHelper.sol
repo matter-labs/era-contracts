@@ -50,14 +50,12 @@ library GatewayCTMDeployerHelper {
 
         // Caching some values
         bytes32 salt = config.salt;
-        uint256 eraChainId = config.eraChainId;
         uint256 l1ChainId = config.l1ChainId;
 
         contracts.multicall3 = _deployInternal("Multicall3", "Multicall3.sol", hex"", innerConfig);
 
         contracts = _deployFacetsAndUpgrades(
             salt,
-            eraChainId,
             l1ChainId,
             config.aliasedGovernanceAddress,
             config.isZKsyncOS,
@@ -135,7 +133,6 @@ library GatewayCTMDeployerHelper {
 
     function _deployFacetsAndUpgrades(
         bytes32 _salt,
-        uint256 _eraChainId,
         uint256 _l1ChainId,
         address _governanceAddress,
         bool _isZKsyncOS,
@@ -145,7 +142,7 @@ library GatewayCTMDeployerHelper {
         _deployedContracts.stateTransition.mailboxFacet = _deployInternal(
             "MailboxFacet",
             "Mailbox.sol",
-            abi.encode(_eraChainId, _l1ChainId, IEIP7702Checker(address(0))),
+            abi.encode(_l1ChainId, IEIP7702Checker(address(0))),
             innerConfig
         );
 
