@@ -295,24 +295,24 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
     }
 
     function deployDiamondProxy() internal {
-        // Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        // facetCuts[0] = Diamond.FacetCut({
-        //     facet: addresses.stateTransition.adminFacet,
-        //     action: Diamond.Action.Add,
-        //     isFreezable: false,
-        //     selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
-        // });
-        // Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
-        //     facetCuts: facetCuts,
-        //     initAddress: address(0),
-        //     initCalldata: ""
-        // });
-        // address contractAddress = deployViaCreate2(
-        //     type(DiamondProxy).creationCode,
-        //     abi.encode(config.l1ChainId, diamondCut)
-        // );
-        // console.log("DiamondProxy deployed at:", contractAddress);
-        // addresses.stateTransition.diamondProxy = contractAddress;
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: addresses.stateTransition.adminFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
+        });
+        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(0),
+            initCalldata: ""
+        });
+        address contractAddress = deployViaCreate2(
+            type(DiamondProxy).creationCode,
+            abi.encode(config.l1ChainId, diamondCut)
+        );
+        console.log("DiamondProxy deployed at:", contractAddress);
+        addresses.stateTransition.diamondProxy = contractAddress;
     }
 
     function updateOwners() internal {
