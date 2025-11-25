@@ -227,6 +227,7 @@ contract GatewayCTMFromL1 is Script {
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
             aliasedGovernanceAddress: aliasedGovernor,
             salt: bytes32(0),
+            eraChainId: config.eraChainId,
             l1ChainId: config.l1ChainId,
             testnetVerifier: config.testnetVerifier,
             isZKsyncOS: config.isZKsyncOS,
@@ -360,7 +361,7 @@ contract GatewayCTMFromL1 is Script {
         address mailboxFacet = address(
             _deployInternal(
                 ContractsBytecodesLib.getCreationCode("MailboxFacet"),
-                abi.encode(config.l1ChainId, config.eraChainId)  //@check second arg shoul be _eip7702Checker!!
+                abi.encode(config.l1ChainId, config.eraChainId)
             )
         );
         console.log("Mailbox facet deployed at", mailboxFacet);

@@ -63,7 +63,7 @@ contract GatewayCTMDeployerTest is Test {
 
     // This is done merely to publish the respective bytecodes.
     function _predeployContracts() internal {
-        new MailboxFacet(1, IEIP7702Checker(address(0)));
+        new MailboxFacet(1, 1, IEIP7702Checker(address(0)));
         new ExecutorFacet(1);
         new GettersFacet();
         new AdminFacet(1, RollupDAManager(address(0)));
@@ -94,6 +94,7 @@ contract GatewayCTMDeployerTest is Test {
         GatewayCTMDeployerConfig memory config = GatewayCTMDeployerConfig({
             aliasedGovernanceAddress: address(0x123),
             salt: keccak256("test-salt"),
+            eraChainId: 1001,
             l1ChainId: 1,
             testnetVerifier: true,
             isZKsyncOS: false,

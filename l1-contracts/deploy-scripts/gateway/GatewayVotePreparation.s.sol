@@ -58,6 +58,8 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
 
     uint256 constant EXPECTED_MAX_L1_GAS_PRICE = 50 gwei;
 
+    uint256 internal eraChainId;
+
     uint256 internal gatewayChainId;
     bytes internal forceDeploymentsData;
 
@@ -73,6 +75,8 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
         addresses.bridgehub.bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
         refundRecipient = toml.readAddress("$.refund_recipient");
 
+        eraChainId = toml.readUint("$.era_chain_id");
+
         gatewayChainId = toml.readUint("$.gateway_chain_id");
         forceDeploymentsData = toml.readBytes(".force_deployments_data");
 
@@ -82,6 +86,7 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
             aliasedGovernanceAddress: aliasedGovernor,
             salt: bytes32(0),
+            eraChainId: config.eraChainId,
             l1ChainId: config.l1ChainId,
             testnetVerifier: config.testnetVerifier,
             isZKsyncOS: config.isZKsyncOS,

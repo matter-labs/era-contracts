@@ -12,9 +12,10 @@ contract MailboxFacetTest is MailboxFacet {
     function test() internal virtual {}
 
     constructor(
+        uint256 _eraChainId,
         uint256 _l1ChainId,
         IEIP7702Checker _eip7702Checker
-    ) MailboxFacet(_l1ChainId, _eip7702Checker) {
+    ) MailboxFacet(_eraChainId, _l1ChainId, _eip7702Checker) {
         s.admin = msg.sender;
     }
 
