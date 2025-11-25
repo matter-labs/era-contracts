@@ -3,7 +3,7 @@ import * as ethers from "ethers";
 import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
-import type { Bridgehub, Forwarder, MailboxFacetTest, MockExecutorFacet } from "../../typechain";
+import type { Bridgehub, Forwarder, MailboxFacetTest } from "../../typechain";
 import {
   BridgehubFactory,
   ForwarderFactory,
@@ -19,8 +19,6 @@ import { Action, facetCut } from "../../src.ts/diamondCut";
 
 import {
   DEFAULT_REVERT_REASON,
-  L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-  L2_TO_L1_MESSENGER,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   defaultFeeParams,
   getCallRevertReason,
@@ -29,7 +27,6 @@ import {
 
 describe("Mailbox tests", function () {
   let mailbox: IMailbox;
-  let proxyAsMockExecutor: MockExecutorFacet;
   let bridgehub: Bridgehub;
   let owner: ethers.Signer;
   let forwarder: Forwarder;
@@ -123,66 +120,6 @@ describe("Mailbox tests", function () {
     );
 
     expect(revertReason).contains("MalformedBytecode");
-  });
-
-  describe("finalizeEthWithdrawal", function () {
-    const BLOCK_NUMBER = 0;
-    const MESSAGE_INDEX = 0;
-    const TX_NUMBER_IN_BLOCK = 0;
-
-    const MESSAGE =
-      "0x6c0960f9d8dA6BF26964aF9D7eEd9e03E53415D37aA960450000000000000000000000000000000000000000000000000000000000000001";
-    const MESSAGE_HASH = ethers.utils.keccak256(MESSAGE);
-    const key = ethers.utils.hexZeroPad(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, 32);
-    const HASHED_LOG = ethers.utils.solidityKeccak256(
-      ["uint8", "bool", "uint16", "address", "bytes32", "bytes32"],
-      [0, true, TX_NUMBER_IN_BLOCK, L2_TO_L1_MESSENGER, key, MESSAGE_HASH]
-    );
-
-    const MERKLE_PROOF = [
-      "0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba",
-      "0xc3d03eebfd83049991ea3d3e358b6712e7aa2e2e63dc2d4b438987cec28ac8d0",
-      "0xe3697c7f33c31a9b0f0aeb8542287d0d21e8c4cf82163d0c44c7a98aa11aa111",
-      "0x199cc5812543ddceeddd0fc82807646a4899444240db2c0d2f20c3cceb5f51fa",
-      "0xe4733f281f18ba3ea8775dd62d2fcd84011c8c938f16ea5790fd29a03bf8db89",
-      "0x1798a1fd9c8fbb818c98cff190daa7cc10b6e5ac9716b4a2649f7c2ebcef2272",
-      "0x66d7c5983afe44cf15ea8cf565b34c6c31ff0cb4dd744524f7842b942d08770d",
-      "0xb04e5ee349086985f74b73971ce9dfe76bbed95c84906c5dffd96504e1e5396c",
-      "0xac506ecb5465659b3a927143f6d724f91d8d9c4bdb2463aee111d9aa869874db",
-    ];
-
-    let L2_LOGS_TREE_ROOT = HASHED_LOG;
-    for (let i = 0; i < MERKLE_PROOF.length; i++) {
-      L2_LOGS_TREE_ROOT = ethers.utils.keccak256(L2_LOGS_TREE_ROOT + MERKLE_PROOF[i].slice(2));
-    }
-
-    before(async () => {
-      await proxyAsMockExecutor.saveL2LogsRootHash(BLOCK_NUMBER, L2_LOGS_TREE_ROOT);
-    });
-
-    it("Reverts when proof is invalid", async () => {
-      const invalidProof = [...MERKLE_PROOF];
-      invalidProof[0] = "0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43bb";
-
-      const revertReason = await getCallRevertReason(
-        mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, invalidProof)
-      );
-      expect(revertReason).contains("OnlyEraSupported");
-    });
-
-    it("Successful withdrawal", async () => {
-      const revertReason = await getCallRevertReason(
-        mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
-      );
-      expect(revertReason).contains("OnlyEraSupported");
-    });
-
-    it("Reverts when withdrawal is already finalized", async () => {
-      const revertReason = await getCallRevertReason(
-        mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
-      );
-      expect(revertReason).contains("OnlyEraSupported");
-    });
   });
 
   describe("L2 gas price", async () => {

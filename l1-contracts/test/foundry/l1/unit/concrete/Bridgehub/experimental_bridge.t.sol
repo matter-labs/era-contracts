@@ -101,7 +101,7 @@ contract ExperimentalBridgeTest is Test {
 
     function setUp() public {
         l1ChainId = 1;
-        eraChainId = 320;  //@check deprecate?
+        eraChainId = 320; //@check deprecate?
         deployerAddress = makeAddr("DEPLOYER_ADDRESS");
         bridgeOwner = makeAddr("BRIDGE_OWNER");
         dummyBridgehub = new DummyBridgehubSetter(bridgeOwner, type(uint256).max);

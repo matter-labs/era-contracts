@@ -5,7 +5,6 @@ import type { Address } from "zksync-ethers/build/types";
 
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
-import type { IMailbox } from "../../typechain/IMailbox";
 
 import type { ExecutorFacet } from "../../typechain";
 
@@ -161,43 +160,6 @@ export async function requestExecute(
       factoryDeps,
       refundRecipient,
     },
-    overrides
-  );
-}
-
-// due to gas reasons we call the chains' contract directly, instead of the bridgehub.
-export async function requestExecuteDirect(
-  mailbox: IMailbox,
-  to: Address,
-  l2Value: ethers.BigNumber,
-  calldata: ethers.BytesLike,
-  l2GasLimit: ethers.BigNumber,
-  factoryDeps: BytesLike[],
-  refundRecipient: string,
-  value?: ethers.BigNumber
-) {
-  const gasPrice = await mailbox.provider.getGasPrice();
-
-  // we call bridgehubChain direcetly to avoid running out of gas.
-  const baseCost = await mailbox.l2TransactionBaseCost(
-    gasPrice,
-    ethers.BigNumber.from(100000),
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-  );
-
-  const overrides = {
-    gasPrice,
-    value: baseCost.add(value || ethers.BigNumber.from(0)),
-  };
-
-  return await mailbox.requestL2Transaction(
-    to,
-    l2Value,
-    calldata,
-    l2GasLimit,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    factoryDeps,
-    refundRecipient,
     overrides
   );
 }

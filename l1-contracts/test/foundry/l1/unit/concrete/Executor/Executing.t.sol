@@ -10,6 +10,7 @@ import {POINT_EVALUATION_PRECOMPILE_ADDR, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, TES
 import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {BatchHashMismatch, CantExecuteUnprovenBatches, NonSequentialBatch, PriorityOperationsRollingHashMismatch, QueueIsEmpty} from "contracts/common/L1ContractErrors.sol";
+import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
 
 contract ExecutingTest is ExecutorTest {
     bytes32 l2DAValidatorOutputHash;
@@ -366,15 +367,20 @@ contract ExecutingTest is ExecutorTest {
         uint256 l2Value = 10 ether;
         uint256 totalCost = baseCost + l2Value;
 
-        mailbox.requestL2Transaction{value: totalCost}({
-            _contractL2: address(0),
-            _l2Value: l2Value,
-            _calldata: bytes(""),
-            _l2GasLimit: l2GasLimit,
-            _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _factoryDeps: factoryDeps,
-            _refundRecipient: address(0)
-        });
+        vm.prank(bridgeHubAddr);
+        mailbox.bridgehubRequestL2Transaction(
+            BridgehubL2TransactionRequest({
+                sender: msg.sender,
+                contractL2: address(0),
+                mintValue: totalCost,
+                l2Value: l2Value,
+                l2GasLimit: l2GasLimit,
+                l2Calldata: bytes(""),
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                factoryDeps: factoryDeps,
+                refundRecipient: address(0)
+            })
+        );
 
         vm.prank(validator);
         vm.expectRevert(PriorityOperationsRollingHashMismatch.selector);

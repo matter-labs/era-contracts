@@ -11,10 +11,7 @@ contract MailboxFacetTest is MailboxFacet {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
-    constructor(
-        uint256 _l1ChainId,
-        IEIP7702Checker _eip7702Checker
-    ) MailboxFacet(_l1ChainId, _eip7702Checker) {
+    constructor(uint256 _l1ChainId, IEIP7702Checker _eip7702Checker) MailboxFacet(_l1ChainId, _eip7702Checker) {
         s.admin = msg.sender;
     }
 

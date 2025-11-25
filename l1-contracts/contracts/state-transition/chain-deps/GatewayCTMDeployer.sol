@@ -50,8 +50,6 @@ struct GatewayCTMDeployerConfig {
     address aliasedGovernanceAddress;
     /// @notice Salt used for deterministic deployments via CREATE2.
     bytes32 salt;
-    /// @notice Chain ID of the Era chain.
-    uint256 eraChainId;
     /// @notice Chain ID of the L1 chain.
     uint256 l1ChainId;
     /// @notice Flag indicating whether to use the testnet verifier.
@@ -179,7 +177,6 @@ contract GatewayCTMDeployer {
     constructor(GatewayCTMDeployerConfig memory _config) {
         // Caching some values
         bytes32 salt = _config.salt;
-        uint256 eraChainId = _config.eraChainId;  //@check remove?
         uint256 l1ChainId = _config.l1ChainId;
 
         DeployedContracts memory contracts;

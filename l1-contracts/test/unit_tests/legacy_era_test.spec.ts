@@ -4,7 +4,7 @@ import * as hardhat from "hardhat";
 import type { BytesLike } from "ethers/lib/utils";
 import { Interface } from "ethers/lib/utils";
 
-import type { Bridgehub, GettersFacet, MockExecutorFacet } from "../../typechain";
+import type { Bridgehub, MockExecutorFacet } from "../../typechain";
 import {
   BridgehubFactory,
   TestnetERC20TokenFactory,
@@ -15,7 +15,6 @@ import {
 } from "../../typechain";
 import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
 import { IL1ERC20BridgeFactory } from "../../typechain/IL1ERC20BridgeFactory";
-import type { IMailbox } from "../../typechain/IMailbox";
 
 import { ethTestConfig } from "../../src.ts/utils";
 import { Action, facetCut } from "../../src.ts/diamondCut";
@@ -28,7 +27,6 @@ import {
   L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
   L2_TO_L1_MESSENGER,
   getCallRevertReason,
-  requestExecuteDirect,
   DUMMY_MERKLE_PROOF_START,
   DUMMY_MERKLE_PROOF_2_START,
 } from "./utils";
@@ -51,11 +49,7 @@ describe("Legacy Era tests", function () {
   const functionSignature = "0x11a2ccc1";
   let l2ToL1message: BytesLike;
 
-  let mailbox: IMailbox;
-  let getter: GettersFacet;
   let proxyAsMockExecutor: MockExecutorFacet;
-  const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
-  const MAX_CODE_LEN_BYTES = MAX_CODE_LEN_WORDS * 32;
   const dummyProof = Array(9).fill(ethers.constants.HashZero);
   dummyProof[0] = DUMMY_MERKLE_PROOF_START;
 
@@ -225,34 +219,9 @@ describe("Legacy Era tests", function () {
     expect(revertReason).contains("InvalidProof");
   });
 
-  /////////// Mailbox. Note we have these two together because we need to fix ERA Diamond proxy Address
-
-  /// we have this here as calling through the bridgehub does not work
-  it("Should not accept bytecode that is too long", async () => {
-    const revertReason = await getCallRevertReason(
-      requestExecuteDirect(
-        mailbox,
-        ethers.constants.AddressZero,
-        ethers.BigNumber.from(0),
-        "0x",
-        ethers.BigNumber.from(100000),
-        [
-          // "+64" to keep the length in words odd and bytecode chunkable
-          new Uint8Array(MAX_CODE_LEN_BYTES + 64),
-        ],
-        ethers.constants.AddressZero
-      )
-    );
-
-    expect(revertReason).contains("MalformedBytecode");
-  });
-
   describe("finalizeEthWithdrawal", function () {
     const BLOCK_NUMBER = 1;
-    const MESSAGE_INDEX = 0;
     const TX_NUMBER_IN_BLOCK = 0;
-    const L1_RECEIVER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
-    const AMOUNT = 1;
 
     const MESSAGE =
       "0x6c0960f9d8dA6BF26964aF9D7eEd9e03E53415D37aA960450000000000000000000000000000000000000000000000000000000000000001";
@@ -283,47 +252,6 @@ describe("Legacy Era tests", function () {
 
     before(async () => {
       await proxyAsMockExecutor.saveL2LogsRootHash(BLOCK_NUMBER, L2_LOGS_TREE_ROOT);
-    });
-
-    it("Reverts when proof is invalid", async () => {
-      const invalidProof = [...MERKLE_PROOF];
-      invalidProof[1] = "0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43bb";
-
-      const revertReason = await getCallRevertReason(
-        mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, invalidProof)
-      );
-      expect(revertReason).contains("InvalidProof");
-    });
-
-    it("Successful deposit", async () => {
-      const priorityQueueLengthBefore = await getter.getPriorityQueueSize();
-      const amount = ethers.utils.parseEther("1");
-      await requestExecuteDirect(
-        mailbox,
-        ethers.constants.AddressZero,
-        ethers.BigNumber.from(2000000),
-        "0x",
-        ethers.BigNumber.from(1000000),
-        [],
-        ethers.constants.AddressZero,
-        amount
-      );
-      const priorityQueueLengthAfter = await getter.getPriorityQueueSize();
-      expect(priorityQueueLengthAfter.sub(priorityQueueLengthBefore)).equal(1);
-    });
-
-    it("Successful withdrawal", async () => {
-      const balanceBefore = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
-      await mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF);
-      const balanceAfter = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
-      expect(balanceAfter.sub(balanceBefore)).equal(AMOUNT);
-    });
-
-    it("Reverts when withdrawal is already finalized", async () => {
-      const revertReason = await getCallRevertReason(
-        mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
-      );
-      expect(revertReason).contains("WithdrawalAlreadyFinalized");
     });
   });
 });

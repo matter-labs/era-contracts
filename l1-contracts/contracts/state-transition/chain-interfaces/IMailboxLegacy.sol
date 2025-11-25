@@ -6,7 +6,6 @@ pragma solidity ^0.8.21;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IMailboxLegacy {
-    
     /// @notice Finalize the withdrawal and release funds.
     /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed.
     /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
