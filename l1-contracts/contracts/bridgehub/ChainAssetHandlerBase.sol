@@ -39,29 +39,8 @@ abstract contract ChainAssetHandlerBase is
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /*//////////////////////////////////////////////////////////////
-                            EXTERNAL GETTERS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice The asset ID of ETH token
-    function ETH_TOKEN_ASSET_ID() external view virtual returns (bytes32);
-
-    /// @notice The chain ID of L1
-    function L1_CHAIN_ID() external view virtual returns (uint256);
-
-    /// @notice The bridgehub contract
-    function BRIDGEHUB() external view virtual returns (IL1Bridgehub);
-
-    /// @notice The message root contract
-    function MESSAGE_ROOT() external view virtual returns (IMessageRoot);
-
-    /// @notice The asset router contract
-    function ASSET_ROUTER() external view virtual returns (IAssetRouterBase);
-
-    /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-
-    function _ethTokenAssetId() internal view virtual returns (bytes32);
 
     function _l1ChainId() internal view virtual returns (uint256);
 
@@ -70,8 +49,6 @@ abstract contract ChainAssetHandlerBase is
     function _messageRoot() internal view virtual returns (IMessageRoot);
 
     function _assetRouter() internal view virtual returns (IAssetRouterBase);
-
-    function _assetTracker() internal view virtual returns (address);
 
     /// @notice Used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;

@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {BALANCE_CHANGE_VERSION, SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, INTEROP_BALANCE_CHANGE_VERSION} from "./IAssetTrackerBase.sol";
 import {BUNDLE_IDENTIFIER, BalanceChange, InteropBalanceChange, ConfirmBalanceMigrationData, InteropBundle, InteropCall, L2Log, TokenBalanceMigrationData, TxStatus, AssetBalanceChange} from "../../common/Messaging.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR, L2_ASSET_ROUTER} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR, L2_ASSET_ROUTER} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AssetRouterBase} from "../asset-router/AssetRouterBase.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
@@ -73,20 +73,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         _;
     }
 
-    modifier onlyL2NativeTokenVault() {
-        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    modifier onlyBaseTokenSystemContract() {
-        if (msg.sender != address(L2_BASE_TOKEN_SYSTEM_CONTRACT)) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
     modifier onlyChain(uint256 _chainId) {
         if (msg.sender != L2_BRIDGEHUB.getZKChain(_chainId)) {
             revert Unauthorized(msg.sender);
@@ -127,11 +113,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         legacySharedBridgeAddress[_chainId] = _legacySharedBridgeAddress;
     }
 
-    function _l1ChainId() internal view override returns (uint256) {
+    function _l1ChainId() internal view returns (uint256) {
         return L1_CHAIN_ID;
     }
 
-    function _bridgehub() internal view override returns (IBridgehubBase) {
+    function _bridgehub() internal view returns (IBridgehubBase) {
         return L2_BRIDGEHUB;
     }
 
@@ -139,7 +125,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         return L2_NATIVE_TOKEN_VAULT;
     }
 
-    function _messageRoot() internal view override returns (IMessageRoot) {
+    function _messageRoot() internal view returns (IMessageRoot) {
         return L2_MESSAGE_ROOT;
     }
 

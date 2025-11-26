@@ -194,13 +194,7 @@ contract L1AssetRouterTest is Test {
             abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
             abi.encode(0)
         );
-        l1AssetTracker = new L1AssetTracker(
-            block.chainid,
-            bridgehubAddress,
-            address(sharedBridge),
-            address(nativeTokenVault),
-            messageRootAddress
-        );
+        l1AssetTracker = new L1AssetTracker(bridgehubAddress, address(nativeTokenVault), messageRootAddress);
         vm.prank(owner);
         nativeTokenVault.setAssetTracker(address(l1AssetTracker));
 
