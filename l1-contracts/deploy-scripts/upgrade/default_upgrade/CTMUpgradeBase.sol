@@ -66,7 +66,7 @@ abstract contract CTMUpgradeBase is DeployCTMUtils {
     /// @notice Get L2 upgrade target and data
     function getL2UpgradeTargetAndData(
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
-    ) internal pure returns (address, bytes memory) {
+    ) internal view virtual returns (address, bytes memory) {
         return (
             address(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR),
             abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (_forceDeployments))
