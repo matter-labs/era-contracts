@@ -6,9 +6,9 @@ pragma solidity 0.8.28;
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {EcosystemUpgrade} from "./EcosystemUpgrade.s.sol";
-import {ChainUpgrade} from "./ChainUpgrade.s.sol";
+import {ChainUpgrade} from "./default_upgrade/ChainUpgrade.s.sol";
 import {Call} from "../../contracts/governance/Common.sol";
-import {Utils} from "../Utils.sol";
+
 import {IGovernance} from "../../contracts/governance/IGovernance.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {Diamond} from "../../contracts/state-transition/libraries/Diamond.sol";

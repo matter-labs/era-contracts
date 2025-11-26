@@ -3,9 +3,12 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
+import {console2 as console} from "forge-std/console2.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
@@ -16,10 +19,10 @@ import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
-import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
 contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
@@ -51,6 +54,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
     address public currentChainAddress;
     address public currentTokenAddress = ETH_TOKEN_ADDRESS;
     TestnetERC20Token currentToken;
+    SimpleExecutor simpleExecutor;
 
     // Amounts deposited by each user, mapped by user address and token address
     mapping(address user => mapping(address token => uint256 deposited)) public depositsUsers;
@@ -513,7 +517,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             addresses.bridgehubProxyAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL2MessageInclusion.selector,
+                IBridgehubBase.proveL2MessageInclusion.selector,
                 currentChainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -573,7 +577,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             addresses.bridgehubProxyAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL2MessageInclusion.selector,
+                IBridgehubBase.proveL2MessageInclusion.selector,
                 currentChainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -694,6 +698,62 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 }
 
 contract BoundedBridgeHubInvariantTests is BridgeHubInvariantTests {
+    function test_DepositEthBase7702() external {
+        prepare();
+        uint256 randomCallerPk = uint256(keccak256("RANDOM_CALLER"));
+        address payable randomCaller = payable(vm.addr(randomCallerPk));
+        currentUser = randomCaller;
+        uint256 l2Value = 100;
+        uint256 currentChainId = 10;
+        uint256 gasPrice = 10000000;
+        vm.txGasPrice(gasPrice);
+
+        simpleExecutor = new SimpleExecutor();
+
+        uint256 l2GasLimit = 1000000; // reverts with 8
+        uint256 minRequiredGas = _getMinRequiredGasPriceForChain(
+            currentChainId,
+            gasPrice,
+            l2GasLimit,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+        );
+
+        uint256 mintValue = l2Value + minRequiredGas;
+        vm.deal(currentUser, mintValue);
+
+        bytes memory callData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
+        L2TransactionRequestDirect memory txRequest = _createL2TransactionRequestDirect({
+            _chainId: currentChainId,
+            _mintValue: mintValue,
+            _l2Value: l2Value,
+            _l2GasLimit: l2GasLimit,
+            _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            _l2CallData: callData
+        });
+
+        bytes memory calldataForExecutor = abi.encodeWithSelector(
+            IL1Bridgehub.requestL2TransactionDirect.selector,
+            txRequest
+        );
+
+        vm.signAndAttachDelegation(address(simpleExecutor), randomCallerPk);
+        vm.recordLogs();
+        vm.prank(randomCaller);
+        SimpleExecutor(randomCaller).execute(address(addresses.bridgehub), mintValue, calldataForExecutor);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
+
+        assertEq(currentUser, address(uint160(request.transaction.from)));
+        assertNotEq(request.txHash, bytes32(0));
+        _handleRequestByMockL2Contract(request, RequestType.DIRECT);
+
+        depositsUsers[currentUser][ETH_TOKEN_ADDRESS] += mintValue;
+        depositsBridge[currentChainAddress][ETH_TOKEN_ADDRESS] += mintValue;
+        tokenSumDeposit[ETH_TOKEN_ADDRESS] += mintValue;
+        l2ValuesSum[ETH_TOKEN_ADDRESS] += l2Value;
+    }
+
     function depositEthSuccess(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 l2Value) public {
         uint64 MAX = 2 ** 64 - 1;
         uint256 l2Value = bound(l2Value, 0.1 ether, MAX);

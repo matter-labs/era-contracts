@@ -8,8 +8,10 @@ import {PriorityQueue} from "../../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 import {Unauthorized} from "../../../common/L1ContractErrors.sol";
-import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
-import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
+import {L2_INTEROP_CENTER_ADDR, GW_ASSET_TRACKER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {IL1Bridgehub} from "../../../bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "../../../bridgehub/IBridgehubBase.sol";
+import {PRIORITY_OPERATION_L2_TX_TYPE, SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "../../../common/Config.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
@@ -52,14 +54,21 @@ contract ZKChainBase is ReentrancyGuard {
     }
 
     modifier onlyBridgehubOrInteropCenter() {
-        if ((msg.sender != s.bridgehub) && (msg.sender != s.interopCenter)) {
+        if ((msg.sender != s.bridgehub) && (msg.sender != L2_INTEROP_CENTER_ADDR)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    modifier onlyGatewayAssetTracker() {
+        if (msg.sender != GW_ASSET_TRACKER_ADDR) {
             revert Unauthorized(msg.sender);
         }
         _;
     }
 
     modifier onlyChainAssetHandler() {
-        if (msg.sender != IBridgehub(s.bridgehub).chainAssetHandler()) {
+        if (msg.sender != IL1Bridgehub(s.bridgehub).chainAssetHandler()) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -94,16 +103,16 @@ contract ZKChainBase is ReentrancyGuard {
     }
 
     modifier onlyServiceTransaction() {
-        IBridgehub bridgehub = IBridgehub(s.bridgehub);
+        IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
         if (
-            /// Multiple purposes.
+            /// Purposes.
             /// 1. Allow EVM emulation.
-            /// 2. saveV30UpgradeGatewayBlockNumberOnL2, so disable interop for pre V30 batches.
             msg.sender != address(this) &&
             /// For registering chains in the L2Bridgehub. This is used for interop initiation.
             msg.sender != bridgehub.chainRegistrationSender() &&
             /// For sending the token balance migration confirmation txs to L2s and the Gateway.
-            msg.sender != address(IInteropCenter(bridgehub.interopCenter()).assetTracker()) &&
+            /// confirmMigrationOnL2, confirmMigrationOnGateway.
+            msg.sender != address(s.assetTracker) &&
             /// 1. For setting the legacy shared bridge in the L2Asset Tracker.
             /// 2. Also for sending the demarcation txs for token balance migration. It might be deleted.
             msg.sender != address(bridgehub.chainAssetHandler())
@@ -133,5 +142,13 @@ contract ZKChainBase is ReentrancyGuard {
 
     function _getTotalPriorityTxs() internal view returns (uint256) {
         return s.priorityTree.getTotalPriorityTxs();
+    }
+
+    function _getPriorityTxType() internal view returns (uint256) {
+        return s.zksyncOS ? ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE : PRIORITY_OPERATION_L2_TX_TYPE;
+    }
+
+    function _getUpgradeTxType() internal view returns (uint256) {
+        return s.zksyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
     }
 }

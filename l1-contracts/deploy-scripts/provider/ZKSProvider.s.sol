@@ -8,10 +8,10 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {FinalizeL1DepositParams} from "contracts/common/Messaging.sol";
-import {Utils} from "../Utils.sol";
+import {Utils} from "../utils/Utils.sol";
 import {AltL2ToL1Log, AltLog, AltTransactionReceipt, L2ToL1Log, L2ToL1LogProof, Log, TransactionReceipt} from "./ReceipTypes.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -28,8 +28,8 @@ contract ZKSProvider is Script {
     ) public {
         FinalizeL1DepositParams memory params = getFinalizeWithdrawalParams(chainId, l2RpcUrl, withdrawalHash, index);
 
-        IBridgehub bridgehub = IBridgehub(l1Bridgehub);
-        IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
+        IBridgehubBase bridgehub = IBridgehubBase(l1Bridgehub);
+        IL1AssetRouter assetRouter = IL1AssetRouter(address(bridgehub.assetRouter()));
         IL1Nullifier nullifier = IL1Nullifier(assetRouter.L1_NULLIFIER());
 
         waitForBatchToBeExecuted(l1Bridgehub, chainId, params);
@@ -59,7 +59,7 @@ contract ZKSProvider is Script {
         uint256 chainId,
         FinalizeL1DepositParams memory params
     ) public {
-        IBridgehub bridgehub = IBridgehub(l1Bridgehub);
+        IBridgehubBase bridgehub = IBridgehubBase(l1Bridgehub);
         // IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
         // IL1Nullifier nullifier = IL1Nullifier(assetRouter.L1_NULLIFIER());
         IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());
@@ -148,7 +148,7 @@ contract ZKSProvider is Script {
             }
         }
 
-        revert("Withdrawal log not found at specified index");
+        console.log("Withdrawal log not found at specified index", index);
     }
 
     function getWithdrawalL2ToL1Log(
@@ -178,7 +178,7 @@ contract ZKSProvider is Script {
             }
         }
 
-        revert("L2ToL1 log not found at specified index");
+        console.log("L2ToL1 log not found at specified index", index);
     }
 
     function getFinalizeWithdrawalParams(
@@ -192,6 +192,9 @@ contract ZKSProvider is Script {
         // Get withdrawal log and L2ToL1 log
         (Log memory log, uint64 l1BatchTxId) = getWithdrawalLog(l2RpcUrl, withdrawalHash, index);
         (uint64 l2ToL1LogIndex, L2ToL1Log memory l2ToL1Log) = getWithdrawalL2ToL1Log(l2RpcUrl, withdrawalHash, index);
+        if (l2ToL1Log.key == bytes32(0)) {
+            return params;
+        }
 
         // Get L2ToL1 log proof
         L2ToL1LogProof memory proof = getL2ToL1LogProof(l2RpcUrl, withdrawalHash, l2ToL1LogIndex);

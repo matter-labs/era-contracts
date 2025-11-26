@@ -3,10 +3,8 @@
 pragma solidity ^0.8.21;
 
 import {Diamond} from "./libraries/Diamond.sol";
-import {L2CanonicalTransaction} from "../common/Messaging.sol";
+import {L2CanonicalTransaction, TxStatus} from "../common/Messaging.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
-
-// import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 /// @notice Struct that holds all data needed for initializing CTM Proxy.
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
@@ -123,6 +121,10 @@ interface IChainTypeManager {
 
     function getProtocolVersion(uint256 _chainId) external view returns (uint256);
 
+    function serverNotifierAddress() external view returns (address);
+
+    function validatorTimelock() external view returns (address);
+
     function initialize(ChainTypeManagerInitializeData calldata _initializeData) external;
 
     function setLegacyValidatorTimelock(address _validatorTimelock) external;
@@ -181,8 +183,9 @@ interface IChainTypeManager {
 
     function forwardedBridgeMint(uint256 _chainId, bytes calldata _data) external returns (address);
 
-    function forwardedBridgeRecoverFailedTransfer(
+    function forwardedBridgeConfirmTransferResult(
         uint256 _chainId,
+        TxStatus _txStatus,
         bytes32 _assetInfo,
         address _depositSender,
         bytes calldata _ctmData

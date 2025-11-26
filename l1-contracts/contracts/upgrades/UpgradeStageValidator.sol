@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {MigrationPaused, MigrationsNotPaused, ProtocolIdMismatch, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {IChainAssetHandler} from "../bridgehub/IChainAssetHandler.sol";
 
 /// @title Rules to validate that different upgrade stages have passed.
 /// @author Matter Labs
@@ -12,7 +13,7 @@ import {MigrationPaused, MigrationsNotPaused, ProtocolIdMismatch, ZeroAddress} f
 /// next upgrade stage.
 contract UpgradeStageValidator {
     /// @notice Address of bridgehub.
-    IBridgehub public immutable BRIDGEHUB;
+    IL1Bridgehub public immutable BRIDGEHUB;
 
     /// @notice Address of chain type manager.
     IChainTypeManager public immutable CHAIN_TYPE_MANAGER;
@@ -30,20 +31,20 @@ contract UpgradeStageValidator {
         }
 
         CHAIN_TYPE_MANAGER = IChainTypeManager(chainTypeManager);
-        BRIDGEHUB = IBridgehub(CHAIN_TYPE_MANAGER.BRIDGE_HUB());
+        BRIDGEHUB = IL1Bridgehub(CHAIN_TYPE_MANAGER.BRIDGE_HUB());
         NEW_PROTOCOL_VERSION = newProtocolVersion;
     }
 
     /// @notice Check if migrations are paused
     function checkMigrationsPaused() external {
-        if (!BRIDGEHUB.migrationPaused()) {
+        if (!IChainAssetHandler(BRIDGEHUB.chainAssetHandler()).migrationPaused()) {
             revert MigrationsNotPaused();
         }
     }
 
     /// @notice Check if migrations are unpaused
     function checkMigrationsUnpaused() external {
-        if (BRIDGEHUB.migrationPaused()) {
+        if (IChainAssetHandler(BRIDGEHUB.chainAssetHandler()).migrationPaused()) {
             revert MigrationPaused();
         }
     }

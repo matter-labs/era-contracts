@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Vm} from "forge-std/Test.sol";
-import {L2_SYSTEM_CONTEXT_ADDRESS, Utils, EVENT_INDEX} from "../Utils/Utils.sol";
+import {EVENT_INDEX, L2_SYSTEM_CONTEXT_ADDRESS, Utils} from "../Utils/Utils.sol";
 
 import {EMPTY_PREPUBLISHED_COMMITMENT, ExecutorTest, POINT_EVALUATION_PRECOMPILE_RESULT} from "./_Executor_Shared.t.sol";
 

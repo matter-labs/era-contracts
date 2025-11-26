@@ -5,17 +5,19 @@ pragma solidity ^0.8.24;
 import {MessageVerification} from "../common/MessageVerification.sol";
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 import {L2_INTEROP_ROOT_STORAGE} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {DepthMoreThanOneForRecursiveMerkleProof} from "../bridgehub/L1BridgehubErrors.sol";
 
 /// @title The interface of the ZKsync L2MessageVerification contract that can be used to prove L2 message inclusion on the L2.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract L2MessageVerification is MessageVerification {
-    function _proveL2LeafInclusion(
+    function _proveL2LeafInclusionRecursive(
         uint256 _chainId,
         uint256 _blockOrBatchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
-        bytes32[] calldata _proof
+        bytes32[] calldata _proof,
+        uint256 _depth
     ) internal view override returns (bool) {
         ProofData memory proofData = MessageHashing._getProofData({
             _chainId: _chainId,
@@ -29,6 +31,13 @@ contract L2MessageVerification is MessageVerification {
             bytes32 correctBatchRoot = L2_INTEROP_ROOT_STORAGE.interopRoots(_chainId, _blockOrBatchNumber);
             return correctBatchRoot == proofData.batchSettlementRoot && correctBatchRoot != bytes32(0);
         }
+        if (_depth == 1) {
+            revert DepthMoreThanOneForRecursiveMerkleProof();
+        }
+
+        // Note that here we assume that all settlement layers that the chain has ever settled on are trustworthy,
+        // i.e. all chains inside the ecosystem trust that they will not accept a message for a batch
+        // that never happened.
 
         return
             this.proveL2LeafInclusionShared({

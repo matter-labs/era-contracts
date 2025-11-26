@@ -2,35 +2,35 @@ pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {BridgehubBurnCTMAssetData, IBridgehub, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
-import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
+
+import {BridgehubBurnCTMAssetData, IBridgehubBase, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
-import {CallNotAllowed, InvalidSelector, NotAllowed, RemovingPermanentRestriction, UnallowedImplementation, UnsupportedEncodingVersion, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {CallNotAllowed, InvalidSelector, NotAllowed, RemovingPermanentRestriction, UnallowedImplementation, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {FeeParams, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
+
 import {ChainTypeManagerTest} from "test/foundry/l1/unit/concrete/state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract TestPermanentRestriction is PermanentRestriction {
-    constructor(IBridgehub _bridgehub, address _l2AdminFactory) PermanentRestriction(_bridgehub, _l2AdminFactory) {}
+    constructor(IL1Bridgehub _bridgehub, address _l2AdminFactory) PermanentRestriction(_bridgehub, _l2AdminFactory) {}
 
     function isAdminOfAChain(address _chain) external view returns (bool) {
         return _isAdminOfAChain(_chain);
@@ -42,6 +42,7 @@ contract TestPermanentRestriction is PermanentRestriction {
 }
 
 contract PermanentRestrictionTest is ChainTypeManagerTest {
+    uint256 internal L1_CHAIN_ID;
     ChainAdmin internal chainAdmin;
     AccessControlRestriction internal restriction;
     TestPermanentRestriction internal permRestriction;
@@ -63,10 +64,11 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         address[] memory restrictions = new address[](1);
         restrictions[0] = address(restriction);
         chainAdmin = new ChainAdmin(restrictions);
+        L1_CHAIN_ID = 5;
     }
 
     function _deployPermRestriction(
-        IBridgehub _bridgehub,
+        IL1Bridgehub _bridgehub,
         address _l2AdminFactory,
         address _owner
     ) internal returns (TestPermanentRestriction proxy, TestPermanentRestriction impl) {
@@ -270,7 +272,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             secondBridgeCalldata: hex""
         });
         if (!correctSecondBridge) {
-            call.data = abi.encodeCall(IBridgehub.requestL2TransactionTwoBridges, (outer));
+            call.data = abi.encodeCall(IL1Bridgehub.requestL2TransactionTwoBridges, (outer));
             // 0 is not correct second bridge
             return call;
         }
@@ -285,12 +287,12 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
                 // Gateway chain id, we do not need it
                 chainId: 0,
                 ctmData: abi.encode(l2Admin, hex""),
-                chainData: abi.encode(IZKChain(IBridgehub(bridgehub).getZKChain(chainId)).getProtocolVersion())
+                chainData: abi.encode(IZKChain(IBridgehubBase(bridgehub).getZKChain(chainId)).getProtocolVersion())
             })
         );
         outer.secondBridgeCalldata = abi.encodePacked(bytes1(encoding), abi.encode(chainAssetId, bridgehubData));
 
-        call.data = abi.encodeCall(IBridgehub.requestL2TransactionTwoBridges, (outer));
+        call.data = abi.encodeCall(IL1Bridgehub.requestL2TransactionTwoBridges, (outer));
     }
 
     function assertInvalidMigrationCall(Call memory call) public {
@@ -364,14 +366,13 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         vm.startPrank(governor);
         bridgehub.addChainTypeManager(address(chainContractAddress));
         bridgehub.addTokenAssetId(DataEncoding.encodeNTVAssetId(block.chainid, baseToken));
-        MessageRoot messageRootNew = new MessageRoot(bridgehub, block.chainid);
+        L1MessageRoot messageRootNew = new L1MessageRoot(address(bridgehub), 1);
         bridgehub.setAddresses(
             sharedBridge,
             ICTMDeploymentTracker(address(0)),
             messageRootNew,
             address(chainAssetHandler),
-            address(0),
-            address(0x000000000000000000000000000000000002000a)
+            address(0)
         ); // kl todo maybe address(1)
         vm.stopPrank();
 
@@ -396,28 +397,30 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         );
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(Bridgehub.baseToken.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.baseToken.selector, chainId),
             abi.encode(baseToken)
-        );
-        vm.mockCall(
-            address(messageRootNew),
-            abi.encodeWithSelector(IMessageRoot.v30UpgradeGatewayBlockNumber.selector),
-            abi.encode(1)
         );
         vm.mockCall(
             address(messageRootNew),
             abi.encodeWithSelector(IMessageRoot.v30UpgradeChainBatchNumber.selector),
             abi.encode(0)
         );
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(chainAssetHandler)
+        );
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
+        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(18));
 
-        mockDiamondInitInteropCenterCallsWithAddress(interopCenterAddress);
+        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, baseToken);
+        mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge, baseTokenAssetId);
         vm.startPrank(governor);
         bridgehub.createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(chainContractAddress),
-            _baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, baseToken),
+            _baseTokenAssetId: baseTokenAssetId,
             _salt: 0,
             _admin: newChainAdmin,
             _initData: getCTMInitData(),

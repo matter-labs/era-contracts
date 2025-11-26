@@ -2,11 +2,11 @@
 
 pragma solidity 0.8.28;
 
-import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
+import {IL1Bridgehub} from "../../bridgehub/IL1Bridgehub.sol";
 import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
-import {FinalizeL1DepositParams} from "../../common/Messaging.sol";
+import {FinalizeL1DepositParams, ConfirmTransferResultData} from "../../common/Messaging.sol";
 
 /// @dev Transient storage slot for storing the settlement layer chain ID during proof verification.
 /// @dev This slot is used to temporarily store which settlement layer is processing the current proof,
@@ -56,7 +56,7 @@ interface IL1Nullifier {
 
     function finalizeDeposit(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external;
 
-    function BRIDGE_HUB() external view returns (IBridgehub);
+    function BRIDGE_HUB() external view returns (IL1Bridgehub);
 
     function l1AssetRouter() external view returns (IL1AssetRouter);
 
@@ -79,6 +79,11 @@ interface IL1Nullifier {
     function transferTokenToNTV(address _token) external;
 
     function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external;
+
+    /// @notice Confirms the result of a deposit, whether it was successful or not.
+    /// @dev This function is used to confirm the migration of a chain to Gateway.
+    /// @param _confirmTransferResultData The data to confirm the deposit result.
+    function bridgeConfirmTransferResult(ConfirmTransferResultData calldata _confirmTransferResultData) external;
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
     /// @param _chainId The ZK chain id to which deposit was initiated.
@@ -126,6 +131,9 @@ interface IL1Nullifier {
     /// @notice When verifying recursive proofs, we mark the transient settlement layer,
     /// this function retrieves the currently stored transient settlement layer chain ID.
     /// @dev The transient settlement layer is cleared at the end of each transaction.
+    /// @dev Note, that it is hard assumption that must be enforced by all the users of this function:
+    /// Any operations that reads this value, must be preceded by a successful invocation of L1Nullifier
+    /// that has set this value. Otherwise, it is possible that the same value is reused multiple times.
     /// @return The chain ID of the settlement layer that processed the current proof, or 0 if none is set.
     function getTransientSettlementLayer() external view returns (uint256, uint256);
 }

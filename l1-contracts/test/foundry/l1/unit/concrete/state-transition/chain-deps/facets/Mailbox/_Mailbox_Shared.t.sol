@@ -10,12 +10,15 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
+import {IL1ChainAssetHandler} from "contracts/bridgehub/IL1ChainAssetHandler.sol";
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
+import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
 contract MailboxTest is UtilsTest {
     IMailbox internal mailboxFacet;
@@ -23,11 +26,12 @@ contract MailboxTest is UtilsTest {
     IGetters internal gettersFacet;
     address sender;
     uint256 constant eraChainId = 9;
-    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
     address diamondProxy;
     address bridgehub;
     address chainAssetHandler;
     address interopCenter;
+    IEIP7702Checker eip7702Checker;
 
     function deployDiamondProxy() internal returns (address proxy) {
         sender = makeAddr("sender");
@@ -36,9 +40,13 @@ contract MailboxTest is UtilsTest {
         interopCenter = makeAddr("interopCenter");
         vm.deal(sender, 100 ether);
 
+        eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
+
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(new MailboxFacet(eraChainId, block.chainid)),
+            facet: address(
+                new MailboxFacet(eraChainId, block.chainid, address(chainAssetHandler), eip7702Checker, false)
+            ),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: Utils.getMailboxSelectors()
@@ -56,21 +64,25 @@ contract MailboxTest is UtilsTest {
             selectors: Utils.getGettersSelectors()
         });
 
-        mockDiamondInitInteropCenterCalls();
+        mockDiamondInitInteropCenterCallsWithAddress(bridgehub, address(0), bytes32(0));
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
             abi.encode(chainAssetHandler)
         );
         vm.mockCall(
             address(chainAssetHandler),
-            abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
+            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
             abi.encode(1)
         );
-        proxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
+        vm.mockCall(
+            address(chainAssetHandler),
+            abi.encodeWithSelector(IL1ChainAssetHandler.isMigrationInProgress.selector),
+            abi.encode(false)
+        );
+        proxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, bridgehub);
         utilsFacet = UtilsFacet(proxy);
         utilsFacet.util_setBridgehub(bridgehub);
-        utilsFacet.util_setInteropCenter(interopCenter);
     }
 
     function setupDiamondProxy() public {

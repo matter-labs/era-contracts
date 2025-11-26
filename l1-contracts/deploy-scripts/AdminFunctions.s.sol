@@ -8,12 +8,11 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {ChainInfoFromBridgehub, Utils} from "./Utils.sol";
+import {ChainInfoFromBridgehub, Utils} from "./utils/Utils.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -23,11 +22,13 @@ import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainS
 
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {BridgehubBurnCTMAssetData, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehubBase.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
@@ -359,16 +360,30 @@ contract AdminFunctions is Script {
     ) public {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
-        address transactionFilterer = IGetters(chainInfo.diamondProxy).getTransactionFilterer();
-        require(transactionFilterer != address(0), "Chain does not have a transaction filterer");
+        GatewayTransactionFilterer transactionFilterer = GatewayTransactionFilterer(
+            IGetters(chainInfo.diamondProxy).getTransactionFilterer()
+        );
+        require(address(transactionFilterer) != address(0), "Chain does not have a transaction filterer");
 
-        Call[] memory calls = new Call[](_grantees.length);
+        uint256 countWhitelistedSenders = 0;
         for (uint256 i = 0; i < _grantees.length; i++) {
-            calls[i] = Call({
-                target: transactionFilterer,
-                value: 0,
-                data: abi.encodeCall(GatewayTransactionFilterer.grantWhitelist, (_grantees[i]))
-            });
+            if (!transactionFilterer.whitelistedSenders(_grantees[i])) {
+                countWhitelistedSenders++;
+            }
+        }
+
+        Call[] memory calls = new Call[](countWhitelistedSenders);
+
+        uint256 j = 0;
+        for (uint256 i = 0; i < _grantees.length; i++) {
+            if (!transactionFilterer.whitelistedSenders(_grantees[i])) {
+                calls[j] = Call({
+                    target: address(transactionFilterer),
+                    value: 0,
+                    data: abi.encodeCall(GatewayTransactionFilterer.grantWhitelist, (_grantees[i]))
+                });
+                j++;
+            }
         }
 
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
@@ -410,11 +425,33 @@ contract AdminFunctions is Script {
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
 
+    function pauseDepositsBeforeInitiatingMigration(address _bridgehub, uint256 _chainId, bool _shouldSend) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IAdmin.pauseDepositsBeforeInitiatingMigration, ())
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
+    }
+
+    function unpauseDeposits(address _bridgehub, uint256 _chainId, bool _shouldSend) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: chainInfo.diamondProxy, value: 0, data: abi.encodeCall(IAdmin.unpauseDeposits, ())});
+
+        saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
+    }
+
     function setDAValidatorPair(
         address _bridgehub,
         uint256 _chainId,
         address _l1DaValidator,
-        address _l2DaValidator,
+        L2DACommitmentScheme _l2DaCommitmentScheme,
         bool _shouldSend
     ) public {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
@@ -423,7 +460,7 @@ contract AdminFunctions is Script {
         calls[0] = Call({
             target: chainInfo.diamondProxy,
             value: 0,
-            data: abi.encodeCall(IAdmin.setDAValidatorPair, (_l1DaValidator, _l2DaValidator))
+            data: abi.encodeCall(IAdmin.setDAValidatorPair, (_l1DaValidator, _l2DaCommitmentScheme))
         });
 
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
@@ -455,9 +492,9 @@ contract AdminFunctions is Script {
 
         bytes memory secondBridgeData;
         {
-            bytes32 chainAssetId = Bridgehub(data.bridgehub).ctmAssetIdFromChainId(data.l2ChainId);
+            bytes32 chainAssetId = L1Bridgehub(data.bridgehub).ctmAssetIdFromChainId(data.l2ChainId);
 
-            uint256 currentSettlementLayer = Bridgehub(data.bridgehub).settlementLayer(data.l2ChainId);
+            uint256 currentSettlementLayer = L1Bridgehub(data.bridgehub).settlementLayer(data.l2ChainId);
             if (currentSettlementLayer == data.gatewayChainId) {
                 console.log("Chain already using gateway as its settlement layer");
                 saveOutput(Output({admin: l2ChainInfo.admin, encodedData: hex""}));
@@ -472,7 +509,7 @@ contract AdminFunctions is Script {
                         data._gatewayDiamondCutData
                     ),
                     chainData: abi.encode(
-                        IZKChain(Bridgehub(data.bridgehub).getZKChain(data.l2ChainId)).getProtocolVersion()
+                        IZKChain(L1Bridgehub(data.bridgehub).getZKChain(data.l2ChainId)).getProtocolVersion()
                     )
                 })
             );
@@ -524,7 +561,7 @@ contract AdminFunctions is Script {
         uint256 l2ChainId;
         uint256 gatewayChainId;
         address l1DAValidator;
-        address l2DAValidator;
+        L2DACommitmentScheme l2DACommitmentScheme;
         address chainDiamondProxyOnGateway;
         address refundRecipient;
         bool _shouldSend;
@@ -537,7 +574,10 @@ contract AdminFunctions is Script {
             data.bridgehub,
             data.l2ChainId
         );
-        bytes memory callData = abi.encodeCall(IAdmin.setDAValidatorPair, (data.l1DAValidator, data.l2DAValidator));
+        bytes memory callData = abi.encodeCall(
+            IAdmin.setDAValidatorPair,
+            (data.l1DAValidator, data.l2DACommitmentScheme)
+        );
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
             callData,
@@ -560,7 +600,7 @@ contract AdminFunctions is Script {
         uint256 l2ChainId,
         uint256 gatewayChainId,
         address l1DAValidator,
-        address l2DAValidator,
+        L2DACommitmentScheme l2DACommitmentScheme,
         address chainDiamondProxyOnGateway,
         address refundRecipient,
         bool _shouldSend
@@ -572,7 +612,7 @@ contract AdminFunctions is Script {
                 l2ChainId: l2ChainId,
                 gatewayChainId: gatewayChainId,
                 l1DAValidator: l1DAValidator,
-                l2DAValidator: l2DAValidator,
+                l2DACommitmentScheme: l2DACommitmentScheme,
                 chainDiamondProxyOnGateway: chainDiamondProxyOnGateway,
                 refundRecipient: refundRecipient,
                 _shouldSend: _shouldSend
@@ -677,7 +717,7 @@ contract AdminFunctions is Script {
         );
 
         {
-            uint256 currentSettlementLayer = Bridgehub(data.bridgehub).settlementLayer(data.l2ChainId);
+            uint256 currentSettlementLayer = L1Bridgehub(data.bridgehub).settlementLayer(data.l2ChainId);
             if (currentSettlementLayer != data.gatewayChainId) {
                 console.log("Chain does not settle on Gateway");
                 saveOutput(Output({admin: l2ChainInfo.admin, encodedData: hex""}));
@@ -689,11 +729,11 @@ contract AdminFunctions is Script {
             BridgehubBurnCTMAssetData({
                 chainId: data.l2ChainId,
                 ctmData: abi.encode(l2ChainInfo.admin, data.l1DiamondCutData),
-                chainData: abi.encode(ChainTypeManager(l2ChainInfo.ctm).getProtocolVersion(data.l2ChainId))
+                chainData: abi.encode(IChainTypeManager(l2ChainInfo.ctm).getProtocolVersion(data.l2ChainId))
             })
         );
 
-        bytes32 ctmAssetId = IBridgehub(data.bridgehub).ctmAssetIdFromChainId(data.l2ChainId);
+        bytes32 ctmAssetId = IL1Bridgehub(data.bridgehub).ctmAssetIdFromChainId(data.l2ChainId);
         bytes memory l2Calldata = abi.encodeCall(IL2AssetRouter.withdraw, (ctmAssetId, bridgehubBurnData));
 
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
@@ -797,7 +837,7 @@ contract AdminFunctions is Script {
     function saveAndSendAdminTx(address _admin, Call[] memory _calls, bool _shouldSend) internal {
         bytes memory data = abi.encode(_calls);
 
-        if (_shouldSend) {
+        if (_shouldSend && _calls.length > 0) {
             Utils.adminExecuteCalls(_admin, address(0), _calls);
         }
 

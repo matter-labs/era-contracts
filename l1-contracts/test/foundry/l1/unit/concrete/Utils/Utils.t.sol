@@ -3,16 +3,14 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_DA_VALIDATOR_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, L2_TO_L1_MESSENGER, SystemLogKey, Utils} from "./Utils.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, L2_TO_L1_MESSENGER, SystemLogKey, Utils, L2_DA_COMMITMENT_SCHEME} from "./Utils.sol";
 
-import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 
 // solhint-enable max-line-length
 
-contract UtilsTest is Test {
-    function test_PackBatchTimestampAndBlockTimestamp() public {
+contract UtilsTest is UtilsCallMockerTest {
+    function test_PackBatchTimestampAndBlockTimestamp() public virtual {
         uint64 batchTimestamp = 0x12345678;
         uint64 blockTimestamp = 0x87654321;
         bytes32 packedBytes = Utils.packBatchTimestampAndBlockTimestamp(batchTimestamp, blockTimestamp);
@@ -24,7 +22,7 @@ contract UtilsTest is Test {
         );
     }
 
-    function test_ConstructL2Log() public {
+    function test_ConstructL2Log() public virtual {
         bytes memory l2Log = Utils.constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -45,7 +43,7 @@ contract UtilsTest is Test {
         );
     }
 
-    function test_CreateSystemLogs() public {
+    function test_CreateSystemLogs() public virtual {
         bytes[] memory logs = Utils.createSystemLogs(bytes32(0));
 
         assertEq(logs.length, 10, "logs length should be correct");
@@ -122,7 +120,7 @@ contract UtilsTest is Test {
                 true,
                 L2_TO_L1_MESSENGER,
                 uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
-                bytes32(uint256(uint160(L2_DA_VALIDATOR_ADDRESS)))
+                bytes32(uint256(L2_DA_COMMITMENT_SCHEME))
             ),
             "log[6] should be correct"
         );
@@ -150,32 +148,6 @@ contract UtilsTest is Test {
         );
     }
 
-    function mockDiamondInitInteropCenterCalls() public {
-        mockDiamondInitInteropCenterCallsWithAddress(address(0x1234567890876543567890));
-    }
-
-    function mockDiamondInitInteropCenterCallsWithAddress(address interopCenter) public {
-        address assetTracker = address(0x1234567890876543567890);
-        address assetRouter = address(0x1234567890876543567890);
-        address nativeTokenVault = address(0x1234567890876543567890);
-
-        vm.mockCall(
-            interopCenter,
-            abi.encodeWithSelector(IInteropCenter.assetTracker.selector),
-            abi.encode(assetTracker)
-        );
-        vm.mockCall(
-            interopCenter,
-            abi.encodeWithSelector(IInteropCenter.assetRouter.selector),
-            abi.encode(assetRouter)
-        );
-        vm.mockCall(
-            assetRouter,
-            abi.encodeWithSelector(IL1AssetRouter.nativeTokenVault.selector),
-            abi.encode(nativeTokenVault)
-        );
-    }
-
     // add this to be excluded from coverage report
-    function test() internal virtual {}
+    function test() internal virtual override {}
 }

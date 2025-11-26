@@ -4,10 +4,6 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-
-import {L1AssetRouterActorHandler} from "../handlers/L1AssetRouterActorHandler.sol";
-import {UserActorHandler} from "../handlers/UserActorHandler.sol";
 import {AssetRouter_ActorHandler_Deployer} from "../deployers/AssetRouter_ActorHandler_Deployer.sol";
 import {AssetRouterProperties} from "../properties/AssetRouterProperties.sol";
 
@@ -21,8 +17,6 @@ contract AssetRouterTest is
     AssetRouterProperties,
     AssetRouter_ActorHandler_Deployer
 {
-    function test() internal virtual override(DeployUtils, SharedL2ContractL1Deployer) {}
-
     function initSystemContracts(
         SystemContractsArgs memory _args
     ) internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {

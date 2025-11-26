@@ -4,15 +4,16 @@ pragma solidity ^0.8.0;
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Utils} from "./../Utils.sol";
-import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
+
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {DummyL1ERC20Bridge} from "contracts/dev-contracts/DummyL1ERC20Bridge.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {L2LegacySharedBridgeTestHelper} from "../L2LegacySharedBridgeTestHelper.sol";
+import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 
 /// This scripts is only for developer
 contract SetupLegacyBridge is Script {
@@ -99,9 +100,18 @@ contract SetupLegacyBridge is Script {
     }
 
     function deployL1NullifierImplementation() internal {
+        IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub);
+
         bytes memory bytecode = abi.encodePacked(
             type(L1NullifierDev).creationCode,
-            abi.encode(addresses.bridgehub, config.chainId, addresses.diamondProxy)
+            abi.encode(
+                addresses.bridgehub,
+                bridgehub.messageRoot(),
+                // This value ignored now, but supposed to be interop center
+                address(0),
+                config.chainId,
+                addresses.diamondProxy
+            )
         );
         address contractAddress = deployViaCreate2(bytecode);
 

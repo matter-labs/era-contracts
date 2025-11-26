@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {console} from "forge-std/console.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
-import {Config as ChainConfig, RegisterZKChainScript} from "deploy-scripts/RegisterZKChain.s.sol";
+import {Config as ChainConfig, RegisterZKChainScript} from "deploy-scripts/ctm/RegisterZKChain.s.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 
 contract ZKChainDeployer is L1ContractDeployer {
     using stdStorage for StdStorage;
@@ -24,8 +24,10 @@ contract ZKChainDeployer is L1ContractDeployer {
         address baseToken;
         uint256 bridgehubCreateNewChainSalt;
         bool validiumMode;
-        address validatorSenderOperatorCommitEth;
+        address validatorSenderOperatorEth;
         address validatorSenderOperatorBlobsEth;
+        address validatorSenderOperatorProve;
+        address validatorSenderOperatorExecute;
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
         bool allowEvmEmulator;
@@ -52,6 +54,9 @@ contract ZKChainDeployer is L1ContractDeployer {
         deployScript.runForTest();
         zkChainIds.push(eraZKChainId);
         eraConfig = deployScript.getConfig();
+
+        address chainAddress = getZKChainAddress(eraZKChainId);
+        IAdmin(chainAddress).unpauseDeposits();
     }
 
     function _deployZKChain(address _baseToken) internal {
@@ -59,7 +64,18 @@ contract ZKChainDeployer is L1ContractDeployer {
     }
 
     function _deployZKChain(address _baseToken, uint256 _chainId) internal {
-        uint256 chainId = _chainId == 0 ? currentZKChainId : _chainId;
+        uint256 chainId = _deployZKChainInner(_baseToken, _chainId);
+
+        address chainAddress = getZKChainAddress(chainId);
+        IAdmin(chainAddress).unpauseDeposits();
+    }
+
+    function _deployZKChainWithPausedDeposits(address _baseToken, uint256 _chainId) internal {
+        _deployZKChainInner(_baseToken, _chainId);
+    }
+
+    function _deployZKChainInner(address _baseToken, uint256 _chainId) internal returns (uint256 chainId) {
+        chainId = _chainId == 0 ? currentZKChainId : _chainId;
         vm.setEnv(
             "ZK_CHAIN_CONFIG",
             string.concat(
@@ -94,8 +110,10 @@ contract ZKChainDeployer is L1ContractDeployer {
             baseToken: __baseToken,
             bridgehubCreateNewChainSalt: __salt,
             validiumMode: false,
-            validatorSenderOperatorCommitEth: address(0),
+            validatorSenderOperatorEth: address(0),
             validatorSenderOperatorBlobsEth: address(1),
+            validatorSenderOperatorProve: address(2),
+            validatorSenderOperatorExecute: address(3),
             baseTokenGasPriceMultiplierNominator: uint128(1),
             baseTokenGasPriceMultiplierDenominator: uint128(1),
             allowEvmEmulator: false
@@ -117,16 +135,14 @@ contract ZKChainDeployer is L1ContractDeployer {
         }
 
         vm.serializeUint("chain", "validium_mode", validiumMode);
-        vm.serializeAddress(
-            "chain",
-            "validator_sender_operator_commit_eth",
-            description.validatorSenderOperatorCommitEth
-        );
+        vm.serializeAddress("chain", "validator_sender_operator_eth", description.validatorSenderOperatorEth);
         vm.serializeAddress(
             "chain",
             "validator_sender_operator_blobs_eth",
             description.validatorSenderOperatorBlobsEth
         );
+        vm.serializeAddress("chain", "validator_sender_operator_prove", description.validatorSenderOperatorProve);
+        vm.serializeAddress("chain", "validator_sender_operator_execute", description.validatorSenderOperatorExecute);
         vm.serializeUint(
             "chain",
             "base_token_gas_price_multiplier_nominator",

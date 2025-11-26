@@ -8,30 +8,29 @@ import {IChainRegistrationSender} from "./IChainRegistrationSender.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IL1CrossChainSender} from "../bridge/interfaces/IL1CrossChainSender.sol";
 
-import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
+import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "./IBridgehubBase.sol";
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 
 import {Unauthorized, UnsupportedEncodingVersion} from "../common/L1ContractErrors.sol";
-import {ChainAlreadyRegistered, HyperchainNotRegistered, NoEthAllowed} from "./L1BridgehubErrors.sol";
+import {ChainAlreadyRegistered, NoEthAllowed, ZKChainNotRegistered} from "./L1BridgehubErrors.sol";
+import {IL2Bridgehub} from "./IL2Bridgehub.sol";
 
 /// @dev The encoding version of the data.
 bytes1 constant CHAIN_REGISTRATION_SENDER_ENCODING_VERSION = 0x01;
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev The Bridgehub contract serves as the primary entry point for L1->L2 communication,
-/// facilitating interactions between end user and bridges.
-/// It also manages state transition managers, base tokens, and chain registrations.
+/// @dev The ChainRegistrationSender contract is used to register chains in other chains for interop via a service transaction.
 contract ChainRegistrationSender is
     IChainRegistrationSender,
     IL1CrossChainSender,
     ReentrancyGuard,
     Ownable2StepUpgradeable
 {
-    IBridgehub public immutable BRIDGE_HUB;
+    IBridgehubBase public immutable BRIDGE_HUB;
 
     mapping(uint256 chainToBeRegistered => mapping(uint256 chainRegisteredOn => bool isRegistered))
         public chainRegisteredOnChain;
@@ -44,7 +43,7 @@ contract ChainRegistrationSender is
         _;
     }
 
-    constructor(IBridgehub _bridgehub) {
+    constructor(IBridgehubBase _bridgehub) {
         BRIDGE_HUB = _bridgehub;
     }
 
@@ -93,7 +92,7 @@ contract ChainRegistrationSender is
         uint256 chainToBeRegistered = abi.decode(_data[1:], (uint256));
         address chainToBeRegisteredAddress = BRIDGE_HUB.getZKChain(chainToBeRegistered);
         if (chainToBeRegisteredAddress == address(0)) {
-            revert HyperchainNotRegistered();
+            revert ZKChainNotRegistered();
         }
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,
@@ -113,9 +112,10 @@ contract ChainRegistrationSender is
     /// @return the L2 transaction calldata
     function _getL2TxCalldata(uint256 chainToBeRegistered) internal view returns (bytes memory) {
         bytes32 baseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(chainToBeRegistered);
-        return abi.encodeCall(IBridgehub.registerChainForInterop, (chainToBeRegistered, baseTokenAssetId));
+        return abi.encodeCall(IL2Bridgehub.registerChainForInterop, (chainToBeRegistered, baseTokenAssetId));
     }
 
     /// @inheritdoc IL1CrossChainSender
+    /// @notice This function is not used for ChainRegistrationSender, since we do not need to support failed L1->L2 transactions.
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external override {}
 }

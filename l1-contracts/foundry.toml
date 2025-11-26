@@ -6,7 +6,7 @@ libs = ["./lib"]
 cache_path = "cache-forge"
 test = "test/foundry"
 solc_version = "0.8.28"
-evm_version = "cancun"
+evm_version = "prague"
 fs_permissions = [
     { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
     { access = "read", path = "../system-contracts/artifacts-zk/" },
@@ -42,7 +42,6 @@ remappings = [
     "l2-contracts/=../l2-contracts/contracts/",
     "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
     "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
-    "@openzeppelin/contracts-master/=lib/openzeppelin-contracts-master/contracts/",
 ]
 optimizer = true
 optimizer_runs = 9999999

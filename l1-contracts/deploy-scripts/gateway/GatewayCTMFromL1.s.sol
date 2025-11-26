@@ -5,21 +5,14 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-// import {Vm} from "forge-std/Vm.sol";
-import {stdToml} from "forge-std/StdToml.sol";
-
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IBridgehub, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {ADDRESS_ONE, StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
 import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
+import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 
@@ -28,14 +21,11 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {EraChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
@@ -85,8 +75,8 @@ contract GatewayCTMFromL1 is Script {
         uint256 genesisRollupLeafIndex;
         bytes32 genesisBatchCommitment;
         uint256 latestProtocolVersion;
-        address expectedRollupL2DAValidator;
         bytes forceDeploymentsData;
+        bool isZKsyncOS;
     }
 
     struct Output {
@@ -229,8 +219,8 @@ contract GatewayCTMFromL1 is Script {
             genesisRollupLeafIndex: toml.readUint("$.genesis_rollup_leaf_index"),
             genesisBatchCommitment: toml.readBytes32("$.genesis_batch_commitment"),
             latestProtocolVersion: toml.readUint("$.latest_protocol_version"),
-            expectedRollupL2DAValidator: toml.readAddress("$.expected_rollup_l2_da_validator"),
-            forceDeploymentsData: toml.readBytes("$.force_deployments_data")
+            forceDeploymentsData: toml.readBytes("$.force_deployments_data"),
+            isZKsyncOS: toml.readBool("$.is_zk_sync_os")
         });
 
         address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.governanceAddr);
@@ -239,29 +229,15 @@ contract GatewayCTMFromL1 is Script {
             salt: bytes32(0),
             eraChainId: config.eraChainId,
             l1ChainId: config.l1ChainId,
-            rollupL2DAValidatorAddress: config.expectedRollupL2DAValidator,
             testnetVerifier: config.testnetVerifier,
+            isZKsyncOS: config.isZKsyncOS,
             adminSelectors: Utils.getAllSelectorsForFacet("Admin"),
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
             gettersSelectors: Utils.getAllSelectorsForFacet("Getters"),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: config.recursionNodeLevelVkHash,
-                recursionLeafLevelVkHash: config.recursionLeafLevelVkHash,
-                recursionCircuitsSetVksHash: config.recursionCircuitsSetVksHash
-            }),
-            feeParams: FeeParams({
-                pubdataPricingMode: config.diamondInitPubdataPricingMode,
-                batchOverheadL1Gas: uint32(config.diamondInitBatchOverheadL1Gas),
-                maxPubdataPerBatch: uint32(config.diamondInitMaxPubdataPerBatch),
-                maxL2GasPerBatch: uint32(config.diamondInitMaxL2GasPerBatch),
-                priorityTxMaxPubdata: uint32(config.diamondInitPriorityTxMaxPubdata),
-                minimalL2GasPrice: uint64(config.diamondInitMinimalL2GasPrice)
-            }),
             bootloaderHash: config.bootloaderHash,
             defaultAccountHash: config.defaultAAHash,
             evmEmulatorHash: config.evmEmulatorHash,
-            priorityTxMaxGasLimit: config.priorityTxMaxGasLimit,
             genesisRoot: config.genesisRoot,
             genesisRollupLeafIndex: uint64(config.genesisRollupLeafIndex),
             genesisBatchCommitment: config.genesisBatchCommitment,
@@ -391,24 +367,59 @@ contract GatewayCTMFromL1 is Script {
     }
 
     function deployGatewayVerifier() internal returns (address verifier) {
-        address verifierFflonk = address(
-            _deployInternal(ContractsBytecodesLib.getCreationCode("VerifierFflonk"), hex"")
-        );
-        console.log("VerifierFflonk deployed at", verifierFflonk);
-        address verifierPlonk = address(_deployInternal(ContractsBytecodesLib.getCreationCode("VerifierPlonk"), hex""));
-        console.log("VerifierPlonk deployed at", verifierPlonk);
+        address verifierFflonk;
+        address verifierPlonk;
+
+        if (config.isZKsyncOS) {
+            verifierFflonk = address(
+                _deployInternal(ContractsBytecodesLib.getCreationCode("ZKsyncOSVerifierFflonk"), hex"")
+            );
+            console.log("ZKsyncOSVerifierFflonk deployed at", verifierFflonk);
+            verifierPlonk = address(
+                _deployInternal(ContractsBytecodesLib.getCreationCode("ZKsyncOSVerifierPlonk"), hex"")
+            );
+            console.log("ZKsyncOSVerifierPlonk deployed at", verifierPlonk);
+        } else {
+            verifierFflonk = address(
+                _deployInternal(ContractsBytecodesLib.getCreationCode("EraVerifierFflonk"), hex"")
+            );
+            console.log("EraVerifierFflonk deployed at", verifierFflonk);
+            verifierPlonk = address(_deployInternal(ContractsBytecodesLib.getCreationCode("EraVerifierPlonk"), hex""));
+            console.log("EraVerifierPlonk deployed at", verifierPlonk);
+        }
 
         if (config.testnetVerifier) {
-            verifier = address(
-                _deployInternal(ContractsBytecodesLib.getCreationCode("TestnetVerifier"), abi.encode(config.l1ChainId))
-            );
+            if (config.isZKsyncOS) {
+                verifier = address(
+                    _deployInternal(
+                        ContractsBytecodesLib.getCreationCode("ZKsyncOSTestnetVerifier"),
+                        abi.encode(verifierFflonk, verifierPlonk, config.governanceAddr)
+                    )
+                );
+            } else {
+                verifier = address(
+                    _deployInternal(
+                        ContractsBytecodesLib.getCreationCode("EraTestnetVerifier"),
+                        abi.encode(verifierFflonk, verifierPlonk)
+                    )
+                );
+            }
         } else {
-            verifier = address(
-                _deployInternal(
-                    ContractsBytecodesLib.getCreationCode("DualVerifier"),
-                    abi.encode(verifierFflonk, verifierPlonk)
-                )
-            );
+            if (config.isZKsyncOS) {
+                verifier = address(
+                    _deployInternal(
+                        ContractsBytecodesLib.getCreationCode("ZKsyncOSDualVerifier"),
+                        abi.encode(verifierFflonk, verifierPlonk, config.governanceAddr)
+                    )
+                );
+            } else {
+                verifier = address(
+                    _deployInternal(
+                        ContractsBytecodesLib.getCreationCode("EraDualVerifier"),
+                        abi.encode(verifierFflonk, verifierPlonk)
+                    )
+                );
+            }
         }
 
         console.log("Verifier deployed at", verifier);
@@ -435,15 +446,16 @@ contract GatewayCTMFromL1 is Script {
         address dp = address(_deployInternal(ContractsBytecodesLib.getCreationCode("DiamondProxy"), hex""));
         console.log("Dummy diamond proxy deployed at", dp);
 
+        string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
         output.gatewayStateTransition.chainTypeManagerImplementation = address(
-            _deployInternal(ContractsBytecodesLib.getCreationCode("ChainTypeManager"), abi.encode(L2_BRIDGEHUB_ADDR))
+            _deployInternal(ContractsBytecodesLib.getCreationCode(ctmContractName), abi.encode(L2_BRIDGEHUB_ADDR))
         );
         console.log(
             "StateTransitionImplementation deployed at",
             output.gatewayStateTransition.chainTypeManagerImplementation
         );
 
-        // TODO(EVM-745): eventually a proxy admin or something should be deplyoed here
+        // TODO(EVM-745): eventually a proxy admin or something should be deployed here
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
             facet: output.gatewayStateTransition.adminFacet,
@@ -470,12 +482,6 @@ contract GatewayCTMFromL1 is Script {
             selectors: Utils.getAllSelectorsForFacet("Executor")
         });
 
-        VerifierParams memory verifierParams = VerifierParams({
-            recursionNodeLevelVkHash: config.recursionNodeLevelVkHash,
-            recursionLeafLevelVkHash: config.recursionLeafLevelVkHash,
-            recursionCircuitsSetVksHash: config.recursionCircuitsSetVksHash
-        });
-
         FeeParams memory feeParams = FeeParams({
             pubdataPricingMode: config.diamondInitPubdataPricingMode,
             batchOverheadL1Gas: uint32(config.diamondInitBatchOverheadL1Gas),
@@ -487,12 +493,9 @@ contract GatewayCTMFromL1 is Script {
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(output.gatewayStateTransition.verifier),
-            verifierParams: verifierParams,
             l2BootloaderBytecodeHash: config.bootloaderHash,
             l2DefaultAccountBytecodeHash: config.defaultAAHash,
-            l2EvmEmulatorBytecodeHash: config.evmEmulatorHash,
-            priorityTxMaxGasLimit: config.priorityTxMaxGasLimit,
-            feeParams: feeParams
+            l2EvmEmulatorBytecodeHash: config.evmEmulatorHash
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
@@ -526,7 +529,7 @@ contract GatewayCTMFromL1 is Script {
             abi.encode(
                 output.gatewayStateTransition.chainTypeManagerImplementation,
                 deployerAddress,
-                abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))
+                abi.encodeCall(EraChainTypeManager.initialize, (diamondInitData))
             )
         );
 

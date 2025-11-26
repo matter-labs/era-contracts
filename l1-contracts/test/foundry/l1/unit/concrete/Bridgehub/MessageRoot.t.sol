@@ -4,11 +4,16 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {MessageRoot, IMessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler, OnlyL2} from "contracts/bridgehub/L1BridgehubErrors.sol";
-import {Merkle} from "contracts/common/libraries/Merkle.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
+import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
+
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler} from "contracts/bridgehub/L1BridgehubErrors.sol";
+
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
@@ -22,33 +27,37 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 
 contract MessageRootTest is Test {
     address bridgeHub;
+    L1MessageRoot messageRoot;
+    L2MessageRoot l2MessageRoot;
     uint256 L1_CHAIN_ID;
-    MessageRoot messageRoot;
+    uint256 gatewayChainId;
     address assetTracker;
 
     function setUp() public {
         bridgeHub = makeAddr("bridgeHub");
-        vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehub.L1_CHAIN_ID.selector), abi.encode(1));
         uint256[] memory allZKChainChainIDs = new uint256[](1);
         allZKChainChainIDs[0] = 271;
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getAllZKChainChainIDs.selector),
+            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
             abi.encode(allZKChainChainIDs)
         );
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.chainTypeManager.selector),
+            abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector),
             abi.encode(makeAddr("chainTypeManager"))
         );
+        vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector), abi.encode(0));
 
         assetTracker = makeAddr("assetTracker");
         bridgeHub = makeAddr("bridgeHub");
         L1_CHAIN_ID = 5;
-        messageRoot = new MessageRoot(IBridgehub(bridgeHub), L1_CHAIN_ID);
+        gatewayChainId = 506;
+        messageRoot = new L1MessageRoot(bridgeHub, 1);
+        l2MessageRoot = new L2MessageRoot();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        l2MessageRoot.initL2(L1_CHAIN_ID, gatewayChainId);
         vm.mockCall(address(bridgeHub), abi.encodeWithSelector(Ownable.owner.selector), abi.encode(assetTracker));
-        vm.prank(assetTracker);
-        messageRoot.setAddresses(assetTracker);
     }
 
     function test_init() public {
@@ -72,7 +81,7 @@ contract MessageRootTest is Test {
         );
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
             abi.encode(chainAssetHandler)
         );
         messageRoot.addNewChain(alphaChainId, 0);
@@ -81,6 +90,7 @@ contract MessageRootTest is Test {
     }
 
     function test_addNewChain() public {
+        // kl todo: enable these tests if commented out.
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         uint256 betaChainId = uint256(uint160(makeAddr("betaChainId")));
 
@@ -103,69 +113,82 @@ contract MessageRootTest is Test {
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, alphaChainId),
             abi.encode(alphaChainSender)
         );
 
-        vm.prank(assetTracker);
+        vm.prank(alphaChainSender);
         vm.expectRevert(MessageRootNotRegistered.selector);
         messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
     }
 
-    function test_RevertWhen_ChainNotL2() public {
-        address alphaChainSender = makeAddr("alphaChainSender");
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector, L1_CHAIN_ID),
-            abi.encode(alphaChainSender)
-        );
-
-        vm.prank(bridgeHub);
-        messageRoot.addNewChain(L1_CHAIN_ID, 0);
-
-        vm.chainId(L1_CHAIN_ID);
-        vm.prank(alphaChainSender);
-        messageRoot.addChainBatchRoot(L1_CHAIN_ID, 1, bytes32(L1_CHAIN_ID));
-    }
-
-    function test_addChainBatchRoot() public {
+    function test_addChainBatchRoot_1() public {
         address alphaChainSender = makeAddr("alphaChainSender");
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, alphaChainId),
             abi.encode(alphaChainSender)
         );
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(L2_CHAIN_ASSET_HANDLER_ADDR)
+        );
 
-        vm.prank(bridgeHub);
-        messageRoot.addNewChain(alphaChainId, 0);
+        vm.prank(L2_BRIDGEHUB_ADDR);
+        l2MessageRoot.addNewChain(L1_CHAIN_ID, 0);
 
-        vm.prank(assetTracker);
+        vm.chainId(L1_CHAIN_ID);
+        vm.prank(alphaChainSender);
+        vm.expectRevert();
+        l2MessageRoot.addChainBatchRoot(L1_CHAIN_ID, 1, bytes32(L1_CHAIN_ID));
+
+        vm.prank(L2_BRIDGEHUB_ADDR);
+        l2MessageRoot.addNewChain(alphaChainId, 0);
+
+        vm.prank(alphaChainSender);
         vm.expectEmit(true, false, false, false);
         emit IMessageRoot.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
         vm.expectEmit(true, false, false, false);
         emit IMessageRoot.NewChainRoot(alphaChainId, bytes32(0), bytes32(0));
-        messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
+        l2MessageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
     }
 
     function test_updateFullTree() public {
         address alphaChainSender = makeAddr("alphaChainSender");
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
+            address(bridgeHub),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, alphaChainId),
             abi.encode(alphaChainSender)
         );
-
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, alphaChainId),
+            abi.encode(alphaChainSender)
+        );
+        vm.mockCall(
+            address(bridgeHub),
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(L2_CHAIN_ASSET_HANDLER_ADDR)
+        );
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(L2_CHAIN_ASSET_HANDLER_ADDR)
+        );
         vm.prank(bridgeHub);
         messageRoot.addNewChain(alphaChainId, 0);
-
-        vm.prank(assetTracker);
+        vm.prank(alphaChainSender);
         messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
-
-        messageRoot.updateFullTree();
-
-        assertEq(messageRoot.getAggregatedRoot(), 0x0ef1ac67d77f177a33449c47a8f05f0283300a81adca6f063c92c774beed140c);
+        vm.prank(L2_BRIDGEHUB_ADDR);
+        l2MessageRoot.addNewChain(alphaChainId, 0);
+        vm.chainId(gatewayChainId);
+        vm.prank(GW_ASSET_TRACKER_ADDR);
+        l2MessageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
+        l2MessageRoot.updateFullTree();
+        assertEq(l2MessageRoot.getAggregatedRoot(), 0x0ef1ac67d77f177a33449c47a8f05f0283300a81adca6f063c92c774beed140c);
     }
 
     function test_addChainBatchRootWithRealData() public {
@@ -173,14 +196,14 @@ contract MessageRootTest is Test {
         uint256 alphaChainId = 271; //uint256(uint160(makeAddr("alphaChainId")));
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, alphaChainId),
             abi.encode(alphaChainSender)
         );
 
         vm.prank(bridgeHub);
         messageRoot.addNewChain(alphaChainId, 0);
 
-        vm.prank(assetTracker);
+        vm.prank(alphaChainSender);
         // vm.expectEmit(true, false, false, false);
         // emit MessageRoot.Preimage(bytes32(0), bytes32(0));
         // vm.expectEmit(true, false, false, false);
@@ -190,13 +213,13 @@ contract MessageRootTest is Test {
             1,
             bytes32(hex"63c4d39ce8f2410a1e65b0ad1209fe8b368928a7124bfa6e10e0d4f0786129dd")
         );
-        vm.prank(assetTracker);
+        vm.prank(alphaChainSender);
         messageRoot.addChainBatchRoot(
             alphaChainId,
             2,
             bytes32(hex"bcc3a5584fe0f85e968c0bae082172061e3f3a8a47ff9915adae4a3e6174fc12")
         );
-        vm.prank(assetTracker);
+        vm.prank(alphaChainSender);
         messageRoot.addChainBatchRoot(
             alphaChainId,
             3,

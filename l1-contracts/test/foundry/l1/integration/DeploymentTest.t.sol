@@ -2,11 +2,9 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {Vm} from "forge-std/Vm.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -16,18 +14,14 @@ import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
-import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
-import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 
 contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -55,12 +49,12 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         _registerNewTokens(tokens);
 
         _deployEra();
-        // _deployZKChain(ETH_TOKEN_ADDRESS);
-        // _deployZKChain(ETH_TOKEN_ADDRESS);
-        // _deployZKChain(tokens[0]);
-        // _deployZKChain(tokens[0]);
-        // _deployZKChain(tokens[1]);
-        // _deployZKChain(tokens[1]);
+        _deployZKChain(ETH_TOKEN_ADDRESS);
+        _deployZKChain(ETH_TOKEN_ADDRESS);
+        _deployZKChain(tokens[0]);
+        _deployZKChain(tokens[0]);
+        _deployZKChain(tokens[1]);
+        _deployZKChain(tokens[1]);
 
         releaseConfigLock();
 
@@ -87,11 +81,11 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         assertNotEq(newChainAddress, address(0));
 
         address[] memory chainAddresses = addresses.bridgehub.getAllZKChains();
-        assertEq(chainAddresses.length, 1);
+        assertEq(chainAddresses.length, 7);
         assertEq(chainAddresses[0], newChainAddress);
 
         uint256[] memory chainIds = addresses.bridgehub.getAllZKChainChainIDs();
-        assertEq(chainIds.length, 1);
+        assertEq(chainIds.length, 7);
         assertEq(chainIds[0], chainId);
 
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(chainId);
@@ -143,7 +137,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 owner,
                 addresses.chainTypeManager.protocolVersion(),
                 addresses.chainTypeManager.storedBatchZero(),
-                address(addresses.bridgehub.assetRouter()),
+                address(addresses.bridgehub),
                 address(addresses.interopCenter)
             );
 
@@ -151,9 +145,6 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
             vm.startBroadcast(owner);
             addresses.bridgehub.addTokenAssetId(baseTokenAssetId);
-            vm.expectRevert(
-                abi.encodeWithSelector(IncorrectBridgeHubAddress.selector, address(addresses.bridgehub.assetRouter()))
-            );
             addresses.bridgehub.registerAlreadyDeployedZKChain(chainId, chain);
             vm.stopBroadcast();
         }

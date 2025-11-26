@@ -4,11 +4,13 @@ pragma solidity 0.8.28;
 
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
 import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
-import {INativeTokenVault} from "../../bridge/ntv/INativeTokenVault.sol";
-import {AssetIdMismatch, IncorrectTokenAddressFromNTV, InvalidNTVBurnData, L2WithdrawalMessageWrongLength, UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
+import {IL1ERC20Bridge} from "../../bridge/interfaces/IL1ERC20Bridge.sol";
+import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
+import {AssetIdMismatch, IncorrectTokenAddressFromNTV, InvalidNTVBurnData, L2WithdrawalMessageWrongLength, UnsupportedEncodingVersion, BadTransferDataLength} from "../L1ContractErrors.sol";
 import {WrongMsgLength} from "../../bridge/L1BridgeContractErrors.sol";
 import {UnsafeBytes} from "./UnsafeBytes.sol";
 import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
+import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol";
 
 /**
  * @author Matter Labs
@@ -49,6 +51,21 @@ library DataEncoding {
         }
 
         (amount, receiver, maybeTokenAddress) = abi.decode(_data, (uint256, address, address));
+    }
+
+    function encodeAssetRouterBridgehubDepositData(
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) internal pure returns (bytes memory) {
+        return bytes.concat(NEW_ENCODING_VERSION, abi.encode(_assetId, _transferData));
+    }
+
+    function decodeAssetRouterBridgehubDepositData(
+        bytes calldata _dataWithVersion
+    ) internal pure returns (bytes32 assetId, bytes memory transferData) {
+        require(_dataWithVersion.length >= 33, BadTransferDataLength());
+        require(_dataWithVersion[0] == NEW_ENCODING_VERSION, UnsupportedEncodingVersion());
+        (assetId, transferData) = abi.decode(_dataWithVersion[1:], (bytes32, bytes));
     }
 
     /// @notice Abi.encodes the data required for bridgeMint on remote chain.
@@ -144,7 +161,7 @@ library DataEncoding {
         bytes memory _transferData
     ) internal view returns (bytes32 txDataHash) {
         if (_encodingVersion == LEGACY_ENCODING_VERSION) {
-            address tokenAddress = INativeTokenVault(_nativeTokenVault).tokenAddress(_assetId);
+            address tokenAddress = INativeTokenVaultBase(_nativeTokenVault).tokenAddress(_assetId);
 
             // This is a double check to ensure that the used token for the legacy encoding is correct.
             // This revert should never be emitted and in real life and should only serve as a guard in
@@ -268,6 +285,15 @@ library DataEncoding {
         (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
     }
 
+    function encodeL1ERC20BridgeFinalizeWithdrawalData(
+        address _l1Receiver,
+        address _l1Token,
+        uint256 _amount
+    ) internal pure returns (bytes memory) {
+        // solhint-disable-next-line func-named-parameters
+        return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _l1Receiver, _l1Token, _amount);
+    }
+
     function decodeLegacyFinalizeWithdrawalData(
         bytes memory _l2ToL1message
     ) internal pure returns (bytes4 functionSignature, address l1Token, bytes memory transferData) {
@@ -295,12 +321,27 @@ library DataEncoding {
         });
     }
 
+    function encodeAssetRouterFinalizeDepositData(
+        uint256 _messageSourceChainId,
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) internal pure returns (bytes memory) {
+        // solhint-disable-next-line func-named-parameters
+        return
+            abi.encodePacked(
+                IAssetRouterShared.finalizeDeposit.selector,
+                _messageSourceChainId,
+                _assetId,
+                _transferData
+            );
+    }
+
     function decodeAssetRouterFinalizeDepositData(
         bytes memory _l2ToL1message
     )
         internal
         pure
-        returns (bytes4 functionSignature, uint256 originChainId, bytes32 assetId, bytes memory transferData)
+        returns (bytes4 functionSignature, uint256 _messageSourceChainId, bytes32 assetId, bytes memory transferData)
     {
         (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         functionSignature = bytes4(functionSignatureUint);
@@ -308,7 +349,7 @@ library DataEncoding {
         // The data is expected to be at least 68 bytes long to contain assetId.
         require(_l2ToL1message.length >= 68, WrongMsgLength(68, _l2ToL1message.length));
         // slither-disable-next-line unused-return
-        (originChainId, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset); // originChainId, not used for L2->L1 txs
+        (_messageSourceChainId, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset); // originChainId, not used for L2->L1 txs
         (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
         transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
     }

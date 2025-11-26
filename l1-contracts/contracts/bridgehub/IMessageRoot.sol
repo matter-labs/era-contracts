@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageVerification} from "../common/interfaces/IMessageVerification.sol";
 import {ProofData} from "../common/Messaging.sol";
 
@@ -25,9 +24,6 @@ uint256 constant V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY = 
 uint256 constant V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1 = uint256(
     keccak256(abi.encodePacked("V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1"))
 );
-
-// TODO fix the value
-bytes32 constant GENESIS_CHAIN_BATCH_ROOT = keccak256("GENESIS_CHAIN_BATCH_ROOT");
 
 /**
  * @author Matter Labs
@@ -61,9 +57,9 @@ interface IMessageRoot is IMessageVerification {
     /// of length one, which only include the interop root itself. More on that in `L2InteropRootStorage` contract.
     event NewInteropRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);
 
-    function BRIDGE_HUB() external view returns (IBridgehub);
+    function BRIDGE_HUB() external view returns (address);
 
-    function setAddresses(address _assetTracker) external;
+    function ERA_GATEWAY_CHAIN_ID() external view returns (uint256);
 
     function addNewChain(uint256 _chainId, uint256 _startingBatchNumber) external;
 
@@ -72,10 +68,6 @@ interface IMessageRoot is IMessageVerification {
     function chainBatchRoots(uint256 _chainId, uint256 _batchNumber) external view returns (bytes32);
 
     function historicalRoot(uint256 _blockNumber) external view returns (bytes32);
-
-    function v30UpgradeGatewayBlockNumber() external view returns (uint256);
-
-    function saveV30UpgradeGatewayBlockNumberOnL2(uint256 _v30UpgradeGatewayBlockNumber) external;
 
     function v30UpgradeChainBatchNumber(uint256 _chainId) external view returns (uint256);
 
@@ -90,5 +82,11 @@ interface IMessageRoot is IMessageVerification {
         bytes32[] calldata _proof
     ) external pure returns (ProofData memory);
 
-    function setMigratingChainBatchRoot(uint256 _chainId, uint256 _batchNumber) external;
+    function setMigratingChainBatchRoot(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        uint256 _v30UpgradeChainBatchNumber
+    ) external;
+
+    function currentChainBatchNumber(uint256 _chainId) external view returns (uint256);
 }

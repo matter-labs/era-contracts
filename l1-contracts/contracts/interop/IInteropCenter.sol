@@ -3,8 +3,6 @@
 pragma solidity ^0.8.21;
 
 import {BalanceChange, InteropBundle, InteropCallStarter} from "../common/Messaging.sol";
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -26,13 +24,8 @@ interface IInteropCenter {
         CallAndBundleAttributes
     }
 
-    function BRIDGE_HUB() external view returns (IBridgehub);
+    function initL2(uint256 _l1ChainId, address _owner) external;
 
-    function assetTracker() external view returns (IL2AssetTracker);
-
-    function assetRouter() external view returns (address);
-
-    function setAddresses(address assetRouter, address assetTracker) external;
     /// Mailbox forwarder
 
     function forwardTransactionOnGatewayWithBalanceChange(
@@ -43,7 +36,7 @@ interface IInteropCenter {
     ) external;
 
     function sendBundle(
-        uint256 _destinationChainId,
+        bytes calldata _destinationChainId,
         InteropCallStarter[] calldata _callStarters,
         bytes[] calldata _bundleAttributes
     ) external payable returns (bytes32);

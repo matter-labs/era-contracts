@@ -8,11 +8,13 @@ import {IMessageVerification} from "../interfaces/IMessageVerification.sol";
 import {IBaseToken} from "./IBaseToken.sol";
 import {IL2ContractDeployer} from "../interfaces/IL2ContractDeployer.sol";
 import {IL2NativeTokenVault} from "../../bridge/ntv/IL2NativeTokenVault.sol";
-import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
 import {IInteropCenter} from "../../interop/IInteropCenter.sol";
+import {IInteropHandler} from "../../interop/IInteropHandler.sol";
 import {IL2AssetRouter} from "../../bridge/asset-router/IL2AssetRouter.sol";
 import {IL2AssetTracker} from "../../bridge/asset-tracker/IL2AssetTracker.sol";
+import {IGWAssetTracker} from "../../bridge/asset-tracker/IGWAssetTracker.sol";
 import {ISystemContext} from "../interfaces/ISystemContext.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 
@@ -84,7 +86,7 @@ address constant L2_VERSION_SPECIFIC_UPGRADER_ADDR = L2_GENESIS_UPGRADE_ADDR;
 /// @dev The address of the L2 bridge hub system contract, used to start L1->L2 transactions
 address constant L2_BRIDGEHUB_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x02);
 
-IBridgehub constant L2_BRIDGEHUB = IBridgehub(L2_BRIDGEHUB_ADDR);
+IBridgehubBase constant L2_BRIDGEHUB = IBridgehubBase(L2_BRIDGEHUB_ADDR);
 
 /// @dev the address of the l2 asset router.
 address constant L2_ASSET_ROUTER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x03);
@@ -103,8 +105,8 @@ IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(L2_MESSAGE_ROOT_ADDR);
 /// @dev The address of the SloadContract system contract, which provides a method to read values from arbitrary storage slots
 address constant SLOAD_CONTRACT_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x06);
 
-/// @dev The address of the WETH implementation contract
-address constant L2_WETH_IMPL_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x07);
+/// @dev The address of the l2 wrapped base token.
+address constant L2_WRAPPED_BASE_TOKEN_IMPL_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x07);
 
 /// @dev The address of the L2 interop root storage system contract
 IL2InteropRootStorage constant L2_INTEROP_ROOT_STORAGE = IL2InteropRootStorage(
@@ -118,13 +120,26 @@ IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(add
 address constant L2_CHAIN_ASSET_HANDLER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0a);
 IChainAssetHandler constant L2_CHAIN_ASSET_HANDLER = IChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR);
 
+/// @dev UpgradeableBeaconDeployer that's responsible for deploying the upgradeable beacons for the bridged standard ERC20 tokens
+/// @dev Besides separation of concerns, we need it as a separate contract to ensure that L2NativeTokenVaultZKOS
+/// does not have to include BridgedStandardERC20 and UpgradeableBeacon and so can fit into the code size limit.
+address constant L2_NTV_BEACON_DEPLOYER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0b);
+
 /// @dev the address of the L2 interop center
-address constant L2_INTEROP_CENTER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0b);
+address constant L2_INTEROP_CENTER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0c);
 IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(L2_INTEROP_CENTER_ADDR);
 
 /// @dev the address of the L2 interop handler
-address constant L2_INTEROP_HANDLER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0c);
+address constant L2_INTEROP_HANDLER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0d);
+IInteropHandler constant L2_INTEROP_HANDLER = IInteropHandler(L2_INTEROP_HANDLER_ADDR);
 
 /// @dev the address of the L2 asset tracker
-address constant L2_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0d);
+address constant L2_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0e);
 IL2AssetTracker constant L2_ASSET_TRACKER = IL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+
+/// @dev the address of the GW asset tracker
+address constant GW_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0f);
+IGWAssetTracker constant GW_ASSET_TRACKER = IGWAssetTracker(GW_ASSET_TRACKER_ADDR);
+
+/// @dev the address of the L2 system contract proxy admin
+address constant L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x10);

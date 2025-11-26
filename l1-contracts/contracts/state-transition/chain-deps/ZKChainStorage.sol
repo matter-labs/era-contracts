@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../state-transition/libraries/PriorityTree.sol";
+import {L2DACommitmentScheme, PubdataPricingMode} from "../../common/Config.sol";
 
 /// @notice Indicates whether an upgrade is initiated and if yes what type
 /// @param None Upgrade is NOT initiated
@@ -32,14 +33,6 @@ struct UpgradeStorage {
     bool approvedBySecurityCouncil;
     uint40 proposedUpgradeTimestamp;
     uint40 currentProposalId;
-}
-
-/// @notice The struct that describes whether users will be charged for pubdata for L1->L2 transactions.
-/// @param Rollup The users are charged for pubdata & it is priced based on the gas price on Ethereum.
-/// @param Validium The pubdata is considered free with regard to the L1 gas price.
-enum PubdataPricingMode {
-    Rollup,
-    Validium
 }
 
 /// @notice The fee params for L1->L2 transactions for the network.
@@ -159,11 +152,13 @@ struct ZKChainStorage {
     address l1DAValidator;
     /// @dev The address of the contract on L2 that is responsible for the data availability verification.
     /// This contract sends `l2DAValidatorOutputHash` to L1 via L2->L1 system log and it will routed to the `l1DAValidator` contract.
-    address l2DAValidator;
+    address __DEPRECATED_l2DAValidator;
     /// @dev the Asset Id of the baseToken
     bytes32 baseTokenAssetId;
     /// @dev If this ZKchain settles on this chain, then this is zero. Otherwise it is the address of the ZKchain that is a
     /// settlement layer for this ZKchain. (think about it as a 'forwarding' address for the chain that migrated away).
+    /// @dev Note, that while we cannot trust the operator of the settlement layer, it is assumed that the settlement layer
+    /// belongs to the same CTM and has a trusted implementation, i.e., its implementation consists of the expected facets: Mailbox, Executor, etc.
     address settlementLayer;
     /// @dev Priority tree, the new data structure for priority queue
     PriorityTree.Tree priorityTree;
@@ -177,12 +172,14 @@ struct ZKChainStorage {
     /// @dev Whenever the `totalBatchesCommitted` changes, this variable is reset to `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`
     /// (the value of the constant can be found in Config.sol).
     bytes32 precommitmentForTheLatestBatch;
-    /// @dev Interop Center, responsible for starting L1->L2 messages
-    address interopCenter;
+    /// @dev ZKsync OS flag, if `true` state transition is done with ZKsync OS, otherwise Era VM
+    bool zksyncOS;
+    /// @dev The scheme of L2 DA commitment. Different L1 validators may use different schemes.
+    L2DACommitmentScheme l2DACommitmentScheme;
     /// @dev The address of the asset tracker
     address assetTracker;
     /// @dev The address of the native token vault
     address nativeTokenVault;
-    /// @dev Whether we have paused deposits, used for chain migration to and from Gateway.
-    mapping(uint256 migrationNumber => uint256 pausedDepositsTimestamp) pausedDepositsTimestamp;
+    /// @dev Timestamp when deposits were paused for chain migration to/from Gateway. 0 = not paused.
+    uint256 pausedDepositsTimestamp;
 }

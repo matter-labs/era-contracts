@@ -3,12 +3,13 @@
 pragma solidity ^0.8.21;
 
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
-import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
-import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
+import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
 import {IL1SharedBridgeLegacy} from "../interfaces/IL1SharedBridgeLegacy.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IL1CrossChainSender} from "../interfaces/IL1CrossChainSender.sol";
+import {TxStatus} from "../../common/Messaging.sol";
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
@@ -80,11 +81,11 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy, IL1CrossCha
 
     function ETH_TOKEN_ASSET_ID() external view returns (bytes32);
 
-    function nativeTokenVault() external view returns (INativeTokenVault);
+    function nativeTokenVault() external view returns (INativeTokenVaultBase);
 
     function setAssetDeploymentTracker(bytes32 _assetRegistrationData, address _assetDeploymentTracker) external;
 
-    function setNativeTokenVault(INativeTokenVault _nativeTokenVault) external;
+    function setNativeTokenVault(INativeTokenVaultBase _nativeTokenVault) external;
 
     function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external;
 
@@ -94,8 +95,9 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy, IL1CrossCha
     /// @param _assetId The unique identifier of the deposited L1 token.
     /// @param _assetData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver. Might include extra information.
     /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
-    function bridgeRecoverFailedTransfer(
+    function bridgeConfirmTransferResult(
         uint256 _chainId,
+        TxStatus _txStatus,
         address _depositSender,
         bytes32 _assetId,
         bytes calldata _assetData

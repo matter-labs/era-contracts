@@ -170,11 +170,13 @@ struct FinalizeL1DepositParams {
 }
 
 /// @dev Struct used to define parameters for adding a single call in an interop bundle.
-/// @param to Address to call on the destination chain.
+/// @param to ERC-7930 address to call on the destination chain. Note, that it will have empty ChainReference.
+///           This is due to the fact that chain ID is always provided on a bundle level, as a destination chain ID.
+///           And in case of sendMessage the chain ID is also provided via the sendMessage interface, so it's redundant to store it here.
 /// @param data Calldata payload to send to `to` address on the destination chain.
 /// @param callAttributes EIP-7786 Attributes.
 struct InteropCallStarter {
-    address to;
+    bytes to;
     bytes data;
     bytes[] callAttributes;
 }
@@ -322,7 +324,17 @@ struct TokenBalanceMigrationData {
     bytes32 assetId;
     uint256 tokenOriginChainId;
     uint256 amount;
+    uint256 chainMigrationNumber;
+    uint256 assetMigrationNumber;
+}
+
+struct ConfirmBalanceMigrationData {
+    bytes1 version;
+    bool isL1ToGateway;
+    uint256 chainId;
+    bytes32 assetId;
     uint256 migrationNumber;
+    uint256 amount;
 }
 
 struct BalanceChange {
@@ -333,4 +345,51 @@ struct BalanceChange {
     bytes32 assetId;
     uint256 amount;
     uint256 tokenOriginChainId;
+}
+
+struct AssetBalanceChange {
+    bytes32 assetId;
+    uint256 amount;
+}
+
+struct InteropBalanceChange {
+    bytes1 version;
+    uint256 baseTokenAmount;
+    AssetBalanceChange[] assetBalanceChanges;
+}
+
+/// @param _chainId The ZK chain id to which deposit was initiated.
+/// @param _depositSender The address of the entity that initiated the deposit.
+/// @param _assetId The unique identifier of the deposited L1 token.
+/// @param _assetData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
+/// @param _l2TxHash The L2 transaction hash.
+/// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed.
+/// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
+/// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent.
+/// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization.
+/// @param _txStatus The status of the transaction.
+struct ConfirmTransferResultData {
+    uint256 _chainId;
+    address _depositSender;
+    uint16 _l2TxNumberInBatch;
+    TxStatus _txStatus;
+    bytes32 _assetId;
+    bytes _assetData;
+    bytes32 _l2TxHash;
+    uint256 _l2BatchNumber;
+    uint256 _l2MessageIndex;
+    bytes32[] _merkleProof;
+}
+
+struct TokenMetadata {
+    string name;
+    string symbol;
+    uint256 decimals;
+}
+
+struct TokenBridgingData {
+    bytes32 assetId;
+    uint256 originChainId;
+    /// The address of the base token on the origin chain.
+    address originToken;
 }

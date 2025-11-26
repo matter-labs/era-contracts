@@ -4,40 +4,36 @@ pragma solidity ^0.8.20;
 
 // solhint-disable gas-custom-errors
 
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {StdStorage, Test, console2 as console, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
-import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
-import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
+import {SETTLEMENT_LAYER_RELAY_SENDER, ZKChainCommitment, CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET} from "contracts/common/Config.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {ETH_TOKEN_ADDRESS, MAX_GAS_PER_TRANSACTION, SETTLEMENT_LAYER_RELAY_SENDER, ZKChainCommitment} from "contracts/common/Config.sol";
+import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {BridgehubBase} from "contracts/bridgehub/BridgehubBase.sol";
+import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
 
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
-import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
-import {SystemContractsArgs} from "./Utils.sol";
+
 import {BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {BalanceChange} from "contracts/common/Messaging.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 
 abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
+
+    function _pauseDeposits(uint256 _chainId) public {
+        pauseDepositsBeforeInitiatingMigration(L2_BRIDGEHUB_ADDR, _chainId);
+        // As the priority queue was not empty before migration, we wait until the chain migration window starts
+        vm.warp(block.timestamp + CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET);
+    }
 
     function test_gatewayShouldFinalizeDeposit() public {
         finalizeDeposit();
@@ -62,10 +58,15 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         require(!GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
     }
 
-    function test_forwardToL2OnGateway() public {
+    function test_forwardToL2OnGateway_L2() public {
         // todo fix this test
         finalizeDeposit();
         vm.prank(SETTLEMENT_LAYER_RELAY_SENDER);
+        vm.mockCall(
+            L2_CHAIN_ASSET_HANDLER_ADDR,
+            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
+            abi.encode(1)
+        );
         BalanceChange memory balanceChange = BalanceChange({
             version: BALANCE_CHANGE_VERSION,
             baseTokenAssetId: bytes32(0),
@@ -79,9 +80,10 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     }
 
     function test_withdrawFromGateway() public {
-        // todo fix this test
         finalizeDeposit();
-        address newAdmin = address(0x1);
+        clearPriorityQueue(address(discoveredBridgehub.bridgehubProxy), mintChainId);
+        _pauseDeposits(mintChainId);
+        address newAdmin = makeAddr("newAdmin");
         bytes memory newDiamondCut = abi.encode();
         BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({
             chainId: mintChainId,
@@ -110,9 +112,11 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             .with_key(assetId)
             .checked_write(L2_BRIDGEHUB_ADDR);
 
-        stdstore.target(L2_BRIDGEHUB_ADDR).sig(IBridgehub.ctmAssetIdToAddress.selector).with_key(assetId).checked_write(
-            address(chainTypeManager)
-        );
+        stdstore
+            .target(L2_BRIDGEHUB_ADDR)
+            .sig(IBridgehubBase.ctmAssetIdToAddress.selector)
+            .with_key(assetId)
+            .checked_write(address(chainTypeManager));
 
         (bool success, ) = recipient.call(data);
     }

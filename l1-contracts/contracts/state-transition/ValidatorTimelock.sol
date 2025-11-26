@@ -5,8 +5,8 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "./AccessControlEnumerablePerChainAddressUpgradeable.sol";
 import {LibMap} from "./libraries/LibMap.sol";
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
-import {TimeNotReached, NotAZKChain} from "../common/L1ContractErrors.sol";
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+import {NotAZKChain, TimeNotReached} from "../common/L1ContractErrors.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 import {IValidatorTimelock} from "./IValidatorTimelock.sol";
 
 /// @author Matter Labs
@@ -62,7 +62,7 @@ contract ValidatorTimelock is
     bytes32 public constant override OPTIONAL_EXECUTOR_ADMIN_ROLE = keccak256("OPTIONAL_EXECUTOR_ADMIN_ROLE");
 
     /// @inheritdoc IValidatorTimelock
-    IBridgehub public immutable override BRIDGE_HUB;
+    IL1Bridgehub public immutable override BRIDGE_HUB;
 
     /// @dev The mapping of ZK chain address => batch number => timestamp when it was committed.
     mapping(address chainAddress => LibMap.Uint32Map batchNumberToTimestampMapping) internal committedBatchTimestamp;
@@ -71,7 +71,7 @@ contract ValidatorTimelock is
     uint32 public override executionDelay;
 
     constructor(address _bridgehubAddr) {
-        BRIDGE_HUB = IBridgehub(_bridgehubAddr);
+        BRIDGE_HUB = IL1Bridgehub(_bridgehubAddr);
         // Disable initialization to prevent Parity hack.
         _disableInitializers();
     }
@@ -288,7 +288,7 @@ contract ValidatorTimelock is
 
         // Firstly, we check that the chain is indeed a part of the ecosystem
         uint256 chainId = IZKChain(_chainAddress).getChainId();
-        if (IBridgehub(BRIDGE_HUB).getZKChain(chainId) != _chainAddress) {
+        if (IL1Bridgehub(BRIDGE_HUB).getZKChain(chainId) != _chainAddress) {
             revert NotAZKChain(_chainAddress);
         }
 

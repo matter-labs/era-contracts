@@ -4,54 +4,25 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
-import {BUNDLE_IDENTIFIER, BalanceChange, InteropBundle, InteropCall, L2Log, TokenBalanceMigrationData, TxStatus} from "../../common/Messaging.sol";
-import {L2_ASSET_ROUTER, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
-import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
-import {ChainIdNotRegistered, InvalidInteropCalldata, InvalidMessage, ReconstructionMismatch, Unauthorized} from "../../common/L1ContractErrors.sol";
-import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../bridgehub/IMessageRoot.sol";
-import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
-import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
-import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "../../common/Config.sol";
-import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
-import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
+import {SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
+import {ConfirmBalanceMigrationData, TokenBalanceMigrationData} from "../../common/Messaging.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
+import {Unauthorized, InvalidChainId} from "../../common/L1ContractErrors.sol";
 
-import {AssetIdNotRegistered, InvalidAmount, InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidInteropChainId, NotEnoughChainBalance, NotMigratedChain, OnlyWithdrawalsAllowedForPreV30Chains, TokenBalanceNotMigratedToGateway, InvalidV30UpgradeChainBatchNumber, InvalidFunctionSignature, InvalidEmptyMessageRoot} from "./AssetTrackerErrors.sol";
+import {AssetIdNotRegistered, MissingBaseTokenAssetId, OnlyGatewaySettlementLayer, TokenBalanceNotMigratedToGateway, MaxChainBalanceAlreadyAssigned} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
-import {IBridgedStandardToken} from "../BridgedStandardERC20.sol";
-import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
-import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
-import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
-import {IMailboxImpl} from "../../state-transition/chain-interfaces/IMailboxImpl.sol";
-import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
-
-struct SavedTotalSupply {
-    bool isSaved;
-    uint256 amount;
-}
 
 contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
-    using FullMerkleMemory for FullMerkleMemory.FullTree;
-    using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
-
     uint256 public L1_CHAIN_ID;
 
-    mapping(uint256 chainId => mapping(bytes32 canonicalTxHash => BalanceChange balanceChange)) internal balanceChange;
+    bytes32 public BASE_TOKEN_ASSET_ID;
 
-    /// used only on Gateway.
-    mapping(bytes32 assetId => address originToken) internal originToken;
-
-    /// used only on Gateway.
-    mapping(bytes32 assetId => uint256 originChainId) internal tokenOriginChainId;
-
-    /// used only on Gateway.
-    mapping(uint256 chainId => address legacySharedBridgeAddress) internal legacySharedBridgeAddress;
-
-    /// empty messageRoot calculated for specific chain.
-    mapping(uint256 chainId => bytes32 emptyMessageRoot) internal emptyMessageRoot;
+    /// @notice We save the token balance in the first deposit after chain migration. For native tokens, this is the chainBalance; for foreign tokens, this is the total supply. See _handleFinalizeBridgingOnL2Inner for details.
+    /// We need this to be able to migrate token balance to Gateway AssetTracker from the L1AssetTracker.
+    mapping(uint256 migrationNumber => mapping(bytes32 assetId => SavedTotalSupply savedTotalSupply))
+        internal savedTotalSupply;
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -67,7 +38,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _;
     }
 
-    modifier onlyBaseTokenSystemContract() {
+    modifier onlyL2BaseTokenSystemContract() {
         if (msg.sender != address(L2_BASE_TOKEN_SYSTEM_CONTRACT)) {
             revert Unauthorized(msg.sender);
         }
@@ -81,97 +52,132 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _;
     }
 
-    function setAddresses(uint256 _l1ChainId) external onlyUpgrader {
+    /// @notice Sets the L1 chain ID and base token asset ID for this L2 chain.
+    /// @dev This function is called during contract initialization or upgrades.
+    /// @param _l1ChainId The chain ID of the L1 network.
+    /// @param _baseTokenAssetId The asset ID of the base token used for gas fees on this chain.
+    function setAddresses(uint256 _l1ChainId, bytes32 _baseTokenAssetId) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
+        BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
     }
-    function _l1ChainId() internal view override returns (uint256) {
+
+    function _l1ChainId() internal view returns (uint256) {
         return L1_CHAIN_ID;
     }
 
-    function _bridgehub() internal view override returns (IBridgehub) {
-        return L2_BRIDGEHUB;
-    }
-
-    function _nativeTokenVault() internal view override returns (INativeTokenVault) {
+    function _nativeTokenVault() internal view override returns (INativeTokenVaultBase) {
         return L2_NATIVE_TOKEN_VAULT;
     }
 
-    function _messageRoot() internal view override returns (IMessageRoot) {
-        return L2_MESSAGE_ROOT;
+    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
+        _registerTokenOnL2(_assetId);
+        if (_originChainId == block.chainid) {
+            _assignMaxChainBalance(_originChainId, _assetId);
+        }
+    }
+
+    function _registerTokenOnL2(bytes32 _assetId) internal {
+        /// If the chain is settling on Gateway, then withdrawals are not automatically allowed for new tokens.
+        if (L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == _l1ChainId()) {
+            assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.migrationNumber(block.chainid);
+        }
+    }
+
+    /// @notice Registers a legacy token on this L2 chain for backwards compatibility.
+    /// @dev This function is used during upgrades to ensure pre-V30 tokens continue to work.
+    /// @param _assetId The asset ID of the legacy token to register.
+    function registerLegacyTokenOnChain(bytes32 _assetId) external onlyNativeTokenVault {
+        _registerTokenOnL2(_assetId);
+    }
+
+    /// @notice Migrates token balance tracking from NativeTokenVault to AssetTracker for V30 upgrade.
+    /// @dev This function calculates the correct chainBalance by accounting for tokens currently held in the NTV.
+    /// @dev The chainBalance represents how much of the token supply is "available" for bridging out.
+    /// @param _assetId The asset id of the token to migrate the token balance for.
+    function migrateTokenBalanceFromNTVV30(bytes32 _assetId) external {
+        INativeTokenVaultBase ntv = _nativeTokenVault();
+
+        // Validate that this is a token native to the current L2
+        uint256 originChainId = ntv.originChainId(_assetId);
+        require(originChainId == block.chainid, InvalidChainId());
+
+        // Get token address
+        address tokenAddress = ntv.tokenAddress(_assetId);
+        require(tokenAddress != address(0), AssetIdNotRegistered(_assetId));
+
+        // Prevent re-initialization if already set
+        require(!maxChainBalanceAssigned[_assetId], MaxChainBalanceAlreadyAssigned(_assetId));
+
+        // Mark chainBalance as assigned
+        maxChainBalanceAssigned[_assetId] = true;
+
+        // Initialize chainBalance
+        // For origin chains, chainBalance starts at MAX_TOKEN_BALANCE and decreases as tokens are bridged out
+        // We need to account for tokens currently locked in the NTV from previous bridge operations
+        uint256 ntvBalance = IERC20(tokenAddress).balanceOf(address(ntv));
+        // First, flip the existing chainBalance calculation (was tracking bridged out, now tracks available)
+        chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE - chainBalance[originChainId][_assetId];
+        // Then subtract tokens currently locked in NTV (these were already "bridged out" in pre-V30)
+        chainBalance[originChainId][_assetId] -= ntvBalance;
     }
 
     /*//////////////////////////////////////////////////////////////
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
 
-    function handleChainBalanceIncreaseOnGateway(
-        uint256 _chainId,
-        bytes32 _canonicalTxHash,
-        BalanceChange calldata _balanceChange
-    ) external {
-        _updateTotalSupplyOnGateway({
-            _sourceChainId: L1_CHAIN_ID,
-            _destinationChainId: _chainId,
-            _tokenOriginChainId: _balanceChange.tokenOriginChainId,
-            _assetId: _balanceChange.assetId,
-            _amount: _balanceChange.amount
-        });
-        // we increase the chain balance of the token.
-        if (_balanceChange.amount > 0) {
-            chainBalance[_chainId][_balanceChange.assetId] += _balanceChange.amount;
-        }
-        // we increase the chain balance of the base token.
-        if (_balanceChange.baseTokenAmount > 0 && _balanceChange.tokenOriginChainId != _chainId) {
-            chainBalance[_chainId][_balanceChange.baseTokenAssetId] += _balanceChange.baseTokenAmount;
-        }
-        if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _balanceChange.assetId)) {
-            _forceSetAssetMigrationNumber(_chainId, _balanceChange.assetId);
-        }
-        _registerToken(_balanceChange.assetId, _balanceChange.originToken, _balanceChange.tokenOriginChainId);
-
-        /// A malicious chain can cause a collision for the canonical tx hash.
-        require(balanceChange[_chainId][_canonicalTxHash].amount == 0, InvalidCanonicalTxHash(_canonicalTxHash));
-        // we save the balance change to be able to handle failed deposits.
-
-        balanceChange[_chainId][_canonicalTxHash] = _balanceChange;
-    }
-
     /// @notice This function is called for outgoing bridging from the L2, i.e. L2->L1 withdrawals and outgoing L2->L2 interop.
-    function handleInitiateBridgingOnL2(bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId) public {
-        if (_tokenOriginChainId == block.chainid) {
-            // We track the total supply on the origin L2 to make sure the token is not maliciously overflowing the sum of chainBalances.
-            totalSupplyAcrossAllChains[_assetId] += _amount;
-            return;
-        }
-        _checkAssetMigrationNumberOnGateway(_assetId);
+    function handleInitiateBridgingOnL2(
+        bytes32 _assetId,
+        uint256 _amount,
+        uint256 _tokenOriginChainId
+    ) external onlyL2NativeTokenVault {
+        _handleInitiateBridgingOnL2Inner(_assetId, _amount, _tokenOriginChainId);
     }
 
-    function _checkAssetMigrationNumberOnGateway(bytes32 _assetId) internal view {
+    function _handleInitiateBridgingOnL2Inner(bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId) internal {
+        _checkAssetMigrationNumber(_assetId);
+        if (_tokenOriginChainId == block.chainid) {
+            /// On the L2 we only save chainBalance for native tokens.
+            _decreaseChainBalance(block.chainid, _assetId, _amount);
+        }
+    }
+
+    /// @notice This function is used to check the asset migration number.
+    /// @dev This is used to pause outgoing withdrawals and interop transactions after the chain migrates to Gateway.
+    function _checkAssetMigrationNumber(bytes32 _assetId) internal view {
         uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
         /// Note we always allow bridging when settling on L1.
         /// On Gateway we require that the tokenBalance be migrated to Gateway from L1,
-        /// otherwise withdrawals might fail in the Gateway L2AssetTracker when the chain settles.
+        /// otherwise withdrawals might fail in the GWAssetTracker when the chain settles.
         require(
             savedAssetMigrationNumber == migrationNumber ||
-                L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() == _l1ChainId(),
+                L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == _l1ChainId(),
             TokenBalanceNotMigratedToGateway(_assetId, savedAssetMigrationNumber, migrationNumber)
         );
     }
 
-    function handleInitiateBaseTokenBridgingOnL2(uint256 _amount) external {
-        bytes32 baseTokenAssetId = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
-        /// Note the tokenOriginChainId, might not be the L1 chain Id, but the base token is bridged from L1,
-        /// and we only use the token origin chain id to increase the totalSupplyAcrossAllChains.
-        handleInitiateBridgingOnL2(baseTokenAssetId, _amount, tokenOriginChainId[baseTokenAssetId]);
+    /// @notice Handles the initiation of base token bridging operations on L2.
+    /// @dev This function is specifically for the chain's native base token used for gas payments.
+    /// @param _amount The amount of base tokens being bridged out.
+    function handleInitiateBaseTokenBridgingOnL2(uint256 _amount) external onlyL2BaseTokenSystemContract {
+        bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
+        uint256 baseTokenOriginChainId = L2_NATIVE_TOKEN_VAULT.originChainId(baseTokenAssetId);
+        _handleInitiateBridgingOnL2Inner(baseTokenAssetId, _amount, baseTokenOriginChainId);
     }
 
+    /// @notice Handles the finalization of incoming token bridging operations on L2.
+    /// @dev This function is called when tokens are bridged into this L2 from another chain.
+    /// @param _assetId The asset ID of the token being bridged in.
+    /// @param _amount The amount of tokens being bridged in.
+    /// @param _tokenOriginChainId The chain ID where this token was originally created.
+    /// @param _tokenAddress The contract address of the token on this chain.
     function handleFinalizeBridgingOnL2(
         bytes32 _assetId,
         uint256 _amount,
         uint256 _tokenOriginChainId,
         address _tokenAddress
-    ) public onlyL2NativeTokenVault {
+    ) external onlyL2NativeTokenVault {
         _handleFinalizeBridgingOnL2Inner(_assetId, _amount, _tokenOriginChainId, _tokenAddress);
     }
 
@@ -179,31 +185,67 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         bytes32 _assetId,
         uint256 _amount,
         uint256 _tokenOriginChainId,
-        address //_tokenAddress
+        address _tokenAddress
     ) internal {
-        if (_tokenCanSkipMigrationOnL2(_tokenOriginChainId, _assetId)) {
-            _forceSetAssetMigrationNumber(_tokenOriginChainId, _assetId);
-        } else {
-            /// Deposits are already paused when the chain migrates to GW, however L2->L2 interop is not.
-            _checkAssetMigrationNumberOnGateway(_assetId);
+        if (_needToForceSetAssetMigrationOnL2(_assetId, _tokenOriginChainId, _tokenAddress)) {
+            _forceSetAssetMigrationNumber(block.chainid, _assetId);
         }
 
+        /// We save the total supply for the first deposit after a migration.
+        uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
+        /// Here we don't care about the total supply, we only want to save it if it is not already saved.
+        // solhint-disable-next-line no-unused-vars
+        _getOrSaveTotalSupply(_assetId, migrationNumber, _tokenOriginChainId, _tokenAddress);
+        /// On the L2 we only save chainBalance for native tokens.
         if (_tokenOriginChainId == block.chainid) {
-            // We track the total supply on the origin L2 to make sure the token is not maliciously overflowing the sum of chainBalances.
-            totalSupplyAcrossAllChains[_assetId] += _amount;
+            chainBalance[block.chainid][_assetId] += _amount;
         }
     }
 
-    function handleFinalizeBaseTokenBridgingOnL2(uint256 _amount) external onlyBaseTokenSystemContract {
-        bytes32 baseTokenAssetId = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
-        if (baseTokenAssetId == bytes32(0)) {
-            /// this means we are before the genesis upgrade, where we don't transfer value, so we can skip.
-            /// if we don't skip we use incorrect asset id.
-            return;
+    /// @notice This saves the total supply if it is not saved yet. It returns the saved total supply.
+    function _getOrSaveTotalSupply(
+        bytes32 _assetId,
+        uint256 _migrationNumber,
+        uint256 _tokenOriginChainId,
+        address _tokenAddress
+    ) internal returns (uint256 _totalSupply) {
+        SavedTotalSupply memory tokenSavedTotalSupply = savedTotalSupply[_migrationNumber][_assetId];
+        if (!tokenSavedTotalSupply.isSaved) {
+            _totalSupply = _readTotalSupply(_assetId, _tokenOriginChainId, _tokenAddress);
+            /// This function saves the token supply before the first deposit after the chain migration is processed (in the same transaction).
+            /// This totalSupply is the chain's total supply at the moment of chain migration.
+            savedTotalSupply[_migrationNumber][_assetId] = SavedTotalSupply({isSaved: true, amount: _totalSupply});
+        } else {
+            _totalSupply = tokenSavedTotalSupply.amount;
         }
+    }
+
+    function _readTotalSupply(
+        bytes32 _assetId,
+        uint256 _tokenOriginChainId,
+        address _tokenAddress
+    ) internal view returns (uint256 _totalSupply) {
+        if (_tokenOriginChainId == block.chainid) {
+            _totalSupply = chainBalance[block.chainid][_assetId];
+        } else {
+            _totalSupply = IERC20(_tokenAddress).totalSupply();
+        }
+    }
+
+    /// @notice Handles the finalization of incoming base token bridging operations on L2.
+    /// @dev This function is specifically for the chain's native base token used for gas payments.
+    /// @param _amount The amount of base tokens being bridged into this chain.
+    function handleFinalizeBaseTokenBridgingOnL2(uint256 _amount) external onlyL2BaseTokenSystemContract {
+        bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
         if (_amount == 0) {
             return;
         }
+        if (baseTokenAssetId == bytes32(0)) {
+            /// this means we are before the genesis upgrade, where we don't transfer value, so we can skip.
+            /// if we don't skip we use incorrect asset id.
+            revert MissingBaseTokenAssetId();
+        }
+
         _handleFinalizeBridgingOnL2Inner(
             baseTokenAssetId,
             _amount,
@@ -212,318 +254,29 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         );
     }
 
-    function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external {
-        legacySharedBridgeAddress[_chainId] = _legacySharedBridgeAddress;
-    }
-    /*//////////////////////////////////////////////////////////////
-                    Chain settlement logs processing on Gateway
-    //////////////////////////////////////////////////////////////*/
-
-    function processLogsAndMessages(
-        ProcessLogsInput calldata _processLogsInputs
-    ) external onlyChain(_processLogsInputs.chainId) {
-        (, uint32 minor, ) = IZKChain(msg.sender).getSemverProtocolVersion();
-        /// If a chain is pre v30, we only allow withdrawals, and don't keep track of chainBalance.
-        bool onlyWithdrawals = minor < 30;
-        /// We check that the chain has not upgraded to V30 for onlyWithdrawals case.
-        require(
-            !onlyWithdrawals ||
-                L2_MESSAGE_ROOT.v30UpgradeChainBatchNumber(_processLogsInputs.chainId) ==
-                V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY,
-            InvalidV30UpgradeChainBatchNumber(_processLogsInputs.chainId)
-        );
-
-        DynamicIncrementalMerkleMemory.Bytes32PushTree memory reconstructedLogsTree;
-        reconstructedLogsTree.createTree(L2_TO_L1_LOGS_MERKLE_TREE_DEPTH);
-
-        // slither-disable-next-line unused-return
-        reconstructedLogsTree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
-
-        uint256 msgCount = 0;
-        uint256 logsLength = _processLogsInputs.logs.length;
-        bytes32 baseTokenAssetId = _bridgehub().baseTokenAssetId(_processLogsInputs.chainId);
-        for (uint256 logCount = 0; logCount < logsLength; ++logCount) {
-            L2Log memory log = _processLogsInputs.logs[logCount];
-            {
-                bytes32 hashedLog = MessageHashing.getLeafHashFromLog(log);
-                // slither-disable-next-line unused-return
-                reconstructedLogsTree.push(hashedLog);
-            }
-            if (log.sender == L2_BOOTLOADER_ADDRESS) {
-                if (log.value == bytes32(uint256(TxStatus.Failure))) {
-                    _handlePotentialFailedDeposit(_processLogsInputs.chainId, log.key);
-                }
-                continue;
-            } else if (log.sender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
-                ++msgCount;
-                bytes memory message = _processLogsInputs.messages[msgCount - 1];
-
-                if (log.value != keccak256(message)) {
-                    revert InvalidMessage();
-                }
-
-                if (log.key == bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
-                    require(!onlyWithdrawals, OnlyWithdrawalsAllowedForPreV30Chains());
-                    _handleInteropMessage(_processLogsInputs.chainId, message, baseTokenAssetId);
-                } else if (log.key == bytes32(uint256(uint160(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)))) {
-                    _handleBaseTokenSystemContractMessage(_processLogsInputs.chainId, baseTokenAssetId, message);
-                } else if (log.key == bytes32(uint256(uint160(L2_ASSET_ROUTER_ADDR)))) {
-                    _handleAssetRouterMessage(_processLogsInputs.chainId, message);
-                } else if (log.key == bytes32(uint256(uint160(L2_ASSET_TRACKER_ADDR)))) {
-                    _checkAssetTrackerMessageSelector(message);
-                } else if (log.key == bytes32(uint256(uint160(L2_COMPRESSOR_ADDR)))) {
-                    // No further action is required in this case.
-                } else if (uint256(log.key) <= MAX_BUILT_IN_CONTRACT_ADDR) {
-                    // This Log is not supported
-                    revert InvalidBuiltInContractMessage(logCount, msgCount - 1, log.key);
-                } else {
-                    address legacySharedBridge = legacySharedBridgeAddress[block.chainid];
-                    if (log.key == bytes32(uint256(uint160(legacySharedBridge))) && legacySharedBridge != address(0)) {
-                        _handleLegacySharedBridgeMessage(_processLogsInputs.chainId, message);
-                    }
-                }
-            }
-        }
-        reconstructedLogsTree.extendUntilEnd();
-        bytes32 localLogsRootHash = reconstructedLogsTree.root();
-
-        bytes32 emptyMessageRootForChain = _getEmptyMessageRoot(_processLogsInputs.chainId);
-        require(
-            _processLogsInputs.messageRoot == emptyMessageRootForChain,
-            InvalidEmptyMessageRoot(emptyMessageRootForChain, _processLogsInputs.messageRoot)
-        );
-        bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.messageRoot));
-
-        if (chainBatchRootHash != _processLogsInputs.chainBatchRoot) {
-            revert ReconstructionMismatch(chainBatchRootHash, _processLogsInputs.chainBatchRoot);
-        }
-
-        _appendChainBatchRoot(_processLogsInputs.chainId, _processLogsInputs.batchNumber, chainBatchRootHash);
-    }
-
-    function _getEmptyMessageRoot(uint256 _chainId) internal returns (bytes32) {
-        bytes32 savedEmptyMessageRoot = emptyMessageRoot[_chainId];
-        if (savedEmptyMessageRoot != bytes32(0)) {
-            return savedEmptyMessageRoot;
-        }
-        FullMerkleMemory.FullTree memory sharedTree;
-        sharedTree.createTree(2);
-        sharedTree.setup(SHARED_ROOT_TREE_EMPTY_HASH);
-
-        DynamicIncrementalMerkleMemory.Bytes32PushTree memory chainTree;
-        chainTree.createTree(1);
-        bytes32 initialChainTreeHash = chainTree.setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
-        bytes32 leafHash = MessageHashing.chainIdLeafHash(initialChainTreeHash, _chainId);
-        bytes32 emptyMessageRootCalculated = sharedTree.pushNewLeaf(leafHash);
-
-        emptyMessageRoot[_chainId] = emptyMessageRootCalculated;
-        return emptyMessageRootCalculated;
-    }
-
-    /// @notice Handles potential failed deposits. Not all L1->L2 txs are deposits.
-    function _handlePotentialFailedDeposit(uint256 _chainId, bytes32 _canonicalTxHash) internal {
-        BalanceChange memory savedBalanceChange = balanceChange[_chainId][_canonicalTxHash];
-        /// Note we handle failedDeposits here for deposits that do not go through GW during chainMigration,
-        /// because they were initiated when the chain settles on L1, however the failedDeposit L2->L1 message goes through GW.
-        /// Here we do not need to decrement the chainBalance, since the chainBalance was added to the chain's chainBalance on L1,
-        /// and never migrated to the GW's chainBalance, since it never increments the totalSupply since the L2 txs fails.
-        if (savedBalanceChange.amount > 0 && savedBalanceChange.tokenOriginChainId != _chainId) {
-            chainBalance[_chainId][savedBalanceChange.assetId] -= savedBalanceChange.amount;
-        }
-        /// Note the base token is never native to the chain as of V30.
-        if (savedBalanceChange.baseTokenAmount > 0) {
-            chainBalance[_chainId][savedBalanceChange.baseTokenAssetId] -= savedBalanceChange.baseTokenAmount;
-        }
-    }
-
-    function _handleInteropMessage(uint256 _chainId, bytes memory _message, bytes32 _baseTokenAssetId) internal {
-        if (_message[0] != BUNDLE_IDENTIFIER) {
-            // This should not be possible in V30. In V31 this will be a trigger.
-            return;
-        }
-
-        InteropBundle memory interopBundle = this.parseInteropBundle(_message);
-
-        InteropCall memory interopCall;
-        uint256 callsLength = interopBundle.calls.length;
-
-        for (uint256 callCount = 0; callCount < callsLength; ++callCount) {
-            interopCall = interopBundle.calls[callCount];
-
-            if (interopCall.value > 0) {
-                require(chainBalance[_chainId][_baseTokenAssetId] >= interopCall.value, InvalidAmount());
-                chainBalance[_chainId][_baseTokenAssetId] -= interopCall.value;
-            }
-
-            // e.g. for direct calls we just skip
-            if (interopCall.from != L2_ASSET_ROUTER_ADDR) {
-                continue;
-            }
-
-            if (bytes4(interopCall.data) != IAssetRouterBase.finalizeDeposit.selector) {
-                revert InvalidInteropCalldata(bytes4(interopCall.data));
-            }
-            (uint256 fromChainId, bytes32 assetId, bytes memory transferData) = this.parseInteropCall(interopCall.data);
-            require(_chainId == fromChainId, InvalidInteropChainId(fromChainId, interopBundle.destinationChainId));
-
-            _handleAssetRouterMessageInner(_chainId, interopBundle.destinationChainId, assetId, transferData);
-        }
-    }
-
-    /// @notice L2->L1 withdrawals go through the L2AssetRouter directly.
-    function _handleAssetRouterMessage(uint256 _chainId, bytes memory _message) internal {
-        (bytes4 functionSignature, , bytes32 assetId, bytes memory transferData) = DataEncoding
-            .decodeAssetRouterFinalizeDepositData(_message);
-        require(
-            functionSignature == IAssetRouterBase.finalizeDeposit.selector,
-            InvalidFunctionSignature(functionSignature)
-        );
-        _handleAssetRouterMessageInner(_chainId, L1_CHAIN_ID, assetId, transferData);
-    }
-
-    /// @notice Handles the logic of the AssetRouter message.
-    /// @param _sourceChainId The chain id of the source chain. Can not be L1.
-    /// @param _destinationChainId The chain id of the destination chain. Can be L1.
-    /// @param _assetId The asset id of the asset.
-    /// @param _transferData The transfer data of the asset.
-    /// @dev This function is used to handle the logic of the AssetRouter message.
-
-    function _handleAssetRouterMessageInner(
-        uint256 _sourceChainId,
-        uint256 _destinationChainId,
-        bytes32 _assetId,
-        bytes memory _transferData
-    ) internal {
-        // slither-disable-next-line unused-return
-        (, , address originalToken, uint256 amount, bytes memory erc20Metadata) = DataEncoding.decodeBridgeMintData(
-            _transferData
-        );
-        // slither-disable-next-line unused-return
-        (uint256 tokenOriginalChainId, , , ) = this.parseTokenData(erc20Metadata);
-        DataEncoding.assetIdCheck(tokenOriginalChainId, _assetId, originalToken);
-        if (originToken[_assetId] == address(0)) {
-            originToken[_assetId] = originalToken;
-            tokenOriginChainId[_assetId] = tokenOriginalChainId;
-        }
-
-        _handleChainBalanceChangeOnGateway({
-            _sourceChainId: _sourceChainId,
-            _destinationChainId: _destinationChainId,
-            _tokenOriginalChainId: tokenOriginalChainId,
-            _assetId: _assetId,
-            _amount: amount
-        });
-
-        _updateTotalSupplyOnGateway({
-            _sourceChainId: _sourceChainId,
-            _destinationChainId: _destinationChainId,
-            _tokenOriginChainId: tokenOriginalChainId,
-            _assetId: _assetId,
-            _amount: amount
-        });
-    }
-
-    function _handleChainBalanceChangeOnGateway(
-        uint256 _sourceChainId,
-        uint256 _destinationChainId,
-        uint256 _tokenOriginalChainId,
-        bytes32 _assetId,
-        uint256 _amount
-    ) internal {
-        if (_tokenOriginalChainId != _sourceChainId && _amount > 0) {
-            require(
-                chainBalance[_sourceChainId][_assetId] >= _amount,
-                NotEnoughChainBalance(_sourceChainId, _assetId, _amount)
-            );
-            chainBalance[_sourceChainId][_assetId] -= _amount;
-        }
-        if (_tokenOriginalChainId != _destinationChainId && _amount > 0) {
-            chainBalance[_destinationChainId][_assetId] += _amount;
-        }
-    }
-
-    function _handleLegacySharedBridgeMessage(uint256 _chainId, bytes memory _message) internal {
-        (bytes4 functionSignature, address l1Token, bytes memory transferData) = DataEncoding
-            .decodeLegacyFinalizeWithdrawalData(_message);
-        require(
-            functionSignature == IL1ERC20Bridge.finalizeWithdrawal.selector,
-            InvalidFunctionSignature(functionSignature)
-        );
-        /// The legacy shared bridge message is only for L1 tokens on legacy chains where the legacy L2 shared bridge is deployed.
-        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
-
-        _handleAssetRouterMessageInner(_chainId, L1_CHAIN_ID, expectedAssetId, transferData);
-    }
-
-    /// @notice L2->L1 base token withdrawals go through the L2BaseTokenSystemContract directly.
-    function _handleBaseTokenSystemContractMessage(
-        uint256 _chainId,
-        bytes32 _baseTokenAssetId,
-        bytes memory _message
-    ) internal {
-        (bytes4 functionSignature, , uint256 amount) = DataEncoding.decodeBaseTokenFinalizeWithdrawalData(_message);
-        require(
-            functionSignature == IMailboxImpl.finalizeEthWithdrawal.selector,
-            InvalidFunctionSignature(functionSignature)
-        );
-        chainBalance[_chainId][_baseTokenAssetId] -= amount;
-        _updateTotalSupplyOnGateway({
-            _sourceChainId: _chainId,
-            _destinationChainId: L1_CHAIN_ID,
-            _tokenOriginChainId: tokenOriginChainId[_baseTokenAssetId],
-            _assetId: _baseTokenAssetId,
-            _amount: amount
-        });
-    }
-
-    /// @notice this function is a bit unintuitive since the Gateway AssetTracker checks the messages sent by the L2 AssetTracker,
-    /// since we check the messages from all built-in contracts.
-    /// However this is not where the receiveMigrationOnL1 function is processed, but on L1.
-    function _checkAssetTrackerMessageSelector(bytes memory _message) internal pure {
-        bytes4 functionSignature = DataEncoding.getSelector(_message);
-        require(
-            functionSignature == IAssetTrackerDataEncoding.receiveMigrationOnL1.selector,
-            InvalidFunctionSignature(functionSignature)
-        );
-    }
-
-    /// we track the total supply on the gateway to make sure the chain and token are not maliciously overflowing the sum of chainBalances.
-    function _updateTotalSupplyOnGateway(
-        uint256 _sourceChainId,
-        uint256 _destinationChainId,
-        uint256 _tokenOriginChainId,
-        bytes32 _assetId,
-        uint256 _amount
-    ) internal {
-        if (_tokenOriginChainId == _sourceChainId) {
-            totalSupplyAcrossAllChains[_assetId] += _amount;
-        } else if (_tokenOriginChainId == _destinationChainId) {
-            totalSupplyAcrossAllChains[_assetId] -= _amount;
-        }
-    }
-
     /*//////////////////////////////////////////////////////////////
                     Gateway related token balance migration 
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Migrates the token balance from L2 to L1.
     /// @dev This function can be called multiple times on the chain it does not have a direct effect.
-    /// @dev This function is permissionless, it does not affect the state.
+    /// @dev This function is permissionless, it does not affect the state of the contract substantially, and can be called multiple times.
     function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external {
+        require(
+            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
+            OnlyGatewaySettlementLayer()
+        );
         address tokenAddress = _tryGetTokenAddress(_assetId);
 
         uint256 originChainId = L2_NATIVE_TOKEN_VAULT.originChainId(_assetId);
-        address originalToken;
-        if (originChainId == block.chainid) {
-            originalToken = tokenAddress;
-        } else if (originChainId != 0) {
-            originalToken = IBridgedStandardToken(tokenAddress).originToken();
-        } else {
-            /// this is the base token case. We can set the L1 chain id here, we don't store the real origin chainId.
-            originChainId = L1_CHAIN_ID;
+        address originalToken = L2_NATIVE_TOKEN_VAULT.originToken(_assetId);
+
+        uint256 chainMigrationNumber = _getChainMigrationNumber(block.chainid);
+        if (chainMigrationNumber == assetMigrationNumber[block.chainid][_assetId]) {
+            /// In this case the token was either already migrated, or the migration number was set using _forceSetAssetMigrationNumber.
+            return;
         }
-        uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
-        uint256 amount = IERC20(tokenAddress).totalSupply();
+        uint256 amount = _getOrSaveTotalSupply(_assetId, chainMigrationNumber, originChainId, tokenAddress);
 
         TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
@@ -531,123 +284,53 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             assetId: _assetId,
             tokenOriginChainId: originChainId,
             amount: amount,
-            migrationNumber: migrationNumber,
+            chainMigrationNumber: chainMigrationNumber,
+            assetMigrationNumber: assetMigrationNumber[block.chainid][_assetId],
             originToken: originalToken,
             isL1ToGateway: true
         });
         _sendMigrationDataToL1(tokenBalanceMigrationData);
     }
 
-    /// @notice Migrates the token balance from Gateway to L1.
-    /// @dev This function can be called multiple times on the Gateway as it does not have a direct effect.
-    /// @dev This function is permissionless, it does not affect the state.
-    function initiateGatewayToL1MigrationOnGateway(uint256 _chainId, bytes32 _assetId) external {
-        address zkChain = L2_BRIDGEHUB.getZKChain(_chainId);
-        require(zkChain != address(0), ChainIdNotRegistered(_chainId));
-
-        uint256 settlementLayer = L2_BRIDGEHUB.settlementLayer(_chainId);
-        require(settlementLayer != block.chainid, NotMigratedChain());
-
-        uint256 migrationNumber = _getChainMigrationNumber(_chainId);
-        require(assetMigrationNumber[_chainId][_assetId] < migrationNumber, InvalidAssetId(_assetId));
-
-        TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
-            chainId: _chainId,
-            assetId: _assetId,
-            tokenOriginChainId: tokenOriginChainId[_assetId],
-            amount: chainBalance[_chainId][_assetId],
-            migrationNumber: migrationNumber,
-            originToken: originToken[_assetId],
-            isL1ToGateway: false
-        });
-
-        _sendMigrationDataToL1(tokenBalanceMigrationData);
-    }
-
-    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata data) external {
-        //onlyServiceTransactionSender {
-        assetMigrationNumber[data.chainId][data.assetId] = data.migrationNumber;
-        if (data.isL1ToGateway) {
-            /// In this case the balance might never have been migrated back to L1.
-            chainBalance[data.chainId][data.assetId] += data.amount;
-            totalSupplyAcrossAllChains[data.assetId] += data.amount;
-        } else {
-            require(data.amount == chainBalance[data.chainId][data.assetId], InvalidAmount());
-            chainBalance[data.chainId][data.assetId] = 0;
-            totalSupplyAcrossAllChains[data.assetId] -= data.amount;
-        }
-    }
-
-    function confirmMigrationOnL2(TokenBalanceMigrationData calldata data) external {
-        //onlyServiceTransactionSender {
+    /// @notice Confirms a migration operation has been completed and updates the asset migration number.
+    /// @dev This function is called by L1 after a migration has been processed to update local state.
+    /// @param data The migration confirmation data containing the asset ID and migration number.
+    function confirmMigrationOnL2(ConfirmBalanceMigrationData calldata data) external onlyServiceTransactionSender {
         assetMigrationNumber[block.chainid][data.assetId] = data.migrationNumber;
-    }
-
-    function _sendMigrationDataToL1(TokenBalanceMigrationData memory data) internal {
-        // slither-disable-next-line unused-return
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
-            abi.encodeCall(IAssetTrackerDataEncoding.receiveMigrationOnL1, data)
-        );
     }
 
     /*//////////////////////////////////////////////////////////////
                             Helper Functions
     //////////////////////////////////////////////////////////////*/
 
-    function _registerToken(bytes32 _assetId, address _originalToken, uint256 _tokenOriginChainId) internal {
-        if (originToken[_assetId] == address(0)) {
-            originToken[_assetId] = _originalToken;
-            tokenOriginChainId[_assetId] = _tokenOriginChainId;
+    /// @notice Determines if a token's migration number should be force-set during bridging operations.
+    /// @param _assetId The asset ID of the token to check.
+    /// @param _tokenOriginChainId The chain ID where this token originated.
+    /// @param _tokenAddress The contract address of the token on this chain.
+    /// @return bool True if the migration number should be force-set, false otherwise.
+    function _needToForceSetAssetMigrationOnL2(
+        bytes32 _assetId,
+        uint256 _tokenOriginChainId,
+        address _tokenAddress
+    ) internal view returns (bool) {
+        if (_tokenOriginChainId == block.chainid) {
+            return false;
         }
-    }
-
-    function _tokenCanSkipMigrationOnL2(uint256 _chainId, bytes32 _assetId) internal view returns (bool) {
-        uint256 savedAssetMigrationNumber = assetMigrationNumber[_chainId][_assetId];
-        address tokenAddress = _tryGetTokenAddress(_assetId);
-        uint256 amount = IERC20(tokenAddress).totalSupply();
+        uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
+        uint256 amount = IERC20(_tokenAddress).totalSupply();
 
         return savedAssetMigrationNumber == 0 && amount == 0;
     }
 
+    /// @notice Retrieves the token contract address for a given asset ID.
+    /// @param _assetId The asset ID to look up.
+    /// @return tokenAddress The contract address of the token.
     function _tryGetTokenAddress(bytes32 _assetId) internal view returns (address tokenAddress) {
         tokenAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
-
-        if (tokenAddress == address(0)) {
-            if (_assetId == L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID()) {
-                tokenAddress = address(L2_BASE_TOKEN_SYSTEM_CONTRACT);
-            } else {
-                revert AssetIdNotRegistered(_assetId);
-            }
-        }
-    }
-
-    function parseInteropBundle(bytes calldata _bundleData) external pure returns (InteropBundle memory interopBundle) {
-        interopBundle = abi.decode(_bundleData[1:], (InteropBundle));
-    }
-
-    function parseInteropCall(
-        bytes calldata _callData
-    ) external pure returns (uint256 fromChainId, bytes32 assetId, bytes memory transferData) {
-        (fromChainId, assetId, transferData) = abi.decode(_callData[4:], (uint256, bytes32, bytes));
-    }
-
-    function parseTokenData(
-        bytes calldata _tokenData
-    ) external pure returns (uint256 originChainId, bytes memory name, bytes memory symbol, bytes memory decimals) {
-        (originChainId, name, symbol, decimals) = DataEncoding.decodeTokenData(_tokenData);
-    }
-
-    /// @notice Appends the batch message root to the global message.
-    /// @param _batchNumber The number of the batch
-    /// @param _messageRootToAppend The root of the merkle tree of the messages to L1.
-    /// @dev The logic of this function depends on the settlement layer as we support
-    /// message root aggregation only on non-L1 settlement layers for ease for migration.
-    function _appendChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _messageRootToAppend) internal {
-        _messageRoot().addChainBatchRoot(_chainId, _batchNumber, _messageRootToAppend);
+        require(tokenAddress != address(0), AssetIdNotRegistered(_assetId));
     }
 
     function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
-        return L2_CHAIN_ASSET_HANDLER.getMigrationNumber(_chainId);
+        return L2_CHAIN_ASSET_HANDLER.migrationNumber(_chainId);
     }
 }
