@@ -175,26 +175,27 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         // We set to it to zero explicitly so that it is clear to the reader.
         addresses.accessControlRestrictionAddress = address(0);
 
-        (, addresses.stateTransition.validatorTimelock) = deployTuppWithContract("ValidatorTimelock", false);
+        // UNCOMMENTING THIS MAKES THE COMPILER FAIL
+        // (, addresses.stateTransition.validatorTimelock) = deployTuppWithContract("ValidatorTimelock", false);
 
-        (
-            addresses.stateTransition.serverNotifierImplementation,
-            addresses.stateTransition.serverNotifierProxy
-        ) = deployServerNotifier();
+        // (
+        //     addresses.stateTransition.serverNotifierImplementation,
+        //     addresses.stateTransition.serverNotifierProxy
+        // ) = deployServerNotifier();
 
-        initializeGeneratedData();
+        // initializeGeneratedData();
 
-        deployStateTransitionDiamondFacets();
-        string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
-        (
-            addresses.stateTransition.chainTypeManagerImplementation,
-            addresses.stateTransition.chainTypeManagerProxy
-        ) = deployTuppWithContract(ctmContractName, false);
-        setChainTypeManagerInServerNotifier();
+        // deployStateTransitionDiamondFacets();
+        // string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
+        // (
+        //     addresses.stateTransition.chainTypeManagerImplementation,
+        //     addresses.stateTransition.chainTypeManagerProxy
+        // ) = deployTuppWithContract(ctmContractName, false);
+        // setChainTypeManagerInServerNotifier();
 
-        updateOwners();
+        // updateOwners();
 
-        saveOutput(outputPath);
+        // saveOutput(outputPath);
     }
 
     function initializeGeneratedData() internal {
@@ -300,7 +301,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             facet: addresses.stateTransition.adminFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
+            selectors: new bytes4[](0) // Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
         });
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -619,10 +620,10 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         GettersFacet gettersFacet = new GettersFacet();
         MailboxFacet mailboxFacet = new MailboxFacet(1, 1, IEIP7702Checker(address(0)));
         ExecutorFacet executorFacet = new ExecutorFacet(1);
-        bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);
-        bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);
-        bytes4[] memory mailboxFacetSelectors = Utils.getAllSelectors(address(mailboxFacet).code);
-        bytes4[] memory executorFacetSelectors = Utils.getAllSelectors(address(executorFacet).code);
+        bytes4[] memory adminFacetSelectors; // = Utils.getAllSelectors(address(adminFacet).code);
+        bytes4[] memory gettersFacetSelectors; // = Utils.getAllSelectors(address(gettersFacet).code);
+        bytes4[] memory mailboxFacetSelectors; // = Utils.getAllSelectors(address(mailboxFacet).code);
+        bytes4[] memory executorFacetSelectors; // = Utils.getAllSelectors(address(executorFacet).code);
 
         string memory root = vm.projectRoot();
         string memory outputPath = string.concat(root, "/script-out/diamond-selectors.toml");
@@ -655,25 +656,25 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             facet: stateTransition.adminFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
+            selectors: new bytes4[](0) // Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
         });
         facetCuts[1] = Diamond.FacetCut({
             facet: stateTransition.gettersFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.gettersFacet.code)
+            selectors: new bytes4[](0) // Utils.getAllSelectors(addresses.stateTransition.gettersFacet.code)
         });
         facetCuts[2] = Diamond.FacetCut({
             facet: stateTransition.mailboxFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
+            selectors: new bytes4[](0) // Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
         });
         facetCuts[3] = Diamond.FacetCut({
             facet: stateTransition.executorFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.executorFacet.code)
+            selectors: new bytes4[](0) // Utils.getAllSelectors(addresses.stateTransition.executorFacet.code)
         });
     }
 
