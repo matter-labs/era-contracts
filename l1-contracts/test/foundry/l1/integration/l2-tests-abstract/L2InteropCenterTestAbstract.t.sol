@@ -59,7 +59,7 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
 
         vm.recordLogs();
 
-        InteropLibrary.sendCall(
+        InteropLibrary.sendDirectCall(
             destinationChainId,
             interopTargetContract,
             abi.encodeWithSignature("simpleCall()"),
@@ -136,7 +136,11 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
         uint256 amount = 100;
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](2);
-        calls[0] = InteropLibrary.buildSendNativeCall(destinationChainId, interopTargetContract, amount);
+        calls[0] = InteropLibrary.buildSendDestinationChainBaseTokenCall(
+            destinationChainId,
+            interopTargetContract,
+            amount
+        );
         bytes memory empty = hex"";
         bytes[] memory callAttributes = new bytes[](1);
         callAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (amount));
@@ -148,7 +152,7 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
         });
         bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(UNBUNDLER_ADDRESS);
 
-        L2_INTEROP_CENTER.sendBundle{value: amount}(
+        L2_INTEROP_CENTER.sendDirectCallBundle{value: amount}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
             bundleAttributes
@@ -204,7 +208,7 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
 
         vm.recordLogs();
 
-        InteropLibrary.sendCall(
+        InteropLibrary.sendDirectCall(
             destinationChainId,
             L2_INTEROP_HANDLER_ADDR,
             abi.encodeCall(L2_INTEROP_HANDLER.executeBundle, (bundle, proof)),
@@ -243,7 +247,7 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
         CallStatus[] memory callStatuses = new CallStatus[](1);
         callStatuses[0] = CallStatus.Executed;
         vm.prank(UNBUNDLER_ADDRESS);
-        InteropLibrary.sendCall(
+        InteropLibrary.sendDirectCall(
             destinationChainId,
             L2_INTEROP_HANDLER_ADDR,
             abi.encodeCall(L2_INTEROP_HANDLER.unbundleBundle, (originalChainId, bundle, callStatuses)),
