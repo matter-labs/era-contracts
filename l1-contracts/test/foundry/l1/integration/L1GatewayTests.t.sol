@@ -44,7 +44,6 @@ import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerif
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
-import {IL1ChainAssetHandler} from "contracts/bridgehub/IL1ChainAssetHandler.sol";
 import {IMessageRoot, IMessageVerification} from "contracts/bridgehub/IMessageRoot.sol";
 import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 import {NotMigrated} from "contracts/state-transition/L1StateTransitionErrors.sol";
@@ -546,9 +545,7 @@ contract L1GatewayTests is
             uint256 pausedDepositsTimestamp = uint256(vm.load(address(zkChain), pausedDepositsTimestampSlot));
             assertEq(pausedDepositsTimestamp, 0);
             // Migration is no longer in progress
-            bool isMigrationInProgress = IL1ChainAssetHandler(chainAssetHandler).isMigrationInProgress(
-                migratingChainId
-            );
+            bool isMigrationInProgress = IChainAssetHandler(chainAssetHandler).isMigrationInProgress(migratingChainId);
             assertEq(isMigrationInProgress, false);
         }
 

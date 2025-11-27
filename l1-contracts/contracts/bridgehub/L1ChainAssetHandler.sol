@@ -15,7 +15,6 @@ import {IL1Bridgehub} from "./IL1Bridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IChainAssetHandlerShared} from "./IChainAssetHandlerShared.sol";
-import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -23,7 +22,7 @@ import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
 /// it is the IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
 /// @dev L1 version – keeps the cheap immutables set in the constructor.
-contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1ChainAssetHandler, IChainAssetHandlerShared {
+contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IChainAssetHandlerShared {
     /// @dev The assetId of the ETH.
     bytes32 public immutable override ETH_TOKEN_ASSET_ID;
 
@@ -44,9 +43,6 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
 
     /// @dev The L1 nullifier contract.
     IL1Nullifier internal immutable L1_NULLIFIER;
-
-    /// @dev The mapping showing for each chain if migration is in progress or not, used for freezing deposits.abi
-    mapping(uint256 chainId => bool isMigrationInProgress) public isMigrationInProgress;
 
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
