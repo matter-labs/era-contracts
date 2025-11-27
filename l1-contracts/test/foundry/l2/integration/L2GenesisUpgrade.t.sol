@@ -197,11 +197,7 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
         vm.mockCall(L2_BRIDGEHUB_ADDR, abi.encodeWithSelector(L2Bridgehub.initL2.selector), "");
         vm.mockCall(L2_ASSET_ROUTER_ADDR, abi.encodeWithSelector(L2AssetRouter.initL2.selector), "");
         vm.mockCall(L2_CHAIN_ASSET_HANDLER_ADDR, abi.encodeWithSelector(L2ChainAssetHandler.initL2.selector), "");
-        vm.mockCall(
-            L2_INTEROP_CENTER_ADDR,
-            abi.encodeWithSelector(bytes4(keccak256("initL2(uint256,address)"))),
-            ""
-        );
+        vm.mockCall(L2_INTEROP_CENTER_ADDR, abi.encodeWithSelector(bytes4(keccak256("initL2(uint256,address)"))), "");
         vm.mockCall(
             L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(bytes4(keccak256("getMarker(bytes32)"))),
