@@ -33,8 +33,8 @@ license.
 We aim to make it as easy as possible to contribute to the mission. This is still WIP, and we're happy for contributions
 and suggestions here too. Some resources to help:
 
-1. [In-repo docs aimed at developers](docs)
-2. [ZKsync Era docs!](https://docs.zksync.io/zk-stack)
+1. [Docs aimed at developers](https://docs.zksync.io/zksync-protocol)
+2. [ZK Stack docs!](https://docs.zksync.io/zk-stack)
 3. Company links can be found in the [repo's readme](README.md)
 
 ## Code of Conduct
