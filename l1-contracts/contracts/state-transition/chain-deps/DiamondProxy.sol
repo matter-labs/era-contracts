@@ -20,8 +20,8 @@ contract DiamondProxy {
         console.log("diamond proxy constructor");
         // Check that the contract is deployed on the expected chain.
         // Thus, the contract deployed by the same Create2 factory on the different chain will have different addresses!
-        // require(_chainId == block.chainid, "pr");
-        // Diamond.diamondCut(_diamondCut);
+        require(_chainId == block.chainid, "pr");
+        Diamond.diamondCut(_diamondCut);
     }
 
     /// @dev 1. Find the facet for the function that is called.
