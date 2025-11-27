@@ -3,23 +3,30 @@
 pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage, console} from "forge-std/Test.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
-import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDR, L2_BRIDGEHUB, L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDR, L2_CHAIN_ASSET_HANDLER, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+
+import {L2AssetTrackerData} from "./L2AssetTrackerData.sol";
 
 abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
 
     function test_processLogsAndMessages() public {
         finalizeDepositWithChainId(271);
+        finalizeDepositWithChainId(260);
 
         vm.chainId(GATEWAY_CHAIN_ID);
 
-        bytes
-            memory data = hex"000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001a0000000000000000000000000000000000000000000000000000000000000010f0000000000000000000000000000000000000000000000000000000000000007cc02c444ed97a398f98ce0846b2caeb14e9645874c530fc4443be56e97ac8ebee4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf7594400000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008008000000000000000000000000000000000000000000000000000000000001000ddfdf66b94c8f7281bac1dacc6204e33587e468aa0c680028c352df613ce9a26700000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000010439efa3f00100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000026e45cb3eb3303a363310dba9552e16500027f51000000000000000000000000000000000000000000000000000000000000010feaf44f2baeaf1396b40964237242564e6742f685bdef518ddbcd34039ae3d29f00000000000000000000000000000000000000000000000000000000000000090000000000000000000000000000000000000000000000000000000000000064000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000";
-        // ProcessLogsInput memory input = abi.decode(data,(ProcessLogsInput));
-        // Note: get this from real local txs
+        bytes[] memory input2 = L2AssetTrackerData.getData2();
+        for (uint256 i = 0; i < input2.length; i++) {
+            this.printProcess(abi.decode(input2[i], (ProcessLogsInput)));
+            return;
+        }
+
+        ProcessLogsInput[] memory testData = L2AssetTrackerData.getData();
 
         // Initialize v30UpgradeChainBatchNumber for chain 271 with the correct placeholder value
         uint256 placeholderValue = uint256(
@@ -43,19 +50,104 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
                 .checked_write(bytes32(uint256(dummyBatchRoot) + i));
         }
 
-        // Set the current batch number to 4 so that batch 5 can be added next
+        for (uint256 i = 0; i < testData.length; i++) {
+            // Set the current batch number to 4 so that batch 5 can be added next
+            if (testData[i].batchNumber > 0) {
+                stdstore
+                    .target(address(L2_MESSAGE_ROOT_ADDR))
+                    .sig("currentChainBatchNumber(uint256)")
+                    .with_key(testData[i].chainId)
+                    .checked_write(testData[i].batchNumber - 1);
+            }
+
+            storeChainBalance(
+                testData[i].chainId,
+                0x444c07697a6b15219c574dcc0ee09b479f6171009a6afd65b93e6f028cfa031b,
+                100
+            );
+            storeChainBalance(
+                testData[i].chainId,
+                0xa6203e30497f83b9f5f056745b6ff94f7e22d88bacea03d4dd4393d66217a86f,
+                100
+            );
+            storeChainBalance(
+                testData[i].chainId,
+                0x8592bf3100a24d737aba8ba9895f6801b9ec30200dc016dd8369f3171cbd1921,
+                100
+            );
+            storeChainBalance(
+                testData[i].chainId,
+                0xb615cd4917043452e354e4797dc23e4d6106663f7a37249d54f5996dd2347710,
+                100
+            );
+            storeChainBalance(
+                testData[i].chainId,
+                0xb1f317b7effffcd4e3cf53784ae442ecc4e835c532aaf0e60a046fa8efb96e85,
+                100
+            );
+            storeChainBalance(
+                testData[i].chainId,
+                0xb5eab7cc8c9114c3115a034b49b3d87b0b352aa88c2a9d5ff7339cde105aa44c,
+                100
+            );
+
+            stdstore
+                .target(address(L2_CHAIN_ASSET_HANDLER))
+                .sig("migrationNumber(uint256)")
+                .with_key(271)
+                .checked_write(1);
+
+            bytes32[] memory txHashes = getTxHashes(testData[i]);
+
+            // Loop over l1TxHashes in testData[i] and for each mark balanceChange version number as 1
+            // Note: balanceChange is internal, so we calculate storage slot manually
+            // balanceChange is at slot 155 in GWAssetTracker
+            for (uint256 j = 0; j < txHashes.length; j++) {
+                // Calculate storage slot: keccak256(txHash, keccak256(chainId, 155))
+                bytes32 innerSlot = keccak256(abi.encode(testData[i].chainId, uint256(155)));
+                bytes32 structSlot = keccak256(abi.encode(txHashes[j], innerSlot));
+                // Write 1 to the version field (first byte of the struct)
+                vm.store(address(GW_ASSET_TRACKER), structSlot, bytes32(uint256(1)));
+            }
+
+            vm.prank(L2_BRIDGEHUB.getZKChain(testData[i].chainId));
+
+            (bool success, ) = GW_ASSET_TRACKER_ADDR.call(
+                abi.encodeCall(GW_ASSET_TRACKER.processLogsAndMessages, testData[i])
+            );
+
+            require(success, string.concat("Failed to call GWAssetTracker ", vm.toString(i)));
+            console.log("success", i);
+        }
+    }
+
+    function getTxHashes(ProcessLogsInput memory input) public returns (bytes32[] memory) {
+        bytes32[] memory txHashes = new bytes32[](input.logs.length);
+        uint256 length = 0;
+        for (uint256 i = 0; i < input.logs.length; i++) {
+            if (input.logs[i].sender == L2_BOOTLOADER_ADDRESS) {
+                length++;
+            }
+        }
+        uint256 j;
+        for (uint256 i = 0; i < input.logs.length; i++) {
+            if (input.logs[i].sender == L2_BOOTLOADER_ADDRESS) {
+                txHashes[j++] = input.logs[i].key;
+            }
+        }
+        return txHashes;
+    }
+
+    function storeChainBalance(uint256 chainId, bytes32 assetId, uint256 balance) public {
         stdstore
-            .target(address(L2_MESSAGE_ROOT_ADDR))
-            .sig("currentChainBatchNumber(uint256)")
-            .with_key(271)
-            .checked_write(4);
+            .target(address(GW_ASSET_TRACKER))
+            .sig("chainBalance(uint256,bytes32)")
+            .with_key(chainId)
+            .with_key(assetId)
+            .checked_write(balance);
+    }
 
-        vm.prank(L2_BRIDGEHUB.getZKChain(271));
-
-        // TODO fix data
-
-        // (bool success, ) = GW_ASSET_TRACKER_ADDR.call(bytes.concat(hex"e7ca8589", data));
-
-        // require(success, "Failed to call GWAssetTracker");
+    function printProcess(ProcessLogsInput memory) public {
+        /// its just here so that the ProcessLogsInput is printed in console
     }
 }

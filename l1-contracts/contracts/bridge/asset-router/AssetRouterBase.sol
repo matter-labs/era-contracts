@@ -16,7 +16,7 @@ import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
-import {AssetHandlerDoesNotExist, AssetIdNotSupported, BadTransferDataLength, Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
+import {AssetHandlerDoesNotExist, AssetIdNotSupported, Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 
@@ -181,9 +181,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes calldata _data
     ) internal virtual returns (bytes32 assetId, bytes memory transferData) {
         if (_encodingVersion == NEW_ENCODING_VERSION) {
-            // For better error handling.
-            require(_data.length >= 33, BadTransferDataLength());
-            (assetId, transferData) = abi.decode(_data[1:], (bytes32, bytes));
+            (assetId, transferData) = DataEncoding.decodeAssetRouterBridgehubDepositData(_data);
         } else {
             revert UnsupportedEncodingVersion();
         }
@@ -297,12 +295,11 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         });
     }
 
-    /// @inheritdoc IAssetRouterBase
     function getDepositCalldata(
         address,
         bytes32 _assetId,
         bytes memory _assetData
-    ) public view virtual override returns (bytes memory) {
+    ) public view virtual returns (bytes memory) {
         return abi.encodeCall(AssetRouterBase.finalizeDeposit, (block.chainid, _assetId, _assetData));
     }
 

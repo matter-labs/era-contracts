@@ -7,7 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IL2AssetRouter} from "./IL2AssetRouter.sol";
-import {IAssetRouterBase, LEGACY_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
+import {LEGACY_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 import {IL1CrossChainSender} from "../interfaces/IL1CrossChainSender.sol";
 
@@ -212,13 +212,12 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                             INITIATE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc IAssetRouterBase
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         bytes32 _assetId,
         address _originalCaller,
         uint256 _amount
-    ) public payable virtual override(AssetRouterBase, IAssetRouterBase) onlyBridgehubOrEra(_chainId) whenNotPaused {
+    ) public payable virtual override onlyBridgehubOrEra(_chainId) whenNotPaused {
         _bridgehubDepositBaseToken(_chainId, _assetId, _originalCaller, _amount);
     }
 
@@ -430,12 +429,11 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         return false;
     }
 
-    /// @inheritdoc IAssetRouterBase
     function getDepositCalldata(
         address _sender,
         bytes32 _assetId,
         bytes memory _assetData
-    ) public view override(AssetRouterBase, IAssetRouterBase) returns (bytes memory) {
+    ) public view override returns (bytes memory) {
         // First branch covers the case when asset is not registered with NTV (custom asset handler)
         // Second branch handles tokens registered with NTV and uses legacy calldata encoding
         // We need to use the legacy encoding to support the old SDK, which relies on a specific encoding of the data.

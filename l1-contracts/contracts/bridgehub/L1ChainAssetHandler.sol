@@ -14,6 +14,8 @@ import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 import {IL1Bridgehub} from "./IL1Bridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {IChainAssetHandlerShared} from "./IChainAssetHandlerShared.sol";
+import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -21,7 +23,7 @@ import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 /// it is the IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
 /// @dev L1 version – keeps the cheap immutables set in the constructor.
-contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
+contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1ChainAssetHandler, IChainAssetHandlerShared {
     /// @dev The assetId of the ETH.
     bytes32 public immutable override ETH_TOKEN_ASSET_ID;
 
@@ -50,9 +52,6 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _ethTokenAssetId() internal view override returns (bytes32) {
-        return ETH_TOKEN_ASSET_ID;
-    }
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
@@ -66,7 +65,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
         return ASSET_ROUTER;
     }
 
-    function _assetTracker() internal view override returns (address) {
+    function _assetTracker() internal view returns (address) {
         return ASSET_TRACKER;
     }
 

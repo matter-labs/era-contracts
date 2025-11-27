@@ -63,7 +63,7 @@ contract UpgradeIntegrationTest is Test {
         // TODO: We do not include calls that ensure that the server is ready for the sake of brevity.
         chainUpgrade.upgradeChain(
             ctmUpgrade.getOldProtocolVersion(),
-            ctmUpgrade.generateUpgradeCutData(ctmUpgrade.getAddresses().stateTransition)
+            ctmUpgrade.generateUpgradeCutDataFromLocalConfig(ctmUpgrade.getAddresses().stateTransition)
         );
 
         console.log("Creating new chain");

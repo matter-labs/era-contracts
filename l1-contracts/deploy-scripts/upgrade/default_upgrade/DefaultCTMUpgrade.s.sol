@@ -10,7 +10,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Utils} from "../../utils/Utils.sol";
-import {StateTransitionDeployedAddresses} from "../../utils/Types.sol";
+import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../../utils/Types.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
@@ -42,11 +42,11 @@ import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2G
 import {IValidatorTimelock} from "contracts/state-transition/IValidatorTimelock.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
-import {UpgradeUtils} from "./UpgradeUtils.sol";
+import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
 
 /// @notice Script used for default CTM upgrade flow. Should be run after Ecosystem upgrade
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract DefaultCTMUpgrade is Script, DeployCTMUtils {
+contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     using stdToml for string;
 
     /**
@@ -116,11 +116,115 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
 
-        initializeConfig(newConfigPath);
+        initializeConfigFromFile(newConfigPath);
 
         console.log("Initialized config from %s", newConfigPath);
         upgradeConfig.outputPath = string.concat(root, _outputPath);
         upgradeConfig.initialized = true;
+    }
+
+    function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual override returns (bool) {
+        return isHashInFactoryDeps[bytecodeHash];
+    }
+
+    function initializeConfig(
+        bytes32 create2FactorySalt,
+        address create2FactoryAddr,
+        address ctmProxy,
+        bool isZKsyncOS,
+        ChainCreationParamsConfig memory chainCreationParams,
+        uint256 eraChainId,
+        // Should be discoverable
+        address bytecodesSupplier,
+        address rollupDAManager,
+        // Optional
+        address governance
+    ) public {
+        _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
+        config.l1ChainId = block.chainid;
+        newConfig.ctm = ctmProxy;
+        config.eraChainId = eraChainId;
+        nonDisoverable.bytecodesSupplier = bytecodesSupplier;
+        nonDisoverable.rollupDAManager = rollupDAManager;
+        setAddressesBasedOnCTM();
+        config.isZKsyncOS = isZKsyncOS;
+        config.contracts.chainCreationParams = chainCreationParams;
+        if (governance != address(0)) {
+            config.ownerAddress = governance;
+        } else {
+            config.ownerAddress = discoveredCTM.governance;
+        }
+        newConfig.ecosystemAdminAddress = discoveredCTM.governance;
+        config.contracts.governanceSecurityCouncilAddress = Governance(payable(discoveredCTM.governance))
+            .securityCouncil();
+        config.contracts.governanceMinDelay = Governance(payable(discoveredCTM.governance)).minDelay();
+        config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(discoveredCTM.validatorTimelockPostV29)
+            .executionDelay();
+        (bool ok, bytes memory data) = discoveredEraZkChain.verifier.staticcall(
+            abi.encodeWithSignature("isTestnetVerifier()")
+        );
+        config.testnetVerifier = ok;
+        config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
+    }
+
+    function initializeConfigFromFile(string memory newConfigPath) internal virtual {
+        string memory toml = vm.readFile(newConfigPath);
+
+        bytes32 create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
+        address create2FactoryAddr;
+        if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
+            create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
+        }
+
+        address ctm = toml.readAddress("$.contracts.ctm_proxy_address");
+        // Can we safely get it from the CTM? is it always exists even for zksync os ?
+        uint256 eraChainId = toml.readUint("$.era_chain_id");
+
+        address bytecodesSupplier = toml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
+        address rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
+
+        address governance;
+        if (toml.keyExists("$.governance")) {
+            governance = toml.readAddress("$.governance");
+        } else {
+            governance = address(0);
+        }
+
+        // TODO can we discover it?. Try to get it from the chain
+        bool isZKsyncOS;
+        if (toml.keyExists("$.is_zk_sync_os")) {
+            isZKsyncOS = toml.readBool("$.is_zk_sync_os");
+        }
+        ChainCreationParamsConfig memory chainCreationParams;
+
+        chainCreationParams.latestProtocolVersion = toml.readUint("$.contracts.latest_protocol_version");
+        // Protocol specific params for the entire CTM
+        chainCreationParams.genesisRoot = toml.readBytes32("$.contracts.genesis_root");
+        chainCreationParams.genesisRollupLeafIndex = toml.readUint("$.contracts.genesis_rollup_leaf_index");
+        chainCreationParams.genesisBatchCommitment = toml.readBytes32("$.contracts.genesis_batch_commitment");
+
+        // These fields are redundant for zksync_os.
+        if (toml.keyExists("$.contracts.default_aa_hash")) {
+            chainCreationParams.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
+        }
+        if (toml.keyExists("$.contracts.bootloader_hash")) {
+            chainCreationParams.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
+        }
+        if (toml.keyExists("$.contracts.evm_emulator_hash")) {
+            chainCreationParams.evmEmulatorHash = toml.readBytes32("$.contracts.evm_emulator_hash");
+        }
+
+        initializeConfig(
+            create2FactorySalt,
+            create2FactoryAddr,
+            ctm,
+            isZKsyncOS,
+            chainCreationParams,
+            eraChainId,
+            bytecodesSupplier,
+            rollupDAManager,
+            governance
+        );
     }
 
     /// @notice Full default upgrade preparation flow
@@ -153,14 +257,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         // Empty by default.
     }
 
-    /// @notice Encode calldata that will be passed to `_postUpgrade`
-    /// in the on‑chain contract. Override in concrete upgrades.
-    function encodePostUpgradeCalldata(
-        StateTransitionDeployedAddresses memory
-    ) internal virtual returns (bytes memory) {
-        return new bytes(0);
-    }
-
     /// @notice Generate data required for the upgrade
     function generateUpgradeData() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
@@ -175,10 +271,25 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         config.contracts.diamondCutData = abi.encode(diamondCut);
         newlyGeneratedData.diamondCutData = config.contracts.diamondCutData;
         console.log("Prepared diamond cut data");
-        generateUpgradeCutData(addresses.stateTransition);
+        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutDataFromLocalConfig(addresses.stateTransition);
+        newlyGeneratedData.upgradeCutData = abi.encode(upgradeCutData);
         upgradeConfig.upgradeCutPrepared = true;
         console.log("UpgradeCutGenerated");
         saveOutput(upgradeConfig.outputPath);
+    }
+
+    function generateUpgradeCutDataFromLocalConfig(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
+        upgradeCutData = generateUpgradeCutData(
+            stateTransition,
+            config.contracts.chainCreationParams,
+            config.l1ChainId,
+            config.ownerAddress,
+            factoryDepsHashes,
+            discoveredEraZkChain.zkChainProxy,
+            config.isZKsyncOS
+        );
     }
 
     /// @notice E2e upgrade generation
@@ -196,26 +307,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         return config.ownerAddress;
     }
 
-    /// @notice Get facet cuts that should be removed
-    function getFacetCutsForDeletion() internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
-        address diamondProxy = discoveredEraZkChain.zkChainProxy;
-        return UpgradeUtils.getFacetCutsForDeletion(IZKChain(diamondProxy));
-    }
-
-    /// @notice Build L1 -> L2 upgrade tx
-    function _composeUpgradeTx(
-        IL2ContractDeployer.ForceDeployment[] memory forceDeployments
-    ) internal virtual returns (L2CanonicalTransaction memory transaction) {
-        return
-            UpgradeUtils.composeUpgradeTx(
-                forceDeployments,
-                isHashInFactoryDeps,
-                factoryDepsHashes,
-                UpgradeUtils.getProtocolUpgradeNonce(getNewProtocolVersion()),
-                config.isZKsyncOS
-            );
-    }
-
     function getNewProtocolVersion() public view virtual returns (uint256) {
         return config.contracts.chainCreationParams.latestProtocolVersion;
     }
@@ -224,165 +315,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         return newConfig.oldProtocolVersion;
     }
 
-    /// @notice Generate upgrade cut data
-    function generateUpgradeCutData(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
-        require(upgradeConfig.factoryDepsPublished, "Factory deps not published");
-
-        Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion();
-
-        Diamond.FacetCut[] memory facetCuts;
-        facetCuts = getUpgradeAddedFacetCuts(stateTransition);
-        facetCuts = UpgradeUtils.mergeFacets(facetCutsForDeletion, facetCuts);
-
-        ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(stateTransition);
-
-        upgradeCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: stateTransition.defaultUpgrade,
-            initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade))
-        });
-
-        newlyGeneratedData.upgradeCutData = abi.encode(upgradeCutData);
-    }
-
-    function getProposedPatchUpgrade(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
-        VerifierParams memory verifierParams = getVerifierParams();
-        proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: UpgradeUtils.emptyUpgradeTx(),
-            bootloaderHash: bytes32(0),
-            defaultAccountHash: bytes32(0),
-            evmEmulatorHash: bytes32(0),
-            verifier: stateTransition.verifier,
-            verifierParams: verifierParams,
-            l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: new bytes(0),
-            upgradeTimestamp: 0,
-            newProtocolVersion: getNewProtocolVersion()
-        });
-    }
-
-    function getProposedUpgrade(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
-        VerifierParams memory verifierParams = getVerifierParams();
-
-        IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
-            .getBaseForceDeployments(config.l1ChainId, config.ownerAddress);
-
-        // Additional force deployments after Gateway
-        IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments = getAdditionalForceDeployments();
-
-        IL2ContractDeployer.ForceDeployment[] memory forceDeployments = SystemContractsProcessing.mergeForceDeployments(
-            baseForceDeployments,
-            additionalForceDeployments
-        );
-
-        proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: _composeUpgradeTx(forceDeployments),
-            bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
-            defaultAccountHash: config.contracts.chainCreationParams.defaultAAHash,
-            evmEmulatorHash: config.contracts.chainCreationParams.evmEmulatorHash,
-            verifier: stateTransition.verifier,
-            verifierParams: verifierParams,
-            l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
-            upgradeTimestamp: 0,
-            newProtocolVersion: getNewProtocolVersion()
-        });
-    }
-
-    function getAdditionalForceDeployments()
-        internal
-        returns (IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments)
-    {
-        string[] memory forceDeploymentNames = getForceDeploymentNames();
-        additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](forceDeploymentNames.length);
-        for (uint256 i; i < forceDeploymentNames.length; i++) {
-            additionalForceDeployments[i] = getForceDeployment(forceDeploymentNames[i]);
-        }
-        return additionalForceDeployments;
-    }
-
-    function getForceDeploymentNames() internal virtual returns (string[] memory) {
-        return new string[](0);
-    }
-
-    function initializeConfig(string memory newConfigPath) internal virtual override {
-        string memory toml = vm.readFile(newConfigPath);
-
-        bytes32 create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
-        address create2FactoryAddr;
-        if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
-        }
-        _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
-
-        newConfig.ctm = toml.readAddress("$.contracts.ctm_proxy_address");
-        // Can we safely get it from the CTM? is it always exists even for zksync os ?
-        config.eraChainId = toml.readUint("$.era_chain_id");
-
-        nonDisoverable.bytecodesSupplier = toml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
-        nonDisoverable.rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
-        setAddressesBasedOnCTM();
-
-        config.l1ChainId = block.chainid;
-
-        config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
-
-        if (toml.keyExists("$.governance")) {
-            config.ownerAddress = toml.readAddress("$.governance");
-        } else {
-            config.ownerAddress = discoveredCTM.governance;
-        }
-
-        newConfig.ecosystemAdminAddress = discoveredCTM.governance;
-
-        (bool ok, bytes memory data) = discoveredEraZkChain.verifier.staticcall(
-            abi.encodeWithSignature("isTestnetVerifier()")
-        );
-        config.testnetVerifier = ok;
-
-        // TODO can we discover it?. Try to get it from the chain
-        if (toml.keyExists("$.is_zk_sync_os")) {
-            config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
-        }
-
-        config.contracts.governanceSecurityCouncilAddress = Governance(payable(discoveredCTM.governance))
-            .securityCouncil();
-        config.contracts.governanceMinDelay = Governance(payable(discoveredCTM.governance)).minDelay();
-        config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(discoveredCTM.validatorTimelockPostV29)
-            .executionDelay();
-
-        config.contracts.chainCreationParams.latestProtocolVersion = toml.readUint(
-            "$.contracts.latest_protocol_version"
-        );
-        // Protocol specific params for the entire CTM
-        config.contracts.chainCreationParams.genesisRoot = toml.readBytes32("$.contracts.genesis_root");
-        config.contracts.chainCreationParams.genesisRollupLeafIndex = toml.readUint(
-            "$.contracts.genesis_rollup_leaf_index"
-        );
-        config.contracts.chainCreationParams.genesisBatchCommitment = toml.readBytes32(
-            "$.contracts.genesis_batch_commitment"
-        );
-
-        // These fields are redundant for zksync_os.
-        if (toml.keyExists("$.contracts.default_aa_hash")) {
-            config.contracts.chainCreationParams.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
-        }
-        if (toml.keyExists("$.contracts.bootloader_hash")) {
-            config.contracts.chainCreationParams.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
-        }
-        if (toml.keyExists("$.contracts.evm_emulator_hash")) {
-            config.contracts.chainCreationParams.evmEmulatorHash = toml.readBytes32("$.contracts.evm_emulator_hash");
-        }
-    }
-
     function getBridgehubAdmin() public virtual returns (address admin) {
-        admin = discoveredBridgehub.admin;
+        return discoveredBridgehub.admin;
     }
 
     /// @notice This function is meant to only be used in tests
@@ -434,7 +368,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         FixedForceDeploymentsData memory forceDeploymentsData = prepareFixedForceDeploymentsData();
 
         newlyGeneratedData.fixedForceDeploymentsData = abi.encode(forceDeploymentsData);
-        generatedData.forceDeploymentsData = abi.encode(forceDeploymentsData);
         upgradeConfig.fixedForceDeploymentsDataGenerated = true;
     }
 
@@ -455,10 +388,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, additionalDependencies);
         factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
-    }
-
-    function getAdditionalDependenciesNames() internal view virtual returns (string[] memory) {
-        return new string[](0);
     }
 
     function prepareFixedForceDeploymentsData() public view virtual returns (FixedForceDeploymentsData memory data) {
@@ -491,95 +420,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         });
     }
 
-    function saveOutputVersionSpecific() internal virtual {}
-
     function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
         return getChainCreationFacetCuts(stateTransition);
-    }
-
-    function saveOutput(string memory outputPath) internal virtual {
-        // Serialize newly deployed state transition addresses
-        vm.serializeAddress(
-            "state_transition",
-            "chain_type_manager_implementation_addr",
-            addresses.stateTransition.chainTypeManagerImplementation
-        );
-        vm.serializeAddress("state_transition", "verifier_addr", addresses.stateTransition.verifier);
-        vm.serializeAddress("state_transition", "admin_facet_addr", addresses.stateTransition.adminFacet);
-        vm.serializeAddress("state_transition", "mailbox_facet_addr", addresses.stateTransition.mailboxFacet);
-        vm.serializeAddress("state_transition", "executor_facet_addr", addresses.stateTransition.executorFacet);
-        vm.serializeAddress("state_transition", "getters_facet_addr", addresses.stateTransition.gettersFacet);
-        vm.serializeAddress("state_transition", "diamond_init_addr", addresses.stateTransition.diamondInit);
-        vm.serializeAddress("state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
-        vm.serializeAddress("state_transition", "verifier_fflonk_addr", addresses.stateTransition.verifierFflonk);
-        vm.serializeAddress("state_transition", "verifier_plonk_addr", addresses.stateTransition.verifierPlonk);
-        vm.serializeAddress(
-            "state_transition",
-            "validator_timelock_implementation_addr",
-            addresses.stateTransition.validatorTimelockImplementation
-        );
-        vm.serializeAddress("state_transition", "validator_timelock_addr", addresses.stateTransition.validatorTimelock);
-        vm.serializeAddress("state_transition", "bytecodes_supplier_addr", addresses.stateTransition.bytecodesSupplier);
-        string memory stateTransition = vm.serializeAddress(
-            "state_transition",
-            "default_upgrade_addr",
-            addresses.stateTransition.defaultUpgrade
-        );
-
-        // Serialize newly deployed upgrade addresses
-        vm.serializeAddress("deployed_addresses", "chain_admin", addresses.chainAdmin);
-        vm.serializeAddress(
-            "deployed_addresses",
-            "access_control_restriction_addr",
-            addresses.accessControlRestrictionAddress
-        );
-        vm.serializeAddress("deployed_addresses", "transparent_proxy_admin", addresses.transparentProxyAdmin);
-        vm.serializeAddress(
-            "deployed_addresses",
-            "rollup_l1_da_validator_addr",
-            addresses.daAddresses.l1RollupDAValidator
-        );
-        vm.serializeAddress(
-            "deployed_addresses",
-            "validium_l1_da_validator_addr",
-            addresses.daAddresses.noDAValidiumL1DAValidator
-        );
-        vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
-        vm.serializeAddress("deployed_addresses", "upgrade_stage_validator", upgradeAddresses.upgradeStageValidator);
-
-        string memory deployedAddresses = vm.serializeAddress(
-            "deployed_addresses",
-            "l1_governance_upgrade_timer",
-            upgradeAddresses.upgradeTimer
-        );
-
-        // Serialize generated upgrade data
-        vm.serializeBytes("contracts_newConfig", "diamond_cut_data", newlyGeneratedData.diamondCutData);
-        vm.serializeBytes(
-            "contracts_newConfig",
-            "force_deployments_data",
-            newlyGeneratedData.fixedForceDeploymentsData
-        );
-
-        // Serialize protocol version info (needed for upgrade)
-        vm.serializeUint("contracts_newConfig", "new_protocol_version", getNewProtocolVersion());
-        string memory contractsConfig = vm.serializeUint(
-            "contracts_newConfig",
-            "old_protocol_version",
-            newConfig.oldProtocolVersion
-        );
-
-        // Serialize root structure
-        vm.serializeString("root", "deployed_addresses", deployedAddresses);
-        vm.serializeString("root", "state_transition", stateTransition);
-        vm.serializeString("root", "contracts_config", contractsConfig);
-        string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
-
-        vm.writeToml(toml, outputPath);
-
-        saveOutputVersionSpecific();
     }
 
     /////////////////////////// Blockchain interactions ////////////////////////////
@@ -645,7 +489,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
     function prepareDefaultEcosystemAdminCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](1);
         allCalls[0] = prepareUpgradeServerNotifierCall();
-        calls = UpgradeUtils.mergeCallsArray(allCalls);
+        calls = mergeCallsArray(allCalls);
 
         string memory ecosystemAdminCallsSerialized = vm.serializeBytes(
             "ecosystem_admin_calls",
@@ -698,7 +542,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         allCalls[0] = prepareVersionSpecificStage0GovernanceCallsL1();
         allCalls[1] = prepareGovernanceUpgradeTimerStartCall();
 
-        calls = UpgradeUtils.mergeCallsArray(allCalls);
+        calls = mergeCallsArray(allCalls);
     }
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
@@ -716,7 +560,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         allCalls[4] = prepareDAValidatorCall();
         console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
         allCalls[5] = prepareVersionSpecificStage1GovernanceCallsL1();
-        calls = UpgradeUtils.mergeCallsArray(allCalls);
+        calls = mergeCallsArray(allCalls);
     }
 
     /// @notice The second step of upgrade. By default it unpauses migrations.
@@ -728,7 +572,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         allCalls[2] = prepareVersionSpecificStage2GovernanceCallsL1();
         allCalls[4] = prepareCheckMigrationsUnpausedCalls();
 
-        calls = UpgradeUtils.mergeCallsArray(allCalls);
+        calls = mergeCallsArray(allCalls);
     }
 
     function prepareVersionSpecificStage0GovernanceCallsL1() public virtual returns (Call[] memory calls) {
@@ -751,7 +595,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
 
         // Just retrieved it from the contract
         uint256 previousProtocolVersion = getOldProtocolVersion();
-        uint256 deadline = UpgradeUtils.getOldProtocolDeadline();
+        uint256 deadline = getOldProtocolDeadline();
         uint256 newProtocolVersion = getNewProtocolVersion();
         Diamond.DiamondCutData memory upgradeCut = abi.decode(
             newlyGeneratedData.upgradeCutData,
@@ -920,7 +764,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
             gatewayConfig.chainId
         );
         uint256 oldProtocolVersion = getOldProtocolVersion();
-        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutData(getAddresses().stateTransition);
+        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutDataFromLocalConfig(addresses.stateTransition);
 
         admin = IZKChain(chainDiamondProxyAddress).getAdmin();
 
@@ -977,22 +821,90 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
         }
     }
 
-    function getForceDeployment(
-        string memory contractName
-    ) public virtual returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
-        return
-            IL2ContractDeployer.ForceDeployment({
-                bytecodeHash: getL2BytecodeHash(contractName),
-                newAddress: getExpectedL2Address(contractName),
-                callConstructor: false,
-                value: 0,
-                input: ""
-            });
+    function saveOutput(string memory outputPath) internal virtual {
+        // Serialize newly deployed state transition addresses
+        vm.serializeAddress(
+            "state_transition",
+            "chain_type_manager_implementation_addr",
+            addresses.stateTransition.chainTypeManagerImplementation
+        );
+        vm.serializeAddress("state_transition", "verifier_addr", addresses.stateTransition.verifier);
+        vm.serializeAddress("state_transition", "admin_facet_addr", addresses.stateTransition.adminFacet);
+        vm.serializeAddress("state_transition", "mailbox_facet_addr", addresses.stateTransition.mailboxFacet);
+        vm.serializeAddress("state_transition", "executor_facet_addr", addresses.stateTransition.executorFacet);
+        vm.serializeAddress("state_transition", "getters_facet_addr", addresses.stateTransition.gettersFacet);
+        vm.serializeAddress("state_transition", "diamond_init_addr", addresses.stateTransition.diamondInit);
+        vm.serializeAddress("state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
+        vm.serializeAddress("state_transition", "verifier_fflonk_addr", addresses.stateTransition.verifierFflonk);
+        vm.serializeAddress("state_transition", "verifier_plonk_addr", addresses.stateTransition.verifierPlonk);
+        vm.serializeAddress(
+            "state_transition",
+            "validator_timelock_implementation_addr",
+            addresses.stateTransition.validatorTimelockImplementation
+        );
+        vm.serializeAddress("state_transition", "validator_timelock_addr", addresses.stateTransition.validatorTimelock);
+        vm.serializeAddress("state_transition", "bytecodes_supplier_addr", addresses.stateTransition.bytecodesSupplier);
+        string memory stateTransition = vm.serializeAddress(
+            "state_transition",
+            "default_upgrade_addr",
+            addresses.stateTransition.defaultUpgrade
+        );
+
+        // Serialize newly deployed upgrade addresses
+        vm.serializeAddress("deployed_addresses", "chain_admin", addresses.chainAdmin);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "access_control_restriction_addr",
+            addresses.accessControlRestrictionAddress
+        );
+        vm.serializeAddress("deployed_addresses", "transparent_proxy_admin", addresses.transparentProxyAdmin);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "rollup_l1_da_validator_addr",
+            addresses.daAddresses.l1RollupDAValidator
+        );
+        vm.serializeAddress(
+            "deployed_addresses",
+            "validium_l1_da_validator_addr",
+            addresses.daAddresses.noDAValidiumL1DAValidator
+        );
+        vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
+        vm.serializeAddress("deployed_addresses", "upgrade_stage_validator", upgradeAddresses.upgradeStageValidator);
+
+        string memory deployedAddresses = vm.serializeAddress(
+            "deployed_addresses",
+            "l1_governance_upgrade_timer",
+            upgradeAddresses.upgradeTimer
+        );
+
+        // Serialize generated upgrade data
+        vm.serializeBytes("contracts_newConfig", "diamond_cut_data", newlyGeneratedData.diamondCutData);
+        vm.serializeBytes(
+            "contracts_newConfig",
+            "force_deployments_data",
+            newlyGeneratedData.fixedForceDeploymentsData
+        );
+
+        // Serialize protocol version info (needed for upgrade)
+        vm.serializeUint("contracts_newConfig", "new_protocol_version", getNewProtocolVersion());
+        string memory contractsConfig = vm.serializeUint(
+            "contracts_newConfig",
+            "old_protocol_version",
+            newConfig.oldProtocolVersion
+        );
+
+        // Serialize root structure
+        vm.serializeString("root", "deployed_addresses", deployedAddresses);
+        vm.serializeString("root", "state_transition", stateTransition);
+        vm.serializeString("root", "contracts_config", contractsConfig);
+        string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
+
+        vm.writeToml(toml, outputPath);
+
+        saveOutputVersionSpecific();
     }
 
-    function getExpectedL2Address(string memory contractName) public virtual returns (address) {
-        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
-    }
+    function saveOutputVersionSpecific() internal virtual {}
 
     ////////////////////////////// Misc utils /////////////////////////////////
 

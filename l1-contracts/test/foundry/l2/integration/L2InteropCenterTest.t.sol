@@ -8,16 +8,13 @@ import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {SystemContractsArgs} from "./L2Utils.sol";
-
+import {L2InteropCenterTestAbstract} from "../../l1/integration/l2-tests-abstract/L2InteropCenterTestAbstract.t.sol";
+import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
 
-import {L2InteropHandlerTestAbstract} from "../../l1/integration/l2-tests-abstract/L2InteropHandlerTestAbstract.t.sol";
-import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {Create2FactoryUtils} from "deploy-scripts/utils/deploy/Create2FactoryUtils.s.sol";
 
-contract L2InteropHandlerTests is Test, L2InteropHandlerTestAbstract, SharedL2ContractL2Deployer {
-    // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
-    // It is a bit easier to use EOA and it is sufficient for the tests.
+contract L2InteropCenterTest is Test, L2InteropCenterTestAbstract, SharedL2ContractL2Deployer {
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL2Deployer) {}
 
     function initSystemContracts(
@@ -37,12 +34,5 @@ contract L2InteropHandlerTests is Test, L2InteropHandlerTestAbstract, SharedL2Co
         uint256 _l1ChainId
     ) public override(SharedL2ContractL2Deployer, SharedL2ContractDeployer) {
         super.deployL2Contracts(_l1ChainId);
-    }
-
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        return super.getCreationCode(contractName, false);
     }
 }
