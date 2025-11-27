@@ -21,6 +21,11 @@ interface IChainAssetHandler is IAssetHandler {
 
     function migrationNumber(uint256 _chainId) external view returns (uint256);
 
+    /// @notice Returns whether the chain's migration is in progress or not
+    /// @param _chainId The chain ID to check.
+    /// @return bool True if the chain's migration is in progress, false otherwise.
+    function isMigrationInProgress(uint256 _chainId) external view returns (bool);
+
     function setMigrationNumberForV30(uint256 _chainId) external;
 
     /// @dev Denotes whether the migrations of chains is paused.
