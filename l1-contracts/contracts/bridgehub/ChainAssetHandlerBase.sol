@@ -77,7 +77,7 @@ abstract contract ChainAssetHandlerBase is
     /// NOTE: this mapping may be deprecated in the future, don't rely on it!
     mapping(uint256 chainId => uint256 migrationNumber) public migrationNumber;
 
-    /// @dev The mapping showing for each chain if migration is in progress or not, used for freezing deposits.abi
+    /// @dev The mapping showing for each chain if migration is in progress or not, used for freezing deposits.
     mapping(uint256 chainId => bool isMigrationInProgress) public isMigrationInProgress;
 
     /**
