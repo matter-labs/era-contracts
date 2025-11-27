@@ -621,11 +621,14 @@ contract DefaultCTMUpgrade is Script, DeployCTMUtils {
     function prepareDefaultGovernanceCalls()
         public
         virtual
-        returns (Call[] memory stage1Calls, Call[] memory stage2Calls)
+        returns (Call[] memory stage0Calls, Call[] memory stage1Calls, Call[] memory stage2Calls)
     {
         // Default upgrade is done it 3 stages:
+        // 0. Pause migration to/from Gateway, other stage 0 calls.
         // 1. Perform upgrade
         // 2. Unpause migration to/from Gateway
+        stage0Calls = prepareStage0GovernanceCalls();
+        vm.serializeBytes("governance_calls", "stage0_calls", abi.encode(stage0Calls));
         stage1Calls = prepareStage1GovernanceCalls();
         vm.serializeBytes("governance_calls", "stage1_calls", abi.encode(stage1Calls));
         stage2Calls = prepareStage2GovernanceCalls();
