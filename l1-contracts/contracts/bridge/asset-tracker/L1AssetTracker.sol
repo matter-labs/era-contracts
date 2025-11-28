@@ -16,7 +16,7 @@ import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidVersion, L1TotalSupplyAlreadyMigrated, InvalidAssetMigrationNumber, InvalidSettlementLayer} from "./AssetTrackerErrors.sol";
-import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
+import {V31UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
@@ -205,18 +205,18 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         // Note, that since this method is used for claiming failed deposits, it implies that any failed deposit that has been processed
         // while the chain settled on top of Gateway, has been accredited to Gateway's balance.
         // For all the batches smaller or equal to that, the responsibility lies with the chain itself.
-        uint256 v30UpgradeChainBatchNumber = MESSAGE_ROOT.v30UpgradeChainBatchNumber(_chainId);
+        uint256 v31UpgradeChainBatchNumber = MESSAGE_ROOT.v31UpgradeChainBatchNumber(_chainId);
 
-        // We need to wait for the proper v30UpgradeChainBatchNumber to be set on the MessageRoot, otherwise we might decrement the chain's chainBalance instead of the gateway's.
+        // We need to wait for the proper v31UpgradeChainBatchNumber to be set on the MessageRoot, otherwise we might decrement the chain's chainBalance instead of the gateway's.
         require(
-            v30UpgradeChainBatchNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY,
-            V30UpgradeChainBatchNumberNotSet()
+            v31UpgradeChainBatchNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY,
+            V31UpgradeChainBatchNumberNotSet()
         );
-        if (v30UpgradeChainBatchNumber != 0) {
+        if (v31UpgradeChainBatchNumber != 0) {
             /// For chains that were settling on GW before V30, we need to update the chain's chainBalance until the chain updates to V30.
             /// Logic: If no settlement layer OR the batch number is before V30 upgrade, update the chain itself.
             /// Otherwise, update the settlement layer (Gateway) balance.
-            chainToUpdate = settlementLayer == 0 || l2BatchNumber < v30UpgradeChainBatchNumber
+            chainToUpdate = settlementLayer == 0 || l2BatchNumber < v31UpgradeChainBatchNumber
                 ? _chainId
                 : settlementLayer;
         } else {

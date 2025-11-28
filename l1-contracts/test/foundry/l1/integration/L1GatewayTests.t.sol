@@ -253,7 +253,7 @@ contract L1GatewayTests is
             chainData: chainData,
             migrationNumber: IChainAssetHandler(address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy))
                 .migrationNumber(migratingChainId),
-            v30UpgradeChainBatchNumber: 0
+            v31UpgradeChainBatchNumber: 0
         });
         bytes memory bridgehubMintData = abi.encode(data);
         bytes memory message = abi.encodePacked(

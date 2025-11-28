@@ -263,7 +263,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
         vm.mockCall(
             messageRootAddress,
-            abi.encodeWithSelector(IMessageRoot.v30UpgradeChainBatchNumber.selector, chainId),
+            abi.encodeWithSelector(IMessageRoot.v31UpgradeChainBatchNumber.selector, chainId),
             abi.encode(10)
         );
 
@@ -304,7 +304,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
         vm.mockCall(
             messageRootAddress,
-            abi.encodeWithSelector(IMessageRoot.v30UpgradeChainBatchNumber.selector, chainId),
+            abi.encodeWithSelector(IMessageRoot.v31UpgradeChainBatchNumber.selector, chainId),
             abi.encode(10)
         );
 

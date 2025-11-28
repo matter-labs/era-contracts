@@ -322,7 +322,7 @@ contract L1AssetRouterTest is Test {
         );
         vm.mockCall(
             messageRootAddress,
-            abi.encodeWithSelector(IMessageRoot.v30UpgradeChainBatchNumber.selector),
+            abi.encodeWithSelector(IMessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
         );
         vm.mockCall(

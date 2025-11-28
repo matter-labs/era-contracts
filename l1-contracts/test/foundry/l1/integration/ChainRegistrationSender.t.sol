@@ -73,7 +73,7 @@ contract ChainRegistrationSenderTests is
 
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.messageRootProxy),
-            abi.encodeWithSelector(IMessageRoot.v30UpgradeChainBatchNumber.selector),
+            abi.encodeWithSelector(IMessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
         );
     }

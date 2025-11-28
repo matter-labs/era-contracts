@@ -343,7 +343,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             ctmData: ctmData,
             chainData: chainData,
             migrationNumber: 0,
-            v30UpgradeChainBatchNumber: 0
+            v31UpgradeChainBatchNumber: 0
         });
         vm.prank(aliasedL1AssetRouter);
         AssetRouterBase(address(l2AssetRouter)).finalizeDeposit(L1_CHAIN_ID, ctmAssetId, abi.encode(data));

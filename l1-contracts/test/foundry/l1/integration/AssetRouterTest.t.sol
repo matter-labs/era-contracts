@@ -122,7 +122,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         );
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.messageRootProxy),
-            abi.encodeWithSelector(IMessageRoot.v30UpgradeChainBatchNumber.selector),
+            abi.encodeWithSelector(IMessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
         );
 
@@ -168,7 +168,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         );
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.messageRootProxy),
-            abi.encodeWithSelector(IMessageRoot.v30UpgradeChainBatchNumber.selector),
+            abi.encodeWithSelector(IMessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
         );
         uint256 chainId = eraZKChainId;

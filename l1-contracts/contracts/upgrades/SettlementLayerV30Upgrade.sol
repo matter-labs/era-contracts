@@ -71,7 +71,7 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
         chainAssetHandler.setMigrationNumberForV30(s.chainId);
 
         if (s.settlementLayer == address(0)) {
-            messageRoot.saveV30UpgradeChainBatchNumber(s.chainId);
+            messageRoot.saveV31UpgradeChainBatchNumber(s.chainId);
         }
 
         if (bridgehub.whitelistedSettlementLayers(s.chainId)) {

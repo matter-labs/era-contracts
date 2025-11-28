@@ -15,12 +15,12 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
     0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21
 );
 
-// The value that is saved in the v30UpgradeChainBatchNumber mapping for all deployed chains until the chain upgrades to v30.
+// The value that is saved in the v31UpgradeChainBatchNumber mapping for all deployed chains until the chain upgrades to v30.
 uint256 constant V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY = uint256(
     keccak256(abi.encodePacked("V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY"))
 );
 
-// The value that is saved in the v30UpgradeChainBatchNumber mapping for all deployed chains until the chain upgrades to v30.
+// The value that is saved in the v31UpgradeChainBatchNumber mapping for all deployed chains until the chain upgrades to v30.
 uint256 constant V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1 = uint256(
     keccak256(abi.encodePacked("V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1"))
 );
@@ -69,9 +69,9 @@ interface IMessageRoot is IMessageVerification {
 
     function historicalRoot(uint256 _blockNumber) external view returns (bytes32);
 
-    function v30UpgradeChainBatchNumber(uint256 _chainId) external view returns (uint256);
+    function v31UpgradeChainBatchNumber(uint256 _chainId) external view returns (uint256);
 
-    function saveV30UpgradeChainBatchNumber(uint256 _chainId) external;
+    function saveV31UpgradeChainBatchNumber(uint256 _chainId) external;
 
     /// @dev Used to parse the merkle proof data, this function calls a library function.
     function getProofData(
@@ -85,7 +85,7 @@ interface IMessageRoot is IMessageVerification {
     function setMigratingChainBatchRoot(
         uint256 _chainId,
         uint256 _batchNumber,
-        uint256 _v30UpgradeChainBatchNumber
+        uint256 _v31UpgradeChainBatchNumber
     ) external;
 
     function currentChainBatchNumber(uint256 _chainId) external view returns (uint256);

@@ -644,7 +644,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
 
         if (
-            bridgehub.messageRoot().v30UpgradeChainBatchNumber(_chainId) ==
+            bridgehub.messageRoot().v31UpgradeChainBatchNumber(_chainId) ==
             V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY
         ) {
             /// We pause deposits until the chain has upgraded on GW

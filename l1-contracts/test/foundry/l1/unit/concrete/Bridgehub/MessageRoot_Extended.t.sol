@@ -9,7 +9,7 @@ import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
-import {ChainExists, MessageRootNotRegistered, NotL2, OnlyChain, OnlyGateway, OnlyL2MessageRoot, OnlyOnSettlementLayer, TotalBatchesExecutedZero, V30UpgradeChainBatchNumberNotSet} from "contracts/bridgehub/L1BridgehubErrors.sol";
+import {ChainExists, MessageRootNotRegistered, NotL2, OnlyChain, OnlyGateway, OnlyL2MessageRoot, OnlyOnSettlementLayer, TotalBatchesExecutedZero, V31UpgradeChainBatchNumberNotSet} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {Unauthorized, InvalidCaller} from "contracts/common/L1ContractErrors.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -139,11 +139,11 @@ contract MessageRoot_Extended_Test is Test {
 
     function test_SendV30UpgradeBlockNumberFromGateway_NotSet() public {
         vm.chainId(gatewayChainId); // Set to gateway chain
-        vm.expectRevert(V30UpgradeChainBatchNumberNotSet.selector);
+        vm.expectRevert(V31UpgradeChainBatchNumberNotSet.selector);
         l2MessageRoot.sendV30UpgradeBlockNumberFromGateway(271, 100);
     }
 
-    function test_SaveV30UpgradeChainBatchNumberOnL1_NotL2MessageRoot() public {
+    function test_SaveV31UpgradeChainBatchNumberOnL1_NotL2MessageRoot() public {
         FinalizeL1DepositParams memory params = FinalizeL1DepositParams({
             l2Sender: makeAddr("wrongSender"),
             chainId: 1,
@@ -154,10 +154,10 @@ contract MessageRoot_Extended_Test is Test {
             merkleProof: new bytes32[](0)
         });
         vm.expectRevert(OnlyL2MessageRoot.selector);
-        messageRoot.saveV30UpgradeChainBatchNumberOnL1(params);
+        messageRoot.saveV31UpgradeChainBatchNumberOnL1(params);
     }
 
-    function test_SaveV30UpgradeChainBatchNumber_NotChain() public {
+    function test_SaveV31UpgradeChainBatchNumber_NotChain() public {
         uint256 chainId = 271;
         address wrongSender = makeAddr("wrongSender");
 
@@ -169,10 +169,10 @@ contract MessageRoot_Extended_Test is Test {
 
         vm.expectRevert(abi.encodeWithSelector(OnlyChain.selector, wrongSender, makeAddr("correctChain")));
         vm.prank(wrongSender);
-        messageRoot.saveV30UpgradeChainBatchNumber(chainId);
+        messageRoot.saveV31UpgradeChainBatchNumber(chainId);
     }
 
-    function test_SaveV30UpgradeChainBatchNumber_NotOnSettlementLayer() public {
+    function test_SaveV31UpgradeChainBatchNumber_NotOnSettlementLayer() public {
         uint256 chainId = 271;
         address chainSender = makeAddr("chainSender");
 
@@ -189,10 +189,10 @@ contract MessageRoot_Extended_Test is Test {
 
         vm.expectRevert(OnlyOnSettlementLayer.selector);
         vm.prank(chainSender);
-        messageRoot.saveV30UpgradeChainBatchNumber(chainId);
+        messageRoot.saveV31UpgradeChainBatchNumber(chainId);
     }
 
-    function test_SaveV30UpgradeChainBatchNumber_TotalBatchesExecutedZero() public {
+    function test_SaveV31UpgradeChainBatchNumber_TotalBatchesExecutedZero() public {
         uint256 chainId = 271;
         address chainSender = makeAddr("chainSender");
 
@@ -212,19 +212,19 @@ contract MessageRoot_Extended_Test is Test {
 
         vm.expectRevert(TotalBatchesExecutedZero.selector);
         vm.prank(chainSender);
-        messageRoot.saveV30UpgradeChainBatchNumber(chainId);
+        messageRoot.saveV31UpgradeChainBatchNumber(chainId);
     }
 
     function test_SetMigratingChainBatchRoot_Success() public {
         uint256 chainId = 271;
         uint256 batchNumber = 1;
-        uint256 v30UpgradeChainBatchNumber = 100;
+        uint256 v31UpgradeChainBatchNumber = 100;
 
         vm.prank(bridgeHub);
-        messageRoot.setMigratingChainBatchRoot(chainId, batchNumber, v30UpgradeChainBatchNumber);
+        messageRoot.setMigratingChainBatchRoot(chainId, batchNumber, v31UpgradeChainBatchNumber);
 
         assertEq(messageRoot.currentChainBatchNumber(chainId), batchNumber);
-        assertEq(messageRoot.v30UpgradeChainBatchNumber(chainId), v30UpgradeChainBatchNumber);
+        assertEq(messageRoot.v31UpgradeChainBatchNumber(chainId), v31UpgradeChainBatchNumber);
     }
 
     function test_GetProofData() public {
@@ -277,14 +277,14 @@ contract MessageRoot_Extended_Test is Test {
         assertEq(currentBatch, startingBatchNumber);
     }
 
-    function test_V30UpgradeChainBatchNumber() public {
+    function test_V31UpgradeChainBatchNumber() public {
         uint256 chainId = 271;
         uint256 v30UpgradeBatchNumber = 100;
 
         vm.prank(bridgeHub);
         messageRoot.setMigratingChainBatchRoot(chainId, 1, v30UpgradeBatchNumber);
 
-        uint256 v30Batch = messageRoot.v30UpgradeChainBatchNumber(chainId);
+        uint256 v30Batch = messageRoot.v31UpgradeChainBatchNumber(chainId);
         assertEq(v30Batch, v30UpgradeBatchNumber);
     }
 

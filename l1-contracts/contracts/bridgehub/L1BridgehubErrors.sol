@@ -83,13 +83,13 @@ error SLHasDifferentCTM();
 // 0x90c7cbf1
 error SLNotWhitelisted();
 // 0x8732442d
-error TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber();
+error TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber();
 // 0x70a472bd
 error TotalBatchesExecutedZero();
 // 0x246de5b7
-error V30UpgradeChainBatchNumberAlreadySet();
+error V31UpgradeChainBatchNumberAlreadySet();
 // 0x862f0039
-error V30UpgradeChainBatchNumberNotSet();
+error V31UpgradeChainBatchNumberNotSet();
 // 0x92626457
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
 // 0x7b968d06

@@ -223,7 +223,7 @@ abstract contract ChainAssetHandlerBase is
             ctmData: ctmMintData,
             chainData: chainMintData,
             migrationNumber: migrationNumber[bridgehubBurnData.chainId],
-            v30UpgradeChainBatchNumber: IMessageRoot(_messageRoot()).v30UpgradeChainBatchNumber(
+            v31UpgradeChainBatchNumber: IMessageRoot(_messageRoot()).v31UpgradeChainBatchNumber(
                 bridgehubBurnData.chainId
             )
         });
@@ -277,11 +277,11 @@ abstract contract ChainAssetHandlerBase is
             // Note, that here we rely on the correctness of the provided data.
             // A malicious settlement layer could provide invalid values here.
             // To support untrusted CTMs, we would need to at the very least enforce
-            // that the `v30UpgradeChainBatchNumber` is not in conflict with the existing values.
+            // that the `v31UpgradeChainBatchNumber` is not in conflict with the existing values.
             IMessageRoot(_messageRoot()).setMigratingChainBatchRoot(
                 bridgehubMintData.chainId,
                 bridgehubMintData.batchNumber,
-                bridgehubMintData.v30UpgradeChainBatchNumber
+                bridgehubMintData.v31UpgradeChainBatchNumber
             );
         }
 

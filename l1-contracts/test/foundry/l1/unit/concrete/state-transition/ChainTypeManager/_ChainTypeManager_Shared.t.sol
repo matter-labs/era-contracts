@@ -98,7 +98,7 @@ contract ChainTypeManagerTest is UtilsTest {
         );
         stdstore
             .target(address(messageroot))
-            .sig(IMessageRoot.v30UpgradeChainBatchNumber.selector)
+            .sig(IMessageRoot.v31UpgradeChainBatchNumber.selector)
             .with_key(chainId)
             .checked_write(uint256(1));
         vm.prank(governor);
