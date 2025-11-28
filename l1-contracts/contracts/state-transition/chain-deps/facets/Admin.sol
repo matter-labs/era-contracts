@@ -14,7 +14,7 @@ import {IL1Bridgehub} from "../../../bridgehub/IL1Bridgehub.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {IChainAssetHandler} from "../../../bridgehub/IChainAssetHandler.sol";
+import {IL1ChainAssetHandler} from "../../../bridgehub/IL1ChainAssetHandler.sol";
 import {AlreadyMigrated, PriorityQueueNotFullyProcessed, TotalPriorityTxsIsZero, ContractNotDeployed, DepositsAlreadyPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted, MigrationInProgress} from "../../L1StateTransitionErrors.sol";
 import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, NotAZKChain, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
@@ -349,7 +349,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
             block.timestamp < timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END;
         require(inPausedWindow, DepositsNotPaused());
         require(
-            !IChainAssetHandler(IL1Bridgehub(s.bridgehub).chainAssetHandler()).isMigrationInProgress(s.chainId),
+            !IL1ChainAssetHandler(IL1Bridgehub(s.bridgehub).chainAssetHandler()).isMigrationInProgress(s.chainId),
             MigrationInProgress()
         );
         _unpauseDeposits();
