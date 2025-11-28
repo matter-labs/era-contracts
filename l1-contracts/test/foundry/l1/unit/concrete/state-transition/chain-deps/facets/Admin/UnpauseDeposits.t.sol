@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
-import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
+import {IL1ChainAssetHandler} from "contracts/bridgehub/IL1ChainAssetHandler.sol";
 import {DepositsNotPaused, MigrationInProgress} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
@@ -75,7 +75,7 @@ contract UnpauseDepositsTest is AdminTest {
         );
         vm.mockCall(
             mockChainAssetHandler,
-            abi.encodeWithSelector(IChainAssetHandler.isMigrationInProgress.selector, chainId),
+            abi.encodeWithSelector(IL1ChainAssetHandler.isMigrationInProgress.selector, chainId),
             abi.encode(true)
         );
 
@@ -98,7 +98,7 @@ contract UnpauseDepositsTest is AdminTest {
         );
         vm.mockCall(
             mockChainAssetHandler,
-            abi.encodeWithSelector(IChainAssetHandler.isMigrationInProgress.selector, chainId),
+            abi.encodeWithSelector(IL1ChainAssetHandler.isMigrationInProgress.selector, chainId),
             abi.encode(false)
         );
 

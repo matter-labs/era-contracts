@@ -77,15 +77,12 @@ abstract contract ChainAssetHandlerBase is
     /// NOTE: this mapping may be deprecated in the future, don't rely on it!
     mapping(uint256 chainId => uint256 migrationNumber) public migrationNumber;
 
-    /// @dev The mapping showing for each chain if migration is in progress or not, used for freezing deposits.
-    mapping(uint256 chainId => bool isMigrationInProgress) public isMigrationInProgress;
-
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[42] private __gap;
+    uint256[43] private __gap;
 
     /// @notice Only the asset router can call.
     modifier onlyAssetRouter() {

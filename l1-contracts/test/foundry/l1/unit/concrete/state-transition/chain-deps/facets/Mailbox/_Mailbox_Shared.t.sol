@@ -16,6 +16,7 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
+import {IL1ChainAssetHandler} from "contracts/bridgehub/IL1ChainAssetHandler.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
@@ -76,7 +77,7 @@ contract MailboxTest is UtilsTest {
         );
         vm.mockCall(
             address(chainAssetHandler),
-            abi.encodeWithSelector(IChainAssetHandler.isMigrationInProgress.selector),
+            abi.encodeWithSelector(IL1ChainAssetHandler.isMigrationInProgress.selector),
             abi.encode(false)
         );
         proxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, bridgehub);
