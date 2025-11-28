@@ -15,7 +15,7 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {IChainAssetHandler} from "../../../bridgehub/IChainAssetHandler.sol";
-import {AlreadyMigrated, PriorityQueueNotFullyProcessed, PriorityQueueIsEmpty, ContractNotDeployed, DepositsAlreadyPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted, MigrationInProgress} from "../../L1StateTransitionErrors.sol";
+import {AlreadyMigrated, PriorityQueueNotFullyProcessed, TotalPriorityTxsIsZero, ContractNotDeployed, DepositsAlreadyPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted, MigrationInProgress} from "../../L1StateTransitionErrors.sol";
 import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, NotAZKChain, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
@@ -336,7 +336,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         }
         s.pausedDepositsTimestamp = timestamp;
         if (s.settlementLayer != address(0)) {
-            require(totalPriorityTxs != 0, PriorityQueueIsEmpty());
+            require(totalPriorityTxs != 0, TotalPriorityTxsIsZero());
             IL1AssetTracker(s.assetTracker).requestPauseDepositsForChainOnGateway(s.chainId);
         }
         emit DepositsPaused(s.chainId, timestamp);
