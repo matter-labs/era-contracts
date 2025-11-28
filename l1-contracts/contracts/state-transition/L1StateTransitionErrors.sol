@@ -82,6 +82,8 @@ error OnlyOneBlobWithCalldataAllowed();
 error OperatorDAInputTooSmall(uint256 operatorDAInputLength, uint256 minAllowedLength);
 // 0x681150be
 error OutdatedProtocolVersion(uint256 protocolVersion, uint256 currentProtocolVersion);
+// 0x34da8388
+error PriorityQueueIsEmpty();
 // 0xfe26193e
 error PriorityQueueNotFullyProcessed();
 // 0xc59d372c

@@ -33,5 +33,5 @@ interface IL1AssetTracker {
 
     function setAddresses() external;
 
-    function requestPauseDepositsForChainOnGateway(uint256 _chainId, uint256 _timestamp) external;
+    function requestPauseDepositsForChainOnGateway(uint256 _chainId) external;
 }
