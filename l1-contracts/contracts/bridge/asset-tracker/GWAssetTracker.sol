@@ -519,6 +519,12 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function requestPauseDepositsForChain(uint256 _chainId, uint256 _timestamp) external onlyServiceTransactionSender {
         address zkChain = _bridgehub().getZKChain(_chainId);
         require(zkChain != address(0), ChainIdNotRegistered(_chainId));
+
+        // Account for possible time drift between L1 and GW
+        if (_timestamp > block.timestamp) {
+            _timestamp = block.timestamp;
+        }
+
         IMailboxImpl(zkChain).pauseDepositsOnGateway(_timestamp);
     }
 
