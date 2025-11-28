@@ -10,7 +10,7 @@ import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 import {IL1Bridgehub} from "./IL1Bridgehub.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
+import {IMessageRootBase} from "./IMessageRootBase.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 /// @author Matter Labs
@@ -30,7 +30,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
     IL1Bridgehub public immutable override BRIDGEHUB;
 
     /// @dev The message root contract.
-    IMessageRoot public immutable override MESSAGE_ROOT;
+    IMessageRootBase public immutable override MESSAGE_ROOT;
 
     /// @dev The asset router contract.
     IAssetRouterBase public immutable override ASSET_ROUTER;
@@ -48,7 +48,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
     function _bridgehub() internal view override returns (IL1Bridgehub) {
         return BRIDGEHUB;
     }
-    function _messageRoot() internal view override returns (IMessageRoot) {
+    function _messageRoot() internal view override returns (IMessageRootBase) {
         return MESSAGE_ROOT;
     }
     function _assetRouter() internal view override returns (IAssetRouterBase) {
@@ -64,7 +64,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
         _disableInitializers();
         BRIDGEHUB = IL1Bridgehub(_bridgehub);
         ASSET_ROUTER = IAssetRouterBase(_assetRouter);
-        MESSAGE_ROOT = IMessageRoot(_messageRoot);
+        MESSAGE_ROOT = IMessageRootBase(_messageRoot);
         L1_CHAIN_ID = block.chainid;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);

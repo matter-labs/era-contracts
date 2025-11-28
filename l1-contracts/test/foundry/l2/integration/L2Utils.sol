@@ -13,7 +13,7 @@ import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/bridgehub/IMessageRootBase.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
 import {IL2Bridgehub} from "contracts/bridgehub/IL2Bridgehub.sol";
@@ -71,7 +71,7 @@ library L2Utils {
         bridgehub.setAddresses(
             L2_ASSET_ROUTER_ADDR,
             ICTMDeploymentTracker(_args.l1CtmDeployer),
-            IMessageRoot(L2_MESSAGE_ROOT_ADDR),
+            IMessageRootBase(L2_MESSAGE_ROOT_ADDR),
             L2_CHAIN_ASSET_HANDLER_ADDR
         );
     }

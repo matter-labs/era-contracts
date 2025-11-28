@@ -16,7 +16,7 @@ import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/bridgehub/IMessageRootBase.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
@@ -137,7 +137,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         BridgehubBase(address(bridgehub)).setAddresses(
             addresses.bridges.l1AssetRouterProxy,
             ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
-            IMessageRoot(addresses.bridgehub.messageRootProxy),
+            IMessageRootBase(addresses.bridgehub.messageRootProxy),
             addresses.bridgehub.chainAssetHandlerProxy
         );
         vm.stopBroadcast();

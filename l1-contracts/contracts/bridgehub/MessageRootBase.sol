@@ -6,7 +6,7 @@ import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializabl
 
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {IBridgehubBase} from "./IBridgehubBase.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
+import {IMessageRootBase} from "./IMessageRootBase.sol";
 import {ChainExists, MessageRootNotRegistered, NotL2, OnlyBridgehubOrChainAssetHandler, OnlyChain} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
@@ -24,7 +24,7 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
-abstract contract MessageRootBase is IMessageRoot, Initializable {
+abstract contract MessageRootBase is IMessageRootBase, Initializable {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 

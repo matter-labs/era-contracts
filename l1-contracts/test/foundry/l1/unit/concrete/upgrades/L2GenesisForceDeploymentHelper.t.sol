@@ -11,7 +11,7 @@ import "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 import "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import "contracts/bridgehub/IMessageRoot.sol";
+import "contracts/bridgehub/IMessageRootBase.sol";
 import "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import "contracts/bridgehub/L2Bridgehub.sol";
 import "contracts/bridgehub/L2MessageRoot.sol";

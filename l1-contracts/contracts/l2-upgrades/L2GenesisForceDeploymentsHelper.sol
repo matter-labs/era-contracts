@@ -21,7 +21,7 @@ import {DeployFailed, UnsupportedUpgradeType, ZKsyncOSNotForceDeployForExistingC
 import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
 import {ICTMDeploymentTracker} from "../bridgehub/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
+import {IMessageRootBase} from "../bridgehub/IMessageRootBase.sol";
 
 import {UpgradeableBeaconDeployer} from "../bridge/UpgradeableBeaconDeployer.sol";
 import {ISystemContractProxy} from "./ISystemContractProxy.sol";
@@ -310,7 +310,7 @@ library L2GenesisForceDeploymentsHelper {
         L2Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses(
             L2_ASSET_ROUTER_ADDR,
             ICTMDeploymentTracker(_ctmDeployer),
-            IMessageRoot(L2_MESSAGE_ROOT_ADDR),
+            IMessageRootBase(L2_MESSAGE_ROOT_ADDR),
             L2_CHAIN_ASSET_HANDLER_ADDR
         );
     }

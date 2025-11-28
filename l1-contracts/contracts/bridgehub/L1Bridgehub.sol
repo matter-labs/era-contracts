@@ -14,7 +14,7 @@ import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
+import {IMessageRootBase} from "./IMessageRootBase.sol";
 import {BridgehubL2TransactionRequest} from "../common/Messaging.sol";
 import {ChainIdAlreadyPresent, ChainNotLegacy, ChainNotPresentInCTM, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
 import {SettlementLayersMustSettleOnL1} from "../common/L1ContractErrors.sol";
@@ -297,7 +297,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     function setAddresses(
         address _assetRouter,
         ICTMDeploymentTracker _l1CtmDeployer,
-        IMessageRoot _messageRoot,
+        IMessageRootBase _messageRoot,
         address _chainAssetHandler
     ) external override onlyOwnerOrUpgrader {
         assetRouter = IAssetRouterBase(_assetRouter);
