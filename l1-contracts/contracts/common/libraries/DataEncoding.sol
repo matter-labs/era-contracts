@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
 import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol";
-import {IncorrectTokenAddressFromNTV, InvalidNTVBurnData, UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
+import {IncorrectTokenAddressFromNTV, InvalidNTVBurnData, UnsupportedEncodingVersion, EmptyData} from "../L1ContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -168,6 +168,9 @@ library DataEncoding {
     function decodeTokenData(
         bytes calldata _tokenData
     ) internal pure returns (uint256 chainId, bytes memory name, bytes memory symbol, bytes memory decimals) {
+        if (_tokenData.length == 0) {
+            revert EmptyData();
+        }
         bytes1 encodingVersion = _tokenData[0];
         if (encodingVersion == LEGACY_ENCODING_VERSION) {
             (name, symbol, decimals) = abi.decode(_tokenData, (bytes, bytes, bytes));
