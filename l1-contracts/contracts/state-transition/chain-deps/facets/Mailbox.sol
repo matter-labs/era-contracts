@@ -39,7 +39,7 @@ import {INativeTokenVaultBase} from "../../../bridge/ntv/INativeTokenVaultBase.s
 import {V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../../bridgehub/IMessageRoot.sol";
 import {OnlyGateway} from "../../../bridgehub/L1BridgehubErrors.sol";
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
-import {IChainAssetHandler} from "../../../bridgehub/IChainAssetHandler.sol";
+import {IL1ChainAssetHandler} from "../../../bridgehub/IL1ChainAssetHandler.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -635,7 +635,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         /// After that, the deposits are not being processed for 3.5 days.
         bool inPausedWindow = timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START <= block.timestamp &&
             block.timestamp < timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END;
-        return inPausedWindow || IChainAssetHandler(CHAIN_ASSET_HANDLER).isMigrationInProgress(s.chainId);
+        return inPausedWindow || IL1ChainAssetHandler(CHAIN_ASSET_HANDLER).isMigrationInProgress(s.chainId);
     }
 
     /// @notice Returns whether the chain has upgraded to V30 on GW.
