@@ -326,7 +326,8 @@ contract AdminFacet is ZKChainBase, IAdmin {
         uint256 timestamp;
         // Note, if the chain is new (total number of priority transactions is 0) we allow admin to pause the deposits with immediate effect.
         // This is in place to allow for faster migration for newly spawned chains.
-        if (s.priorityTree.getTotalPriorityTxs() == 0) {
+        uint256 totalPriorityTxs = s.priorityTree.getTotalPriorityTxs();
+        if (totalPriorityTxs == 0) {
             // We mark the start of pausedDeposits window as current timestamp - PAUSE_DEPOSITS_TIME_WINDOW_START,
             // meaning that starting from this point in time the deposits are immediately paused.
             timestamp = block.timestamp - PAUSE_DEPOSITS_TIME_WINDOW_START;
@@ -335,7 +336,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         }
         s.pausedDepositsTimestamp = timestamp;
         if (s.settlementLayer != address(0)) {
-            require(s.priorityTree.getTotalPriorityTxs() != 0, PriorityQueueIsEmpty());
+            require(totalPriorityTxs != 0, PriorityQueueIsEmpty());
             IL1AssetTracker(s.assetTracker).requestPauseDepositsForChainOnGateway(s.chainId);
         }
         emit DepositsPaused(s.chainId, timestamp);
