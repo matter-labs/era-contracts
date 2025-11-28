@@ -150,14 +150,14 @@ interface IAdmin is IZKChainBase {
 
     event BridgeMint(address indexed _account, uint256 _amount);
 
-    /// @dev Similar to IL1AssetHandler interface, used to send chains.
+    /// @dev Used to send chains to another settlement layer.
     function forwardedBridgeBurn(
         address _settlementLayer,
         address _originalCaller,
         bytes calldata _data
     ) external payable returns (bytes memory _bridgeMintData);
 
-    /// @dev Similar to IL1AssetHandler interface, used to claim failed chain transfers.
+    /// @dev Used to claim failed chain transfers.
     function forwardedBridgeRecoverFailedTransfer(
         uint256 _chainId,
         bytes32 _assetInfo,
@@ -165,7 +165,7 @@ interface IAdmin is IZKChainBase {
         bytes calldata _chainData
     ) external payable;
 
-    /// @dev Similar to IL1AssetHandler interface, used to receive chains.
+    /// @dev Used to receive chains from another settlement layer.
     function forwardedBridgeMint(bytes calldata _data, bool _contractAlreadyDeployed) external payable;
 
     function prepareChainCommitment() external view returns (ZKChainCommitment memory commitment);

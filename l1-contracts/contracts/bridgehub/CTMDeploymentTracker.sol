@@ -35,7 +35,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
         _;
     }
 
-    /// @notice Checks that the message sender is the bridgehub.
+    /// @notice Checks that the message sender is the L1_ASSET_ROUTER and the original caller is the contract owner.
     modifier onlyOwnerViaRouter(address _originalCaller) {
         if (msg.sender != address(L1_ASSET_ROUTER) || _originalCaller != owner()) {
             revert NotOwnerViaRouter(msg.sender, _originalCaller);
