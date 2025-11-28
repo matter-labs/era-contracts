@@ -86,14 +86,6 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         return L1_CHAIN_ID;
     }
 
-    modifier onlySettlementLayerRelayedSender() override {
-        /// There is no sender for the wrapping, we use a virtual address.
-        if (msg.sender != SETTLEMENT_LAYER_RELAY_SENDER) {
-            revert NotRelayedSender(msg.sender, SETTLEMENT_LAYER_RELAY_SENDER);
-        }
-        _;
-    }
-
     /// @notice Used to forward a transaction on the gateway to the chains mailbox.
     /// @param _chainId the chainId of the chain
     /// @param _canonicalTxHash the canonical transaction hash
