@@ -152,7 +152,7 @@ abstract contract L2InteropCenterTestAbstract is Test, SharedL2ContractDeployer 
         });
         bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(UNBUNDLER_ADDRESS);
 
-        L2_INTEROP_CENTER.sendDirectCallBundle{value: amount}(
+        L2_INTEROP_CENTER.sendBundle{value: amount}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
             bundleAttributes

@@ -11,17 +11,14 @@ import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.
 import {AmountMustBeGreaterThanZero, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
-
-// 0xa5cea466
-error ArgumentsLengthNotIdentical();
+import {ArgumentsLengthNotIdentical} from "./utils/ZkSyncScriptErrors.sol";
 
 library InteropLibrary {
     /*//////////////////////////////////////////////////////////////
                                BUILDERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Build the “second bridge” calldata:
-    ///         bytes.concat(NEW_ENCODING_VERSION, abi.encode(l2TokenAssetId, abi.encode(amount, receiver, fee)))
+    /// @notice Build the “second bridge” calldata. Check DataEncoding library for details.
     function buildSecondBridgeCalldata(
         bytes32 l2TokenAssetId,
         uint256 amount,
@@ -34,13 +31,14 @@ library InteropLibrary {
 
     /// @notice Create a single Interop call to the L2 asset router with the 7786 "indirectCall" attribute set.
     function buildSecondBridgeCall(
-        bytes memory secondBridgeCalldata
+        bytes memory secondBridgeCalldata,
+        address bridgeAddress
     ) internal pure returns (InteropCallStarter memory) {
         bytes[] memory callAttributes = new bytes[](1);
         callAttributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (uint256(0)));
         return
             InteropCallStarter({
-                to: InteroperableAddress.formatEvmV1(L2_ASSET_ROUTER_ADDR),
+                to: InteroperableAddress.formatEvmV1(bridgeAddress),
                 data: secondBridgeCalldata,
                 callAttributes: callAttributes
             });
@@ -193,16 +191,11 @@ library InteropLibrary {
         );
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
-        calls[0] = buildSecondBridgeCall(secondBridgeCalldata);
+        calls[0] = buildSecondBridgeCall(secondBridgeCalldata, L2_ASSET_ROUTER_ADDR); // Using the default address as second bridge.
 
         bytes[] memory bundleAttrs = buildBundleAttributes(unbundlerAddress);
 
-        return
-            L2_INTEROP_CENTER.sendDirectCallBundle(
-                InteroperableAddress.formatEvmV1(destinationChainId),
-                calls,
-                bundleAttrs
-            );
+        return L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(destinationChainId), calls, bundleAttrs);
     }
 
     /// @notice Build and send a bundle of interop calls in one go.
@@ -238,8 +231,7 @@ library InteropLibrary {
 
         bytes[] memory bundleAttrs = buildBundleAttributes(executionAddress, unbundlerAddress);
 
-        return
-            L2_INTEROP_CENTER.sendDirectCallBundle(InteroperableAddress.formatEvmV1(destination), calls, bundleAttrs);
+        return L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(destination), calls, bundleAttrs);
     }
 
     /// @notice Build and send a call in one go.
@@ -269,20 +261,7 @@ library InteropLibrary {
             data: data
         });
 
-        bytes[] memory mergedAttributes = new bytes[](calls[0].callAttributes.length + bundleAttributes.length);
-        uint256 idx = 0;
-
-        // copy first array
-        for (uint256 i = 0; i < calls[0].callAttributes.length; i++) {
-            mergedAttributes[idx] = calls[0].callAttributes[i];
-            idx++;
-        }
-
-        // copy second array
-        for (uint256 i = 0; i < bundleAttributes.length; i++) {
-            mergedAttributes[idx] = bundleAttributes[i];
-            idx++;
-        }
+        bytes[] memory mergedAttributes = _concatBytesArrays(calls[0].callAttributes, bundleAttributes);
 
         return
             IERC7786GatewaySource(address(L2_INTEROP_CENTER)).sendMessage(calls[0].to, calls[0].data, mergedAttributes);
@@ -312,7 +291,7 @@ library InteropLibrary {
         bytes[] memory bundleAttributes = buildBundleAttributes(unbundlerAddress);
 
         return
-            L2_INTEROP_CENTER.sendDirectCallBundle{value: amount}(
+            L2_INTEROP_CENTER.sendBundle{value: amount}(
                 InteroperableAddress.formatEvmV1(destinationChainId),
                 calls,
                 bundleAttributes
@@ -324,5 +303,23 @@ library InteropLibrary {
     /// @return hash (keccak256) of the sent message.
     function sendMessage(bytes memory message) internal returns (bytes32 hash) {
         return L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(message);
+    }
+
+    function _concatBytesArrays(bytes[] memory a, bytes[] memory b) internal pure returns (bytes[] memory result) {
+        result = new bytes[](a.length + b.length);
+
+        uint256 idx = 0;
+
+        // copy first array
+        for (uint256 i = 0; i < a.length; i++) {
+            result[idx] = a[i];
+            idx++;
+        }
+
+        // copy second array
+        for (uint256 i = 0; i < b.length; i++) {
+            result[idx] = b[i];
+            idx++;
+        }
     }
 }
