@@ -33,7 +33,7 @@ interface IL1Bridgehub is IBridgehubBase {
     function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external;
 
     /// @notice Register already deployed ZK chain
-    function registerAlreadyDeployedZKChain(uint256 _chainId, address _hyperchain) external;
+    function registerAlreadyDeployedZKChain(uint256 _chainId, address _zkChain) external;
 
     /// @notice Register legacy chain
     function registerLegacyChain(uint256 _chainId) external;

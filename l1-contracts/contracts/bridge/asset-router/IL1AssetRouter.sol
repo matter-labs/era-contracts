@@ -8,6 +8,8 @@ import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
 import {IL1SharedBridgeLegacy} from "../interfaces/IL1SharedBridgeLegacy.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
+import {IL1Bridgehub} from "../../bridgehub/IL1Bridgehub.sol";
+import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
@@ -79,7 +81,15 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
 
     function ETH_TOKEN_ASSET_ID() external view returns (bytes32);
 
+    function BRIDGE_HUB() external view returns (IL1Bridgehub);
+
+    function ERA_CHAIN_ID() external view returns (uint256);
+
+    function ERA_DIAMOND_PROXY() external view returns (IZKChain);
+
     function nativeTokenVault() external view returns (INativeTokenVaultBase);
+
+    function legacyBridge() external view returns (IL1ERC20Bridge);
 
     function setAssetDeploymentTracker(bytes32 _assetRegistrationData, address _assetDeploymentTracker) external;
 
@@ -203,4 +213,17 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex
     ) external view returns (bool);
+
+    /// @notice Claim failed deposit using legacy approach
+    function claimFailedDeposit(
+        uint256 _chainId,
+        address _depositSender,
+        address _l1Token,
+        uint256 _amount,
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) external;
 }
