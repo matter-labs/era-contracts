@@ -68,7 +68,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         }
         _setAssetHandler(assetId, _assetHandlerAddress);
         assetDeploymentTracker[assetId] = msg.sender;
-        emit AssetDeploymentTrackerRegistered(assetId, _assetRegistrationData, msg.sender);
+        emit AssetDeploymentTrackerSet(assetId, msg.sender, _assetRegistrationData);
     }
 
     /*//////////////////////////////////////////////////////////////
