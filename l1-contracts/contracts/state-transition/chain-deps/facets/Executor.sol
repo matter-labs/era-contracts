@@ -190,6 +190,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (_newBatch.lastBlockTimestamp > block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA) {
             revert L2TimestampTooBig();
         }
+        if (_newBatch.firstBlockTimestamp >= _newBatch.lastBlockTimestamp) {
+            revert NonIncreasingTimestamp();
+        }
         if (_newBatch.chainId != s.chainId) {
             revert IncorrectBatchChainId(_newBatch.chainId, s.chainId);
         }
