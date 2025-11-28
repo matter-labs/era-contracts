@@ -30,7 +30,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
 
         // Initialize v31UpgradeChainBatchNumber for chain 271 with the correct placeholder value
         uint256 placeholderValue = uint256(
-            keccak256(abi.encodePacked("V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY"))
+            keccak256(abi.encodePacked("V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY"))
         );
         stdstore
             .target(address(L2_MESSAGE_ROOT_ADDR))

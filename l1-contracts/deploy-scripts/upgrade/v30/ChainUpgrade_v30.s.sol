@@ -10,8 +10,8 @@ import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 
 import {DefaultChainUpgrade} from "./default_upgrade/DefaultChainUpgrade.s.sol";
 
-/// @notice For V30 we need to migrate all token balances on L1 NTV to AssetTracker, and from L1AssetTracker to GW AssetTracker.
-contract ChainUpgrade_v30 is DefaultChainUpgrade {
+/// @notice For V31 we need to migrate all token balances on L1 NTV to AssetTracker, and from L1AssetTracker to GW AssetTracker.
+contract ChainUpgrade_v31 is DefaultChainUpgrade {
     using stdToml for string;
 
     function run() public {
@@ -29,7 +29,7 @@ contract ChainUpgrade_v30 is DefaultChainUpgrade {
         uint256 bridgedTokensCount = ntv.bridgedTokensCount();
         for (uint256 i = 0; i < bridgedTokensCount; ++i) {
             bytes32 assetId = ntv.bridgedTokens(i);
-            l1AssetTracker.migrateTokenBalanceFromNTVV30(_chainId, assetId);
+            l1AssetTracker.migrateTokenBalanceFromNTVV31(_chainId, assetId);
         }
     }
 

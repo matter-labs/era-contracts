@@ -6,10 +6,10 @@ bytes32 constant PROXY_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8
 
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
-/// @title L2V30Upgrade, contains v30 upgrade fixes.
+/// @title L2V31Upgrade, contains v31 upgrade fixes.
 /// @dev This contract is neither predeployed nor a system contract. It resides in this folder to facilitate code reuse.
 /// @dev This contract is called during the forceDeployAndUpgrade function of the ComplexUpgrader system contract.
-contract L2V30Upgrade {
+contract L2V31Upgrade {
     /// @notice Executes the one‑time migration/patch.
     /// @dev Intended to be delegate‑called by the `ComplexUpgrader` contract.
     /// @param _baseTokenOriginChainId The chainId of the origin chain of the base token.

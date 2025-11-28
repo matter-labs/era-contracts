@@ -75,7 +75,7 @@ error OnlyL2MessageRoot();
 // 0x6b75db8c
 error OnlyOnSettlementLayer();
 // 0x26d10385
-error OnlyPreV30Chain(uint256 chainId);
+error OnlyPreV31Chain(uint256 chainId);
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
 // 0x36917565

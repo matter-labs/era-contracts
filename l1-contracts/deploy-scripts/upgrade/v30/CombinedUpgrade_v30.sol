@@ -33,16 +33,16 @@ import {DefaultEcosystemUpgrade} from "../default_upgrade/DefaultEcosystemUpgrad
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
 
-/// @notice Script used for v30 upgrade flow
-contract CombinedUpgrade_v30 is Script {
+/// @notice Script used for v31 upgrade flow
+contract CombinedUpgrade_v31 is Script {
 
     function run() public {
         // Run the CTM upgrade
-        CTMUpgrade_v30 ctmUpgrade = new CTMUpgrade_v30();
+        CTMUpgrade_v31 ctmUpgrade = new CTMUpgrade_v31();
         ctmUpgrade.run();
 
         // Run the Ecosystem upgrade
-        EcosystemUpgrade_v30 ecosystemUpgrade = new EcosystemUpgrade_v30();
+        EcosystemUpgrade_v31 ecosystemUpgrade = new EcosystemUpgrade_v31();
         ecosystemUpgrade.run();
     }
 

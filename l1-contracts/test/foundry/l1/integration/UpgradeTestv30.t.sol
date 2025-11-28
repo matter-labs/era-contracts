@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 
 import {console2 as console} from "forge-std/Script.sol";
 
-import {EcosystemUpgrade_v30} from "../../../../deploy-scripts/upgrade/v30/EcosystemUpgrade_v30.s.sol";
+import {EcosystemUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/EcosystemUpgrade_v31.s.sol";
 import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default_upgrade/DefaultChainUpgrade.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
@@ -18,12 +18,12 @@ string constant CHAIN_INPUT = "/upgrade-envs/v0.29.2-interopA-ff/mainnet-gateway
 string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet-gateway.toml";
 
 contract UpgradeIntegrationTest is Test {
-    EcosystemUpgrade_v30 ecosystemUpgrade;
+    EcosystemUpgrade_v31 ecosystemUpgrade;
     DefaultCTMUpgrade ctmUpgrade;
     DefaultChainUpgrade chainUpgrade;
 
     function setUp() public {
-        ecosystemUpgrade = new EcosystemUpgrade_v30();
+        ecosystemUpgrade = new EcosystemUpgrade_v31();
         ecosystemUpgrade.initialize(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT);
         ecosystemUpgrade.deployNewEcosystemContractsL1();
         chainUpgrade = new DefaultChainUpgrade();

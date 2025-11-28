@@ -6,8 +6,8 @@ import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializabl
 
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 
-import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessageRoot.sol";
-import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, CurrentBatchNumberAlreadySet, DepthMoreThanOneForRecursiveMerkleProof, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyChain, OnlyL1, OnlyOnSettlementLayer, OnlyPreV30Chain, TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber, TotalBatchesExecutedZero, V31UpgradeChainBatchNumberAlreadySet} from "./L1BridgehubErrors.sol";
+import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH, V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY, V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessageRoot.sol";
+import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, CurrentBatchNumberAlreadySet, DepthMoreThanOneForRecursiveMerkleProof, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyChain, OnlyL1, OnlyOnSettlementLayer, OnlyPreV31Chain, TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber, TotalBatchesExecutedZero, V31UpgradeChainBatchNumberAlreadySet} from "./L1BridgehubErrors.sol";
 
 import {GW_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
@@ -23,7 +23,7 @@ import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
-/// @dev From V30 onwards it is also used for L2->L1 message verification, this allows bypassing the Mailbox of individual chains.
+/// @dev From V31 onwards it is also used for L2->L1 message verification, this allows bypassing the Mailbox of individual chains.
 /// This is especially useful for chains settling on Gateway.
 abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerification {
     using FullMerkle for FullMerkle.FullTree;
@@ -65,7 +65,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     uint256 internal DEPRECATED_l1ChainId;
 
     /// @notice The mapping from chainId to its current executed batch number.
-    /// @dev We store the current batch number for each chain once it upgrades to v30. This value is moved between settlement layers
+    /// @dev We store the current batch number for each chain once it upgrades to v31. This value is moved between settlement layers
     /// during migration to ensure consistency. For now, only using a settlement layer from the same CTM is allowed,
     /// so the value can be trusted on top of the settlement layer.
     mapping(uint256 chainId => uint256 currentChainBatchNumber) public currentChainBatchNumber;
@@ -73,7 +73,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// @notice The mapping from chainId to batchNumber to chainBatchRoot.
     /// @dev These are the same values as the leaves of the chainTree.
     /// @dev We store these values for message verification on L1 and Gateway.
-    /// @dev We only update the chainTree on GW as of V30.
+    /// @dev We only update the chainTree on GW as of V31.
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
 
@@ -108,7 +108,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
 
     /// On L1, the chain can add it directly.
     /// On GW, the asset tracker should add it,
-    /// except for PreV30 chains, which can add it directly.
+    /// except for PreV31 chains, which can add it directly.
     modifier addChainBatchRootRestriction(uint256 _chainId) {
         if (block.chainid != L1_CHAIN_ID()) {
             if (msg.sender == GW_ASSET_TRACKER_ADDR) {
@@ -118,9 +118,9 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
                 uint32 minor;
                 // slither-disable-next-line unused-return
                 (, minor, ) = IGetters(chain).getSemverProtocolVersion();
-                /// This might be a security issue if v29 has prover bugs. We should upgrade GW chains to v30 quickly.
+                /// This might be a security issue if v29 has prover bugs. We should upgrade GW chains to v31 quickly.
                 require(msg.sender == chain, OnlyChain(msg.sender, chain));
-                require(minor < 30, OnlyPreV30Chain(_chainId));
+                require(minor < 30, OnlyPreV31Chain(_chainId));
             } else {
                 revert OnlyAssetTracker(msg.sender, GW_ASSET_TRACKER_ADDR);
             }
@@ -153,13 +153,13 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         _addNewChain(block.chainid, 0);
     }
 
-    function _v30InitializeInner(uint256[] memory _allZKChains) internal {
+    function _v31InitializeInner(uint256[] memory _allZKChains) internal {
         uint256 allZKChainsLength = _allZKChains.length;
         for (uint256 i = 0; i < allZKChainsLength; ++i) {
-            uint256 batchNumberToWrite = V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY;
+            uint256 batchNumberToWrite = V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY;
             if (IBridgehubBase(_bridgehub()).settlementLayer(_allZKChains[i]) == L1_CHAIN_ID()) {
                 /// If we are settling on L1.
-                batchNumberToWrite = V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1;
+                batchNumberToWrite = V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1;
             }
             v31UpgradeChainBatchNumber[_allZKChains[i]] = batchNumberToWrite;
         }
@@ -170,13 +170,13 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         uint256 totalBatchesExecuted = IGetters(msg.sender).getTotalBatchesExecuted();
         require(totalBatchesExecuted > 0, TotalBatchesExecutedZero());
         require(
-            totalBatchesExecuted != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY &&
-                totalBatchesExecuted != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
+            totalBatchesExecuted != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY &&
+                totalBatchesExecuted != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
             TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber()
         );
         require(
-            v31UpgradeChainBatchNumber[_chainId] == V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY ||
-                v31UpgradeChainBatchNumber[_chainId] == V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
+            v31UpgradeChainBatchNumber[_chainId] == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY ||
+                v31UpgradeChainBatchNumber[_chainId] == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
             V31UpgradeChainBatchNumberAlreadySet()
         );
         require(currentChainBatchNumber[_chainId] == 0, CurrentBatchNumberAlreadySet());
@@ -351,7 +351,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
             });
     }
 
-    /// @notice Internal to get the historical batch root for chains before the v30 upgrade.
+    /// @notice Internal to get the historical batch root for chains before the v31 upgrade.
     function _getChainBatchRoot(uint256 _chainId, uint256 _batchNumber) internal view returns (bytes32) {
         /// In current server the zeroth batch does not have L2->L1 logs.
         require(_batchNumber > 0, BatchZeroNotAllowed());

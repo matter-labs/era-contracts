@@ -33,14 +33,14 @@ import {DefaultEcosystemUpgrade} from "../default_upgrade/DefaultEcosystemUpgrad
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
 
-/// @notice Script used for v30 upgrade flow
-contract CTMUpgrade_v30 is Script, DefaultCTMUpgrade {
+/// @notice Script used for v31 upgrade flow
+contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     /// @notice E2e upgrade generation
     function run() public virtual override {
         initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
         prepareEcosystemUpgrade();
 
-        /// kl todo check that no chain is on GW. We can write a contract to check it and call it in V30 stage 0 calls.
+        /// kl todo check that no chain is on GW. We can write a contract to check it and call it in V31 stage 0 calls.
 
         prepareDefaultGovernanceCalls();
     }

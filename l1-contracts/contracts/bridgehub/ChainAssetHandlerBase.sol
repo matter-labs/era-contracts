@@ -108,7 +108,7 @@ abstract contract ChainAssetHandlerBase is
     }
 
     /*//////////////////////////////////////////////////////////////
-                            V30 Upgrade
+                            V31 Upgrade
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Checks that the message sender is the specified ZK Chain.
@@ -121,7 +121,7 @@ abstract contract ChainAssetHandlerBase is
     }
 
     /// @notice Sets the migration number for a chain on the Gateway when the chain's DiamondProxy upgrades.
-    function setMigrationNumberForV30(uint256 _chainId) external onlyChain(_chainId) {
+    function setMigrationNumberForV31(uint256 _chainId) external onlyChain(_chainId) {
         require(migrationNumber[_chainId] == 0, MigrationNumberAlreadySet());
         bool isOnThisSettlementLayer = block.chainid == IBridgehubBase(_bridgehub()).settlementLayer(_chainId);
         bool shouldIncrementMigrationNumber = (isOnThisSettlementLayer && block.chainid != _l1ChainId()) ||

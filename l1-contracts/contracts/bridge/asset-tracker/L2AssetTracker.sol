@@ -84,17 +84,17 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     }
 
     /// @notice Registers a legacy token on this L2 chain for backwards compatibility.
-    /// @dev This function is used during upgrades to ensure pre-V30 tokens continue to work.
+    /// @dev This function is used during upgrades to ensure pre-V31 tokens continue to work.
     /// @param _assetId The asset ID of the legacy token to register.
     function registerLegacyTokenOnChain(bytes32 _assetId) external onlyNativeTokenVault {
         _registerTokenOnL2(_assetId);
     }
 
-    /// @notice Migrates token balance tracking from NativeTokenVault to AssetTracker for V30 upgrade.
+    /// @notice Migrates token balance tracking from NativeTokenVault to AssetTracker for V31 upgrade.
     /// @dev This function calculates the correct chainBalance by accounting for tokens currently held in the NTV.
     /// @dev The chainBalance represents how much of the token supply is "available" for bridging out.
     /// @param _assetId The asset id of the token to migrate the token balance for.
-    function migrateTokenBalanceFromNTVV30(bytes32 _assetId) external {
+    function migrateTokenBalanceFromNTVV31(bytes32 _assetId) external {
         INativeTokenVaultBase ntv = _nativeTokenVault();
 
         // Validate that this is a token native to the current L2
@@ -117,7 +117,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 ntvBalance = IERC20(tokenAddress).balanceOf(address(ntv));
         // First, flip the existing chainBalance calculation (was tracking bridged out, now tracks available)
         chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE - chainBalance[originChainId][_assetId];
-        // Then subtract tokens currently locked in NTV (these were already "bridged out" in pre-V30)
+        // Then subtract tokens currently locked in NTV (these were already "bridged out" in pre-V31)
         chainBalance[originChainId][_assetId] -= ntvBalance;
     }
 

@@ -113,41 +113,41 @@ contract MessageRoot_Extended_Test is Test {
         assertTrue(root != bytes32(0));
     }
 
-    function test_InitializeL2V30Upgrade_NotL2() public {
+    function test_InitializeL2V31Upgrade_NotL2() public {
         vm.expectRevert(abi.encodeWithSelector(InvalidCaller.selector, address(this)));
-        l2MessageRoot.initializeL2V30Upgrade();
+        l2MessageRoot.initializeL2V31Upgrade();
     }
 
-    function test_InitializeL2V30Upgrade_NotUpgrader() public {
+    function test_InitializeL2V31Upgrade_NotUpgrader() public {
         vm.chainId(2); // Set to non-L1 chain
         vm.expectRevert(abi.encodeWithSelector(InvalidCaller.selector, address(this)));
-        l2MessageRoot.initializeL2V30Upgrade();
+        l2MessageRoot.initializeL2V31Upgrade();
     }
 
-    function test_InitializeL1V30Upgrade_NotL1() public {
+    function test_InitializeL1V31Upgrade_NotL1() public {
         vm.chainId(2); // Set to non-L1 chain
 
         vm.expectRevert("Initializable: contract is already initialized");
-        messageRoot.initializeL1V30Upgrade();
+        messageRoot.initializeL1V31Upgrade();
     }
 
-    function test_SendV30UpgradeBlockNumberFromGateway_NotGateway() public {
+    function test_SendV31UpgradeBlockNumberFromGateway_NotGateway() public {
         vm.chainId(2); // Set to non-gateway chain
         vm.expectRevert(OnlyGateway.selector);
-        l2MessageRoot.sendV30UpgradeBlockNumberFromGateway(271, 100);
+        l2MessageRoot.sendV31UpgradeBlockNumberFromGateway(271, 100);
     }
 
-    function test_SendV30UpgradeBlockNumberFromGateway_NotSet() public {
+    function test_SendV31UpgradeBlockNumberFromGateway_NotSet() public {
         vm.chainId(gatewayChainId); // Set to gateway chain
         vm.expectRevert(V31UpgradeChainBatchNumberNotSet.selector);
-        l2MessageRoot.sendV30UpgradeBlockNumberFromGateway(271, 100);
+        l2MessageRoot.sendV31UpgradeBlockNumberFromGateway(271, 100);
     }
 
     function test_SaveV31UpgradeChainBatchNumberOnL1_NotL2MessageRoot() public {
         FinalizeL1DepositParams memory params = FinalizeL1DepositParams({
             l2Sender: makeAddr("wrongSender"),
             chainId: 1,
-            message: abi.encodeWithSelector(L2MessageRoot.sendV30UpgradeBlockNumberFromGateway.selector, 271, 100),
+            message: abi.encodeWithSelector(L2MessageRoot.sendV31UpgradeBlockNumberFromGateway.selector, 271, 100),
             l2TxNumberInBatch: 1,
             l2BatchNumber: 1,
             l2MessageIndex: 1,
@@ -279,13 +279,13 @@ contract MessageRoot_Extended_Test is Test {
 
     function test_V31UpgradeChainBatchNumber() public {
         uint256 chainId = 271;
-        uint256 v30UpgradeBatchNumber = 100;
+        uint256 v31UpgradeBatchNumber = 100;
 
         vm.prank(bridgeHub);
-        messageRoot.setMigratingChainBatchRoot(chainId, 1, v30UpgradeBatchNumber);
+        messageRoot.setMigratingChainBatchRoot(chainId, 1, v31UpgradeBatchNumber);
 
-        uint256 v30Batch = messageRoot.v31UpgradeChainBatchNumber(chainId);
-        assertEq(v30Batch, v30UpgradeBatchNumber);
+        uint256 v31Batch = messageRoot.v31UpgradeChainBatchNumber(chainId);
+        assertEq(v31Batch, v31UpgradeBatchNumber);
     }
 
     function test_AddChainBatchRoot_Success() public {

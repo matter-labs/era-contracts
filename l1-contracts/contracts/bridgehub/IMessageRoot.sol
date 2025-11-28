@@ -15,14 +15,14 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
     0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21
 );
 
-// The value that is saved in the v31UpgradeChainBatchNumber mapping for all deployed chains until the chain upgrades to v30.
-uint256 constant V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY = uint256(
-    keccak256(abi.encodePacked("V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY"))
+// The value that is saved in the v31UpgradeChainBatchNumber mapping for all deployed chains until the chain upgrades to v31.
+uint256 constant V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY = uint256(
+    keccak256(abi.encodePacked("V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY"))
 );
 
-// The value that is saved in the v31UpgradeChainBatchNumber mapping for all deployed chains until the chain upgrades to v30.
-uint256 constant V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1 = uint256(
-    keccak256(abi.encodePacked("V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1"))
+// The value that is saved in the v31UpgradeChainBatchNumber mapping for all deployed chains until the chain upgrades to v31.
+uint256 constant V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1 = uint256(
+    keccak256(abi.encodePacked("V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1"))
 );
 
 /**

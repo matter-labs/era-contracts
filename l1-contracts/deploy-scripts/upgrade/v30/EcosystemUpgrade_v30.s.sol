@@ -35,8 +35,8 @@ import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
 import {DefaultGatewayUpgrade} from "../default_upgrade/DefaultGatewayUpgrade.s.sol";
 
-/// @notice Script used for v30 upgrade flow
-contract EcosystemUpgrade_v30 is Script, DefaultEcosystemUpgrade {
+/// @notice Script used for v31 upgrade flow
+contract EcosystemUpgrade_v31 is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
     /*//////////////////////////////////////////////////////////////
@@ -72,14 +72,14 @@ contract EcosystemUpgrade_v30 is Script, DefaultEcosystemUpgrade {
         bool isZkBytecode
     ) internal virtual override returns (bytes memory) {
         if (compareStrings(contractName, "L1MessageRoot")) {
-            return abi.encodeCall(L1MessageRoot.initializeL1V30Upgrade, ());
+            return abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ());
         }
         return super.getInitializeCalldata(contractName, isZkBytecode);
     }
 }
 
-/// @notice Script used for v30 upgrade flow
-contract CTMUpgrade_v30 is Script, DefaultCTMUpgrade {
+/// @notice Script used for v31 upgrade flow
+contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     function getForceDeploymentNames() internal override returns (string[] memory forceDeploymentNames) {
         forceDeploymentNames = new string[](1);
         forceDeploymentNames[0] = "L2V29Upgrade";
@@ -111,8 +111,8 @@ contract CTMUpgrade_v30 is Script, DefaultCTMUpgrade {
     }
 }
 
-/// @notice Script used for v30 upgrade flow
-contract GatewayUpgrade_v30 is Script, DefaultGatewayUpgrade {
+/// @notice Script used for v31 upgrade flow
+contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
     function getForceDeploymentNames() internal override returns (string[] memory forceDeploymentNames) {
         forceDeploymentNames = new string[](1);
         forceDeploymentNames[0] = "L2V29Upgrade";
@@ -144,19 +144,19 @@ contract GatewayUpgrade_v30 is Script, DefaultGatewayUpgrade {
     }
 }
 
-contract FullV30Upgrade is Script {
-    EcosystemUpgrade_v30 ecosystemUpgrade;
-    CTMUpgrade_v30 ctmUpgrade;
-    GatewayUpgrade_v30 gatewayUpgrade;
+contract FullV31Upgrade is Script {
+    EcosystemUpgrade_v31 ecosystemUpgrade;
+    CTMUpgrade_v31 ctmUpgrade;
+    GatewayUpgrade_v31 gatewayUpgrade;
 
     function run() external {
-        ecosystemUpgrade = new EcosystemUpgrade_v30();
+        ecosystemUpgrade = new EcosystemUpgrade_v31();
         ecosystemUpgrade.run();
 
-        ctmUpgrade = new CTMUpgrade_v30();
+        ctmUpgrade = new CTMUpgrade_v31();
         ctmUpgrade.run();
 
-        gatewayUpgrade = new GatewayUpgrade_v30();
+        gatewayUpgrade = new GatewayUpgrade_v31();
         gatewayUpgrade.run();
     }
 
