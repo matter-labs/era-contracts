@@ -587,7 +587,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     ) internal {
         // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
-        for (uint256 i = 0; i < _newBatchesData.length; i++) {
+        for (uint256 i = 0; i < _newBatchesData.length; ++i) {
             _lastCommittedBatchData = _commitOneBatch(_lastCommittedBatchData, _newBatchesData[i], bytes32(0));
 
             s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(_lastCommittedBatchData);
@@ -623,7 +623,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
-        for (uint256 i = 0; i < _newBatchesData.length; i++) {
+        for (uint256 i = 0; i < _newBatchesData.length; ++i) {
             // The upgrade transaction must only be included in the first batch.
             bytes32 expectedUpgradeTxHash = i == 0 ? _systemContractUpgradeTxHash : bytes32(0);
             _lastCommittedBatchData = _commitOneBatch(
@@ -661,7 +661,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
-        for (uint256 i = 0; i < _newBatchesData.length; i++) {
+        for (uint256 i = 0; i < _newBatchesData.length; ++i) {
             _lastCommittedBatchData = _commitOneBatchZKsyncOS(
                 _lastCommittedBatchData,
                 _newBatchesData[i],
@@ -685,7 +685,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     function _rollingHash(bytes32[] memory _hashes) internal pure returns (bytes32) {
         bytes32 hash = EMPTY_STRING_KECCAK;
         uint256 nHashes = _hashes.length;
-        for (uint256 i = 0; i < nHashes; i++) {
+        for (uint256 i = 0; i < nHashes; ++i) {
             hash = keccak256(abi.encode(hash, _hashes[i]));
         }
         return hash;
@@ -749,7 +749,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 length = _dependencyRoots.length;
         IMessageRoot messageRootContract = IL1Bridgehub(s.bridgehub).messageRoot();
 
-        for (uint256 i = 0; i < length; i++) {
+        for (uint256 i = 0; i < length; ++i) {
             InteropRoot memory interopRoot = _dependencyRoots[i];
             bytes32 correctRootHash;
             if (interopRoot.chainId == block.chainid) {
@@ -810,7 +810,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert InvalidBatchesDataLength(batchesData.length, priorityOpsData.length);
         }
 
-        for (uint256 i = 0; i < nBatches; i++) {
+        for (uint256 i = 0; i < nBatches; ++i) {
             _executeOneBatch(batchesData[i], priorityOpsData[i], dependencyRoots[i], i);
             emit BlockExecution(batchesData[i].batchNumber, batchesData[i].batchHash, batchesData[i].commitment);
         }
@@ -859,7 +859,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
         bytes32 prevBatchStateCommitment = prevBatch.batchHash;
-        for (uint256 i = 0; i < committedBatchesLength; i++) {
+        for (uint256 i = 0; i < committedBatchesLength; ++i) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
             if (_hashStoredBatchInfo(committedBatches[i]) != s.storedBatchHashes[currentTotalBatchesVerified]) {
                 revert BatchHashMismatch(
