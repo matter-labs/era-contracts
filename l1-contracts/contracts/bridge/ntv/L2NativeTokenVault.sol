@@ -57,6 +57,12 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// the old version where it was an immutable.
     bytes32 public L2_TOKEN_PROXY_BYTECODE_HASH;
 
+    /// @dev Returns the L2 asset router contract.
+    /// @dev Present for backward compatibility purposes.
+    function ASSET_ROUTER() public view returns (IAssetRouterBase) {
+        return IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
