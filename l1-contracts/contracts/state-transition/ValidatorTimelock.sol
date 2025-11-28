@@ -70,6 +70,9 @@ contract ValidatorTimelock is
     /// @inheritdoc IValidatorTimelock
     uint32 public override executionDelay;
 
+    /// @dev Reserved storage space to allow for layout changes in future upgrades.
+    uint256[48] private __gap;
+
     constructor(address _bridgehubAddr) {
         BRIDGE_HUB = IL1Bridgehub(_bridgehubAddr);
         // Disable initialization to prevent Parity hack.
@@ -305,7 +308,4 @@ contract ValidatorTimelock is
         // Now, we can extract the admin
         return IZKChain(_chainAddress).getAdmin();
     }
-
-    /// @dev Reserved storage space to allow for layout changes in future upgrades.
-    uint256[50] private __gap;
 }

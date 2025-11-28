@@ -28,17 +28,17 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
     bytes32 internal constant COMMIT_BATCHES_MULTISIG_TYPEHASH =
         keccak256("CommitBatchesMultisig(address chainAddress,uint256 processBatchFrom,uint256 processBatchTo,bytes batchData)");
 
-	// per chain validator role, only applies if useCustomValidators is set
+	/// @dev The per chain validator role, only applies if useCustomValidators is set
 	bytes32 public constant override COMMIT_VALIDATOR_ROLE = keccak256("COMMIT_VALIDATOR_ROLE");
 
+	/// @dev The list of shared validators, used if useCustomValidators is false for a chain and 
+	/// apply to all chains by default.
 	EnumerableSetUpgradeable.AddressSet private sharedValidators;
+	
+	/// @inheritdoc IMultisigCommitter
 	uint64 public override sharedSigningThreshold;
 
-	struct ChainConfig {
-		bool useCustomValidators; // if we should use per chain COMMIT_VALIDATOR_ROLE holders instead of the shared validator set
-		uint64 signingThreshold; // only applies if useCustomValidators is true
-	}
-
+	/// @dev Per chain configuration
 	mapping(address chainAddress => ChainConfig) public chainConfig;
 
 	constructor(address _bridgehubAddr) ValidatorTimelock(_bridgehubAddr) {

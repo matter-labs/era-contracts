@@ -6,6 +6,11 @@ import {IValidatorTimelock} from "./IValidatorTimelock.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IMultisigCommitter is IValidatorTimelock {
+	struct ChainConfig {
+		bool useCustomValidators; // if we should use per chain COMMIT_VALIDATOR_ROLE holders instead of the shared validator set
+		uint64 signingThreshold; // only applies if useCustomValidators is true
+	}
+
 	/// @notice Signing threshold for a chain is set or changed. Shared signing set is disabled. threshold=0 signifies multisig disabled
 	event NewSigningThreshold(address chainAddress, uint256 threshold);
 
