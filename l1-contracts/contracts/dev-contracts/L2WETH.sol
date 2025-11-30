@@ -33,12 +33,14 @@ contract L2WETH is ERC20PermitUpgradeable, IL2WETH, IL2StandardToken {
     /// @param symbol_ The symbol of the token.
     /// Note: The decimals are hardcoded to 18, the same as on Ether.
     function initL2(string memory name_, string memory symbol_) external onlyUpgrader {
-        _disableInitializers();
         // Set decoded values for name and symbol.
         __ERC20_init_unchained(name_, symbol_);
 
         // Set the name for EIP-712 signature.
         __ERC20Permit_init(name_);
+
+        // Disable further initializations after successful setup
+        _disableInitializers();
 
         emit Initialize(name_, symbol_, 18);
     }
