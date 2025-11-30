@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {IL1DAValidator, L1DAValidatorOutput} from "./IL1DAValidator.sol";
 
-import {NonEmptyBlobVersionHash, InvalidBlobsDAInputLength, BlobNotPublished, InvalidBlobsPublished, InvalidNumberOfBlobs} from "./DAContractsErrors.sol";
+import {NonEmptyBlobVersionHash, InvalidBlobsDAInputLength, BlobNotPublished, InvalidBlobsPublished} from "./DAContractsErrors.sol";
 
 /// @dev The number of blocks within each we allow blob to be used for DA.
 /// On Ethereum blobs expire within 4096 epochs, i.e. 4096 * 32 blocks. We reserve
@@ -46,7 +46,7 @@ contract BlobsL1DAValidatorZKsyncOS is IL1DAValidator {
         uint256, // _batchNumber
         bytes32 _l2DAValidatorOutputHash,
         bytes calldata _operatorDAInput,
-        uint256 _maxBlobsSupported
+        uint256 // _maxBlobsSupported
     ) external view returns (L1DAValidatorOutput memory output) {
         // As DA input operator should provide concatenated blob versioned hashes of published blobs.
         // If provided hash equals to 0, blob versioned hash will be taken from blob published with the current transaction.
@@ -55,11 +55,6 @@ contract BlobsL1DAValidatorZKsyncOS is IL1DAValidator {
         }
 
         uint256 blobsProvided = _operatorDAInput.length / BLOB_VERSIONED_HASH_SIZE;
-
-        // Validate that the number of blobs provided does not exceed the maximum supported
-        if (blobsProvided > _maxBlobsSupported) {
-            revert InvalidNumberOfBlobs(blobsProvided, _maxBlobsSupported);
-        }
 
         bytes memory publishedVersionedHashes = new bytes(_operatorDAInput.length);
         uint256 versionedHashIndex = 0;
