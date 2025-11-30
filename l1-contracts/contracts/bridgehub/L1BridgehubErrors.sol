@@ -30,8 +30,6 @@ error NotChainAssetHandler(address sender, address chainAssetHandler);
 error NotCurrentSL(uint256 settlementLayerChainId, uint256 blockChainId);
 // 0x472477e2
 error NotInGatewayMode();
-// 0xecb34449
-error NotL1(uint256 l1ChainId, uint256 blockChainId);
 // 0x8eb4fc01
 error NotL2();
 // 0x23295f0e

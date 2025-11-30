@@ -39,9 +39,6 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _ethTokenAssetId() internal view override returns (bytes32) {
-        return ETH_TOKEN_ASSET_ID;
-    }
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
