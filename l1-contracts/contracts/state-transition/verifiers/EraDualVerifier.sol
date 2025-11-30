@@ -6,7 +6,7 @@ import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {EmptyProofLength, UnknownVerifierType} from "../../common/L1ContractErrors.sol";
 
-/// @title Dual Verifier
+/// @title ZKsync Era Dual Verifier
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice This contract wraps two different verifiers (FFLONK and PLONK) and routes zk-SNARK proof verification
