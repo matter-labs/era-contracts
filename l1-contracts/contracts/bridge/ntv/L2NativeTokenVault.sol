@@ -62,7 +62,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Returns the L2 asset router for internal use.
-    function _assetRouter() internal view override returns (IAssetRouterBase) {
+    function _assetRouter() internal pure override returns (IAssetRouterBase) {
         return IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
     }
 

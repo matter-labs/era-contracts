@@ -254,7 +254,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
             });
     }
 
-    function getVerifierParams() internal returns (VerifierParams memory) {
+    function getVerifierParams() internal view returns (VerifierParams memory) {
         return
             VerifierParams({
                 recursionNodeLevelVkHash: config.contracts.recursionNodeLevelVkHash,
@@ -263,7 +263,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
             });
     }
 
-    function getFeeParams() internal returns (FeeParams memory) {
+    function getFeeParams() internal view returns (FeeParams memory) {
         return
             FeeParams({
                 pubdataPricingMode: config.contracts.diamondInitPubdataPricingMode,
@@ -277,7 +277,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
 
     function getInitializeData(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal returns (DiamondInitializeDataNewChain memory) {
+    ) internal view returns (DiamondInitializeDataNewChain memory) {
         VerifierParams memory verifierParams = getVerifierParams();
 
         FeeParams memory feeParams = getFeeParams();
@@ -474,7 +474,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         }
     }
 
-    function calculateExpectedL2Address(string memory contractName) internal returns (address) {
+    function calculateExpectedL2Address(string memory contractName) internal view returns (address) {
         return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
     }
 

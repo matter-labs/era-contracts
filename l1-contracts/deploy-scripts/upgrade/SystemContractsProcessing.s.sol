@@ -271,7 +271,7 @@ library SystemContractsProcessing {
     }
 
     /// @notice Deduplicates the array of bytecodes.
-    function deduplicateBytecodes(bytes[] memory input) internal returns (bytes[] memory output) {
+    function deduplicateBytecodes(bytes[] memory input) internal pure returns (bytes[] memory output) {
         // A more efficient way would be to sort + deduplicate, but
         // there is no built-in sorting in Solidity + this function should be only
         // used in scripts, so ineffiency is fine.
@@ -310,7 +310,7 @@ library SystemContractsProcessing {
         require(included == toInclude, "Internal error: included != toInclude");
     }
 
-    function getSystemContractsBytecodes() internal returns (bytes[] memory result) {
+    function getSystemContractsBytecodes() internal view returns (bytes[] memory result) {
         result = new bytes[](SYSTEM_CONTRACTS_COUNT);
 
         SystemContract[] memory systemContracts = getSystemContracts();
@@ -329,6 +329,7 @@ library SystemContractsProcessing {
 
     function getSystemContractsForceDeployments()
         internal
+        view
         returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments)
     {
         forceDeployments = new IL2ContractDeployer.ForceDeployment[](SYSTEM_CONTRACTS_COUNT);
@@ -364,7 +365,7 @@ library SystemContractsProcessing {
     function getOtherBuiltinForceDeployments(
         uint256 l1ChainId,
         address owner
-    ) internal returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
+    ) internal view returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
         forceDeployments = new IL2ContractDeployer.ForceDeployment[](OTHER_BUILT_IN_CONTRACTS_COUNT);
         bytes[] memory bytecodes = getOtherContractsBytecodes();
 
@@ -427,7 +428,7 @@ library SystemContractsProcessing {
 
     function forceDeploymentsToHashes(
         IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments
-    ) internal returns (bytes32[] memory hashes) {
+    ) internal pure returns (bytes32[] memory hashes) {
         hashes = new bytes32[](baseForceDeployments.length);
         for (uint256 i = 0; i < baseForceDeployments.length; i++) {
             hashes[i] = baseForceDeployments[i].bytecodeHash;
@@ -437,7 +438,7 @@ library SystemContractsProcessing {
     function mergeForceDeployments(
         IL2ContractDeployer.ForceDeployment[] memory left,
         IL2ContractDeployer.ForceDeployment[] memory right
-    ) internal returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
+    ) internal pure returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
         forceDeployments = new IL2ContractDeployer.ForceDeployment[](left.length + right.length);
         for (uint256 i = 0; i < left.length; i++) {
             forceDeployments[i] = left[i];
@@ -447,7 +448,7 @@ library SystemContractsProcessing {
         }
     }
 
-    function mergeBytesArrays(bytes[] memory left, bytes[] memory right) internal returns (bytes[] memory result) {
+    function mergeBytesArrays(bytes[] memory left, bytes[] memory right) internal pure returns (bytes[] memory result) {
         result = new bytes[](left.length + right.length);
         for (uint256 i = 0; i < left.length; i++) {
             result[i] = left[i];
@@ -459,6 +460,7 @@ library SystemContractsProcessing {
 
     function getBaseForceDeployments()
         internal
+        view
         returns (
             // For purpose of making compilation of earlier upgrade scripts possible.
             IL2ContractDeployer.ForceDeployment[] memory forceDeployments
@@ -470,7 +472,7 @@ library SystemContractsProcessing {
     function getBaseForceDeployments(
         uint256 l1ChainId,
         address owner
-    ) internal returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
+    ) internal view returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
         IL2ContractDeployer.ForceDeployment[] memory otherForceDeployments = getOtherBuiltinForceDeployments(
             l1ChainId,
             owner
@@ -480,7 +482,7 @@ library SystemContractsProcessing {
         forceDeployments = mergeForceDeployments(systemForceDeployments, otherForceDeployments);
     }
 
-    function getBaseListOfDependencies() internal returns (bytes[] memory factoryDeps) {
+    function getBaseListOfDependencies() internal view returns (bytes[] memory factoryDeps) {
         // Note that it is *important* that these go first in this exact order,
         // since the server will rely on it.
         bytes[] memory basicBytecodes = new bytes[](3);

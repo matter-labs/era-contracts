@@ -29,7 +29,7 @@ contract L2MessageRoot is MessageRootBase {
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _bridgehub() internal view override returns (address) {
+    function _bridgehub() internal pure override returns (address) {
         return L2_BRIDGEHUB_ADDR;
     }
 
@@ -38,7 +38,7 @@ contract L2MessageRoot is MessageRootBase {
     }
 
     // A method for backwards compatibility with the old implementation
-    function BRIDGE_HUB() public view returns (address) {
+    function BRIDGE_HUB() public pure returns (address) {
         return L2_BRIDGEHUB_ADDR;
     }
 

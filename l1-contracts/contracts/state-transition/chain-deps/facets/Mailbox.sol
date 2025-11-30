@@ -353,7 +353,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         uint256 _chainId,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) internal view returns (BridgehubL2TransactionRequest memory) {
+    ) internal pure returns (BridgehubL2TransactionRequest memory) {
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encodeCall(
             L2Bridgehub.forwardTransactionOnGateway,

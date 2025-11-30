@@ -203,7 +203,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         }
     }
 
-    function getRollupL2DACommitmentScheme() internal returns (L2DACommitmentScheme) {
+    function getRollupL2DACommitmentScheme() internal pure returns (L2DACommitmentScheme) {
         return ROLLUP_L2_DA_COMMITMENT_SCHEME;
     }
 

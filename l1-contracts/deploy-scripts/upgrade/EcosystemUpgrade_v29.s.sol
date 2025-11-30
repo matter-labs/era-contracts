@@ -109,7 +109,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
 
     function _getL2UpgradeTargetAndData(
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
-    ) internal override returns (address, bytes memory) {
+    ) internal view override returns (address, bytes memory) {
         bytes32 ethAssetId = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy).ETH_TOKEN_ASSET_ID();
         bytes memory v29UpgradeCalldata = abi.encodeCall(
             IL2V29Upgrade.upgrade,
@@ -135,7 +135,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         );
     }
 
-    function getForceDeploymentNames() internal override returns (string[] memory) {
+    function getForceDeploymentNames() internal pure override returns (string[] memory) {
         string[] memory forceDeploymentNames = new string[](1);
         forceDeploymentNames[0] = "L2V29Upgrade";
         return forceDeploymentNames;
@@ -197,7 +197,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
 
     function encodePostUpgradeCalldata(
         StateTransitionDeployedAddresses memory stateTransitionAddresses
-    ) internal override returns (bytes memory) {
+    ) internal view override returns (bytes memory) {
         address[] memory oldValidatorTimelocks = stateTransitionAddresses.isOnGateway
             ? oldGatewayValidatorTimelocks
             : oldValidatorTimelocks;

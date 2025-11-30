@@ -34,7 +34,7 @@ library GatewayCTMDeployerHelper {
     function calculateAddresses(
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config
-    ) internal returns (DeployedContracts memory contracts, bytes memory create2Calldata, address ctmDeployerAddress) {
+    ) internal view returns (DeployedContracts memory contracts, bytes memory create2Calldata, address ctmDeployerAddress) {
         (bytes32 bytecodeHash, bytes memory deployData) = Utils.getDeploymentCalldata(
             _create2Salt,
             Utils.readZKFoundryBytecodeL1("GatewayCTMDeployer.sol", "GatewayCTMDeployer"),
@@ -110,7 +110,7 @@ library GatewayCTMDeployerHelper {
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig,
         address ctmDeployerAddress
-    ) internal returns (address) {
+    ) internal view returns (address) {
         address serverNotifierImplementation = _deployInternal(
             "ServerNotifier",
             "ServerNotifier.sol",
@@ -141,7 +141,7 @@ library GatewayCTMDeployerHelper {
         bool _isZKsyncOS,
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig
-    ) internal returns (DeployedContracts memory) {
+    ) internal view returns (DeployedContracts memory) {
         _deployedContracts.stateTransition.mailboxFacet = _deployInternal(
             "MailboxFacet",
             "Mailbox.sol",
@@ -199,7 +199,7 @@ library GatewayCTMDeployerHelper {
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig,
         address _verifierOwner
-    ) internal returns (DeployedContracts memory) {
+    ) internal view returns (DeployedContracts memory) {
         address verifierFflonk;
         address verifierPlonk;
 
@@ -260,7 +260,7 @@ library GatewayCTMDeployerHelper {
         address _governanceAddress,
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig
-    ) internal returns (DeployedContracts memory, address) {
+    ) internal view returns (DeployedContracts memory, address) {
         address daManager = _deployInternal("RollupDAManager", "RollupDAManager.sol", hex"", innerConfig);
 
         address validiumDAValidator = _deployInternal(
@@ -289,7 +289,7 @@ library GatewayCTMDeployerHelper {
         GatewayCTMDeployerConfig memory _config,
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig
-    ) internal returns (DeployedContracts memory) {
+    ) internal view returns (DeployedContracts memory) {
         if (_config.isZKsyncOS) {
             _deployedContracts.stateTransition.chainTypeManagerImplementation = _deployInternal(
                 "ZKsyncOSChainTypeManager",
@@ -388,7 +388,7 @@ library GatewayCTMDeployerHelper {
         string memory fileName,
         bytes memory params,
         InnerDeployConfig memory config
-    ) private returns (address) {
+    ) private view returns (address) {
         bytes memory bytecode = Utils.readZKFoundryBytecodeL1(fileName, contractName);
 
         return
@@ -402,7 +402,7 @@ library GatewayCTMDeployerHelper {
 
     /// @notice List of factory dependencies needed for the correct execution of
     /// CTMDeployer and healthy functionaling of the system overall
-    function getListOfFactoryDeps() external returns (bytes[] memory dependencies) {
+    function getListOfFactoryDeps() external view returns (bytes[] memory dependencies) {
         uint256 totalDependencies = 25;
         dependencies = new bytes[](totalDependencies);
         uint256 index = 0;
