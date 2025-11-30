@@ -54,7 +54,7 @@ export enum SYSTEM_LOG_KEYS {
   // it is the only one that is emitted before the system contracts are upgraded.
   PREV_BATCH_HASH_KEY,
   L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
-  USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+  USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY,
   EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
 }
 
@@ -253,7 +253,7 @@ export function createSystemLogs(
     constructL2Log(
       true,
       L2_TO_L1_MESSENGER,
-      SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+      SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY,
       process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR
     ),
   ];
@@ -301,7 +301,7 @@ export function createSystemLogsWithUpgrade(
     constructL2Log(
       true,
       L2_TO_L1_MESSENGER,
-      SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+      SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY,
       process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR || ethers.constants.AddressZero
     ),
     constructL2Log(
