@@ -191,6 +191,7 @@ contract GatewayCTMDeployer {
             _eraChainId: eraChainId,
             _l1ChainId: l1ChainId,
             _aliasedGovernanceAddress: _config.aliasedGovernanceAddress,
+            _isZKsyncOS: _config.isZKsyncOS,
             _deployedContracts: contracts
         });
         // solhint-disable-next-line func-named-parameters
@@ -218,6 +219,7 @@ contract GatewayCTMDeployer {
     /// @param _l1ChainId L1 Chain ID.
     /// used by permanent rollups.
     /// @param _aliasedGovernanceAddress The aliased address of the governnace.
+    /// @param _isZKsyncOS Whether ZKsync OS mode should be used.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
     /// in the process of the execution of this function.
     function _deployFacetsAndUpgrades(
@@ -225,6 +227,7 @@ contract GatewayCTMDeployer {
         uint256 _eraChainId,
         uint256 _l1ChainId,
         address _aliasedGovernanceAddress,
+        bool _isZKsyncOS,
         DeployedContracts memory _deployedContracts
     ) internal {
         _deployedContracts.stateTransition.mailboxFacet = address(
@@ -242,7 +245,7 @@ contract GatewayCTMDeployer {
             new AdminFacet{salt: _salt}(_l1ChainId, rollupDAManager)
         );
 
-        _deployedContracts.stateTransition.diamondInit = address(new DiamondInit{salt: _salt}(false));
+        _deployedContracts.stateTransition.diamondInit = address(new DiamondInit{salt: _salt}(_isZKsyncOS));
         _deployedContracts.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade{salt: _salt}());
     }
 
