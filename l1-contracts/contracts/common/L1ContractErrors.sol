@@ -109,6 +109,8 @@ error EmptyDeposit();
 error EmptyPrecommitData(uint256 batchNumber);
 // 0x456f8f7a
 error EmptyProofLength();
+// 0x05410cbc
+error EmptyPublicInputsLength();
 // 0x627e0872
 error ETHDepositNotSupported();
 // 0xac4a3f98
