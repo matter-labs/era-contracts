@@ -1074,7 +1074,10 @@ library Utils {
         vm.stopBroadcast();
     }
 
-    function encodeChainAdminMulticall(Call[] memory _calls, bool _requireSuccess) internal pure returns (bytes memory) {
+    function encodeChainAdminMulticall(
+        Call[] memory _calls,
+        bool _requireSuccess
+    ) internal pure returns (bytes memory) {
         return abi.encodeCall(IChainAdmin.multicall, (_calls, _requireSuccess));
     }
 

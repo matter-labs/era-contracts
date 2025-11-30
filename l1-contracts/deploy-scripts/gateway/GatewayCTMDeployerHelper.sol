@@ -34,7 +34,11 @@ library GatewayCTMDeployerHelper {
     function calculateAddresses(
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config
-    ) internal view returns (DeployedContracts memory contracts, bytes memory create2Calldata, address ctmDeployerAddress) {
+    )
+        internal
+        view
+        returns (DeployedContracts memory contracts, bytes memory create2Calldata, address ctmDeployerAddress)
+    {
         (bytes32 bytecodeHash, bytes memory deployData) = Utils.getDeploymentCalldata(
             _create2Salt,
             Utils.readZKFoundryBytecodeL1("GatewayCTMDeployer.sol", "GatewayCTMDeployer"),
