@@ -32,7 +32,6 @@ import {IMessageVerification} from "contracts/common/interfaces/IMessageVerifica
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IL1MessageRoot} from "contracts/bridgehub/IL1MessageRoot.sol";
 
-
 /// We are testing all the specified revert and require cases.
 contract L1AssetRouterFailTest is L1AssetRouterTest {
     using stdStorage for StdStorage;

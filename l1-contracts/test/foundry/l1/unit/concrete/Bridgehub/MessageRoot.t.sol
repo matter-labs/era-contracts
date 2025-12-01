@@ -42,7 +42,6 @@ contract MessageRootTest is Test {
             abi.encode(allZKChainChainIDsZero)
         );
 
-
         assetTracker = makeAddr("assetTracker");
         bridgeHub = makeAddr("bridgeHub");
         L1_CHAIN_ID = 5;

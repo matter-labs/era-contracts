@@ -76,8 +76,6 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// @dev We only update the chainTree on GW as of V31.
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
-
-
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.

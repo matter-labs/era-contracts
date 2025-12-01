@@ -9,8 +9,6 @@ import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessag
 import {CurrentBatchNumberAlreadySet, OnlyOnSettlementLayer, TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber, TotalBatchesExecutedZero, V31UpgradeChainBatchNumberAlreadySet} from "./L1BridgehubErrors.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 
-
-
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
@@ -72,7 +70,7 @@ contract L1MessageRoot is MessageRootBase {
     function _v31InitializeInner(uint256[] memory _allZKChains) internal {
         uint256 allZKChainsLength = _allZKChains.length;
         for (uint256 i = 0; i < allZKChainsLength; ++i) {
-            require (IBridgehubBase(_bridgehub()).settlementLayer(_allZKChains[i]) == block.chainid, NotAllChainsOnL1());
+            require(IBridgehubBase(_bridgehub()).settlementLayer(_allZKChains[i]) == block.chainid, NotAllChainsOnL1());
             v31UpgradeChainBatchNumber[_allZKChains[i]] = V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1;
         }
     }
@@ -82,11 +80,11 @@ contract L1MessageRoot is MessageRootBase {
         uint256 totalBatchesExecuted = IGetters(msg.sender).getTotalBatchesExecuted();
         require(totalBatchesExecuted > 0, TotalBatchesExecutedZero());
         require(
-                totalBatchesExecuted != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
+            totalBatchesExecuted != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
             TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber()
         );
         require(
-                v31UpgradeChainBatchNumber[_chainId] == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
+            v31UpgradeChainBatchNumber[_chainId] == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
             V31UpgradeChainBatchNumberAlreadySet()
         );
         require(currentChainBatchNumber[_chainId] == 0, CurrentBatchNumberAlreadySet());

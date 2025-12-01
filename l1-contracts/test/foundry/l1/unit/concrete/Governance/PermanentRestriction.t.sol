@@ -31,7 +31,6 @@ import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/
 
 import {IL1MessageRoot} from "contracts/bridgehub/IL1MessageRoot.sol";
 
-
 contract TestPermanentRestriction is PermanentRestriction {
     constructor(IL1Bridgehub _bridgehub, address _l2AdminFactory) PermanentRestriction(_bridgehub, _l2AdminFactory) {}
 

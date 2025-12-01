@@ -20,7 +20,6 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {IL1MessageRoot} from "contracts/bridgehub/IL1MessageRoot.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 
-
 contract MessageRoot_Extended_Test is Test {
     address bridgeHub;
     uint256 L1_CHAIN_ID;
@@ -44,7 +43,6 @@ contract MessageRoot_Extended_Test is Test {
             abi.encode(chainAssetHandler)
         );
         vm.mockCall(address(bridgeHub), abi.encodeWithSelector(Ownable.owner.selector), abi.encode(assetTracker));
-
 
         vm.mockCall(
             bridgeHub,
