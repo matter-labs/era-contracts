@@ -21,6 +21,7 @@ import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
+import {IL1MessageRoot} from "contracts/bridgehub/IL1MessageRoot.sol";
 
 contract ChainRegistrationSenderTests is
     L1ContractDeployer,
@@ -73,7 +74,7 @@ contract ChainRegistrationSenderTests is
 
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.messageRootProxy),
-            abi.encodeWithSelector(IMessageRoot.v31UpgradeChainBatchNumber.selector),
+            abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
         );
     }

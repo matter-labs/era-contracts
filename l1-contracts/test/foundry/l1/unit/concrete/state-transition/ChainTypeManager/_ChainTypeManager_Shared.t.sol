@@ -42,6 +42,7 @@ import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifier
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
+import {IL1MessageRoot} from "contracts/bridgehub/IL1MessageRoot.sol";
 
 contract ChainTypeManagerTest is UtilsTest {
     using stdStorage for StdStorage;
@@ -98,7 +99,7 @@ contract ChainTypeManagerTest is UtilsTest {
         );
         stdstore
             .target(address(messageroot))
-            .sig(IMessageRoot.v31UpgradeChainBatchNumber.selector)
+            .sig(IL1MessageRoot.v31UpgradeChainBatchNumber.selector)
             .with_key(chainId)
             .checked_write(uint256(1));
         vm.prank(governor);

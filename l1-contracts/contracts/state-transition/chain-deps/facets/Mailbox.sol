@@ -40,6 +40,7 @@ import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../.
 import {OnlyGateway} from "../../../bridgehub/L1BridgehubErrors.sol";
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IL1ChainAssetHandler} from "../../../bridgehub/IL1ChainAssetHandler.sol";
+import {IL1MessageRoot} from "../../../bridgehub/IL1MessageRoot.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -644,7 +645,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
 
         if (
-            bridgehub.messageRoot().v31UpgradeChainBatchNumber(_chainId) ==
+            IL1MessageRoot(address(bridgehub.messageRoot())).v31UpgradeChainBatchNumber(_chainId) ==
             V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY
         ) {
             /// We pause deposits until the chain has upgraded on GW

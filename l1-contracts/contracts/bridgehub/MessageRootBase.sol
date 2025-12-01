@@ -6,8 +6,8 @@ import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializabl
 
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 
-import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH, V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY, V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessageRoot.sol";
-import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, CurrentBatchNumberAlreadySet, DepthMoreThanOneForRecursiveMerkleProof, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyChain, OnlyL1, OnlyOnSettlementLayer, OnlyPreV31Chain, TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber, TotalBatchesExecutedZero, V31UpgradeChainBatchNumberAlreadySet} from "./L1BridgehubErrors.sol";
+import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH} from "./IMessageRoot.sol";
+import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, DepthMoreThanOneForRecursiveMerkleProof, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyChain, OnlyL1} from "./L1BridgehubErrors.sol";
 
 import {GW_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
@@ -111,17 +111,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// except for PreV31 chains, which can add it directly.
     modifier addChainBatchRootRestriction(uint256 _chainId) {
         if (block.chainid != L1_CHAIN_ID()) {
-            if (msg.sender == GW_ASSET_TRACKER_ADDR) {
-                // this case is valid.
-            } else if (v31UpgradeChainBatchNumber[_chainId] != 0) {
-                address chain = IBridgehubBase(_bridgehub()).getZKChain(_chainId);
-                uint32 minor;
-                // slither-disable-next-line unused-return
-                (, minor, ) = IGetters(chain).getSemverProtocolVersion();
-                /// This might be a security issue if v29 has prover bugs. We should upgrade GW chains to v31 quickly.
-                require(msg.sender == chain, OnlyChain(msg.sender, chain));
-                require(minor < 30, OnlyPreV31Chain(_chainId));
-            } else {
+            if (msg.sender != GW_ASSET_TRACKER_ADDR) {
                 revert OnlyAssetTracker(msg.sender, GW_ASSET_TRACKER_ADDR);
             }
         } else {
@@ -153,38 +143,6 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         _addNewChain(block.chainid, 0);
     }
 
-    function _v31InitializeInner(uint256[] memory _allZKChains) internal {
-        uint256 allZKChainsLength = _allZKChains.length;
-        for (uint256 i = 0; i < allZKChainsLength; ++i) {
-            uint256 batchNumberToWrite = V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY;
-            if (IBridgehubBase(_bridgehub()).settlementLayer(_allZKChains[i]) == L1_CHAIN_ID()) {
-                /// If we are settling on L1.
-                batchNumberToWrite = V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1;
-            }
-            v31UpgradeChainBatchNumber[_allZKChains[i]] = batchNumberToWrite;
-        }
-    }
-
-    function saveV31UpgradeChainBatchNumber(uint256 _chainId) external onlyChain(_chainId) {
-        require(block.chainid == IBridgehubBase(_bridgehub()).settlementLayer(_chainId), OnlyOnSettlementLayer());
-        uint256 totalBatchesExecuted = IGetters(msg.sender).getTotalBatchesExecuted();
-        require(totalBatchesExecuted > 0, TotalBatchesExecutedZero());
-        require(
-            totalBatchesExecuted != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY &&
-                totalBatchesExecuted != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
-            TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber()
-        );
-        require(
-            v31UpgradeChainBatchNumber[_chainId] == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY ||
-                v31UpgradeChainBatchNumber[_chainId] == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
-            V31UpgradeChainBatchNumberAlreadySet()
-        );
-        require(currentChainBatchNumber[_chainId] == 0, CurrentBatchNumberAlreadySet());
-
-        currentChainBatchNumber[_chainId] = totalBatchesExecuted;
-        v31UpgradeChainBatchNumber[_chainId] = totalBatchesExecuted + 1;
-    }
-
     /// @notice Adds a single chain to the message root.
     /// @param _chainId The ID of the chain that is being added to the message root.
     function addNewChain(uint256 _chainId, uint256 _startingBatchNumber) external onlyBridgehubOrChainAssetHandler {
@@ -197,15 +155,13 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// @notice we set the chainBatchRoot to be nonempty for when a chain migrates.
     function setMigratingChainBatchRoot(
         uint256 _chainId,
-        uint256 _batchNumber,
-        uint256 _v31UpgradeChainBatchNumber
+        uint256 _batchNumber
     ) external onlyBridgehubOrChainAssetHandler {
         require(
             chainBatchRoots[_chainId][_batchNumber] == bytes32(0),
             ChainBatchRootAlreadyExists(_chainId, _batchNumber)
         );
         currentChainBatchNumber[_chainId] = _batchNumber;
-        v31UpgradeChainBatchNumber[_chainId] = _v31UpgradeChainBatchNumber;
     }
 
     function chainRegistered(uint256 _chainId) public view returns (bool) {

@@ -36,6 +36,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
+import {IL1MessageRoot} from "contracts/bridgehub/IL1MessageRoot.sol";
 
 contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
     using stdStorage for StdStorage;
@@ -122,7 +123,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         );
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.messageRootProxy),
-            abi.encodeWithSelector(IMessageRoot.v31UpgradeChainBatchNumber.selector),
+            abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
         );
 
@@ -168,7 +169,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         );
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.messageRootProxy),
-            abi.encodeWithSelector(IMessageRoot.v31UpgradeChainBatchNumber.selector),
+            abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
         );
         uint256 chainId = eraZKChainId;

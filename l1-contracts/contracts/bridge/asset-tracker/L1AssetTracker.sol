@@ -25,6 +25,7 @@ import {IL1AssetTracker} from "./IL1AssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
+import {IL1MessageRoot} from "../../bridgehub/IL1MessageRoot.sol";
 
 contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     IBridgehubBase public immutable BRIDGE_HUB;
@@ -205,7 +206,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         // Note, that since this method is used for claiming failed deposits, it implies that any failed deposit that has been processed
         // while the chain settled on top of Gateway, has been accredited to Gateway's balance.
         // For all the batches smaller or equal to that, the responsibility lies with the chain itself.
-        uint256 v31UpgradeChainBatchNumber = MESSAGE_ROOT.v31UpgradeChainBatchNumber(_chainId);
+        uint256 v31UpgradeChainBatchNumber = IL1MessageRoot(address(MESSAGE_ROOT)).v31UpgradeChainBatchNumber(_chainId);
 
         // We need to wait for the proper v31UpgradeChainBatchNumber to be set on the MessageRoot, otherwise we might decrement the chain's chainBalance instead of the gateway's.
         require(

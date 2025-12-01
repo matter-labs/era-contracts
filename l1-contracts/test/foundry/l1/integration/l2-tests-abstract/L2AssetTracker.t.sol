@@ -29,14 +29,14 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         ProcessLogsInput[] memory testData = L2AssetTrackerData.getData();
 
         // Initialize v31UpgradeChainBatchNumber for chain 271 with the correct placeholder value
-        uint256 placeholderValue = uint256(
-            keccak256(abi.encodePacked("V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY"))
-        );
-        stdstore
-            .target(address(L2_MESSAGE_ROOT_ADDR))
-            .sig("v31UpgradeChainBatchNumber(uint256)")
-            .with_key(271)
-            .checked_write(placeholderValue);
+        // uint256 placeholderValue = uint256(
+        //     keccak256(abi.encodePacked("V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY"))
+        // );
+        // stdstore
+        //     .target(address(L2_MESSAGE_ROOT_ADDR))
+        //     .sig("v31UpgradeChainBatchNumber(uint256)")
+        //     .with_key(271)
+        //     .checked_write(placeholderValue);
 
         // Add the required previous batch roots for batches 1-4
         // The test is trying to add batch 5, so we need batches 1-4 to exist first

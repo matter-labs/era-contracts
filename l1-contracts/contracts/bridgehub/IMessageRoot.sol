@@ -69,10 +69,6 @@ interface IMessageRoot is IMessageVerification {
 
     function historicalRoot(uint256 _blockNumber) external view returns (bytes32);
 
-    function v31UpgradeChainBatchNumber(uint256 _chainId) external view returns (uint256);
-
-    function saveV31UpgradeChainBatchNumber(uint256 _chainId) external;
-
     /// @dev Used to parse the merkle proof data, this function calls a library function.
     function getProofData(
         uint256 _chainId,
@@ -84,8 +80,7 @@ interface IMessageRoot is IMessageVerification {
 
     function setMigratingChainBatchRoot(
         uint256 _chainId,
-        uint256 _batchNumber,
-        uint256 _v31UpgradeChainBatchNumber
+        uint256 _batchNumber
     ) external;
 
     function currentChainBatchNumber(uint256 _chainId) external view returns (uint256);

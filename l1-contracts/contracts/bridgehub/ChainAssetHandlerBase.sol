@@ -23,6 +23,7 @@ import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2Con
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandler} from "./IChainAssetHandler.sol";
+import {IL1MessageRoot} from "./IL1MessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -222,10 +223,7 @@ abstract contract ChainAssetHandlerBase is
             batchNumber: batchNumber,
             ctmData: ctmMintData,
             chainData: chainMintData,
-            migrationNumber: migrationNumber[bridgehubBurnData.chainId],
-            v31UpgradeChainBatchNumber: IMessageRoot(_messageRoot()).v31UpgradeChainBatchNumber(
-                bridgehubBurnData.chainId
-            )
+            migrationNumber: migrationNumber[bridgehubBurnData.chainId]
         });
         bridgehubMintData = abi.encode(bridgeMintStruct);
 
@@ -280,8 +278,7 @@ abstract contract ChainAssetHandlerBase is
             // that the `v31UpgradeChainBatchNumber` is not in conflict with the existing values.
             IMessageRoot(_messageRoot()).setMigratingChainBatchRoot(
                 bridgehubMintData.chainId,
-                bridgehubMintData.batchNumber,
-                bridgehubMintData.v31UpgradeChainBatchNumber
+                bridgehubMintData.batchNumber
             );
         }
 

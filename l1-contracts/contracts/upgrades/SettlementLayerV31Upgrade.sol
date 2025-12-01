@@ -14,6 +14,7 @@ import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 import {IL2V31Upgrade} from "./IL2V31Upgrade.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
+import {IL1MessageRoot} from "../bridgehub/IL1MessageRoot.sol";
 
 error PriorityQueueNotReady();
 error V31UpgradeGatewayBlockNumberNotSet();
@@ -21,6 +22,7 @@ error GWNotV31(uint256 chainId);
 error NotAllBatchesExecuted();
 
 /// @author Matter Labs
+/// @title This contract will only be used on L1, since for V31 there will be no active GW, due the deprecation of EraGW, and the ZKSync OS GW launch will only happen after V31.
 /// @custom:security-contact security@matterlabs.dev
 contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
     /// @notice The main function that will be delegate-called by the chain.
@@ -71,7 +73,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         chainAssetHandler.setMigrationNumberForV31(s.chainId);
 
         if (s.settlementLayer == address(0)) {
-            messageRoot.saveV31UpgradeChainBatchNumber(s.chainId);
+            IL1MessageRoot(address(messageRoot)).saveV31UpgradeChainBatchNumber(s.chainId);
         }
 
         if (bridgehub.whitelistedSettlementLayers(s.chainId)) {

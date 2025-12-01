@@ -3,13 +3,13 @@
 pragma solidity 0.8.28;
 
 import {MessageRootBase} from "./MessageRootBase.sol";
-import {FinalizeL1DepositParams} from "../bridge/interfaces/IL1Nullifier.sol";
-import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
-import {IncorrectFunctionSignature, LocallyNoChainsAtGenesis, NotWhitelistedSettlementLayer, OnlyGateway, OnlyL2MessageRoot, V31UpgradeChainBatchNumberAlreadySet} from "./L1BridgehubErrors.sol";
-import {L2_MESSAGE_ROOT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {InvalidProof} from "../common/L1ContractErrors.sol";
-import {L2MessageRoot} from "./L2MessageRoot.sol";
+import {LocallyNoChainsAtGenesis, V31UpgradeChainBatchNumberAlreadySet, NotAllChainsOnL1} from "./L1BridgehubErrors.sol";
 import {IBridgehubBase} from "./IBridgehubBase.sol";
+import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessageRoot.sol";
+import {CurrentBatchNumberAlreadySet, OnlyOnSettlementLayer, TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber, TotalBatchesExecutedZero, V31UpgradeChainBatchNumberAlreadySet} from "./L1BridgehubErrors.sol";
+import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
+
+
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -68,34 +68,31 @@ contract L1MessageRoot is MessageRootBase {
         uint256[] memory allZKChains = IBridgehubBase(BRIDGE_HUB).getAllZKChainChainIDs();
         _v31InitializeInner(allZKChains);
     }
-    function saveV31UpgradeChainBatchNumberOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external {
-        require(_finalizeWithdrawalParams.l2Sender == L2_MESSAGE_ROOT_ADDR, OnlyL2MessageRoot());
-        bool success = proveL1DepositParamsInclusion(_finalizeWithdrawalParams);
-        if (!success) {
-            revert InvalidProof();
+
+    function _v31InitializeInner(uint256[] memory _allZKChains) internal {
+        uint256 allZKChainsLength = _allZKChains.length;
+        for (uint256 i = 0; i < allZKChainsLength; ++i) {
+            require (IBridgehubBase(_bridgehub()).settlementLayer(_allZKChains[i]) == block.chainid, NotAllChainsOnL1());
+            v31UpgradeChainBatchNumber[_allZKChains[i]] = V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1;
         }
+    }
 
-        require(_finalizeWithdrawalParams.chainId == ERA_GATEWAY_CHAIN_ID, OnlyGateway());
+    function saveV31UpgradeChainBatchNumber(uint256 _chainId) external onlyChain(_chainId) {
+        require(block.chainid == IBridgehubBase(_bridgehub()).settlementLayer(_chainId), OnlyOnSettlementLayer());
+        uint256 totalBatchesExecuted = IGetters(msg.sender).getTotalBatchesExecuted();
+        require(totalBatchesExecuted > 0, TotalBatchesExecutedZero());
         require(
-            IBridgehubBase(BRIDGE_HUB).whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
-            NotWhitelistedSettlementLayer(_finalizeWithdrawalParams.chainId)
+                totalBatchesExecuted != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
+            TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber()
         );
-
-        (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_finalizeWithdrawalParams.message, 0);
         require(
-            bytes4(functionSignature) == L2MessageRoot.sendV31UpgradeBlockNumberFromGateway.selector,
-            IncorrectFunctionSignature()
+                v31UpgradeChainBatchNumber[_chainId] == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
+            V31UpgradeChainBatchNumberAlreadySet()
         );
+        require(currentChainBatchNumber[_chainId] == 0, CurrentBatchNumberAlreadySet());
 
-        // slither-disable-next-line unused-return
-        (uint256 chainId, ) = UnsafeBytes.readUint256(_finalizeWithdrawalParams.message, offset);
-        // slither-disable-next-line unused-return
-        (uint256 receivedV31UpgradeChainBatchNumber, ) = UnsafeBytes.readUint256(
-            _finalizeWithdrawalParams.message,
-            offset
-        );
-        require(v31UpgradeChainBatchNumber[chainId] == 0, V31UpgradeChainBatchNumberAlreadySet());
-        v31UpgradeChainBatchNumber[chainId] = receivedV31UpgradeChainBatchNumber;
+        currentChainBatchNumber[_chainId] = totalBatchesExecuted;
+        v31UpgradeChainBatchNumber[_chainId] = totalBatchesExecuted + 1;
     }
 
     /*//////////////////////////////////////////////////////////////
