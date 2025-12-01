@@ -23,7 +23,6 @@ import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2Con
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandler} from "./IChainAssetHandler.sol";
-import {IL1MessageRoot} from "./IL1MessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
