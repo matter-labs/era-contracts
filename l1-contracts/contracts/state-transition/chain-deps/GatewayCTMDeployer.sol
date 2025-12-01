@@ -56,7 +56,8 @@ struct GatewayCTMDeployerConfig {
     uint256 l1ChainId;
     /// @notice Flag indicating whether to use the testnet verifier.
     bool testnetVerifier;
-    /// @notice Flag indicating whether to use ZKsync OS mode.
+    /// @notice Flag indicating whether to use ZKsync OS mode. There are some contract (like CTM) which depend on whether they are tied to ZKsync Era or ZKsync OS.
+    ///         This flag determines which contracts to deploy/what to pass to constructors.
     bool isZKsyncOS;
     /// @notice Array of function selectors for the Admin facet.
     bytes4[] adminSelectors;
@@ -219,7 +220,8 @@ contract GatewayCTMDeployer {
     /// @param _l1ChainId L1 Chain ID.
     /// used by permanent rollups.
     /// @param _aliasedGovernanceAddress The aliased address of the governnace.
-    /// @param _isZKsyncOS Whether ZKsync OS mode should be used.
+    /// @param _isZKsyncOS Whether ZKsync OS mode should be used. There are some contract (like CTM) which depend on whether they are tied to ZKsync Era or ZKsync OS.
+    ///                    This flag determines which contracts to deploy/what to pass to constructors.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
     /// in the process of the execution of this function.
     function _deployFacetsAndUpgrades(
@@ -303,7 +305,8 @@ contract GatewayCTMDeployer {
     /// @notice Deploys verifier.
     /// @param _salt Salt used for CREATE2 deployments.
     /// @param _testnetVerifier Whether testnet verifier should be used.
-    /// @param _isZKsyncOS Whether ZKsync OS mode should be used.
+    /// @param _isZKsyncOS Whether ZKsync OS mode should be used. There are some contract (like CTM) which depend on whether they are tied to ZKsync Era or ZKsync OS.
+    ///                    This flag determines which contracts to deploy/what to pass to constructors.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
     /// @param _verifierOwner The owner that can add additional verification keys.
     /// in the process of the execution of this function.
