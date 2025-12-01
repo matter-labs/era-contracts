@@ -636,7 +636,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         /// After that, the deposits are not being processed for 3.5 days.
         bool inPausedWindow = timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START <= block.timestamp &&
             block.timestamp < timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END;
-        return inPausedWindow || IL1ChainAssetHandler(CHAIN_ASSET_HANDLER).isMigrationInProgress(s.chainId);
+        return
+            inPausedWindow ||
+            (block.chainid == L1_CHAIN_ID &&
+                IL1ChainAssetHandler(CHAIN_ASSET_HANDLER).isMigrationInProgress(s.chainId));
     }
 
     /// @notice Returns whether the chain has upgraded to V31 on GW.
