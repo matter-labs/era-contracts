@@ -391,7 +391,7 @@ jobs:
       # since lcov defaults to removing branch info.
       - name: Filter directories
         run: |
-          lcov --ignore-errors unused --remove lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' 'contracts/chain-registrar/ChainRegistrar.sol' --output-file lcov.info --rc branch_coverage=1
+          lcov --ignore-errors unused --remove lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' --output-file lcov.info --rc branch_coverage=1
 
       # This step posts a detailed coverage report as a comment and deletes previous comments on
       # each push. The below step is used to fail coverage if the specified coverage threshold is

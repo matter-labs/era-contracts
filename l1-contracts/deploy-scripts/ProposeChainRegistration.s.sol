@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {ADDRESS_ONE} from "./Utils.sol";
 

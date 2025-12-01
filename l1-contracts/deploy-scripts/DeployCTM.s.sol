@@ -21,7 +21,6 @@ import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IRollupDAManager} from "./interfaces/IRollupDAManager.sol";
-import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
