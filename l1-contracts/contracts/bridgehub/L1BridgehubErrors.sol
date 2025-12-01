@@ -20,8 +20,6 @@ error CurrentBatchNumberAlreadySet();
 error DepthMoreThanOneForRecursiveMerkleProof();
 // 0x48857c1d
 error IncorrectChainAssetId(bytes32 assetId, bytes32 assetIdFromChainId);
-// 0xdb495273
-error IncorrectFunctionSignature();
 // 0xf5e39c1f
 error IncorrectSender(address prevMsgSender, address chainAdmin);
 // 0x47d42b1b
@@ -76,8 +74,6 @@ error OnlyL1();
 error OnlyL2MessageRoot();
 // 0x6b75db8c
 error OnlyOnSettlementLayer();
-// 0xdb7a6210
-error OnlyPreV31Chain(uint256 chainId);
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
 // 0x36917565
