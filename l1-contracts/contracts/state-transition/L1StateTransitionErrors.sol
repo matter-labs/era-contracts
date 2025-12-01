@@ -92,6 +92,8 @@ error PubdataInputTooSmall(uint256 pubdataInputLength, uint256 totalBlobsCommitm
 error PubdataLengthTooBig(uint256 pubdataLength, uint256 totalBlobSizeBytes);
 // 0x89935a14
 error SettlementLayerChainIdMismatch();
+// 0x97f58c80
+error TotalPriorityTxsIsZero();
 // 0x0baf1d48
 error UnknownVerifierVersion();
 // 0x79274f04

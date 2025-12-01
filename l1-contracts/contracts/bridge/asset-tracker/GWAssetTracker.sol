@@ -516,10 +516,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice used to pause deposits on Gateway from L1 for migration back to L1.
-    function requestPauseDepositsForChain(uint256 _chainId, uint256 _timestamp) external onlyServiceTransactionSender {
+    function requestPauseDepositsForChain(uint256 _chainId) external onlyServiceTransactionSender {
         address zkChain = _bridgehub().getZKChain(_chainId);
         require(zkChain != address(0), ChainIdNotRegistered(_chainId));
-        IMailboxImpl(zkChain).pauseDepositsOnGateway(_timestamp);
+        IMailboxImpl(zkChain).pauseDepositsOnGateway(block.timestamp);
     }
 
     /// @notice Migrates the token balance from Gateway to L1.
