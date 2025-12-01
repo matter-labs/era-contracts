@@ -45,9 +45,19 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
 		_disableInitializers();
 	}
 
-	/// @inheritdoc IValidatorTimelock
-	function initialize(address _initialOwner, uint32 _initialExecutionDelay) external override(ValidatorTimelock, IValidatorTimelock) initializer {
+	/// @notice The initializer for the proxy of the contract. For compatibility with the mainnet deployment
+	/// we initialize to the second version.
+	/// @param _initialOwner The initial owner address
+	/// @param _initialExecutionDelay The initial execution delay
+	function initializeV2(address _initialOwner, uint32 _initialExecutionDelay) external reinitializer(2) {
 		_validatorTimelockInit(_initialOwner, _initialExecutionDelay);
+		__EIP712_init("MultisigCommitter", "1");
+	}
+
+	/// @notice Reinitializer for version 2. We can not directly reuse the ValidatorTimelock's initializer, because 
+	/// it has been already used in the proxy deployment.
+	/// @dev Should be used for production when upgrading the validator timelock to the new version.
+	function reinitializeV2() external reinitializer(2) {
 		__EIP712_init("MultisigCommitter", "1");
 	}
 
