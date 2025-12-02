@@ -590,7 +590,6 @@ contract RegisterZKChainScript is Script {
         string memory chain = vm.serializeUint("", "chain_id", config.chainChainId);
         vm.serializeString("root", "chain", chain);
 
-
         string memory toml = vm.serializeAddress("root", "governance_addr", output.governance);
         string memory root = vm.projectRoot();
         vm.writeToml(toml, outputPath);
