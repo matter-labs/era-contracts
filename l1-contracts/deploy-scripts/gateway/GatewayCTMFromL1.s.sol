@@ -423,7 +423,7 @@ contract GatewayCTMFromL1 is Script {
                 verifier = address(
                     _deployInternal(
                         ContractsBytecodesLib.getCreationCode("ZKsyncOSDualVerifier"),
-                        abi.encode(verifierFflonk, verifierPlonk, config.governanceAddr)
+                        abi.encode(verifierPlonk, config.governanceAddr)
                     )
                 );
             } else {

@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import {ZKsyncOSDualVerifier} from "./ZKsyncOSDualVerifier.sol";
-import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {InvalidMockProofLength, InvalidProof} from "../../common/L1ContractErrors.sol";
 
@@ -12,11 +11,7 @@ import {InvalidMockProofLength, InvalidProof} from "../../common/L1ContractError
 /// @notice Modified version of the main verifier contract for the testnet environment
 /// @dev This contract is used to support mock verification.
 contract ZKsyncOSTestnetVerifier is ZKsyncOSDualVerifier {
-    constructor(
-        IVerifierV2 _fflonkVerifier,
-        IVerifier _plonkVerifier,
-        address _initialOwner
-    ) ZKsyncOSDualVerifier(_fflonkVerifier, _plonkVerifier, _initialOwner) {
+    constructor(IVerifier _plonkVerifier, address _initialOwner) ZKsyncOSDualVerifier(_plonkVerifier, _initialOwner) {
         assert(block.chainid != 1);
     }
 

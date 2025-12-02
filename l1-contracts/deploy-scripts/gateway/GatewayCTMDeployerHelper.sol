@@ -240,7 +240,7 @@ library GatewayCTMDeployerHelper {
                 _deployedContracts.stateTransition.verifier = _deployInternal(
                     "ZKsyncOSDualVerifier",
                     "ZKsyncOSDualVerifier.sol",
-                    abi.encode(verifierFflonk, verifierPlonk, _verifierOwner),
+                    abi.encode(verifierPlonk, _verifierOwner),
                     innerConfig
                 );
             } else {
