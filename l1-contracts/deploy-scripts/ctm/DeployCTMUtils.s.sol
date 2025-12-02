@@ -127,7 +127,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
-    function initializeConfig(string memory configPath) internal virtual {
+    function initializeConfig(string memory permanentValuesInputPath, string memory configPath) internal virtual {
         string memory toml = vm.readFile(configPath);
 
         config.l1ChainId = block.chainid;

@@ -112,11 +112,15 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     uint256[] internal factoryDepsHashes;
     mapping(bytes32 => bool) internal isHashInFactoryDeps;
 
-    function initialize(string memory newConfigPath, string memory _outputPath) public virtual {
+    function initialize(
+        string memory permanentValuesInputPath,
+        string memory newConfigPath,
+        string memory _outputPath
+    ) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
-
-        initializeConfigFromFile(newConfigPath);
+        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
+        initializeConfigFromFile(permanentValuesInputPath, newConfigPath);
 
         console.log("Initialized config from %s", newConfigPath);
         upgradeConfig.outputPath = string.concat(root, _outputPath);
@@ -167,10 +171,14 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
-    function initializeConfigFromFile(string memory newConfigPath) internal virtual {
+    function initializeConfigFromFile(
+        string memory permanentValuesInputPath,
+        string memory newConfigPath
+    ) internal virtual {
+        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
         string memory toml = vm.readFile(newConfigPath);
 
-        bytes32 create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
+        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
         address create2FactoryAddr;
         if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
             create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
@@ -294,7 +302,11 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     /// @notice E2e upgrade generation
     function run() public virtual {
-        initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
+        initialize(
+            vm.envString("PERMANENT_VALUES_INPUT"),
+            vm.envString("UPGRADE_ECOSYSTEM_INPUT"),
+            vm.envString("UPGRADE_ECOSYSTEM_OUTPUT")
+        );
         prepareEcosystemUpgrade();
 
         prepareDefaultGovernanceCalls();
@@ -547,19 +559,20 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](8);
+        Call[][] memory allCalls = new Call[][](7);
 
-        allCalls[0] = prepareCheckMigrationsPausedCalls();
+        allCalls[0] = prepareGovernanceUpgradeTimerCheckCall();
+        allCalls[1] = prepareCheckMigrationsPausedCalls();
         console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
-        allCalls[1] = prepareUpgradeCTMCalls();
+        allCalls[2] = prepareUpgradeCTMCalls();
         console.log("prepareStage1GovernanceCalls: prepareNewChainCreationParamsCall");
-        allCalls[2] = prepareNewChainCreationParamsCall();
+        allCalls[3] = prepareNewChainCreationParamsCall();
         console.log("prepareStage1GovernanceCalls: provideSetNewVersionUpgradeCall");
-        allCalls[3] = provideSetNewVersionUpgradeCall();
+        allCalls[4] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareDAValidatorCall");
-        allCalls[4] = prepareDAValidatorCall();
+        allCalls[5] = prepareDAValidatorCall();
         console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
-        allCalls[5] = prepareVersionSpecificStage1GovernanceCallsL1();
+        allCalls[6] = prepareVersionSpecificStage1GovernanceCallsL1();
         calls = mergeCallsArray(allCalls);
     }
 

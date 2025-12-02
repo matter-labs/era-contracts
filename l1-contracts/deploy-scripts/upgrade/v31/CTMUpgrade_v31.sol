@@ -45,3 +45,36 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         prepareDefaultGovernanceCalls();
     }
 }
+
+/// @notice Script used for v31 upgrade flow
+contract CTMUpgrade_v31_2 is Script, DefaultCTMUpgrade {
+    function getForceDeploymentNames() internal override returns (string[] memory forceDeploymentNames) {
+        forceDeploymentNames = new string[](1);
+        forceDeploymentNames[0] = "L2V29Upgrade";
+    }
+
+    function getExpectedL2Address(string memory contractName) public override returns (address) {
+        if (compareStrings(contractName, "L2V29Upgrade")) {
+            return address(L2_VERSION_SPECIFIC_UPGRADER_ADDR);
+        }
+
+        return super.getExpectedL2Address(contractName);
+    }
+
+    function getL2UpgradeTargetAndData(
+        IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
+    ) internal view virtual override returns (address, bytes memory) {
+        bytes32 ethAssetId = IL1AssetRouter(discoveredBridgehub.assetRouter).ETH_TOKEN_ASSET_ID();
+        bytes memory v29UpgradeCalldata = abi.encodeCall(
+            IL2V29Upgrade.upgrade,
+            (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), ethAssetId)
+        );
+        return (
+            address(L2_COMPLEX_UPGRADER_ADDR),
+            abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgrade,
+                (_forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, v29UpgradeCalldata)
+            )
+        );
+    }
+}

@@ -41,11 +41,15 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
     function run() public virtual {
         console.log("Deploying L1 core contracts");
 
-        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml");
+        runInner(
+            "/script-config/permanent-values.toml",
+            "/script-config/config-deploy-l1.toml",
+            "/script-out/output-deploy-l1.toml"
+        );
     }
 
     function runForTest() public {
-        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"));
+        runInner(vm.envString("PERMANENT_VALUES_INPUT"), vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"));
 
         // In the production environment, there will be a separate script dedicated to accepting the adminship
         // but for testing purposes we'll have to do it here.
@@ -62,12 +66,17 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
         return config;
     }
 
-    function runInner(string memory inputPath, string memory outputPath) internal {
+    function runInner(
+        string memory permanentValuesInputPath,
+        string memory inputPath,
+        string memory outputPath
+    ) internal {
         string memory root = vm.projectRoot();
+        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
         inputPath = string.concat(root, inputPath);
         outputPath = string.concat(root, outputPath);
 
-        initializeConfig(inputPath);
+        initializeConfig(permanentValuesInputPath, inputPath);
 
         instantiateCreate2Factory();
 

@@ -67,7 +67,9 @@ contract DeployL1CoreUtils is DeployUtils {
     Config public config;
     DeployedAddresses internal addresses;
 
-    function initializeConfig(string memory configPath) public virtual {
+    function initializeConfig(string memory permanentValuesInputPath, string memory configPath) public virtual {
+        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
+        // string memory upgradeToml = vm.readFile(upgradeInputPath);
         string memory toml = vm.readFile(configPath);
 
         config.l1ChainId = block.chainid;
@@ -92,6 +94,7 @@ contract DeployL1CoreUtils is DeployUtils {
             create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
         }
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
+        instantiateCreate2Factory();
 
         if (vm.keyExistsToml(toml, "$.contracts.era_diamond_proxy_addr")) {
             config.eraDiamondProxyAddress = toml.readAddress("$.contracts.era_diamond_proxy_addr");

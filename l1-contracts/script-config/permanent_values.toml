@@ -1,0 +1,31 @@
+era_chain_id = 270
+owner_address = "0x8002cd98cfb563492a6fb3e7c8243b7b9ad4cc92"
+testnet_verifier = true
+support_l2_legacy_shared_bridge_test = false
+
+[contracts]
+governance_security_council_address = "0x8002cd98cfb563492a6fb3e7c8243b7b9ad4cc92"
+governance_min_delay = 0
+max_number_of_chains = 100
+create2_factory_salt = "0x5449093bca2c6304d500f9189bf24b3a1aae8b2a2306bda4c6efa7d039849abc"
+validator_timelock_execution_delay = 0
+genesis_root = "0x05f6e3d0cc018903f23c9248a75c20d4fa09e9d84ae51ba22248faa7c7774f6b"
+genesis_rollup_leaf_index = 84
+genesis_batch_commitment = "0xa1bade3051deb55ed9d7bf3df8ee0ddd26c51bfe4a232fda946418d21ef82e13"
+latest_protocol_version = "0x1c00000000"
+recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+priority_tx_max_gas_limit = 72000000
+diamond_init_pubdata_pricing_mode = 0
+diamond_init_batch_overhead_l1_gas = 1000000
+diamond_init_max_pubdata_per_batch = 120000
+diamond_init_max_l2_gas_per_batch = 80000000
+diamond_init_priority_tx_max_pubdata = 99000
+diamond_init_minimal_l2_gas_price = 250000000
+bootloader_hash = "0x01000911c4db4fe62c98e180cfa7e9b3a22fb15f505905d4bf36192f481551e6"
+default_aa_hash = "0x010005f734dec9a66e4471535311709ef26982c3546408de7c25d41a9d4ed09d"
+evm_emulator_hash = "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63"
+
+[tokens]
+token_weth_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"

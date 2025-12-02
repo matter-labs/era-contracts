@@ -29,18 +29,19 @@ contract DefaultChainUpgrade is Script {
     address currentChainAdmin;
     ChainConfig config;
 
-    function prepareChain(string memory configPath) public {
+    function prepareChain(string memory permanentValuesInputPath, string memory configPath) public {
         string memory root = vm.projectRoot();
         configPath = string.concat(root, configPath);
+        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
 
-        initializeConfig(configPath);
+        initializeConfig(permanentValuesInputPath, configPath);
 
         // This script does nothing, it only checks that the provided inputs are correct.
         // It is just a wrapper to easily call `upgradeChain`
     }
 
     function run() public {
-        prepareChain("/script-config/chain-upgrade.toml");
+        prepareChain("/script-config/permanent-values.toml", "/script-config/chain-upgrade.toml");
     }
 
     function upgradeChain(uint256 oldProtocolVersion, Diamond.DiamondCutData memory upgradeCutData) public {
@@ -61,7 +62,7 @@ contract DefaultChainUpgrade is Script {
         IChainAdminOwnable(admin).setUpgradeTimestamp(newProtocolVersion, timestamp);
     }
 
-    function initializeConfig(string memory configPath) internal {
+    function initializeConfig(string memory permanentValuesInputPath, string memory configPath) internal {
         config.deployerAddress = msg.sender;
 
         // Grab config from output of l1 deployment

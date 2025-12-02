@@ -82,7 +82,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
         deploySimpleContract("L1ChainTypeManager", false);
     }
 
-    function initializeConfig(string memory newConfigPath) internal override {
+    function initializeConfig(string memory permanentValuesInputPath, string memory newConfigPath) internal override {
         super.initializeConfig(newConfigPath);
         string memory toml = vm.readFile(newConfigPath);
 

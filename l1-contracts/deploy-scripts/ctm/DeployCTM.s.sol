@@ -74,6 +74,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         console.log("Deploying CTM related contracts");
 
         runInner(
+            "/script-config/permanent-values.toml",
             "/script-config/config-deploy-ctm.toml",
             "/script-out/output-deploy-ctm.toml",
             bridgehub,
@@ -84,7 +85,14 @@ contract DeployCTMScript is Script, DeployCTMUtils {
 
     function runForTest(address bridgehub, bool skipL1Deployments) public {
         saveDiamondSelectors();
-        runInner(vm.envString("CTM_CONFIG"), vm.envString("CTM_OUTPUT"), bridgehub, false, skipL1Deployments);
+        runInner(
+            vm.envString("PERMANENT_VALUES_INPUT"),
+            vm.envString("CTM_CONFIG"),
+            vm.envString("CTM_OUTPUT"),
+            bridgehub,
+            false,
+            skipL1Deployments
+        );
     }
 
     function getAddresses() public view returns (DeployedAddresses memory) {
@@ -96,6 +104,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
     }
 
     function runInner(
+        string memory permanentValuesInputPath,
         string memory inputPath,
         string memory outputPath,
         address bridgehub,
@@ -103,10 +112,11 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         bool skipL1Deployments
     ) internal {
         string memory root = vm.projectRoot();
+        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
         inputPath = string.concat(root, inputPath);
         outputPath = string.concat(root, outputPath);
 
-        initializeConfig(inputPath);
+        initializeConfig(permanentValuesInputPath, inputPath);
 
         if (!skipL1Deployments) {
             instantiateCreate2Factory();
