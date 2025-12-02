@@ -136,7 +136,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
             create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
         }
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
-
+        config.supportL2LegacySharedBridgeTest = permanentValuesToml.readBool("$.support_l2_legacy_shared_bridge_test");
         additionalConfig.newProtocolVersion = upgradeToml.readUint("$.contracts.new_protocol_version");
 
         bridgehub = L1Bridgehub(permanentValuesToml.readAddress("$.contracts.bridgehub_proxy_address"));
@@ -153,8 +153,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         config.eraDiamondProxyAddress = address(assetRouter.ERA_DIAMOND_PROXY());
 
         config.ownerAddress = assetRouter.owner();
-
-        //        config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
 
         config.contracts.governanceSecurityCouncilAddress = governance.securityCouncil();
         config.contracts.governanceMinDelay = governance.minDelay();

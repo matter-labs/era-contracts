@@ -43,9 +43,8 @@ contract EcosystemUpgrade_v31 is Script, DefaultEcosystemUpgrade {
     function deployNewEcosystemContractsL1() public virtual override {
         DeployL1CoreUtils l1CoreDeployer = new DeployL1CoreUtils();
         string memory root = vm.projectRoot();
-        string memory permanentValuesInputPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
         string memory upgradeInputPath = string.concat(root, vm.envString("V31_UPGRADE_ECOSYSTEM_INPUT"));
-        l1CoreDeployer.initializeConfig(permanentValuesInputPath, upgradeInputPath);
+        l1CoreDeployer.initializeConfig(upgradeInputPath);
         bridgehubAddresses.bridgehubImplementation = l1CoreDeployer.deploySimpleContract("L1Bridgehub", false);
         // deploySimpleContract("L1ChainTypeManager", false);
     }

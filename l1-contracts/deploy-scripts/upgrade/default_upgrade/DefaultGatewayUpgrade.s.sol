@@ -94,11 +94,15 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
-    function initialize(string memory newConfigPath, string memory _outputPath) public virtual {
+    function initialize(
+        string memory permanentValuesInputPath,
+        string memory newConfigPath,
+        string memory _outputPath
+    ) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
-
-        initializeConfigFromFile(newConfigPath);
+        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
+        initializeConfigFromFile(permanentValuesInputPath, newConfigPath);
 
         console.log("Initialized config from %s", newConfigPath);
         upgradeConfig.outputPath = string.concat(root, _outputPath);
@@ -145,17 +149,21 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
-    function initializeConfigFromFile(string memory newConfigPath) internal virtual {
+    function initializeConfigFromFile(
+        string memory permanentValuesInputPath,
+        string memory newConfigPath
+    ) internal virtual {
+        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
         string memory toml = vm.readFile(newConfigPath);
 
-        bytes32 create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
+        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
         address create2FactoryAddr;
-        if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
+        if (vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_addr")) {
+            create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
         }
 
         // Can we safely get it from the CTM? is it always exists even for zksync os ?
-        uint256 eraChainId = toml.readUint("$.era_chain_id");
+        uint256 eraChainId = permanentValuesToml.readUint("$.era_chain_id");
 
         address governance;
         if (toml.keyExists("$.governance")) {
@@ -166,8 +174,8 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
 
         // TODO can we discover it?. Try to get it from the chain
         bool isZKsyncOS;
-        if (toml.keyExists("$.is_zk_sync_os")) {
-            isZKsyncOS = toml.readBool("$.is_zk_sync_os");
+        if (permanentValuesToml.keyExists("$.is_zk_sync_os")) {
+            isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
         }
         ChainCreationParamsConfig memory chainCreationParams;
 
@@ -190,26 +198,26 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
 
         Gateway memory gateway;
         // Gateway params
-        gateway.chainId = toml.readUint("$.gateway.chain_id");
-        gateway.gatewayStateTransition.chainTypeManagerProxy = toml.readAddress(
+        gateway.chainId = permanentValuesToml.readUint("$.gateway.chain_id");
+        gateway.gatewayStateTransition.chainTypeManagerProxy = permanentValuesToml.readAddress(
             "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
         );
 
-        gateway.gatewayStateTransition.chainTypeManagerProxyAdmin = toml.readAddress(
+        gateway.gatewayStateTransition.chainTypeManagerProxyAdmin = permanentValuesToml.readAddress(
             "$.gateway.gateway_state_transition.chain_type_manager_proxy_admin"
         );
 
-        gateway.gatewayStateTransition.rollupDAManager = toml.readAddress(
+        gateway.gatewayStateTransition.rollupDAManager = permanentValuesToml.readAddress(
             "$.gateway.gateway_state_transition.rollup_da_manager"
         );
 
-        gateway.gatewayStateTransition.rollupSLDAValidator = toml.readAddress(
+        gateway.gatewayStateTransition.rollupSLDAValidator = permanentValuesToml.readAddress(
             "$.gateway.gateway_state_transition.rollup_sl_da_validator"
         );
 
         // L2 transactions params
-        uint priorityTxsL2GasLimit = toml.readUint("$.priority_txs_l2_gas_limit");
-        uint maxExpectedL1GasPrice = toml.readUint("$.max_expected_l1_gas_price");
+        uint priorityTxsL2GasLimit = permanentValuesToml.readUint("$.priority_txs_l2_gas_limit");
+        uint maxExpectedL1GasPrice = permanentValuesToml.readUint("$.max_expected_l1_gas_price");
 
         initializeConfig(
             create2FactorySalt,
@@ -275,7 +283,11 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
 
     /// @notice E2e upgrade generation
     function run() public virtual {
-        initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
+        initialize(
+            vm.envString("PERMANENT_VALUES_INPUT"),
+            vm.envString("UPGRADE_ECOSYSTEM_INPUT"),
+            vm.envString("UPGRADE_ECOSYSTEM_OUTPUT")
+        );
         prepareEcosystemUpgrade();
 
         prepareDefaultGovernanceCalls();

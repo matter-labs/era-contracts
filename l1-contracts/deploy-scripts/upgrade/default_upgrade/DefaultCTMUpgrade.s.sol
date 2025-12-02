@@ -180,16 +180,16 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
         address create2FactoryAddr;
-        if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
+        if (vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_addr")) {
+            create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
         }
 
-        address ctm = toml.readAddress("$.contracts.ctm_proxy_address");
+        address ctm = permanentValuesToml.readAddress("$.contracts.ctm_proxy_address");
         // Can we safely get it from the CTM? is it always exists even for zksync os ?
-        uint256 eraChainId = toml.readUint("$.era_chain_id");
+        uint256 eraChainId = permanentValuesToml.readUint("$.era_chain_id");
 
-        address bytecodesSupplier = toml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
-        address rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
+        address bytecodesSupplier = permanentValuesToml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
+        address rollupDAManager = permanentValuesToml.readAddress("$.contracts.rollup_da_manager");
 
         address governance;
         if (toml.keyExists("$.governance")) {
@@ -200,8 +200,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         // TODO can we discover it?. Try to get it from the chain
         bool isZKsyncOS;
-        if (toml.keyExists("$.is_zk_sync_os")) {
-            isZKsyncOS = toml.readBool("$.is_zk_sync_os");
+        if (permanentValuesToml.keyExists("$.is_zk_sync_os")) {
+            isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
         }
         ChainCreationParamsConfig memory chainCreationParams;
 
