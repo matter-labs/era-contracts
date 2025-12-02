@@ -159,10 +159,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             config.ownerAddress = discoveredCTM.governance;
         }
         newConfig.ecosystemAdminAddress = discoveredCTM.governance;
-        // FIXME set the proper governor in tests
-        //        config.contracts.governanceSecurityCouncilAddress = Governance(payable(discoveredCTM.governance))
-        //            .securityCouncil();
-        //        config.contracts.governanceMinDelay = Governance(payable(discoveredCTM.governance)).minDelay();
+        config.contracts.governanceSecurityCouncilAddress = Governance(payable(discoveredCTM.governance))
+            .securityCouncil();
+        config.contracts.governanceMinDelay = Governance(payable(discoveredCTM.governance)).minDelay();
         config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(discoveredCTM.validatorTimelockPostV29)
             .executionDelay();
         (bool ok, bytes memory data) = discoveredEraZkChain.verifier.staticcall(

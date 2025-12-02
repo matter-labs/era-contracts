@@ -95,18 +95,25 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         addresses.chainRegistrationSender = ChainRegistrationSender(
             ecosystemAddresses.bridgehub.chainRegistrationSenderProxy
         );
-        _acceptOwnership();
+        _acceptOwnershipCore();
+        _acceptOwnershipCTM();
         _setEraBatch();
 
         addresses.bridgehubOwnerAddress = addresses.bridgehub.owner();
     }
 
-    function _acceptOwnership() private {
+    function _acceptOwnershipCore() private {
         vm.startPrank(addresses.bridgehub.pendingOwner());
         addresses.bridgehub.acceptOwnership();
         addresses.sharedBridge.acceptOwnership();
         IOwnable(ecosystemAddresses.bridgehub.chainAssetHandlerProxy).acceptOwnership();
         addresses.ctmDeploymentTracker.acceptOwnership();
+        vm.stopPrank();
+    }
+
+    function _acceptOwnershipCTM() private {
+        vm.startPrank(IOwnable(address(addresses.chainTypeManager)).pendingOwner());
+        IOwnable(address(addresses.chainTypeManager)).acceptOwnership();
         vm.stopPrank();
     }
 

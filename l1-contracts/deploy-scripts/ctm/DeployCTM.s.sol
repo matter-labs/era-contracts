@@ -280,8 +280,6 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         IOwnable(addresses.stateTransition.serverNotifierProxy).transferOwnership(addresses.chainAdmin);
         IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
 
-        IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
-
         if (config.isZKsyncOS) {
             // We need to transfer the ownership of the Verifier
             ZKsyncOSDualVerifier(addresses.stateTransition.verifier).transferOwnership(addresses.governance);
