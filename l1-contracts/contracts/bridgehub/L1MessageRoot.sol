@@ -24,7 +24,7 @@ contract L1MessageRoot is MessageRootBase {
     /// if a withdrawal happens, the balance of the settlement layer will be reduced and not the chain.
     /// @notice This is also the first batch starting from which we store batch roots on L1.
     /// @notice Due to the definition above, this mapping will have the default value (0) for newly added chains, so all their batches are under v31 rules.
-    /// For chains that existed at the moment of the upgrade, its value will be populated either with V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE until
+    /// For chains that existed at the moment of the upgrade, its value will be populated with V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE until
     /// they call this contract to establish the batch when the upgrade has happened.
     /// @notice Also, as a consequence of the above, the MessageRoot on a settlement layer will require that all messages after this batch go through the asset tracker
     /// to ensure balance consistency.
