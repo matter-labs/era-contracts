@@ -94,7 +94,7 @@ jobs:
       - name: Use Foundry
         uses: foundry-rs/foundry-toolchain@v1
         # Using "stable" channel leads to issues with files not being opened for writing.
-        # Before removing specific version, ensure the issue is resolved. 
+        # Before removing specific version, ensure the issue is resolved.
         with:
           version: "v1.4.0"
 
