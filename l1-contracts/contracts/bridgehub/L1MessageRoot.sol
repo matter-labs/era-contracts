@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {MessageRootBase} from "./MessageRootBase.sol";
+import {ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -15,6 +16,7 @@ contract L1MessageRoot is MessageRootBase {
     /// This means we call the _initialize in both the constructor and the initialize functions.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(address _bridgehub) {
+        require(_bridgehub != address(0), ZeroAddress());
         BRIDGE_HUB = _bridgehub;
         _initialize();
         _disableInitializers();
