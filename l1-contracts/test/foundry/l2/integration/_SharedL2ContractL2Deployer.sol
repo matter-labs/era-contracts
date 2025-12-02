@@ -26,6 +26,8 @@ import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.so
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 // import {DeployCTMIntegrationScript} from "../../l1/integration/deploy-scripts/DeployCTMIntegration.s.sol";
 
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
@@ -46,6 +48,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         );
         initializeConfig(inputPath);
         addresses.transparentProxyAdmin = makeAddr("transparentProxyAdmin");
+        addresses.chainAdmin = makeAddr("chainAdmin");
         addresses.bridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
         addresses.bridges.l1AssetRouterProxy = L2_ASSET_ROUTER_ADDR;
         addresses.vaults.l1NativeTokenVaultProxy = L2_NATIVE_TOKEN_VAULT_ADDR;
@@ -64,6 +67,17 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
                 abi.encodeCall(ValidatorTimelock.initialize, (config.deployerAddress, executionDelay))
             )
         );
+
+        address serverNotifierProxyAdmin = address(new ProxyAdmin());
+        addresses.stateTransition.serverNotifierImplementation = address(new ServerNotifier());
+        addresses.stateTransition.serverNotifierProxy = address(
+            new TransparentUpgradeableProxy(
+                addresses.stateTransition.serverNotifierImplementation,
+                serverNotifierProxyAdmin,
+                abi.encodeCall(ServerNotifier.initialize, (addresses.chainAdmin))
+            )
+        );
+
         addresses.stateTransition.executorFacet = address(new ExecutorFacet(config.l1ChainId));
         addresses.stateTransition.adminFacet = address(
             new AdminFacet(config.l1ChainId, RollupDAManager(addresses.daAddresses.rollupDAManager))
