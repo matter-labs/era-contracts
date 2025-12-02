@@ -49,6 +49,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         );
         initializeConfig(inputPath);
         addresses.transparentProxyAdmin = makeAddr("transparentProxyAdmin");
+        addresses.chainAdmin = makeAddr("chainAdmin");
         addresses.bridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
         addresses.bridges.l1AssetRouterProxy = L2_ASSET_ROUTER_ADDR;
         addresses.vaults.l1NativeTokenVaultProxy = L2_NATIVE_TOKEN_VAULT_ADDR;
@@ -58,6 +59,10 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         addresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
         addresses.stateTransition.verifier = deploySimpleContract("Verifier", true);
         addresses.stateTransition.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
+        (
+            addresses.stateTransition.serverNotifierImplementation,
+            addresses.stateTransition.serverNotifierProxy
+        ) = deployServerNotifier();
         addresses.eip7702Checker = address(0);
         deployStateTransitionDiamondFacets();
         string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
