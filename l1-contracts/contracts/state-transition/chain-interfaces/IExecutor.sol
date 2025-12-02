@@ -4,7 +4,7 @@ pragma solidity ^0.8.21;
 
 import {IZKChainBase} from "./IZKChainBase.sol";
 import {L2DACommitmentScheme} from "../../common/Config.sol";
-import {SystemLogKey} from "../../../system-contracts/contracts/Constants.sol";
+import {SystemLogKey} from "system-contracts/contracts/Constants.sol";
 
 struct LogProcessingOutput {
     uint256 numberOfLayer1Txs;

@@ -16,7 +16,7 @@ import {FeeParams, IVerifier, PubdataPricingMode, VerifierParams} from "contract
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {SystemLogKey} from "../../../../system-contracts/contracts/Constants.sol";
+import {SystemLogKey} from "system-contracts/contracts/Constants.sol";
 import {InteropRoot, L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
@@ -105,7 +105,7 @@ library Utils {
         logs[6] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+            uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY),
             bytes32(uint256(L2_DA_COMMITMENT_SCHEME))
         );
         logs[7] = constructL2Log(
@@ -126,10 +126,10 @@ library Utils {
 
     function createSystemLogsWithNoneDAValidator() public returns (bytes[] memory) {
         bytes[] memory systemLogs = createSystemLogs(bytes32(0));
-        systemLogs[uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)] = constructL2Log(
+        systemLogs[uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY)] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+            uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY),
             bytes32(uint256(L2DACommitmentScheme.NONE))
         );
 

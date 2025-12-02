@@ -8,7 +8,7 @@ import {EMPTY_PREPUBLISHED_COMMITMENT, ExecutorTest, POINT_EVALUATION_PRECOMPILE
 
 import {POINT_EVALUATION_PRECOMPILE_ADDR, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {SystemLogKey} from "../../../../../system-contracts/contracts/Constants.sol";
+import {SystemLogKey} from "system-contracts/contracts/Constants.sol";
 import {RevertedBatchNotAfterNewLastBatch} from "contracts/common/L1ContractErrors.sol";
 
 contract RevertingTest is ExecutorTest {
