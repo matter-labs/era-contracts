@@ -587,6 +587,10 @@ contract RegisterZKChainScript is Script {
         vm.serializeAddress("root", "access_control_restriction_addr", output.accessControlRestrictionAddress);
         vm.serializeAddress("root", "chain_proxy_admin_addr", output.chainProxyAdmin);
 
+        string memory chain = vm.serializeUint("", "chain_id", config.chainChainId);
+        vm.serializeString("root", "chain", chain);
+
+
         string memory toml = vm.serializeAddress("root", "governance_addr", output.governance);
         string memory root = vm.projectRoot();
         vm.writeToml(toml, outputPath);

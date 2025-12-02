@@ -67,13 +67,14 @@ contract DefaultChainUpgrade is Script {
 
         // Grab config from output of l1 deployment
         string memory toml = vm.readFile(configPath);
+        string memory permanentValuesInputToml = vm.readFile(permanentValuesInputPath);
 
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
 
-        config.chainChainId = toml.readUint("$.chain.chain_id");
-        config.bridgehubProxyAddress = toml.readAddress("$.bridgehub_proxy_address");
+        config.chainChainId = permanentValuesInputToml.readUint("$.chain.chain_id");
+        config.bridgehubProxyAddress = permanentValuesInputToml.readAddress("$.contracts.bridgehub_proxy_address");
 
         config.chainDiamondProxyAddress = L1Bridgehub(config.bridgehubProxyAddress).getZKChain(config.chainChainId);
     }
