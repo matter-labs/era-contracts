@@ -1317,7 +1317,7 @@ library Utils {
     function getZKOSBytecodeInfo(bytes memory bytecode) internal returns (bytes memory bytecodeInfo) {
         bytes32 bytecodeBlakeHash = blakeHashBytecode(bytecode);
         bytes32 observableBytecodeBlakeHash = keccak256(bytecode);
-        bytecodeInfo = abi.encode(bytecodeBlakeHash, bytecode.length, observableBytecodeBlakeHash);
+        bytecodeInfo = abi.encode(bytecodeBlakeHash, uint32(bytecode.length), observableBytecodeBlakeHash);
     }
 
     function getZKOSBytecodeInfoForContract(
