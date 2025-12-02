@@ -4,9 +4,6 @@ pragma solidity ^0.8.24;
 
 import {L2InteropRootStorageBase, InteropRoot} from "./abstract/L2InteropRootStorageBase.sol";
 
-// TODO: where should this live? Also, use a constant + offset.
-address constant INTEROP_ROOT_REPORTER_HOOK = address(0x7003);
-error InteropRootReporterHookFailed();
 error InteropRootAlreadyAddedThisBlock();
 
 /**
@@ -59,19 +56,5 @@ contract L2InteropRootStorageZKsyncOS is L2InteropRootStorageBase {
         InteropRoot[] calldata interopRootsInput
     ) external onlyCallFromCoinbase onlyOncePerBlock {
         _addInteropRootsInBatchInternal(interopRootsInput);
-    }
-
-    /// @dev ZKsync OS–specific hook: report to INTEROP_ROOT_REPORTER_HOOK.
-    function _afterInteropRootAdded(uint256 chainId, uint256 blockOrBatchNumber, bytes32 root) internal override {
-        // Binary layout:
-        // [ 0..31] chainId
-        // [32..63] blockOrBatchNumber
-        // [64..95] root
-        bytes memory message = abi.encodePacked(chainId, blockOrBatchNumber, root);
-
-        (bool ok, ) = INTEROP_ROOT_REPORTER_HOOK.call(message);
-        if (!ok) {
-            revert InteropRootReporterHookFailed();
-        }
     }
 }

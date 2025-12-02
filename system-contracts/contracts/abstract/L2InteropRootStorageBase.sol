@@ -51,9 +51,6 @@ abstract contract L2InteropRootStorageBase is SystemContractBase {
         // Set interopRoots for specified chainId and blockOrBatchNumber.
         interopRoots[chainId][blockOrBatchNumber] = sides[0];
 
-        // Optional hook (no-op by default, overridden in ZKsync OS version).
-        _afterInteropRootAdded(chainId, blockOrBatchNumber, sides[0]);
-
         // Emit event.
         emit InteropRootAdded(chainId, blockOrBatchNumber, sides);
     }
@@ -73,10 +70,5 @@ abstract contract L2InteropRootStorageBase is SystemContractBase {
                 );
             }
         }
-    }
-
-    /// @dev Hook for derived contracts. Default: no-op.
-    function _afterInteropRootAdded(uint256 chainId, uint256 blockOrBatchNumber, bytes32 root) internal virtual {
-        // default: do nothing
     }
 }
