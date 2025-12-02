@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, SYSTEM_CONTRACTS_OFFSET, USER_CONTRACTS_OFFSET} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL2WrappedBaseToken} from "../bridge/interfaces/IL2WrappedBaseToken.sol";
@@ -16,7 +16,7 @@ import {L2AssetRouter} from "../bridge/asset-router/L2AssetRouter.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL2SharedBridgeLegacy} from "../bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {L2ChainAssetHandler} from "../bridgehub/L2ChainAssetHandler.sol";
-import {DeployFailed, UnsupportedUpgradeType, ZKsyncOSNotForceDeployForExistingContract, ZKsyncOSForceDeployToPrecompileAddress} from "../common/L1ContractErrors.sol";
+import {DeployFailed, UnsupportedUpgradeType, ZKsyncOSNotForceDeployForExistingContract} from "../common/L1ContractErrors.sol";
 
 import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
@@ -70,11 +70,11 @@ library L2GenesisForceDeploymentsHelper {
 
     function forceDeployOnAddressZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
         require(_newAddress.code.length == 0, ZKsyncOSNotForceDeployForExistingContract(_newAddress));
-        
+
         // Block deployment to precompile addresses (0x01-0xFF)
         uint160 addr = uint160(_newAddress);
         require(addr == 0 || addr > 0xFF, ZKsyncOSNotForceDeployToPrecompileAddress(_newAddress));
-        
+
         unsafeForceDeployZKsyncOS(_bytecodeInfo, _newAddress);
     }
 
