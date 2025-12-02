@@ -22,7 +22,6 @@ contract UpgradeIntegrationTest_Remote is UpgradeIntegrationTestBase {
         PERMANENT_VALUES_INPUT = "/upgrade-envs/permanent-values/mainnet.toml";
         CHAIN_INPUT = "/upgrade-envs/v0.30.0-interopB/mainnet-gateway.toml";
         CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet-gateway.toml";
-
         setupUpgrade();
     }
 

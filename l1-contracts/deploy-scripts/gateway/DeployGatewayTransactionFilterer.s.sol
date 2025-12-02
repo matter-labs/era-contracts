@@ -72,7 +72,7 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils {
             toml.readAddress("$.chain_admin"),
             toml.readAddress("$.chain_proxy_admin"),
             toml.readAddress("$.create2_factory_addr"),
-            toml.readBytes32("$.create2_factory_salt")
+            toml.readBytes32("$.contracts.create2_factory_salt")
         );
 
         // Save the address of the deployed proxy into an output TOML file.

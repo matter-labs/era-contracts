@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 // solhint-disable no-console, gas-custom-errors
 
 import {console2 as console} from "forge-std/Script.sol";
+import {stdToml} from "forge-std/StdToml.sol";
 
 import {EcosystemUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/EcosystemUpgrade_v31.s.sol";
 import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default_upgrade/DefaultChainUpgrade.s.sol";
@@ -16,6 +17,8 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 contract UpgradeIntegrationTestBase is Test {
+    using stdToml for string;
+
     EcosystemUpgrade_v31 ecosystemUpgrade;
     DefaultCTMUpgrade ctmUpgrade;
     DefaultChainUpgrade chainUpgrade;
@@ -31,12 +34,13 @@ contract UpgradeIntegrationTestBase is Test {
     string public CHAIN_OUTPUT;
 
     function setupUpgrade() public {
+        preparePermanentValues();
         ecosystemUpgrade = new EcosystemUpgrade_v31();
         ecosystemUpgrade.initialize(PERMANENT_VALUES_INPUT, ECOSYSTEM_UPGRADE_INPUT, ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT);
         ecosystemUpgrade.deployNewEcosystemContractsL1();
         chainUpgrade = new DefaultChainUpgrade();
         ctmUpgrade = new DefaultCTMUpgrade();
-        // ctmUpgrade.initialize(PERMANENT_VALUES_INPUT, CTM_INPUT, CTM_OUTPUT);
+        ctmUpgrade.initialize(PERMANENT_VALUES_INPUT, CTM_INPUT, CTM_OUTPUT);
     }
 
     function internalTest() internal {
@@ -106,5 +110,37 @@ contract UpgradeIntegrationTestBase is Test {
         }
 
         vm.stopBroadcast();
+    }
+
+    function preparePermanentValues() internal {
+        string memory root = vm.projectRoot();
+        string memory permanentValuesInputPath = string.concat(root, PERMANENT_VALUES_INPUT);
+        string memory outputDeployL1Toml = vm.readFile(string.concat(root, ECOSYSTEM_INPUT));
+        string memory outputDeployCTMToml = vm.readFile(string.concat(root, CTM_INPUT));
+
+        bytes32 create2FactorySalt = outputDeployL1Toml.readBytes32("$.contracts.create2_factory_salt");
+        address create2FactoryAddr;
+        if (vm.keyExistsToml(outputDeployL1Toml, "$.contracts.create2_factory_addr")) {
+            create2FactoryAddr = outputDeployL1Toml.readAddress("$.contracts.create2_factory_addr");
+        }
+        address ctm = outputDeployCTMToml.readAddress(
+            "$.deployed_addresses.state_transition.state_transition_proxy_addr"
+        );
+        address bytecodesSupplier = outputDeployCTMToml.readAddress(
+            "$.deployed_addresses.state_transition.bytecodes_supplier_addr"
+        );
+        address l1Bridgehub = outputDeployL1Toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
+        address rollupDAManager = outputDeployCTMToml.readAddress("$.deployed_addresses.l1_rollup_da_manager");
+        uint256 eraChainId = outputDeployL1Toml.readUint("$.era_chain_id");
+
+        vm.serializeString("contracts", "create2_factory_salt", vm.toString(create2FactorySalt));
+        vm.serializeAddress("contracts", "create2_factory_addr", create2FactoryAddr);
+        vm.serializeAddress("contracts", "ctm_proxy_address", ctm);
+        vm.serializeAddress("contracts", "bridgehub_proxy_address", l1Bridgehub);
+        vm.serializeAddress("contracts", "rollup_da_manager", rollupDAManager);
+        string memory contracts = vm.serializeAddress("contracts", "l1_bytecodes_supplier_addr", bytecodesSupplier);
+        vm.serializeString("root", "contracts", contracts);
+        string memory permanentValuesToml = vm.serializeUint("root", "era_chain_id", eraChainId);
+        vm.writeToml(permanentValuesToml, permanentValuesInputPath);
     }
 }

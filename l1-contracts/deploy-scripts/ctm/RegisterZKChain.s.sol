@@ -236,7 +236,7 @@ contract RegisterZKChainScript is Script {
 
         config.governance = toml.readAddress("$.deployed_addresses.governance_addr");
         config.create2FactoryAddress = toml.readAddress("$.create2_factory_addr");
-        config.create2Salt = toml.readBytes32("$.create2_factory_salt");
+        config.create2Salt = toml.readBytes32("$.contracts.create2_factory_salt");
 
         path = string.concat(root, vm.envString("ZK_CHAIN_CONFIG"));
         toml = vm.readFile(path);

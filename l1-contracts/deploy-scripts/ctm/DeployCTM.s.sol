@@ -361,6 +361,40 @@ contract DeployCTMScript is Script, DeployCTMUtils {
             addresses.daAddresses.availL1DAValidator
         );
         string memory deployedAddresses = vm.serializeString("deployed_addresses", "state_transition", stateTransition);
+
+        vm.serializeUint(
+            "chain_creation_params",
+            "latest_protocol_version",
+            config.contracts.chainCreationParams.latestProtocolVersion
+        );
+        vm.serializeBytes32(
+            "chain_creation_params",
+            "bootloader_hash",
+            config.contracts.chainCreationParams.bootloaderHash
+        );
+        vm.serializeBytes32(
+            "chain_creation_params",
+            "default_aa_hash",
+            config.contracts.chainCreationParams.defaultAAHash
+        );
+        vm.serializeBytes32(
+            "chain_creation_params",
+            "evm_emulator_hash",
+            config.contracts.chainCreationParams.evmEmulatorHash
+        );
+        vm.serializeBytes32("chain_creation_params", "genesis_root", config.contracts.chainCreationParams.genesisRoot);
+        vm.serializeUint(
+            "chain_creation_params",
+            "genesis_rollup_leaf_index",
+            config.contracts.chainCreationParams.genesisRollupLeafIndex
+        );
+        string memory chainCreationParams = vm.serializeBytes32(
+            "chain_creation_params",
+            "genesis_batch_commitment",
+            config.contracts.chainCreationParams.genesisBatchCommitment
+        );
+
+        vm.serializeString("root", "chain_creation_params", chainCreationParams);
         vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeAddress("root", "create2_factory_addr", create2FactoryState.create2FactoryAddress);

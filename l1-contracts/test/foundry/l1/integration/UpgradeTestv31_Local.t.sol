@@ -30,12 +30,13 @@ contract UpgradeIntegrationTest_Local is
     }
 
     function test_DefaultUpgrade_Local() public {
-        PERMANENT_VALUES_INPUT = "/upgrade-envs/permanent-values/local.toml";
+        PERMANENT_VALUES_INPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/permanent-ctm.toml";
+
         ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.31.0-interopB/local.toml";
         ECOSYSTEM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml";
         ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/local.toml";
-        CTM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml";
-        CTM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/local-ctm.toml";
+        CTM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-ctm.toml";
+        CTM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/local.toml";
         CHAIN_INPUT = "/upgrade-envs/v0.31.0-interopB/local.toml";
         CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/local-gateway.toml";
 

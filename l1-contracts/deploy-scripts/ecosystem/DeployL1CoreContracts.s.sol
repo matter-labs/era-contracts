@@ -288,8 +288,14 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
             addresses.vaults.l1NativeTokenVaultProxy
         );
 
-        vm.serializeAddress("root", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
-        vm.serializeBytes32("root", "create2_factory_salt", create2FactoryParams.factorySalt);
+        vm.serializeAddress("contracts", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
+        string memory contracts = vm.serializeBytes32(
+            "contracts",
+            "create2_factory_salt",
+            create2FactoryParams.factorySalt
+        );
+
+        vm.serializeString("root", "contracts", contracts);
         vm.serializeUint("root", "l1_chain_id", config.l1ChainId);
         vm.serializeUint("root", "era_chain_id", config.eraChainId);
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
