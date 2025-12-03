@@ -32,7 +32,7 @@ error ProtocolMajorVersionNotZero();
 error ProtocolVersionDeltaTooLarge(uint256 _proposedDelta, uint256 _maxDelta);
 // 0xd328c12a
 error ProtocolVersionMinorDeltaTooBig(uint256 limit, uint256 proposed);
-// 0x88d7b498
+// 0x2ea43a45
 error ProtocolVersionTooSmall(uint256 _previousProtocolVersion, uint256 _newProtocolVersion);
 // 0x364b6f8b
 error SettlementLayerUpgradeMustPrecedeChainUpgrade();
