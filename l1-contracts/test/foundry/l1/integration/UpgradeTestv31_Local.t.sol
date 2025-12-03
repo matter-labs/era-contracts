@@ -40,13 +40,15 @@ contract UpgradeIntegrationTest_Local is
         CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/local-gateway.toml";
 
         setupUpgrade(true);
+        address bridgehub = ecosystemUpgrade.getDiscoveredBridgehub().bridgehubProxy;
+        bytes32 eraBaseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(eraZKChainId);
+    
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.baseTokenAssetId, 0), abi.encode(eraBaseTokenAssetId));
+        internalTest();
     }
 
     function test_DefaultUpgrade_Local() public {
-        address bridgehub = ecosystemUpgrade.getDiscoveredBridgehub().bridgehubProxy;
-        bytes32 eraBaseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(eraZKChainId);
-
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.baseTokenAssetId, 0), abi.encode(eraBaseTokenAssetId));
-        internalTest();
+        /// we do the whole test in the setup, since it is very ram heavy.
+        require(true, "test passed");
     }
 }
