@@ -1,6 +1,6 @@
 
 old_protocol_version = 0x1d00000000
-bridgehub_proxy_address = "0xC0F09Cb637DCfDe54D8B7b5170736Ec21aBB33cd"
+bridgehub_proxy_address = "0xC0F09Cb637DCfDe54D8B7b5170736Ec21aBB33ce"
 
 [chain]
 chain_id = 270

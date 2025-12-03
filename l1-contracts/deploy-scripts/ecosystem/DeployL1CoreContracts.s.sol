@@ -33,7 +33,7 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
-import {Config, DeployedAddresses, DeployL1CoreUtils} from "./DeployL1CoreUtils.s.sol";
+import {Config, CoreDeployedAddresses, DeployL1CoreUtils} from "./DeployL1CoreUtils.s.sol";
 
 contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
     using stdToml for string;
@@ -54,7 +54,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
         bridgehub.acceptAdmin();
     }
 
-    function getAddresses() public view returns (DeployedAddresses memory) {
+    function getAddresses() public view returns (CoreDeployedAddresses memory) {
         return addresses;
     }
 

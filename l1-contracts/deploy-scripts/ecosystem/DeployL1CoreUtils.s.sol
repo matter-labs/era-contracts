@@ -27,7 +27,7 @@ import {BridgehubDeployedAddresses, BridgesDeployedAddresses, L1NativeTokenVault
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
 
 // solhint-disable-next-line gas-struct-packing
-struct DeployedAddresses {
+struct CoreDeployedAddresses {
     BridgehubDeployedAddresses bridgehub;
     BridgesDeployedAddresses bridges;
     L1NativeTokenVaultAddresses vaults;
@@ -65,7 +65,7 @@ contract DeployL1CoreUtils is DeployUtils {
     using stdToml for string;
 
     Config public config;
-    DeployedAddresses internal addresses;
+    CoreDeployedAddresses internal addresses;
 
     function initializeConfig(string memory configPath) public virtual {
         string memory toml = vm.readFile(configPath);

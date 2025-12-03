@@ -16,8 +16,9 @@ import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../..
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
+import {DeployCTMScript} from "../../ctm/DeployCTM.s.sol";
 
-abstract contract CTMUpgradeBase is DeployCTMUtils {
+abstract contract CTMUpgradeBase is DeployCTMScript {
     function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual returns (bool);
 
     /// @notice Get protocol upgrade nonce from protocol version
@@ -292,7 +293,12 @@ abstract contract CTMUpgradeBase is DeployCTMUtils {
     }
 
     function getAdditionalDependenciesNames() internal virtual returns (string[] memory forceDeploymentNames) {
-        return new string[](0);
+        string[] memory additionalForceDeploymentNames = getForceDeploymentNames();
+        forceDeploymentNames = new string[](additionalForceDeploymentNames.length);
+        for (uint256 i; i < additionalForceDeploymentNames.length; i++) {
+            forceDeploymentNames[i] = additionalForceDeploymentNames[i];
+        }
+        return forceDeploymentNames;
     }
 
     function getForceDeploymentNames() internal virtual returns (string[] memory forceDeploymentNames) {

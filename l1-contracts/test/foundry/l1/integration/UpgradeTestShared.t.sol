@@ -7,10 +7,12 @@ import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {EcosystemUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/EcosystemUpgrade_v31.s.sol";
-import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default_upgrade/DefaultChainUpgrade.s.sol";
+// import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default_upgrade/DefaultChainUpgrade.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
-import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default_upgrade/DefaultCTMUpgrade.s.sol";
+// import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default_upgrade/DefaultCTMUpgrade.s.sol";
+import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
+import {ChainUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/ChainUpgrade_v31.s.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
@@ -20,8 +22,8 @@ contract UpgradeIntegrationTestBase is Test {
     using stdToml for string;
 
     EcosystemUpgrade_v31 ecosystemUpgrade;
-    DefaultCTMUpgrade ctmUpgrade;
-    DefaultChainUpgrade chainUpgrade;
+    CTMUpgrade_v31 ctmUpgrade;
+    ChainUpgrade_v31 chainUpgrade;
 
     // For now, this test is testing "stage" - as mainnet wasn't updated yet.
     string public ECOSYSTEM_INPUT;
@@ -38,36 +40,53 @@ contract UpgradeIntegrationTestBase is Test {
         ecosystemUpgrade = new EcosystemUpgrade_v31();
         ecosystemUpgrade.initialize(PERMANENT_VALUES_INPUT, ECOSYSTEM_UPGRADE_INPUT, ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT);
         ecosystemUpgrade.deployNewEcosystemContractsL1();
-        chainUpgrade = new DefaultChainUpgrade();
-        ctmUpgrade = new DefaultCTMUpgrade();
+        chainUpgrade = new ChainUpgrade_v31();
+        ctmUpgrade = new CTMUpgrade_v31();
         ctmUpgrade.initialize(PERMANENT_VALUES_INPUT, CTM_INPUT, CTM_OUTPUT);
-    }
+        ctmUpgrade.setNewProtocolVersion(0x1d00000000);
 
-    function internalTest() internal {
         console.log("Preparing ecosystem upgrade");
         ecosystemUpgrade.prepareEcosystemUpgrade();
 
+        console.log("Preparing ctm upgrade");
+        ctmUpgrade.prepareCTMUpgrade();
+
         console.log("Preparing chain for the upgrade");
         chainUpgrade.prepareChain(PERMANENT_VALUES_INPUT, CHAIN_INPUT);
+    }
 
+    function internalTest() internal {
         (
             Call[] memory upgradeGovernanceStage0Calls,
             Call[] memory upgradeGovernanceStage1Calls,
             Call[] memory upgradeGovernanceStage2Calls
         ) = ecosystemUpgrade.prepareDefaultGovernanceCalls();
 
-        // ecosystemUpgrade.setOwners(IOwnable(ecosystemUpgrade.getDiscoveredBridgehub().chainAssetHandler).owner());
+        (
+            Call[] memory upgradeCTMStage0Calls,
+            Call[] memory upgradeCTMStage1Calls,
+            Call[] memory upgradeCTMStage2Calls
+        ) = ctmUpgrade.prepareDefaultGovernanceCalls();
 
         console.log("Starting ecosystem upgrade stage 0!");
         governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage0Calls);
+
+        console.log("Starting ctm upgrade stage 0!");
+        governanceMulticall(ctmUpgrade.getOwnerAddress(), upgradeCTMStage0Calls);
 
         // console.log("proxy admin owner", IOwnable(ecosystemUpgrade.getDiscoveredBridgehub().transparentProxyAdmin).owner());
 
         console.log("Starting ecosystem upgrade stage 1!");
         governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage1Calls);
 
+        console.log("Starting ctm upgrade stage 1!");
+        governanceMulticall(ctmUpgrade.getOwnerAddress(), upgradeCTMStage1Calls);
+
         console.log("Starting ecosystem upgrade stage 2!");
         governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage2Calls);
+
+        console.log("Starting ctm upgrade stage 2!");
+        governanceMulticall(ctmUpgrade.getOwnerAddress(), upgradeCTMStage2Calls);
 
         console.log("Ecosystem upgrade is prepared, now all the chains have to upgrade to the new version");
 
@@ -75,20 +94,20 @@ contract UpgradeIntegrationTestBase is Test {
 
         // Now, the admin of the Era needs to call the upgrade function.
         // TODO: We do not include calls that ensure that the server is ready for the sake of brevity.
-        // chainUpgrade.upgradeChain(
-        //     ctmUpgrade.getOldProtocolVersion(),
-        //     ctmUpgrade.generateUpgradeCutDataFromLocalConfig(ctmUpgrade.getAddresses().stateTransition)
-        // );
+        chainUpgrade.upgradeChain(
+            ctmUpgrade.getOldProtocolVersion(),
+            ctmUpgrade.generateUpgradeCutDataFromLocalConfig(ctmUpgrade.getAddresses().stateTransition)
+        );
 
-        // console.log("Creating new chain");
-        // address admin = ctmUpgrade.getBridgehubAdmin();
-        // vm.startPrank(admin);
-        // Call memory createNewChainCall = ctmUpgrade.prepareCreateNewChainCall(555)[0];
-        // (bool success, bytes memory data) = payable(createNewChainCall.target).call{value: createNewChainCall.value}(
-        //     createNewChainCall.data
-        // );
-        // require(success, "Create new chain call failed");
-        // vm.stopPrank();
+        console.log("Creating new chain");
+        address admin = ctmUpgrade.getBridgehubAdmin();
+        vm.startPrank(admin);
+        Call memory createNewChainCall = ctmUpgrade.prepareCreateNewChainCall(555)[0];
+        (bool success, bytes memory data) = payable(createNewChainCall.target).call{value: createNewChainCall.value}(
+            createNewChainCall.data
+        );
+        require(success, "Create new chain call failed");
+        vm.stopPrank();
 
         // TODO: here we should include tests that depoists work for upgraded chains
         // including era specific deposit/withdraw functions

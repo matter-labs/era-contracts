@@ -15,9 +15,9 @@ import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {DeployedAddresses as CoreDeployedAddresses} from "../../../../deploy-scripts/ecosystem/DeployL1CoreUtils.s.sol";
+import {CoreDeployedAddresses} from "../../../../deploy-scripts/ecosystem/DeployL1CoreUtils.s.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
-import {Config, DeployedAddresses as CTMDeployedAddresses} from "../../../../deploy-scripts/ctm/DeployCTMUtils.s.sol";
+import {Config, CTMDeployedAddresses} from "../../../../deploy-scripts/ctm/DeployCTMUtils.s.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 contract L1ContractDeployer is UtilsCallMockerTest {
@@ -114,6 +114,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
     function _acceptOwnershipCTM() private {
         vm.startPrank(IOwnable(address(addresses.chainTypeManager)).pendingOwner());
         IOwnable(address(addresses.chainTypeManager)).acceptOwnership();
+        IOwnable(address(ctmAddresses.daAddresses.rollupDAManager)).acceptOwnership();
         vm.stopPrank();
     }
 

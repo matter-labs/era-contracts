@@ -33,28 +33,58 @@ import {DefaultEcosystemUpgrade} from "../default_upgrade/DefaultEcosystemUpgrad
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
 
+import {DefaultCTMUpgrade} from "../default_upgrade/DefaultCTMUpgrade.s.sol";
+
 /// @notice Script used for v31 upgrade flow
 contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     /// @notice E2e upgrade generation
     function run() public virtual override {
-        initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
-        prepareEcosystemUpgrade();
+        initialize(
+            vm.envString("PERMANENT_VALUES_INPUT"),
+            vm.envString("UPGRADE_ECOSYSTEM_INPUT"),
+            vm.envString("UPGRADE_ECOSYSTEM_OUTPUT")
+        );
+        prepareCTMUpgrade();
 
         /// kl todo check that no chain is on GW. We can write a contract to check it and call it in V31 stage 0 calls.
 
         prepareDefaultGovernanceCalls();
     }
-}
 
-/// @notice Script used for v31 upgrade flow
-contract CTMUpgrade_v31_2 is Script, DefaultCTMUpgrade {
+    function initialize(
+        string memory permanentValuesInputPath,
+        string memory newConfigPath,
+        string memory upgradeEcosystemOutputPath
+    ) public virtual override {
+        super.initialize(permanentValuesInputPath, newConfigPath, upgradeEcosystemOutputPath);
+    }
+
+    function getNewProtocolVersion() public view virtual override returns (uint256) {
+        return 0x1c00000001;
+    }
+
+    /// @notice Deploy everything that should be deployed
+    function deployNewCTMContracts() public virtual override {
+        (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
+        (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
+
+        deployVerifiers();
+
+        deployUpgradeStageValidator();
+        deployGovernanceUpgradeTimer();
+
+        addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("EraChainTypeManager", false);
+
+        deployStateTransitionDiamondFacets();
+    }
+
     function getForceDeploymentNames() internal override returns (string[] memory forceDeploymentNames) {
         forceDeploymentNames = new string[](1);
-        forceDeploymentNames[0] = "L2V29Upgrade";
+        forceDeploymentNames[0] = "L2V31Upgrade";
     }
 
     function getExpectedL2Address(string memory contractName) public override returns (address) {
-        if (compareStrings(contractName, "L2V29Upgrade")) {
+        if (compareStrings(contractName, "L2V31Upgrade")) {
             return address(L2_VERSION_SPECIFIC_UPGRADER_ADDR);
         }
 

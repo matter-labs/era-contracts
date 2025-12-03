@@ -54,7 +54,7 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
-import {Config, DeployedAddresses, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
+import {Config, CTMDeployedAddresses, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
@@ -95,7 +95,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         );
     }
 
-    function getAddresses() public view returns (DeployedAddresses memory) {
+    function getAddresses() public view virtual returns (CTMDeployedAddresses memory) {
         return addresses;
     }
 
@@ -313,6 +313,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         vm.serializeAddress("state_transition", "verifier_addr", addresses.stateTransition.verifier);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", addresses.stateTransition.defaultUpgrade);
+        vm.serializeAddress("state_transition", "eip7702_checker_addr", addresses.eip7702Checker);
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "bytecodes_supplier_addr",

@@ -14,6 +14,7 @@ import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {UpgradeIntegrationTestBase} from "./UpgradeTestShared.t.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 contract UpgradeIntegrationTest_Local is
     UpgradeIntegrationTestBase,
@@ -27,9 +28,7 @@ contract UpgradeIntegrationTest_Local is
         _registerNewTokens(tokens);
 
         _deployEra();
-    }
-
-    function test_DefaultUpgrade_Local() public {
+        acceptPendingAdmin();
         PERMANENT_VALUES_INPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/permanent-ctm.toml";
 
         ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.31.0-interopB/local.toml";
@@ -41,6 +40,13 @@ contract UpgradeIntegrationTest_Local is
         CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/local-gateway.toml";
 
         setupUpgrade();
+    }
+
+    function test_DefaultUpgrade_Local() public {
+        address bridgehub = ecosystemUpgrade.getDiscoveredBridgehub().bridgehubProxy;
+        bytes32 eraBaseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(eraZKChainId);
+
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.baseTokenAssetId, 0), abi.encode(eraBaseTokenAssetId));
         internalTest();
     }
 }

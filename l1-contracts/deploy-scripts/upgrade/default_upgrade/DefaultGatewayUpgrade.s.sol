@@ -30,7 +30,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
-import {DeployCTMUtils, DeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
+import {DeployCTMUtils, CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
@@ -282,7 +282,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     }
 
     /// @notice E2e upgrade generation
-    function run() public virtual {
+    function run() public virtual override {
         initialize(
             vm.envString("PERMANENT_VALUES_INPUT"),
             vm.envString("UPGRADE_ECOSYSTEM_INPUT"),
@@ -635,7 +635,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         );
     }
 
-    function getAddresses() public view returns (DeployedAddresses memory) {
+    function getAddresses() public view virtual override returns (CTMDeployedAddresses memory) {
         return addresses;
     }
 
@@ -660,7 +660,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
 
     function saveOutputVersionSpecific() internal virtual {}
 
-    function saveOutput(string memory outputPath) internal virtual {
+    function saveOutput(string memory outputPath) internal virtual override {
         // Serialize newly deployed gateway state transition addresses
         vm.serializeAddress(
             "gateway_state_transition",

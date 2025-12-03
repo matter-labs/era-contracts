@@ -40,7 +40,7 @@ contract DefaultChainUpgrade is Script {
         // It is just a wrapper to easily call `upgradeChain`
     }
 
-    function run() public {
+    function run() public virtual {
         prepareChain("/script-config/permanent-values.toml", "/script-config/chain-upgrade.toml");
     }
 
