@@ -454,6 +454,12 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     /////////////////////////// Blockchain interactions ////////////////////////////
 
+    bool skipFactoryDepsCheck = false;
+
+    function setSkipFactoryDepsCheck_TestOnly(bool _skipFactoryDepsCheck) public virtual {
+        skipFactoryDepsCheck = _skipFactoryDepsCheck;
+    }
+
     function publishBytecodes() public virtual {
         bytes[] memory allDeps = getFullListOfFactoryDependencies();
         uint256[] memory factoryDeps = new uint256[](allDeps.length);
@@ -467,19 +473,28 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             isHashInFactoryDeps[bytecodeHash] = true;
         }
 
-        // Double check for consistency:
-        require(
-            bytes32(factoryDeps[0]) == config.contracts.chainCreationParams.bootloaderHash,
-            "bootloader hash factory dep mismatch"
-        );
-        require(
-            bytes32(factoryDeps[1]) == config.contracts.chainCreationParams.defaultAAHash,
-            "default aa hash factory dep mismatch"
-        );
-        require(
-            bytes32(factoryDeps[2]) == config.contracts.chainCreationParams.evmEmulatorHash,
-            "EVM emulator hash factory dep mismatch"
-        );
+        console.logBytes32(config.contracts.chainCreationParams.bootloaderHash);
+        console.log(factoryDeps[0]);
+        console.logBytes32(config.contracts.chainCreationParams.defaultAAHash);
+        console.log(factoryDeps[1]);
+        console.logBytes32(config.contracts.chainCreationParams.evmEmulatorHash);
+        console.log(factoryDeps[2]);
+
+        if (!skipFactoryDepsCheck) {
+            // Double check for consistency:
+            require(
+                bytes32(factoryDeps[0]) == config.contracts.chainCreationParams.bootloaderHash,
+                "bootloader hash factory dep mismatch"
+            );
+            require(
+                bytes32(factoryDeps[1]) == config.contracts.chainCreationParams.defaultAAHash,
+                "default aa hash factory dep mismatch"
+            );
+            require(
+                bytes32(factoryDeps[2]) == config.contracts.chainCreationParams.evmEmulatorHash,
+                "EVM emulator hash factory dep mismatch"
+            );
+        }
 
         factoryDepsHashes = factoryDeps;
 

@@ -35,13 +35,14 @@ contract UpgradeIntegrationTestBase is Test {
     string public CHAIN_INPUT;
     string public CHAIN_OUTPUT;
 
-    function setupUpgrade() public {
+    function setupUpgrade(bool skipFactoryDepsCheck) public {
         preparePermanentValues();
         ecosystemUpgrade = new EcosystemUpgrade_v31();
         ecosystemUpgrade.initialize(PERMANENT_VALUES_INPUT, ECOSYSTEM_UPGRADE_INPUT, ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT);
         ecosystemUpgrade.deployNewEcosystemContractsL1();
         chainUpgrade = new ChainUpgrade_v31();
         ctmUpgrade = new CTMUpgrade_v31();
+        ctmUpgrade.setSkipFactoryDepsCheck_TestOnly(skipFactoryDepsCheck);
         ctmUpgrade.initialize(PERMANENT_VALUES_INPUT, CTM_INPUT, CTM_OUTPUT);
         ctmUpgrade.setNewProtocolVersion(0x1d00000000);
 

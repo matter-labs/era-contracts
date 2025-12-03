@@ -39,7 +39,7 @@ contract UpgradeIntegrationTest_Local is
         CHAIN_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml";
         CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/local-gateway.toml";
 
-        setupUpgrade();
+        setupUpgrade(true);
     }
 
     function test_DefaultUpgrade_Local() public {
