@@ -16,7 +16,7 @@ import {L2AssetRouter} from "../bridge/asset-router/L2AssetRouter.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL2SharedBridgeLegacy} from "../bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {L2ChainAssetHandler} from "../bridgehub/L2ChainAssetHandler.sol";
-import {DeployFailed, UnsupportedUpgradeType, ZKsyncOSNotForceDeployForExistingContract} from "../common/L1ContractErrors.sol";
+import {DeployFailed, UnsupportedUpgradeType, ZKsyncOSNotForceDeployForExistingContract, NonCanonicalRepresentation} from "../common/L1ContractErrors.sol";
 
 import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
@@ -51,6 +51,9 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     function unsafeForceDeployZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
+        // Validate canonical encoding for (bytes32, uint32, bytes32) = 32 + 32 + 32 = 96 bytes
+        require(_bytecodeInfo.length == 96, NonCanonicalRepresentation());
+
         (bytes32 bytecodeHash, uint32 bytecodeLength, bytes32 observableBytecodeHash) = abi.decode(
             _bytecodeInfo,
             (bytes32, uint32, bytes32)
@@ -74,7 +77,15 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     function updateZKsyncOSContract(bytes memory _bytecodeInfo, address _newAddress) internal {
+        // Validate that _bytecodeInfo contains exactly the expected length for (bytes, bytes) encoding
+        // to prevent trailing bytes from affecting the hash calculation
+        require(_bytecodeInfo.length >= 64, NonCanonicalRepresentation());
+
         (bytes memory bytecodeInfo, bytes memory bytecodeInfoSystemProxy) = abi.decode((_bytecodeInfo), (bytes, bytes));
+
+        // Verify canonical encoding by re-encoding and comparing
+        bytes memory canonicalEncoding = abi.encode(bytecodeInfo, bytecodeInfoSystemProxy);
+        require(keccak256(_bytecodeInfo) == keccak256(canonicalEncoding), NonCanonicalRepresentation());
 
         // The address to force deploy the implementation to.
         // The first 32 bytes are 0s to ensure that the address will never collide with neither create nor create2.
