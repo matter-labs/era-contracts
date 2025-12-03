@@ -698,8 +698,12 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 }
 
 contract BoundedBridgeHubInvariantTests is BridgeHubInvariantTests {
-    function test_DepositEthBase7702() external {
+
+    function setUp() public {
         prepare();
+    }
+
+    function test_DepositEthBase7702() external {
         uint256 randomCallerPk = uint256(keccak256("RANDOM_CALLER"));
         address payable randomCaller = payable(vm.addr(randomCallerPk));
         currentUser = randomCaller;
