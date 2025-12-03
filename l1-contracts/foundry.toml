@@ -51,7 +51,7 @@ optimizer_runs = 9999999
 allow_internal_expect_revert = true
 
 
-[profile.default.zksync] 
+[profile.default.zksync]
 enable_eravm_extensions = true
 zksolc = "1.5.11"
 
