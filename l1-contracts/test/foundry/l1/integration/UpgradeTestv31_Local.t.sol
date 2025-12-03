@@ -42,7 +42,7 @@ contract UpgradeIntegrationTest_Local is
         setupUpgrade(true);
         address bridgehub = ecosystemUpgrade.getDiscoveredBridgehub().bridgehubProxy;
         bytes32 eraBaseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(eraZKChainId);
-    
+
         vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.baseTokenAssetId, 0), abi.encode(eraBaseTokenAssetId));
         internalTest();
     }

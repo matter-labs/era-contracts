@@ -698,7 +698,6 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 }
 
 contract BoundedBridgeHubInvariantTests is BridgeHubInvariantTests {
-
     function setUp() public {
         prepare();
     }
