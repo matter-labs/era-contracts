@@ -39,7 +39,7 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
 
         proposedUpgrade.newProtocolVersion = semVerNewProtocolVersion;
 
-        vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector));
+        vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector, semVerCurrentProtocolVersion, semVerNewProtocolVersion));
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
