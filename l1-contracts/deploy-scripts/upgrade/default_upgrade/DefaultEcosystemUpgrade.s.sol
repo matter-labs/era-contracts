@@ -255,25 +255,42 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils, UpgradeUtils {
         vm.writeToml(governanceCallsSerialized, upgradeConfig.outputPath, ".governance_calls");
     }
 
+    function prepareDefaultEcosystemAdminCalls() public virtual returns (Call[] memory calls) {
+        // Empty by default.
+        return calls;
+    }
+
+    function prepareUnpauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
+        require(discoveredBridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
+
+        result = new Call[](1);
+        result[0] = Call({
+            target: discoveredBridgehub.chainAssetHandler,
+            value: 0,
+            data: abi.encodeCall(IChainAssetHandler.unpauseMigration, ())
+        });
+    }
+
     /// @notice The zeroth step of upgrade. By default it just stops gateway migrations
     function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](2);
+        Call[][] memory allCalls = new Call[][](3);
 
         allCalls[0] = preparePauseGatewayMigrationsCall();
         allCalls[1] = prepareVersionSpecificStage0GovernanceCallsL1();
+        allCalls[2] = prepareDefaultEcosystemAdminCalls();
 
         calls = mergeCallsArray(allCalls);
     }
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](8);
+        Call[][] memory allCalls = new Call[][](3);
 
         console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
-        allCalls[2] = prepareUpgradeProxiesCalls();
-        allCalls[3] = provideSetNewVersionUpgradeCall();
+        allCalls[0] = prepareUpgradeProxiesCalls();
+        allCalls[1] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
-        allCalls[4] = prepareVersionSpecificStage1GovernanceCallsL1();
+        allCalls[2] = prepareVersionSpecificStage1GovernanceCallsL1();
 
         calls = mergeCallsArray(allCalls);
     }
@@ -283,6 +300,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils, UpgradeUtils {
         Call[][] memory allCalls = new Call[][](2);
 
         allCalls[0] = prepareVersionSpecificStage2GovernanceCallsL1();
+        allCalls[1] = prepareUnpauseGatewayMigrationsCall();
 
         calls = mergeCallsArray(allCalls);
     }

@@ -309,8 +309,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     function run() public virtual override {
         initialize(
             vm.envString("PERMANENT_VALUES_INPUT"),
-            vm.envString("UPGRADE_ECOSYSTEM_INPUT"),
-            vm.envString("UPGRADE_ECOSYSTEM_OUTPUT")
+            vm.envString("UPGRADE_CTM_INPUT"),
+            vm.envString("UPGRADE_CTM_OUTPUT")
         );
         prepareCTMUpgrade();
 
@@ -607,12 +607,11 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     /// @notice The second step of upgrade. By default it unpauses migrations.
     function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](5);
+        Call[][] memory allCalls = new Call[][](3);
 
         allCalls[0] = prepareCheckUpgradeIsPresent();
-        allCalls[1] = prepareUnpauseGatewayMigrationsCall();
-        allCalls[2] = prepareVersionSpecificStage2GovernanceCallsL1();
-        allCalls[4] = prepareCheckMigrationsUnpausedCalls();
+        allCalls[1] = prepareVersionSpecificStage2GovernanceCallsL1();
+        allCalls[2] = prepareCheckMigrationsUnpausedCalls();
 
         calls = mergeCallsArray(allCalls);
     }
@@ -664,17 +663,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             target: discoveredBridgehub.chainAssetHandler,
             value: 0,
             data: abi.encodeCall(IChainAssetHandler.pauseMigration, ())
-        });
-    }
-
-    function prepareUnpauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
-        require(discoveredBridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
-
-        result = new Call[](1);
-        result[0] = Call({
-            target: discoveredBridgehub.chainAssetHandler,
-            value: 0,
-            data: abi.encodeCall(IChainAssetHandler.unpauseMigration, ())
         });
     }
 
