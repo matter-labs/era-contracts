@@ -12,6 +12,8 @@ import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 import {IL1Bridgehub} from "./IL1Bridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {HyperchainNotRegistered} from "./L1BridgehubErrors.sol";
+import {CTMNotRegistered} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -94,6 +96,9 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
         (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeRecoverFailedTransfer(
             bridgehubBurnData.chainId
         );
+
+        require(zkChain != address(0), HyperchainNotRegistered());
+        require(ctm != address(0), CTMNotRegistered());
 
         IChainTypeManager(ctm).forwardedBridgeRecoverFailedTransfer({
             _chainId: bridgehubBurnData.chainId,
