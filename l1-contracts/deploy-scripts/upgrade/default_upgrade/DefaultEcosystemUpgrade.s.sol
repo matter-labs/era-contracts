@@ -254,12 +254,29 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         vm.writeToml(governanceCallsSerialized, upgradeConfig.outputPath, ".governance_calls");
     }
 
+    function prepareDefaultEcosystemAdminCalls() public virtual returns (Call[] memory calls) {
+        // Empty by default.
+        return calls;
+    }
+
+    function prepareUnpauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
+        require(discoveredBridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
+
+        result = new Call[](1);
+        result[0] = Call({
+            target: discoveredBridgehub.chainAssetHandler,
+            value: 0,
+            data: abi.encodeCall(IChainAssetHandler.unpauseMigration, ())
+        });
+    }
+
     /// @notice The zeroth step of upgrade. By default it just stops gateway migrations
     function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](2);
 
         allCalls[0] = preparePauseGatewayMigrationsCall();
         allCalls[1] = prepareVersionSpecificStage0GovernanceCallsL1();
+        allCalls[2] = prepareDefaultEcosystemAdminCalls();
 
         calls = mergeCallsArray(allCalls);
     }
@@ -282,6 +299,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         Call[][] memory allCalls = new Call[][](2);
 
         allCalls[0] = prepareVersionSpecificStage2GovernanceCallsL1();
+        allCalls[1] = prepareUnpauseGatewayMigrationsCall();
 
         calls = mergeCallsArray(allCalls);
     }
