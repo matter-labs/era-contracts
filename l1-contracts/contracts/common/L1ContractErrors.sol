@@ -392,10 +392,10 @@ error ZeroChainId();
 error ZeroGasPriceL1TxZKsyncOS();
 // 0x601b6882
 error ZKChainLimitReached();
-// 0x2a16fb18
-error ZKsyncOSForceDeployToPrecompileAddress(address);
 // 0x646ac57e
 error ZKsyncOSNotForceDeployForExistingContract(address);
+// 0xb24b1ccb
+error ZKsyncOSNotForceDeployToPrecompileAddress(address);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
