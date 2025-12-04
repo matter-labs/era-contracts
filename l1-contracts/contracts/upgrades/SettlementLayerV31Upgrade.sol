@@ -11,18 +11,20 @@ import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IChainAssetHandler} from "../bridgehub/chain-asset-handler/IChainAssetHandler.sol";
 import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
-import {IL2V30Upgrade} from "./IL2V30Upgrade.sol";
+import {IL2V31Upgrade} from "./IL2V31Upgrade.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
+import {IL1MessageRoot} from "../bridgehub/IL1MessageRoot.sol";
 
 error PriorityQueueNotReady();
-error V30UpgradeGatewayBlockNumberNotSet();
-error GWNotV30(uint256 chainId);
+error V31UpgradeGatewayBlockNumberNotSet();
+error GWNotV31(uint256 chainId);
 error NotAllBatchesExecuted();
 
 /// @author Matter Labs
+/// @title This contract will only be used on L1, since for V31 there will be no active GW, due the deprecation of EraGW, and the ZKSync OS GW launch will only happen after V31.
 /// @custom:security-contact security@matterlabs.dev
-contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
+contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
     /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
@@ -46,7 +48,7 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
         uint256 baseTokenOriginChainId = nativeTokenVault.originChainId(baseTokenAssetId);
         address baseTokenOriginAddress = nativeTokenVault.originToken(baseTokenAssetId);
         bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
-            IL2V30Upgrade.upgrade,
+            IL2V31Upgrade.upgrade,
             (baseTokenOriginChainId, baseTokenOriginAddress)
         );
         bytes memory complexUpgraderCalldata = abi.encodeCall(
@@ -66,12 +68,12 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
         address gwChain = bridgehub.getZKChain(gwChainId);
         // slither-disable-next-line unused-return
         (, uint256 gwMinor, ) = IGetters(gwChain).getSemverProtocolVersion();
-        require(gwMinor >= 30, GWNotV30(gwChainId));
+        require(gwMinor >= 30, GWNotV31(gwChainId));
 
-        chainAssetHandler.setMigrationNumberForV30(s.chainId);
+        chainAssetHandler.setMigrationNumberForV31(s.chainId);
 
         if (s.settlementLayer == address(0)) {
-            messageRoot.saveV30UpgradeChainBatchNumber(s.chainId);
+            IL1MessageRoot(address(messageRoot)).saveV31UpgradeChainBatchNumber(s.chainId);
         }
 
         if (bridgehub.whitelistedSettlementLayers(s.chainId)) {

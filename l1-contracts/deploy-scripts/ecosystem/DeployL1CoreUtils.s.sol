@@ -27,7 +27,7 @@ import {BridgehubDeployedAddresses, BridgesDeployedAddresses, L1NativeTokenVault
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
 
 // solhint-disable-next-line gas-struct-packing
-struct DeployedAddresses {
+struct CoreDeployedAddresses {
     BridgehubDeployedAddresses bridgehub;
     BridgesDeployedAddresses bridges;
     L1NativeTokenVaultAddresses vaults;
@@ -65,7 +65,7 @@ contract DeployL1CoreUtils is DeployUtils {
     using stdToml for string;
 
     Config public config;
-    DeployedAddresses internal addresses;
+    CoreDeployedAddresses internal addresses;
 
     function initializeConfig(string memory configPath) public virtual {
         string memory toml = vm.readFile(configPath);
@@ -92,6 +92,7 @@ contract DeployL1CoreUtils is DeployUtils {
             create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
         }
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
+        instantiateCreate2Factory();
 
         if (vm.keyExistsToml(toml, "$.contracts.era_diamond_proxy_addr")) {
             config.eraDiamondProxyAddress = toml.readAddress("$.contracts.era_diamond_proxy_addr");

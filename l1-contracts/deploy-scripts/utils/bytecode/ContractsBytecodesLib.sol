@@ -96,7 +96,7 @@ library ContractsBytecodesLib {
             "ValidatorTimelock",
             "ValidiumL1DAValidator", // ???
             "L2MessageVerification",
-            "L1V29Upgrade",
+            "L2V31Upgrade",
             "UpgradeableBeaconDeployer"
         ];
 

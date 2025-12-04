@@ -15,11 +15,12 @@ import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/ctm-deployment/CTMDeploymentTracker.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {DeployedAddresses as CoreDeployedAddresses} from "../../../../deploy-scripts/ecosystem/DeployL1CoreUtils.s.sol";
-import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
-import {Config, DeployedAddresses as CTMDeployedAddresses} from "../../../../deploy-scripts/ctm/DeployCTMUtils.s.sol";
+import {CoreDeployedAddresses} from "../../../../deploy-scripts/ecosystem/DeployL1CoreUtils.s.sol";
+import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+import {Config, CTMDeployedAddresses} from "../../../../deploy-scripts/ctm/DeployCTMUtils.s.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
-contract L1ContractDeployer is UtilsTest {
+contract L1ContractDeployer is UtilsCallMockerTest {
     using stdStorage for StdStorage;
 
     DeployL1CoreContractsIntegrationScript l1CoreContractsScript;
@@ -94,17 +95,26 @@ contract L1ContractDeployer is UtilsTest {
         addresses.chainRegistrationSender = ChainRegistrationSender(
             ecosystemAddresses.bridgehub.chainRegistrationSenderProxy
         );
-        _acceptOwnership();
+        _acceptOwnershipCore();
+        _acceptOwnershipCTM();
         _setEraBatch();
 
         addresses.bridgehubOwnerAddress = addresses.bridgehub.owner();
     }
 
-    function _acceptOwnership() private {
+    function _acceptOwnershipCore() private {
         vm.startPrank(addresses.bridgehub.pendingOwner());
         addresses.bridgehub.acceptOwnership();
         addresses.sharedBridge.acceptOwnership();
+        IOwnable(ecosystemAddresses.bridgehub.chainAssetHandlerProxy).acceptOwnership();
         addresses.ctmDeploymentTracker.acceptOwnership();
+        vm.stopPrank();
+    }
+
+    function _acceptOwnershipCTM() private {
+        vm.startPrank(IOwnable(address(addresses.chainTypeManager)).pendingOwner());
+        IOwnable(address(addresses.chainTypeManager)).acceptOwnership();
+        IOwnable(address(ctmAddresses.daAddresses.rollupDAManager)).acceptOwnership();
         vm.stopPrank();
     }
 

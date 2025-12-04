@@ -27,8 +27,9 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
-import {IMessageRoot} from "contracts/bridgehub/message-root/IMessageRoot.sol";
-import {IChainAssetHandler} from "contracts/bridgehub/chain-asset-handler/IChainAssetHandler.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
+import {IL1MessageRoot} from "contracts/bridgehub/IL1MessageRoot.sol";
 
 contract L1AssetRouterTest is Test {
     using stdStorage for StdStorage;
@@ -322,7 +323,7 @@ contract L1AssetRouterTest is Test {
         );
         vm.mockCall(
             messageRootAddress,
-            abi.encodeWithSelector(IMessageRoot.v30UpgradeChainBatchNumber.selector),
+            abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
         );
         vm.mockCall(

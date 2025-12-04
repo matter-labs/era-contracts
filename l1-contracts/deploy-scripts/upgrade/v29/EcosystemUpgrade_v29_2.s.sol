@@ -19,13 +19,13 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
-import {DefaultEcosystemUpgrade} from "../default_upgrade/DefaultEcosystemUpgrade.s.sol";
+import {DefaultCTMUpgrade} from "../default_upgrade/DefaultCTMUpgrade.s.sol";
 
 /// @notice Script used for v29 -> v29.2 stage patch
-contract EcosystemUpgrade_v29_2 is Script, DefaultEcosystemUpgrade {
+contract EcosystemUpgrade_v29_2 is Script, DefaultCTMUpgrade {
     using stdToml for string;
 
-    function initializeConfig(string memory newConfigPath) internal override {
+    function initializeConfig(string memory permanentValuesInputPath, string memory newConfigPath) internal override {
         super.initializeConfig(newConfigPath);
         string memory toml = vm.readFile(newConfigPath);
 

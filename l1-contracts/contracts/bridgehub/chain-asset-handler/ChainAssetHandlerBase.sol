@@ -107,7 +107,7 @@ abstract contract ChainAssetHandlerBase is
     }
 
     /*//////////////////////////////////////////////////////////////
-                            V30 Upgrade
+                            V31 Upgrade
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Checks that the message sender is the specified ZK Chain.
@@ -120,7 +120,7 @@ abstract contract ChainAssetHandlerBase is
     }
 
     /// @notice Sets the migration number for a chain on the Gateway when the chain's DiamondProxy upgrades.
-    function setMigrationNumberForV30(uint256 _chainId) external onlyChain(_chainId) {
+    function setMigrationNumberForV31(uint256 _chainId) external onlyChain(_chainId) {
         require(migrationNumber[_chainId] == 0, MigrationNumberAlreadySet());
         bool isOnThisSettlementLayer = block.chainid == IBridgehubBase(_bridgehub()).settlementLayer(_chainId);
         bool shouldIncrementMigrationNumber = (isOnThisSettlementLayer && block.chainid != _l1ChainId()) ||
@@ -221,10 +221,7 @@ abstract contract ChainAssetHandlerBase is
             batchNumber: batchNumber,
             ctmData: ctmMintData,
             chainData: chainMintData,
-            migrationNumber: migrationNumber[bridgehubBurnData.chainId],
-            v30UpgradeChainBatchNumber: IMessageRoot(_messageRoot()).v30UpgradeChainBatchNumber(
-                bridgehubBurnData.chainId
-            )
+            migrationNumber: migrationNumber[bridgehubBurnData.chainId]
         });
         bridgehubMintData = abi.encode(bridgeMintStruct);
 
@@ -276,11 +273,10 @@ abstract contract ChainAssetHandlerBase is
             // Note, that here we rely on the correctness of the provided data.
             // A malicious settlement layer could provide invalid values here.
             // To support untrusted CTMs, we would need to at the very least enforce
-            // that the `v30UpgradeChainBatchNumber` is not in conflict with the existing values.
+            // that the `v31UpgradeChainBatchNumber` is not in conflict with the existing values.
             IMessageRoot(_messageRoot()).setMigratingChainBatchRoot(
                 bridgehubMintData.chainId,
-                bridgehubMintData.batchNumber,
-                bridgehubMintData.v30UpgradeChainBatchNumber
+                bridgehubMintData.batchNumber
             );
         }
 

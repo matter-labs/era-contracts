@@ -144,7 +144,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     }
 
     /*//////////////////////////////////////////////////////////////
-                            V30 migration
+                            V31 migration
     //////////////////////////////////////////////////////////////*/
 
     function migrateTokenBalanceToAssetTracker(

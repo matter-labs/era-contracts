@@ -196,8 +196,8 @@ contract RegisterZKChainScript is Script {
         config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
 
         config.governance = toml.readAddress("$.governance");
-        config.create2FactoryAddress = toml.readAddress("$.create2_factory_address");
-        config.create2Salt = toml.readBytes32("$.create2_salt");
+        config.create2FactoryAddress = toml.readAddress("$.contracts.create2_factory_addr");
+        config.create2Salt = toml.readBytes32("$.contracts.create2_factory_salt");
         config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
     }
 
@@ -235,8 +235,8 @@ contract RegisterZKChainScript is Script {
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
 
         config.governance = toml.readAddress("$.deployed_addresses.governance_addr");
-        config.create2FactoryAddress = toml.readAddress("$.create2_factory_addr");
-        config.create2Salt = toml.readBytes32("$.create2_factory_salt");
+        config.create2FactoryAddress = toml.readAddress("$.contracts.create2_factory_addr");
+        config.create2Salt = toml.readBytes32("$.contracts.create2_factory_salt");
 
         path = string.concat(root, vm.envString("ZK_CHAIN_CONFIG"));
         toml = vm.readFile(path);
@@ -586,6 +586,9 @@ contract RegisterZKChainScript is Script {
         }
         vm.serializeAddress("root", "access_control_restriction_addr", output.accessControlRestrictionAddress);
         vm.serializeAddress("root", "chain_proxy_admin_addr", output.chainProxyAdmin);
+
+        string memory chain = vm.serializeUint("", "chain_id", config.chainChainId);
+        vm.serializeString("root", "chain", chain);
 
         string memory toml = vm.serializeAddress("root", "governance_addr", output.governance);
         string memory root = vm.projectRoot();

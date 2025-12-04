@@ -693,7 +693,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
     function test() internal override {}
 }
 
-contract BoundedBridgeHubInvariantTests is BridgeHubInvariantTests {
+contract BoundedBridgeHubInvariantTests1 is BridgeHubInvariantTests {
     function depositEthSuccess(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 l2Value) public {
         uint64 MAX = 2 ** 64 - 1;
         uint256 l2Value = bound(l2Value, 0.1 ether, MAX);
@@ -728,10 +728,10 @@ contract BoundedBridgeHubInvariantTests is BridgeHubInvariantTests {
 }
 
 contract InvariantTesterZKChains is Test {
-    BoundedBridgeHubInvariantTests tests;
+    BoundedBridgeHubInvariantTests1 tests;
 
     function setUp() public {
-        tests = new BoundedBridgeHubInvariantTests();
+        tests = new BoundedBridgeHubInvariantTests1();
         // tests.prepare();
     }
 

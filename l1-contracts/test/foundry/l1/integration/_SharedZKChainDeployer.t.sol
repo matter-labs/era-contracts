@@ -13,6 +13,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 contract ZKChainDeployer is L1ContractDeployer {
     using stdStorage for StdStorage;
@@ -57,6 +58,8 @@ contract ZKChainDeployer is L1ContractDeployer {
 
         address chainAddress = getZKChainAddress(eraZKChainId);
         IAdmin(chainAddress).unpauseDeposits();
+        _setDAValidatorPair(eraZKChainId);
+        _processGenesisUpgrade(eraZKChainId);
     }
 
     function _deployZKChain(address _baseToken) internal {
@@ -98,6 +101,25 @@ contract ZKChainDeployer is L1ContractDeployer {
             currentZKChainId++;
         }
         deployScript.runForTest();
+        _setDAValidatorPair(chainId);
+        _processGenesisUpgrade(chainId);
+    }
+
+    function _processGenesisUpgrade(uint256 _chainId) internal {
+        IZKChain chain = IZKChain(addresses.bridgehub.getZKChain(_chainId));
+        // Slot 34 is "l2SystemContractsUpgradeBatchNumber" in ZKChainStorage
+        vm.store(address(chain), bytes32(uint256(34)), bytes32(0));
+    }
+
+    function _setDAValidatorPair(uint256 _chainId) internal {
+        IZKChain chain = IZKChain(addresses.bridgehub.getZKChain(_chainId));
+        address admin = chain.getAdmin();
+        vm.startBroadcast(admin);
+        chain.setDAValidatorPair(
+            ctmAddresses.daAddresses.l1RollupDAValidator,
+            L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256
+        );
+        vm.stopBroadcast();
     }
 
     function _getDefaultDescription(

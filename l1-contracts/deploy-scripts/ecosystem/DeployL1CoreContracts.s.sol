@@ -33,7 +33,7 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
-import {Config, DeployedAddresses, DeployL1CoreUtils} from "./DeployL1CoreUtils.s.sol";
+import {Config, CoreDeployedAddresses, DeployL1CoreUtils} from "./DeployL1CoreUtils.s.sol";
 
 contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
     using stdToml for string;
@@ -54,7 +54,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
         bridgehub.acceptAdmin();
     }
 
-    function getAddresses() public view returns (DeployedAddresses memory) {
+    function getAddresses() public view returns (CoreDeployedAddresses memory) {
         return addresses;
     }
 
@@ -288,8 +288,14 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
             addresses.vaults.l1NativeTokenVaultProxy
         );
 
-        vm.serializeAddress("root", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
-        vm.serializeBytes32("root", "create2_factory_salt", create2FactoryParams.factorySalt);
+        vm.serializeAddress("contracts", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
+        string memory contracts = vm.serializeBytes32(
+            "contracts",
+            "create2_factory_salt",
+            create2FactoryParams.factorySalt
+        );
+
+        vm.serializeString("root", "contracts", contracts);
         vm.serializeUint("root", "l1_chain_id", config.l1ChainId);
         vm.serializeUint("root", "era_chain_id", config.eraChainId);
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);

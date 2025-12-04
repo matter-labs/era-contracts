@@ -29,6 +29,8 @@ import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 
+import {IL1MessageRoot} from "contracts/bridgehub/IL1MessageRoot.sol";
+
 contract TestPermanentRestriction is PermanentRestriction {
     constructor(IL1Bridgehub _bridgehub, address _l2AdminFactory) PermanentRestriction(_bridgehub, _l2AdminFactory) {}
 
@@ -402,7 +404,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         );
         vm.mockCall(
             address(messageRootNew),
-            abi.encodeWithSelector(IMessageRoot.v30UpgradeChainBatchNumber.selector),
+            abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(0)
         );
         vm.mockCall(

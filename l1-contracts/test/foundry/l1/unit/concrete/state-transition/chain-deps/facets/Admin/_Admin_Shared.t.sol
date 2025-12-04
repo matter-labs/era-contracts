@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
-import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
+import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -16,7 +16,7 @@ import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifier
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
-contract AdminTest is UtilsTest {
+contract AdminTest is UtilsCallMockerTest {
     IAdmin internal adminFacet;
     UtilsFacet internal utilsFacet;
     address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
