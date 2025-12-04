@@ -345,13 +345,13 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     }
 
     /// @notice used to pause deposits on Gateway from L1 for migration back to L1.
-    function requestPauseDepositsForChainOnGateway(uint256 _chainId, uint256 _timestamp) external onlyChain(_chainId) {
+    function requestPauseDepositsForChainOnGateway(uint256 _chainId) external onlyChain(_chainId) {
         uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
         require(settlementLayer != 0, InvalidSettlementLayer());
         _sendToChain(
             settlementLayer,
             GW_ASSET_TRACKER_ADDR,
-            abi.encodeCall(IGWAssetTracker.requestPauseDepositsForChain, (_chainId, _timestamp))
+            abi.encodeCall(IGWAssetTracker.requestPauseDepositsForChain, (_chainId))
         );
     }
 
