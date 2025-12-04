@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
-import {IL1Bridgehub} from "../../bridgehub/core/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
 import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
 import {FinalizeL1DepositParams, ConfirmTransferResultData} from "../../common/Messaging.sol";

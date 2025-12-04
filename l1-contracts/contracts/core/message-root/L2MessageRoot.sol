@@ -6,7 +6,7 @@ import {MessageRootBase} from "./MessageRootBase.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {OnlyGateway} from "../core/L1BridgehubErrors.sol";
+import {OnlyGateway} from "../bridgehub/L1BridgehubErrors.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
 
 import {FullMerkle} from "../../common/libraries/FullMerkle.sol";

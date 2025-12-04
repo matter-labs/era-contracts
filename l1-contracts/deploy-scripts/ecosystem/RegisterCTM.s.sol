@@ -10,8 +10,8 @@ import {Call} from "contracts/governance/Common.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
-import {IL1Bridgehub} from "contracts/bridgehub/core/IL1Bridgehub.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ctm-deployment/ICTMDeploymentTracker.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 contract RegisterCTM is Script {

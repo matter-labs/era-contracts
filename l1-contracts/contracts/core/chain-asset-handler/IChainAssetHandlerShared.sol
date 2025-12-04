@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.24;
 
-import {IL1Bridgehub} from "../core/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 import {IMessageRoot} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 

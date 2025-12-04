@@ -5,8 +5,8 @@ import {console} from "forge-std/console.sol";
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 
-import {IL1Bridgehub} from "contracts/bridgehub/core/IL1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/bridgehub/core/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
@@ -25,11 +25,11 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {IChainAssetHandler} from "contracts/bridgehub/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IL2AssetTracker, L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {IL1AssetTracker, L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {GWAssetTracker, IGWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
-import {IMessageVerification} from "contracts/bridgehub/message-root/IMessageRoot.sol";
+import {IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
 
 import {IAssetTrackerDataEncoding} from "contracts/bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";

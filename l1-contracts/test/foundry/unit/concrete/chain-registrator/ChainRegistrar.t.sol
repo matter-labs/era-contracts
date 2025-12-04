@@ -8,9 +8,9 @@ import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interf
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
-import {L1MessageRoot} from "contracts/bridgehub/message-root/L1MessageRoot.sol";
-import "contracts/bridgehub/core/L1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/bridgehub/core/IBridgehubBase.sol";
+import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
+import "contracts/core/bridgehub/L1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import "contracts/chain-registrar/ChainRegistrar.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";

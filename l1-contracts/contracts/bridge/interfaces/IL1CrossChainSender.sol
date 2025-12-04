@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/core/IBridgehubBase.sol";
+import {L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs

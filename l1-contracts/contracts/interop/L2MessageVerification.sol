@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 import {MessageVerification} from "../common/MessageVerification.sol";
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 import {L2_INTEROP_ROOT_STORAGE} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {DepthMoreThanOneForRecursiveMerkleProof} from "../bridgehub/core/L1BridgehubErrors.sol";
+import {DepthMoreThanOneForRecursiveMerkleProof} from "../core/bridgehub/L1BridgehubErrors.sol";
 
 /// @title The interface of the ZKsync L2MessageVerification contract that can be used to prove L2 message inclusion on the L2.
 /// @author Matter Labs

@@ -4,8 +4,8 @@ pragma solidity ^0.8.21;
 
 import {Script} from "forge-std/Script.sol";
 import {console2 as console} from "forge-std/console2.sol";
-import {IBridgehubBase} from "contracts/bridgehub/core/IBridgehubBase.sol";
-import {ChainRegistrationSender} from "contracts/bridgehub/chain-registration/ChainRegistrationSender.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 
 contract RegisterOnAllChainsScript is Script {
