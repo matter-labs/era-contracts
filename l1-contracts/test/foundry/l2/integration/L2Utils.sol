@@ -126,7 +126,7 @@ library L2Utils {
             _args.l2TokenProxyBytecodeHash,
             _args.legacySharedBridge,
             _args.l2TokenBeacon,
-            address(0),
+            _args.wethToken,
             ethAssetId
         );
     }

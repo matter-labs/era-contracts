@@ -15,4 +15,5 @@ struct SystemContractsArgs {
     bool contractsDeployedAlready;
     address l1CtmDeployer;
     uint256 maxNumberOfZKChains;
+    address wethToken;
 }
