@@ -52,6 +52,14 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         _initializeInner();
     }
 
+    /// @notice used to initialize the contract
+    /// @notice this contract is also deployed on L2 as a system contract there the owner and the related functions will not be used
+    /// @param _owner the owner of the contract
+    function initialize(address _owner) external reentrancyGuardInitializer {
+        _transferOwnership(_owner);
+        _initializeInner();
+    }
+
     /// @dev Returns the asset ID of ETH token for internal use.
     function _ethTokenAssetId() internal view override returns (bytes32) {
         return ETH_TOKEN_ASSET_ID;
