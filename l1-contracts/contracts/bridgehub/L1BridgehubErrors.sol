@@ -70,8 +70,6 @@ error OnlyChain(address msgSender, address zkChainAddress);
 error OnlyGateway();
 // 0x8d14ca84
 error OnlyL1();
-// 0x605d6b86
-error OnlyL2MessageRoot();
 // 0x6b75db8c
 error OnlyOnSettlementLayer();
 // 0xb78dbaa7
