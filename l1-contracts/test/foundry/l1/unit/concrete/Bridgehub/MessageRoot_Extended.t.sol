@@ -17,7 +17,7 @@ import {ProofData} from "contracts/common/Messaging.sol";
 
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {IL1MessageRoot} from "contracts/bridgehub/IL1MessageRoot.sol";
+import {IL1MessageRoot} from "contracts/bridgehub/message-root/IL1MessageRoot.sol";
 import {L1Bridgehub} from "contracts/bridgehub/core/L1Bridgehub.sol";
 
 contract MessageRoot_Extended_Test is Test {

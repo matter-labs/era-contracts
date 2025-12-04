@@ -14,7 +14,7 @@ import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 import {IL2V31Upgrade} from "./IL2V31Upgrade.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
-import {IL1MessageRoot} from "../bridgehub/IL1MessageRoot.sol";
+import {IL1MessageRoot} from "../bridgehub/message-root/IL1MessageRoot.sol";
 
 error PriorityQueueNotReady();
 error V31UpgradeGatewayBlockNumberNotSet();

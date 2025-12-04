@@ -29,7 +29,7 @@ import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {IL1MessageRoot} from "contracts/bridgehub/IL1MessageRoot.sol";
+import {IL1MessageRoot} from "contracts/bridgehub/message-root/IL1MessageRoot.sol";
 
 contract TestPermanentRestriction is PermanentRestriction {
     constructor(IL1Bridgehub _bridgehub, address _l2AdminFactory) PermanentRestriction(_bridgehub, _l2AdminFactory) {}

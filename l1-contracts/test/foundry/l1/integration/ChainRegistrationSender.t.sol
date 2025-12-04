@@ -21,7 +21,7 @@ import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
 import {IMessageRoot} from "contracts/bridgehub/message-root/IMessageRoot.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
-import {IL1MessageRoot} from "contracts/bridgehub/IL1MessageRoot.sol";
+import {IL1MessageRoot} from "contracts/bridgehub/message-root/IL1MessageRoot.sol";
 
 contract ChainRegistrationSenderTests is
     L1ContractDeployer,

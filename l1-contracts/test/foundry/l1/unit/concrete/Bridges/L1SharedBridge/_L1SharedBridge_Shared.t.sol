@@ -29,7 +29,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {IMessageRoot} from "contracts/bridgehub/message-root/IMessageRoot.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/chain-asset-handler/IChainAssetHandler.sol";
-import {IL1MessageRoot} from "contracts/bridgehub/IL1MessageRoot.sol";
+import {IL1MessageRoot} from "contracts/bridgehub/message-root/IL1MessageRoot.sol";
 
 contract L1AssetRouterTest is Test {
     using stdStorage for StdStorage;

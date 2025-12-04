@@ -36,7 +36,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
-import {IL1MessageRoot} from "contracts/bridgehub/IL1MessageRoot.sol";
+import {IL1MessageRoot} from "contracts/bridgehub/message-root/IL1MessageRoot.sol";
 
 contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
     using stdStorage for StdStorage;

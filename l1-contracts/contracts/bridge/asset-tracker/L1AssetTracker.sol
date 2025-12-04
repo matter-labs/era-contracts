@@ -25,7 +25,7 @@ import {IL1AssetTracker} from "./IL1AssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IChainAssetHandler} from "../../bridgehub/chain-asset-handler/IChainAssetHandler.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
-import {IL1MessageRoot} from "../../bridgehub/IL1MessageRoot.sol";
+import {IL1MessageRoot} from "../../bridgehub/message-root/IL1MessageRoot.sol";
 
 contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     IBridgehubBase public immutable BRIDGE_HUB;
