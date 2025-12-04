@@ -243,7 +243,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     /// @notice Full default upgrade preparation flow
     function prepareCTMUpgrade() public virtual {
         deployNewCTMContracts();
-        console.log("Ecosystem contracts are deployed!");
+        console.log("CTM contracts are deployed!");
         publishBytecodes();
         console.log("Bytecodes published!");
         // TODO should we deploy state transition diamond facets here again?
@@ -315,7 +315,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         prepareCTMUpgrade();
 
         prepareDefaultGovernanceCalls();
-        prepareDefaultEcosystemAdminCalls();
+        prepareDefaultCTMAdminCalls();
 
         prepareDefaultTestUpgradeCalls();
     }
@@ -527,18 +527,18 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         vm.writeToml(governanceCallsSerialized, upgradeConfig.outputPath, ".governance_calls");
     }
 
-    function prepareDefaultEcosystemAdminCalls() public virtual returns (Call[] memory calls) {
+    function prepareDefaultCTMAdminCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](1);
         allCalls[0] = prepareUpgradeServerNotifierCall();
         calls = mergeCallsArray(allCalls);
 
-        string memory ecosystemAdminCallsSerialized = vm.serializeBytes(
-            "ecosystem_admin_calls",
+        string memory ctmAdminCallsSerialized = vm.serializeBytes(
+            "ctm_admin_calls",
             "server_notifier_upgrade",
             abi.encode(calls)
         );
 
-        vm.writeToml(ecosystemAdminCallsSerialized, upgradeConfig.outputPath, ".ecosystem_admin_calls");
+        vm.writeToml(ctmAdminCallsSerialized, upgradeConfig.outputPath, ".ctm_admin_calls");
     }
 
     function prepareDefaultTestUpgradeCalls() public {
