@@ -133,6 +133,16 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         address _wethToken,
         bytes32 _baseTokenAssetId
     ) public onlyUpgrader {
+        // Ensure _wethToken is not zero address to maintain WETH security guards
+        if (_wethToken == address(0)) {
+            revert EmptyAddress();
+        }
+
+        // Prevent changing WETH_TOKEN if already set to a different non-zero value
+        if (WETH_TOKEN != address(0) && WETH_TOKEN != _wethToken) {
+            revert AddressMismatch(_wethToken, WETH_TOKEN);
+        }
+
         WETH_TOKEN = _wethToken;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         L1_CHAIN_ID = _l1ChainId;
