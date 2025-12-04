@@ -29,7 +29,7 @@ import {ClaimFailedDepositFailed, EmptyToken, NativeTokenVaultAlreadySet, WrongC
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {IMessageRoot} from "contracts/bridgehub/message-root/IMessageRoot.sol";
 import {IL1MessageRoot} from "contracts/bridgehub/IL1MessageRoot.sol";
 
 /// We are testing all the specified revert and require cases.

@@ -41,7 +41,7 @@ import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
-import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/chain-asset-handler/L1ChainAssetHandler.sol";
 import {IL1MessageRoot} from "contracts/bridgehub/IL1MessageRoot.sol";
 
 contract ChainTypeManagerTest is UtilsCallMockerTest {

@@ -14,7 +14,7 @@ import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {UpgradeIntegrationTestBase} from "./UpgradeTestShared.t.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "contracts/bridgehub/core/IBridgehubBase.sol";
 
 contract UpgradeIntegrationTest_Local is
     UpgradeIntegrationTestBase,
