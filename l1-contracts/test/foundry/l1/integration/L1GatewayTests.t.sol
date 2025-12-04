@@ -7,9 +7,9 @@ import "forge-std/console.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
-import {IBridgehubBase, BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/core/IL1Bridgehub.sol";
+import {L2Bridgehub} from "contracts/bridgehub/core/L2Bridgehub.sol";
+import {IBridgehubBase, BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, L2TransactionRequestDirect} from "contracts/bridgehub/core/IBridgehubBase.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
@@ -29,7 +29,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-import {NotInGatewayMode} from "contracts/bridgehub/L1BridgehubErrors.sol";
+import {NotInGatewayMode} from "contracts/bridgehub/core/L1BridgehubErrors.sol";
 import {InvalidProof, DepositDoesNotExist} from "contracts/common/L1ContractErrors.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
@@ -43,9 +43,9 @@ import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
-import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
-import {IL1ChainAssetHandler} from "contracts/bridgehub/IL1ChainAssetHandler.sol";
-import {IMessageRoot, IMessageVerification} from "contracts/bridgehub/IMessageRoot.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/chain-asset-handler/IChainAssetHandler.sol";
+import {IL1ChainAssetHandler} from "contracts/bridgehub/chain-asset-handler/IL1ChainAssetHandler.sol";
+import {IMessageRoot, IMessageVerification} from "contracts/bridgehub/message-root/IMessageRoot.sol";
 import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 import {NotMigrated} from "contracts/state-transition/L1StateTransitionErrors.sol";
 

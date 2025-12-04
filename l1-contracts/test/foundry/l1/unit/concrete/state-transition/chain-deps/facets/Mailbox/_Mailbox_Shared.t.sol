@@ -14,9 +14,9 @@ import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestne
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
-import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
-import {IL1ChainAssetHandler} from "contracts/bridgehub/IL1ChainAssetHandler.sol";
+import {IBridgehubBase} from "contracts/bridgehub/core/IBridgehubBase.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/chain-asset-handler/IChainAssetHandler.sol";
+import {IL1ChainAssetHandler} from "contracts/bridgehub/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 

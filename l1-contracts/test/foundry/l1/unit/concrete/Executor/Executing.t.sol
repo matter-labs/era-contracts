@@ -13,7 +13,7 @@ import {BatchHashMismatch, CantExecuteUnprovenBatches, NonSequentialBatch, Prior
 import {PriorityOpsBatchInfo, PriorityTree} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InteropRoot} from "contracts/common/Messaging.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {IMessageRoot} from "contracts/bridgehub/message-root/IMessageRoot.sol";
 
 contract ExecutingTest is ExecutorTest {
     using stdStorage for StdStorage;

@@ -25,12 +25,12 @@ import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
 import {AddressAlreadySet, LegacyBridgeUsesNonNativeToken, LegacyEncodingUsedForNonL1Token, NonEmptyMsgValue, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {IL1Bridgehub} from "../../bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "../../bridgehub/core/IL1Bridgehub.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/core/IBridgehubBase.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
-import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "../../bridgehub/core/IBridgehubBase.sol";
 import {TxStatus} from "../../common/Messaging.sol";
 
 /// @author Matter Labs

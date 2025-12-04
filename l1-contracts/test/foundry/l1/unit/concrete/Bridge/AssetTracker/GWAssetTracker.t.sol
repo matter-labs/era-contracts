@@ -16,9 +16,9 @@ import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
 import {InvalidCanonicalTxHash} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/chain-asset-handler/IChainAssetHandler.sol";
 
-import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
+import {L2MessageRoot} from "contracts/bridgehub/message-root/L2MessageRoot.sol";
 
 contract GWAssetTrackerTestHelper is GWAssetTracker {
     function getEmptyMessageRoot(uint256 _chainId) external returns (bytes32) {

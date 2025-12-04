@@ -8,8 +8,8 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
 
-import {BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehubBase.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {BridgehubBurnCTMAssetData} from "contracts/bridgehub/core/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/core/IL1Bridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";

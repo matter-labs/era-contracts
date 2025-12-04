@@ -4,18 +4,18 @@ pragma solidity 0.8.28;
 
 import {MessageRootBase} from "./MessageRootBase.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {V30UpgradeChainBatchNumberNotSet, OnlyGateway} from "./L1BridgehubErrors.sol";
-import {MessageHashing} from "../common/libraries/MessageHashing.sol";
+import {V30UpgradeChainBatchNumberNotSet, OnlyGateway} from "../core/L1BridgehubErrors.sol";
+import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
 
-import {FullMerkle} from "../common/libraries/FullMerkle.sol";
-import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
+import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
+import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 import {V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "./IMessageRoot.sol";
-import {InvalidCaller, Unauthorized} from "../common/L1ContractErrors.sol";
-import {SERVICE_TRANSACTION_SENDER} from "../common/Config.sol";
-import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {IBridgehubBase} from "./IBridgehubBase.sol";
+import {InvalidCaller, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {IBridgehubBase} from "../core/IBridgehubBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

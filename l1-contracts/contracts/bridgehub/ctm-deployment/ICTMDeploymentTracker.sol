@@ -2,9 +2,9 @@
 
 pragma solidity 0.8.28;
 
-import {IBridgehubBase} from "./IBridgehubBase.sol";
-import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
-import {IL1AssetDeploymentTracker} from "../bridge/interfaces/IL1AssetDeploymentTracker.sol";
+import {IBridgehubBase} from "../core/IBridgehubBase.sol";
+import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
+import {IL1AssetDeploymentTracker} from "../../bridge/interfaces/IL1AssetDeploymentTracker.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

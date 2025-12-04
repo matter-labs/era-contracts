@@ -4,13 +4,13 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
-import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
+import {L1MessageRoot} from "contracts/bridgehub/message-root/L1MessageRoot.sol";
+import {L2MessageRoot} from "contracts/bridgehub/message-root/L2MessageRoot.sol";
+import {IMessageRoot} from "contracts/bridgehub/message-root/IMessageRoot.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/chain-asset-handler/IChainAssetHandler.sol";
 
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
-import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler} from "contracts/bridgehub/L1BridgehubErrors.sol";
+import {IBridgehubBase} from "contracts/bridgehub/core/IBridgehubBase.sol";
+import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler} from "contracts/bridgehub/core/L1BridgehubErrors.sol";
 
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";

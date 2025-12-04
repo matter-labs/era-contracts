@@ -8,15 +8,15 @@ import {IMessageVerification} from "../interfaces/IMessageVerification.sol";
 import {IBaseToken} from "./IBaseToken.sol";
 import {IL2ContractDeployer} from "../interfaces/IL2ContractDeployer.sol";
 import {IL2NativeTokenVault} from "../../bridge/ntv/IL2NativeTokenVault.sol";
-import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
-import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
+import {IBridgehubBase} from "../../bridgehub/core/IBridgehubBase.sol";
+import {IChainAssetHandler} from "../../bridgehub/chain-asset-handler/IChainAssetHandler.sol";
 import {IInteropCenter} from "../../interop/IInteropCenter.sol";
 import {IInteropHandler} from "../../interop/IInteropHandler.sol";
 import {IL2AssetRouter} from "../../bridge/asset-router/IL2AssetRouter.sol";
 import {IL2AssetTracker} from "../../bridge/asset-tracker/IL2AssetTracker.sol";
 import {IGWAssetTracker} from "../../bridge/asset-tracker/IGWAssetTracker.sol";
 import {ISystemContext} from "../interfaces/ISystemContext.sol";
-import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
+import {IMessageRoot} from "../../bridgehub/message-root/IMessageRoot.sol";
 
 /// @dev the offset for the system contracts
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15

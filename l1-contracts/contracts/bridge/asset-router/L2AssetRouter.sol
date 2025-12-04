@@ -11,9 +11,9 @@ import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
 import {NativeTokenVaultBase} from "../ntv/NativeTokenVaultBase.sol";
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
-import {IL2Bridgehub} from "../../bridgehub/IL2Bridgehub.sol";
+import {IL2Bridgehub} from "../../bridgehub/core/IL2Bridgehub.sol";
 
-import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/core/IBridgehubBase.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 

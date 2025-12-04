@@ -12,7 +12,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
 import {BundleAlreadyProcessed, BundleVerifiedAlready, CallAlreadyExecuted, CallNotExecutable, CanNotUnbundle, ExecutingNotAllowed, MessageNotIncluded, UnauthorizedMessageSender, UnbundlingNotAllowed, WrongCallStatusLength, WrongDestinationChainId, WrongSourceChainId} from "./InteropErrors.sol";
 import {InvalidSelector, Unauthorized} from "../common/L1ContractErrors.sol";
-import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
+import {NotInGatewayMode} from "../bridgehub/core/L1BridgehubErrors.sol";
 
 /// @title InteropHandler
 /// @author Matter Labs

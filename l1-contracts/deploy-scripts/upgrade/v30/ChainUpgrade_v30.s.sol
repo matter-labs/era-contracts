@@ -6,7 +6,7 @@ pragma solidity 0.8.28;
 import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {Bridgehub} from "contracts/bridgehub/core/Bridgehub.sol";
 
 import {DefaultChainUpgrade} from "./default_upgrade/DefaultChainUpgrade.s.sol";
 

@@ -6,8 +6,8 @@ import {ChainTypeManagerBase} from "./ChainTypeManagerBase.sol";
 import {Diamond} from "./libraries/Diamond.sol";
 import {ChainCreationParams} from "./IChainTypeManager.sol";
 import {GenesisIndexStorageZero, MigrationsNotPaused} from "../common/L1ContractErrors.sol";
-import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
-import {IChainAssetHandler} from "../bridgehub/IChainAssetHandler.sol";
+import {IL1Bridgehub} from "../bridgehub/core/IL1Bridgehub.sol";
+import {IChainAssetHandler} from "../bridgehub/chain-asset-handler/IChainAssetHandler.sol";
 
 /// @title Era Chain Type Manager contract
 /// @author Matter Labs

@@ -2,10 +2,10 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 // import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-// import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+// import {IBridgehub} from "contracts/bridgehub/core/IBridgehub.sol";
 // import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {GatewayGovernanceUtils} from "deploy-scripts/gateway/GatewayGovernanceUtils.s.sol";
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/core/L1Bridgehub.sol";
 
 import {DeployGatewayTransactionFilterer} from "deploy-scripts/gateway/DeployGatewayTransactionFilterer.s.sol";
 

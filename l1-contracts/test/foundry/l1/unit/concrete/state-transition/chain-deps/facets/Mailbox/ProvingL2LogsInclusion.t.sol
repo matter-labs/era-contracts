@@ -13,7 +13,7 @@ import {BatchNotExecuted, HashedLogIsDefault} from "contracts/common/L1ContractE
 import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
 import {TxStatus} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "contracts/bridgehub/core/IBridgehubBase.sol";
 import {MerkleTreeNoSort} from "test/foundry/l1/unit/concrete/common/libraries/Merkle/MerkleTreeNoSort.sol";
 import {MessageHashing, ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";

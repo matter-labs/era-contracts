@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {FinalizeL1DepositParams} from "../../common/Messaging.sol";
-import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "../../bridgehub/core/IBridgehubBase.sol";
 
 interface IL1AssetTracker {
     function BRIDGE_HUB() external view returns (IBridgehubBase);

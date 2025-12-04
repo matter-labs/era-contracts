@@ -12,7 +12,7 @@ import {EmptyAssetId, EmptyBytes32, ZeroAddress} from "../../common/L1ContractEr
 import {L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
-import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "../../bridgehub/core/IBridgehubBase.sol";
 import {FeeParams} from "../../state-transition/chain-deps/ZKChainStorage.sol";
 
 /// @author Matter Labs

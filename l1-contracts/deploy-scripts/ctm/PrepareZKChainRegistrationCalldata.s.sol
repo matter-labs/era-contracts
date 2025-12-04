@@ -6,8 +6,8 @@ pragma solidity 0.8.28;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/core/IL1Bridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/core/L1Bridgehub.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";

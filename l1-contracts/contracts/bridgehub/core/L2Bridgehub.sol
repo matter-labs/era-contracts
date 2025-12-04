@@ -2,19 +2,19 @@
 
 pragma solidity 0.8.28;
 
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
-import {SERVICE_TRANSACTION_SENDER} from "../common/Config.sol";
-import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {Unauthorized} from "../common/L1ContractErrors.sol";
-import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
+import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
+import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
+import {Unauthorized} from "../../common/L1ContractErrors.sol";
+import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
 import {IL2Bridgehub} from "./IL2Bridgehub.sol";
-import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
-import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
-import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
+import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
+import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {NotInGatewayMode, NotRelayedSender} from "./L1BridgehubErrors.sol";
 
 /// @author Matter Labs

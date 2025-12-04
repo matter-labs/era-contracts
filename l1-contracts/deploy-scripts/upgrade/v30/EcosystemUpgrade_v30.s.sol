@@ -6,11 +6,11 @@ pragma solidity 0.8.28;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehub} from "contracts/bridgehub/core/IBridgehub.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {Bridgehub} from "contracts/bridgehub/core/Bridgehub.sol";
 
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 

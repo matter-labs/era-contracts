@@ -31,12 +31,12 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
-import {MessageRootBase} from "contracts/bridgehub/MessageRootBase.sol";
-import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {L1MessageRoot} from "contracts/bridgehub/message-root/L1MessageRoot.sol";
+import {MessageRootBase} from "contracts/bridgehub/message-root/MessageRootBase.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/chain-asset-handler/L1ChainAssetHandler.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/core/IL1Bridgehub.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "contracts/bridgehub/core/IBridgehubBase.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 

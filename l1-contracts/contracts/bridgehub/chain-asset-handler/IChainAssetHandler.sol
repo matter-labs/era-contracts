@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.24;
 
-import {IAssetHandler} from "../bridge/interfaces/IAssetHandler.sol";
+import {IAssetHandler} from "../../bridge/interfaces/IAssetHandler.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

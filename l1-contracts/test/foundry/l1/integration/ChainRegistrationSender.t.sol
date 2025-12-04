@@ -6,8 +6,8 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
-import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehubBase.sol";
-import {CHAIN_REGISTRATION_SENDER_ENCODING_VERSION, ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
+import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/core/IBridgehubBase.sol";
+import {CHAIN_REGISTRATION_SENDER_ENCODING_VERSION, ChainRegistrationSender} from "contracts/bridgehub/chain-registration/ChainRegistrationSender.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 
@@ -19,7 +19,7 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/co
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {IMessageRoot} from "contracts/bridgehub/message-root/IMessageRoot.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 
 contract ChainRegistrationSenderTests is

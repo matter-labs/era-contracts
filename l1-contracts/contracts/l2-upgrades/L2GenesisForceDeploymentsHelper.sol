@@ -10,12 +10,12 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {SystemContractProxyAdmin} from "./SystemContractProxyAdmin.sol";
 import {IZKOSContractDeployer} from "./IZKOSContractDeployer.sol";
 import {L2NativeTokenVault} from "../bridge/ntv/L2NativeTokenVault.sol";
-import {L2MessageRoot} from "../bridgehub/L2MessageRoot.sol";
-import {L2Bridgehub} from "../bridgehub/L2Bridgehub.sol";
+import {L2MessageRoot} from "../bridgehub/message-root/L2MessageRoot.sol";
+import {L2Bridgehub} from "../bridgehub/core/L2Bridgehub.sol";
 import {L2AssetRouter} from "../bridge/asset-router/L2AssetRouter.sol";
 import {L2AssetTracker} from "../bridge/asset-tracker/L2AssetTracker.sol";
 import {GWAssetTracker} from "../bridge/asset-tracker/GWAssetTracker.sol";
-import {L2ChainAssetHandler} from "../bridgehub/L2ChainAssetHandler.sol";
+import {L2ChainAssetHandler} from "../bridgehub/chain-asset-handler/L2ChainAssetHandler.sol";
 import {InteropHandler} from "../interop/InteropHandler.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL2SharedBridgeLegacy} from "../bridge/interfaces/IL2SharedBridgeLegacy.sol";
@@ -23,8 +23,8 @@ import {DeployFailed, UnsupportedUpgradeType, ZKsyncOSNotForceDeployForExistingC
 
 import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
-import {ICTMDeploymentTracker} from "../bridgehub/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
+import {ICTMDeploymentTracker} from "../bridgehub/ctm-deployment/ICTMDeploymentTracker.sol";
+import {IMessageRoot} from "../bridgehub/message-root/IMessageRoot.sol";
 import {InteropCenter} from "../interop/InteropCenter.sol";
 
 import {UpgradeableBeaconDeployer} from "../bridge/UpgradeableBeaconDeployer.sol";

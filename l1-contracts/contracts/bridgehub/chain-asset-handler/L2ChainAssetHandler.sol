@@ -3,13 +3,13 @@
 pragma solidity 0.8.28;
 
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
-import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {InvalidCaller} from "../common/L1ContractErrors.sol";
-import {IL1Bridgehub} from "./IL1Bridgehub.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
-import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {InvalidCaller} from "../../common/L1ContractErrors.sol";
+import {IL1Bridgehub} from "../core/IL1Bridgehub.sol";
+import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IChainAssetHandlerShared} from "./IChainAssetHandlerShared.sol";
 
 /// @author Matter Labs

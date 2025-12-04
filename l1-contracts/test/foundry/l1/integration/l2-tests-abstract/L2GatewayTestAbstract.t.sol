@@ -11,9 +11,9 @@ import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2
 
 import {SETTLEMENT_LAYER_RELAY_SENDER, ZKChainCommitment, CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET} from "contracts/common/Config.sol";
 
-import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
-import {BridgehubBase} from "contracts/bridgehub/BridgehubBase.sol";
-import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
+import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/bridgehub/core/IBridgehubBase.sol";
+import {BridgehubBase} from "contracts/bridgehub/core/BridgehubBase.sol";
+import {L2Bridgehub} from "contracts/bridgehub/core/L2Bridgehub.sol";
 
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
@@ -24,7 +24,7 @@ import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
 import {BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {BalanceChange} from "contracts/common/Messaging.sol";
-import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/chain-asset-handler/IChainAssetHandler.sol";
 
 abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;

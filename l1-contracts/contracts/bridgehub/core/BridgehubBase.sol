@@ -9,20 +9,20 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 
 import {IBridgehubBase} from "./IBridgehubBase.sol";
 
-import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
-import {IL1BaseTokenAssetHandler} from "../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
+import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
+import {IL1BaseTokenAssetHandler} from "../../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
+import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
+import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 
-import {SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
-import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
-import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
-import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
+import {SETTLEMENT_LAYER_RELAY_SENDER} from "../../common/Config.sol";
+import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "../../common/Messaging.sol";
+import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
+import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {AlreadyCurrentSL, NotChainAssetHandler, NotRelayedSender, SLNotWhitelisted} from "./L1BridgehubErrors.sol";
-import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdCantBeCurrentChain, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, NoCTMForAssetId, NotCurrentSettlementLayer, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
-import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdCantBeCurrentChain, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, NoCTMForAssetId, NotCurrentSettlementLayer, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../../common/L1ContractErrors.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

@@ -4,16 +4,16 @@ pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
-import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "./IBridgehubBase.sol";
+import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../core/IBridgehubBase.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {IL1CrossChainSender} from "../bridge/interfaces/IL1CrossChainSender.sol";
+import {IL1CrossChainSender} from "../../bridge/interfaces/IL1CrossChainSender.sol";
 
-import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
-import {AssetRouterBase} from "../bridge/asset-router/AssetRouterBase.sol";
-import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
-import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {NoEthAllowed, NotOwner, NotOwnerViaRouter, OnlyBridgehub, WrongCounterPart} from "./L1BridgehubErrors.sol";
-import {CTMNotRegistered, UnsupportedEncodingVersion} from "../common/L1ContractErrors.sol";
+import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
+import {AssetRouterBase} from "../../bridge/asset-router/AssetRouterBase.sol";
+import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
+import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {NoEthAllowed, NotOwner, NotOwnerViaRouter, OnlyBridgehub, WrongCounterPart} from "../core/L1BridgehubErrors.sol";
+import {CTMNotRegistered, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 
 /// @dev The encoding version of the data.
 bytes1 constant CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION = 0x01;
