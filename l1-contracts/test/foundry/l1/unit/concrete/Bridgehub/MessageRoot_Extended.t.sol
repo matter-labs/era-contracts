@@ -117,14 +117,12 @@ contract MessageRoot_Extended_Test is Test {
         assertTrue(root != bytes32(0));
     }
 
-
     function test_InitializeL1V31Upgrade_NotL1() public {
         vm.chainId(2); // Set to non-L1 chain
 
         vm.expectRevert("Initializable: contract is already initialized");
         messageRoot.initializeL1V31Upgrade();
     }
-
 
     function test_SaveV31UpgradeChainBatchNumber_NotChain() public {
         uint256 chainId = 271;

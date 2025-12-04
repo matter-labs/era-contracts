@@ -10,11 +10,9 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 
-
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract UpgradeUtils is Script {
-
-        /// @notice Merge array of Call arrays into single Call array
+    /// @notice Merge array of Call arrays into single Call array
     function mergeCallsArray(Call[][] memory a) public pure returns (Call[] memory result) {
         uint256 resultLength;
 
@@ -32,5 +30,4 @@ contract UpgradeUtils is Script {
             }
         }
     }
-
 }
