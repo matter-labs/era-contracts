@@ -13,14 +13,6 @@ import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
-    event BridgehubMintData(bytes bridgeMintData);
-
-    event BridgehubDepositFinalized(
-        uint256 indexed chainId,
-        bytes32 indexed txDataHash,
-        bytes32 indexed l2DepositTxHash
-    );
-
     event ClaimedFailedDepositAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
     event AssetDeploymentTrackerSet(

@@ -60,8 +60,6 @@ abstract contract ChainAssetHandlerBase is
                             INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function _ethTokenAssetId() internal view virtual returns (bytes32);
-
     function _l1ChainId() internal view virtual returns (uint256);
 
     function _bridgehub() internal view virtual returns (IL1Bridgehub);

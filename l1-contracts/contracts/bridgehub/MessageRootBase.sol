@@ -7,7 +7,7 @@ import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializabl
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {IBridgehubBase} from "./IBridgehubBase.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {ChainExists, MessageRootNotRegistered, NotL2, OnlyBridgehubOrChainAssetHandler, OnlyChain} from "./L1BridgehubErrors.sol";
+import {ChainExists, MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler, OnlyChain} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
 
@@ -111,14 +111,6 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
     modifier onlyChain(uint256 _chainId) {
         if (msg.sender != IBridgehubBase(_bridgehub()).getZKChain(_chainId)) {
             revert OnlyChain(msg.sender, IBridgehubBase(_bridgehub()).getZKChain(_chainId));
-        }
-        _;
-    }
-
-    /// @notice Checks that the Chain ID is not L1 when adding chain batch root.
-    modifier onlyL2() {
-        if (block.chainid == L1_CHAIN_ID()) {
-            revert NotL2();
         }
         _;
     }
