@@ -136,14 +136,14 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
     }
 
     /// @inheritdoc IMultisigCommitter
-    function setSigningThreshold(
+    function setCustomSigningThreshold(
         address chainAddress,
         uint64 _signingThreshold
     ) external override onlyRole(chainAddress, getRoleAdmin(chainAddress, COMMIT_VALIDATOR_ROLE)) {
         if (_signingThreshold > getRoleMemberCount(chainAddress, COMMIT_VALIDATOR_ROLE))
             revert InvalidThreshold(getRoleMemberCount(chainAddress, COMMIT_VALIDATOR_ROLE), _signingThreshold);
         chainConfig[chainAddress].signingThreshold = _signingThreshold;
-        emit NewSigningThreshold(chainAddress, _signingThreshold);
+        emit NewCustomSigningThreshold(chainAddress, _signingThreshold);
     }
 
     /// @inheritdoc IMultisigCommitter

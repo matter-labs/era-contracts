@@ -130,7 +130,7 @@ contract MultisigCommitterTest is Test {
         assertEq(multisigCommitter.getValidatorsCount(chainAddress), 2);
 
         vm.prank(chainAdmin);
-        multisigCommitter.setSigningThreshold(chainAddress, 1);
+        multisigCommitter.setCustomSigningThreshold(chainAddress, 1);
         // setting the threshold has no effect unless customValidatorSet is enabled
         assertEq(multisigCommitter.getSigningThreshold(chainAddress), 2);
         assertEq(multisigCommitter.getValidatorsCount(chainAddress), 2);
