@@ -388,8 +388,6 @@ error WrongMagicValue(uint256 expectedMagicValue, uint256 providedMagicValue);
 error ZeroAddress();
 // 0xc84885d4
 error ZeroChainId();
-// 0xdb60e600
-error ZeroGasPriceL1TxZKsyncOS();
 // 0x601b6882
 error ZKChainLimitReached();
 // 0x646ac57e
