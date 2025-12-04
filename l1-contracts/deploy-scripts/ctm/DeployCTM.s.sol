@@ -208,7 +208,6 @@ contract DeployCTMScript is Script, DeployCTMUtils {
                 IVerifierV2(addresses.stateTransition.verifierFflonk),
                 IVerifier(addresses.stateTransition.verifierPlonk)
             );
-            ZKsyncOSDualVerifier(addresses.stateTransition.verifier).transferOwnership(config.ownerAddress);
             vm.stopBroadcast();
         }
     }

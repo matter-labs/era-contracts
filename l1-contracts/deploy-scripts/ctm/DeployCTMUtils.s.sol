@@ -14,6 +14,8 @@ import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {Utils} from "../utils/Utils.sol";
+import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
+import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
@@ -334,6 +336,10 @@ abstract contract DeployCTMUtils is DeployUtils {
                 return type(EraVerifierFflonk).creationCode;
             } else if (compareStrings(contractName, "EraVerifierPlonk")) {
                 return type(EraVerifierPlonk).creationCode;
+            } else if (compareStrings(contractName, "ZKsyncOSVerifierFflonk")) {
+                return type(ZKsyncOSVerifierFflonk).creationCode;
+            } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
+                return type(ZKsyncOSVerifierPlonk).creationCode;
             } else if (compareStrings(contractName, "DefaultUpgrade")) {
                 return type(DefaultUpgrade).creationCode;
             } else if (compareStrings(contractName, "L1GenesisUpgrade")) {

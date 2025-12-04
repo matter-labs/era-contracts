@@ -25,7 +25,8 @@ enum CTMContract {
     ValidatorTimelock,
     Verifier,
     ZKsyncOSChainTypeManager,
-    EraChainTypeManager
+    EraChainTypeManager,
+    BlobsL1DAValidatorZKsyncOS
 }
 
 library DeployCTML1OrGateway {
@@ -54,13 +55,13 @@ library DeployCTML1OrGateway {
         } else if (contractName == CTMContract.Verifier) {
             if (config.testnetVerifier) {
                 if (config.isZKsyncOS) {
-                    return abi.encode(config.verifierFflonk, config.verifierPlonk, config.ownerAddress);
+                    return abi.encode(config.verifierFflonk, config.verifierPlonk, msg.sender);
                 } else {
                     return abi.encode(config.verifierFflonk, config.verifierPlonk);
                 }
             } else {
                 if (config.isZKsyncOS) {
-                    return abi.encode(config.verifierFflonk, config.verifierPlonk, config.ownerAddress);
+                    return abi.encode(config.verifierFflonk, config.verifierPlonk, msg.sender);
                 } else {
                     return abi.encode(config.verifierFflonk, config.verifierPlonk);
                 }
@@ -69,6 +70,10 @@ library DeployCTML1OrGateway {
             return abi.encode(config.bridgehubProxy, config.interopCenterProxy);
         } else if (contractName == CTMContract.EraChainTypeManager) {
             return abi.encode(config.bridgehubProxy, config.interopCenterProxy);
+        } else if (contractName == CTMContract.BlobsL1DAValidatorZKsyncOS) {
+            return abi.encode();
+        } else {
+            revert("getCreationCalldata: Unknown CTM contract");
         }
     }
 
@@ -89,6 +94,8 @@ library DeployCTML1OrGateway {
             return CTMContract.ZKsyncOSChainTypeManager;
         } else if (compareStrings(contractName, "EraChainTypeManager")) {
             return CTMContract.EraChainTypeManager;
+        } else if (compareStrings(contractName, "BlobsL1DAValidatorZKsyncOS")) {
+            return CTMContract.BlobsL1DAValidatorZKsyncOS;
         } else if (compareStrings(contractName, "EraTestnetVerifier")) {
             // The EraTestnetVerifier contract maps to the Verifier slot for testnets.
             return CTMContract.Verifier;

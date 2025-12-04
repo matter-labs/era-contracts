@@ -54,16 +54,18 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
             revert EmptyAssetId();
         }
 
-        if (_initializeData.l2BootloaderBytecodeHash == bytes32(0)) {
-            revert EmptyBytes32();
-        }
+        if (!IS_ZKSYNC_OS) {
+            if (_initializeData.l2BootloaderBytecodeHash == bytes32(0)) {
+                revert EmptyBytes32();
+            }
 
-        if (_initializeData.l2DefaultAccountBytecodeHash == bytes32(0)) {
-            revert EmptyBytes32();
-        }
+            if (_initializeData.l2DefaultAccountBytecodeHash == bytes32(0)) {
+                revert EmptyBytes32();
+            }
 
-        if (_initializeData.l2EvmEmulatorBytecodeHash == bytes32(0)) {
-            revert EmptyBytes32();
+            if (_initializeData.l2EvmEmulatorBytecodeHash == bytes32(0)) {
+                revert EmptyBytes32();
+            }
         }
 
         s.chainId = _initializeData.chainId;
