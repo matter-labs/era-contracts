@@ -19,7 +19,7 @@ import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {DeployCTMScript} from "../../ctm/DeployCTM.s.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 
-abstract contract CTMUpgradeBase is DeployCTMScript, UpgradeUtils {
+abstract contract CTMUpgradeBase is DeployCTMScript {
     function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual returns (bool);
 
     /// @notice Get protocol upgrade nonce from protocol version

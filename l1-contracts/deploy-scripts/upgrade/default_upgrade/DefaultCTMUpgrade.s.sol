@@ -43,6 +43,7 @@ import {IValidatorTimelock} from "contracts/state-transition/IValidatorTimelock.
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
+import {UpgradeUtils} from "./UpgradeUtils.sol";
 
 /// @notice Script used for default CTM upgrade flow. Should be run after Ecosystem upgrade
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
@@ -530,7 +531,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     function prepareDefaultEcosystemAdminCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](1);
         allCalls[0] = prepareUpgradeServerNotifierCall();
-        calls = mergeCallsArray(allCalls);
+        calls = UpgradeUtils.mergeCallsArray(allCalls);
 
         string memory ecosystemAdminCallsSerialized = vm.serializeBytes(
             "ecosystem_admin_calls",
@@ -583,7 +584,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         allCalls[0] = prepareVersionSpecificStage0GovernanceCallsL1();
         allCalls[1] = prepareGovernanceUpgradeTimerStartCall();
 
-        calls = mergeCallsArray(allCalls);
+        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
@@ -602,7 +603,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         allCalls[5] = prepareDAValidatorCall();
         console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
         allCalls[6] = prepareVersionSpecificStage1GovernanceCallsL1();
-        calls = mergeCallsArray(allCalls);
+        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     /// @notice The second step of upgrade. By default it unpauses migrations.
@@ -613,7 +614,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         allCalls[1] = prepareVersionSpecificStage2GovernanceCallsL1();
         allCalls[2] = prepareCheckMigrationsUnpausedCalls();
 
-        calls = mergeCallsArray(allCalls);
+        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     function prepareVersionSpecificStage0GovernanceCallsL1() public virtual returns (Call[] memory calls) {

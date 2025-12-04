@@ -42,6 +42,7 @@ import {IValidatorTimelock} from "contracts/state-transition/IValidatorTimelock.
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
+import {UpgradeUtils} from "./UpgradeUtils.sol";
 
 /// @notice Script used for default CTM on gateway upgrade flow, should be run after L1 CTM upgrade
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
@@ -358,7 +359,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
 
         allCalls[0] = prepareGatewaySpecificStage0GovernanceCalls();
 
-        calls = mergeCallsArray(allCalls);
+        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
@@ -367,7 +368,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
 
         allCalls[0] = prepareGatewaySpecificStage1GovernanceCalls();
 
-        calls = mergeCallsArray(allCalls);
+        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     /// @notice The second step of upgrade. By default it unpauses migrations.
@@ -375,7 +376,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         Call[][] memory allCalls = new Call[][](1);
 
         allCalls[0] = prepareGatewaySpecificStage2GovernanceCalls();
-        calls = mergeCallsArray(allCalls);
+        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     function prepareVersionSpecificStage0GovernanceCallsGW(
@@ -423,7 +424,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         allCalls[0] = preparePauseMigrationCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
         allCalls[1] = prepareVersionSpecificStage0GovernanceCallsGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
 
-        calls = mergeCallsArray(allCalls);
+        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     function deployUsedUpgradeContractGW() internal virtual returns (address) {
@@ -471,7 +472,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         allCalls[3] = prepareDAValidatorCallGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
         allCalls[4] = prepareVersionSpecificStage1GovernanceCallsGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
 
-        calls = mergeCallsArray(allCalls);
+        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     function prepareGatewaySpecificStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
@@ -486,7 +487,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         allCalls[0] = prepareUnpauseMigrationCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
         allCalls[1] = prepareVersionSpecificStage2GovernanceCallsGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
 
-        calls = mergeCallsArray(allCalls);
+        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     function provideSetNewVersionUpgradeCallForGateway(
