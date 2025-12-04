@@ -174,29 +174,31 @@ async function processFile(
 
   // Find all enum definitions in the file and imported enums
   const enums = new Set<string>();
-  
+
   // Find locally defined enums
   const enumRegex = /enum\s+(\w+)\s*\{/g;
   let enumMatch;
   while ((enumMatch = enumRegex.exec(content)) !== null) {
     enums.add(enumMatch[1]);
   }
-  
+
   // Find imported enums from import statements
   const importRegex = /import\s*\{([^}]+)\}\s*from\s*['"]/g;
   let importMatch;
   while ((importMatch = importRegex.exec(content)) !== null) {
-    const importedItems = importMatch[1].split(',');
+    const importedItems = importMatch[1].split(",");
     for (const item of importedItems) {
       const trimmedItem = item.trim();
       // Add specific known enums and common enum naming patterns
-      if (trimmedItem === 'L2DACommitmentScheme' || 
-          trimmedItem === 'PubdataPricingMode' ||
-          trimmedItem === 'SharedBridgeKey' ||
-          trimmedItem === 'BytecodeError' ||
-          trimmedItem === 'UpgradeTxVerifyParam' ||
-          /^[A-Z][a-zA-Z]*(?:Scheme|Mode|Type|Status|State|Kind|Level|Priority|Error|Key)$/.test(trimmedItem) ||
-          /^[A-Z][a-z]*[A-Z][a-zA-Z]*$/.test(trimmedItem)) {
+      if (
+        trimmedItem === "L2DACommitmentScheme" ||
+        trimmedItem === "PubdataPricingMode" ||
+        trimmedItem === "SharedBridgeKey" ||
+        trimmedItem === "BytecodeError" ||
+        trimmedItem === "UpgradeTxVerifyParam" ||
+        /^[A-Z][a-zA-Z]*(?:Scheme|Mode|Type|Status|State|Kind|Level|Priority|Error|Key)$/.test(trimmedItem) ||
+        /^[A-Z][a-z]*[A-Z][a-zA-Z]*$/.test(trimmedItem)
+      ) {
         enums.add(trimmedItem);
       }
     }
