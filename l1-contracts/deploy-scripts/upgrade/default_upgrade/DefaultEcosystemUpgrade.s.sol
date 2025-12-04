@@ -25,7 +25,7 @@ import {UpgradeUtils} from "./UpgradeUtils.sol";
 
 /// @notice Script used for default ecosystem upgrade flow should be run as a first for the upgrade.
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils, UpgradeUtils {
+contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
     using stdToml for string;
 
     // solhint-disable-next-line gas-struct-packing
@@ -279,7 +279,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils, UpgradeUtils {
         allCalls[1] = prepareVersionSpecificStage0GovernanceCallsL1();
         allCalls[2] = prepareDefaultEcosystemAdminCalls();
 
-        calls = mergeCallsArray(allCalls);
+        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
@@ -292,7 +292,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils, UpgradeUtils {
         console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
         allCalls[2] = prepareVersionSpecificStage1GovernanceCallsL1();
 
-        calls = mergeCallsArray(allCalls);
+        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     /// @notice The second step of upgrade. By default it unpauses migrations.
@@ -302,7 +302,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils, UpgradeUtils {
         allCalls[0] = prepareVersionSpecificStage2GovernanceCallsL1();
         allCalls[1] = prepareUnpauseGatewayMigrationsCall();
 
-        calls = mergeCallsArray(allCalls);
+        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     function prepareVersionSpecificStage0GovernanceCallsL1() public virtual returns (Call[] memory calls) {
