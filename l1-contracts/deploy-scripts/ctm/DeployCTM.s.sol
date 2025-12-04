@@ -393,11 +393,17 @@ contract DeployCTMScript is Script, DeployCTMUtils {
             config.contracts.chainCreationParams.genesisBatchCommitment
         );
 
+        vm.serializeAddress("contracts", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
+        string memory contracts = vm.serializeBytes32(
+            "contracts",
+            "create2_factory_salt",
+            create2FactoryParams.factorySalt
+        );
+
         vm.serializeString("root", "chain_creation_params", chainCreationParams);
         vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
-        vm.serializeAddress("root", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
-        vm.serializeBytes32("root", "create2_factory_salt", create2FactoryParams.factorySalt);
+        vm.serializeString("root", "contracts", contracts);
         string memory toml = vm.serializeString("root", "contracts_config", contractsConfig);
         vm.writeToml(toml, outputPath);
     }
