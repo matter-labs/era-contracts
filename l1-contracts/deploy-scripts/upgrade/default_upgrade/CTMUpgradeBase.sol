@@ -17,8 +17,10 @@ import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {DeployCTMScript} from "../../ctm/DeployCTM.s.sol";
+import {UpgradeUtils} from "./UpgradeUtils.sol";
 
-abstract contract CTMUpgradeBase is DeployCTMScript {
+
+abstract contract CTMUpgradeBase is DeployCTMScript, UpgradeUtils {
     function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual returns (bool);
 
     /// @notice Get protocol upgrade nonce from protocol version
@@ -121,25 +123,6 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         }
         for (uint256 i = 0; i < b.length; i++) {
             result[a.length + i] = b[i];
-        }
-    }
-
-    /// @notice Merge array of Call arrays into single Call array
-    function mergeCallsArray(Call[][] memory a) internal pure returns (Call[] memory result) {
-        uint256 resultLength;
-
-        for (uint256 i; i < a.length; i++) {
-            resultLength += a[i].length;
-        }
-
-        result = new Call[](resultLength);
-
-        uint256 counter;
-        for (uint256 i; i < a.length; i++) {
-            for (uint256 j; j < a[i].length; j++) {
-                result[counter] = a[i][j];
-                counter++;
-            }
         }
     }
 

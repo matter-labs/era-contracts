@@ -117,16 +117,6 @@ contract MessageRoot_Extended_Test is Test {
         assertTrue(root != bytes32(0));
     }
 
-    // function test_InitializeL2V31Upgrade_NotL2() public {
-    //     vm.expectRevert(abi.encodeWithSelector(InvalidCaller.selector, address(this)));
-    //     l2MessageRoot.initializeL2V31Upgrade();
-    // }
-
-    // function test_InitializeL2V31Upgrade_NotUpgrader() public {
-    //     vm.chainId(2); // Set to non-L1 chain
-    //     vm.expectRevert(abi.encodeWithSelector(InvalidCaller.selector, address(this)));
-    //     l2MessageRoot.initializeL2V31Upgrade();
-    // }
 
     function test_InitializeL1V31Upgrade_NotL1() public {
         vm.chainId(2); // Set to non-L1 chain
@@ -135,31 +125,6 @@ contract MessageRoot_Extended_Test is Test {
         messageRoot.initializeL1V31Upgrade();
     }
 
-    // function test_SendV31UpgradeBlockNumberFromGateway_NotGateway() public {
-    //     vm.chainId(2); // Set to non-gateway chain
-    //     vm.expectRevert(OnlyGateway.selector);
-    //     l2MessageRoot.sendV31UpgradeBlockNumberFromGateway(271, 100);
-    // }
-
-    // function test_SendV31UpgradeBlockNumberFromGateway_NotSet() public {
-    //     vm.chainId(gatewayChainId); // Set to gateway chain
-    //     vm.expectRevert(V31UpgradeChainBatchNumberNotSet.selector);
-    //     l2MessageRoot.sendV31UpgradeBlockNumberFromGateway(271, 100);
-    // }
-
-    // function test_SaveV31UpgradeChainBatchNumberOnL1_NotL2MessageRoot() public {
-    //     FinalizeL1DepositParams memory params = FinalizeL1DepositParams({
-    //         l2Sender: makeAddr("wrongSender"),
-    //         chainId: 1,
-    //         message: abi.encodeWithSelector(L2MessageRoot.sendV31UpgradeBlockNumberFromGateway.selector, 271, 100),
-    //         l2TxNumberInBatch: 1,
-    //         l2BatchNumber: 1,
-    //         l2MessageIndex: 1,
-    //         merkleProof: new bytes32[](0)
-    //     });
-    //     vm.expectRevert(OnlyL2MessageRoot.selector);
-    //     messageRoot.saveV31UpgradeChainBatchNumberOnL1(params);
-    // }
 
     function test_SaveV31UpgradeChainBatchNumber_NotChain() public {
         uint256 chainId = 271;

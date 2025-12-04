@@ -21,10 +21,11 @@ import {BridgehubDeployedAddresses, BridgesDeployedAddresses} from "../../ecosys
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
+import {UpgradeUtils} from "./UpgradeUtils.sol";
 
 /// @notice Script used for default ecosystem upgrade flow should be run as a first for the upgrade.
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
+contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils, UpgradeUtils {
     using stdToml for string;
 
     // solhint-disable-next-line gas-struct-packing
@@ -364,26 +365,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
             ),
             value: 0
         });
-    }
-
-    ////////////////////////////// Misc utils /////////////////////////////////
-
-    function mergeCallsArray(Call[][] memory a) public pure returns (Call[] memory result) {
-        uint256 resultLength;
-
-        for (uint256 i; i < a.length; i++) {
-            resultLength += a[i].length;
-        }
-
-        result = new Call[](resultLength);
-
-        uint256 counter;
-        for (uint256 i; i < a.length; i++) {
-            for (uint256 j; j < a[i].length; j++) {
-                result[counter] = a[i][j];
-                counter++;
-            }
-        }
     }
 
     // add this to be excluded from coverage report

@@ -57,7 +57,6 @@ contract ChainRegistrationSenderTests is
 
         _deployEra();
         _deployZKChain(ETH_TOKEN_ADDRESS);
-        // _deployZKChain(ETH_TOKEN_ADDRESS);
 
         releaseConfigLock();
 
