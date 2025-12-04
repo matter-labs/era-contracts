@@ -81,9 +81,6 @@ address constant L2_WRAPPED_BASE_TOKEN_IMPL_ADDR = address(USER_CONTRACTS_OFFSET
 /// @dev The address of the SloadContract system contract, which provides a method to read values from arbitrary storage slots
 address constant SLOAD_CONTRACT_ADDR = address(USER_CONTRACTS_OFFSET + 0x06);
 
-/// @dev The address of the WETH implementation contract
-address constant L2_WETH_IMPL_ADDR = address(USER_CONTRACTS_OFFSET + 0x07);
-
 /// @dev The address of the L2 interop root storage system contract
 IL2InteropRootStorage constant L2_INTEROP_ROOT_STORAGE = IL2InteropRootStorage(address(USER_CONTRACTS_OFFSET + 0x08));
 
