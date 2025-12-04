@@ -13,6 +13,7 @@ fs_permissions = [
     { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-out/" },
     { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-config/" },
     { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-out/" },
+    { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/permanent-values/" },
     { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
     { access = "read", path = "../system-contracts/artifacts-zk/" },
     { access = "read", path = "../system-contracts/contracts-preprocessed/precompiles/artifacts" },
@@ -50,7 +51,7 @@ optimizer_runs = 9999999
 allow_internal_expect_revert = true
 
 
-[profile.default.zksync] 
+[profile.default.zksync]
 enable_eravm_extensions = true
 zksolc = "1.5.11"
 

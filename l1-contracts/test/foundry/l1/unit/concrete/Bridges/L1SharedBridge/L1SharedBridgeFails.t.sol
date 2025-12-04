@@ -30,6 +30,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {IL1MessageRoot} from "contracts/bridgehub/IL1MessageRoot.sol";
 
 /// We are testing all the specified revert and require cases.
 contract L1AssetRouterFailTest is L1AssetRouterTest {
@@ -263,7 +264,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
         vm.mockCall(
             messageRootAddress,
-            abi.encodeWithSelector(IMessageRoot.v30UpgradeChainBatchNumber.selector, chainId),
+            abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector, chainId),
             abi.encode(10)
         );
 
@@ -304,7 +305,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
         vm.mockCall(
             messageRootAddress,
-            abi.encodeWithSelector(IMessageRoot.v30UpgradeChainBatchNumber.selector, chainId),
+            abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector, chainId),
             abi.encode(10)
         );
 

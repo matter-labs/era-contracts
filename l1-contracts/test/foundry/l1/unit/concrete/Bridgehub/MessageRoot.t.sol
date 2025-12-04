@@ -35,6 +35,20 @@ contract MessageRootTest is Test {
 
     function setUp() public {
         bridgeHub = makeAddr("bridgeHub");
+        uint256[] memory allZKChainChainIDsZero = new uint256[](0);
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
+            abi.encode(allZKChainChainIDsZero)
+        );
+
+        assetTracker = makeAddr("assetTracker");
+        bridgeHub = makeAddr("bridgeHub");
+        L1_CHAIN_ID = 5;
+        gatewayChainId = 506;
+        messageRoot = new L1MessageRoot(bridgeHub, 1);
+        l2MessageRoot = new L2MessageRoot();
+
         uint256[] memory allZKChainChainIDs = new uint256[](1);
         allZKChainChainIDs[0] = 271;
         vm.mockCall(
@@ -47,14 +61,8 @@ contract MessageRootTest is Test {
             abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector),
             abi.encode(makeAddr("chainTypeManager"))
         );
-        vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector), abi.encode(0));
 
-        assetTracker = makeAddr("assetTracker");
-        bridgeHub = makeAddr("bridgeHub");
-        L1_CHAIN_ID = 5;
-        gatewayChainId = 506;
-        messageRoot = new L1MessageRoot(bridgeHub, 1);
-        l2MessageRoot = new L2MessageRoot();
+        vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector), abi.encode(0));
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2MessageRoot.initL2(L1_CHAIN_ID, gatewayChainId);
         vm.mockCall(address(bridgeHub), abi.encodeWithSelector(Ownable.owner.selector), abi.encode(assetTracker));

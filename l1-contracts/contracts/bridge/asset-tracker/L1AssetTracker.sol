@@ -8,7 +8,7 @@ import {ConfirmBalanceMigrationData, TokenBalanceMigrationData} from "../../comm
 import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {InvalidProof, ZeroAddress, InvalidChainId, Unauthorized} from "../../common/L1ContractErrors.sol";
-import {IMessageRoot, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../bridgehub/IMessageRoot.sol";
+import {IMessageRoot, V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../bridgehub/IMessageRoot.sol";
 import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
@@ -16,7 +16,7 @@ import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidVersion, L1TotalSupplyAlreadyMigrated, InvalidAssetMigrationNumber, InvalidSettlementLayer} from "./AssetTrackerErrors.sol";
-import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
+import {V31UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
@@ -25,6 +25,7 @@ import {IL1AssetTracker} from "./IL1AssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
+import {IL1MessageRoot} from "../../bridgehub/IL1MessageRoot.sol";
 
 contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     IBridgehubBase public immutable BRIDGE_HUB;
@@ -37,7 +38,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     IChainAssetHandler public chainAssetHandler;
 
-    /// Todo Deprecate after V30 is finished.
+    /// Todo Deprecate after V31 is finished.
     mapping(bytes32 assetId => bool l1TotalSupplyMigrated) internal l1TotalSupplyMigrated;
 
     function _nativeTokenVault() internal view override returns (INativeTokenVaultBase) {
@@ -84,10 +85,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         chainAssetHandler = IChainAssetHandler(BRIDGE_HUB.chainAssetHandler());
     }
 
-    /// @notice This function is used to migrate the token balance from the NTV to the AssetTracker for V30 upgrade.
+    /// @notice This function is used to migrate the token balance from the NTV to the AssetTracker for V31 upgrade.
     /// @param _chainId The chain id of the chain to migrate the token balance for.
     /// @param _assetId The asset id of the token to migrate the token balance for.
-    function migrateTokenBalanceFromNTVV30(uint256 _chainId, bytes32 _assetId) external {
+    function migrateTokenBalanceFromNTVV31(uint256 _chainId, bytes32 _assetId) external {
         IL1NativeTokenVault l1NTV = IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT));
         uint256 originChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
         // We do not migrate the chainBalance for the originChain directly, but indirectly by subtracting from MAX_TOKEN_BALANCE.
@@ -193,8 +194,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     }
 
     /// @notice Determines which chain's balance should be updated for a withdrawal operation.
-    /// @dev This function handles the complex logic around V30 upgrade transitions and settlement layer changes.
-    /// @dev The key insight is that before V30, withdrawals affected the chain's own balance, but after V30,
+    /// @dev This function handles the complex logic around V31 upgrade transitions and settlement layer changes.
+    /// @dev The key insight is that before V31, withdrawals affected the chain's own balance, but after V31,
     /// @dev withdrawals from Gateway-settled chains affect the Gateway's balance instead.
     /// @param _chainId The ID of the chain from which the withdrawal is being processed.
     /// @return chainToUpdate The chain ID whose balance should be decremented for this withdrawal.
@@ -205,22 +206,22 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         // Note, that since this method is used for claiming failed deposits, it implies that any failed deposit that has been processed
         // while the chain settled on top of Gateway, has been accredited to Gateway's balance.
         // For all the batches smaller or equal to that, the responsibility lies with the chain itself.
-        uint256 v30UpgradeChainBatchNumber = MESSAGE_ROOT.v30UpgradeChainBatchNumber(_chainId);
+        uint256 v31UpgradeChainBatchNumber = IL1MessageRoot(address(MESSAGE_ROOT)).v31UpgradeChainBatchNumber(_chainId);
 
-        // We need to wait for the proper v30UpgradeChainBatchNumber to be set on the MessageRoot, otherwise we might decrement the chain's chainBalance instead of the gateway's.
+        // We need to wait for the proper v31UpgradeChainBatchNumber to be set on the MessageRoot, otherwise we might decrement the chain's chainBalance instead of the gateway's.
         require(
-            v30UpgradeChainBatchNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY,
-            V30UpgradeChainBatchNumberNotSet()
+            v31UpgradeChainBatchNumber != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY,
+            V31UpgradeChainBatchNumberNotSet()
         );
-        if (v30UpgradeChainBatchNumber != 0) {
-            /// For chains that were settling on GW before V30, we need to update the chain's chainBalance until the chain updates to V30.
-            /// Logic: If no settlement layer OR the batch number is before V30 upgrade, update the chain itself.
+        if (v31UpgradeChainBatchNumber != 0) {
+            /// For chains that were settling on GW before V31, we need to update the chain's chainBalance until the chain updates to V31.
+            /// Logic: If no settlement layer OR the batch number is before V31 upgrade, update the chain itself.
             /// Otherwise, update the settlement layer (Gateway) balance.
-            chainToUpdate = settlementLayer == 0 || l2BatchNumber < v30UpgradeChainBatchNumber
+            chainToUpdate = settlementLayer == 0 || l2BatchNumber < v31UpgradeChainBatchNumber
                 ? _chainId
                 : settlementLayer;
         } else {
-            /// For chains deployed at V30 or later, the logic is simpler:
+            /// For chains deployed at V31 or later, the logic is simpler:
             /// Update the chain balance if settling on L1, otherwise update the settlement layer balance.
             chainToUpdate = settlementLayer == 0 ? _chainId : settlementLayer;
         }

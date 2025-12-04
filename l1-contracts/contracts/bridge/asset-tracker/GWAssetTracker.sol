@@ -92,7 +92,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     }
 
     /// @notice Sets legacy shared bridge addresses for chains that used the old bridging system.
-    /// @dev This function is called during upgrades to maintain backwards compatibility with pre-V30 chains.
+    /// @dev This function is called during upgrades to maintain backwards compatibility with pre-V31 chains.
     /// @dev Legacy bridges are needed to process withdrawal messages from chains that haven't upgraded yet.
     function setLegacySharedBridgeAddress() external onlyUpgrader {
         address l1AssetRouter = address(L2_ASSET_ROUTER.L1_ASSET_ROUTER());
@@ -304,7 +304,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         if (savedBalanceChange.amount > 0) {
             _decreaseChainBalance(_chainId, savedBalanceChange.assetId, savedBalanceChange.amount);
         }
-        /// Note the base token is never native to the chain as of V30.
+        /// Note the base token is never native to the chain as of V31.
         if (savedBalanceChange.baseTokenAmount > 0) {
             _decreaseChainBalance(_chainId, savedBalanceChange.baseTokenAssetId, savedBalanceChange.baseTokenAmount);
         }
@@ -316,7 +316,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes32 _baseTokenAssetId
     ) internal {
         if (_message[0] != BUNDLE_IDENTIFIER) {
-            // This should not be possible in V30. In V31 this will be a trigger.
+            // This should not be possible in V31. In V31 this will be a trigger.
             return;
         }
 
@@ -465,7 +465,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
     }
 
-    /// @notice Handles withdrawal messages from legacy shared bridge contracts on pre-V30 chains.
+    /// @notice Handles withdrawal messages from legacy shared bridge contracts on pre-V31 chains.
     /// @dev This function provides backwards compatibility for chains that used the old bridge system.
     /// @param _chainId The chain ID that sent the legacy withdrawal message.
     /// @param _message The raw legacy bridge message containing withdrawal data.
