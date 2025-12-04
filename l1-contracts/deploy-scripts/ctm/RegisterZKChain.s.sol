@@ -196,8 +196,8 @@ contract RegisterZKChainScript is Script {
         config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
 
         config.governance = toml.readAddress("$.governance");
-        config.create2FactoryAddress = toml.readAddress("$.contracts.create2_factory_address");
-        config.create2Salt = toml.readBytes32("$.create2_salt");
+        config.create2FactoryAddress = toml.readAddress("$.contracts.create2_factory_addr");
+        config.create2Salt = toml.readBytes32("$.contracts.create2_factory_salt");
         config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
     }
 
