@@ -82,9 +82,10 @@ library L2GenesisForceDeploymentsHelper {
         address implAddress = address(uint160(uint256(keccak256(bytes.concat(bytes32(0), bytecodeInfo)))));
         forceDeployOnAddressZKsyncOS(bytecodeInfo, implAddress);
 
-        // If the address does not have any bytecode, we expect that it is a proxy
+        // If the address does not have any bytecode, we expect that it is a proxy.
         if (_newAddress.code.length == 0) {
-            forceDeployOnAddressZKsyncOS(bytecodeInfoSystemProxy, _newAddress);
+            // We can call unsafe directly, since the code length is checked to be 0 already.
+            unsafeForceDeployZKsyncOS(bytecodeInfoSystemProxy, _newAddress);
             ISystemContractProxy(_newAddress).forceInitAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR);
         }
 
