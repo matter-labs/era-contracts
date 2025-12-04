@@ -69,6 +69,8 @@ contract UpgradeIntegrationTestBase is Test {
             Call[] memory upgradeCTMStage2Calls
         ) = ctmUpgrade.prepareDefaultGovernanceCalls();
 
+        // kl todo add GW calls here.
+
         console.log("Starting ecosystem upgrade stage 0!");
         governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage0Calls);
 

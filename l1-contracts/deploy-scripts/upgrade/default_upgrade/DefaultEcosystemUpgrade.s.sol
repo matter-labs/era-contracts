@@ -385,6 +385,17 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         });
     }
 
+    function _buildCallBeaconProxyUpgrade(
+        address proxyAddress,
+        address newImplementationAddress
+    ) internal virtual returns (Call memory call) {
+        call = Call({
+            target: proxyAddress,
+            data: abi.encodeCall(UpgradeableBeacon.upgradeTo, (newImplementationAddress)),
+            value: 0
+        });
+    }
+
     // add this to be excluded from coverage report
     function test() internal override {}
 }
