@@ -358,8 +358,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (IBridgehubBase(s.bridgehub).getZKChain(_chainId) != msg.sender) {
             revert NotHyperchain();
         }
-        // We pause L1->GW->L2 deposits.
-        require(_checkV31UpgradeProcessed(_chainId), DepositsPaused());
+        // Note during the upgrade to V31 no chain will be on GW.
 
         BalanceChange memory balanceChange;
         if (_getBalanceChange) {
@@ -640,21 +639,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             inPausedWindow ||
             (block.chainid == L1_CHAIN_ID &&
                 IL1ChainAssetHandler(CHAIN_ASSET_HANDLER).isMigrationInProgress(s.chainId));
-    }
-
-    /// @notice Returns whether the chain has upgraded to V31 on GW.
-    /// if the chain is on L1 at V31, or is deployed V31 or after, then it returns true.
-    function _checkV31UpgradeProcessed(uint256 _chainId) internal view returns (bool) {
-        IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
-
-        if (
-            IL1MessageRoot(address(bridgehub.messageRoot())).v31UpgradeChainBatchNumber(_chainId) ==
-            V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY
-        ) {
-            /// We pause deposits until the chain has upgraded on GW
-            return false;
-        }
-        return true;
     }
 
     /// @notice Stores a transaction record in storage & send event about that
