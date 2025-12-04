@@ -128,22 +128,26 @@ contract MultisigCommitterTest is Test {
         assertEq(multisigCommitter.sharedValidatorsCount(), 2);
         assertEq(multisigCommitter.getSigningThreshold(chainAddress), 2);
         assertEq(multisigCommitter.getValidatorsCount(chainAddress), 2);
+        assertFalse(multisigCommitter.isCustomSigningSetActive(chainAddress));
 
         vm.prank(chainAdmin);
         multisigCommitter.setSigningThreshold(chainAddress, 1);
         // setting the threshold has no effect unless customValidatorSet is enabled
         assertEq(multisigCommitter.getSigningThreshold(chainAddress), 2);
         assertEq(multisigCommitter.getValidatorsCount(chainAddress), 2);
+        assertFalse(multisigCommitter.isCustomSigningSetActive(chainAddress));
 
         vm.prank(ecosystemOwner);
         multisigCommitter.useCustomSigningSet(chainAddress);
         assertEq(multisigCommitter.getSigningThreshold(chainAddress), 1);
         assertEq(multisigCommitter.getValidatorsCount(chainAddress), 1);
+        assertTrue(multisigCommitter.isCustomSigningSetActive(chainAddress));
 
         vm.prank(chainAdmin);
         multisigCommitter.useSharedSigningSet(chainAddress);
         assertEq(multisigCommitter.getSigningThreshold(chainAddress), 2);
         assertEq(multisigCommitter.getValidatorsCount(chainAddress), 2);
+        assertFalse(multisigCommitter.isCustomSigningSetActive(chainAddress));
     }
 
     function test_custom_validator_set_enablemenet_permissions() public {

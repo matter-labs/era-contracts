@@ -44,6 +44,9 @@ interface IMultisigCommitter is IValidatorTimelock {
     /// Respects custom signing set if used
     function getSigningThreshold(address chainAddress) external view returns (uint64);
 
+    /// @notice Returns true if the chain uses the custom signing set. False indicates shared signing set is active.
+    function isCustomSigningSetActive(address chainAddress) external view returns (bool);
+
     /// @notice Returns true if the validator is authorized to verify commits on the chain.
     /// Respects custom signing set if used
     function isValidator(address chainAddress, address validator) external view returns (bool);
