@@ -53,11 +53,21 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
-    function initialize(string memory newConfigPath, string memory _outputPath) public virtual {
+    function initialize(
+        string memory permanentValuesInputPath,
+        string memory upgradeInputPath,
+        string memory newConfigPath,
+        string memory _outputPath
+    ) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
+        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
+        upgradeInputPath = string.concat(root, upgradeInputPath);
+        console.log("permanentValuesInputPath", permanentValuesInputPath);
+        console.log("root", root);
 
-        initializeConfig(newConfigPath);
+        initializeConfig(permanentValuesInputPath, upgradeInputPath, newConfigPath);
+        instantiateCreate2Factory();
 
         console.log("Initialized config from %s", newConfigPath);
         upgradeConfig.outputPath = string.concat(root, _outputPath);
@@ -75,13 +85,22 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice E2e upgrade generation
     function run() public virtual {
-        initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
+        initialize(
+            vm.envString("PERMANENT_VALUES_INPUT"),
+            vm.envString("UPGRADE_INPUT"),
+            vm.envString("UPGRADE_ECOSYSTEM_INPUT"),
+            vm.envString("UPGRADE_ECOSYSTEM_OUTPUT")
+        );
         prepareEcosystemUpgrade();
         prepareDefaultGovernanceCalls();
     }
 
     function getOwnerAddress() public virtual returns (address) {
         return config.ownerAddress;
+    }
+
+    function setOwners(address owner) public virtual {
+        config.ownerAddress = owner;
     }
 
     function getDiscoveredBridgehub() public view returns (AddressIntrospector.BridgehubAddresses memory) {
@@ -102,19 +121,25 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         return type(uint256).max;
     }
 
-    function initializeConfig(string memory newConfigPath) public virtual override {
+    function initializeConfig(
+        string memory permanentValuesInputPath,
+        string memory upgradeInputPath,
+        string memory newConfigPath
+    ) public virtual {
+        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
+        string memory upgradeToml = vm.readFile(upgradeInputPath);
         string memory toml = vm.readFile(newConfigPath);
 
-        bytes32 create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
+        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
         address create2FactoryAddr;
-        if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
+        if (vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_addr")) {
+            create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
         }
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
+        //        config.supportL2LegacySharedBridgeTest = permanentValuesToml.readBool("$.support_l2_legacy_shared_bridge_test");
+        additionalConfig.newProtocolVersion = upgradeToml.readUint("$.contracts.new_protocol_version");
 
-        additionalConfig.newProtocolVersion = toml.readUint("$.contracts.new_protocol_version");
-
-        bridgehub = L1Bridgehub(toml.readAddress("$.contracts.bridgehub_proxy_address"));
+        bridgehub = L1Bridgehub(permanentValuesToml.readAddress("$.contracts.bridgehub_proxy_address"));
         setAddressesBasedOnBridgehub();
         initializeL1CoreUtilsConfig();
     }
@@ -128,8 +153,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         config.eraDiamondProxyAddress = address(assetRouter.ERA_DIAMOND_PROXY());
 
         config.ownerAddress = assetRouter.owner();
-
-        //        config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
 
         config.contracts.governanceSecurityCouncilAddress = governance.securityCouncil();
         config.contracts.governanceMinDelay = governance.minDelay();
@@ -233,11 +256,10 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice The zeroth step of upgrade. By default it just stops gateway migrations
     function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](4);
+        Call[][] memory allCalls = new Call[][](2);
 
         allCalls[0] = preparePauseGatewayMigrationsCall();
         allCalls[1] = prepareVersionSpecificStage0GovernanceCallsL1();
-        allCalls[3] = prepareGovernanceUpgradeTimerStartCall();
 
         calls = mergeCallsArray(allCalls);
     }
@@ -246,8 +268,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](8);
 
-        allCalls[0] = prepareGovernanceUpgradeTimerCheckCall();
-        allCalls[1] = prepareCheckMigrationsPausedCalls();
         console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
         allCalls[2] = prepareUpgradeProxiesCalls();
         allCalls[3] = provideSetNewVersionUpgradeCall();
@@ -259,11 +279,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice The second step of upgrade. By default it unpauses migrations.
     function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](5);
+        Call[][] memory allCalls = new Call[][](2);
 
-        allCalls[0] = prepareCheckUpgradeIsPresent();
-        allCalls[2] = prepareVersionSpecificStage2GovernanceCallsL1();
-        allCalls[4] = prepareCheckMigrationsUnpausedCalls();
+        allCalls[0] = prepareVersionSpecificStage2GovernanceCallsL1();
 
         calls = mergeCallsArray(allCalls);
     }
@@ -284,102 +302,16 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
     }
 
     // TODO looks like we have to set it for bridgehub too
-    function provideSetNewVersionUpgradeCall() public virtual returns (Call[] memory calls) {
-        //        require(discoveredCTM.ctmProxy != address(0), "stateTransitionManagerAddress is zero in newConfig");
-        //
-        //        // Just retrieved it from the contract
-        //        uint256 previousProtocolVersion = getOldProtocolVersion();
-        //        uint256 deadline = getOldProtocolDeadline();
-        //        uint256 newProtocolVersion = getNewProtocolVersion();
-        //        Diamond.DiamondCutData memory upgradeCut = abi.decode(
-        //            newlyGeneratedData.upgradeCutData,
-        //            (Diamond.DiamondCutData)
-        //        );
-        //        Call memory ctmCall = Call({
-        //            target: discoveredCTM.ctmProxy,
-        //            data: abi.encodeCall(
-        //                IChainTypeManager.setNewVersionUpgrade,
-        //                (upgradeCut, previousProtocolVersion, deadline, newProtocolVersion)
-        //            ),
-        //            value: 0
-        //        });
-        //
-        //        calls = new Call[](1);
-        //        calls[0] = ctmCall;
-    }
+    function provideSetNewVersionUpgradeCall() public virtual returns (Call[] memory calls) {}
 
     function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
         require(discoveredBridgehub.chainAssetHandler != address(0), "chainAssetHandlerProxy is zero");
 
         result = new Call[](1);
         result[0] = Call({
-            target: discoveredBridgehub.bridgehubProxy,
+            target: discoveredBridgehub.chainAssetHandler,
             value: 0,
             data: abi.encodeCall(IChainAssetHandler.pauseMigration, ())
-        });
-    }
-
-    /// @notice Start the upgrade timer.
-    function prepareGovernanceUpgradeTimerStartCall() public virtual returns (Call[] memory calls) {
-        require(upgradeAddresses.upgradeTimer != address(0), "upgradeTimer is zero");
-        calls = new Call[](1);
-
-        calls[0] = Call({
-            target: upgradeAddresses.upgradeTimer,
-            data: abi.encodeCall(GovernanceUpgradeTimer.startTimer, ()),
-            value: 0
-        });
-    }
-
-    /// @notice Double checking that the deadline has passed.
-    function prepareGovernanceUpgradeTimerCheckCall() public virtual returns (Call[] memory calls) {
-        require(upgradeAddresses.upgradeTimer != address(0), "upgradeTimer is zero");
-        calls = new Call[](1);
-
-        calls[0] = Call({
-            target: upgradeAddresses.upgradeTimer,
-            // Double checking that the deadline has passed.
-            data: abi.encodeCall(GovernanceUpgradeTimer.checkDeadline, ()),
-            value: 0
-        });
-    }
-
-    /// @notice Checks to make sure that migrations are paused
-    function prepareCheckMigrationsPausedCalls() public virtual returns (Call[] memory calls) {
-        require(upgradeAddresses.upgradeStageValidator != address(0), "upgradeStageValidator is zero");
-        calls = new Call[](1);
-
-        calls[0] = Call({
-            target: upgradeAddresses.upgradeStageValidator,
-            // Double checking migrations are paused
-            data: abi.encodeCall(UpgradeStageValidator.checkMigrationsPaused, ()),
-            value: 0
-        });
-    }
-
-    /// @notice Checks to make sure that migrations are paused
-    function prepareCheckMigrationsUnpausedCalls() public virtual returns (Call[] memory calls) {
-        require(upgradeAddresses.upgradeStageValidator != address(0), "upgradeStageValidator is zero");
-        calls = new Call[](1);
-
-        calls[0] = Call({
-            target: upgradeAddresses.upgradeStageValidator,
-            // Double checking migrations are unpaused
-            data: abi.encodeCall(UpgradeStageValidator.checkMigrationsUnpaused, ()),
-            value: 0
-        });
-    }
-
-    /// @notice Checks to make sure that the upgrade has happened.
-    function prepareCheckUpgradeIsPresent() public virtual returns (Call[] memory calls) {
-        require(upgradeAddresses.upgradeStageValidator != address(0), "upgradeStageValidator is zero");
-        calls = new Call[](1);
-
-        calls[0] = Call({
-            target: upgradeAddresses.upgradeStageValidator,
-            // Double checking the presence of the upgrade
-            data: abi.encodeCall(UpgradeStageValidator.checkProtocolUpgradePresence, ()),
-            value: 0
         });
     }
 
@@ -393,29 +325,29 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         );
 
         // Note, that we do not need to run the initializer
-        calls[1] = _buildCallProxyUpgrade(
-            discoveredBridgehub.assetRouterAddresses.l1Nullifier,
-            bridges.l1NullifierImplementation
-        );
+        // calls[1] = _buildCallProxyUpgrade(
+        //     discoveredBridgehub.assetRouterAddresses.l1Nullifier,
+        //     bridges.l1NullifierImplementation
+        // );
 
-        calls[2] = _buildCallProxyUpgrade(discoveredBridgehub.assetRouter, bridges.l1AssetRouterImplementation);
+        // calls[2] = _buildCallProxyUpgrade(discoveredBridgehub.assetRouter, bridges.l1AssetRouterImplementation);
 
-        calls[3] = _buildCallProxyUpgrade(
-            discoveredBridgehub.assetRouterAddresses.nativeTokenVault,
-            upgradeAddresses.nativeTokenVaultImplementation
-        );
+        // calls[3] = _buildCallProxyUpgrade(
+        //     discoveredBridgehub.assetRouterAddresses.nativeTokenVault,
+        //     upgradeAddresses.nativeTokenVaultImplementation
+        // );
 
-        calls[4] = _buildCallProxyUpgrade(
-            discoveredBridgehub.messageRoot,
-            bridgehubAddresses.messageRootImplementation
-        );
+        // calls[4] = _buildCallProxyUpgrade(
+        //     discoveredBridgehub.messageRoot,
+        //     bridgehubAddresses.messageRootImplementation
+        // );
 
-        calls[5] = _buildCallProxyUpgrade(
-            discoveredBridgehub.l1CtmDeployer,
-            bridgehubAddresses.ctmDeploymentTrackerImplementation
-        );
+        // calls[5] = _buildCallProxyUpgrade(
+        //     discoveredBridgehub.l1CtmDeployer,
+        //     bridgehubAddresses.ctmDeploymentTrackerImplementation
+        // );
 
-        calls[6] = _buildCallProxyUpgrade(bridges.erc20BridgeProxy, bridges.erc20BridgeImplementation);
+        // calls[6] = _buildCallProxyUpgrade(bridges.erc20BridgeProxy, bridges.erc20BridgeImplementation);
     }
 
     function _buildCallProxyUpgrade(

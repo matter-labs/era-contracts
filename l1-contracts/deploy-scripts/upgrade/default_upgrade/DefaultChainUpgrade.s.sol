@@ -29,18 +29,19 @@ contract DefaultChainUpgrade is Script {
     address currentChainAdmin;
     ChainConfig config;
 
-    function prepareChain(string memory configPath) public {
+    function prepareChain(string memory permanentValuesInputPath, string memory configPath) public {
         string memory root = vm.projectRoot();
         configPath = string.concat(root, configPath);
+        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
 
-        initializeConfig(configPath);
+        initializeConfig(permanentValuesInputPath, configPath);
 
         // This script does nothing, it only checks that the provided inputs are correct.
         // It is just a wrapper to easily call `upgradeChain`
     }
 
-    function run() public {
-        prepareChain("/script-config/chain-upgrade.toml");
+    function run() public virtual {
+        prepareChain("/script-config/permanent-values.toml", "/script-config/chain-upgrade.toml");
     }
 
     function upgradeChain(uint256 oldProtocolVersion, Diamond.DiamondCutData memory upgradeCutData) public {
@@ -61,18 +62,19 @@ contract DefaultChainUpgrade is Script {
         IChainAdminOwnable(admin).setUpgradeTimestamp(newProtocolVersion, timestamp);
     }
 
-    function initializeConfig(string memory configPath) internal {
+    function initializeConfig(string memory permanentValuesInputPath, string memory configPath) internal {
         config.deployerAddress = msg.sender;
 
         // Grab config from output of l1 deployment
         string memory toml = vm.readFile(configPath);
+        string memory permanentValuesInputToml = vm.readFile(permanentValuesInputPath);
 
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
 
-        config.chainChainId = toml.readUint("$.chain.chain_id");
-        config.bridgehubProxyAddress = toml.readAddress("$.bridgehub_proxy_address");
+        config.chainChainId = permanentValuesInputToml.readUint("$.chain.chain_id");
+        config.bridgehubProxyAddress = permanentValuesInputToml.readAddress("$.contracts.bridgehub_proxy_address");
 
         config.chainDiamondProxyAddress = L1Bridgehub(config.bridgehubProxyAddress).getZKChain(config.chainChainId);
     }

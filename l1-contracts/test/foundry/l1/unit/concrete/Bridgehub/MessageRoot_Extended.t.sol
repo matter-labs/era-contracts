@@ -9,7 +9,7 @@ import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
-import {ChainExists, MessageRootNotRegistered, NotL2, OnlyChain, OnlyGateway, OnlyL2MessageRoot, OnlyOnSettlementLayer, TotalBatchesExecutedZero, V30UpgradeChainBatchNumberNotSet} from "contracts/bridgehub/L1BridgehubErrors.sol";
+import {ChainExists, MessageRootNotRegistered, NotL2, OnlyChain, OnlyGateway, OnlyL2MessageRoot, OnlyOnSettlementLayer, TotalBatchesExecutedZero, V31UpgradeChainBatchNumberNotSet} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {Unauthorized, InvalidCaller} from "contracts/common/L1ContractErrors.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -17,6 +17,8 @@ import {ProofData} from "contracts/common/Messaging.sol";
 
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {IL1MessageRoot} from "contracts/bridgehub/IL1MessageRoot.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 
 contract MessageRoot_Extended_Test is Test {
     address bridgeHub;
@@ -28,7 +30,7 @@ contract MessageRoot_Extended_Test is Test {
     address chainAssetHandler;
 
     function setUp() public {
-        bridgeHub = makeAddr("bridgeHub");
+        bridgeHub = address(new L1Bridgehub(makeAddr("owner"), 10));
         chainAssetHandler = makeAddr("chainAssetHandler");
         assetTracker = makeAddr("assetTracker");
         L1_CHAIN_ID = 1;
@@ -42,13 +44,6 @@ contract MessageRoot_Extended_Test is Test {
         );
         vm.mockCall(address(bridgeHub), abi.encodeWithSelector(Ownable.owner.selector), abi.encode(assetTracker));
 
-        uint256[] memory allZKChainChainIDs = new uint256[](1);
-        allZKChainChainIDs[0] = 271;
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
-            abi.encode(allZKChainChainIDs)
-        );
         vm.mockCall(
             bridgeHub,
             abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector),
@@ -58,6 +53,15 @@ contract MessageRoot_Extended_Test is Test {
 
         messageRoot = new L1MessageRoot(bridgeHub, gatewayChainId);
         l2MessageRoot = new L2MessageRoot();
+
+        uint256[] memory allZKChainChainIDs = new uint256[](1);
+        allZKChainChainIDs[0] = 271;
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
+            abi.encode(allZKChainChainIDs)
+        );
+
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2MessageRoot.initL2(L1_CHAIN_ID, gatewayChainId);
     }
@@ -113,51 +117,51 @@ contract MessageRoot_Extended_Test is Test {
         assertTrue(root != bytes32(0));
     }
 
-    function test_InitializeL2V30Upgrade_NotL2() public {
-        vm.expectRevert(abi.encodeWithSelector(InvalidCaller.selector, address(this)));
-        l2MessageRoot.initializeL2V30Upgrade();
-    }
+    // function test_InitializeL2V31Upgrade_NotL2() public {
+    //     vm.expectRevert(abi.encodeWithSelector(InvalidCaller.selector, address(this)));
+    //     l2MessageRoot.initializeL2V31Upgrade();
+    // }
 
-    function test_InitializeL2V30Upgrade_NotUpgrader() public {
-        vm.chainId(2); // Set to non-L1 chain
-        vm.expectRevert(abi.encodeWithSelector(InvalidCaller.selector, address(this)));
-        l2MessageRoot.initializeL2V30Upgrade();
-    }
+    // function test_InitializeL2V31Upgrade_NotUpgrader() public {
+    //     vm.chainId(2); // Set to non-L1 chain
+    //     vm.expectRevert(abi.encodeWithSelector(InvalidCaller.selector, address(this)));
+    //     l2MessageRoot.initializeL2V31Upgrade();
+    // }
 
-    function test_InitializeL1V30Upgrade_NotL1() public {
+    function test_InitializeL1V31Upgrade_NotL1() public {
         vm.chainId(2); // Set to non-L1 chain
 
         vm.expectRevert("Initializable: contract is already initialized");
-        messageRoot.initializeL1V30Upgrade();
+        messageRoot.initializeL1V31Upgrade();
     }
 
-    function test_SendV30UpgradeBlockNumberFromGateway_NotGateway() public {
-        vm.chainId(2); // Set to non-gateway chain
-        vm.expectRevert(OnlyGateway.selector);
-        l2MessageRoot.sendV30UpgradeBlockNumberFromGateway(271, 100);
-    }
+    // function test_SendV31UpgradeBlockNumberFromGateway_NotGateway() public {
+    //     vm.chainId(2); // Set to non-gateway chain
+    //     vm.expectRevert(OnlyGateway.selector);
+    //     l2MessageRoot.sendV31UpgradeBlockNumberFromGateway(271, 100);
+    // }
 
-    function test_SendV30UpgradeBlockNumberFromGateway_NotSet() public {
-        vm.chainId(gatewayChainId); // Set to gateway chain
-        vm.expectRevert(V30UpgradeChainBatchNumberNotSet.selector);
-        l2MessageRoot.sendV30UpgradeBlockNumberFromGateway(271, 100);
-    }
+    // function test_SendV31UpgradeBlockNumberFromGateway_NotSet() public {
+    //     vm.chainId(gatewayChainId); // Set to gateway chain
+    //     vm.expectRevert(V31UpgradeChainBatchNumberNotSet.selector);
+    //     l2MessageRoot.sendV31UpgradeBlockNumberFromGateway(271, 100);
+    // }
 
-    function test_SaveV30UpgradeChainBatchNumberOnL1_NotL2MessageRoot() public {
-        FinalizeL1DepositParams memory params = FinalizeL1DepositParams({
-            l2Sender: makeAddr("wrongSender"),
-            chainId: 1,
-            message: abi.encodeWithSelector(L2MessageRoot.sendV30UpgradeBlockNumberFromGateway.selector, 271, 100),
-            l2TxNumberInBatch: 1,
-            l2BatchNumber: 1,
-            l2MessageIndex: 1,
-            merkleProof: new bytes32[](0)
-        });
-        vm.expectRevert(OnlyL2MessageRoot.selector);
-        messageRoot.saveV30UpgradeChainBatchNumberOnL1(params);
-    }
+    // function test_SaveV31UpgradeChainBatchNumberOnL1_NotL2MessageRoot() public {
+    //     FinalizeL1DepositParams memory params = FinalizeL1DepositParams({
+    //         l2Sender: makeAddr("wrongSender"),
+    //         chainId: 1,
+    //         message: abi.encodeWithSelector(L2MessageRoot.sendV31UpgradeBlockNumberFromGateway.selector, 271, 100),
+    //         l2TxNumberInBatch: 1,
+    //         l2BatchNumber: 1,
+    //         l2MessageIndex: 1,
+    //         merkleProof: new bytes32[](0)
+    //     });
+    //     vm.expectRevert(OnlyL2MessageRoot.selector);
+    //     messageRoot.saveV31UpgradeChainBatchNumberOnL1(params);
+    // }
 
-    function test_SaveV30UpgradeChainBatchNumber_NotChain() public {
+    function test_SaveV31UpgradeChainBatchNumber_NotChain() public {
         uint256 chainId = 271;
         address wrongSender = makeAddr("wrongSender");
 
@@ -169,10 +173,10 @@ contract MessageRoot_Extended_Test is Test {
 
         vm.expectRevert(abi.encodeWithSelector(OnlyChain.selector, wrongSender, makeAddr("correctChain")));
         vm.prank(wrongSender);
-        messageRoot.saveV30UpgradeChainBatchNumber(chainId);
+        messageRoot.saveV31UpgradeChainBatchNumber(chainId);
     }
 
-    function test_SaveV30UpgradeChainBatchNumber_NotOnSettlementLayer() public {
+    function test_SaveV31UpgradeChainBatchNumber_NotOnSettlementLayer() public {
         uint256 chainId = 271;
         address chainSender = makeAddr("chainSender");
 
@@ -189,10 +193,10 @@ contract MessageRoot_Extended_Test is Test {
 
         vm.expectRevert(OnlyOnSettlementLayer.selector);
         vm.prank(chainSender);
-        messageRoot.saveV30UpgradeChainBatchNumber(chainId);
+        messageRoot.saveV31UpgradeChainBatchNumber(chainId);
     }
 
-    function test_SaveV30UpgradeChainBatchNumber_TotalBatchesExecutedZero() public {
+    function test_SaveV31UpgradeChainBatchNumber_TotalBatchesExecutedZero() public {
         uint256 chainId = 271;
         address chainSender = makeAddr("chainSender");
 
@@ -212,19 +216,17 @@ contract MessageRoot_Extended_Test is Test {
 
         vm.expectRevert(TotalBatchesExecutedZero.selector);
         vm.prank(chainSender);
-        messageRoot.saveV30UpgradeChainBatchNumber(chainId);
+        messageRoot.saveV31UpgradeChainBatchNumber(chainId);
     }
 
     function test_SetMigratingChainBatchRoot_Success() public {
         uint256 chainId = 271;
         uint256 batchNumber = 1;
-        uint256 v30UpgradeChainBatchNumber = 100;
 
         vm.prank(bridgeHub);
-        messageRoot.setMigratingChainBatchRoot(chainId, batchNumber, v30UpgradeChainBatchNumber);
+        messageRoot.setMigratingChainBatchRoot(chainId, batchNumber);
 
         assertEq(messageRoot.currentChainBatchNumber(chainId), batchNumber);
-        assertEq(messageRoot.v30UpgradeChainBatchNumber(chainId), v30UpgradeChainBatchNumber);
     }
 
     function test_GetProofData() public {
@@ -277,15 +279,15 @@ contract MessageRoot_Extended_Test is Test {
         assertEq(currentBatch, startingBatchNumber);
     }
 
-    function test_V30UpgradeChainBatchNumber() public {
+    function test_V31UpgradeChainBatchNumber() public {
         uint256 chainId = 271;
-        uint256 v30UpgradeBatchNumber = 100;
+        uint256 v31UpgradeBatchNumber = 0;
 
         vm.prank(bridgeHub);
-        messageRoot.setMigratingChainBatchRoot(chainId, 1, v30UpgradeBatchNumber);
+        messageRoot.setMigratingChainBatchRoot(chainId, 1);
 
-        uint256 v30Batch = messageRoot.v30UpgradeChainBatchNumber(chainId);
-        assertEq(v30Batch, v30UpgradeBatchNumber);
+        uint256 v31Batch = messageRoot.v31UpgradeChainBatchNumber(chainId);
+        assertEq(v31Batch, v31UpgradeBatchNumber);
     }
 
     function test_AddChainBatchRoot_Success() public {

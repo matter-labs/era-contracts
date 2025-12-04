@@ -67,7 +67,7 @@ contract DeployErc20Script is Script {
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.create2FactoryAddr = vm.parseTomlAddress(toml, "$.create2_factory_addr");
-        config.create2FactorySalt = vm.parseTomlBytes32(toml, "$.create2_factory_salt");
+        config.create2FactorySalt = vm.parseTomlBytes32(toml, "$.contracts.create2_factory_salt");
 
         // Grab config from custom config file
         path = string.concat(root, vm.envString("TOKENS_CONFIG"));

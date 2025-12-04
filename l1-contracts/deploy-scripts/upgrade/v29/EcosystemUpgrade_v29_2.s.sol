@@ -25,7 +25,7 @@ import {DefaultCTMUpgrade} from "../default_upgrade/DefaultCTMUpgrade.s.sol";
 contract EcosystemUpgrade_v29_2 is Script, DefaultCTMUpgrade {
     using stdToml for string;
 
-    function initializeConfig(string memory newConfigPath) internal override {
+    function initializeConfig(string memory permanentValuesInputPath, string memory newConfigPath) internal override {
         super.initializeConfig(newConfigPath);
         string memory toml = vm.readFile(newConfigPath);
 

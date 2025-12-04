@@ -60,9 +60,11 @@ import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
 import {StateTransitionDeployedAddresses, DataAvailabilityDeployedAddresses, ChainCreationParamsConfig} from "../utils/Types.sol";
 
 import {DeployCTML1OrGateway, CTMCoreDeploymentConfig, CTMContract} from "./DeployCTML1OrGateway.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
 
 // solhint-disable-next-line gas-struct-packing
-struct DeployedAddresses {
+struct CTMDeployedAddresses {
     StateTransitionDeployedAddresses stateTransition;
     DataAvailabilityDeployedAddresses daAddresses;
     address transparentProxyAdmin;
@@ -115,7 +117,7 @@ abstract contract DeployCTMUtils is DeployUtils {
 
     Config public config;
     GeneratedData internal generatedData;
-    DeployedAddresses internal addresses;
+    CTMDeployedAddresses internal addresses;
     // Addresses discovered from already deployed core contracts (Bridgehub, AssetRouter, etc.)
     AddressIntrospector.BridgehubAddresses internal discoveredBridgehub;
 
@@ -127,7 +129,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
-    function initializeConfig(string memory configPath) internal virtual {
+    function initializeConfig(string memory permanentValuesInputPath, string memory configPath) internal virtual {
         string memory toml = vm.readFile(configPath);
 
         config.l1ChainId = block.chainid;

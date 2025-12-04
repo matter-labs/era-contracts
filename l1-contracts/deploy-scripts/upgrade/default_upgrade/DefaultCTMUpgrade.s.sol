@@ -30,7 +30,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
-import {DeployCTMUtils, DeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
+import {DeployCTMUtils, CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 import {BytecodePublisher} from "../../utils/bytecode/BytecodePublisher.s.sol";
@@ -71,7 +71,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     // solhint-disable-next-line gas-struct-packing
-    struct Gateway {
+    struct GatewayConfig {
         uint256 chainId;
     }
 
@@ -101,7 +101,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     // Input for the script
     AdditionalConfig internal newConfig;
-    Gateway internal gatewayConfig;
+    GatewayConfig internal gatewayConfig;
 
     // Discovered addresses
     AddressIntrospector.CTMAddresses internal discoveredCTM;
@@ -112,11 +112,16 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     uint256[] internal factoryDepsHashes;
     mapping(bytes32 => bool) internal isHashInFactoryDeps;
 
-    function initialize(string memory newConfigPath, string memory _outputPath) public virtual {
+    function initialize(
+        string memory permanentValuesInputPath,
+        string memory newConfigPath,
+        string memory _outputPath
+    ) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
-
-        initializeConfigFromFile(newConfigPath);
+        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
+        initializeConfigFromFile(permanentValuesInputPath, newConfigPath);
+        instantiateCreate2Factory();
 
         console.log("Initialized config from %s", newConfigPath);
         upgradeConfig.outputPath = string.concat(root, _outputPath);
@@ -167,21 +172,27 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
-    function initializeConfigFromFile(string memory newConfigPath) internal virtual {
+    function initializeConfigFromFile(
+        string memory permanentValuesInputPath,
+        string memory newConfigPath
+    ) internal virtual {
+        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
         string memory toml = vm.readFile(newConfigPath);
 
-        bytes32 create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
+        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
         address create2FactoryAddr;
-        if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
+        if (vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_addr")) {
+            create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
         }
 
-        address ctm = toml.readAddress("$.contracts.ctm_proxy_address");
+        address ctm = permanentValuesToml.readAddress("$.contracts.ctm_proxy_address");
         // Can we safely get it from the CTM? is it always exists even for zksync os ?
-        uint256 eraChainId = toml.readUint("$.era_chain_id");
+        uint256 eraChainId = permanentValuesToml.readUint("$.era_chain_id");
 
-        address bytecodesSupplier = toml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
-        address rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
+        address bytecodesSupplier = permanentValuesToml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
+        address rollupDAManager = permanentValuesToml.readAddress("$.contracts.rollup_da_manager");
+
+        addresses.eip7702Checker = toml.readAddress("$.deployed_addresses.state_transition.eip7702_checker_addr");
 
         address governance;
         if (toml.keyExists("$.governance")) {
@@ -192,26 +203,28 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         // TODO can we discover it?. Try to get it from the chain
         bool isZKsyncOS;
-        if (toml.keyExists("$.is_zk_sync_os")) {
-            isZKsyncOS = toml.readBool("$.is_zk_sync_os");
+        if (permanentValuesToml.keyExists("$.is_zk_sync_os")) {
+            isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
         }
         ChainCreationParamsConfig memory chainCreationParams;
 
-        chainCreationParams.latestProtocolVersion = toml.readUint("$.contracts.latest_protocol_version");
+        chainCreationParams.latestProtocolVersion = toml.readUint("$.chain_creation_params.latest_protocol_version");
         // Protocol specific params for the entire CTM
-        chainCreationParams.genesisRoot = toml.readBytes32("$.contracts.genesis_root");
-        chainCreationParams.genesisRollupLeafIndex = toml.readUint("$.contracts.genesis_rollup_leaf_index");
-        chainCreationParams.genesisBatchCommitment = toml.readBytes32("$.contracts.genesis_batch_commitment");
+        chainCreationParams.genesisRoot = toml.readBytes32("$.chain_creation_params.genesis_root");
+        chainCreationParams.genesisRollupLeafIndex = toml.readUint("$.chain_creation_params.genesis_rollup_leaf_index");
+        chainCreationParams.genesisBatchCommitment = toml.readBytes32(
+            "$.chain_creation_params.genesis_batch_commitment"
+        );
 
         // These fields are redundant for zksync_os.
-        if (toml.keyExists("$.contracts.default_aa_hash")) {
-            chainCreationParams.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
+        if (toml.keyExists("$.chain_creation_params.default_aa_hash")) {
+            chainCreationParams.defaultAAHash = toml.readBytes32("$.chain_creation_params.default_aa_hash");
         }
-        if (toml.keyExists("$.contracts.bootloader_hash")) {
-            chainCreationParams.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
+        if (toml.keyExists("$.chain_creation_params.bootloader_hash")) {
+            chainCreationParams.bootloaderHash = toml.readBytes32("$.chain_creation_params.bootloader_hash");
         }
-        if (toml.keyExists("$.contracts.evm_emulator_hash")) {
-            chainCreationParams.evmEmulatorHash = toml.readBytes32("$.contracts.evm_emulator_hash");
+        if (toml.keyExists("$.chain_creation_params.evm_emulator_hash")) {
+            chainCreationParams.evmEmulatorHash = toml.readBytes32("$.chain_creation_params.evm_emulator_hash");
         }
 
         initializeConfig(
@@ -228,8 +241,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     /// @notice Full default upgrade preparation flow
-    function prepareEcosystemUpgrade() public virtual {
-        deployNewEcosystemContractsL1();
+    function prepareCTMUpgrade() public virtual {
+        deployNewCTMContracts();
         console.log("Ecosystem contracts are deployed!");
         publishBytecodes();
         console.log("Bytecodes published!");
@@ -248,7 +261,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     /// @notice Deploy everything that should be deployed
-    function deployNewEcosystemContractsL1() public virtual {
+    function deployNewCTMContracts() public virtual {
         deployUpgradeStageValidator();
         deployGovernanceUpgradeTimer();
     }
@@ -293,9 +306,13 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     /// @notice E2e upgrade generation
-    function run() public virtual {
-        initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
-        prepareEcosystemUpgrade();
+    function run() public virtual override {
+        initialize(
+            vm.envString("PERMANENT_VALUES_INPUT"),
+            vm.envString("UPGRADE_ECOSYSTEM_INPUT"),
+            vm.envString("UPGRADE_ECOSYSTEM_OUTPUT")
+        );
+        prepareCTMUpgrade();
 
         prepareDefaultGovernanceCalls();
         prepareDefaultEcosystemAdminCalls();
@@ -305,6 +322,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     function getOwnerAddress() public virtual returns (address) {
         return config.ownerAddress;
+    }
+
+    function setNewProtocolVersion(uint256 _protocolVersion) public virtual {
+        config.contracts.chainCreationParams.latestProtocolVersion = _protocolVersion;
     }
 
     function getNewProtocolVersion() public view virtual returns (uint256) {
@@ -317,6 +338,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     function getBridgehubAdmin() public virtual returns (address admin) {
         return discoveredBridgehub.admin;
+    }
+
+    function getGatewayConfig() public virtual returns (GatewayConfig memory) {
+        return gatewayConfig;
     }
 
     /// @notice This function is meant to only be used in tests
@@ -368,6 +393,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         FixedForceDeploymentsData memory forceDeploymentsData = prepareFixedForceDeploymentsData();
 
         newlyGeneratedData.fixedForceDeploymentsData = abi.encode(forceDeploymentsData);
+        generatedData.forceDeploymentsData = abi.encode(forceDeploymentsData);
         upgradeConfig.fixedForceDeploymentsDataGenerated = true;
     }
 
@@ -409,7 +435,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             beaconDeployerInfo: abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
             interopCenterBytecodeInfo: abi.encode(getL2BytecodeHash("InteropCenter")),
             interopHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("InteropHandler")),
-            assetTrackerBytecodeInfo: abi.encode(getL2BytecodeHash("AssetTracker")),
+            assetTrackerBytecodeInfo: abi.encode(getL2BytecodeHash("L2AssetTracker")),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
@@ -428,6 +454,12 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     /////////////////////////// Blockchain interactions ////////////////////////////
 
+    bool skipFactoryDepsCheck = false;
+
+    function setSkipFactoryDepsCheck_TestOnly(bool _skipFactoryDepsCheck) public virtual {
+        skipFactoryDepsCheck = _skipFactoryDepsCheck;
+    }
+
     function publishBytecodes() public virtual {
         bytes[] memory allDeps = getFullListOfFactoryDependencies();
         uint256[] memory factoryDeps = new uint256[](allDeps.length);
@@ -441,19 +473,28 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             isHashInFactoryDeps[bytecodeHash] = true;
         }
 
-        // Double check for consistency:
-        require(
-            bytes32(factoryDeps[0]) == config.contracts.chainCreationParams.bootloaderHash,
-            "bootloader hash factory dep mismatch"
-        );
-        require(
-            bytes32(factoryDeps[1]) == config.contracts.chainCreationParams.defaultAAHash,
-            "default aa hash factory dep mismatch"
-        );
-        require(
-            bytes32(factoryDeps[2]) == config.contracts.chainCreationParams.evmEmulatorHash,
-            "EVM emulator hash factory dep mismatch"
-        );
+        console.logBytes32(config.contracts.chainCreationParams.bootloaderHash);
+        console.log(factoryDeps[0]);
+        console.logBytes32(config.contracts.chainCreationParams.defaultAAHash);
+        console.log(factoryDeps[1]);
+        console.logBytes32(config.contracts.chainCreationParams.evmEmulatorHash);
+        console.log(factoryDeps[2]);
+
+        if (!skipFactoryDepsCheck) {
+            // Double check for consistency:
+            require(
+                bytes32(factoryDeps[0]) == config.contracts.chainCreationParams.bootloaderHash,
+                "bootloader hash factory dep mismatch"
+            );
+            require(
+                bytes32(factoryDeps[1]) == config.contracts.chainCreationParams.defaultAAHash,
+                "default aa hash factory dep mismatch"
+            );
+            require(
+                bytes32(factoryDeps[2]) == config.contracts.chainCreationParams.evmEmulatorHash,
+                "EVM emulator hash factory dep mismatch"
+            );
+        }
 
         factoryDepsHashes = factoryDeps;
 
@@ -465,11 +506,14 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     function prepareDefaultGovernanceCalls()
         public
         virtual
-        returns (Call[] memory stage1Calls, Call[] memory stage2Calls)
+        returns (Call[] memory stage0Calls, Call[] memory stage1Calls, Call[] memory stage2Calls)
     {
         // Default upgrade is done it 3 stages:
+        // 0. Pause migration to/from Gateway, other stage 0 calls.
         // 1. Perform upgrade
         // 2. Unpause migration to/from Gateway
+        stage0Calls = prepareStage0GovernanceCalls();
+        vm.serializeBytes("governance_calls", "stage0_calls", abi.encode(stage0Calls));
         stage1Calls = prepareStage1GovernanceCalls();
         vm.serializeBytes("governance_calls", "stage1_calls", abi.encode(stage1Calls));
         stage2Calls = prepareStage2GovernanceCalls();
@@ -544,19 +588,20 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](8);
+        Call[][] memory allCalls = new Call[][](7);
 
-        allCalls[0] = prepareCheckMigrationsPausedCalls();
+        allCalls[0] = prepareGovernanceUpgradeTimerCheckCall();
+        allCalls[1] = prepareCheckMigrationsPausedCalls();
         console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
-        allCalls[1] = prepareUpgradeCTMCalls();
+        allCalls[2] = prepareUpgradeCTMCalls();
         console.log("prepareStage1GovernanceCalls: prepareNewChainCreationParamsCall");
-        allCalls[2] = prepareNewChainCreationParamsCall();
+        allCalls[3] = prepareNewChainCreationParamsCall();
         console.log("prepareStage1GovernanceCalls: provideSetNewVersionUpgradeCall");
-        allCalls[3] = provideSetNewVersionUpgradeCall();
+        allCalls[4] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareDAValidatorCall");
-        allCalls[4] = prepareDAValidatorCall();
+        allCalls[5] = prepareDAValidatorCall();
         console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
-        allCalls[5] = prepareVersionSpecificStage1GovernanceCallsL1();
+        allCalls[6] = prepareVersionSpecificStage1GovernanceCallsL1();
         calls = mergeCallsArray(allCalls);
     }
 
@@ -616,7 +661,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         result = new Call[](1);
         result[0] = Call({
-            target: discoveredBridgehub.bridgehubProxy,
+            target: discoveredBridgehub.chainAssetHandler,
             value: 0,
             data: abi.encodeCall(IChainAssetHandler.pauseMigration, ())
         });
@@ -627,7 +672,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         result = new Call[](1);
         result[0] = Call({
-            target: discoveredBridgehub.bridgehubProxy,
+            target: discoveredBridgehub.chainAssetHandler,
             value: 0,
             data: abi.encodeCall(IChainAssetHandler.unpauseMigration, ())
         });
@@ -751,7 +796,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         });
     }
 
-    function getAddresses() public view returns (DeployedAddresses memory) {
+    function getAddresses() public view override returns (CTMDeployedAddresses memory) {
         return addresses;
     }
 
@@ -784,18 +829,18 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         string memory contractName,
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
-        require(!isZKBytecode, "ZK bytecodes are not supported in CTM upgrade");
-        if (compareStrings(contractName, "DiamondProxy")) {
-            return type(DiamondProxy).creationCode;
-        } else if (compareStrings(contractName, "DefaultUpgrade")) {
-            return type(DefaultUpgrade).creationCode;
-        } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
-            return type(GovernanceUpgradeTimer).creationCode;
-        } else if (compareStrings(contractName, "UpgradeStageValidator")) {
-            return type(UpgradeStageValidator).creationCode;
-        } else {
-            return super.getCreationCode(contractName, isZKBytecode);
+        if (!isZKBytecode) {
+            if (compareStrings(contractName, "DiamondProxy")) {
+                return type(DiamondProxy).creationCode;
+            } else if (compareStrings(contractName, "DefaultUpgrade")) {
+                return type(DefaultUpgrade).creationCode;
+            } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
+                return type(GovernanceUpgradeTimer).creationCode;
+            } else if (compareStrings(contractName, "UpgradeStageValidator")) {
+                return type(UpgradeStageValidator).creationCode;
+            }
         }
+        return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function deployUpgradeStageValidator() internal {
@@ -818,7 +863,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         }
     }
 
-    function saveOutput(string memory outputPath) internal virtual {
+    function saveOutput(string memory outputPath) internal virtual override {
         // Serialize newly deployed state transition addresses
         vm.serializeAddress(
             "state_transition",

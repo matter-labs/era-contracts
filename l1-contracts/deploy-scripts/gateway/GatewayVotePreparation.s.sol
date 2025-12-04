@@ -72,7 +72,11 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
     GatewayCTMDeployerConfig internal gatewayCTMDeployerConfig;
 
-    function initializeConfig(string memory configPath, uint256 ctmRepresentativeChainId) internal virtual {
+    function initializeConfig(
+        string memory permanentValuesInputPath,
+        string memory configPath,
+        uint256 ctmRepresentativeChainId
+    ) internal virtual {
         super.initializeConfig(configPath);
         string memory toml = vm.readFile(configPath);
 
