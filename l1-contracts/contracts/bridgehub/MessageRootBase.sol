@@ -10,6 +10,7 @@ import {IMessageRoot} from "./IMessageRoot.sol";
 import {ChainExists, MessageRootNotRegistered, NotL2, OnlyBridgehubOrChainAssetHandler, OnlyChain} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
+import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
@@ -24,7 +25,7 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
-abstract contract MessageRootBase is IMessageRoot, Initializable {
+abstract contract MessageRootBase is IMessageRoot, ReentrancyGuard, Initializable {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
