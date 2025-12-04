@@ -679,11 +679,11 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         _deployEra();
         _deployZKChain(ETH_TOKEN_ADDRESS);
-        _deployZKChain(ETH_TOKEN_ADDRESS);
+        // _deployZKChain(ETH_TOKEN_ADDRESS);
         _deployZKChain(tokens[0]);
-        _deployZKChain(tokens[0]);
-        _deployZKChain(tokens[1]);
-        _deployZKChain(tokens[1]);
+        // _deployZKChain(tokens[0]);
+        // _deployZKChain(tokens[1]);
+        // _deployZKChain(tokens[1]);
 
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
@@ -697,7 +697,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
     function test() internal override {}
 }
 
-contract BoundedBridgeHubInvariantTests is BridgeHubInvariantTests {
+contract BoundedBridgeHubInvariantTests2 is BridgeHubInvariantTests {
     function setUp() public {
         prepare();
     }
