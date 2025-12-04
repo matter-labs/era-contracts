@@ -285,8 +285,8 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     function run() public virtual override {
         initialize(
             vm.envString("PERMANENT_VALUES_INPUT"),
-            vm.envString("UPGRADE_ECOSYSTEM_INPUT"),
-            vm.envString("UPGRADE_ECOSYSTEM_OUTPUT")
+            vm.envString("UPGRADE_GATEWAY_INPUT"),
+            vm.envString("UPGRADE_GATEWAY_OUTPUT")
         );
         prepareEcosystemUpgrade();
 

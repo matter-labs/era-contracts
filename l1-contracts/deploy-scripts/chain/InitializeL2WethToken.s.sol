@@ -46,7 +46,7 @@ contract InitializeL2WethTokenScript is Script {
         string memory path = string.concat(root, vm.envString("L1_OUTPUT"));
         string memory toml = vm.readFile(path);
 
-        config.create2FactoryAddr = toml.readAddress("$.create2_factory_addr");
+        config.create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
         config.create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
         config.eraChainId = toml.readUint("$.era_chain_id");
         config.bridgehubProxyAddr = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");

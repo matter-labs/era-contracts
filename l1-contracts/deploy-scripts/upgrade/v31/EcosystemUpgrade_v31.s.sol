@@ -57,9 +57,6 @@ contract EcosystemUpgrade_v31 is Script, DefaultEcosystemUpgrade {
         string memory contractName,
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
-        if (!isZKBytecode && compareStrings(contractName, "L1V29Upgrade")) {
-            return type(L1V29Upgrade).creationCode;
-        }
         return super.getCreationCode(contractName, isZKBytecode);
     }
 
@@ -67,14 +64,11 @@ contract EcosystemUpgrade_v31 is Script, DefaultEcosystemUpgrade {
         string memory contractName,
         bool isZKBytecode
     ) internal view override returns (bytes memory) {
-        if (compareStrings(contractName, "L1V29Upgrade")) {
-            return abi.encode();
-        }
         return super.getCreationCalldata(contractName, isZKBytecode);
     }
 
     function deployUsedUpgradeContract() internal returns (address) {
-        return deploySimpleContract("L1V29Upgrade", false);
+        return deploySimpleContract("L1V31Upgrade", false);
     }
 
     function getInitializeCalldata(
