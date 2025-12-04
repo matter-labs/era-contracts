@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
+import {L2DACommitmentScheme} from "./Config.sol";
+
 // 0x5ecf2d7a
 error AccessToFallbackDenied(address target, address invoker);
 // 0x3995f750
@@ -153,7 +155,7 @@ error InvalidDAForPermanentRollup();
 // 0x4fbe5dba
 error InvalidDelay();
 // 0x3f98a77e
-error InvalidL2DACommitmentScheme(uint8);
+error InvalidL2DACommitmentScheme(L2DACommitmentScheme);
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
 // 0xa1ec1876

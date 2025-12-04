@@ -30,7 +30,7 @@ contract RollupDAManager is Ownable2Step {
         }
 
         if (l2DACommitmentScheme == L2DACommitmentScheme.NONE) {
-            revert InvalidL2DACommitmentScheme(uint8(l2DACommitmentScheme));
+            revert InvalidL2DACommitmentScheme(l2DACommitmentScheme);
         }
         _;
     }
