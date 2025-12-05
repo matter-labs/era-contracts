@@ -33,6 +33,8 @@ import {IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol
 
 import {IAssetTrackerDataEncoding} from "contracts/bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
@@ -376,6 +378,201 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
         gwAssetTracker.confirmMigrationOnGateway(confirmData);
+    }
+
+    function test_migrateTokenBalanceFromNTVV31_L2Chain() public {
+        // Test migrating token balance from NTV for an L2 chain
+        uint256 testChainId = eraZKChainId;
+        uint256 migratedBalance = 5000;
+
+        // Set origin chain ID (different from test chain)
+        vm.mockCall(
+            address(ecosystemAddresses.vaults.l1NativeTokenVaultProxy),
+            abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, assetId),
+            abi.encode(originalChainId)
+        );
+
+        // Mock the migrateTokenBalanceToAssetTracker call
+        vm.mockCall(
+            address(ecosystemAddresses.vaults.l1NativeTokenVaultProxy),
+            abi.encodeWithSelector(IL1NativeTokenVault.migrateTokenBalanceToAssetTracker.selector, testChainId, assetId),
+            abi.encode(migratedBalance)
+        );
+
+        // Set initial origin chain balance to MAX_TOKEN_BALANCE
+        bytes32 maxTokenBalance = bytes32(type(uint256).max);
+        vm.store(address(assetTracker), getChainBalanceLocation(assetId, originalChainId), maxTokenBalance);
+
+        // Call the migration function
+        assetTracker.migrateTokenBalanceFromNTVV31(testChainId, assetId);
+
+        // Verify balances updated correctly
+        uint256 originBalance = uint256(vm.load(address(assetTracker), getChainBalanceLocation(assetId, originalChainId)));
+        uint256 testChainBalance = uint256(vm.load(address(assetTracker), getChainBalanceLocation(assetId, testChainId)));
+
+        assertEq(originBalance, type(uint256).max - migratedBalance, "Origin chain balance should decrease");
+        assertEq(testChainBalance, migratedBalance, "Test chain balance should increase");
+    }
+
+    function test_migrateTokenBalanceFromNTVV31_L1Chain() public {
+        // Test migrating token balance for L1 chain (current chain)
+        // Note: _chainId must be != originChainId, so we use a different origin chain
+        uint256 totalSupply = 8000;
+        uint256 differentOriginChain = 999; // Different from originalChainId
+
+        // Set origin chain ID to a different chain
+        vm.mockCall(
+            address(ecosystemAddresses.vaults.l1NativeTokenVaultProxy),
+            abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, assetId),
+            abi.encode(differentOriginChain)
+        );
+
+        // Mock token address
+        vm.mockCall(
+            address(ecosystemAddresses.vaults.l1NativeTokenVaultProxy),
+            abi.encodeWithSelector(INativeTokenVaultBase.tokenAddress.selector, assetId),
+            abi.encode(tokenAddress)
+        );
+
+        // Mock total supply
+        vm.mockCall(
+            tokenAddress,
+            abi.encodeWithSelector(IERC20.totalSupply.selector),
+            abi.encode(totalSupply)
+        );
+
+        // Set initial origin chain balance to MAX_TOKEN_BALANCE
+        bytes32 maxTokenBalance = bytes32(type(uint256).max);
+        vm.store(address(assetTracker), getChainBalanceLocation(assetId, differentOriginChain), maxTokenBalance);
+
+        // Call the migration function for L1 (current chain)
+        assetTracker.migrateTokenBalanceFromNTVV31(originalChainId, assetId);
+
+        // Verify balances updated correctly
+        uint256 originBalance = uint256(vm.load(address(assetTracker), getChainBalanceLocation(assetId, differentOriginChain)));
+        uint256 l1Balance = uint256(vm.load(address(assetTracker), getChainBalanceLocation(assetId, originalChainId)));
+
+        assertEq(originBalance, type(uint256).max - totalSupply, "Origin chain balance should decrease by totalSupply");
+        assertEq(l1Balance, totalSupply, "L1 balance should equal totalSupply");
+    }
+
+    function test_consumeBalanceChange() public {
+        // Test consuming balance change for a deposit via Gateway
+        uint256 callerChainId = gwChainId;
+        uint256 targetChainId = eraZKChainId;
+        bytes32 testAssetId = keccak256("test_asset");
+        uint256 testAmount = 2500;
+
+        // Mock caller as whitelisted settlement layer
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.whitelistedSettlementLayers.selector, callerChainId),
+            abi.encode(true)
+        );
+
+        // Mock getZKChain to return msg.sender (simulating the chain calling)
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, callerChainId),
+            abi.encode(address(this))
+        );
+
+        // First, we need to set up a transient balance change by calling handleChainBalanceIncreaseOnL1
+        // Mock settlement layer for target chain
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector, targetChainId),
+            abi.encode(callerChainId)
+        );
+
+        // Mock base token asset ID (different from test asset)
+        bytes32 baseTokenAssetId = keccak256("base_token");
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, targetChainId),
+            abi.encode(baseTokenAssetId)
+        );
+
+        // Set up initial balances
+        vm.store(address(assetTracker), getChainBalanceLocation(testAssetId, originalChainId), bytes32(uint256(10000)));
+
+        // Mock origin chain ID
+        vm.mockCall(
+            address(ecosystemAddresses.vaults.l1NativeTokenVaultProxy),
+            abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, testAssetId),
+            abi.encode(originalChainId)
+        );
+
+        // Set asset migration number
+        vm.store(
+            address(assetTracker),
+            getAssetMigrationNumberLocation(testAssetId, targetChainId),
+            bytes32(migrationNumber)
+        );
+
+        // Mock chain migration number
+        vm.mockCall(
+            address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
+            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector, targetChainId),
+            abi.encode(migrationNumber)
+        );
+
+        // Call handleChainBalanceIncreaseOnL1 as NativeTokenVault to set transient balance
+        vm.prank(address(ecosystemAddresses.vaults.l1NativeTokenVaultProxy));
+        assetTracker.handleChainBalanceIncreaseOnL1(targetChainId, testAssetId, testAmount, originalChainId);
+
+        // Now consume the balance change
+        (bytes32 returnedAssetId, uint256 returnedAmount) = assetTracker.consumeBalanceChange(callerChainId, targetChainId);
+
+        // Verify the returned values
+        assertEq(returnedAssetId, testAssetId, "Returned asset ID should match");
+        assertEq(returnedAmount, testAmount, "Returned amount should match");
+
+        // Verify transient storage is cleared (calling again should return 0)
+        (bytes32 clearedAssetId, uint256 clearedAmount) = assetTracker.consumeBalanceChange(callerChainId, targetChainId);
+        assertEq(clearedAssetId, bytes32(0), "Asset ID should be cleared");
+        assertEq(clearedAmount, 0, "Amount should be cleared");
+    }
+
+    function test_requestPauseDepositsForChainOnGateway() public {
+        // Test requesting pause of deposits on Gateway for a chain migrating back to L1
+        uint256 targetChainId = eraZKChainId;
+
+        // Mock settlement layer for the chain (should be Gateway)
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector, targetChainId),
+            abi.encode(gwChainId)
+        );
+
+        // Mock getZKChain to return the caller address
+        address zkChainAddress = address(0x1111111111111111111111111111111111111111);
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, targetChainId),
+            abi.encode(zkChainAddress)
+        );
+
+        // Mock getZKChain for gateway
+        address gwChainAddress = address(0x2222222222222222222222222222222222222222);
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, gwChainId),
+            abi.encode(gwChainAddress)
+        );
+
+        // Mock the mailbox requestL2ServiceTransaction call
+        vm.mockCall(
+            gwChainAddress,
+            abi.encodeWithSelector(IMailboxImpl.requestL2ServiceTransaction.selector),
+            abi.encode(bytes32(uint256(1)))
+        );
+
+        // Call as the chain itself
+        vm.prank(zkChainAddress);
+        assetTracker.requestPauseDepositsForChainOnGateway(targetChainId);
+
+        // Verify the call was made to the gateway (checking it didn't revert is sufficient)
     }
 
     // add this to be excluded from coverage report
