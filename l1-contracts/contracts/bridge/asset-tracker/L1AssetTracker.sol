@@ -399,7 +399,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @notice Verifies that a message was properly included in the L2->L1 message system.
     /// @param _finalizeWithdrawalParams The parameters containing the message and its inclusion proof.
     function _proveMessageInclusion(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) internal view {
-        require(_finalizeWithdrawalParams.l2Sender == L2_ASSET_TRACKER_ADDR, InvalidSender());
+        require(_finalizeWithdrawalParams.l2Sender == GW_ASSET_TRACKER_ADDR, InvalidSender());
         bool success = MESSAGE_ROOT.proveL1DepositParamsInclusion(_finalizeWithdrawalParams);
         if (!success) {
             revert InvalidProof();
