@@ -49,7 +49,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
             root,
             "/test/foundry/l1/integration/deploy-scripts/script-config/permanent-values.toml"
         );
-        initializeConfig(permanentValuesInputPath, inputPath);
+        initializeConfig(inputPath);
         addresses.transparentProxyAdmin = address(0x1);
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");

@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IL1Bridgehub, L1Nullifier} from "../bridge/L1Nullifier.sol";
-import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
+import {IMessageRoot} from "../core/message-root/IMessageRoot.sol";
 import {IInteropCenter} from "../interop/IInteropCenter.sol";
 
 contract L1NullifierDev is L1Nullifier {

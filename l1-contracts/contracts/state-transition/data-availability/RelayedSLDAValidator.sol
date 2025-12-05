@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {IL1DAValidator, L1DAValidatorOutput, PubdataSource} from "../chain-interfaces/IL1DAValidator.sol";
 import {CalldataDAGateway} from "./CalldataDAGateway.sol";
 
-import {IL2Bridgehub} from "../../bridgehub/IL2Bridgehub.sol";
+import {IL2Bridgehub} from "../../core/bridgehub/IL2Bridgehub.sol";
 import {L2_BRIDGEHUB_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {BlobHashBlobCommitmentMismatchValue, InvalidPubdataSource, L1DAValidatorInvalidSender} from "../L1StateTransitionErrors.sol";
 
