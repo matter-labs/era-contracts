@@ -36,6 +36,8 @@ import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol"
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
+import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+
 contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
 
@@ -585,6 +587,10 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         assetTracker.requestPauseDepositsForChainOnGateway(targetChainId);
 
         // Verify the call was made to the gateway (checking it didn't revert is sufficient)
+    }
+
+    function test_tokenMigratedThisChain() public {
+        IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(bytes32(0));
     }
 
     // add this to be excluded from coverage report
