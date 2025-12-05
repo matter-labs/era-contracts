@@ -286,24 +286,6 @@ abstract contract ChainAssetHandlerBase is
     }
 
     /*//////////////////////////////////////////////////////////////
-                            L2 functions
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice This function is called at the start of each batch.
-    function setSettlementLayerChainId(
-        uint256 _previousSettlementLayerChainId,
-        uint256 _currentSettlementLayerChainId
-    ) external onlySystemContext {
-        if (_previousSettlementLayerChainId == 0 && _currentSettlementLayerChainId == _l1ChainId()) {
-            /// For the initial call if we are settling on L1, we return, as there is no real migration.
-            return;
-        }
-        if (_previousSettlementLayerChainId != _currentSettlementLayerChainId) {
-            ++migrationNumber[block.chainid];
-        }
-    }
-
-    /*//////////////////////////////////////////////////////////////
                             PAUSE
     //////////////////////////////////////////////////////////////*/
 
