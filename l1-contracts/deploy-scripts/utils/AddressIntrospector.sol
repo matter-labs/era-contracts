@@ -3,9 +3,9 @@
 pragma solidity ^0.8.21;
 
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -39,6 +39,7 @@ library AddressIntrospector {
         address legacyValidatorTimelock;
         address admin;
         address serverNotifier;
+        address governance;
     }
 
     struct ZkChainAddresses {
@@ -103,6 +104,7 @@ library AddressIntrospector {
         info.validatorTimelockPostV29 = _tryAddress(ctmAddr, "validatorTimelockPostV29()");
         info.legacyValidatorTimelock = _ctm.validatorTimelock();
         info.admin = _ctm.admin();
+        info.governance = IOwnable(ctmAddr).owner();
         info.serverNotifier = _ctm.serverNotifierAddress();
     }
 

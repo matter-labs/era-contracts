@@ -3,23 +3,24 @@ pragma solidity 0.8.28;
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import {DeployL1CoreContractsIntegrationScript} from "./deploy-scripts/DeployL1CoreContractsIntegration.s.sol";
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {DeployCTMIntegrationScript} from "./deploy-scripts/DeployCTMIntegration.s.sol";
 import {RegisterCTM} from "../../../../deploy-scripts/ecosystem/RegisterCTM.s.sol";
-import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
+import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
+import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {DeployedAddresses as CoreDeployedAddresses} from "../../../../deploy-scripts/ecosystem/DeployL1CoreUtils.s.sol";
-import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
-import {Config, DeployedAddresses as CTMDeployedAddresses} from "../../../../deploy-scripts/ctm/DeployCTMUtils.s.sol";
+import {CoreDeployedAddresses} from "../../../../deploy-scripts/ecosystem/DeployL1CoreUtils.s.sol";
+import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+import {Config, CTMDeployedAddresses} from "../../../../deploy-scripts/ctm/DeployCTMUtils.s.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
-contract L1ContractDeployer is UtilsTest {
+contract L1ContractDeployer is UtilsCallMockerTest {
     using stdStorage for StdStorage;
 
     DeployL1CoreContractsIntegrationScript l1CoreContractsScript;
@@ -94,17 +95,26 @@ contract L1ContractDeployer is UtilsTest {
         addresses.chainRegistrationSender = ChainRegistrationSender(
             ecosystemAddresses.bridgehub.chainRegistrationSenderProxy
         );
-        _acceptOwnership();
+        _acceptOwnershipCore();
+        _acceptOwnershipCTM();
         _setEraBatch();
 
         addresses.bridgehubOwnerAddress = addresses.bridgehub.owner();
     }
 
-    function _acceptOwnership() private {
+    function _acceptOwnershipCore() private {
         vm.startPrank(addresses.bridgehub.pendingOwner());
         addresses.bridgehub.acceptOwnership();
         addresses.sharedBridge.acceptOwnership();
+        IOwnable(ecosystemAddresses.bridgehub.chainAssetHandlerProxy).acceptOwnership();
         addresses.ctmDeploymentTracker.acceptOwnership();
+        vm.stopPrank();
+    }
+
+    function _acceptOwnershipCTM() private {
+        vm.startPrank(IOwnable(address(addresses.chainTypeManager)).pendingOwner());
+        IOwnable(address(addresses.chainTypeManager)).acceptOwnership();
+        IOwnable(address(ctmAddresses.daAddresses.rollupDAManager)).acceptOwnership();
         vm.stopPrank();
     }
 

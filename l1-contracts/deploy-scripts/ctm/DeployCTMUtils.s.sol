@@ -13,9 +13,9 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {Utils} from "../utils/Utils.sol";
 
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
@@ -60,9 +60,11 @@ import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
 import {StateTransitionDeployedAddresses, DataAvailabilityDeployedAddresses, ChainCreationParamsConfig} from "../utils/Types.sol";
 
 import {DeployCTML1OrGateway, CTMCoreDeploymentConfig, CTMContract} from "./DeployCTML1OrGateway.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
 
 // solhint-disable-next-line gas-struct-packing
-struct DeployedAddresses {
+struct CTMDeployedAddresses {
     StateTransitionDeployedAddresses stateTransition;
     DataAvailabilityDeployedAddresses daAddresses;
     address transparentProxyAdmin;
@@ -115,7 +117,7 @@ abstract contract DeployCTMUtils is DeployUtils {
 
     Config public config;
     GeneratedData internal generatedData;
-    DeployedAddresses internal addresses;
+    CTMDeployedAddresses internal addresses;
     // Addresses discovered from already deployed core contracts (Bridgehub, AssetRouter, etc.)
     AddressIntrospector.BridgehubAddresses internal discoveredBridgehub;
 
@@ -221,9 +223,6 @@ abstract contract DeployCTMUtils is DeployUtils {
             initAddress: stateTransition.diamondInit,
             initCalldata: abi.encode(initializeData)
         });
-        if (!stateTransition.isOnGateway) {
-            config.contracts.diamondCutData = abi.encode(diamondCut);
-        }
     }
 
     function getChainCreationParams(
@@ -231,6 +230,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     ) internal returns (ChainCreationParams memory) {
         require(generatedData.forceDeploymentsData.length != 0, "force deployments data is empty");
         Diamond.DiamondCutData memory diamondCut = getChainCreationDiamondCutData(stateTransition);
+        config.contracts.diamondCutData = abi.encode(diamondCut);
         return
             ChainCreationParams({
                 genesisUpgrade: stateTransition.genesisUpgrade,
@@ -347,8 +347,6 @@ abstract contract DeployCTMUtils is DeployUtils {
                 return type(DiamondInit).creationCode;
             } else if (compareStrings(contractName, "ServerNotifier")) {
                 return type(ServerNotifier).creationCode;
-            } else if (compareStrings(contractName, "UpgradeStageValidator")) {
-                return type(UpgradeStageValidator).creationCode;
             }
         } else {
             if (compareStrings(contractName, "Verifier")) {
@@ -438,13 +436,13 @@ abstract contract DeployCTMUtils is DeployUtils {
         }
     }
 
-    function getCTMCoreDeploymentConfig(Config memory config) internal view returns (CTMCoreDeploymentConfig memory) {
+    function getCTMCoreDeploymentConfig(Config memory _config) internal view returns (CTMCoreDeploymentConfig memory) {
         return
             CTMCoreDeploymentConfig({
-                isZKsyncOS: config.isZKsyncOS,
-                testnetVerifier: config.testnetVerifier,
-                eraChainId: config.eraChainId,
-                l1ChainId: config.l1ChainId,
+                isZKsyncOS: _config.isZKsyncOS,
+                testnetVerifier: _config.testnetVerifier,
+                eraChainId: _config.eraChainId,
+                l1ChainId: _config.l1ChainId,
                 bridgehubProxy: discoveredBridgehub.bridgehubProxy,
                 interopCenterProxy: discoveredBridgehub.interopCenterProxy,
                 rollupDAManager: addresses.daAddresses.rollupDAManager,

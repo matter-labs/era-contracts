@@ -10,7 +10,7 @@ import {Utils} from "../utils/Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
@@ -36,9 +36,9 @@ import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
-import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
-import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
+import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
+import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
@@ -54,10 +54,10 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
-import {Config, DeployedAddresses, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
+import {Config, CTMDeployedAddresses, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 // TODO: pass this value from zkstack_cli
 uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 3;
@@ -74,6 +74,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         console.log("Deploying CTM related contracts");
 
         runInner(
+            "/script-config/permanent-values.toml",
             "/script-config/config-deploy-ctm.toml",
             "/script-out/output-deploy-ctm.toml",
             bridgehub,
@@ -84,10 +85,17 @@ contract DeployCTMScript is Script, DeployCTMUtils {
 
     function runForTest(address bridgehub, bool skipL1Deployments) public {
         saveDiamondSelectors();
-        runInner(vm.envString("CTM_CONFIG"), vm.envString("CTM_OUTPUT"), bridgehub, false, skipL1Deployments);
+        runInner(
+            vm.envString("PERMANENT_VALUES_INPUT"),
+            vm.envString("CTM_CONFIG"),
+            vm.envString("CTM_OUTPUT"),
+            bridgehub,
+            false,
+            skipL1Deployments
+        );
     }
 
-    function getAddresses() public view returns (DeployedAddresses memory) {
+    function getAddresses() public view virtual returns (CTMDeployedAddresses memory) {
         return addresses;
     }
 
@@ -96,6 +104,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
     }
 
     function runInner(
+        string memory permanentValuesInputPath,
         string memory inputPath,
         string memory outputPath,
         address bridgehub,
@@ -103,6 +112,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         bool skipL1Deployments
     ) internal {
         string memory root = vm.projectRoot();
+        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
         inputPath = string.concat(root, inputPath);
         outputPath = string.concat(root, outputPath);
 
@@ -270,8 +280,6 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         IOwnable(addresses.stateTransition.serverNotifierProxy).transferOwnership(addresses.chainAdmin);
         IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
 
-        IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
-
         if (config.isZKsyncOS) {
             // We need to transfer the ownership of the Verifier
             ZKsyncOSDualVerifier(addresses.stateTransition.verifier).transferOwnership(addresses.governance);
@@ -305,6 +313,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         vm.serializeAddress("state_transition", "verifier_addr", addresses.stateTransition.verifier);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", addresses.stateTransition.defaultUpgrade);
+        vm.serializeAddress("state_transition", "eip7702_checker_addr", addresses.eip7702Checker);
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "bytecodes_supplier_addr",
@@ -351,10 +360,50 @@ contract DeployCTMScript is Script, DeployCTMUtils {
             addresses.daAddresses.availL1DAValidator
         );
         string memory deployedAddresses = vm.serializeString("deployed_addresses", "state_transition", stateTransition);
+
+        vm.serializeUint(
+            "chain_creation_params",
+            "latest_protocol_version",
+            config.contracts.chainCreationParams.latestProtocolVersion
+        );
+        vm.serializeBytes32(
+            "chain_creation_params",
+            "bootloader_hash",
+            config.contracts.chainCreationParams.bootloaderHash
+        );
+        vm.serializeBytes32(
+            "chain_creation_params",
+            "default_aa_hash",
+            config.contracts.chainCreationParams.defaultAAHash
+        );
+        vm.serializeBytes32(
+            "chain_creation_params",
+            "evm_emulator_hash",
+            config.contracts.chainCreationParams.evmEmulatorHash
+        );
+        vm.serializeBytes32("chain_creation_params", "genesis_root", config.contracts.chainCreationParams.genesisRoot);
+        vm.serializeUint(
+            "chain_creation_params",
+            "genesis_rollup_leaf_index",
+            config.contracts.chainCreationParams.genesisRollupLeafIndex
+        );
+        string memory chainCreationParams = vm.serializeBytes32(
+            "chain_creation_params",
+            "genesis_batch_commitment",
+            config.contracts.chainCreationParams.genesisBatchCommitment
+        );
+
+        vm.serializeAddress("contracts", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
+        string memory contracts = vm.serializeBytes32(
+            "contracts",
+            "create2_factory_salt",
+            create2FactoryParams.factorySalt
+        );
+
+        vm.serializeString("root", "chain_creation_params", chainCreationParams);
         vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
-        vm.serializeAddress("root", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
-        vm.serializeBytes32("root", "create2_factory_salt", create2FactoryParams.factorySalt);
+        vm.serializeString("root", "contracts", contracts);
         string memory toml = vm.serializeString("root", "contracts_config", contractsConfig);
         vm.writeToml(toml, outputPath);
     }

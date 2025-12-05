@@ -7,8 +7,8 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Utils} from "../../utils/Utils.sol";
 import {StateTransitionDeployedAddresses} from "../../utils/Types.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
+import {MessageRoot} from "contracts/core/message-root/MessageRoot.sol";
+import {ChainAssetHandler} from "contracts/core/chain-asset-handler/ChainAssetHandler.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -19,13 +19,13 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
-import {DefaultEcosystemUpgrade} from "../default_upgrade/DefaultEcosystemUpgrade.s.sol";
+import {DefaultCTMUpgrade} from "../default_upgrade/DefaultCTMUpgrade.s.sol";
 
 /// @notice Script used for v29 -> v29.2 stage patch
-contract EcosystemUpgrade_v29_2 is Script, DefaultEcosystemUpgrade {
+contract EcosystemUpgrade_v29_2 is Script, DefaultCTMUpgrade {
     using stdToml for string;
 
-    function initializeConfig(string memory newConfigPath) internal override {
+    function initializeConfig(string memory permanentValuesInputPath, string memory newConfigPath) internal override {
         super.initializeConfig(newConfigPath);
         string memory toml = vm.readFile(newConfigPath);
 

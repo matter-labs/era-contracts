@@ -31,23 +31,23 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
-import {MessageRootBase} from "contracts/bridgehub/MessageRootBase.sol";
-import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
+import {MessageRootBase} from "contracts/core/message-root/MessageRootBase.sol";
+import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
+import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 
 bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
 bytes constant POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000100073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
 
-contract ExecutorTest is UtilsTest {
+contract ExecutorTest is UtilsCallMockerTest {
     address internal owner;
     address internal validator;
     address internal randomSigner;
@@ -193,6 +193,14 @@ contract ExecutorTest is UtilsTest {
         randomSigner = makeAddr("randomSigner");
         dummyBridgehub = new DummyBridgehub();
         vm.mockCall(address(dummyBridgehub), abi.encodeWithSelector(IL1Bridgehub.L1_CHAIN_ID.selector), abi.encode(1));
+        uint256[] memory allZKChainChainIDsZero = new uint256[](0);
+        vm.mockCall(
+            address(dummyBridgehub),
+            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
+            abi.encode(allZKChainChainIDsZero)
+        );
+        messageRoot = new L1MessageRoot(address(dummyBridgehub), 1);
+
         uint256[] memory allZKChainChainIDs = new uint256[](1);
         allZKChainChainIDs[0] = 271;
         vm.mockCall(
@@ -206,7 +214,6 @@ contract ExecutorTest is UtilsTest {
             abi.encode(makeAddr("chainTypeManager"))
         );
         address interopCenter = makeAddr("interopCenter");
-        messageRoot = new L1MessageRoot(address(dummyBridgehub), 1);
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
         address assetTracker = makeAddr("assetTracker");

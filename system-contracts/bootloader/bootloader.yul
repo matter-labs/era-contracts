@@ -3117,8 +3117,8 @@ object "Bootloader" {
                     debugLog("Failed to set new settlement layer chain id: ", currentSettlementLayerChainId)
 
                     /// here during the upgrade the setting of the settlement layer chain will fail, as the system context is not yet upgraded.
-                    /// todo remove after v30 upgrade.
-                    /// We want to check if the interop center is deployed or not, i.e. did we execute V30 upgrade.
+                    /// todo remove after v31 upgrade.
+                    /// We want to check if the interop center is deployed or not, i.e. did we execute V31 upgrade.
                     let codeSize := getCodeSize(L2_INTEROP_CENTER_ADDR())
                     debugLog("codeSize", codeSize)
                     /// nothing is deployed at this address.

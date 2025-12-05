@@ -10,8 +10,8 @@ import {ERC20} from "@openzeppelin/contracts-v4/token/ERC20/ERC20.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
@@ -27,8 +27,9 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
+import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 
 contract L1AssetRouterTest is Test {
     using stdStorage for StdStorage;
@@ -322,7 +323,7 @@ contract L1AssetRouterTest is Test {
         );
         vm.mockCall(
             messageRootAddress,
-            abi.encodeWithSelector(IMessageRoot.v30UpgradeChainBatchNumber.selector),
+            abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
         );
         vm.mockCall(

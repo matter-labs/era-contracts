@@ -7,7 +7,7 @@ import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
 import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
-import {IBridgehubBase} from "../../../bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
 import {IEIP7702Checker} from "../../chain-interfaces/IEIP7702Checker.sol";
@@ -28,7 +28,7 @@ import {IAssetRouterShared} from "../../../bridge/asset-router/IAssetRouterShare
 
 import {AddressNotZero, BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, NotAssetRouter, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {DepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
-import {DepthMoreThanOneForRecursiveMerkleProof} from "../../../bridgehub/L1BridgehubErrors.sol";
+import {DepthMoreThanOneForRecursiveMerkleProof} from "../../../core/bridgehub/L1BridgehubErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -36,10 +36,9 @@ import {IMessageVerification, MessageVerification} from "../../../common/Message
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
 import {BALANCE_CHANGE_VERSION} from "../../../bridge/asset-tracker/IAssetTrackerBase.sol";
 import {INativeTokenVaultBase} from "../../../bridge/ntv/INativeTokenVaultBase.sol";
-import {V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../../bridgehub/IMessageRoot.sol";
-import {OnlyGateway} from "../../../bridgehub/L1BridgehubErrors.sol";
+import {OnlyGateway} from "../../../core/bridgehub/L1BridgehubErrors.sol";
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
-import {IL1ChainAssetHandler} from "../../../bridgehub/IL1ChainAssetHandler.sol";
+import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAssetHandler.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -357,8 +356,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (IBridgehubBase(s.bridgehub).getZKChain(_chainId) != msg.sender) {
             revert NotHyperchain();
         }
-        // We pause L1->GW->L2 deposits.
-        require(_checkV30UpgradeProcessed(_chainId), DepositsPaused());
+        // Note during the upgrade to V31 no chain will be on GW.
 
         BalanceChange memory balanceChange;
         if (_getBalanceChange) {
@@ -639,21 +637,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             inPausedWindow ||
             (block.chainid == L1_CHAIN_ID &&
                 IL1ChainAssetHandler(CHAIN_ASSET_HANDLER).isMigrationInProgress(s.chainId));
-    }
-
-    /// @notice Returns whether the chain has upgraded to V30 on GW.
-    /// if the chain is on L1 at V30, or is deployed V30 or after, then it returns true.
-    function _checkV30UpgradeProcessed(uint256 _chainId) internal view returns (bool) {
-        IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
-
-        if (
-            bridgehub.messageRoot().v30UpgradeChainBatchNumber(_chainId) ==
-            V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY
-        ) {
-            /// We pause deposits until the chain has upgraded on GW
-            return false;
-        }
-        return true;
     }
 
     /// @notice Stores a transaction record in storage & send event about that

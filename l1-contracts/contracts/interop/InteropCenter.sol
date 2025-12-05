@@ -15,7 +15,7 @@ import {GW_ASSET_TRACKER, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BUNDLE_IDENTIFIER, BalanceChange, BundleAttributes, CallAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal} from "../common/Messaging.sol";
 import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
-import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
+import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
 import {AttributeAlreadySet, AttributeViolatesRestriction, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty} from "./InteropErrors.sol";
 
@@ -31,7 +31,7 @@ import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol"
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev This contract serves as the primary entry point for communication between chains connected to the interop, facilitating interactions between end user and bridges.
-/// @dev as of V30 only deployed on the L2s, not on L1.
+/// @dev as of V31 only deployed on the L2s, not on L1.
 contract InteropCenter is
     IInteropCenter,
     IERC7786GatewaySource,

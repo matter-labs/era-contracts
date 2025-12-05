@@ -10,7 +10,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 // solhint-disable no-unused-import
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "../utils/Utils.sol";
@@ -28,7 +28,7 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 
 import {DeployCTMScript} from "../ctm/DeployCTM.s.sol";
@@ -39,7 +39,7 @@ import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
 import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {GatewayGovernanceUtils} from "./GatewayGovernanceUtils.s.sol";
 import {DeployCTMUtils} from "../ctm/DeployCTMUtils.s.sol";
@@ -189,8 +189,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 // No need for default upgrade on gateway
                 defaultUpgrade: address(0),
                 diamondProxy: address(0),
-                bytecodesSupplier: address(0),
-                isOnGateway: true
+                bytecodesSupplier: address(0)
             }),
             multicall3: expectedGatewayContracts.multicall3,
             diamondCutData: expectedGatewayContracts.diamondCutData,

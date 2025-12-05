@@ -4,13 +4,13 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
-import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
+import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
+import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
+import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
-import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler} from "contracts/bridgehub/L1BridgehubErrors.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -35,6 +35,20 @@ contract MessageRootTest is Test {
 
     function setUp() public {
         bridgeHub = makeAddr("bridgeHub");
+        uint256[] memory allZKChainChainIDsZero = new uint256[](0);
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
+            abi.encode(allZKChainChainIDsZero)
+        );
+
+        assetTracker = makeAddr("assetTracker");
+        bridgeHub = makeAddr("bridgeHub");
+        L1_CHAIN_ID = 5;
+        gatewayChainId = 506;
+        messageRoot = new L1MessageRoot(bridgeHub, 1);
+        l2MessageRoot = new L2MessageRoot();
+
         uint256[] memory allZKChainChainIDs = new uint256[](1);
         allZKChainChainIDs[0] = 271;
         vm.mockCall(
@@ -47,14 +61,8 @@ contract MessageRootTest is Test {
             abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector),
             abi.encode(makeAddr("chainTypeManager"))
         );
-        vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector), abi.encode(0));
 
-        assetTracker = makeAddr("assetTracker");
-        bridgeHub = makeAddr("bridgeHub");
-        L1_CHAIN_ID = 5;
-        gatewayChainId = 506;
-        messageRoot = new L1MessageRoot(bridgeHub, 1);
-        l2MessageRoot = new L2MessageRoot();
+        vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector), abi.encode(0));
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2MessageRoot.initL2(L1_CHAIN_ID, gatewayChainId);
         vm.mockCall(address(bridgeHub), abi.encodeWithSelector(Ownable.owner.selector), abi.encode(assetTracker));

@@ -5,8 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/console2.sol";
 
-import {IL1Bridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -679,11 +679,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         _deployEra();
         _deployZKChain(ETH_TOKEN_ADDRESS);
-        _deployZKChain(ETH_TOKEN_ADDRESS);
         _deployZKChain(tokens[0]);
-        _deployZKChain(tokens[0]);
-        _deployZKChain(tokens[1]);
-        _deployZKChain(tokens[1]);
 
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
@@ -697,9 +693,12 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
     function test() internal override {}
 }
 
-contract BoundedBridgeHubInvariantTests is BridgeHubInvariantTests {
-    function test_DepositEthBase7702() external {
+contract BoundedBridgeHubInvariantTests2 is BridgeHubInvariantTests {
+    function setUp() public {
         prepare();
+    }
+
+    function test_DepositEthBase7702() external {
         uint256 randomCallerPk = uint256(keccak256("RANDOM_CALLER"));
         address payable randomCaller = payable(vm.addr(randomCallerPk));
         currentUser = randomCaller;

@@ -6,24 +6,24 @@ pragma solidity ^0.8.24;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {BridgehubBase} from "contracts/bridgehub/BridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {BridgehubBase} from "contracts/core/bridgehub/BridgehubBase.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1AssetTracker, L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
+import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Governance} from "contracts/governance/Governance.sol";
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
-import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
-import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
-import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
+import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
+import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
+import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
@@ -33,7 +33,7 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
-import {Config, DeployedAddresses, DeployL1CoreUtils} from "./DeployL1CoreUtils.s.sol";
+import {Config, CoreDeployedAddresses, DeployL1CoreUtils} from "./DeployL1CoreUtils.s.sol";
 
 contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
     using stdToml for string;
@@ -54,7 +54,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
         bridgehub.acceptAdmin();
     }
 
-    function getAddresses() public view returns (DeployedAddresses memory) {
+    function getAddresses() public view returns (CoreDeployedAddresses memory) {
         return addresses;
     }
 
@@ -288,8 +288,14 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
             addresses.vaults.l1NativeTokenVaultProxy
         );
 
-        vm.serializeAddress("root", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
-        vm.serializeBytes32("root", "create2_factory_salt", create2FactoryParams.factorySalt);
+        vm.serializeAddress("contracts", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
+        string memory contracts = vm.serializeBytes32(
+            "contracts",
+            "create2_factory_salt",
+            create2FactoryParams.factorySalt
+        );
+
+        vm.serializeString("root", "contracts", contracts);
         vm.serializeUint("root", "l1_chain_id", config.l1ChainId);
         vm.serializeUint("root", "era_chain_id", config.eraChainId);
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);

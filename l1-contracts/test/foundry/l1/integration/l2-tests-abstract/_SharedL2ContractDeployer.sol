@@ -21,8 +21,8 @@ import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.so
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {IL2Bridgehub} from "contracts/bridgehub/IL2Bridgehub.sol";
-import {BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
+import {BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {IL2AssetRouter} from "../../../../../contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "../../../../../contracts/bridge/interfaces/IL1Nullifier.sol";
@@ -342,8 +342,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             batchNumber: 0,
             ctmData: ctmData,
             chainData: chainData,
-            migrationNumber: 0,
-            v30UpgradeChainBatchNumber: 0
+            migrationNumber: 0
         });
         vm.prank(aliasedL1AssetRouter);
         AssetRouterBase(address(l2AssetRouter)).finalizeDeposit(L1_CHAIN_ID, ctmAssetId, abi.encode(data));

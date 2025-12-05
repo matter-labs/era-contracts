@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-import {IBridgehubBase, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -693,7 +693,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
     function test() internal override {}
 }
 
-contract BoundedBridgeHubInvariantTests is BridgeHubInvariantTests {
+contract BoundedBridgeHubInvariantTests1 is BridgeHubInvariantTests {
     function depositEthSuccess(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 l2Value) public {
         uint64 MAX = 2 ** 64 - 1;
         uint256 l2Value = bound(l2Value, 0.1 ether, MAX);
@@ -728,10 +728,10 @@ contract BoundedBridgeHubInvariantTests is BridgeHubInvariantTests {
 }
 
 contract InvariantTesterZKChains is Test {
-    BoundedBridgeHubInvariantTests tests;
+    BoundedBridgeHubInvariantTests1 tests;
 
     function setUp() public {
-        tests = new BoundedBridgeHubInvariantTests();
+        tests = new BoundedBridgeHubInvariantTests1();
         // tests.prepare();
     }
 

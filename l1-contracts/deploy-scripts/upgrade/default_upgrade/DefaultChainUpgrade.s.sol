@@ -12,7 +12,7 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
@@ -29,34 +29,19 @@ contract DefaultChainUpgrade is Script {
     address currentChainAdmin;
     ChainConfig config;
 
-    function prepareChain(
-        string memory ecosystemInputPath,
-        string memory ecosystemOutputPath,
-        string memory configPath,
-        string memory outputPath
-    ) public {
+    function prepareChain(string memory permanentValuesInputPath, string memory configPath) public {
         string memory root = vm.projectRoot();
-        ecosystemInputPath = string.concat(root, ecosystemInputPath);
-        ecosystemOutputPath = string.concat(root, ecosystemOutputPath);
         configPath = string.concat(root, configPath);
-        outputPath = string.concat(root, outputPath);
+        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
 
-        initializeConfig(configPath, ecosystemInputPath, ecosystemOutputPath);
+        initializeConfig(permanentValuesInputPath, configPath);
 
         // This script does nothing, it only checks that the provided inputs are correct.
         // It is just a wrapper to easily call `upgradeChain`
     }
 
-    function run() public {
-        // TODO: maybe make it read from 1 exact input file,
-        // for now doing it this way is just faster
-
-        prepareChain(
-            "/script-config/gateway-upgrade-ecosystem.toml",
-            "/script-out/gateway-upgrade-ecosystem.toml",
-            "/script-config/gateway-upgrade-chain.toml",
-            "/script-out/gateway-upgrade-chain.toml"
-        );
+    function run() public virtual {
+        prepareChain("/script-config/permanent-values.toml", "/script-config/chain-upgrade.toml");
     }
 
     function upgradeChain(uint256 oldProtocolVersion, Diamond.DiamondCutData memory upgradeCutData) public {
@@ -77,24 +62,19 @@ contract DefaultChainUpgrade is Script {
         IChainAdminOwnable(admin).setUpgradeTimestamp(newProtocolVersion, timestamp);
     }
 
-    function initializeConfig(
-        string memory configPath,
-        string memory ecosystemInputPath,
-        string memory ecosystemOutputPath
-    ) internal {
+    function initializeConfig(string memory permanentValuesInputPath, string memory configPath) internal {
         config.deployerAddress = msg.sender;
 
         // Grab config from output of l1 deployment
         string memory toml = vm.readFile(configPath);
+        string memory permanentValuesInputToml = vm.readFile(permanentValuesInputPath);
 
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
 
-        config.chainChainId = toml.readUint("$.chain.chain_id");
-
-        toml = vm.readFile(ecosystemInputPath);
-        config.bridgehubProxyAddress = toml.readAddress("$.contracts.bridgehub_proxy_address");
+        config.chainChainId = permanentValuesInputToml.readUint("$.chain.chain_id");
+        config.bridgehubProxyAddress = permanentValuesInputToml.readAddress("$.contracts.bridgehub_proxy_address");
 
         config.chainDiamondProxyAddress = L1Bridgehub(config.bridgehubProxyAddress).getZKChain(config.chainChainId);
     }
