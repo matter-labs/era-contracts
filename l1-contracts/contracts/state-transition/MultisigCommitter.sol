@@ -109,6 +109,11 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
     }
 
     /// @inheritdoc IMultisigCommitter
+    function isCustomSigningSetActive(address chainAddress) external view override returns (bool) {
+        return chainConfig[chainAddress].useCustomValidators;
+    }
+
+    /// @inheritdoc IMultisigCommitter
     function isValidator(address chainAddress, address validator) external view override returns (bool) {
         if (chainConfig[chainAddress].useCustomValidators) {
             return hasRole(chainAddress, COMMIT_VALIDATOR_ROLE, validator);
