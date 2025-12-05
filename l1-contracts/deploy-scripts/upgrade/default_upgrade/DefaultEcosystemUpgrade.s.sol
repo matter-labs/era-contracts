@@ -9,6 +9,8 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
+
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -381,6 +383,17 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
                 ProxyAdmin.upgrade,
                 (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress)
             ),
+            value: 0
+        });
+    }
+
+    function _buildCallBeaconProxyUpgrade(
+        address proxyAddress,
+        address newImplementationAddress
+    ) internal virtual returns (Call memory call) {
+        call = Call({
+            target: proxyAddress,
+            data: abi.encodeCall(UpgradeableBeacon.upgradeTo, (newImplementationAddress)),
             value: 0
         });
     }

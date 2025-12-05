@@ -116,7 +116,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         inputPath = string.concat(root, inputPath);
         outputPath = string.concat(root, outputPath);
 
-        initializeConfig(permanentValuesInputPath, inputPath);
+        initializeConfig(inputPath);
 
         if (!skipL1Deployments) {
             instantiateCreate2Factory();
