@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {BridgehubInvariantTests} from "./BridgehubTests.t.sol";
-
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/console2.sol";
@@ -26,6 +24,7 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
+import {BridgehubInvariantTests} from "test/foundry/l1/integration/BridgehubTests.t.sol";
 
 contract Bridgehub_7702 is BridgehubInvariantTests {
     function setUp() public {

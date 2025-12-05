@@ -76,7 +76,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         _deployTokens();
         _registerNewTokens(tokens);
 
-        _deployEra();
+        // _deployEra();
         // _deployZKChain(ETH_TOKEN_ADDRESS);
         // _deployZKChain(ETH_TOKEN_ADDRESS);
         // _deployZKChain(tokens[0]);
