@@ -88,7 +88,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
                 .target(address(L2_CHAIN_ASSET_HANDLER))
                 .sig("migrationNumber(uint256)")
                 .with_key(271)
-                .checked_write(1);
+                .checked_write(uint256(1));
 
             bytes32[] memory txHashes = getTxHashes(testData[i]);
 
@@ -223,14 +223,14 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             .target(address(L2_CHAIN_ASSET_HANDLER))
             .sig("migrationNumber(uint256)")
             .with_key(block.chainid)
-            .checked_write(1);
+            .checked_write(uint256(1));
 
         stdstore
             .target(L2_ASSET_TRACKER_ADDR)
             .sig("assetMigrationNumber(uint256,bytes32)")
             .with_key(block.chainid)
             .with_key(baseTokenAssetId)
-            .checked_write(1);
+            .checked_write(uint256(1));
 
         // Call as L2 Base Token System Contract
         vm.prank(address(L2_BASE_TOKEN_SYSTEM_CONTRACT));
@@ -265,7 +265,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             .sig("chainBalance(uint256,bytes32)")
             .with_key(block.chainid)
             .with_key(baseTokenAssetId)
-            .checked_write(0);
+            .checked_write(uint256(0));
 
         // Mock origin chain ID for base token (L1)
         stdstore
@@ -273,6 +273,13 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             .sig("originChainId(bytes32)")
             .with_key(baseTokenAssetId)
             .checked_write(l1ChainId);
+
+        // Mock totalSupply on L2_BASE_TOKEN_SYSTEM_CONTRACT (needed for foreign token total supply calculation)
+        vm.mockCall(
+            address(L2_BASE_TOKEN_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(IERC20.totalSupply.selector),
+            abi.encode(1000)
+        );
 
         // Call as L2 Base Token System Contract
         vm.prank(address(L2_BASE_TOKEN_SYSTEM_CONTRACT));
@@ -312,19 +319,19 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             .with_key(assetId)
             .checked_write(originChainId);
 
-        // Mock origin token
-        stdstore
-            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
-            .sig("originToken(bytes32)")
-            .with_key(assetId)
-            .checked_write(uint256(uint160(originalToken)));
+        // Mock origin token (using mockCall since originToken is a function with logic)
+        vm.mockCall(
+            address(L2_NATIVE_TOKEN_VAULT_ADDR),
+            abi.encodeWithSignature("originToken(bytes32)", assetId),
+            abi.encode(originalToken)
+        );
 
         // Mock chain migration number
         stdstore
             .target(address(L2_CHAIN_ASSET_HANDLER))
             .sig("migrationNumber(uint256)")
             .with_key(block.chainid)
-            .checked_write(2);
+            .checked_write(uint256(2));
 
         // Set asset migration number to 0 (not yet migrated)
         stdstore
@@ -332,7 +339,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             .sig("assetMigrationNumber(uint256,bytes32)")
             .with_key(block.chainid)
             .with_key(assetId)
-            .checked_write(0);
+            .checked_write(uint256(0));
 
         // Mock total supply
         vm.mockCall(
