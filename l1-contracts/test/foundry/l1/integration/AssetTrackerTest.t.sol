@@ -395,7 +395,11 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         // Mock the migrateTokenBalanceToAssetTracker call
         vm.mockCall(
             address(ecosystemAddresses.vaults.l1NativeTokenVaultProxy),
-            abi.encodeWithSelector(IL1NativeTokenVault.migrateTokenBalanceToAssetTracker.selector, testChainId, assetId),
+            abi.encodeWithSelector(
+                IL1NativeTokenVault.migrateTokenBalanceToAssetTracker.selector,
+                testChainId,
+                assetId
+            ),
             abi.encode(migratedBalance)
         );
 
@@ -407,8 +411,12 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         assetTracker.migrateTokenBalanceFromNTVV31(testChainId, assetId);
 
         // Verify balances updated correctly
-        uint256 originBalance = uint256(vm.load(address(assetTracker), getChainBalanceLocation(assetId, originalChainId)));
-        uint256 testChainBalance = uint256(vm.load(address(assetTracker), getChainBalanceLocation(assetId, testChainId)));
+        uint256 originBalance = uint256(
+            vm.load(address(assetTracker), getChainBalanceLocation(assetId, originalChainId))
+        );
+        uint256 testChainBalance = uint256(
+            vm.load(address(assetTracker), getChainBalanceLocation(assetId, testChainId))
+        );
 
         assertEq(originBalance, type(uint256).max - migratedBalance, "Origin chain balance should decrease");
         assertEq(testChainBalance, migratedBalance, "Test chain balance should increase");
@@ -435,11 +443,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         );
 
         // Mock total supply
-        vm.mockCall(
-            tokenAddress,
-            abi.encodeWithSelector(IERC20.totalSupply.selector),
-            abi.encode(totalSupply)
-        );
+        vm.mockCall(tokenAddress, abi.encodeWithSelector(IERC20.totalSupply.selector), abi.encode(totalSupply));
 
         // Set initial origin chain balance to MAX_TOKEN_BALANCE
         bytes32 maxTokenBalance = bytes32(type(uint256).max);
@@ -449,7 +453,9 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         assetTracker.migrateTokenBalanceFromNTVV31(originalChainId, assetId);
 
         // Verify balances updated correctly
-        uint256 originBalance = uint256(vm.load(address(assetTracker), getChainBalanceLocation(assetId, differentOriginChain)));
+        uint256 originBalance = uint256(
+            vm.load(address(assetTracker), getChainBalanceLocation(assetId, differentOriginChain))
+        );
         uint256 l1Balance = uint256(vm.load(address(assetTracker), getChainBalanceLocation(assetId, originalChainId)));
 
         assertEq(originBalance, type(uint256).max - totalSupply, "Origin chain balance should decrease by totalSupply");
@@ -522,14 +528,20 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         assetTracker.handleChainBalanceIncreaseOnL1(targetChainId, testAssetId, testAmount, originalChainId);
 
         // Now consume the balance change
-        (bytes32 returnedAssetId, uint256 returnedAmount) = assetTracker.consumeBalanceChange(callerChainId, targetChainId);
+        (bytes32 returnedAssetId, uint256 returnedAmount) = assetTracker.consumeBalanceChange(
+            callerChainId,
+            targetChainId
+        );
 
         // Verify the returned values
         assertEq(returnedAssetId, testAssetId, "Returned asset ID should match");
         assertEq(returnedAmount, testAmount, "Returned amount should match");
 
         // Verify transient storage is cleared (calling again should return 0)
-        (bytes32 clearedAssetId, uint256 clearedAmount) = assetTracker.consumeBalanceChange(callerChainId, targetChainId);
+        (bytes32 clearedAssetId, uint256 clearedAmount) = assetTracker.consumeBalanceChange(
+            callerChainId,
+            targetChainId
+        );
         assertEq(clearedAssetId, bytes32(0), "Asset ID should be cleared");
         assertEq(clearedAmount, 0, "Amount should be cleared");
     }
