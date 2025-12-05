@@ -3,17 +3,17 @@
 pragma solidity 0.8.28;
 
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
-import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
-import {TxStatus} from "../common/Messaging.sol";
-import {IBridgehubBase, BridgehubBurnCTMAssetData} from "./IBridgehubBase.sol";
-import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
-import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
-import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
-import {IL1Bridgehub} from "./IL1Bridgehub.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
-import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
+import {IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
+import {TxStatus} from "../../common/Messaging.sol";
+import {IBridgehubBase, BridgehubBurnCTMAssetData} from "../bridgehub/IBridgehubBase.sol";
+import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
+import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
+import {IL1AssetHandler} from "../../bridge/interfaces/IL1AssetHandler.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
+import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IChainAssetHandlerShared} from "./IChainAssetHandlerShared.sol";
 import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
 

@@ -2,25 +2,25 @@
 
 pragma solidity 0.8.28;
 
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
-import {ETH_TOKEN_ADDRESS, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
 import {IL1Bridgehub} from "./IL1Bridgehub.sol";
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehubBase.sol";
-import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
-import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
-import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
-import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol";
-import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
-import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
-import {BridgehubL2TransactionRequest} from "../common/Messaging.sol";
+import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
+import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
+import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
+import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
+import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
+import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 import {SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
-import {SettlementLayersMustSettleOnL1} from "../common/L1ContractErrors.sol";
-import {ChainIdAlreadyExists, ChainIdMismatch, IncorrectBridgeHubAddress, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
-import {IL1CrossChainSender} from "../bridge/interfaces/IL1CrossChainSender.sol";
+import {SettlementLayersMustSettleOnL1} from "../../common/L1ContractErrors.sol";
+import {ChainIdAlreadyExists, ChainIdMismatch, IncorrectBridgeHubAddress, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {IL1CrossChainSender} from "../../bridge/interfaces/IL1CrossChainSender.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

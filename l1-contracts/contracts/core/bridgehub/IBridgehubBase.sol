@@ -2,11 +2,11 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
-import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
-import {TxStatus} from "../common/Messaging.sol";
-import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {L2Log, L2Message, TxStatus} from "../../common/Messaging.sol";
+import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
+import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {TxStatus} from "../../common/Messaging.sol";
+import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;

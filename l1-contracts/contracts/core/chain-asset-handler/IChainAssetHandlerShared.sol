@@ -2,9 +2,9 @@
 
 pragma solidity ^0.8.24;
 
-import {IL1Bridgehub} from "./IL1Bridgehub.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
-import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
+import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 
 /// @author Matter Labs
 /// Shared functions that are not inherited to avoid double inheritance.
