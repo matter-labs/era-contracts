@@ -61,7 +61,7 @@ contract L1GatewayTests is
     address[] public users;
     address[] public l2ContractAddresses;
 
-    uint256 migratingChainId = 271;
+    uint256 migratingChainId = eraZKChainId;
     IZKChain migratingChain;
 
     uint256 gatewayChainId = 506;
@@ -89,11 +89,8 @@ contract L1GatewayTests is
 
         takeConfigLock(); // Prevents race condition with configs
         _deployL1Contracts();
-        _deployTokens();
-        _registerNewTokens(tokens);
 
-        _deployEra();
-        _deployZKChainWithPausedDeposits(ETH_TOKEN_ADDRESS, migratingChainId);
+        _deployEraWithPausedDeposits();
         acceptPendingAdmin(migratingChainId);
         _deployZKChain(ETH_TOKEN_ADDRESS, gatewayChainId);
         acceptPendingAdmin(gatewayChainId);
