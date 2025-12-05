@@ -1451,13 +1451,13 @@
   },
   {
     "contractName": "l1-contracts/MultisigCommitter",
-    "zkBytecodeHash": "0x01000d8980acb7096a6a78e8494dbeff5c4a785e76cecd70d4b7aae4f9612d67",
+    "zkBytecodeHash": "0x01000d912ae1073d919d62179a13a954d55a4024f42487957261845c73919376",
     "zkBytecodePath": "/l1-contracts/zkout/MultisigCommitter.sol/MultisigCommitter.json",
-    "evmBytecodeHash": "0x185833cf9fa45378a0961b9c7186dddd80e853f7a8f036b2272abeb856b175a2",
+    "evmBytecodeHash": "0x3a7f864777666578413fa9ec6bc2b099f398a421025732bced5e9cdb3b5bcb43",
     "evmBytecodePath": "/l1-contracts/out/MultisigCommitter.sol/MultisigCommitter.json",
-    "evmDeployedBytecodeHash": "0x8d592a2d8df46ce3532a833a707135b79bc3f2c7fe11525f34d03e3470620170",
-    "evmDeployedBytecodeBlakeHash": "0x31da45b8817f762a29445c47b0057cf34607cdc4eb997f353b463b5751ec6fbe",
-    "evmDeployedBytecodeLength": 16529
+    "evmDeployedBytecodeHash": "0x8979cc7b441532da0c7761a3cffc5a5ef97db712bc01ff5e1d399b1b79e35e12",
+    "evmDeployedBytecodeBlakeHash": "0x68e4ff119fc0396fb7e84f2714276b734b21487790a4bf3e08a6626dd89bc60e",
+    "evmDeployedBytecodeLength": 16597
   },
   {
     "contractName": "l1-contracts/PermanentRestriction",
