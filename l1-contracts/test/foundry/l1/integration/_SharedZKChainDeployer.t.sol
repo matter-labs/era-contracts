@@ -59,9 +59,9 @@ contract ZKChainDeployer is L1ContractDeployer {
         );
         deployScript = new RegisterZKChainScript();
         vm.warp(100);
-        
+
         _deployZKChainShared(eraZKChainId, ETH_TOKEN_ADDRESS);
-        
+
         address chainAddress = getZKChainAddress(eraZKChainId);
         if (!_pausedDeposits) {
             IAdmin(chainAddress).unpauseDeposits();
@@ -107,14 +107,13 @@ contract ZKChainDeployer is L1ContractDeployer {
         }
         _deployZKChainShared(chainId, _baseToken);
     }
-    
+
     function _deployZKChainShared(uint256 _chainId, address _baseToken) internal {
         saveZKChainConfig(_getDefaultDescription(_chainId, _baseToken, _chainId));
         zkChainIds.push(_chainId);
         deployScript.runForTest();
         _setDAValidatorPair(_chainId);
         _processGenesisUpgrade(_chainId);
-
     }
 
     function _processGenesisUpgrade(uint256 _chainId) internal {
