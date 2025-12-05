@@ -197,10 +197,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         uint256 amount = 500;
 
         // Mock base token asset ID
-        stdstore
-            .target(L2_ASSET_TRACKER_ADDR)
-            .sig("BASE_TOKEN_ASSET_ID()")
-            .checked_write(uint256(baseTokenAssetId));
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
 
         // Mock origin chain ID for base token
         stdstore
@@ -248,16 +245,10 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         uint256 l1ChainId = 1;
 
         // Mock base token asset ID
-        stdstore
-            .target(L2_ASSET_TRACKER_ADDR)
-            .sig("BASE_TOKEN_ASSET_ID()")
-            .checked_write(uint256(baseTokenAssetId));
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
 
         // Mock L1 chain ID
-        stdstore
-            .target(L2_ASSET_TRACKER_ADDR)
-            .sig("L1_CHAIN_ID()")
-            .checked_write(l1ChainId);
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("L1_CHAIN_ID()").checked_write(l1ChainId);
 
         // Set initial chain balance (should be 0 for incoming tokens)
         stdstore
@@ -342,18 +333,10 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             .checked_write(uint256(0));
 
         // Mock total supply
-        vm.mockCall(
-            tokenAddress,
-            abi.encodeWithSelector(IERC20.totalSupply.selector),
-            abi.encode(totalSupply)
-        );
+        vm.mockCall(tokenAddress, abi.encodeWithSelector(IERC20.totalSupply.selector), abi.encode(totalSupply));
 
         // Mock sendMessageToL1 to avoid revert
-        vm.mockCall(
-            address(L2_BRIDGEHUB),
-            abi.encodeWithSignature("sendMessageToL1(bytes)"),
-            abi.encode(bytes32(0))
-        );
+        vm.mockCall(address(L2_BRIDGEHUB), abi.encodeWithSignature("sendMessageToL1(bytes)"), abi.encode(bytes32(0)));
 
         // Call the migration function - should not revert
         L2_ASSET_TRACKER.initiateL1ToGatewayMigrationOnL2(assetId);
