@@ -37,7 +37,7 @@ contract L2V29Upgrade {
         ensureOwnable2StepOwner(address(L2_NATIVE_TOKEN_VAULT), _aliasedGovernance);
 
         // 2. Call setAddresses in L2 Brighehub contract to set the address of ChainAssetHandler, a new contract.
-        setChainAssetHandler();
+        // setChainAssetHandler();
 
         // 3. If the legacy shared bridge does not exist on this chain, no need to proceed
         address l2LegacySharedBridge = L2_ASSET_ROUTER.L2_LEGACY_SHARED_BRIDGE();
@@ -55,17 +55,17 @@ contract L2V29Upgrade {
     }
 
     /// @notice Calls setAddresses on L2 Bridgehub to set the address of newly appeared ChainAssetHandler contract.
-    function setChainAssetHandler() internal {
-        // Get the current L2 Brigehub owner.
-        address owner = IBridgehub(L2_BRIDGE_HUB).owner();
+    // function setChainAssetHandler() internal {
+    //     // Get the current L2 Brigehub owner.
+    //     address owner = IBridgehub(L2_BRIDGE_HUB).owner();
 
-        // Call L2 Bridgehub out of it's owner's name to setAddresses.
-        SystemContractHelper.mimicCallWithPropagatedRevert(
-            address(L2_BRIDGE_HUB),
-            owner,
-            abi.encodeCall(IBridgehub.setChainAssetHandler, address(L2_CHAIN_ASSET_HANDLER))
-        );
-    }
+    //     // Call L2 Bridgehub out of it's owner's name to setAddresses.
+    //     SystemContractHelper.mimicCallWithPropagatedRevert(
+    //         address(L2_BRIDGE_HUB),
+    //         owner,
+    //         abi.encodeCall(IBridgehub.setChainAssetHandler, address(L2_CHAIN_ASSET_HANDLER))
+    //     );
+    // }
 
     /// @notice Makes `_aliasedGovernance` the owner of the legacy shared bridge’s
     /// TransparentUpgradeableProxy, deploying a fresh `ProxyAdmin` when

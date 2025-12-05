@@ -207,13 +207,6 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
         chainRegistrationSender = _chainRegistrationSender;
     }
 
-    /// @notice Used to set the chain asset handler address.
-    /// @dev Called during v29 upgrade.
-    /// @param _chainAssetHandler the chain asset handler address
-    function setChainAssetHandler(address _chainAssetHandler) external onlyOwner {
-        chainAssetHandler = _chainAssetHandler;
-    }
-
     //// Registry
 
     /// @notice Chain Type Manager can be any contract with the appropriate interface/functionality
