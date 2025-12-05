@@ -150,6 +150,13 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     ) external onlyL2InteropCenter {
         uint256 chainMigrationNumber = _getChainMigrationNumber(_chainId);
 
+        if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _balanceChange.assetId)) {
+            _forceSetAssetMigrationNumber(_chainId, _balanceChange.assetId);
+        }
+        if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _balanceChange.baseTokenAssetId)) {
+            _forceSetAssetMigrationNumber(_chainId, _balanceChange.baseTokenAssetId);
+        }
+
         /// Note we don't decrease L1ChainBalance here, since we don't track L1 chainBalance on Gateway.
         _increaseAndSaveChainBalance(_chainId, _balanceChange.assetId, _balanceChange.amount, chainMigrationNumber);
         _increaseAndSaveChainBalance(
@@ -159,10 +166,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             chainMigrationNumber
         );
 
-        if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _balanceChange.assetId)) {
-            _forceSetAssetMigrationNumber(_chainId, _balanceChange.assetId);
-        }
         _registerToken(_balanceChange.assetId, _balanceChange.originToken, _balanceChange.tokenOriginChainId);
+        // _registerToken(_balanceChange.baseTokenAssetId, _balanceChange.originToken, _balanceChange.tokenOriginChainId); // TODO: should we do this
 
         /// A malicious chain can cause a collision for the canonical tx hash.
         require(balanceChange[_chainId][_canonicalTxHash].version == 0, InvalidCanonicalTxHash(_canonicalTxHash));
