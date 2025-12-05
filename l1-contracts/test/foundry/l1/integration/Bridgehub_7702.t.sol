@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {BridgeHubInvariantTests} from "./BridgeHubTests.t.sol";
+import {BridgehubInvariantTests} from "./BridgehubTests.t.sol";
 
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
@@ -27,7 +27,7 @@ import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-contract Bridgehub_7702 is BridgeHubInvariantTests {
+contract Bridgehub_7702 is BridgehubInvariantTests {
     function setUp() public {
         prepare();
     }
@@ -135,5 +135,5 @@ contract Bridgehub_7702 is BridgeHubInvariantTests {
     }
 
     // add this to be excluded from coverage report
-    function testBoundedBridgeHubInvariant() internal {}
+    function testBoundedBridgehubInvariant() internal {}
 }
