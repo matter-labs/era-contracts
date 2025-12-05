@@ -164,6 +164,19 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         // Optionally add: assert paused is true if readable
     }
 
+    function test_bridgeBurn_Failed() public {
+        vm.expectRevert();
+        IChainAssetHandler(address(l2ChainAssetHandler)).bridgeBurn(eraZKChainId, 0, 0, address(0), "");
+
+        address owner = Ownable2StepUpgradeable(address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy)).owner();
+        vm.prank(address(0));
+        IChainAssetHandler(address(l2ChainAssetHandler)).pauseMigration();
+
+        vm.expectRevert();
+        vm.prank(address(0));
+        IChainAssetHandler(address(l2ChainAssetHandler)).bridgeBurn(eraZKChainId, 0, 0, address(0), "");
+    }
+
     function test_setSettlementLayerChainId_Success() public {
         address systemContext = L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR;
         vm.prank(systemContext);
