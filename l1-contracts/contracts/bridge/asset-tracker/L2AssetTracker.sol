@@ -258,7 +258,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                     Gateway related token balance migration 
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Migrates the token balance from L2 to L1.
+    /// @notice Migrates the token balance from L1 to Gateway.
     /// @dev This function can be called multiple times on the chain it does not have a direct effect.
     /// @dev This function is permissionless, it does not affect the state of the contract substantially, and can be called multiple times.
     function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external {
@@ -272,7 +272,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         address originalToken = L2_NATIVE_TOKEN_VAULT.originToken(_assetId);
 
         uint256 chainMigrationNumber = _getChainMigrationNumber(block.chainid);
-        if (chainMigrationNumber == assetMigrationNumber[block.chainid][_assetId]) {
+        uint256 assetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
+        if (chainMigrationNumber == assetMigrationNumber) {
             /// In this case the token was either already migrated, or the migration number was set using _forceSetAssetMigrationNumber.
             return;
         }
@@ -285,7 +286,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             tokenOriginChainId: originChainId,
             amount: amount,
             chainMigrationNumber: chainMigrationNumber,
-            assetMigrationNumber: assetMigrationNumber[block.chainid][_assetId],
+            assetMigrationNumber: assetMigrationNumber,
             originToken: originalToken,
             isL1ToGateway: true
         });
