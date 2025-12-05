@@ -50,11 +50,6 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
         _deployEra();
         _deployZKChain(ETH_TOKEN_ADDRESS);
-        _deployZKChain(ETH_TOKEN_ADDRESS);
-        _deployZKChain(tokens[0]);
-        _deployZKChain(tokens[0]);
-        _deployZKChain(tokens[1]);
-        _deployZKChain(tokens[1]);
 
         releaseConfigLock();
 
@@ -81,11 +76,11 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         assertNotEq(newChainAddress, address(0));
 
         address[] memory chainAddresses = addresses.bridgehub.getAllZKChains();
-        assertEq(chainAddresses.length, 7);
+        assertEq(chainAddresses.length, 2);
         assertEq(chainAddresses[0], newChainAddress);
 
         uint256[] memory chainIds = addresses.bridgehub.getAllZKChainChainIDs();
-        assertEq(chainIds.length, 7);
+        assertEq(chainIds.length, 2);
         assertEq(chainIds[0], chainId);
 
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(chainId);

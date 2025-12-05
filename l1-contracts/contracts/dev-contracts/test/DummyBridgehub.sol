@@ -38,10 +38,6 @@ contract DummyBridgehub {
         messageRoot = IMessageRoot(_messageRoot);
     }
 
-    function setChainAssetHandler(address _chainAssetHandler) public {
-        chainAssetHandler = _chainAssetHandler;
-    }
-
     function setZKChain(uint256, address _zkChain) external {
         zkChain = _zkChain;
     }

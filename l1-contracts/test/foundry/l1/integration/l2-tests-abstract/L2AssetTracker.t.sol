@@ -6,8 +6,11 @@ pragma solidity ^0.8.20;
 import {StdStorage, Test, stdStorage, console} from "forge-std/Test.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
-import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDR, L2_CHAIN_ASSET_HANDLER, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER, L2_ASSET_TRACKER_ADDR, L2_CHAIN_ASSET_HANDLER, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {MAX_TOKEN_BALANCE} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 
 import {L2AssetTrackerData} from "./L2AssetTrackerData.sol";
 
@@ -85,7 +88,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
                 .target(address(L2_CHAIN_ASSET_HANDLER))
                 .sig("migrationNumber(uint256)")
                 .with_key(271)
-                .checked_write(1);
+                .checked_write(uint256(1));
 
             bytes32[] memory txHashes = getTxHashes(testData[i]);
 
@@ -139,5 +142,205 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
 
     function printProcess(ProcessLogsInput memory) public {
         /// its just here so that the ProcessLogsInput is printed in console
+    }
+
+    function test_migrateTokenBalanceFromNTVV31() public {
+        // Test migrating token balance from NTV to AssetTracker for V31 upgrade
+        bytes32 assetId = keccak256("test_asset_id");
+
+        // Mock the asset as being native to the current chain
+        stdstore
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
+            .sig("originChainId(bytes32)")
+            .with_key(assetId)
+            .checked_write(block.chainid);
+
+        // Mock token address
+        address mockTokenAddress = address(0x1234);
+        stdstore
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
+            .sig("tokenAddress(bytes32)")
+            .with_key(assetId)
+            .checked_write(uint256(uint160(mockTokenAddress)));
+
+        // Set initial chainBalance (pre-V31 tracking)
+        uint256 initialChainBalance = 1000;
+        stdstore
+            .target(L2_ASSET_TRACKER_ADDR)
+            .sig("chainBalance(uint256,bytes32)")
+            .with_key(block.chainid)
+            .with_key(assetId)
+            .checked_write(initialChainBalance);
+
+        // Mock NTV balance (tokens locked from previous bridge operations)
+        uint256 ntvBalance = 300;
+        vm.mockCall(
+            mockTokenAddress,
+            abi.encodeWithSelector(IERC20.balanceOf.selector, address(L2_NATIVE_TOKEN_VAULT_ADDR)),
+            abi.encode(ntvBalance)
+        );
+
+        // Call the migration function
+        L2_ASSET_TRACKER.migrateTokenBalanceFromNTVV31(assetId);
+
+        // Verify chainBalance was calculated correctly
+        // Expected: MAX_TOKEN_BALANCE - initialChainBalance - ntvBalance
+        uint256 expectedBalance = MAX_TOKEN_BALANCE - initialChainBalance - ntvBalance;
+        uint256 actualBalance = L2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, assetId);
+
+        assertEq(actualBalance, expectedBalance, "Chain balance should be correctly migrated");
+    }
+
+    function test_handleInitiateBaseTokenBridgingOnL2() public {
+        // Test handling base token bridging out from L2
+        bytes32 baseTokenAssetId = keccak256("base_token_asset_id");
+        uint256 amount = 500;
+
+        // Mock base token asset ID
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
+
+        // Mock origin chain ID for base token
+        stdstore
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
+            .sig("originChainId(bytes32)")
+            .with_key(baseTokenAssetId)
+            .checked_write(block.chainid);
+
+        // Set initial chain balance
+        uint256 initialBalance = 1000;
+        stdstore
+            .target(L2_ASSET_TRACKER_ADDR)
+            .sig("chainBalance(uint256,bytes32)")
+            .with_key(block.chainid)
+            .with_key(baseTokenAssetId)
+            .checked_write(initialBalance);
+
+        // Set migration number
+        stdstore
+            .target(address(L2_CHAIN_ASSET_HANDLER))
+            .sig("migrationNumber(uint256)")
+            .with_key(block.chainid)
+            .checked_write(uint256(1));
+
+        stdstore
+            .target(L2_ASSET_TRACKER_ADDR)
+            .sig("assetMigrationNumber(uint256,bytes32)")
+            .with_key(block.chainid)
+            .with_key(baseTokenAssetId)
+            .checked_write(uint256(1));
+
+        // Call as L2 Base Token System Contract
+        vm.prank(address(L2_BASE_TOKEN_SYSTEM_CONTRACT));
+        L2_ASSET_TRACKER.handleInitiateBaseTokenBridgingOnL2(amount);
+
+        // Verify chain balance decreased
+        uint256 finalBalance = L2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, baseTokenAssetId);
+        assertEq(finalBalance, initialBalance - amount, "Chain balance should decrease by bridged amount");
+    }
+
+    function test_handleFinalizeBaseTokenBridgingOnL2() public {
+        // Test handling base token bridging into L2
+        bytes32 baseTokenAssetId = keccak256("base_token_asset_id");
+        uint256 amount = 300;
+        uint256 l1ChainId = 1;
+
+        // Mock base token asset ID
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
+
+        // Mock L1 chain ID
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("L1_CHAIN_ID()").checked_write(l1ChainId);
+
+        // Set initial chain balance (should be 0 for incoming tokens)
+        stdstore
+            .target(L2_ASSET_TRACKER_ADDR)
+            .sig("chainBalance(uint256,bytes32)")
+            .with_key(block.chainid)
+            .with_key(baseTokenAssetId)
+            .checked_write(uint256(0));
+
+        // Mock origin chain ID for base token (L1)
+        stdstore
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
+            .sig("originChainId(bytes32)")
+            .with_key(baseTokenAssetId)
+            .checked_write(l1ChainId);
+
+        // Mock totalSupply on L2_BASE_TOKEN_SYSTEM_CONTRACT (needed for foreign token total supply calculation)
+        vm.mockCall(
+            address(L2_BASE_TOKEN_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(IERC20.totalSupply.selector),
+            abi.encode(1000)
+        );
+
+        // Call as L2 Base Token System Contract
+        vm.prank(address(L2_BASE_TOKEN_SYSTEM_CONTRACT));
+        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(amount);
+
+        // Verify chain balance did NOT increase (foreign token, not native)
+        uint256 finalBalance = L2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, baseTokenAssetId);
+        assertEq(finalBalance, 0, "Chain balance should remain 0 for foreign tokens");
+    }
+
+    function test_initiateL1ToGatewayMigrationOnL2() public {
+        // Test initiating L1 to Gateway migration on L2
+        bytes32 assetId = keccak256("migration_asset_id");
+        uint256 originChainId = 1;
+        address tokenAddress = address(0x5678);
+        address originalToken = address(0x9ABC);
+        uint256 totalSupply = 10000;
+
+        // Mock settlement layer chain ID (not L1)
+        vm.mockCall(
+            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(bytes4(keccak256("currentSettlementLayerChainId()"))),
+            abi.encode(270) // Gateway chain ID
+        );
+
+        // Mock token address
+        stdstore
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
+            .sig("tokenAddress(bytes32)")
+            .with_key(assetId)
+            .checked_write(uint256(uint160(tokenAddress)));
+
+        // Mock origin chain ID
+        stdstore
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
+            .sig("originChainId(bytes32)")
+            .with_key(assetId)
+            .checked_write(originChainId);
+
+        // Mock origin token (using mockCall since originToken is a function with logic)
+        vm.mockCall(
+            address(L2_NATIVE_TOKEN_VAULT_ADDR),
+            abi.encodeWithSignature("originToken(bytes32)", assetId),
+            abi.encode(originalToken)
+        );
+
+        // Mock chain migration number
+        stdstore
+            .target(address(L2_CHAIN_ASSET_HANDLER))
+            .sig("migrationNumber(uint256)")
+            .with_key(block.chainid)
+            .checked_write(uint256(2));
+
+        // Set asset migration number to 0 (not yet migrated)
+        stdstore
+            .target(L2_ASSET_TRACKER_ADDR)
+            .sig("assetMigrationNumber(uint256,bytes32)")
+            .with_key(block.chainid)
+            .with_key(assetId)
+            .checked_write(uint256(0));
+
+        // Mock total supply
+        vm.mockCall(tokenAddress, abi.encodeWithSelector(IERC20.totalSupply.selector), abi.encode(totalSupply));
+
+        // Mock sendMessageToL1 to avoid revert
+        vm.mockCall(address(L2_BRIDGEHUB), abi.encodeWithSignature("sendMessageToL1(bytes)"), abi.encode(bytes32(0)));
+
+        // Call the migration function - should not revert
+        L2_ASSET_TRACKER.initiateL1ToGatewayMigrationOnL2(assetId);
+
+        // Test passes if no revert occurred
     }
 }

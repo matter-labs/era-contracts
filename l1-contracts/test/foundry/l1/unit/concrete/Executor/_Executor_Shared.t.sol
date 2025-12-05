@@ -225,7 +225,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             address(assetTracker),
             IL1Nullifier(address(0))
         );
-        dummyBridgehub.setChainAssetHandler(address(chainAssetHandler));
+        // dummyBridgehub.setChainAssetHandler(address(chainAssetHandler));
 
         dummyBridgehub.setSharedBridge(address(sharedBridge));
 

@@ -171,8 +171,6 @@ interface IBridgehubBase {
 
     function addTokenAssetId(bytes32 _baseTokenAssetId) external;
 
-    function setChainAssetHandler(address _chainAssetHandler) external;
-
     function setCTMAssetAddress(bytes32 _additionalData, address _assetAddress) external;
 
     /// Asset Handler functions

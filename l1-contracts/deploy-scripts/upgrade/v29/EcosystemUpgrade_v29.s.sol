@@ -219,11 +219,11 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
     }
 
     function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](4);
+        Call[][] memory allCalls = new Call[][](3);
         allCalls[0] = prepareSetValidatorTimelockPostV29L1();
-        allCalls[1] = prepareSetChainAssetHandlerOnBridgehubCall();
-        allCalls[2] = prepareSetCtmAssetHandlerAddressOnL1Call();
-        allCalls[3] = prepareSetUpgradeDiamondCutOnL1Call();
+        // allCalls[1] = prepareSetChainAssetHandlerOnBridgehubCall();
+        allCalls[1] = prepareSetCtmAssetHandlerAddressOnL1Call();
+        allCalls[2] = prepareSetUpgradeDiamondCutOnL1Call();
         calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 

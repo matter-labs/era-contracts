@@ -41,6 +41,14 @@ contract ZKChainDeployer is L1ContractDeployer {
     uint256[] public zkChainIds;
 
     function _deployEra() internal {
+        _deployEraDeposits(false);
+    }
+
+    function _deployEraWithPausedDeposits() internal {
+        _deployEraDeposits(true);
+    }
+
+    function _deployEraDeposits(bool _pausedDeposits) internal {
         vm.setEnv(
             "ZK_CHAIN_CONFIG",
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-era.toml"
@@ -50,16 +58,15 @@ contract ZKChainDeployer is L1ContractDeployer {
             "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml"
         );
         deployScript = new RegisterZKChainScript();
-        saveZKChainConfig(_getDefaultDescription(eraZKChainId, ETH_TOKEN_ADDRESS, eraZKChainId));
         vm.warp(100);
-        deployScript.runForTest();
-        zkChainIds.push(eraZKChainId);
-        eraConfig = deployScript.getConfig();
+
+        _deployZKChainShared(eraZKChainId, ETH_TOKEN_ADDRESS);
 
         address chainAddress = getZKChainAddress(eraZKChainId);
-        IAdmin(chainAddress).unpauseDeposits();
-        _setDAValidatorPair(eraZKChainId);
-        _processGenesisUpgrade(eraZKChainId);
+        if (!_pausedDeposits) {
+            IAdmin(chainAddress).unpauseDeposits();
+        }
+        eraConfig = deployScript.getConfig();
     }
 
     function _deployZKChain(address _baseToken) internal {
@@ -95,14 +102,18 @@ contract ZKChainDeployer is L1ContractDeployer {
                 ".toml"
             )
         );
-        zkChainIds.push(chainId);
-        saveZKChainConfig(_getDefaultDescription(chainId, _baseToken, chainId));
         if (chainId == currentZKChainId) {
             currentZKChainId++;
         }
+        _deployZKChainShared(chainId, _baseToken);
+    }
+
+    function _deployZKChainShared(uint256 _chainId, address _baseToken) internal {
+        saveZKChainConfig(_getDefaultDescription(_chainId, _baseToken, _chainId));
+        zkChainIds.push(_chainId);
         deployScript.runForTest();
-        _setDAValidatorPair(chainId);
-        _processGenesisUpgrade(chainId);
+        _setDAValidatorPair(_chainId);
+        _processGenesisUpgrade(_chainId);
     }
 
     function _processGenesisUpgrade(uint256 _chainId) internal {

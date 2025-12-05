@@ -110,7 +110,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         return L1_CHAIN_ID;
     }
 
-    modifier onlySettlementLayerRelayedSender() override {
+    modifier onlySettlementLayerRelayedSender() {
         /// There is no sender for the wrapping, we use a virtual address.
         if (msg.sender != SETTLEMENT_LAYER_RELAY_SENDER) {
             revert NotRelayedSender(msg.sender, SETTLEMENT_LAYER_RELAY_SENDER);
