@@ -11,8 +11,8 @@ interface IMultisigCommitter is IValidatorTimelock {
         uint64 signingThreshold; // only applies if useCustomValidators is true
     }
 
-    /// @notice Signing threshold for a chain is set or changed. Shared signing set is disabled. threshold=0 signifies multisig disabled
-    event NewSigningThreshold(address chainAddress, uint256 threshold);
+    /// @notice Custom signing threshold for a chain is set or changed. Shared signing set is disabled. threshold=0 signifies multisig disabled
+    event NewCustomSigningThreshold(address chainAddress, uint256 threshold);
 
     /// @notice Change in useCustomValidators flag for a chain. if true, custom chain admin validators are used instead of the shared validator set
     event UseCustomValidators(address chainAddress, bool useCustomValidators);
@@ -57,10 +57,10 @@ interface IMultisigCommitter is IValidatorTimelock {
     /// @notice Returns the shared signing threshold.
     function sharedSigningThreshold() external view returns (uint64);
 
-    /// @notice Sets the signing threshold for a chain. 0 disabled multisig
-    /// Only effective if useCustomValidators flag is true
+    /// @notice Sets the signing threshold for a chain's custom validator set. 0 disables multisig
+    /// Only effective if useCustomValidators flag is true.
     /// Can only be called by COMMIT_VALIDATOR_ROLE admin.
-    function setSigningThreshold(address chainAddress, uint64 threshold) external;
+    function setCustomSigningThreshold(address chainAddress, uint64 threshold) external;
 
     /// @notice Disables custom signing set and enables shared signing set for a chain.
     /// (sets useCustomValidators flag to false)
