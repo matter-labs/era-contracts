@@ -16,7 +16,10 @@ import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
-contract GW_CTMDeployerL1Test is Test, GW_CTMDeployerTest { //SharedL2ContractL1Deployer
+contract GW_CTMDeployerL1Test is
+    Test,
+    GW_CTMDeployerTest //SharedL2ContractL1Deployer
+{
     function test() internal virtual {} // override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {}
 
     // function initSystemContracts(

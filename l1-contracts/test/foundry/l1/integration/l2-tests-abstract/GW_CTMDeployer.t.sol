@@ -17,7 +17,7 @@ abstract contract GW_CTMDeployerTest is Test {
     using stdStorage for StdStorage;
 
     // function setUp() public override {
-        // super.setUp();
+    // super.setUp();
     // }
 
     function test_GW_CTMDeployer() public {
