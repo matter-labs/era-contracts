@@ -53,7 +53,6 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
         prepare();
     }
 
-
     function test_removeChainTypeManager_addressZero() public {
         address owner = Ownable(address(addresses.bridgehub)).owner();
         address ctm = address(0);
@@ -110,7 +109,9 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
         uint256 nonWhitelistedSL = 888888;
 
         // Set settlementLayer[chainId] = block.chainid to pass that check
-        stdstore.target(address(addresses.bridgehub)).sig("settlementLayer(uint256)").with_key(chainId).checked_write(block.chainid);
+        stdstore.target(address(addresses.bridgehub)).sig("settlementLayer(uint256)").with_key(chainId).checked_write(
+            block.chainid
+        );
 
         vm.prank(addresses.bridgehub.chainAssetHandler());
         vm.expectRevert(abi.encodeWithSelector(SLNotWhitelisted.selector));
@@ -123,12 +124,18 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
         uint256 validWhitelistedSL = block.chainid + 1;
 
         // Whitelist the validWhitelistedSL first
-        stdstore.target(address(addresses.bridgehub)).sig("settlementLayer(uint256)").with_key(validWhitelistedSL).checked_write(block.chainid);
+        stdstore
+            .target(address(addresses.bridgehub))
+            .sig("settlementLayer(uint256)")
+            .with_key(validWhitelistedSL)
+            .checked_write(block.chainid);
         vm.prank(addresses.bridgehub.owner());
         addresses.bridgehub.registerSettlementLayer(validWhitelistedSL, true);
 
         // Set settlementLayer[chainId] to not be block.chainid (to trigger NotCurrentSettlementLayer error)
-        stdstore.target(address(addresses.bridgehub)).sig("settlementLayer(uint256)").with_key(chainId).checked_write(block.chainid + 8);
+        stdstore.target(address(addresses.bridgehub)).sig("settlementLayer(uint256)").with_key(chainId).checked_write(
+            block.chainid + 8
+        );
 
         vm.prank(addresses.bridgehub.chainAssetHandler());
         vm.expectRevert(abi.encodeWithSelector(NotCurrentSettlementLayer.selector));
@@ -141,8 +148,14 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
         uint256 validWhitelistedSL = block.chainid + 1;
 
         // Set settlementLayer for both chainId and validWhitelistedSL to block.chainid
-        stdstore.target(address(addresses.bridgehub)).sig("settlementLayer(uint256)").with_key(chainId).checked_write(block.chainid);
-        stdstore.target(address(addresses.bridgehub)).sig("settlementLayer(uint256)").with_key(validWhitelistedSL).checked_write(block.chainid);
+        stdstore.target(address(addresses.bridgehub)).sig("settlementLayer(uint256)").with_key(chainId).checked_write(
+            block.chainid
+        );
+        stdstore
+            .target(address(addresses.bridgehub))
+            .sig("settlementLayer(uint256)")
+            .with_key(validWhitelistedSL)
+            .checked_write(block.chainid);
 
         // Whitelist chainId as a settlement layer (this should cause the test to pass the first two checks but fail the third)
         vm.prank(addresses.bridgehub.owner());
@@ -182,12 +195,15 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
         address sharedBridgeAddress = addresses.bridgehub.sharedBridge();
 
         // Verify it returns the asset router address
-        assertEq(sharedBridgeAddress, address(addresses.bridgehub.assetRouter()), "sharedBridge should return asset router address");
+        assertEq(
+            sharedBridgeAddress,
+            address(addresses.bridgehub.assetRouter()),
+            "sharedBridge should return asset router address"
+        );
 
         // Verify it's not zero address
         assertTrue(sharedBridgeAddress != address(0), "Asset router should have non-zero address");
     }
-
 
     // add this to be excluded from coverage report
     function test() internal override {}
