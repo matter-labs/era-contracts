@@ -345,7 +345,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @inheritdoc IAdmin
     function unpauseDeposits() external onlyAdmin onlyL1 {
         uint256 timestamp = s.pausedDepositsTimestamp;
-        bool inPausedWindow = timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START <= block.timestamp &&
+        bool inPausedWindow = timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START < block.timestamp &&
             block.timestamp < timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END;
         require(inPausedWindow, DepositsNotPaused());
         require(
