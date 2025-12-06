@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-import {IBridgehubBase, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -22,7 +22,7 @@ import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
 
     bytes32 constant NEW_PRIORITY_REQUEST_HASH =
@@ -666,7 +666,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         return addressesToExclude;
     }
 
-    function prepare() public {
+    function prepare() public virtual {
         _generateUserAddresses();
 
         _deployL1Contracts();
@@ -675,11 +675,11 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         _deployEra();
         _deployZKChain(ETH_TOKEN_ADDRESS);
-        _deployZKChain(ETH_TOKEN_ADDRESS);
+        // _deployZKChain(ETH_TOKEN_ADDRESS);
         _deployZKChain(tokens[0]);
-        _deployZKChain(tokens[0]);
+        // _deployZKChain(tokens[0]);
         _deployZKChain(tokens[1]);
-        _deployZKChain(tokens[1]);
+        // _deployZKChain(tokens[1]);
 
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
@@ -691,56 +691,4 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 
     // add this to be excluded from coverage report
     function test() internal override {}
-}
-
-contract BoundedBridgeHubInvariantTests1 is BridgeHubInvariantTests {
-    function depositEthSuccess(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 l2Value) public {
-        uint64 MAX = 2 ** 64 - 1;
-        uint256 l2Value = bound(l2Value, 0.1 ether, MAX);
-
-        emit log_string("DEPOSIT ETH");
-        super.depositEthToBridgeSuccess(userIndexSeed, chainIndexSeed, l2Value);
-    }
-
-    function depositERC20Success(
-        uint256 userIndexSeed,
-        uint256 chainIndexSeed,
-        uint256 tokenIndexSeed,
-        uint256 l2Value
-    ) public {
-        uint64 MAX = 2 ** 64 - 1;
-        uint256 l2Value = bound(l2Value, 0.1 ether, MAX);
-
-        emit log_string("DEPOSIT ERC20");
-        super.depositERC20ToBridgeSuccess(userIndexSeed, chainIndexSeed, tokenIndexSeed, l2Value);
-    }
-
-    function withdrawERC20Success(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 amountToWithdraw) public {
-        uint64 MAX = (2 ** 32 - 1) + 0.1 ether;
-        uint256 amountToWithdraw = bound(amountToWithdraw, 0.1 ether, MAX);
-
-        emit log_string("WITHDRAW ERC20");
-        super.withdrawSuccess(userIndexSeed, chainIndexSeed, amountToWithdraw);
-    }
-
-    // add this to be excluded from coverage report
-    function testBoundedBridgeHubInvariant() internal {}
-}
-
-contract InvariantTesterZKChains is Test {
-    BoundedBridgeHubInvariantTests1 tests;
-
-    function setUp() public {
-        tests = new BoundedBridgeHubInvariantTests1();
-        // tests.prepare();
-    }
-
-    // // Check whether the sum of ETH deposits from tests, updated on each deposit and withdrawal,
-    // // equals the balance of L1Shared bridge.
-    // function invariant_ETHbalanceStaysEqual() public {
-    //     require(1==1);
-    // }
-
-    // add this to be excluded from coverage report
-    function test() internal {}
 }

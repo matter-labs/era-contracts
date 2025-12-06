@@ -5,18 +5,18 @@ pragma solidity 0.8.28;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
 import {IChainRegistrationSender} from "./IChainRegistrationSender.sol";
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {IL1CrossChainSender} from "../bridge/interfaces/IL1CrossChainSender.sol";
+import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
+import {IL1CrossChainSender} from "../../bridge/interfaces/IL1CrossChainSender.sol";
 
-import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "./IBridgehubBase.sol";
-import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
+import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../bridgehub/IBridgehubBase.sol";
+import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 
-import {L2_BRIDGEHUB_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
+import {L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 
-import {Unauthorized, UnsupportedEncodingVersion} from "../common/L1ContractErrors.sol";
-import {ChainAlreadyRegistered, NoEthAllowed, ZKChainNotRegistered} from "./L1BridgehubErrors.sol";
-import {IL2Bridgehub} from "./IL2Bridgehub.sol";
+import {Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
+import {ChainAlreadyRegistered, NoEthAllowed, ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
+import {IL2Bridgehub} from "../bridgehub/IL2Bridgehub.sol";
 
 /// @dev The encoding version of the data.
 bytes1 constant CHAIN_REGISTRATION_SENDER_ENCODING_VERSION = 0x01;

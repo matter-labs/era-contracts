@@ -3,13 +3,13 @@
 pragma solidity 0.8.28;
 
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
-import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {InvalidCaller} from "../common/L1ContractErrors.sol";
-import {IL1Bridgehub} from "./IL1Bridgehub.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
-import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {InvalidCaller} from "../../common/L1ContractErrors.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
+import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IChainAssetHandlerShared} from "./IChainAssetHandlerShared.sol";
 
 /// @author Matter Labs
@@ -102,5 +102,23 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase, IChainAssetHandlerShared 
         ASSET_ROUTER = IAssetRouterBase(_assetRouter);
         MESSAGE_ROOT = IMessageRoot(_messageRoot);
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            L2 functions
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice This function is called at the start of each batch.
+    function setSettlementLayerChainId(
+        uint256 _previousSettlementLayerChainId,
+        uint256 _currentSettlementLayerChainId
+    ) external onlySystemContext {
+        if (_previousSettlementLayerChainId == 0 && _currentSettlementLayerChainId == _l1ChainId()) {
+            /// For the initial call if we are settling on L1, we return, as there is no real migration.
+            return;
+        }
+        if (_previousSettlementLayerChainId != _currentSettlementLayerChainId) {
+            ++migrationNumber[block.chainid];
+        }
     }
 }

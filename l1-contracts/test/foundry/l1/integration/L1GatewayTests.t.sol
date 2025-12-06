@@ -7,9 +7,9 @@ import "forge-std/console.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
-import {IBridgehubBase, BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
+import {IBridgehubBase, BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
@@ -29,7 +29,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-import {NotInGatewayMode} from "contracts/bridgehub/L1BridgehubErrors.sol";
+import {NotInGatewayMode} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {InvalidProof, DepositDoesNotExist} from "contracts/common/L1ContractErrors.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
@@ -43,9 +43,9 @@ import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
-import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
-import {IL1ChainAssetHandler} from "contracts/bridgehub/IL1ChainAssetHandler.sol";
-import {IMessageRoot, IMessageVerification} from "contracts/bridgehub/IMessageRoot.sol";
+import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
+import {IMessageRoot, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
 import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 import {NotMigrated} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
@@ -61,7 +61,7 @@ contract L1GatewayTests is
     address[] public users;
     address[] public l2ContractAddresses;
 
-    uint256 migratingChainId = 271;
+    uint256 migratingChainId = eraZKChainId;
     IZKChain migratingChain;
 
     uint256 gatewayChainId = 506;
@@ -89,11 +89,8 @@ contract L1GatewayTests is
 
         takeConfigLock(); // Prevents race condition with configs
         _deployL1Contracts();
-        _deployTokens();
-        _registerNewTokens(tokens);
 
-        _deployEra();
-        _deployZKChainWithPausedDeposits(ETH_TOKEN_ADDRESS, migratingChainId);
+        _deployEraWithPausedDeposits();
         acceptPendingAdmin(migratingChainId);
         _deployZKChain(ETH_TOKEN_ADDRESS, gatewayChainId);
         acceptPendingAdmin(gatewayChainId);

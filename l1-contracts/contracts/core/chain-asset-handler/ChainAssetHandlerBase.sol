@@ -7,21 +7,20 @@ import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/Enumerable
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {IBridgehubBase, BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData} from "./IBridgehubBase.sol";
-import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
-import {IL1Bridgehub} from "./IL1Bridgehub.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
-import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {IBridgehubBase, BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData} from "../bridgehub/IBridgehubBase.sol";
+import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
+import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
+import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
+import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 
-import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
-import {IncorrectChainAssetId, IncorrectSender, MigrationNotToL1, MigrationNumberAlreadySet, MigrationNumberMismatch, NotSystemContext, OnlyChain, SLHasDifferentCTM, ZKChainNotRegistered, IteratedMigrationsNotSupported} from "./L1BridgehubErrors.sol";
-import {ChainIdNotRegistered, MigrationPaused, NotAssetRouter} from "../common/L1ContractErrors.sol";
-import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../../common/Config.sol";
+import {IncorrectChainAssetId, IncorrectSender, MigrationNotToL1, MigrationNumberAlreadySet, MigrationNumberMismatch, NotSystemContext, OnlyChain, SLHasDifferentCTM, ZKChainNotRegistered, IteratedMigrationsNotSupported} from "../bridgehub/L1BridgehubErrors.sol";
+import {ChainIdNotRegistered, MigrationPaused, NotAssetRouter} from "../../common/L1ContractErrors.sol";
+import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
+import {AssetHandlerModifiers} from "../../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandler} from "./IChainAssetHandler.sol";
 
 /// @author Matter Labs
@@ -284,24 +283,6 @@ abstract contract ChainAssetHandlerBase is
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);
 
         emit MigrationFinalized(bridgehubMintData.chainId, _assetId, zkChain);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            L2 functions
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice This function is called at the start of each batch.
-    function setSettlementLayerChainId(
-        uint256 _previousSettlementLayerChainId,
-        uint256 _currentSettlementLayerChainId
-    ) external onlySystemContext {
-        if (_previousSettlementLayerChainId == 0 && _currentSettlementLayerChainId == _l1ChainId()) {
-            /// For the initial call if we are settling on L1, we return, as there is no real migration.
-            return;
-        }
-        if (_previousSettlementLayerChainId != _currentSettlementLayerChainId) {
-            ++migrationNumber[block.chainid];
-        }
     }
 
     /*//////////////////////////////////////////////////////////////

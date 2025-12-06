@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.28;
 
-import {IMessageVerification} from "../common/interfaces/IMessageVerification.sol";
-import {ProofData} from "../common/Messaging.sol";
+import {IMessageVerification} from "../../common/interfaces/IMessageVerification.sol";
+import {ProofData} from "../../common/Messaging.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(

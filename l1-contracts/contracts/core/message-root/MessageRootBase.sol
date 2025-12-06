@@ -4,21 +4,20 @@ pragma solidity 0.8.28;
 
 import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
 
-import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
+import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 
 import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH} from "./IMessageRoot.sol";
-import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, DepthMoreThanOneForRecursiveMerkleProof, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyChain, OnlyL1} from "./L1BridgehubErrors.sol";
+import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, DepthMoreThanOneForRecursiveMerkleProof, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyChain, OnlyL1} from "../bridgehub/L1BridgehubErrors.sol";
 
-import {GW_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
-import {IBridgehubBase} from "./IBridgehubBase.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
-import {FullMerkle} from "../common/libraries/FullMerkle.sol";
+import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
+import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
+import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
 
-import {MessageVerification} from "../common/MessageVerification.sol";
+import {MessageVerification} from "../../common/MessageVerification.sol";
 
-import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
+import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

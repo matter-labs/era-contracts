@@ -23,13 +23,13 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
-import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {AddressAlreadySet, DepositDoesNotExist, DepositExists, InvalidProof, InvalidSelector, LegacyBridgeNotSet, LegacyMethodForNonL1Token, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotLegacy, Unauthorized, WithdrawalAlreadyFinalized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {EthAlreadyMigratedToL1NTV, NativeTokenVaultAlreadySet, WrongL2Sender} from "./L1BridgeContractErrors.sol";
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 import {TransientPrimitivesLib} from "../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
+import {IMessageRoot} from "../core/message-root/IMessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
