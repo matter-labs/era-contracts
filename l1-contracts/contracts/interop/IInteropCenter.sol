@@ -24,7 +24,7 @@ interface IInteropCenter {
         CallAndBundleAttributes
     }
 
-    function initL2(uint256 _l1ChainId, address _owner) external;
+    function initL2(uint256 _l1ChainId, address _owner, address _zkToken) external;
 
     /// Mailbox forwarder
 

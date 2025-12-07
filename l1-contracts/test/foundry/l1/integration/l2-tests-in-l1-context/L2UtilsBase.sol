@@ -68,7 +68,7 @@ library L2UtilsBase {
             address interopCenter = address(new InteropCenter());
             vm.etch(L2_INTEROP_CENTER_ADDR, interopCenter.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner);
+            InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner, address(3));
         }
 
         {
@@ -128,7 +128,7 @@ library L2UtilsBase {
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
             L2AssetTracker(L2_ASSET_TRACKER_ADDR).setAddresses(_args.l1ChainId, bytes32(0));
 
-            address gwAssetTrackerAddress = address(new GWAssetTracker());
+            address gwAssetTrackerAddress = address(new GWAssetTracker(address(1), address(2)));
             vm.etch(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAddress.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
             GWAssetTracker(GW_ASSET_TRACKER_ADDR).setAddresses(_args.l1ChainId);

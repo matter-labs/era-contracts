@@ -16,7 +16,8 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed, InvalidInteropBalanceChange} from "./AssetTrackerErrors.sol";
+import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed, InvalidInteropBalanceChange, InvalidFeeRecipient} from "./AssetTrackerErrors.sol";
+import {IChainEscrowRegistry} from "../../interop/IChainEscrowRegistry.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
@@ -26,8 +27,15 @@ import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {LegacySharedBridgeAddresses, SharedBridgeOnChainId} from "./LegacySharedBridgeAddresses.sol";
 import {InteropDataEncoding} from "../../interop/InteropDataEncoding.sol";
 import {IInteropHandler} from "../../interop/IInteropHandler.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
+    /// @notice Emitted when the gateway settlement fee is updated.
+    ///         This is the fee that operator must pay for each interop bundle that was sent by user without paying fixed ZK fee.
+    ///         It's paid by operator of source chain of interop bundle on the moment of chain settling on GW.
+    /// @param oldFee Previous fee amount.
+    /// @param newFee New fee amount.
+    event GatewaySettlementFeeUpdated(uint256 indexed oldFee, uint256 indexed newFee);
     using FullMerkleMemory for FullMerkleMemory.FullTree;
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
 
@@ -66,6 +74,25 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     mapping(uint256 receivingChainId => mapping(bytes32 bundleHash => InteropBalanceChange interopBalanceChange))
         internal interopBalanceChange;
 
+    /// @notice Gateway settlement fee per interop operation in ZK tokens.
+    /// @dev Set by gateway governance, charged to chain operators during settlement.
+    uint256 public gatewaySettlementFee;
+
+    /// @notice ZK token contract for gateway settlement fee collection.
+    /// @dev Immutable, set during initialization.
+    IERC20 public immutable ZK_TOKEN;
+
+    /// @notice Chain escrow registry for managing operator escrows.
+    /// @dev Immutable, set during initialization.
+    IChainEscrowRegistry public immutable CHAIN_ESCROW_REGISTRY;
+
+    /// @param _zkToken Address of the ZK token contract.
+    /// @param _chainEscrowRegistry Address of the chain escrow registry contract.
+    constructor(address _zkToken, address _chainEscrowRegistry) {
+        ZK_TOKEN = IERC20(_zkToken);
+        CHAIN_ESCROW_REGISTRY = IChainEscrowRegistry(_chainEscrowRegistry);
+    }
+
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert Unauthorized(msg.sender);
@@ -89,6 +116,28 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     function setAddresses(uint256 _l1ChainId) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
+    }
+
+    /// @notice Sets the gateway settlement fee per interop bundle.
+    /// @dev Only callable by owner.
+    /// @param _fee New fee amount in ZK tokens
+    function setGatewaySettlementFee(uint256 _fee) external onlyOwner {
+        uint256 oldFee = gatewaySettlementFee;
+        gatewaySettlementFee = _fee;
+        emit GatewaySettlementFeeUpdated(oldFee, _fee);
+    }
+
+    /// @notice Withdraws collected gateway fees to specified recipient
+    /// @dev Only callable by owner.
+    /// @param _recipient Address to receive the collected fees
+    function withdrawGatewayFees(address _recipient) external onlyOwner {
+        if (_recipient == address(0)) {
+            revert InvalidFeeRecipient();
+        }
+        uint256 balance = ZK_TOKEN.balanceOf(address(this));
+        if (balance > 0) {
+            ZK_TOKEN.transfer(_recipient, balance);
+        }
     }
 
     /// @notice Sets legacy shared bridge addresses for chains that used the old bridging system.
@@ -193,6 +242,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function processLogsAndMessages(
         ProcessLogsInput calldata _processLogsInputs
     ) external onlyChain(_processLogsInputs.chainId) {
+        // Collect ZK settlement fees from chain escrow before processing.
+        _collectGatewaySettlementFees(_processLogsInputs);
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory reconstructedLogsTree;
         reconstructedLogsTree.createTree(L2_TO_L1_LOGS_MERKLE_TREE_DEPTH);
 
@@ -666,5 +717,62 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
         return L2_CHAIN_ASSET_HANDLER.migrationNumber(_chainId);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        Gateway Settlement Fee Collection
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Collects ZK settlement fees from chain escrows during batch processing.
+    /// @param _processLogsInputs The input containing logs and messages being processed.
+    /// @dev This function analyzes the logs to count interop operations and charges fees from the chain's escrow.
+    /// @dev Chain operators must ensure sufficient escrow balance before settlement.
+    function _collectGatewaySettlementFees(ProcessLogsInput calldata _processLogsInputs) internal {
+        // Only collect fees if gateway settlement fee is non-zero.
+        if (gatewaySettlementFee == 0) {
+            return;
+        }
+
+        uint256 chainId = _processLogsInputs.chainId;
+
+        // Count interop bundles that require gateway fees.
+        uint256 chargeableInteropCount = 0;
+        uint256 logsLength = _processLogsInputs.logs.length;
+        uint256 msgCount = 0;
+
+        for (uint256 i = 0; i < logsLength; ++i) {
+            L2Log memory log = _processLogsInputs.logs[i];
+
+            // Check if this log is from L2ToL1Messenger (where InteropCenter sends messages).
+            if (log.sender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
+                bytes calldata message = _processLogsInputs.messages[msgCount];
+                ++msgCount;
+
+                // Check if it's an interop bundle message (starts with BUNDLE_IDENTIFIER)
+                if (message.length > 32 && bytes32(message[:32]) == BUNDLE_IDENTIFIER) {
+                    // Extract and decode the bundle to check fee payment status
+                    bytes memory bundleData = message[32:];
+
+                    // Decode the bundle directly instead of using try-catch
+                    InteropBundle memory bundle = abi.decode(bundleData, (InteropBundle));
+
+                    // Validate this bundle is from the correct source chain
+                    if (bundle.sourceChainId == chainId) {
+                        // Only charge gateway fee if user didn't prepay with fixed ZK fees
+                        if (!bundle.bundleAttributes.useFixedFee) {
+                            ++chargeableInteropCount;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Collect ZK fees from chain escrow if there are chargeable interop operations.
+        if (chargeableInteropCount > 0) {
+            uint256 totalFee = gatewaySettlementFee * chargeableInteropCount;
+
+            // Pay settlement fees directly from the chain's escrow
+            CHAIN_ESCROW_REGISTRY.paySettlementFees(chainId, totalFee);
+        }
     }
 }

@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
@@ -17,7 +18,7 @@ import {BUNDLE_IDENTIFIER, BalanceChange, BundleAttributes, CallAttributes, INTE
 import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
-import {AttributeAlreadySet, AttributeViolatesRestriction, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty} from "./InteropErrors.sol";
+import {AttributeAlreadySet, AttributeViolatesRestriction, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty, UseFixedFeeRequired, FeeCollectionFailed} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
@@ -39,6 +40,11 @@ contract InteropCenter is
     Ownable2StepUpgradeable,
     PausableUpgradeable
 {
+    /// @notice Emitted when the interop protocol fee is updated.
+    /// @param oldFee Previous fee amount.
+    /// @param newFee New fee amount.
+    event InteropFeeUpdated(uint256 indexed oldFee, uint256 indexed newFee);
+
     /// @notice The chain ID of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
     uint256 public L1_CHAIN_ID;
@@ -50,6 +56,15 @@ contract InteropCenter is
     ///         It's being used to derive interopBundleSalt in InteropBundle struct, whose role
     ///         is to ensure that each bundle has a unique hash.
     mapping(address sender => uint256 numberOfBundlesSent) public interopBundleNonce;
+
+    /// @notice Operator-set fee in base token per interop bundle (when useFixedFee=false).
+    uint256 public interopProtocolFee;
+
+    /// @notice Fixed fee amount in ZK tokens per interop bundle (when useFixedFee=true).
+    uint256 public constant ZK_INTEROP_FEE = 1e18;
+
+    /// @notice ZK token contract address.
+    IERC20 public ZK_TOKEN;
 
     modifier onlyL1() {
         require(L1_CHAIN_ID == block.chainid, NotL1(L1_CHAIN_ID, block.chainid));
@@ -75,12 +90,17 @@ contract InteropCenter is
     }
 
     /// @notice To avoid parity hack
-    function initL2(uint256 _l1ChainId, address _owner) public reentrancyGuardInitializer onlyUpgrader {
+    function initL2(
+        uint256 _l1ChainId,
+        address _owner,
+        address _zkToken
+    ) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
         L1_CHAIN_ID = _l1ChainId;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+        ZK_TOKEN = IERC20(_zkToken);
 
-        _transferOwnership(_owner);
+        _transferOwnership(_owner); // vg todo: contract assumes this is the operator, which is incorrect, to be fixed
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -96,7 +116,7 @@ contract InteropCenter is
         bytes calldata recipient,
         bytes calldata payload,
         bytes[] calldata attributes
-    ) external payable whenNotPaused returns (bytes32 sendId) {
+    ) public payable whenNotPaused returns (bytes32 sendId) {
         (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(recipient);
 
         _ensureL2ToL2(recipientChainId);
@@ -252,27 +272,40 @@ contract InteropCenter is
         );
     }
 
-    /// @notice Ensures the received base token value matches expected for the destination chain.
+    /// @notice Ensures the received base token value matches expected for the destination chain
+    /// @dev Handles fee collection based on useFixedFee flag. When useFixedFee is true, no base token fee is charged.
+    /// @dev When useFixedFee is false, interopProtocolFee is charged in base tokens.
     /// @param _destinationChainId Destination chain ID.
     /// @param _totalBurnedCallsValue Sum of requested interop call values.
     /// @param _totalIndirectCallsValue Sum of requested indirect call values.
+    /// @param _useFixedFee Whether fixed ZK fees were used (true) or base token fees required (false).
     function _ensureCorrectTotalValue(
         uint256 _destinationChainId,
         uint256 _totalBurnedCallsValue,
-        uint256 _totalIndirectCallsValue
+        uint256 _totalIndirectCallsValue,
+        bool _useFixedFee
     ) internal {
         bytes32 destinationChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
         // We burn the value that is passed along the bundle here, on source chain.
         bytes32 thisChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(block.chainid);
+
+        // Calculate protocol fee - only charge base token fee if not using fixed ZK fees.
+        uint256 protocolFee = _useFixedFee ? 0 : interopProtocolFee;
+
         if (destinationChainBaseTokenAssetId == thisChainBaseTokenAssetId) {
-            require(
-                msg.value == _totalBurnedCallsValue + _totalIndirectCallsValue,
-                MsgValueMismatch(_totalBurnedCallsValue + _totalIndirectCallsValue, msg.value)
-            );
-            // slither-disable-next-line arbitrary-send-eth
-            L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalBurnedCallsValue}();
+            uint256 expectedValue = _totalBurnedCallsValue + _totalIndirectCallsValue + protocolFee;
+            require(msg.value == expectedValue, MsgValueMismatch(expectedValue, msg.value));
+
+            // Burn user value for interop calls.
+            if (_totalBurnedCallsValue > 0) {
+                // slither-disable-next-line arbitrary-send-eth
+                L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalBurnedCallsValue}();
+            }
         } else {
-            require(msg.value == _totalIndirectCallsValue, MsgValueMismatch(_totalIndirectCallsValue, msg.value));
+            uint256 expectedValue = _totalIndirectCallsValue + protocolFee;
+            require(msg.value == expectedValue, MsgValueMismatch(expectedValue, msg.value));
+
+            // Handle cross-chain token deposit for different base tokens
             if (_totalBurnedCallsValue > 0) {
                 IAssetRouterShared(L2_ASSET_ROUTER_ADDR).bridgehubDepositBaseToken(
                     _destinationChainId,
@@ -280,6 +313,13 @@ contract InteropCenter is
                     msg.sender,
                     _totalBurnedCallsValue
                 );
+            }
+        }
+        // Send protocol fee to operator (owner) if applicable
+        if (protocolFee > 0) {
+            (bool success, ) = owner().call{value: protocolFee}("");
+            if (!success) {
+                revert FeeCollectionFailed();
             }
         }
     }
@@ -328,7 +368,12 @@ contract InteropCenter is
         }
 
         // Ensure that tokens required for bundle execution were received.
-        _ensureCorrectTotalValue(bundle.destinationChainId, totalBurnedCallsValue, totalIndirectCallsValue);
+        _ensureCorrectTotalValue(
+            bundle.destinationChainId,
+            totalBurnedCallsValue,
+            totalIndirectCallsValue,
+            _bundleAttributes.useFixedFee
+        );
 
         bytes32 msgHash;
         /// To avoid stack too deep error
@@ -447,11 +492,11 @@ contract InteropCenter is
     function parseAttributes(
         bytes[] calldata _attributes,
         AttributeParsingRestrictions _restriction
-    ) public pure returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) {
+    ) public returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) {
         // Default value is direct call.
         callAttributes.indirectCall = false;
 
-        bytes4[4] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
+        bytes4[5] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
         // We can only pass each attribute once.
         bool[] memory attributeUsed = new bool[](ATTRIBUTE_SELECTORS.length);
 
@@ -497,9 +542,31 @@ contract InteropCenter is
                 );
                 attributeUsed[3] = true;
                 bundleAttributes.unbundlerAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
+            } else if (selector == IERC7786Attributes.useFixedFee.selector) {
+                require(!attributeUsed[4], AttributeAlreadySet(selector));
+                require(
+                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
+                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
+                    AttributeViolatesRestriction(selector, uint256(_restriction))
+                );
+                attributeUsed[4] = true;
+
+                // Decode the boolean parameter using AttributesDecoder
+                bool useFixed = AttributesDecoder.decodeBool(_attributes[i]);
+                bundleAttributes.useFixedFee = useFixed;
+
+                // If using fixed fees, collect ZK tokens immediately
+                if (useFixed) {
+                    ZK_TOKEN.transferFrom(msg.sender, owner(), ZK_INTEROP_FEE);
+                }
             } else {
                 revert IERC7786GatewaySource.UnsupportedAttribute(selector);
             }
+        }
+
+        // Enforce useFixedFee attribute as required for all interop calls. This ensures that interop fee is being paid in one way or another.
+        if (!attributeUsed[4]) {
+            revert UseFixedFeeRequired();
         }
     }
 
@@ -507,7 +574,7 @@ contract InteropCenter is
     /// @param _attributeSelector The attribute selector to check.
     /// @return True if the attribute selector is supported, false otherwise.
     function supportsAttribute(bytes4 _attributeSelector) external pure returns (bool) {
-        bytes4[4] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
+        bytes4[5] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
         uint256 attributeSelectorsLength = ATTRIBUTE_SELECTORS.length;
         for (uint256 i = 0; i < attributeSelectorsLength; ++i) {
             if (_attributeSelector == ATTRIBUTE_SELECTORS[i]) {
@@ -519,12 +586,13 @@ contract InteropCenter is
 
     /// @notice Returns the attribute selectors supported by the InteropCenter.
     /// @return The attribute selectors supported by the InteropCenter.
-    function _getERC7786AttributeSelectors() internal pure returns (bytes4[4] memory) {
+    function _getERC7786AttributeSelectors() internal pure returns (bytes4[5] memory) {
         return [
             IERC7786Attributes.interopCallValue.selector,
             IERC7786Attributes.indirectCall.selector,
             IERC7786Attributes.executionAddress.selector,
-            IERC7786Attributes.unbundlerAddress.selector
+            IERC7786Attributes.unbundlerAddress.selector,
+            IERC7786Attributes.useFixedFee.selector
         ];
     }
 
@@ -540,5 +608,18 @@ contract InteropCenter is
     /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Fee Management
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Sets the base token fee per interop bundle (used when useFixedFee=false).
+    /// @dev Can be set to 0 to disable base token fees for users.
+    /// @param _fee New fee amount in base token wei.
+    function setInteropFee(uint256 _fee) external onlyOwner {
+        uint256 oldFee = interopProtocolFee;
+        interopProtocolFee = _fee;
+        emit InteropFeeUpdated(oldFee, _fee);
     }
 }

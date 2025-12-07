@@ -202,9 +202,22 @@ struct CallAttributes {
 
 /// @param executionAddress ERC-7930 Address allowed to execute the bundle on the destination chain. If the byte array is empty then execution is permissionless.
 /// @param unbundlerAddress ERC-7930 Address allowed to unbundle the bundle on the destination chain. Note, that it is required to be nonempty, unlike `executionAddress`.
+/// @param useFixedFee If true, user paid fixed ZK fees instead of base token fees controlled by chain operator. Used for gateway settlement fee handling.
+///                    In more details, any user of interop functionality is able to choose between two fee options:
+///                    - Fixed fee in ZK that is hardcoded in InteropCenter. In this case user must only pay this fee. The value of this fee is only updateable by Gateway's AT owner.
+///                      No gateway settlement fees are charged for this interop operation.
+///                    - Dynamic fee in base token of source chain where the interop is initiated. This value is fully under control of chain operator, he is able to update it at any point in time.
+///                      In this case gateway settlement fees are paid from the chain's dedicated escrow managed by ChainEscrowRegistry contract, to be precise the amount of ZK set by governance in GWAssetTracker contract.
+///                      This escrow system prevents operators from blocking settlements by ensuring fees are paid from pre-funded chain-specific escrows rather than operator addresses directly.
+///                      Without escrow, malicious operators could block all interop settlements (including from users who paid fixed fees) by:
+///                      1) Emptying their ZK token balance before settlement occurs, or
+///                      2) Rotating to new validator addresses with insufficient ZK token funds.
+///                      The escrow system solves this by allowing anyone to deposit ZK tokens into any chain's escrow, ensuring settlement availability even if operators are uncooperative.
+///                      This preserves true permissionlessness: users who paid fixed fees can always have their transactions settled regardless of operator behavior.
 struct BundleAttributes {
     bytes executionAddress;
     bytes unbundlerAddress;
+    bool useFixedFee;
 }
 
 /// @dev A single call.

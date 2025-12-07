@@ -21,6 +21,7 @@ import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAsset
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
 
 contract GWAssetTrackerTestHelper is GWAssetTracker {
+    constructor() GWAssetTracker(address(1), address(2)) {}
     function getEmptyMessageRoot(uint256 _chainId) external returns (bytes32) {
         return _getEmptyMessageRoot(_chainId);
     }

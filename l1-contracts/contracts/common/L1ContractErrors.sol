@@ -17,6 +17,8 @@ error AddressNotZero();
 error AlreadyPermanentRollup();
 // 0x0bfcef28
 error AlreadyWhitelisted(address);
+// 0xf86d5828
+error AlreadyWithdrawnToday(uint256 chainId, uint256 currentDay);
 // 0x5e85ae73
 error AmountMustBeGreaterThanZero();
 // 0xfde974f4
@@ -61,6 +63,8 @@ error CantExecuteUnprovenBatches();
 error CantRevertExecutedBatch();
 // 0x78d2ed02
 error ChainAlreadyLive();
+// 0xfcd46323
+error ChainAlreadyRegistered(uint256 chainId);
 // 0x24591d89
 error ChainIdAlreadyExists();
 // 0x717a1656
@@ -71,6 +75,8 @@ error ChainIdMismatch();
 error ChainIdNotRegistered(uint256 chainId);
 // 0x8f620a06
 error ChainIdTooBig();
+// 0xf25ca59c
+error ChainNotRegistered(uint256 chainId);
 // 0x8746f42f
 error ConstructorsNotSupported();
 // 0xec273439
@@ -144,6 +150,8 @@ error IncorrectBatchChainId(uint256, uint256);
 error IncorrectBridgeHubAddress(address bridgehub);
 // 0x1929b7de
 error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
+// 0x39ff3b10
+error InsufficientEscrowBalance(uint256 requested, uint256 available);
 // 0x9bf8b9aa
 error InvalidBatchNumber(uint256 provided, uint256 expected);
 // 0xcbd9d2e0

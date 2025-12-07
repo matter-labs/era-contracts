@@ -133,7 +133,7 @@ library L2Utils {
         forceDeployWithoutConstructor("InteropCenter", L2_INTEROP_CENTER_ADDR);
         InteropCenter interopCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner);
+        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner, address(3));
     }
 
     function forceDeployInteropHandler(SystemContractsArgs memory _args) internal {
@@ -152,7 +152,7 @@ library L2Utils {
     }
 
     function forceDeployGWAssetTracker(SystemContractsArgs memory _args) internal {
-        new GWAssetTracker();
+        new GWAssetTracker(address(1), address(2));
 
         forceDeployWithoutConstructor("GWAssetTracker", GW_ASSET_TRACKER_ADDR);
     }
