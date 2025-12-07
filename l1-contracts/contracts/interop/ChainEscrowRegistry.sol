@@ -132,7 +132,6 @@ contract ChainEscrowRegistry is IChainEscrowRegistry, ReentrancyGuard, Ownable2S
     }
 
     /// @inheritdoc IChainEscrowRegistry
-    /// @inheritdoc IChainEscrowRegistry
     function getChainEscrow(uint256 chainId) external view returns (ChainEscrow memory escrow) {
         return chainEscrows[chainId];
     }
