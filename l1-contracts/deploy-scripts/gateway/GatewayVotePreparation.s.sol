@@ -74,20 +74,21 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
     function initializeConfig(
         string memory configPath,
+        string memory permanentValuesPath,
         uint256 ctmRepresentativeChainId,
         address bridgehubProxy
     ) internal virtual {
-        super.initializeConfig(configPath);
+        super.initializeConfig(configPath, permanentValuesPath, bridgehubProxy);
         string memory toml = vm.readFile(configPath);
 
         refundRecipient = toml.readAddress("$.refund_recipient");
-
-        eraChainId = toml.readUint("$.era_chain_id");
 
         gatewayChainId = toml.readUint("$.gateway_chain_id");
         forceDeploymentsData = toml.readBytes(".force_deployments_data");
 
         setAddressesBasedOnBridgehub(ctmRepresentativeChainId, bridgehubProxy);
+        // Get eraChainId from AssetRouter
+        eraChainId = AddressIntrospector.getEraChainId(discoveredBridgehub.assetRouter);
 
         address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
@@ -218,8 +219,9 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
         string memory root = vm.projectRoot();
         string memory configPath = string.concat(root, vm.envString("GATEWAY_VOTE_PREPARATION_INPUT"));
+        string memory permanentValuesPath = string.concat(root, "/upgrade-envs/permanent-values/local.toml");
 
-        initializeConfig(configPath, ctmRepresentativeChainId, bridgehubProxy);
+        initializeConfig(configPath, permanentValuesPath, ctmRepresentativeChainId, bridgehubProxy);
         _initializeGatewayGovernanceConfig(
             GatewayGovernanceConfig({
                 bridgehubProxy: discoveredBridgehub.bridgehubProxy,

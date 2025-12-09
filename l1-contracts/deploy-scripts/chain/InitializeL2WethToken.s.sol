@@ -8,6 +8,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Utils} from "../utils/Utils.sol";
+import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {IL1Bridgehub, L2TransactionRequestDirect} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 contract InitializeL2WethTokenScript is Script {
@@ -48,7 +49,12 @@ contract InitializeL2WethTokenScript is Script {
 
         config.create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
         config.create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
-        config.eraChainId = toml.readUint("$.era_chain_id");
+
+        // Use AddressIntrospector to get addresses from deployed contracts
+        AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
+            IL1Bridgehub(bridgehubProxyAddr)
+        );
+        config.eraChainId = AddressIntrospector.getEraChainId(bhAddresses.assetRouter);
         config.bridgehubProxyAddr = bridgehubProxyAddr;
 
         // Parse some config from output of erc20 tokens deployment

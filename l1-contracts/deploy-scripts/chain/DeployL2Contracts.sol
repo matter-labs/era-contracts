@@ -6,8 +6,10 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "../utils/Utils.sol";
+import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
@@ -129,13 +131,19 @@ contract DeployL2Script is Script {
         string memory toml = vm.readFile(path);
         config.bridgehubAddress = bridgehubAddress;
         config.governance = toml.readAddress("$.governance");
-        config.l1SharedBridgeProxy = toml.readAddress("$.l1_shared_bridge");
-        config.erc20BridgeProxy = toml.readAddress("$.erc20_bridge");
+
+        // Use AddressIntrospector to get addresses from deployed contracts
+        AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
+            IL1Bridgehub(bridgehubAddress)
+        );
+        config.l1SharedBridgeProxy = bhAddresses.assetRouter;
+        config.erc20BridgeProxy = AddressIntrospector.getLegacyBridgeAddress(bhAddresses.assetRouter);
+        config.eraChainId = AddressIntrospector.getEraChainId(bhAddresses.assetRouter);
+
         config.consensusRegistryOwner = toml.readAddress("$.consensus_registry_owner");
         //config.chainRegistrar = toml.readAddress("$.chain_registrar");
         //config.proposalAuthor = toml.readAddress("$.proposal_author");
         config.chainId = chainId;
-        config.eraChainId = toml.readUint("$.era_chain_id");
 
         uint256 validatorTypeUint = toml.readUint("$.da_validator_type");
         require(validatorTypeUint < 3, "Invalid DA validator type");

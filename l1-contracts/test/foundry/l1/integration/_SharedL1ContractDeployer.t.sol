@@ -64,6 +64,10 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         vm.setEnv("CTM_CONFIG", "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm.toml");
         vm.setEnv("CTM_OUTPUT", "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-ctm.toml");
         vm.setEnv(
+            "PERMANENT_VALUES_INPUT",
+            "/test/foundry/l1/integration/deploy-scripts/script-config/permanent-values.toml"
+        );
+        vm.setEnv(
             "ZK_CHAIN_CONFIG",
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-era.toml"
         );

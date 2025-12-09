@@ -16,6 +16,7 @@ import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {Utils} from "../utils/Utils.sol";
+import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_MESSAGE_ROOT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 library AddressIntrospector {
     struct BridgehubAddresses {
@@ -82,6 +83,13 @@ library AddressIntrospector {
     }
 
     function getBridgehubAddresses(IL1Bridgehub _bridgehub) public view returns (BridgehubAddresses memory info) {
+        if (address(_bridgehub) == L2_BRIDGEHUB_ADDR) {
+            return getL2BridgehubAddresses();
+        }
+        return getL1BridgehubAddress(_bridgehub);
+    }
+
+    function getL1BridgehubAddress(IL1Bridgehub _bridgehub) public view returns (BridgehubAddresses memory info) {
         info.bridgehubProxy = address(_bridgehub);
         info.assetRouter = address(_bridgehub.assetRouter());
         info.messageRoot = address(_bridgehub.messageRoot());
@@ -91,6 +99,19 @@ library AddressIntrospector {
         if (info.assetRouter != address(0)) {
             info.assetRouterAddresses = getAssetRouterAddresses(IL1AssetRouter(info.assetRouter));
         }
+        info.governance = IOwnable(info.bridgehubProxy).owner();
+        info.transparentProxyAdmin = Utils.getProxyAdmin(info.bridgehubProxy);
+    }
+
+    function getL2BridgehubAddresses() public view returns (BridgehubAddresses memory info) {
+        info.bridgehubProxy = L2_BRIDGEHUB_ADDR;
+        info.assetRouter = L2_ASSET_ROUTER_ADDR;
+        info.messageRoot = L2_MESSAGE_ROOT_ADDR;
+        IL1Bridgehub _bridgehub = IL1Bridgehub(L2_BRIDGEHUB_ADDR);
+        info.l1CtmDeployer = address(_bridgehub.l1CtmDeployer());
+        info.admin = address(_bridgehub.admin());
+        info.chainAssetHandler = _bridgehub.chainAssetHandler();
+        // Note: We don't call getAssetRouterAddresses for L2 since L2AssetRouter doesn't have L1-specific methods
         info.governance = IOwnable(info.bridgehubProxy).owner();
         info.transparentProxyAdmin = Utils.getProxyAdmin(info.bridgehubProxy);
     }
@@ -153,6 +174,10 @@ library AddressIntrospector {
         info.l2Bridge = bridge.l2Bridge();
         info.eraChainId = bridge.ERA_CHAIN_ID();
         info.l2TokenProxyBytecodeHash = bridge.l2TokenProxyBytecodeHash();
+    }
+
+    function getEraChainId(address _assetRouter) public view returns (uint256 eraChainId) {
+        return IL1AssetRouter(_assetRouter).ERA_CHAIN_ID();
     }
 
     function getBaseTokenRoute(

@@ -134,6 +134,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
         updateOwners();
 
         saveOutput(outputPath);
+        preparePermanentValues(outputPath);
     }
 
     function setBridgehubParams() internal {
@@ -305,38 +306,30 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
         vm.writeToml(toml, outputPath);
     }
 
-    /// todo create permanentValues toml here.
-    // function preparePermanentValues() internal {
-    //     string memory root = vm.projectRoot();
-    //     string memory permanentValuesInputPath = string.concat(root, PERMANENT_VALUES_INPUT);
-    //     string memory outputDeployL1Toml = vm.readFile(string.concat(root, ECOSYSTEM_INPUT));
-    //     string memory outputDeployCTMToml = vm.readFile(string.concat(root, CTM_INPUT));
+    function preparePermanentValues(string memory outputPath) internal virtual {
+        // Read from the output file we just created
+        string memory outputDeployL1Toml = vm.readFile(outputPath);
 
-    //     bytes32 create2FactorySalt = outputDeployL1Toml.readBytes32("$.contracts.create2_factory_salt");
-    //     address create2FactoryAddr;
-    //     if (vm.keyExistsToml(outputDeployL1Toml, "$.contracts.create2_factory_addr")) {
-    //         create2FactoryAddr = outputDeployL1Toml.readAddress("$.contracts.create2_factory_addr");
-    //     }
-    //     address ctm = outputDeployCTMToml.readAddress(
-    //         "$.deployed_addresses.state_transition.state_transition_proxy_addr"
-    //     );
-    //     address bytecodesSupplier = outputDeployCTMToml.readAddress(
-    //         "$.deployed_addresses.state_transition.bytecodes_supplier_addr"
-    //     );
-    //     address l1Bridgehub = outputDeployL1Toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
-    //     address rollupDAManager = outputDeployCTMToml.readAddress("$.deployed_addresses.l1_rollup_da_manager");
-    //     uint256 eraChainId = outputDeployL1Toml.readUint("$.era_chain_id");
+        address create2FactoryAddr;
+        if (vm.keyExistsToml(outputDeployL1Toml, "$.contracts.create2_factory_addr")) {
+            create2FactoryAddr = outputDeployL1Toml.readAddress("$.contracts.create2_factory_addr");
+        }
 
-    //     vm.serializeString("contracts", "create2_factory_salt", vm.toString(create2FactorySalt));
-    //     vm.serializeAddress("contracts", "create2_factory_addr", create2FactoryAddr);
-    //     vm.serializeAddress("contracts", "ctm_proxy_address", ctm);
-    //     vm.serializeAddress("contracts", "bridgehub_proxy_address", l1Bridgehub);
-    //     vm.serializeAddress("contracts", "rollup_da_manager", rollupDAManager);
-    //     string memory contracts = vm.serializeAddress("contracts", "l1_bytecodes_supplier_addr", bytecodesSupplier);
-    //     vm.serializeString("root", "contracts", contracts);
-    //     string memory permanentValuesToml = vm.serializeUint("root", "era_chain_id", eraChainId);
-    //     vm.writeToml(permanentValuesToml, permanentValuesInputPath);
-    // }
+        // Determine the permanent values path
+        string memory permanentValuesPath = getPermanentValuesPath();
+
+        // Only update if create2FactoryAddr is non-zero
+        if (create2FactoryAddr != address(0)) {
+            vm.writeToml(vm.toString(create2FactoryAddr), permanentValuesPath, ".contracts.create2_factory_addr");
+            console.log("Updated permanent values at:", permanentValuesPath);
+            console.log("create2_factory_addr:", create2FactoryAddr);
+        }
+    }
+
+    function getPermanentValuesPath() internal view virtual returns (string memory) {
+        string memory root = vm.projectRoot();
+        return string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
+    }
 
     // add this to be excluded from coverage report
     function test() internal virtual override {}

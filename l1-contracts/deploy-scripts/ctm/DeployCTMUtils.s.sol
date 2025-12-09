@@ -129,8 +129,13 @@ abstract contract DeployCTMUtils is DeployUtils {
         addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
-    function initializeConfig(string memory configPath) internal virtual {
+    function initializeConfig(
+        string memory configPath,
+        string memory permanentValuesPath,
+        address bridgehubAddress
+    ) internal virtual {
         string memory toml = vm.readFile(configPath);
+        string memory permanentToml = vm.readFile(permanentValuesPath);
 
         config.l1ChainId = block.chainid;
         config.deployerAddress = msg.sender;
@@ -140,15 +145,23 @@ abstract contract DeployCTMUtils is DeployUtils {
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
-        config.eraChainId = toml.readUint("$.era_chain_id");
+
+        // Get eraChainId from AssetRouter via AddressIntrospector
+        AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
+            IL1Bridgehub(bridgehubAddress)
+        );
+        config.eraChainId = AddressIntrospector.getEraChainId(bhAddresses.assetRouter);
+
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
         if (toml.keyExists("$.is_zk_sync_os")) {
             config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
         }
-        bytes32 create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
+
+        // Read create2Factory values from permanent values file
+        bytes32 create2FactorySalt = permanentToml.readBytes32("$.contracts.create2_factory_salt");
         address create2FactoryAddr;
-        if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
+        if (vm.keyExistsToml(permanentToml, "$.contracts.create2_factory_addr")) {
+            create2FactoryAddr = permanentToml.readAddress("$.contracts.create2_factory_addr");
         }
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(

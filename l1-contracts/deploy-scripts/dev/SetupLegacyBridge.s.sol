@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Utils} from "./../Utils.sol";
+import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {DummyL1ERC20Bridge} from "contracts/dev-contracts/DummyL1ERC20Bridge.sol";
@@ -59,12 +60,18 @@ contract SetupLegacyBridge is Script {
         string memory toml = vm.readFile(path);
 
         addresses.bridgehub = bridgehub;
+
+        // Use AddressIntrospector to get addresses from deployed contracts
+        AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
+            IL1Bridgehub(bridgehub)
+        );
+        addresses.l1Nullifier = bhAddresses.assetRouterAddresses.l1Nullifier;
+        addresses.sharedBridgeProxy = bhAddresses.assetRouter;
+        addresses.erc20BridgeProxy = AddressIntrospector.getLegacyBridgeAddress(bhAddresses.assetRouter);
+
         addresses.diamondProxy = toml.readAddress("$.diamond_proxy");
-        addresses.l1Nullifier = toml.readAddress("$.l1_nullifier_proxy");
-        addresses.sharedBridgeProxy = toml.readAddress("$.shared_bridge_proxy");
         addresses.l1NativeTokenVault = toml.readAddress("$.l1_native_token_vault");
         addresses.transparentProxyAdmin = toml.readAddress("$.transparent_proxy_admin");
-        addresses.erc20BridgeProxy = toml.readAddress("$.erc20bridge_proxy");
         addresses.tokenWethAddress = toml.readAddress("$.token_weth_address");
         addresses.create2FactoryAddr = toml.readAddress("$.create2factory_addr");
         config.chainId = chainId;

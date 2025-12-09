@@ -6,6 +6,8 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "../utils/Utils.sol";
+import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 contract DeployPaymaster is Script {
     using stdToml for string;
@@ -24,7 +26,13 @@ contract DeployPaymaster is Script {
         string memory path = string.concat(root, "/script-config/config-deploy-paymaster.toml");
         string memory toml = vm.readFile(path);
         config.bridgehubAddress = bridgehubAddress;
-        config.l1SharedBridgeProxy = toml.readAddress("$.l1_shared_bridge");
+
+        // Use AddressIntrospector to get addresses from deployed contracts
+        AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
+            IL1Bridgehub(bridgehubAddress)
+        );
+        config.l1SharedBridgeProxy = bhAddresses.assetRouter;
+
         config.chainId = chainId;
     }
 
