@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {L1_MESSENGER_HOOK, IL1Messenger} from "./L2ContractHelper.sol";
-import {L1MessengerHookFailed} from "./errors/L2ContractErrors.sol";
+import {L1MessengerHookFailed, NotEnoughGasSupplied} from "./errors/L2ContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -19,12 +19,51 @@ import {L1MessengerHookFailed} from "./errors/L2ContractErrors.sol";
  * it requires that the preimage of `value` be provided.
  */
 contract L1Messenger is IL1Messenger {
+    uint256 private constant SHA3 = 30;
+    uint256 private constant SHA3WORD = 6;
+    uint256 private constant LOG = 375;
+    uint256 private constant LOGDATA = 8;
+    uint256 private constant L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
+
+    function ceilDiv(uint256 x, uint256 y) internal pure returns (uint256) {
+        return (x + y - 1) / y;
+    }
+
+    /// @dev Exact Solidity equivalent of `keccak256_ergs_cost(len) / ERGS_PER_GAS` in ZKsync OS
+    function gasKeccak(uint256 len) internal pure returns (uint256) {
+        uint256 words = ceilDiv(len, 32);
+        return SHA3 + SHA3WORD * words;
+    }
+
+    /// @dev Exact Solidity equivalent of l1_message_ergs_cost / ERGS_PER_GAS in ZKsync OS
+    function estimateL1MessageGas(uint256 messageLen) internal pure returns (uint256) {
+        uint256 hashing = gasKeccak(L2_TO_L1_LOG_SERIALIZE_SIZE) + gasKeccak(64) * 3 + gasKeccak(messageLen);
+
+        uint256 logCost = LOG + LOGDATA * messageLen;
+
+        return hashing + logCost;
+    }
+
+    function burnGas(bytes calldata _message) internal {
+        uint256 gasToBurn = estimateL1MessageGas(_message.length);
+
+        uint256 endGas = gasleft() - gasToBurn;
+        require(endGas > 0, NotEnoughGasSupplied());
+
+        while (gasleft() > endGas) {
+            // Empty
+        }
+    }
+
     /// @notice Public functionality to send messages to L1.
     /// @param _message The message intended to be sent to L1.
     function sendToL1(bytes calldata _message) external returns (bytes32 hash) {
+        // As a first step we burn the respective amount of gas, which is the explicit cost of sending L2->L1 message.
+        burnGas(_message);
+
         // Call system hook at the known system address.
         // Calldata to the hook is exactly `message`.
-        (bool ok, ) = L1_MESSENGER_HOOK.call(abi.encode(msg.sender, _message));
+        (bool ok, ) = L1_MESSENGER_HOOK.call(abi.encodePacked(msg.sender, _message));
         if (!ok) {
             revert L1MessengerHookFailed();
         }
