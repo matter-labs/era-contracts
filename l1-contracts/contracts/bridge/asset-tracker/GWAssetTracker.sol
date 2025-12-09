@@ -167,7 +167,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         );
 
         _registerToken(_balanceChange.assetId, _balanceChange.originToken, _balanceChange.tokenOriginChainId);
-        // _registerToken(_balanceChange.baseTokenAssetId, _balanceChange.originToken, _balanceChange.tokenOriginChainId); // TODO: should we do this
 
         /// A malicious chain can cause a collision for the canonical tx hash.
         require(balanceChange[_chainId][_canonicalTxHash].version == 0, InvalidCanonicalTxHash(_canonicalTxHash));
