@@ -75,8 +75,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     function initializeConfig(
         string memory configPath,
         string memory permanentValuesPath,
-        uint256 ctmRepresentativeChainId,
-        address bridgehubProxy
+        address bridgehubProxy,
+        uint256 ctmRepresentativeChainId
     ) internal virtual {
         super.initializeConfig(configPath, permanentValuesPath, bridgehubProxy);
         string memory toml = vm.readFile(configPath);
@@ -203,8 +203,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         });
     }
 
-    function run() public {
-        prepareForGWVoting(0);
+    function run(address bridgehubProxy, uint256 ctmRepresentativeChainId) public {
+        prepareForGWVoting(bridgehubProxy, ctmRepresentativeChainId);
     }
 
     function deployServerNotifier() internal returns (address implementation, address proxy) {
@@ -214,14 +214,14 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin, false);
     }
 
-    function prepareForGWVoting(uint256 ctmRepresentativeChainId, address bridgehubProxy) public {
+    function prepareForGWVoting(address bridgehubProxy, uint256 ctmRepresentativeChainId) public {
         console.log("Setting up the Gateway script");
 
         string memory root = vm.projectRoot();
         string memory configPath = string.concat(root, vm.envString("GATEWAY_VOTE_PREPARATION_INPUT"));
         string memory permanentValuesPath = string.concat(root, "/upgrade-envs/permanent-values/local.toml");
 
-        initializeConfig(configPath, permanentValuesPath, ctmRepresentativeChainId, bridgehubProxy);
+        initializeConfig(configPath, permanentValuesPath, bridgehubProxy, ctmRepresentativeChainId);
         _initializeGatewayGovernanceConfig(
             GatewayGovernanceConfig({
                 bridgehubProxy: discoveredBridgehub.bridgehubProxy,
