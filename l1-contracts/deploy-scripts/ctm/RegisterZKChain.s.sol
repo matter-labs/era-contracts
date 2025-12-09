@@ -206,8 +206,13 @@ contract RegisterZKChainScript is Script {
         config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
 
         config.governance = ctmAddresses.governance;
-        config.create2FactoryAddress = toml.readAddress("$.contracts.create2_factory_addr");
-        config.create2Salt = toml.readBytes32("$.contracts.create2_factory_salt");
+
+        // Read create2 factory values from permanent values file
+        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
+        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
+        config.create2FactoryAddress = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
+        config.create2Salt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
+
         config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
     }
 
@@ -249,8 +254,12 @@ contract RegisterZKChainScript is Script {
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
 
         config.governance = ctmAddresses.governance;
-        config.create2FactoryAddress = toml.readAddress("$.contracts.create2_factory_addr");
-        config.create2Salt = toml.readBytes32("$.contracts.create2_factory_salt");
+
+        // Read create2 factory values from permanent values file
+        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
+        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
+        config.create2FactoryAddress = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
+        config.create2Salt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
 
         path = string.concat(root, vm.envString("ZK_CHAIN_CONFIG"));
         toml = vm.readFile(path);

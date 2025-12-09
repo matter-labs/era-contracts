@@ -67,12 +67,16 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils {
         string memory configPath = string.concat(root, vm.envString("DEPLOY_GATEWAY_TX_FILTERER_INPUT"));
         string memory toml = vm.readFile(configPath);
 
+        // Read create2 factory values from permanent values file
+        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
+        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
+
         address proxy = run(
             toml.readAddress("$.bridgehub_proxy_addr"),
             toml.readAddress("$.chain_admin"),
             toml.readAddress("$.chain_proxy_admin"),
-            toml.readAddress("$.contracts.create2_factory_addr"),
-            toml.readBytes32("$.contracts.create2_factory_salt")
+            permanentValuesToml.readAddress("$.contracts.create2_factory_addr"),
+            permanentValuesToml.readBytes32("$.contracts.create2_factory_salt")
         );
 
         // Save the address of the deployed proxy into an output TOML file.

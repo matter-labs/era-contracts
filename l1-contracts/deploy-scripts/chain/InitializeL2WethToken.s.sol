@@ -44,11 +44,12 @@ contract InitializeL2WethTokenScript is Script {
 
         // Parse some config from output of l1 deployment
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, vm.envString("L1_OUTPUT"));
-        string memory toml = vm.readFile(path);
 
-        config.create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
-        config.create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
+        // Read create2 factory values from permanent values file
+        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
+        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
+        config.create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
+        config.create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
 
         // Use AddressIntrospector to get addresses from deployed contracts
         AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
