@@ -96,7 +96,8 @@
     "size": "hardhat size-contracts",
     "errors-lint": "ts-node scripts/errors-lint.ts",
     "selectors": "ts-node scripts/selectors.ts",
-    "zksync-os-genesis": "ts-node scripts/zksync-os-genesis.ts"
+    "zksync-os-genesis": "ts-node scripts/zksync-os-genesis.ts",
+    "write-factory-deps-zksync-os": "ts-node scripts/write-factory-deps-zksync-os.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3",
