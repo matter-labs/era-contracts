@@ -1,5 +1,4 @@
 * @vladbochok @StanislavBreadless
 l1-contracts/deploy-scripts @Deniallugo
 l1-contracts/deploy-script-config-template @Deniallugo
-.solhint.json @matter-labs/security-reviewer
-.solhintignore @matter-labs/security-reviewer
+.solhint.json .solhintignore @nikitastupin-matterlabs
