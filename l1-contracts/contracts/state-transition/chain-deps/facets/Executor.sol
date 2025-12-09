@@ -37,7 +37,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     /// @inheritdoc IZKChainBase
     // solhint-disable-next-line const-name-snakecase
-    string public constant override getName = "ExecutorFacet"; 
+    string public constant override getName = "ExecutorFacet";
 
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
