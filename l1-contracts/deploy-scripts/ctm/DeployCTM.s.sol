@@ -58,11 +58,12 @@ import {Config, CTMDeployedAddresses, DeployCTMUtils} from "./DeployCTMUtils.s.s
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IDeployCTM} from "contracts/script-interfaces/IDeployCTM.sol";
 
 // TODO: pass this value from zkstack_cli
 uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 3;
 
-contract DeployCTMScript is Script, DeployCTMUtils {
+contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     using stdToml for string;
 
     function run() public virtual {

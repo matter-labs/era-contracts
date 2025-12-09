@@ -51,7 +51,10 @@ abstract contract Create2FactoryUtils is Script {
 
         if (isConfigured) {
             if (create2FactoryParams.factoryAddress.code.length == 0) {
-                revert AddressHasNoCode(create2FactoryParams.factoryAddress);
+                deployedAddress = Utils.deployCreate2Factory();
+                if (create2FactoryParams.factoryAddress.code.length == 0) {
+                    revert AddressHasNoCode(create2FactoryParams.factoryAddress);
+                }
             }
             deployedAddress = create2FactoryParams.factoryAddress;
             console.log("Using configured Create2Factory address:", deployedAddress);

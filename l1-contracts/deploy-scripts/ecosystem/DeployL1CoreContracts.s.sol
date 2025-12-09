@@ -34,8 +34,9 @@ import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.so
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
 import {Config, CoreDeployedAddresses, DeployL1CoreUtils} from "./DeployL1CoreUtils.s.sol";
+import {IDeployL1CoreContracts} from "contracts/script-interfaces/IDeployL1CoreContracts.sol";
 
-contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
+contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1CoreContracts {
     using stdToml for string;
 
     function run() public virtual {

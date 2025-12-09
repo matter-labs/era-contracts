@@ -59,19 +59,19 @@ contract DeployErc20Script is Script {
 
         string memory root = vm.projectRoot();
 
-        // Grab config from output of l1 deployment
-        string memory path = string.concat(root, vm.envString("CTM_OUTPUT"));
-        string memory toml = vm.readFile(path);
+        // Read create2 factory values from permanent values file
+        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
+        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
 
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
-        config.create2FactoryAddr = vm.parseTomlAddress(toml, "$.contracts.create2_factory_addr");
-        config.create2FactorySalt = vm.parseTomlBytes32(toml, "$.contracts.create2_factory_salt");
+        config.create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
+        config.create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
 
         // Grab config from custom config file
-        path = string.concat(root, vm.envString("TOKENS_CONFIG"));
-        toml = vm.readFile(path);
+        string memory path = string.concat(root, vm.envString("TOKENS_CONFIG"));
+        string memory toml = vm.readFile(path);
         config.additionalAddressesForMinting = vm.parseTomlAddressArray(toml, "$.additional_addresses_for_minting");
 
         string[] memory tokens = vm.parseTomlKeys(toml, "$.tokens");

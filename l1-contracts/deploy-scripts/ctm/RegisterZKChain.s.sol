@@ -41,44 +41,9 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Create2AndTransfer} from "../utils/deploy/Create2AndTransfer.sol";
 import {ZkChainAddresses} from "../utils/Types.sol";
 import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
+import {IRegisterZKChain, RegisterZKChainConfig} from "contracts/script-interfaces/IRegisterZKChain.sol";
 
-// solhint-disable-next-line gas-struct-packing
-struct Config {
-    address deployerAddress;
-    address ownerAddress;
-    uint256 chainChainId;
-    bool validiumMode;
-    uint256 bridgehubCreateNewChainSalt;
-    address validatorSenderOperatorEth;
-    address validatorSenderOperatorBlobsEth;
-    // optional - if not set, then equal to 0
-    address validatorSenderOperatorProve;
-    // optional - if not set, then equal to 0
-    address validatorSenderOperatorExecute;
-    address baseToken;
-    bytes32 baseTokenAssetId;
-    uint128 baseTokenGasPriceMultiplierNominator;
-    uint128 baseTokenGasPriceMultiplierDenominator;
-    address bridgehub;
-    // TODO(EVM-744): maybe rename to asset router
-    address sharedBridgeProxy;
-    address nativeTokenVault;
-    address chainTypeManagerProxy;
-    address validatorTimelock;
-    bytes diamondCutData;
-    bytes forceDeployments;
-    address governanceSecurityCouncilAddress;
-    uint256 governanceMinDelay;
-    address l1Nullifier;
-    address l1Erc20Bridge;
-    bool initializeLegacyBridge;
-    address governance;
-    address create2FactoryAddress;
-    bytes32 create2Salt;
-    bool allowEvmEmulator;
-}
-
-contract RegisterZKChainScript is Script {
+contract RegisterZKChainScript is Script, IRegisterZKChain {
     using stdToml for string;
 
     bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewZKChain(uint256,address)");
@@ -92,7 +57,7 @@ contract RegisterZKChainScript is Script {
 
     LegacySharedBridgeParams internal legacySharedBridgeParams;
 
-    Config internal config;
+    RegisterZKChainConfig internal config;
     ZkChainAddresses internal output;
 
     function run(address _bridgehub, address _chainTypeManagerProxy, uint256 _chainChainId) public {
@@ -216,7 +181,7 @@ contract RegisterZKChainScript is Script {
         config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
     }
 
-    function getConfig() public view returns (Config memory) {
+    function getConfig() public view returns (RegisterZKChainConfig memory) {
         return config;
     }
 
