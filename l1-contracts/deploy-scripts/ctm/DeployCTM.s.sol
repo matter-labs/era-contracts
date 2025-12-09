@@ -60,7 +60,7 @@ import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2G
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 // TODO: pass this value from zkstack_cli
-uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 3;
+uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 5;
 
 contract DeployCTMScript is Script, DeployCTMUtils {
     using stdToml for string;
@@ -201,12 +201,14 @@ contract DeployCTMScript is Script, DeployCTMUtils {
 
         if (config.isZKsyncOS) {
             // We add the verifier to the default execution version
-            vm.broadcast(msg.sender);
+            vm.startBroadcast(msg.sender);
             ZKsyncOSDualVerifier(addresses.stateTransition.verifier).addVerifier(
                 DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
                 IVerifierV2(addresses.stateTransition.verifierFflonk),
                 IVerifier(addresses.stateTransition.verifierPlonk)
             );
+            ZKsyncOSDualVerifier(addresses.stateTransition.verifier).transferOwnership(config.ownerAddress);
+            vm.stopBroadcast();
         }
     }
 
@@ -285,6 +287,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
             ZKsyncOSDualVerifier(addresses.stateTransition.verifier).transferOwnership(addresses.governance);
         }
 
+        IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
         vm.stopBroadcast();
         console.log("Owners updated");
     }
@@ -354,6 +357,13 @@ contract DeployCTMScript is Script, DeployCTMUtils {
             "no_da_validium_l1_validator_addr",
             addresses.daAddresses.noDAValidiumL1DAValidator
         );
+        if (config.isZKsyncOS) {
+            vm.serializeAddress(
+                "deployed_addresses",
+                "blobs_zksync_os_l1_da_validator_addr",
+                addresses.daAddresses.l1BlobsDAValidatorZKsyncOS
+            );
+        }
         vm.serializeAddress(
             "deployed_addresses",
             "avail_l1_da_validator_addr",

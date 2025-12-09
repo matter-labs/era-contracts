@@ -33,6 +33,7 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 
 import {FixedForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {ZKSyncOSBytecodeInfo} from "../common/libraries/ZKSyncOSBytecodeInfo.sol";
 
 /// @title L2GenesisForceDeploymentsHelper
 /// @author Matter Labs
@@ -77,14 +78,37 @@ library L2GenesisForceDeploymentsHelper {
         unsafeForceDeployZKsyncOS(_bytecodeInfo, _newAddress);
     }
 
+    /// @notice A random address in the user space derived from the bytecode info.
+    /// @dev The first 32 bytes of the preimage are 0s to ensure that the address will never collide with neither create nor create2.
+    /// This is the case, since for both create and create2 the preimage for hash starts with a non-zero byte.
+    function generateRandomAddress(bytes memory _bytecodeInfo) internal view returns (address) {
+        return address(uint160(uint256(keccak256(bytes.concat(bytes32(0), _bytecodeInfo)))));
+    }
+
     function updateZKsyncOSContract(bytes memory _bytecodeInfo, address _newAddress) internal {
         (bytes memory bytecodeInfo, bytes memory bytecodeInfoSystemProxy) = abi.decode((_bytecodeInfo), (bytes, bytes));
 
-        // The address to force deploy the implementation to.
-        // The first 32 bytes are 0s to ensure that the address will never collide with neither create nor create2.
-        // This is the case, since for both create and create2 the preimage for hash starts with a non-zero byte.
-        address implAddress = address(uint160(uint256(keccak256(bytes.concat(bytes32(0), bytecodeInfo)))));
-        forceDeployOnAddressZKsyncOS(bytecodeInfo, implAddress);
+        address implAddress = generateRandomAddress(bytecodeInfo);
+        // We need to allow not force deploying in to make upgrades simpler in case the bytecode has not changed.
+        if (implAddress.code.length == 0) {
+            forceDeployOnAddressZKsyncOS(bytecodeInfo, implAddress);
+        } else {
+            // Note, that we can not just assume the correct bytecode. Even though due to a new address derivation,
+            // the chances of this contract having a non-empty code that is not being the expected one,
+            // are extremely low, but non-zero (in case a malicious person controls both the correct source code and the malicious one,
+            // they can perform a birthday attack). So we need to ensure that the code matches.
+            bytes32 currentCodeHash;
+            assembly {
+                currentCodeHash := extcodehash(implAddress)
+            }
+
+            // slither-disable-next-line unused-return
+            (, , bytes32 expectedCodeHash) = ZKSyncOSBytecodeInfo.decodeZKSyncOSBytecodeInfo(bytecodeInfo);
+
+            if (currentCodeHash != expectedCodeHash) {
+                revert ZKsyncOSNotForceDeployForExistingContract(implAddress);
+            }
+        }
 
         // If the address does not have any bytecode, we expect that it is a proxy
         if (_newAddress.code.length == 0) {
@@ -455,6 +479,7 @@ library L2GenesisForceDeploymentsHelper {
         );
 
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy{salt: bytes32(0)}(
+            // We could've deployed the implementation, but we keep it predeployed for consistency purposes with Era.
             L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
             _aliasedL1Governance,
             initData

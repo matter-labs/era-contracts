@@ -71,6 +71,8 @@ error ChainIdMismatch();
 error ChainIdNotRegistered(uint256 chainId);
 // 0x8f620a06
 error ChainIdTooBig();
+// 0x5e361ef9
+error ChainRequiresValidatorsSignaturesForCommit();
 // 0x8746f42f
 error ConstructorsNotSupported();
 // 0xec273439
@@ -146,6 +148,8 @@ error IncorrectBridgeHubAddress(address bridgehub);
 error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
 // 0x9bf8b9aa
 error InvalidBatchNumber(uint256 provided, uint256 expected);
+// 0xd438e1fa
+error InvalidBlockRange(uint64 batchNumber, uint64 from, uint64 to);
 // 0xcbd9d2e0
 error InvalidCaller(address);
 // 0x7a47c9a2
@@ -184,6 +188,8 @@ error InvalidPubdataPricingMode();
 error InvalidSelector(bytes4 func);
 // 0xbe7193d4
 error InvalidSystemLogsLength();
+// 0x7b7a98f1
+error InvalidThreshold(uint256 max, uint256 got);
 // 0x5f1aa154
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xfb5c22e6
@@ -250,6 +256,8 @@ error NoLegacySharedBridge();
 error NonEmptyCalldata();
 // 0x536ec84b
 error NonEmptyMsgValue();
+// 0x230f9d11
+error NotEnoughSigners(uint256 provided, uint256 expected);
 // 0xd018e08e
 error NonIncreasingTimestamp();
 // 0x0105f9c0
@@ -334,6 +342,14 @@ error SettlementLayersMustSettleOnL1();
 error SharedBridgeNotSet();
 // 0x7774d2f9
 error SharedBridgeValueNotSet(SharedBridgeKey);
+// 0xa665a34d
+error SignaturesLengthMismatch(uint256 expected, uint256 actual);
+// 0xa7781cbb
+error SignersNotSorted();
+// 0x3b94fe24
+error SignerNotAuthorized(address signer);
+// 0xabdc734e
+error SignatureNotValid(address signer);
 // 0xdf3a8fdd
 error SlotOccupied();
 // 0xcc0f168b
