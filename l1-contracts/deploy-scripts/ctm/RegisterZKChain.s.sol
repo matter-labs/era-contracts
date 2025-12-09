@@ -164,7 +164,7 @@ contract RegisterZKChainScript is Script {
             ChainTypeManagerBase(chainTypeManagerProxy)
         );
 
-        config.validatorTimelock = ctmAddresses.legacyValidatorTimelock;
+        config.validatorTimelock = ctmAddresses.validatorTimelockPostV29;
         config.nativeTokenVault = bhAddresses.assetRouterAddresses.nativeTokenVault;
         config.sharedBridgeProxy = bhAddresses.assetRouter;
         config.l1Nullifier = bhAddresses.assetRouterAddresses.l1Nullifier;
@@ -238,7 +238,7 @@ contract RegisterZKChainScript is Script {
             ChainTypeManagerBase(chainTypeManagerProxy)
         );
 
-        config.validatorTimelock = ctmAddresses.legacyValidatorTimelock;
+        config.validatorTimelock = ctmAddresses.validatorTimelockPostV29;
         config.nativeTokenVault = bhAddresses.assetRouterAddresses.nativeTokenVault;
         config.sharedBridgeProxy = bhAddresses.assetRouter;
         config.l1Nullifier = bhAddresses.assetRouterAddresses.l1Nullifier;
