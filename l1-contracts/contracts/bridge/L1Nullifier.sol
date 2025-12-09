@@ -42,7 +42,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     IL1Bridgehub public immutable override BRIDGE_HUB;
 
     /// @dev Era's chainID
-    uint256 internal immutable ERA_CHAIN_ID;
+    uint256 public immutable ERA_CHAIN_ID;
 
     /// @dev The address of ZKsync Era diamond proxy contract.
     address internal immutable ERA_DIAMOND_PROXY;

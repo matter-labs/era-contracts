@@ -173,10 +173,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         uint256 nonce = getProtocolUpgradeNonce(chainCreationParams.latestProtocolVersion);
         ProposedUpgrade memory proposedUpgrade;
         if (isPatchUpgrade(chainCreationParams.latestProtocolVersion)) {
-            proposedUpgrade = getProposedPatchUpgrade(
-                stateTransition,
-                chainCreationParams.latestProtocolVersion
-            );
+            proposedUpgrade = getProposedPatchUpgrade(stateTransition, chainCreationParams.latestProtocolVersion);
         } else {
             proposedUpgrade = getProposedUpgrade(
                 stateTransition,
