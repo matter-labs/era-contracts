@@ -33,9 +33,9 @@ contract UpgradeIntegrationTest_Local is
 
         ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.31.0-interopB/local.toml";
         ECOSYSTEM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml";
-        ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/local.toml";
+        ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/local-core.toml";
         CTM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-ctm.toml";
-        CTM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/local.toml";
+        CTM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/local-ctm.toml";
         CHAIN_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml";
         CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/local-gateway.toml";
 

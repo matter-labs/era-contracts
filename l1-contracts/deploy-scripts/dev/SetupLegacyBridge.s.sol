@@ -67,15 +67,21 @@ contract SetupLegacyBridge is Script {
         );
         addresses.l1Nullifier = bhAddresses.assetRouterAddresses.l1Nullifier;
         addresses.sharedBridgeProxy = bhAddresses.assetRouter;
+        addresses.l1NativeTokenVault = bhAddresses.assetRouterAddresses.nativeTokenVault;
+        addresses.transparentProxyAdmin = bhAddresses.transparentProxyAdmin;
+        addresses.tokenWethAddress = bhAddresses.assetRouterAddresses.l1WethToken;
         addresses.erc20BridgeProxy = AddressIntrospector.getLegacyBridgeAddress(bhAddresses.assetRouter);
 
+        // Chain-specific configuration
         addresses.diamondProxy = toml.readAddress("$.diamond_proxy");
-        addresses.l1NativeTokenVault = toml.readAddress("$.l1_native_token_vault");
-        addresses.transparentProxyAdmin = toml.readAddress("$.transparent_proxy_admin");
-        addresses.tokenWethAddress = toml.readAddress("$.token_weth_address");
-        addresses.create2FactoryAddr = toml.readAddress("$.create2factory_addr");
+
+        // Read create2 factory values from permanent values file
+        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
+        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
+        addresses.create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
+        config.create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
+
         config.chainId = chainId;
-        config.create2FactorySalt = toml.readBytes32("$.create2factory_salt");
     }
 
     // We need to deploy new shared bridge for changing chain id and diamond proxy address
