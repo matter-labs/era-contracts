@@ -3,10 +3,9 @@
 pragma solidity 0.8.28;
 
 import {MessageRootBase} from "./MessageRootBase.sol";
-import {LocallyNoChainsAtGenesis, V31UpgradeChainBatchNumberAlreadySet, NotAllChainsOnL1} from "../bridgehub/L1BridgehubErrors.sol";
 import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessageRoot.sol";
-import {CurrentBatchNumberAlreadySet, OnlyOnSettlementLayer, TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber, TotalBatchesExecutedZero, V31UpgradeChainBatchNumberAlreadySet} from "../bridgehub/L1BridgehubErrors.sol";
+import {CurrentBatchNumberAlreadySet, OnlyOnSettlementLayer, TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber, TotalBatchesExecutedZero, LocallyNoChainsAtGenesis, V31UpgradeChainBatchNumberAlreadySet, NotAllChainsOnL1} from "../bridgehub/L1BridgehubErrors.sol";
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 
 /// @author Matter Labs
@@ -101,6 +100,7 @@ contract L1MessageRoot is MessageRootBase {
         return BRIDGE_HUB;
     }
 
+    // solhint-disable-next-line func-name-mixedcase
     function L1_CHAIN_ID() public view override returns (uint256) {
         return block.chainid;
     }

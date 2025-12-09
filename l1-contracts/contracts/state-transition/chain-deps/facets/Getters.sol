@@ -27,6 +27,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZKChainBase
+    // solhint-disable-next-line const-name-snakecase
     string public constant override getName = "GettersFacet";
 
     /*//////////////////////////////////////////////////////////////

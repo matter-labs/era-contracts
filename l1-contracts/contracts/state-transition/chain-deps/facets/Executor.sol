@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {IMessageRoot} from "../../../core/message-root/IMessageRoot.sol";
-import {COMMIT_TIMESTAMP_APPROXIMATION_DELTA, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAINNET_CHAIN_ID, MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PACKED_L2_PRECOMMITMENT_LENGTH, PUBLIC_INPUT_SHIFT, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, PACKED_L2_PRECOMMITMENT_LENGTH} from "../../../common/Config.sol";
+import {COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAINNET_CHAIN_ID, MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PACKED_L2_PRECOMMITMENT_LENGTH, PUBLIC_INPUT_SHIFT, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH} from "../../../common/Config.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, LogProcessingOutput, MAX_LOG_KEY, ProcessLogsInput, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
@@ -14,7 +14,7 @@ import {GW_ASSET_TRACKER, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_SYSTEM_CONTRA
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {BatchHashMismatch, BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, EmptyPrecommitData, HashMismatch, IncorrectBatchChainId, InvalidBatchNumber, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidPackedPrecommitmentLength, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, PrecommitmentMismatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches, PrecommitmentMismatch, NonZeroBlobToVerifyZKsyncOS, InvalidBlockRange} from "../../../common/L1ContractErrors.sol";
+import {BatchHashMismatch, BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, EmptyPrecommitData, HashMismatch, IncorrectBatchChainId, InvalidBatchNumber, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidPackedPrecommitmentLength, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, PrecommitmentMismatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches, NonZeroBlobToVerifyZKsyncOS, InvalidBlockRange} from "../../../common/L1ContractErrors.sol";
 import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MessageRootIsZero, MismatchL2DACommitmentScheme, MismatchNumberOfLayer1Txs, SettlementLayerChainIdMismatch} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -36,6 +36,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZKChainBase
+    // solhint-disable-next-line const-name-snakecase
     string public constant override getName = "ExecutorFacet";
 
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the

@@ -167,7 +167,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(discoveredCTM.validatorTimelockPostV29)
             .executionDelay();
         (bool ok, bytes memory data) = discoveredEraZkChain.verifier.staticcall(
-            abi.encodeWithSignature("isTestnetVerifier()")
+            abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
         );
         config.testnetVerifier = ok;
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();

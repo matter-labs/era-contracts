@@ -34,6 +34,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     using PriorityQueue for PriorityQueue.Queue;
 
     /// @inheritdoc IZKChainBase
+    // solhint-disable-next-line const-name-snakecase
     string public constant override getName = "AdminFacet";
 
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the

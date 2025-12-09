@@ -29,6 +29,7 @@ contract ValidatorTimelock is
     using LibMap for LibMap.Uint32Map;
 
     /// @inheritdoc IValidatorTimelock
+    // solhint-disable-next-line const-name-snakecase
     string public constant override getName = "ValidatorTimelock";
 
     /// @inheritdoc IValidatorTimelock
