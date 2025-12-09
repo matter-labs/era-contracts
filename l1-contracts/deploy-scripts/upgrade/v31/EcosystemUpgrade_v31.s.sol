@@ -59,7 +59,7 @@ contract EcosystemUpgrade_v31 is Script, DefaultEcosystemUpgrade {
         string memory root = vm.projectRoot();
         string memory permanentValuesInputPath = string.concat(root, "/upgrade-envs/permanent-values/local.toml");
         string memory outputDeployL1Toml = vm.readFile(string.concat(root, "/script-out/output-deploy-l1.toml"));
-        string memory outputDeployCTMToml = vm.readFile(string.concat(root,  "/script-out/output-deploy-ctm.toml"));
+        string memory outputDeployCTMToml = vm.readFile(string.concat(root, "/script-out/output-deploy-ctm.toml"));
 
         bytes32 create2FactorySalt = outputDeployL1Toml.readBytes32("$.contracts.create2_factory_salt");
         address create2FactoryAddr;
