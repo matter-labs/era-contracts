@@ -261,6 +261,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @notice Migrates the token balance from L1 to Gateway.
     /// @dev This function can be called multiple times on the chain it does not have a direct effect.
     /// @dev This function is permissionless, it does not affect the state of the contract substantially, and can be called multiple times.
+    /// @dev The value to migrate is read from the L2, but the tracking is done on L1/GW.
     function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external {
         require(
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
