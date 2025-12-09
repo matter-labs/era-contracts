@@ -95,6 +95,16 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         string outputPath;
     }
 
+    struct PermanentCTMConfig {
+        address create2FactoryAddr;
+        bytes32 create2FactorySalt;
+        address ctmProxy;
+        uint256 eraChainId;
+        address bytecodesSupplier;
+        address rollupDAManager;
+        bool isZKsyncOS;
+    }
+
     // The output of the script
     NewlyGeneratedData internal newlyGeneratedData;
     UpgradeDeployedAddresses internal upgradeAddresses;
@@ -134,26 +144,19 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function initializeConfig(
-        bytes32 create2FactorySalt,
-        address create2FactoryAddr,
-        address ctmProxy,
-        bool isZKsyncOS,
         ChainCreationParamsConfig memory chainCreationParams,
-        uint256 eraChainId,
-        // Should be discoverable
-        address bytecodesSupplier,
-        address rollupDAManager,
-        // Optional
+        PermanentCTMConfig memory permanentConfig,
+    // Optional
         address governance
     ) public {
-        _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
+        _initCreate2FactoryParams(permanentConfig.create2FactoryAddr, permanentConfig.create2FactorySalt);
         config.l1ChainId = block.chainid;
-        newConfig.ctm = ctmProxy;
-        config.eraChainId = eraChainId;
-        nonDisoverable.bytecodesSupplier = bytecodesSupplier;
-        nonDisoverable.rollupDAManager = rollupDAManager;
+        newConfig.ctm = permanentConfig.ctmProxy;
+        config.eraChainId = permanentConfig.eraChainId;
+        nonDisoverable.bytecodesSupplier = permanentConfig.bytecodesSupplier;
+        nonDisoverable.rollupDAManager = permanentConfig.rollupDAManager;
         setAddressesBasedOnCTM();
-        config.isZKsyncOS = isZKsyncOS;
+        config.isZKsyncOS = permanentConfig.isZKsyncOS;
         config.contracts.chainCreationParams = chainCreationParams;
         if (governance != address(0)) {
             config.ownerAddress = governance;
@@ -173,12 +176,11 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
-    function initializeConfigFromFile(
-        string memory permanentValuesInputPath,
-        string memory newConfigPath
-    ) internal virtual {
+
+    function initializePermanentConfig(
+        string memory permanentValuesInputPath
+    ) internal virtual returns (PermanentCTMConfig memory permanentConfig) {
         string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
-        string memory toml = vm.readFile(newConfigPath);
 
         bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
         address create2FactoryAddr;
@@ -193,21 +195,25 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         address bytecodesSupplier = permanentValuesToml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
         address rollupDAManager = permanentValuesToml.readAddress("$.contracts.rollup_da_manager");
 
-        addresses.eip7702Checker = toml.readAddress("$.deployed_addresses.state_transition.eip7702_checker_addr");
-
-        address governance;
-        if (toml.keyExists("$.governance")) {
-            governance = toml.readAddress("$.governance");
-        } else {
-            governance = address(0);
-        }
-
         // TODO can we discover it?. Try to get it from the chain
         bool isZKsyncOS;
         if (permanentValuesToml.keyExists("$.is_zk_sync_os")) {
             isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
         }
-        ChainCreationParamsConfig memory chainCreationParams;
+
+        permanentConfig = PermanentCTMConfig({
+            ctmProxy: ctm,
+            eraChainId: eraChainId,
+            bytecodesSupplier: bytecodesSupplier,
+            rollupDAManager: rollupDAManager,
+            isZKsyncOS: isZKsyncOS,
+            create2FactoryAddr: create2FactoryAddr,
+            create2FactorySalt: create2FactorySalt
+        });
+    }
+
+    function initializeChainCreationParams(string memory newConfigPath) internal virtual returns (ChainCreationParamsConfig memory chainCreationParams) {
+        string memory toml = vm.readFile(newConfigPath);
 
         chainCreationParams.latestProtocolVersion = toml.readUint("$.chain_creation_params.latest_protocol_version");
         // Protocol specific params for the entire CTM
@@ -227,16 +233,62 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         if (toml.keyExists("$.chain_creation_params.evm_emulator_hash")) {
             chainCreationParams.evmEmulatorHash = toml.readBytes32("$.chain_creation_params.evm_emulator_hash");
         }
+    }
+
+
+    function initializeConfigForPatchUpgrade(
+        string memory permanentValuesInputPath,
+        string memory newConfigPath
+    ) public virtual {
+        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
+        string memory toml = vm.readFile(newConfigPath);
+
+        address governance;
+        if (toml.keyExists("$.governance")) {
+            governance = toml.readAddress("$.governance");
+        } else {
+            governance = address(0);
+        }
+
+        ChainCreationParamsConfig memory chainCreationParams;
+        chainCreationParams.latestProtocolVersion = toml.readUint("$.chain_creation_params.latest_protocol_version");
+
+        PermanentCTMConfig memory permanentConfig = initializePermanentConfig(permanentValuesInputPath);
 
         initializeConfig(
-            create2FactorySalt,
-            create2FactoryAddr,
-            ctm,
-            isZKsyncOS,
             chainCreationParams,
-            eraChainId,
-            bytecodesSupplier,
-            rollupDAManager,
+            permanentConfig,
+            governance
+        );
+        instantiateCreate2Factory();
+
+        console.log("Initialized config from %s", newConfigPath);
+        upgradeConfig.outputPath = string.concat(vm.projectRoot(), vm.envString("UPGRADE_CTM_OUTPUT"));
+        upgradeConfig.initialized = true;
+    }
+
+
+    function initializeConfigFromFile(
+        string memory permanentValuesInputPath,
+        string memory newConfigPath
+    ) internal virtual {
+        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
+        string memory toml = vm.readFile(newConfigPath);
+
+        address governance;
+        if (toml.keyExists("$.governance")) {
+            governance = toml.readAddress("$.governance");
+        } else {
+            governance = address(0);
+        }
+
+        ChainCreationParamsConfig memory chainCreationParams = initializeChainCreationParams(newConfigPath);
+        PermanentCTMConfig memory permanentConfig = initializePermanentConfig(permanentValuesInputPath);
+
+
+        initializeConfig(
+            chainCreationParams,
+            permanentConfig,
             governance
         );
     }
@@ -320,6 +372,22 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         prepareDefaultTestUpgradeCalls();
     }
+
+    /// @notice E2e upgrade generation
+    function runPatchUpgrade() public virtual override {
+        initializeConfigForPatchUpgrade(
+            vm.envString("PERMANENT_VALUES_INPUT"),
+            vm.envString("UPGRADE_CTM_INPUT"),
+            vm.envString("UPGRADE_CTM_OUTPUT")
+        );
+
+        deployVerifiers();
+        prepareDefaultGovernanceCalls();
+        prepareDefaultCTMAdminCalls();
+
+        prepareDefaultTestUpgradeCalls();
+    }
+
 
     function getOwnerAddress() public virtual returns (address) {
         return config.ownerAddress;
@@ -442,7 +510,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
                 discoveredBridgehub.chainRegistrationSenderProxy
             ),
-            // upgradeAddresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
+        // upgradeAddresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
             dangerousTestOnlyForcedBeacon: address(0)
         });
     }
@@ -505,9 +573,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     ////////////////////////////// Preparing calls /////////////////////////////////
 
     function prepareDefaultGovernanceCalls()
-        public
-        virtual
-        returns (Call[] memory stage0Calls, Call[] memory stage1Calls, Call[] memory stage2Calls)
+    public
+    virtual
+    returns (Call[] memory stage0Calls, Call[] memory stage1Calls, Call[] memory stage2Calls)
     {
         // Default upgrade is done it 3 stages:
         // 0. Pause migration to/from Gateway, other stage 0 calls.
@@ -686,7 +754,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         calls[0] = Call({
             target: upgradeAddresses.upgradeTimer,
-            // Double checking that the deadline has passed.
+        // Double checking that the deadline has passed.
             data: abi.encodeCall(GovernanceUpgradeTimer.checkDeadline, ()),
             value: 0
         });
@@ -713,7 +781,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         calls[0] = Call({
             target: upgradeAddresses.upgradeStageValidator,
-            // Double checking migrations are paused
+        // Double checking migrations are paused
             data: abi.encodeCall(UpgradeStageValidator.checkMigrationsPaused, ()),
             value: 0
         });
@@ -726,7 +794,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         calls[0] = Call({
             target: upgradeAddresses.upgradeStageValidator,
-            // Double checking migrations are unpaused
+        // Double checking migrations are unpaused
             data: abi.encodeCall(UpgradeStageValidator.checkMigrationsUnpaused, ()),
             value: 0
         });
@@ -739,7 +807,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         calls[0] = Call({
             target: upgradeAddresses.upgradeStageValidator,
-            // Double checking the presence of the upgrade
+        // Double checking the presence of the upgrade
             data: abi.encodeCall(UpgradeStageValidator.checkProtocolUpgradePresence, ()),
             value: 0
         });
