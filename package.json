@@ -35,7 +35,7 @@
     "lint:check": "yarn lint:md && yarn lint:sol && yarn lint:ts && yarn prettier:check",
     "lint:fix": "yarn lint:md --fix && yarn lint:sol --fix && yarn lint:ts --fix && yarn prettier:fix",
     "lint:md": "markdownlint \"**/*.md\"",
-    "lint:sol": "solhint --noPoster \"**/*.sol\"",
+    "lint:sol": "solhint --noPoster --max-warnings 0 \"**/*.sol\"",
     "lint:ts": "eslint .",
     "prettier:check": "prettier --check \"**/*.{js,json,md,sol,ts,yaml}\"",
     "prettier:fix": "prettier --write \"**/*.{js,json,md,sol,ts,yaml}\"",
