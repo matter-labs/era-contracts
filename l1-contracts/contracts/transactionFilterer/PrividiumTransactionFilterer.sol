@@ -22,26 +22,42 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
     /// @notice Event emitted when sender is removed from whitelist
     event WhitelistRevoked(address indexed sender);
 
+    /// @notice Event emitted when depositsAllowed is toggled
+    event DepositsPermissionChanged(bool depositsAllowed);
+
     /// @notice The L1 asset router
     address public immutable L1_ASSET_ROUTER;
 
-    /// @notice Indicates whether the sender is whitelisted to deposit to Gateway
+    /// @notice Indicates whether the sender is whitelisted to deposit
     mapping(address sender => bool whitelisted) public whitelistedSenders;
+
+    /// @notice Whether deposits are allowed from non-whitelisted addresses
+    bool public depositsAllowed;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(address _assetRouter) {
-        L1_ASSET_ROUTER = _assetRouter;
+    constructor(address assetRouter) {
+        L1_ASSET_ROUTER = assetRouter;
         _disableInitializers();
     }
 
     /// @notice Initializes a contract filterer for later use. Expected to be used in the proxy.
-    /// @param _owner The address which can upgrade the implementation.
-    function initialize(address _owner) external initializer {
-        if (_owner == address(0)) {
+    /// @param owner The address which can upgrade the implementation.
+    function initialize(address owner) external initializer {
+        if (owner == address(0)) {
             revert ZeroAddress();
         }
-        _transferOwnership(_owner);
+        _transferOwnership(owner);
+    }
+
+    /// @notice Sets whether deposits are allowed from non-whitelisted addresses
+    /// @param allowed Whether deposits are allowed from non-whitelisted addresses
+    function setDepositsAllowed(bool allowed) external onlyOwner {
+        if (depositsAllowed == allowed) {
+            return;
+        }
+        depositsAllowed = allowed;
+        emit DepositsPermissionChanged(allowed);
     }
 
     /// @notice Whitelists the sender.
@@ -97,19 +113,19 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
                 (, , bytes memory data) = abi.decode(l2Calldata[4:], (uint256, bytes32, bytes));
                 // slither-disable-next-line unused-return
                 (address depositor, address receiver, , uint256 amount, ) = DataEncoding.decodeBridgeMintData(data);
-                return (depositor == receiver && amount > 0) || whitelistedSenders[depositor];
+                return (depositor == receiver && amount > 0 && depositsAllowed) || whitelistedSenders[depositor];
             } else if (l2TxSelector == IL2SharedBridgeLegacyFunctions.finalizeDeposit.selector) {
                 // slither-disable-next-line unused-return
                 (address depositor, address receiver, , uint256 amount, ) = DataEncoding.decodeBridgeMintData(
                     l2Calldata[4:]
                 );
-                return (depositor == receiver && amount > 0) || whitelistedSenders[depositor];
+                return (depositor == receiver && amount > 0 && depositsAllowed) || whitelistedSenders[depositor];
             } else {
                 return false;
             }
         } else {
             // Base token deposit via `requestL2TransactionDirect`
-            return contractL2 == sender && l2Value > 0 && l2Calldata.length == 0;
+            return contractL2 == sender && l2Value > 0 && l2Calldata.length == 0 && depositsAllowed;
         }
     }
 }
