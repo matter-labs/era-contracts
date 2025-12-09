@@ -50,8 +50,8 @@ contract DeployL2Script is Script {
         address timestampAsserter;
     }
 
-    function run() public {
-        initializeConfig();
+    function run(address _bridgehub, uint256 _chainId) public {
+        initializeConfig(_bridgehub, _chainId);
 
         deploy(false);
     }
@@ -75,8 +75,8 @@ contract DeployL2Script is Script {
         vm.stopPrank();
     }
 
-    function runWithLegacyBridge() public {
-        initializeConfig();
+    function runWithLegacyBridge(address _bridgehub, uint256 _chainId) public {
+        initializeConfig(_bridgehub, _chainId);
         deploy(true);
     }
 
@@ -90,16 +90,16 @@ contract DeployL2Script is Script {
         saveOutput();
     }
 
-    function runDefaultUpgrader() public {
-        initializeConfig();
+    function runDefaultUpgrader(address _bridgehub, uint256 _chainId) public {
+        initializeConfig(_bridgehub, _chainId);
 
         deployForceDeployer();
 
         saveOutput();
     }
 
-    function runDeployConsensusRegistry() public {
-        initializeConfig();
+    function runDeployConsensusRegistry(address _bridgehub, uint256 _chainId) public {
+        initializeConfig(_bridgehub, _chainId);
 
         deployConsensusRegistry();
         deployConsensusRegistryProxy();
@@ -107,34 +107,34 @@ contract DeployL2Script is Script {
         saveOutput();
     }
 
-    function runDeployMulticall3() public {
-        initializeConfig();
+    function runDeployMulticall3(address _bridgehub, uint256 _chainId) public {
+        initializeConfig(_bridgehub, _chainId);
 
         deployMulticall3();
 
         saveOutput();
     }
 
-    function runDeployTimestampAsserter() public {
-        initializeConfig();
+    function runDeployTimestampAsserter(address _bridgehub, uint256 _chainId) public {
+        initializeConfig(_bridgehub, _chainId);
 
         deployTimestampAsserter();
 
         saveOutput();
     }
 
-    function initializeConfig() internal {
+    function initializeConfig(address bridgehubAddress, uint256 chainId) internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/config-deploy-l2-contracts.toml");
         string memory toml = vm.readFile(path);
-        config.bridgehubAddress = toml.readAddress("$.bridgehub");
+        config.bridgehubAddress = bridgehubAddress;
         config.governance = toml.readAddress("$.governance");
         config.l1SharedBridgeProxy = toml.readAddress("$.l1_shared_bridge");
         config.erc20BridgeProxy = toml.readAddress("$.erc20_bridge");
         config.consensusRegistryOwner = toml.readAddress("$.consensus_registry_owner");
         //config.chainRegistrar = toml.readAddress("$.chain_registrar");
         //config.proposalAuthor = toml.readAddress("$.proposal_author");
-        config.chainId = toml.readUint("$.chain_id");
+        config.chainId = chainId;
         config.eraChainId = toml.readUint("$.era_chain_id");
 
         uint256 validatorTypeUint = toml.readUint("$.da_validator_type");

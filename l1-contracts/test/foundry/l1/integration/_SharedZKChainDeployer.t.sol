@@ -111,7 +111,7 @@ contract ZKChainDeployer is L1ContractDeployer {
     function _deployZKChainShared(uint256 _chainId, address _baseToken) internal {
         saveZKChainConfig(_getDefaultDescription(_chainId, _baseToken, _chainId));
         zkChainIds.push(_chainId);
-        deployScript.runForTest();
+        deployScript.runForTest(address(addresses.bridgehub), address(addresses.chainTypeManager), _chainId);
         _setDAValidatorPair(_chainId);
         _processGenesisUpgrade(_chainId);
     }

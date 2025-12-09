@@ -12,6 +12,7 @@ import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {Utils} from "../utils/Utils.sol";
@@ -69,9 +70,6 @@ library AddressIntrospector {
     }
 
     struct L1ERC20BridgeAddresses {
-        address l1Nullifier;
-        address l1AssetRouter;
-        address l1NativeTokenVault;
         address l2TokenBeacon;
         address l2Bridge;
         uint256 eraChainId;
@@ -137,6 +135,24 @@ library AddressIntrospector {
         info.l1WethToken = _assetRouter.L1_WETH_TOKEN();
         info.nativeTokenVault = address(_assetRouter.nativeTokenVault());
         info.ethTokenAssetId = _assetRouter.ETH_TOKEN_ASSET_ID();
+    }
+
+    function getLegacyBridgeAddress(address _assetRouter) public view returns (address legacyBridge) {
+        IL1Nullifier nullifier = IL1AssetRouter(_assetRouter).L1_NULLIFIER();
+        legacyBridge = address(nullifier.legacyBridge());
+    }
+
+    function getLegacyBridgeAddresses(address _assetRouter) public view returns (L1ERC20BridgeAddresses memory info) {
+        address legacyBridge = getLegacyBridgeAddress(_assetRouter);
+        if (legacyBridge == address(0)) {
+            return info; // Return empty struct if no legacy bridge
+        }
+
+        IL1ERC20Bridge bridge = IL1ERC20Bridge(legacyBridge);
+        info.l2TokenBeacon = bridge.l2TokenBeacon();
+        info.l2Bridge = bridge.l2Bridge();
+        info.eraChainId = bridge.ERA_CHAIN_ID();
+        info.l2TokenProxyBytecodeHash = bridge.l2TokenProxyBytecodeHash();
     }
 
     function getBaseTokenRoute(
@@ -206,7 +222,10 @@ library AddressIntrospector {
         baseRoute = getBaseTokenRoute(_bridgehub, _chainId);
         zkFacets = getZkChainFacetAddresses(IZKChain(zkAddr));
 
-        // Optional: if legacy ERC20 bridge is known/set on the asset router, caller can provide it separately.
+        address legacyBridgeAddress = getLegacyBridgeAddress(address(_bridgehub.assetRouter()));
+        if (legacyBridgeAddress != address(0)) {
+            legacyBridge = getLegacyBridgeAddresses(address(_bridgehub.assetRouter()));
+        }
     }
 
     function _tryAddress(address _target, string memory _sig) private view returns (address value) {

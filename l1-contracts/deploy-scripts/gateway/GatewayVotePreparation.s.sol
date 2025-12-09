@@ -72,11 +72,14 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
     GatewayCTMDeployerConfig internal gatewayCTMDeployerConfig;
 
-    function initializeConfig(string memory configPath, uint256 ctmRepresentativeChainId) internal virtual {
+    function initializeConfig(
+        string memory configPath,
+        uint256 ctmRepresentativeChainId,
+        address bridgehubProxy
+    ) internal virtual {
         super.initializeConfig(configPath);
         string memory toml = vm.readFile(configPath);
 
-        address bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
         refundRecipient = toml.readAddress("$.refund_recipient");
 
         eraChainId = toml.readUint("$.era_chain_id");
@@ -210,13 +213,13 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin, false);
     }
 
-    function prepareForGWVoting(uint256 ctmRepresentativeChainId) public {
+    function prepareForGWVoting(uint256 ctmRepresentativeChainId, address bridgehubProxy) public {
         console.log("Setting up the Gateway script");
 
         string memory root = vm.projectRoot();
         string memory configPath = string.concat(root, vm.envString("GATEWAY_VOTE_PREPARATION_INPUT"));
 
-        initializeConfig(configPath, ctmRepresentativeChainId);
+        initializeConfig(configPath, ctmRepresentativeChainId, bridgehubProxy);
         _initializeGatewayGovernanceConfig(
             GatewayGovernanceConfig({
                 bridgehubProxy: discoveredBridgehub.bridgehubProxy,

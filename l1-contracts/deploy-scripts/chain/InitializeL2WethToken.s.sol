@@ -33,12 +33,12 @@ contract InitializeL2WethTokenScript is Script {
 
     Config internal config;
 
-    function run() public {
-        initializeConfig();
+    function run(address _bridgehub) public {
+        initializeConfig(_bridgehub);
         initializeL2WethToken();
     }
 
-    function initializeConfig() internal {
+    function initializeConfig(address bridgehubProxyAddr) internal {
         config.deployerAddress = msg.sender;
 
         // Parse some config from output of l1 deployment
@@ -49,7 +49,7 @@ contract InitializeL2WethTokenScript is Script {
         config.create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
         config.create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
         config.eraChainId = toml.readUint("$.era_chain_id");
-        config.bridgehubProxyAddr = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
+        config.bridgehubProxyAddr = bridgehubProxyAddr;
 
         // Parse some config from output of erc20 tokens deployment
         path = string.concat(root, "/script-out/output-deploy-erc20.toml");

@@ -23,6 +23,9 @@ import {AccessControlRestriction} from "contracts/governance/AccessControlRestri
 import {ADDRESS_ONE, Utils} from "../utils/Utils.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
+import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -92,20 +95,21 @@ contract RegisterZKChainScript is Script {
     Config internal config;
     ZkChainAddresses internal output;
 
-    function run() public {
+    function run(address _bridgehub, address _chainTypeManagerProxy, uint256 _chainChainId) public {
         console.log("Deploying ZKChain");
 
-        initializeConfig();
+        initializeConfig(_bridgehub, _chainTypeManagerProxy, _chainChainId);
         // TODO: some chains may not want to have a legacy shared bridge
         runInner("/script-out/output-register-zk-chain.toml");
     }
 
-    function runForTest() public {
+    function runForTest(address _bridgehub, address _chainTypeManagerProxy, uint256 _chainChainId) public {
         console.log("Deploying ZKChain");
 
         // Timestamp needs to be late enough for `pauseDepositsBeforeInitiatingMigration` time checks
         vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET + 1);
-        initializeConfigTest();
+
+        initializeConfigTest(_bridgehub, _chainTypeManagerProxy, _chainChainId);
         runInner(vm.envString("ZK_CHAIN_OUT"));
     }
 
@@ -137,7 +141,7 @@ contract RegisterZKChainScript is Script {
         saveOutput(outputPath);
     }
 
-    function initializeConfig() internal {
+    function initializeConfig(address bridgehub, address chainTypeManagerProxy, uint256 chainChainId) internal {
         // Grab config from output of l1 deployment
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/register-zk-chain.toml");
@@ -149,23 +153,29 @@ contract RegisterZKChainScript is Script {
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
 
-        config.bridgehub = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
-        config.chainTypeManagerProxy = toml.readAddress(
-            "$.deployed_addresses.state_transition.chain_type_manager_proxy_addr"
+        config.bridgehub = bridgehub;
+        config.chainTypeManagerProxy = chainTypeManagerProxy;
+
+        // Use AddressIntrospector to get addresses from deployed contracts
+        AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
+            IL1Bridgehub(bridgehub)
         );
-        config.validatorTimelock = toml.readAddress("$.deployed_addresses.validator_timelock_addr");
-        // config.bridgehubGovernance = toml.readAddress("$.deployed_addresses.governance_addr");
-        config.nativeTokenVault = toml.readAddress("$.deployed_addresses.native_token_vault_addr");
-        config.sharedBridgeProxy = toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr");
-        config.l1Nullifier = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
-        config.l1Erc20Bridge = toml.readAddress("$.deployed_addresses.bridges.erc20_bridge_proxy_addr");
+        AddressIntrospector.CTMAddresses memory ctmAddresses = AddressIntrospector.getCTMAddresses(
+            ChainTypeManagerBase(chainTypeManagerProxy)
+        );
+
+        config.validatorTimelock = ctmAddresses.legacyValidatorTimelock;
+        config.nativeTokenVault = bhAddresses.assetRouterAddresses.nativeTokenVault;
+        config.sharedBridgeProxy = bhAddresses.assetRouter;
+        config.l1Nullifier = bhAddresses.assetRouterAddresses.l1Nullifier;
+        config.l1Erc20Bridge = AddressIntrospector.getLegacyBridgeAddress(bhAddresses.assetRouter);
 
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
 
         config.ownerAddress = toml.readAddress("$.owner_address");
 
-        config.chainChainId = toml.readUint("$.chain.chain_chain_id");
+        config.chainChainId = chainChainId;
         config.baseTokenGasPriceMultiplierNominator = uint128(
             toml.readUint("$.chain.base_token_gas_price_multiplier_nominator")
         );
@@ -195,7 +205,7 @@ contract RegisterZKChainScript is Script {
 
         config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
 
-        config.governance = toml.readAddress("$.governance");
+        config.governance = ctmAddresses.governance;
         config.create2FactoryAddress = toml.readAddress("$.contracts.create2_factory_addr");
         config.create2Salt = toml.readBytes32("$.contracts.create2_factory_salt");
         config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
@@ -205,7 +215,7 @@ contract RegisterZKChainScript is Script {
         return config;
     }
 
-    function initializeConfigTest() internal {
+    function initializeConfigTest(address bridgehub, address chainTypeManagerProxy, uint256 chainChainId) internal {
         // Grab config from output of l1 deployment
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, vm.envString("L1_OUTPUT")); //"/script-config/register-zkChain.toml");
@@ -217,24 +227,28 @@ contract RegisterZKChainScript is Script {
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
 
-        config.bridgehub = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
-        // TODO(EVM-744): name of the key is a bit inconsistent
+        config.bridgehub = bridgehub;
+        config.chainTypeManagerProxy = chainTypeManagerProxy;
+
+        // Use AddressIntrospector to get addresses from deployed contracts
+        AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
+            IL1Bridgehub(bridgehub)
+        );
+        AddressIntrospector.CTMAddresses memory ctmAddresses = AddressIntrospector.getCTMAddresses(
+            ChainTypeManagerBase(chainTypeManagerProxy)
+        );
+
+        config.validatorTimelock = ctmAddresses.legacyValidatorTimelock;
+        config.nativeTokenVault = bhAddresses.assetRouterAddresses.nativeTokenVault;
+        config.sharedBridgeProxy = bhAddresses.assetRouter;
+        config.l1Nullifier = bhAddresses.assetRouterAddresses.l1Nullifier;
 
         path = string.concat(root, vm.envString("CTM_OUTPUT"));
         toml = vm.readFile(path);
-        config.chainTypeManagerProxy = toml.readAddress(
-            "$.deployed_addresses.state_transition.state_transition_proxy_addr"
-        );
-        config.validatorTimelock = toml.readAddress("$.deployed_addresses.validator_timelock_addr");
-        // config.bridgehubGovernance = toml.readAddress("$.deployed_addresses.governance_addr");
-        config.nativeTokenVault = toml.readAddress("$.deployed_addresses.native_token_vault_addr");
-        config.sharedBridgeProxy = toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr");
-        config.l1Nullifier = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
-
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
 
-        config.governance = toml.readAddress("$.deployed_addresses.governance_addr");
+        config.governance = ctmAddresses.governance;
         config.create2FactoryAddress = toml.readAddress("$.contracts.create2_factory_addr");
         config.create2Salt = toml.readBytes32("$.contracts.create2_factory_salt");
 
@@ -243,7 +257,7 @@ contract RegisterZKChainScript is Script {
 
         config.ownerAddress = toml.readAddress("$.owner_address");
 
-        config.chainChainId = toml.readUint("$.chain.chain_chain_id");
+        config.chainChainId = chainChainId;
         config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
         config.baseToken = toml.readAddress("$.chain.base_token_addr");
         config.validiumMode = toml.readBool("$.chain.validium_mode");

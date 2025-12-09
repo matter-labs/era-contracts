@@ -19,13 +19,13 @@ contract DeployPaymaster is Script {
         address paymaster;
     }
 
-    function initializeConfig() internal {
+    function initializeConfig(address bridgehubAddress, uint256 chainId) internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/config-deploy-paymaster.toml");
         string memory toml = vm.readFile(path);
-        config.bridgehubAddress = toml.readAddress("$.bridgehub");
+        config.bridgehubAddress = bridgehubAddress;
         config.l1SharedBridgeProxy = toml.readAddress("$.l1_shared_bridge");
-        config.chainId = toml.readUint("$.chain_id");
+        config.chainId = chainId;
     }
 
     function saveOutput() internal {
@@ -35,8 +35,8 @@ contract DeployPaymaster is Script {
         vm.writeToml(toml, path);
     }
 
-    function run() external {
-        initializeConfig();
+    function run(address _bridgehub, uint256 _chainId) external {
+        initializeConfig(_bridgehub, _chainId);
 
         deploy();
 

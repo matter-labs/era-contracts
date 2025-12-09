@@ -42,8 +42,8 @@ contract SetupLegacyBridge is Script {
         address l1NullifierProxyImpl;
     }
 
-    function run() public {
-        initializeConfig();
+    function run(address _bridgehub, uint256 _chainId) public {
+        initializeConfig(_bridgehub, _chainId);
         deploySharedBridgeImplementation();
         upgradeImplementation(addresses.sharedBridgeProxy, addresses.sharedBridgeProxyImpl);
         deployDummyErc20Bridge();
@@ -53,12 +53,12 @@ contract SetupLegacyBridge is Script {
         upgradeImplementation(addresses.l1Nullifier, addresses.l1NullifierProxyImpl);
     }
 
-    function initializeConfig() internal {
+    function initializeConfig(address bridgehub, uint256 chainId) internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/setup-legacy-bridge.toml");
         string memory toml = vm.readFile(path);
 
-        addresses.bridgehub = toml.readAddress("$.bridgehub");
+        addresses.bridgehub = bridgehub;
         addresses.diamondProxy = toml.readAddress("$.diamond_proxy");
         addresses.l1Nullifier = toml.readAddress("$.l1_nullifier_proxy");
         addresses.sharedBridgeProxy = toml.readAddress("$.shared_bridge_proxy");
@@ -67,7 +67,7 @@ contract SetupLegacyBridge is Script {
         addresses.erc20BridgeProxy = toml.readAddress("$.erc20bridge_proxy");
         addresses.tokenWethAddress = toml.readAddress("$.token_weth_address");
         addresses.create2FactoryAddr = toml.readAddress("$.create2factory_addr");
-        config.chainId = toml.readUint("$.chain_id");
+        config.chainId = chainId;
         config.create2FactorySalt = toml.readBytes32("$.create2factory_salt");
     }
 
