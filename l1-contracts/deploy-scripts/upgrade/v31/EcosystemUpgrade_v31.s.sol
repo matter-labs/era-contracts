@@ -40,10 +40,57 @@ import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 contract EcosystemUpgrade_v31 is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
+    /// @notice E2e upgrade generation
+    function run() public virtual override {
+        preparePermanentValues();
+        initialize(
+            "/upgrade-envs/permanent-values/local.toml",
+            "/upgrade-envs/v0.31.0-interopB/local.toml",
+            vm.envString("V31_UPGRADE_ECOSYSTEM_INPUT"),
+            vm.envString("V31_UPGRADE_ECOSYSTEM_OUTPUT")
+        );
+
+        prepareEcosystemUpgrade();
+        prepareDefaultGovernanceCalls();
+    }
+
+    /// todo create in deploy scripts instead of here.
+    function preparePermanentValues() internal {
+        string memory root = vm.projectRoot();
+        string memory permanentValuesInputPath = string.concat(root, "/upgrade-envs/permanent-values/local.toml");
+        string memory outputDeployL1Toml = vm.readFile(string.concat(root, "/script-out/output-deploy-l1.toml"));
+        string memory outputDeployCTMToml = vm.readFile(string.concat(root,  "/script-out/output-deploy-ctm.toml"));
+
+        bytes32 create2FactorySalt = outputDeployL1Toml.readBytes32("$.contracts.create2_factory_salt");
+        address create2FactoryAddr;
+        if (vm.keyExistsToml(outputDeployL1Toml, "$.contracts.create2_factory_addr")) {
+            create2FactoryAddr = outputDeployL1Toml.readAddress("$.contracts.create2_factory_addr");
+        }
+        address ctm = outputDeployCTMToml.readAddress(
+            "$.deployed_addresses.state_transition.state_transition_proxy_addr"
+        );
+        address bytecodesSupplier = outputDeployCTMToml.readAddress(
+            "$.deployed_addresses.state_transition.bytecodes_supplier_addr"
+        );
+        address l1Bridgehub = outputDeployL1Toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
+        address rollupDAManager = outputDeployCTMToml.readAddress("$.deployed_addresses.l1_rollup_da_manager");
+        uint256 eraChainId = outputDeployL1Toml.readUint("$.era_chain_id");
+
+        vm.serializeString("contracts", "create2_factory_salt", vm.toString(create2FactorySalt));
+        vm.serializeAddress("contracts", "create2_factory_addr", create2FactoryAddr);
+        vm.serializeAddress("contracts", "ctm_proxy_address", ctm);
+        vm.serializeAddress("contracts", "bridgehub_proxy_address", l1Bridgehub);
+        vm.serializeAddress("contracts", "rollup_da_manager", rollupDAManager);
+        string memory contracts = vm.serializeAddress("contracts", "l1_bytecodes_supplier_addr", bytecodesSupplier);
+        vm.serializeString("root", "contracts", contracts);
+        string memory permanentValuesToml = vm.serializeUint("root", "era_chain_id", eraChainId);
+        vm.writeToml(permanentValuesToml, permanentValuesInputPath);
+    }
+
     function deployNewEcosystemContractsL1() public virtual override {
         DeployL1CoreUtils l1CoreDeployer = new DeployL1CoreUtils();
         string memory root = vm.projectRoot();
-        string memory upgradeInputPath = string.concat(root, vm.envString("V31_UPGRADE_ECOSYSTEM_INPUT"));
+        string memory upgradeInputPath = string.concat(root, "/script-config/config-deploy-l1.toml");
         l1CoreDeployer.initializeConfig(upgradeInputPath);
         bridgehubAddresses.bridgehubImplementation = l1CoreDeployer.deploySimpleContract("L1Bridgehub", false);
         // deploySimpleContract("L1ChainTypeManager", false);
