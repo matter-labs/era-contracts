@@ -61,11 +61,7 @@ interface IAdminFunctions {
         address l2WBaseToken
     ) external;
 
-    function setPubdataPricingMode(
-        ChainAdmin chainAdmin,
-        address target,
-        PubdataPricingMode pricingMode
-    ) external;
+    function setPubdataPricingMode(ChainAdmin chainAdmin, address target, PubdataPricingMode pricingMode) external;
 
     function notifyServerMigrationToGateway(address bridgehub, uint256 chainId, bool shouldSend) external;
 
