@@ -1,1 +1,1060 @@
-{"abi":[{"type":"function","name":"multicall","inputs":[{"name":"_calls","type":"tuple[]","internalType":"struct IChainAdminOwnable.Call[]","components":[{"name":"target","type":"address","internalType":"address"},{"name":"value","type":"uint256","internalType":"uint256"},{"name":"data","type":"bytes","internalType":"bytes"}]},{"name":"_requireSuccess","type":"bool","internalType":"bool"}],"outputs":[],"stateMutability":"payable"},{"type":"function","name":"setTokenMultiplier","inputs":[{"name":"_chainContract","type":"address","internalType":"contract IAdmin"},{"name":"_nominator","type":"uint128","internalType":"uint128"},{"name":"_denominator","type":"uint128","internalType":"uint128"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"setTokenMultiplierSetter","inputs":[{"name":"_tokenMultiplierSetter","type":"address","internalType":"address"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"setUpgradeTimestamp","inputs":[{"name":"_protocolVersion","type":"uint256","internalType":"uint256"},{"name":"_upgradeTimestamp","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"event","name":"CallExecuted","inputs":[{"name":"_call","type":"tuple","indexed":false,"internalType":"struct IChainAdminOwnable.Call","components":[{"name":"target","type":"address","internalType":"address"},{"name":"value","type":"uint256","internalType":"uint256"},{"name":"data","type":"bytes","internalType":"bytes"}]},{"name":"_success","type":"bool","indexed":false,"internalType":"bool"},{"name":"_returnData","type":"bytes","indexed":false,"internalType":"bytes"}],"anonymous":false},{"type":"event","name":"NewTokenMultiplierSetter","inputs":[{"name":"_oldTokenMultiplierSetter","type":"address","indexed":false,"internalType":"address"},{"name":"_newTokenMultiplierSetter","type":"address","indexed":false,"internalType":"address"}],"anonymous":false},{"type":"event","name":"UpdateUpgradeTimestamp","inputs":[{"name":"_protocolVersion","type":"uint256","indexed":true,"internalType":"uint256"},{"name":"_upgradeTimestamp","type":"uint256","indexed":false,"internalType":"uint256"}],"anonymous":false}],"bytecode":{"object":"0x","sourceMap":"","linkReferences":{}},"deployedBytecode":{"object":"0x","sourceMap":"","linkReferences":{}},"methodIdentifiers":{"multicall((address,uint256,bytes)[],bool)":"69340beb","setTokenMultiplier(address,uint128,uint128)":"4d4a1eca","setTokenMultiplierSetter(address)":"60144197","setUpgradeTimestamp(uint256,uint256)":"e2a9d554"},"rawMetadata":"{\"compiler\":{\"version\":\"0.8.28+commit.7893614a\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"anonymous\":false,\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"target\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"indexed\":false,\"internalType\":\"struct IChainAdminOwnable.Call\",\"name\":\"_call\",\"type\":\"tuple\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"_success\",\"type\":\"bool\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"_returnData\",\"type\":\"bytes\"}],\"name\":\"CallExecuted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"_oldTokenMultiplierSetter\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"_newTokenMultiplierSetter\",\"type\":\"address\"}],\"name\":\"NewTokenMultiplierSetter\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"_protocolVersion\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"_upgradeTimestamp\",\"type\":\"uint256\"}],\"name\":\"UpdateUpgradeTimestamp\",\"type\":\"event\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"target\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"internalType\":\"struct IChainAdminOwnable.Call[]\",\"name\":\"_calls\",\"type\":\"tuple[]\"},{\"internalType\":\"bool\",\"name\":\"_requireSuccess\",\"type\":\"bool\"}],\"name\":\"multicall\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contract IAdmin\",\"name\":\"_chainContract\",\"type\":\"address\"},{\"internalType\":\"uint128\",\"name\":\"_nominator\",\"type\":\"uint128\"},{\"internalType\":\"uint128\",\"name\":\"_denominator\",\"type\":\"uint128\"}],\"name\":\"setTokenMultiplier\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_tokenMultiplierSetter\",\"type\":\"address\"}],\"name\":\"setTokenMultiplierSetter\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_protocolVersion\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"_upgradeTimestamp\",\"type\":\"uint256\"}],\"name\":\"setUpgradeTimestamp\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"author\":\"Matter Labs\",\"custom:security-contact\":\"security@matterlabs.dev\",\"kind\":\"dev\",\"methods\":{},\"title\":\"ChainAdmin contract interface\",\"version\":1},\"userdoc\":{\"events\":{\"CallExecuted((address,uint256,bytes),bool,bytes)\":{\"notice\":\"Emitted when the call is executed from the contract.\"},\"NewTokenMultiplierSetter(address,address)\":{\"notice\":\"Emitted when the new token multiplier address is set.\"},\"UpdateUpgradeTimestamp(uint256,uint256)\":{\"notice\":\"Emitted when the expected upgrade timestamp for a specific protocol version is set.\"}},\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/governance/IChainAdminOwnable.sol\":\"IChainAdminOwnable\"},\"evmVersion\":\"prague\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":9999999},\"remappings\":[\":@ensdomains/=node_modules/@ensdomains/\",\":@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/\",\":@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/\",\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":erc4626-tests/=lib/openzeppelin-contracts-v4/lib/erc4626-tests/\",\":eth-gas-reporter/=node_modules/eth-gas-reporter/\",\":forge-std/=lib/forge-std/src/\",\":foundry-test/=test/foundry/\",\":hardhat/=node_modules/hardhat/\",\":l2-contracts/=../l2-contracts/contracts/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/\",\":openzeppelin-contracts-v4/=lib/openzeppelin-contracts-v4/\",\":openzeppelin-contracts/=lib/murky/lib/openzeppelin-contracts/\"]},\"sources\":{\"contracts/common/Config.sol\":{\"keccak256\":\"0x3d3d593829f57f6d8954c98b570ebf0155f0f212e05b74c61e3f19e41f6d06a6\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://f599fe9e8adc08ad0cbb963e1d1164d3dd0b6a6c6e0073c499f0972f77c81840\",\"dweb:/ipfs/Qma5mNegQrt1JCcQC1NQLoGxhNq1m5SXEZHkJrEp3Mrdoy\"]},\"contracts/common/L1ContractErrors.sol\":{\"keccak256\":\"0x49442e2241f15613345b0ec5383fa51d27a246755c5fae37b0fd04446406b69f\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://d0d3337e586ce99f8dc62e13ae5ef2c6c85161088c6fcc9b4a2db2bbd414cbfa\",\"dweb:/ipfs/QmWT6Bqcpvd6D2ZATEEQyUbfbYT3V9VqDycMWscK5Adgai\"]},\"contracts/common/Messaging.sol\":{\"keccak256\":\"0xdf0cd5cf8d2648a02ef442a4c474bdf1ea9ebf38a76366a5d54150ed332a6c9c\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://a9d2c39c46e834a9d0c0162c8f8bdd25bfc8fc586a23181ce1964ccc0deb9373\",\"dweb:/ipfs/QmUidpZTTxnQrLMyh8RrSk5wpck8cZBGoVGPDEPoahyrqK\"]},\"contracts/common/libraries/DynamicIncrementalMerkle.sol\":{\"keccak256\":\"0x59ed03174453eec9cf7d8a14bb1db3d4b8f06d5c03ff72f9904c50ff2362f313\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://c5fcb7fd74db8d7563af09bbcfb1c96eb5da364706c6370dc3cb8d031c04d5ae\",\"dweb:/ipfs/QmSr9mCEBz7wzHHXtUcHjs3YcKkiyLJKEcyA3GxcoHCqRF\"]},\"contracts/common/libraries/Merkle.sol\":{\"keccak256\":\"0xc53f505619f7e7dc9b276a63d1bc743a588633457cefbb3a9bc8b20b42ada35f\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://b13d1dead050a82e4ad6c5013c9f176818933ba4b843110dbaf0bbe6c1259ee8\",\"dweb:/ipfs/Qmac9pko9bhqY4NzM9MeAdxumenNFwKNE5qY4gV3z2zDpz\"]},\"contracts/common/libraries/UncheckedMath.sol\":{\"keccak256\":\"0x0ff1407bcabd5a4349a0da1372afe1f2e449bbb5271a2d88d5b999e4dffe9728\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://b9fde36c3cf8c7989ebe20c1a52676870e0d820dc43afd8f789b09eff620dd9b\",\"dweb:/ipfs/QmbMNcimFvgE44idT1ZUSAEv74FkePodWQfCg4f8GhmHR8\"]},\"contracts/governance/IChainAdminOwnable.sol\":{\"keccak256\":\"0x0fa42fee9a5901774ccea805ca1bf066ebf5dcd98009decb60a59fa62ff93a34\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://be5242f204257f1b7f76c9726e570e2f8693edf084c1ec0529faaadfd13bbf2a\",\"dweb:/ipfs/QmSCZqDVorbtV1UYrhjRbnts87gFucZr8QqyJjy8CzdvQ8\"]},\"contracts/state-transition/L1StateTransitionErrors.sol\":{\"keccak256\":\"0x4d15ae1480bbcac836d833143a19ec3ca3770da8efe7a931127d69cf672e9a82\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://90a827e15a84afd649f60ce17a8de17cba4e8b9b0612f4d5b2f008341216ffca\",\"dweb:/ipfs/QmYjsrVjYgZnopo4Qhe6H3pAq6rFmtNs5sxSa8p4bHfaoT\"]},\"contracts/state-transition/chain-deps/ZKChainStorage.sol\":{\"keccak256\":\"0x76bc06660d08d5cd46d78b90f6032d9e0e5c13609255ebaf222a442a2cfb5307\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://742bbe86cf0cd35b0127c3cd80f695d8608ba64751b30dbed0ee55b2831e0e04\",\"dweb:/ipfs/QmP94UjQFDeduFNTYgaJkiW8pcvMayMCr8EyMY5w2eL16i\"]},\"contracts/state-transition/chain-interfaces/IAdmin.sol\":{\"keccak256\":\"0x1ef5314f4a0151c529be7981621afb0214a81e142ccc581d842538dc97fff741\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://7b7eb04c6f2dce48c731cd08f0f9abf21bc5ac9b35885a7e38bfa3f88f8c15f1\",\"dweb:/ipfs/QmNmcsi2akgyabYuFb6aMmNNcoWoT8P6geq5Tq2jbKhSUh\"]},\"contracts/state-transition/chain-interfaces/IVerifier.sol\":{\"keccak256\":\"0x3c21f4e849c2559b7ad47cc8074884d30ce9717ebfdbc7efb51ba5481adade9b\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://b2bb2783feacfcf6b93e03e1d245792a071ce775d4063d2a56b280bdd79f124b\",\"dweb:/ipfs/QmTGqzb9oqJbrQx8NqBCpY6vojGRHHmc1EuyGu1k4cxRFL\"]},\"contracts/state-transition/chain-interfaces/IZKChainBase.sol\":{\"keccak256\":\"0xee753576cca182c55b1bddb792eec0d60d83bdd3d7978049054fe9ad68423ab0\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://01d17078b900f8c255cff82cd5691b1b520d54e15443396df69ce4a066eed9cb\",\"dweb:/ipfs/QmaZnEav6Frr2wxrWiySwCJbXZrJXmu7kg42E86mUQf3fy\"]},\"contracts/state-transition/libraries/Diamond.sol\":{\"keccak256\":\"0xf29a63bc78a584575238c8e60823600897513b1c41ef509a09e201a2c0c8dd9a\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://fc6f01507e108a0be1257c20c5ebd732a6912efc61a949a11c4de0f8a339e854\",\"dweb:/ipfs/QmTofjv6R5EHSHdz6FTghRyw3tpzY76QXXweS5WscoyfGZ\"]},\"contracts/state-transition/libraries/PriorityQueue.sol\":{\"keccak256\":\"0x204e9a8db491dcc9873297aac4e2d6ba2a0df1cd3bba0f3a9e8f298865a0c036\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://5bea0ceba523e14899751b5802cf8feb12723fa162c8da458285f7212f1dd832\",\"dweb:/ipfs/QmQjQHiBptbdM7Ljo7aGndZiWDrKWFgjVM6Yv4EQZHdHE8\"]},\"contracts/state-transition/libraries/PriorityTree.sol\":{\"keccak256\":\"0x570ce5e67f2a6822ba9326a70f2ed5dbdfec6a8466b21984e9e613569016f2a9\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://a42043735d5d87e51ba0ad0ecee6fb902a2f104c1146bef48faffb6b8f78769e\",\"dweb:/ipfs/QmVA6MwvPqhnLdqwaFc1u6Ajwy5b1K38xnBVr13ngo9rhE\"]},\"lib/openzeppelin-contracts-v4/contracts/utils/Arrays.sol\":{\"keccak256\":\"0x104a08fc99d01f2229044fe3db7b3e0375b5d93cd7203f11db6ecdc9c8c8b0b9\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://07efa42589f5c80e6aa4d7f9de54ae2a2e8de521a981d95f5a9536263eefa52e\",\"dweb:/ipfs/QmWuJU8wGW52KQrh82oRwGJBBAEhyckv8f8zKSG7tCMzQH\"]},\"lib/openzeppelin-contracts-v4/contracts/utils/StorageSlot.sol\":{\"keccak256\":\"0xf09e68aa0dc6722a25bc46490e8d48ed864466d17313b8a0b254c36b54e49899\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://e26daf81e2252dc1fe1ce0e4b55c2eb7c6d1ee84ae6558d1a9554432ea1d32da\",\"dweb:/ipfs/Qmb1UANWiWq5pCKbmHSu772hd4nt374dVaghGmwSVNuk8Q\"]},\"lib/openzeppelin-contracts-v4/contracts/utils/math/Math.sol\":{\"keccak256\":\"0xe4455ac1eb7fc497bb7402579e7b4d64d928b846fce7d2b6fde06d366f21c2b3\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://cc8841b3cd48ad125e2f46323c8bad3aa0e88e399ec62acb9e57efa7e7c8058c\",\"dweb:/ipfs/QmSqE4mXHA2BXW58deDbXE8MTcsL5JSKNDbm23sVQxRLPS\"]},\"lib/openzeppelin-contracts-v4/contracts/utils/math/SafeCast.sol\":{\"keccak256\":\"0x52a8cfb0f5239d11b457dcdd1b326992ef672714ca8da71a157255bddd13f3ad\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://495145362c7ff1c9ca88c58bbbbcb412e3c2004406647412394486552ff6c278\",\"dweb:/ipfs/QmNNCeng6d5eRPDn6tkWSQhjE39XWfQEfjA63rRwHmr1iH\"]}},\"version\":1}","metadata":{"compiler":{"version":"0.8.28+commit.7893614a"},"language":"Solidity","output":{"abi":[{"inputs":[{"internalType":"struct IChainAdminOwnable.Call","name":"_call","type":"tuple","components":[{"internalType":"address","name":"target","type":"address"},{"internalType":"uint256","name":"value","type":"uint256"},{"internalType":"bytes","name":"data","type":"bytes"}],"indexed":false},{"internalType":"bool","name":"_success","type":"bool","indexed":false},{"internalType":"bytes","name":"_returnData","type":"bytes","indexed":false}],"type":"event","name":"CallExecuted","anonymous":false},{"inputs":[{"internalType":"address","name":"_oldTokenMultiplierSetter","type":"address","indexed":false},{"internalType":"address","name":"_newTokenMultiplierSetter","type":"address","indexed":false}],"type":"event","name":"NewTokenMultiplierSetter","anonymous":false},{"inputs":[{"internalType":"uint256","name":"_protocolVersion","type":"uint256","indexed":true},{"internalType":"uint256","name":"_upgradeTimestamp","type":"uint256","indexed":false}],"type":"event","name":"UpdateUpgradeTimestamp","anonymous":false},{"inputs":[{"internalType":"struct IChainAdminOwnable.Call[]","name":"_calls","type":"tuple[]","components":[{"internalType":"address","name":"target","type":"address"},{"internalType":"uint256","name":"value","type":"uint256"},{"internalType":"bytes","name":"data","type":"bytes"}]},{"internalType":"bool","name":"_requireSuccess","type":"bool"}],"stateMutability":"payable","type":"function","name":"multicall"},{"inputs":[{"internalType":"contract IAdmin","name":"_chainContract","type":"address"},{"internalType":"uint128","name":"_nominator","type":"uint128"},{"internalType":"uint128","name":"_denominator","type":"uint128"}],"stateMutability":"nonpayable","type":"function","name":"setTokenMultiplier"},{"inputs":[{"internalType":"address","name":"_tokenMultiplierSetter","type":"address"}],"stateMutability":"nonpayable","type":"function","name":"setTokenMultiplierSetter"},{"inputs":[{"internalType":"uint256","name":"_protocolVersion","type":"uint256"},{"internalType":"uint256","name":"_upgradeTimestamp","type":"uint256"}],"stateMutability":"nonpayable","type":"function","name":"setUpgradeTimestamp"}],"devdoc":{"kind":"dev","methods":{},"version":1},"userdoc":{"kind":"user","methods":{},"version":1}},"settings":{"remappings":["@ensdomains/=node_modules/@ensdomains/","@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/","@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/","ds-test/=lib/forge-std/lib/ds-test/src/","erc4626-tests/=lib/openzeppelin-contracts-v4/lib/erc4626-tests/","eth-gas-reporter/=node_modules/eth-gas-reporter/","forge-std/=lib/forge-std/src/","foundry-test/=test/foundry/","hardhat/=node_modules/hardhat/","l2-contracts/=../l2-contracts/contracts/","murky/=lib/murky/src/","openzeppelin-contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/","openzeppelin-contracts-v4/=lib/openzeppelin-contracts-v4/","openzeppelin-contracts/=lib/murky/lib/openzeppelin-contracts/"],"optimizer":{"enabled":true,"runs":9999999},"metadata":{"bytecodeHash":"ipfs"},"compilationTarget":{"contracts/governance/IChainAdminOwnable.sol":"IChainAdminOwnable"},"evmVersion":"prague","libraries":{}},"sources":{"contracts/common/Config.sol":{"keccak256":"0x3d3d593829f57f6d8954c98b570ebf0155f0f212e05b74c61e3f19e41f6d06a6","urls":["bzz-raw://f599fe9e8adc08ad0cbb963e1d1164d3dd0b6a6c6e0073c499f0972f77c81840","dweb:/ipfs/Qma5mNegQrt1JCcQC1NQLoGxhNq1m5SXEZHkJrEp3Mrdoy"],"license":"MIT"},"contracts/common/L1ContractErrors.sol":{"keccak256":"0x49442e2241f15613345b0ec5383fa51d27a246755c5fae37b0fd04446406b69f","urls":["bzz-raw://d0d3337e586ce99f8dc62e13ae5ef2c6c85161088c6fcc9b4a2db2bbd414cbfa","dweb:/ipfs/QmWT6Bqcpvd6D2ZATEEQyUbfbYT3V9VqDycMWscK5Adgai"],"license":"MIT"},"contracts/common/Messaging.sol":{"keccak256":"0xdf0cd5cf8d2648a02ef442a4c474bdf1ea9ebf38a76366a5d54150ed332a6c9c","urls":["bzz-raw://a9d2c39c46e834a9d0c0162c8f8bdd25bfc8fc586a23181ce1964ccc0deb9373","dweb:/ipfs/QmUidpZTTxnQrLMyh8RrSk5wpck8cZBGoVGPDEPoahyrqK"],"license":"MIT"},"contracts/common/libraries/DynamicIncrementalMerkle.sol":{"keccak256":"0x59ed03174453eec9cf7d8a14bb1db3d4b8f06d5c03ff72f9904c50ff2362f313","urls":["bzz-raw://c5fcb7fd74db8d7563af09bbcfb1c96eb5da364706c6370dc3cb8d031c04d5ae","dweb:/ipfs/QmSr9mCEBz7wzHHXtUcHjs3YcKkiyLJKEcyA3GxcoHCqRF"],"license":"MIT"},"contracts/common/libraries/Merkle.sol":{"keccak256":"0xc53f505619f7e7dc9b276a63d1bc743a588633457cefbb3a9bc8b20b42ada35f","urls":["bzz-raw://b13d1dead050a82e4ad6c5013c9f176818933ba4b843110dbaf0bbe6c1259ee8","dweb:/ipfs/Qmac9pko9bhqY4NzM9MeAdxumenNFwKNE5qY4gV3z2zDpz"],"license":"MIT"},"contracts/common/libraries/UncheckedMath.sol":{"keccak256":"0x0ff1407bcabd5a4349a0da1372afe1f2e449bbb5271a2d88d5b999e4dffe9728","urls":["bzz-raw://b9fde36c3cf8c7989ebe20c1a52676870e0d820dc43afd8f789b09eff620dd9b","dweb:/ipfs/QmbMNcimFvgE44idT1ZUSAEv74FkePodWQfCg4f8GhmHR8"],"license":"MIT"},"contracts/governance/IChainAdminOwnable.sol":{"keccak256":"0x0fa42fee9a5901774ccea805ca1bf066ebf5dcd98009decb60a59fa62ff93a34","urls":["bzz-raw://be5242f204257f1b7f76c9726e570e2f8693edf084c1ec0529faaadfd13bbf2a","dweb:/ipfs/QmSCZqDVorbtV1UYrhjRbnts87gFucZr8QqyJjy8CzdvQ8"],"license":"MIT"},"contracts/state-transition/L1StateTransitionErrors.sol":{"keccak256":"0x4d15ae1480bbcac836d833143a19ec3ca3770da8efe7a931127d69cf672e9a82","urls":["bzz-raw://90a827e15a84afd649f60ce17a8de17cba4e8b9b0612f4d5b2f008341216ffca","dweb:/ipfs/QmYjsrVjYgZnopo4Qhe6H3pAq6rFmtNs5sxSa8p4bHfaoT"],"license":"MIT"},"contracts/state-transition/chain-deps/ZKChainStorage.sol":{"keccak256":"0x76bc06660d08d5cd46d78b90f6032d9e0e5c13609255ebaf222a442a2cfb5307","urls":["bzz-raw://742bbe86cf0cd35b0127c3cd80f695d8608ba64751b30dbed0ee55b2831e0e04","dweb:/ipfs/QmP94UjQFDeduFNTYgaJkiW8pcvMayMCr8EyMY5w2eL16i"],"license":"MIT"},"contracts/state-transition/chain-interfaces/IAdmin.sol":{"keccak256":"0x1ef5314f4a0151c529be7981621afb0214a81e142ccc581d842538dc97fff741","urls":["bzz-raw://7b7eb04c6f2dce48c731cd08f0f9abf21bc5ac9b35885a7e38bfa3f88f8c15f1","dweb:/ipfs/QmNmcsi2akgyabYuFb6aMmNNcoWoT8P6geq5Tq2jbKhSUh"],"license":"MIT"},"contracts/state-transition/chain-interfaces/IVerifier.sol":{"keccak256":"0x3c21f4e849c2559b7ad47cc8074884d30ce9717ebfdbc7efb51ba5481adade9b","urls":["bzz-raw://b2bb2783feacfcf6b93e03e1d245792a071ce775d4063d2a56b280bdd79f124b","dweb:/ipfs/QmTGqzb9oqJbrQx8NqBCpY6vojGRHHmc1EuyGu1k4cxRFL"],"license":"MIT"},"contracts/state-transition/chain-interfaces/IZKChainBase.sol":{"keccak256":"0xee753576cca182c55b1bddb792eec0d60d83bdd3d7978049054fe9ad68423ab0","urls":["bzz-raw://01d17078b900f8c255cff82cd5691b1b520d54e15443396df69ce4a066eed9cb","dweb:/ipfs/QmaZnEav6Frr2wxrWiySwCJbXZrJXmu7kg42E86mUQf3fy"],"license":"MIT"},"contracts/state-transition/libraries/Diamond.sol":{"keccak256":"0xf29a63bc78a584575238c8e60823600897513b1c41ef509a09e201a2c0c8dd9a","urls":["bzz-raw://fc6f01507e108a0be1257c20c5ebd732a6912efc61a949a11c4de0f8a339e854","dweb:/ipfs/QmTofjv6R5EHSHdz6FTghRyw3tpzY76QXXweS5WscoyfGZ"],"license":"MIT"},"contracts/state-transition/libraries/PriorityQueue.sol":{"keccak256":"0x204e9a8db491dcc9873297aac4e2d6ba2a0df1cd3bba0f3a9e8f298865a0c036","urls":["bzz-raw://5bea0ceba523e14899751b5802cf8feb12723fa162c8da458285f7212f1dd832","dweb:/ipfs/QmQjQHiBptbdM7Ljo7aGndZiWDrKWFgjVM6Yv4EQZHdHE8"],"license":"MIT"},"contracts/state-transition/libraries/PriorityTree.sol":{"keccak256":"0x570ce5e67f2a6822ba9326a70f2ed5dbdfec6a8466b21984e9e613569016f2a9","urls":["bzz-raw://a42043735d5d87e51ba0ad0ecee6fb902a2f104c1146bef48faffb6b8f78769e","dweb:/ipfs/QmVA6MwvPqhnLdqwaFc1u6Ajwy5b1K38xnBVr13ngo9rhE"],"license":"MIT"},"lib/openzeppelin-contracts-v4/contracts/utils/Arrays.sol":{"keccak256":"0x104a08fc99d01f2229044fe3db7b3e0375b5d93cd7203f11db6ecdc9c8c8b0b9","urls":["bzz-raw://07efa42589f5c80e6aa4d7f9de54ae2a2e8de521a981d95f5a9536263eefa52e","dweb:/ipfs/QmWuJU8wGW52KQrh82oRwGJBBAEhyckv8f8zKSG7tCMzQH"],"license":"MIT"},"lib/openzeppelin-contracts-v4/contracts/utils/StorageSlot.sol":{"keccak256":"0xf09e68aa0dc6722a25bc46490e8d48ed864466d17313b8a0b254c36b54e49899","urls":["bzz-raw://e26daf81e2252dc1fe1ce0e4b55c2eb7c6d1ee84ae6558d1a9554432ea1d32da","dweb:/ipfs/Qmb1UANWiWq5pCKbmHSu772hd4nt374dVaghGmwSVNuk8Q"],"license":"MIT"},"lib/openzeppelin-contracts-v4/contracts/utils/math/Math.sol":{"keccak256":"0xe4455ac1eb7fc497bb7402579e7b4d64d928b846fce7d2b6fde06d366f21c2b3","urls":["bzz-raw://cc8841b3cd48ad125e2f46323c8bad3aa0e88e399ec62acb9e57efa7e7c8058c","dweb:/ipfs/QmSqE4mXHA2BXW58deDbXE8MTcsL5JSKNDbm23sVQxRLPS"],"license":"MIT"},"lib/openzeppelin-contracts-v4/contracts/utils/math/SafeCast.sol":{"keccak256":"0x52a8cfb0f5239d11b457dcdd1b326992ef672714ca8da71a157255bddd13f3ad","urls":["bzz-raw://495145362c7ff1c9ca88c58bbbbcb412e3c2004406647412394486552ff6c278","dweb:/ipfs/QmNNCeng6d5eRPDn6tkWSQhjE39XWfQEfjA63rRwHmr1iH"],"license":"MIT"}},"version":1},"ast":{"absolutePath":"contracts/governance/IChainAdminOwnable.sol","id":39634,"exportedSymbols":{"IAdmin":[59720],"IChainAdminOwnable":[39633]},"nodeType":"SourceUnit","src":"33:1508:180","nodes":[{"id":39566,"nodeType":"PragmaDirective","src":"33:23:180","nodes":[],"literals":["solidity","0.8",".28"]},{"id":39568,"nodeType":"ImportDirective","src":"58:71:180","nodes":[],"absolutePath":"contracts/state-transition/chain-interfaces/IAdmin.sol","file":"../state-transition/chain-interfaces/IAdmin.sol","nameLocation":"-1:-1:-1","scope":39634,"sourceUnit":59721,"symbolAliases":[{"foreign":{"id":39567,"name":"IAdmin","nodeType":"Identifier","overloadedDeclarations":[],"referencedDeclaration":59720,"src":"66:6:180","typeDescriptions":{}},"nameLocation":"-1:-1:-1"}],"unitAlias":""},{"id":39633,"nodeType":"ContractDefinition","src":"249:1291:180","nodes":[{"id":39577,"nodeType":"StructDefinition","src":"565:86:180","nodes":[],"canonicalName":"IChainAdminOwnable.Call","documentation":{"id":39570,"nodeType":"StructuredDocumentation","src":"284:276:180","text":"@dev Represents a call to be made during multicall.\n @param target The address to which the call will be made.\n @param value The amount of Ether (in wei) to be sent along with the call.\n @param data The calldata to be executed on the `target` address."},"members":[{"constant":false,"id":39572,"mutability":"mutable","name":"target","nameLocation":"595:6:180","nodeType":"VariableDeclaration","scope":39577,"src":"587:14:180","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":39571,"name":"address","nodeType":"ElementaryTypeName","src":"587:7:180","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":39574,"mutability":"mutable","name":"value","nameLocation":"619:5:180","nodeType":"VariableDeclaration","scope":39577,"src":"611:13:180","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"},"typeName":{"id":39573,"name":"uint256","nodeType":"ElementaryTypeName","src":"611:7:180","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"}},"visibility":"internal"},{"constant":false,"id":39576,"mutability":"mutable","name":"data","nameLocation":"640:4:180","nodeType":"VariableDeclaration","scope":39577,"src":"634:10:180","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bytes_storage_ptr","typeString":"bytes"},"typeName":{"id":39575,"name":"bytes","nodeType":"ElementaryTypeName","src":"634:5:180","typeDescriptions":{"typeIdentifier":"t_bytes_storage_ptr","typeString":"bytes"}},"visibility":"internal"}],"name":"Call","nameLocation":"572:4:180","scope":39633,"visibility":"public"},{"id":39584,"nodeType":"EventDefinition","src":"757:90:180","nodes":[],"anonymous":false,"documentation":{"id":39578,"nodeType":"StructuredDocumentation","src":"657:95:180","text":"@notice Emitted when the expected upgrade timestamp for a specific protocol version is set."},"eventSelector":"d50ef21701c8ef211433b140724b8d6de471e7d822c8a616c3d424fe2d0e98a9","name":"UpdateUpgradeTimestamp","nameLocation":"763:22:180","parameters":{"id":39583,"nodeType":"ParameterList","parameters":[{"constant":false,"id":39580,"indexed":true,"mutability":"mutable","name":"_protocolVersion","nameLocation":"802:16:180","nodeType":"VariableDeclaration","scope":39584,"src":"786:32:180","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"},"typeName":{"id":39579,"name":"uint256","nodeType":"ElementaryTypeName","src":"786:7:180","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"}},"visibility":"internal"},{"constant":false,"id":39582,"indexed":false,"mutability":"mutable","name":"_upgradeTimestamp","nameLocation":"828:17:180","nodeType":"VariableDeclaration","scope":39584,"src":"820:25:180","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"},"typeName":{"id":39581,"name":"uint256","nodeType":"ElementaryTypeName","src":"820:7:180","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"}},"visibility":"internal"}],"src":"785:61:180"}},{"id":39594,"nodeType":"EventDefinition","src":"922:65:180","nodes":[],"anonymous":false,"documentation":{"id":39585,"nodeType":"StructuredDocumentation","src":"853:64:180","text":"@notice Emitted when the call is executed from the contract."},"eventSelector":"157c677a40c50f832f816d7b59c8c3e94774acae328c8ccb145b73aea7566d75","name":"CallExecuted","nameLocation":"928:12:180","parameters":{"id":39593,"nodeType":"ParameterList","parameters":[{"constant":false,"id":39588,"indexed":false,"mutability":"mutable","name":"_call","nameLocation":"946:5:180","nodeType":"VariableDeclaration","scope":39594,"src":"941:10:180","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_struct$_Call_$39577_memory_ptr","typeString":"struct IChainAdminOwnable.Call"},"typeName":{"id":39587,"nodeType":"UserDefinedTypeName","pathNode":{"id":39586,"name":"Call","nameLocations":["941:4:180"],"nodeType":"IdentifierPath","referencedDeclaration":39577,"src":"941:4:180"},"referencedDeclaration":39577,"src":"941:4:180","typeDescriptions":{"typeIdentifier":"t_struct$_Call_$39577_storage_ptr","typeString":"struct IChainAdminOwnable.Call"}},"visibility":"internal"},{"constant":false,"id":39590,"indexed":false,"mutability":"mutable","name":"_success","nameLocation":"958:8:180","nodeType":"VariableDeclaration","scope":39594,"src":"953:13:180","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bool","typeString":"bool"},"typeName":{"id":39589,"name":"bool","nodeType":"ElementaryTypeName","src":"953:4:180","typeDescriptions":{"typeIdentifier":"t_bool","typeString":"bool"}},"visibility":"internal"},{"constant":false,"id":39592,"indexed":false,"mutability":"mutable","name":"_returnData","nameLocation":"974:11:180","nodeType":"VariableDeclaration","scope":39594,"src":"968:17:180","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bytes_memory_ptr","typeString":"bytes"},"typeName":{"id":39591,"name":"bytes","nodeType":"ElementaryTypeName","src":"968:5:180","typeDescriptions":{"typeIdentifier":"t_bytes_storage_ptr","typeString":"bytes"}},"visibility":"internal"}],"src":"940:46:180"}},{"id":39601,"nodeType":"EventDefinition","src":"1063:101:180","nodes":[],"anonymous":false,"documentation":{"id":39595,"nodeType":"StructuredDocumentation","src":"993:65:180","text":"@notice Emitted when the new token multiplier address is set."},"eventSelector":"5676714dac9c718b14138faa71ddc6c7fef1efbf765ec950cb0d2de714461aa1","name":"NewTokenMultiplierSetter","nameLocation":"1069:24:180","parameters":{"id":39600,"nodeType":"ParameterList","parameters":[{"constant":false,"id":39597,"indexed":false,"mutability":"mutable","name":"_oldTokenMultiplierSetter","nameLocation":"1102:25:180","nodeType":"VariableDeclaration","scope":39601,"src":"1094:33:180","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":39596,"name":"address","nodeType":"ElementaryTypeName","src":"1094:7:180","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":39599,"indexed":false,"mutability":"mutable","name":"_newTokenMultiplierSetter","nameLocation":"1137:25:180","nodeType":"VariableDeclaration","scope":39601,"src":"1129:33:180","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":39598,"name":"address","nodeType":"ElementaryTypeName","src":"1129:7:180","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"}],"src":"1093:70:180"}},{"id":39606,"nodeType":"FunctionDefinition","src":"1170:75:180","nodes":[],"functionSelector":"60144197","implemented":false,"kind":"function","modifiers":[],"name":"setTokenMultiplierSetter","nameLocation":"1179:24:180","parameters":{"id":39604,"nodeType":"ParameterList","parameters":[{"constant":false,"id":39603,"mutability":"mutable","name":"_tokenMultiplierSetter","nameLocation":"1212:22:180","nodeType":"VariableDeclaration","scope":39606,"src":"1204:30:180","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":39602,"name":"address","nodeType":"ElementaryTypeName","src":"1204:7:180","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"}],"src":"1203:32:180"},"returnParameters":{"id":39605,"nodeType":"ParameterList","parameters":[],"src":"1244:0:180"},"scope":39633,"stateMutability":"nonpayable","virtual":false,"visibility":"external"},{"id":39613,"nodeType":"FunctionDefinition","src":"1251:91:180","nodes":[],"functionSelector":"e2a9d554","implemented":false,"kind":"function","modifiers":[],"name":"setUpgradeTimestamp","nameLocation":"1260:19:180","parameters":{"id":39611,"nodeType":"ParameterList","parameters":[{"constant":false,"id":39608,"mutability":"mutable","name":"_protocolVersion","nameLocation":"1288:16:180","nodeType":"VariableDeclaration","scope":39613,"src":"1280:24:180","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"},"typeName":{"id":39607,"name":"uint256","nodeType":"ElementaryTypeName","src":"1280:7:180","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"}},"visibility":"internal"},{"constant":false,"id":39610,"mutability":"mutable","name":"_upgradeTimestamp","nameLocation":"1314:17:180","nodeType":"VariableDeclaration","scope":39613,"src":"1306:25:180","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"},"typeName":{"id":39609,"name":"uint256","nodeType":"ElementaryTypeName","src":"1306:7:180","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"}},"visibility":"internal"}],"src":"1279:53:180"},"returnParameters":{"id":39612,"nodeType":"ParameterList","parameters":[],"src":"1341:0:180"},"scope":39633,"stateMutability":"nonpayable","virtual":false,"visibility":"external"},{"id":39622,"nodeType":"FunctionDefinition","src":"1348:82:180","nodes":[],"functionSelector":"69340beb","implemented":false,"kind":"function","modifiers":[],"name":"multicall","nameLocation":"1357:9:180","parameters":{"id":39620,"nodeType":"ParameterList","parameters":[{"constant":false,"id":39617,"mutability":"mutable","name":"_calls","nameLocation":"1383:6:180","nodeType":"VariableDeclaration","scope":39622,"src":"1367:22:180","stateVariable":false,"storageLocation":"calldata","typeDescriptions":{"typeIdentifier":"t_array$_t_struct$_Call_$39577_calldata_ptr_$dyn_calldata_ptr","typeString":"struct IChainAdminOwnable.Call[]"},"typeName":{"baseType":{"id":39615,"nodeType":"UserDefinedTypeName","pathNode":{"id":39614,"name":"Call","nameLocations":["1367:4:180"],"nodeType":"IdentifierPath","referencedDeclaration":39577,"src":"1367:4:180"},"referencedDeclaration":39577,"src":"1367:4:180","typeDescriptions":{"typeIdentifier":"t_struct$_Call_$39577_storage_ptr","typeString":"struct IChainAdminOwnable.Call"}},"id":39616,"nodeType":"ArrayTypeName","src":"1367:6:180","typeDescriptions":{"typeIdentifier":"t_array$_t_struct$_Call_$39577_storage_$dyn_storage_ptr","typeString":"struct IChainAdminOwnable.Call[]"}},"visibility":"internal"},{"constant":false,"id":39619,"mutability":"mutable","name":"_requireSuccess","nameLocation":"1396:15:180","nodeType":"VariableDeclaration","scope":39622,"src":"1391:20:180","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bool","typeString":"bool"},"typeName":{"id":39618,"name":"bool","nodeType":"ElementaryTypeName","src":"1391:4:180","typeDescriptions":{"typeIdentifier":"t_bool","typeString":"bool"}},"visibility":"internal"}],"src":"1366:46:180"},"returnParameters":{"id":39621,"nodeType":"ParameterList","parameters":[],"src":"1429:0:180"},"scope":39633,"stateMutability":"payable","virtual":false,"visibility":"external"},{"id":39632,"nodeType":"FunctionDefinition","src":"1436:102:180","nodes":[],"functionSelector":"4d4a1eca","implemented":false,"kind":"function","modifiers":[],"name":"setTokenMultiplier","nameLocation":"1445:18:180","parameters":{"id":39630,"nodeType":"ParameterList","parameters":[{"constant":false,"id":39625,"mutability":"mutable","name":"_chainContract","nameLocation":"1471:14:180","nodeType":"VariableDeclaration","scope":39632,"src":"1464:21:180","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_contract$_IAdmin_$59720","typeString":"contract IAdmin"},"typeName":{"id":39624,"nodeType":"UserDefinedTypeName","pathNode":{"id":39623,"name":"IAdmin","nameLocations":["1464:6:180"],"nodeType":"IdentifierPath","referencedDeclaration":59720,"src":"1464:6:180"},"referencedDeclaration":59720,"src":"1464:6:180","typeDescriptions":{"typeIdentifier":"t_contract$_IAdmin_$59720","typeString":"contract IAdmin"}},"visibility":"internal"},{"constant":false,"id":39627,"mutability":"mutable","name":"_nominator","nameLocation":"1495:10:180","nodeType":"VariableDeclaration","scope":39632,"src":"1487:18:180","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_uint128","typeString":"uint128"},"typeName":{"id":39626,"name":"uint128","nodeType":"ElementaryTypeName","src":"1487:7:180","typeDescriptions":{"typeIdentifier":"t_uint128","typeString":"uint128"}},"visibility":"internal"},{"constant":false,"id":39629,"mutability":"mutable","name":"_denominator","nameLocation":"1515:12:180","nodeType":"VariableDeclaration","scope":39632,"src":"1507:20:180","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_uint128","typeString":"uint128"},"typeName":{"id":39628,"name":"uint128","nodeType":"ElementaryTypeName","src":"1507:7:180","typeDescriptions":{"typeIdentifier":"t_uint128","typeString":"uint128"}},"visibility":"internal"}],"src":"1463:65:180"},"returnParameters":{"id":39631,"nodeType":"ParameterList","parameters":[],"src":"1537:0:180"},"scope":39633,"stateMutability":"nonpayable","virtual":false,"visibility":"external"}],"abstract":false,"baseContracts":[],"canonicalName":"IChainAdminOwnable","contractDependencies":[],"contractKind":"interface","documentation":{"id":39569,"nodeType":"StructuredDocumentation","src":"131:118:180","text":"@title ChainAdmin contract interface\n @author Matter Labs\n @custom:security-contact security@matterlabs.dev"},"fullyImplemented":false,"linearizedBaseContracts":[39633],"name":"IChainAdminOwnable","nameLocation":"259:18:180","scope":39634,"usedErrors":[],"usedEvents":[39584,39594,39601]}],"license":"MIT"},"id":180}
+{
+  "abi": [
+    {
+      "type": "function",
+      "name": "multicall",
+      "inputs": [
+        {
+          "name": "_calls",
+          "type": "tuple[]",
+          "internalType": "struct IChainAdminOwnable.Call[]",
+          "components": [
+            { "name": "target", "type": "address", "internalType": "address" },
+            { "name": "value", "type": "uint256", "internalType": "uint256" },
+            { "name": "data", "type": "bytes", "internalType": "bytes" }
+          ]
+        },
+        { "name": "_requireSuccess", "type": "bool", "internalType": "bool" }
+      ],
+      "outputs": [],
+      "stateMutability": "payable"
+    },
+    {
+      "type": "function",
+      "name": "setTokenMultiplier",
+      "inputs": [
+        { "name": "_chainContract", "type": "address", "internalType": "contract IAdmin" },
+        { "name": "_nominator", "type": "uint128", "internalType": "uint128" },
+        { "name": "_denominator", "type": "uint128", "internalType": "uint128" }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "setTokenMultiplierSetter",
+      "inputs": [{ "name": "_tokenMultiplierSetter", "type": "address", "internalType": "address" }],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "setUpgradeTimestamp",
+      "inputs": [
+        { "name": "_protocolVersion", "type": "uint256", "internalType": "uint256" },
+        { "name": "_upgradeTimestamp", "type": "uint256", "internalType": "uint256" }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "event",
+      "name": "CallExecuted",
+      "inputs": [
+        {
+          "name": "_call",
+          "type": "tuple",
+          "indexed": false,
+          "internalType": "struct IChainAdminOwnable.Call",
+          "components": [
+            { "name": "target", "type": "address", "internalType": "address" },
+            { "name": "value", "type": "uint256", "internalType": "uint256" },
+            { "name": "data", "type": "bytes", "internalType": "bytes" }
+          ]
+        },
+        { "name": "_success", "type": "bool", "indexed": false, "internalType": "bool" },
+        { "name": "_returnData", "type": "bytes", "indexed": false, "internalType": "bytes" }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "NewTokenMultiplierSetter",
+      "inputs": [
+        { "name": "_oldTokenMultiplierSetter", "type": "address", "indexed": false, "internalType": "address" },
+        { "name": "_newTokenMultiplierSetter", "type": "address", "indexed": false, "internalType": "address" }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "UpdateUpgradeTimestamp",
+      "inputs": [
+        { "name": "_protocolVersion", "type": "uint256", "indexed": true, "internalType": "uint256" },
+        { "name": "_upgradeTimestamp", "type": "uint256", "indexed": false, "internalType": "uint256" }
+      ],
+      "anonymous": false
+    }
+  ],
+  "bytecode": { "object": "0x", "sourceMap": "", "linkReferences": {} },
+  "deployedBytecode": { "object": "0x", "sourceMap": "", "linkReferences": {} },
+  "methodIdentifiers": {
+    "multicall((address,uint256,bytes)[],bool)": "69340beb",
+    "setTokenMultiplier(address,uint128,uint128)": "4d4a1eca",
+    "setTokenMultiplierSetter(address)": "60144197",
+    "setUpgradeTimestamp(uint256,uint256)": "e2a9d554"
+  },
+  "rawMetadata": "{\"compiler\":{\"version\":\"0.8.28+commit.7893614a\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"anonymous\":false,\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"target\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"indexed\":false,\"internalType\":\"struct IChainAdminOwnable.Call\",\"name\":\"_call\",\"type\":\"tuple\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"_success\",\"type\":\"bool\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"_returnData\",\"type\":\"bytes\"}],\"name\":\"CallExecuted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"_oldTokenMultiplierSetter\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"_newTokenMultiplierSetter\",\"type\":\"address\"}],\"name\":\"NewTokenMultiplierSetter\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"_protocolVersion\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"_upgradeTimestamp\",\"type\":\"uint256\"}],\"name\":\"UpdateUpgradeTimestamp\",\"type\":\"event\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"target\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"internalType\":\"struct IChainAdminOwnable.Call[]\",\"name\":\"_calls\",\"type\":\"tuple[]\"},{\"internalType\":\"bool\",\"name\":\"_requireSuccess\",\"type\":\"bool\"}],\"name\":\"multicall\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contract IAdmin\",\"name\":\"_chainContract\",\"type\":\"address\"},{\"internalType\":\"uint128\",\"name\":\"_nominator\",\"type\":\"uint128\"},{\"internalType\":\"uint128\",\"name\":\"_denominator\",\"type\":\"uint128\"}],\"name\":\"setTokenMultiplier\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_tokenMultiplierSetter\",\"type\":\"address\"}],\"name\":\"setTokenMultiplierSetter\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_protocolVersion\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"_upgradeTimestamp\",\"type\":\"uint256\"}],\"name\":\"setUpgradeTimestamp\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"author\":\"Matter Labs\",\"custom:security-contact\":\"security@matterlabs.dev\",\"kind\":\"dev\",\"methods\":{},\"title\":\"ChainAdmin contract interface\",\"version\":1},\"userdoc\":{\"events\":{\"CallExecuted((address,uint256,bytes),bool,bytes)\":{\"notice\":\"Emitted when the call is executed from the contract.\"},\"NewTokenMultiplierSetter(address,address)\":{\"notice\":\"Emitted when the new token multiplier address is set.\"},\"UpdateUpgradeTimestamp(uint256,uint256)\":{\"notice\":\"Emitted when the expected upgrade timestamp for a specific protocol version is set.\"}},\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/governance/IChainAdminOwnable.sol\":\"IChainAdminOwnable\"},\"evmVersion\":\"prague\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":9999999},\"remappings\":[\":@ensdomains/=node_modules/@ensdomains/\",\":@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/\",\":@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/\",\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":erc4626-tests/=lib/openzeppelin-contracts-v4/lib/erc4626-tests/\",\":eth-gas-reporter/=node_modules/eth-gas-reporter/\",\":forge-std/=lib/forge-std/src/\",\":foundry-test/=test/foundry/\",\":hardhat/=node_modules/hardhat/\",\":l2-contracts/=../l2-contracts/contracts/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/\",\":openzeppelin-contracts-v4/=lib/openzeppelin-contracts-v4/\",\":openzeppelin-contracts/=lib/murky/lib/openzeppelin-contracts/\"]},\"sources\":{\"contracts/common/Config.sol\":{\"keccak256\":\"0x3d3d593829f57f6d8954c98b570ebf0155f0f212e05b74c61e3f19e41f6d06a6\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://f599fe9e8adc08ad0cbb963e1d1164d3dd0b6a6c6e0073c499f0972f77c81840\",\"dweb:/ipfs/Qma5mNegQrt1JCcQC1NQLoGxhNq1m5SXEZHkJrEp3Mrdoy\"]},\"contracts/common/L1ContractErrors.sol\":{\"keccak256\":\"0x49442e2241f15613345b0ec5383fa51d27a246755c5fae37b0fd04446406b69f\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://d0d3337e586ce99f8dc62e13ae5ef2c6c85161088c6fcc9b4a2db2bbd414cbfa\",\"dweb:/ipfs/QmWT6Bqcpvd6D2ZATEEQyUbfbYT3V9VqDycMWscK5Adgai\"]},\"contracts/common/Messaging.sol\":{\"keccak256\":\"0xdf0cd5cf8d2648a02ef442a4c474bdf1ea9ebf38a76366a5d54150ed332a6c9c\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://a9d2c39c46e834a9d0c0162c8f8bdd25bfc8fc586a23181ce1964ccc0deb9373\",\"dweb:/ipfs/QmUidpZTTxnQrLMyh8RrSk5wpck8cZBGoVGPDEPoahyrqK\"]},\"contracts/common/libraries/DynamicIncrementalMerkle.sol\":{\"keccak256\":\"0x59ed03174453eec9cf7d8a14bb1db3d4b8f06d5c03ff72f9904c50ff2362f313\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://c5fcb7fd74db8d7563af09bbcfb1c96eb5da364706c6370dc3cb8d031c04d5ae\",\"dweb:/ipfs/QmSr9mCEBz7wzHHXtUcHjs3YcKkiyLJKEcyA3GxcoHCqRF\"]},\"contracts/common/libraries/Merkle.sol\":{\"keccak256\":\"0xc53f505619f7e7dc9b276a63d1bc743a588633457cefbb3a9bc8b20b42ada35f\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://b13d1dead050a82e4ad6c5013c9f176818933ba4b843110dbaf0bbe6c1259ee8\",\"dweb:/ipfs/Qmac9pko9bhqY4NzM9MeAdxumenNFwKNE5qY4gV3z2zDpz\"]},\"contracts/common/libraries/UncheckedMath.sol\":{\"keccak256\":\"0x0ff1407bcabd5a4349a0da1372afe1f2e449bbb5271a2d88d5b999e4dffe9728\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://b9fde36c3cf8c7989ebe20c1a52676870e0d820dc43afd8f789b09eff620dd9b\",\"dweb:/ipfs/QmbMNcimFvgE44idT1ZUSAEv74FkePodWQfCg4f8GhmHR8\"]},\"contracts/governance/IChainAdminOwnable.sol\":{\"keccak256\":\"0x0fa42fee9a5901774ccea805ca1bf066ebf5dcd98009decb60a59fa62ff93a34\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://be5242f204257f1b7f76c9726e570e2f8693edf084c1ec0529faaadfd13bbf2a\",\"dweb:/ipfs/QmSCZqDVorbtV1UYrhjRbnts87gFucZr8QqyJjy8CzdvQ8\"]},\"contracts/state-transition/L1StateTransitionErrors.sol\":{\"keccak256\":\"0x4d15ae1480bbcac836d833143a19ec3ca3770da8efe7a931127d69cf672e9a82\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://90a827e15a84afd649f60ce17a8de17cba4e8b9b0612f4d5b2f008341216ffca\",\"dweb:/ipfs/QmYjsrVjYgZnopo4Qhe6H3pAq6rFmtNs5sxSa8p4bHfaoT\"]},\"contracts/state-transition/chain-deps/ZKChainStorage.sol\":{\"keccak256\":\"0x76bc06660d08d5cd46d78b90f6032d9e0e5c13609255ebaf222a442a2cfb5307\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://742bbe86cf0cd35b0127c3cd80f695d8608ba64751b30dbed0ee55b2831e0e04\",\"dweb:/ipfs/QmP94UjQFDeduFNTYgaJkiW8pcvMayMCr8EyMY5w2eL16i\"]},\"contracts/state-transition/chain-interfaces/IAdmin.sol\":{\"keccak256\":\"0x1ef5314f4a0151c529be7981621afb0214a81e142ccc581d842538dc97fff741\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://7b7eb04c6f2dce48c731cd08f0f9abf21bc5ac9b35885a7e38bfa3f88f8c15f1\",\"dweb:/ipfs/QmNmcsi2akgyabYuFb6aMmNNcoWoT8P6geq5Tq2jbKhSUh\"]},\"contracts/state-transition/chain-interfaces/IVerifier.sol\":{\"keccak256\":\"0x3c21f4e849c2559b7ad47cc8074884d30ce9717ebfdbc7efb51ba5481adade9b\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://b2bb2783feacfcf6b93e03e1d245792a071ce775d4063d2a56b280bdd79f124b\",\"dweb:/ipfs/QmTGqzb9oqJbrQx8NqBCpY6vojGRHHmc1EuyGu1k4cxRFL\"]},\"contracts/state-transition/chain-interfaces/IZKChainBase.sol\":{\"keccak256\":\"0xee753576cca182c55b1bddb792eec0d60d83bdd3d7978049054fe9ad68423ab0\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://01d17078b900f8c255cff82cd5691b1b520d54e15443396df69ce4a066eed9cb\",\"dweb:/ipfs/QmaZnEav6Frr2wxrWiySwCJbXZrJXmu7kg42E86mUQf3fy\"]},\"contracts/state-transition/libraries/Diamond.sol\":{\"keccak256\":\"0xf29a63bc78a584575238c8e60823600897513b1c41ef509a09e201a2c0c8dd9a\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://fc6f01507e108a0be1257c20c5ebd732a6912efc61a949a11c4de0f8a339e854\",\"dweb:/ipfs/QmTofjv6R5EHSHdz6FTghRyw3tpzY76QXXweS5WscoyfGZ\"]},\"contracts/state-transition/libraries/PriorityQueue.sol\":{\"keccak256\":\"0x204e9a8db491dcc9873297aac4e2d6ba2a0df1cd3bba0f3a9e8f298865a0c036\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://5bea0ceba523e14899751b5802cf8feb12723fa162c8da458285f7212f1dd832\",\"dweb:/ipfs/QmQjQHiBptbdM7Ljo7aGndZiWDrKWFgjVM6Yv4EQZHdHE8\"]},\"contracts/state-transition/libraries/PriorityTree.sol\":{\"keccak256\":\"0x570ce5e67f2a6822ba9326a70f2ed5dbdfec6a8466b21984e9e613569016f2a9\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://a42043735d5d87e51ba0ad0ecee6fb902a2f104c1146bef48faffb6b8f78769e\",\"dweb:/ipfs/QmVA6MwvPqhnLdqwaFc1u6Ajwy5b1K38xnBVr13ngo9rhE\"]},\"lib/openzeppelin-contracts-v4/contracts/utils/Arrays.sol\":{\"keccak256\":\"0x104a08fc99d01f2229044fe3db7b3e0375b5d93cd7203f11db6ecdc9c8c8b0b9\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://07efa42589f5c80e6aa4d7f9de54ae2a2e8de521a981d95f5a9536263eefa52e\",\"dweb:/ipfs/QmWuJU8wGW52KQrh82oRwGJBBAEhyckv8f8zKSG7tCMzQH\"]},\"lib/openzeppelin-contracts-v4/contracts/utils/StorageSlot.sol\":{\"keccak256\":\"0xf09e68aa0dc6722a25bc46490e8d48ed864466d17313b8a0b254c36b54e49899\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://e26daf81e2252dc1fe1ce0e4b55c2eb7c6d1ee84ae6558d1a9554432ea1d32da\",\"dweb:/ipfs/Qmb1UANWiWq5pCKbmHSu772hd4nt374dVaghGmwSVNuk8Q\"]},\"lib/openzeppelin-contracts-v4/contracts/utils/math/Math.sol\":{\"keccak256\":\"0xe4455ac1eb7fc497bb7402579e7b4d64d928b846fce7d2b6fde06d366f21c2b3\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://cc8841b3cd48ad125e2f46323c8bad3aa0e88e399ec62acb9e57efa7e7c8058c\",\"dweb:/ipfs/QmSqE4mXHA2BXW58deDbXE8MTcsL5JSKNDbm23sVQxRLPS\"]},\"lib/openzeppelin-contracts-v4/contracts/utils/math/SafeCast.sol\":{\"keccak256\":\"0x52a8cfb0f5239d11b457dcdd1b326992ef672714ca8da71a157255bddd13f3ad\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://495145362c7ff1c9ca88c58bbbbcb412e3c2004406647412394486552ff6c278\",\"dweb:/ipfs/QmNNCeng6d5eRPDn6tkWSQhjE39XWfQEfjA63rRwHmr1iH\"]}},\"version\":1}",
+  "metadata": {
+    "compiler": { "version": "0.8.28+commit.7893614a" },
+    "language": "Solidity",
+    "output": {
+      "abi": [
+        {
+          "inputs": [
+            {
+              "internalType": "struct IChainAdminOwnable.Call",
+              "name": "_call",
+              "type": "tuple",
+              "components": [
+                { "internalType": "address", "name": "target", "type": "address" },
+                { "internalType": "uint256", "name": "value", "type": "uint256" },
+                { "internalType": "bytes", "name": "data", "type": "bytes" }
+              ],
+              "indexed": false
+            },
+            { "internalType": "bool", "name": "_success", "type": "bool", "indexed": false },
+            { "internalType": "bytes", "name": "_returnData", "type": "bytes", "indexed": false }
+          ],
+          "type": "event",
+          "name": "CallExecuted",
+          "anonymous": false
+        },
+        {
+          "inputs": [
+            { "internalType": "address", "name": "_oldTokenMultiplierSetter", "type": "address", "indexed": false },
+            { "internalType": "address", "name": "_newTokenMultiplierSetter", "type": "address", "indexed": false }
+          ],
+          "type": "event",
+          "name": "NewTokenMultiplierSetter",
+          "anonymous": false
+        },
+        {
+          "inputs": [
+            { "internalType": "uint256", "name": "_protocolVersion", "type": "uint256", "indexed": true },
+            { "internalType": "uint256", "name": "_upgradeTimestamp", "type": "uint256", "indexed": false }
+          ],
+          "type": "event",
+          "name": "UpdateUpgradeTimestamp",
+          "anonymous": false
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "struct IChainAdminOwnable.Call[]",
+              "name": "_calls",
+              "type": "tuple[]",
+              "components": [
+                { "internalType": "address", "name": "target", "type": "address" },
+                { "internalType": "uint256", "name": "value", "type": "uint256" },
+                { "internalType": "bytes", "name": "data", "type": "bytes" }
+              ]
+            },
+            { "internalType": "bool", "name": "_requireSuccess", "type": "bool" }
+          ],
+          "stateMutability": "payable",
+          "type": "function",
+          "name": "multicall"
+        },
+        {
+          "inputs": [
+            { "internalType": "contract IAdmin", "name": "_chainContract", "type": "address" },
+            { "internalType": "uint128", "name": "_nominator", "type": "uint128" },
+            { "internalType": "uint128", "name": "_denominator", "type": "uint128" }
+          ],
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setTokenMultiplier"
+        },
+        {
+          "inputs": [{ "internalType": "address", "name": "_tokenMultiplierSetter", "type": "address" }],
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setTokenMultiplierSetter"
+        },
+        {
+          "inputs": [
+            { "internalType": "uint256", "name": "_protocolVersion", "type": "uint256" },
+            { "internalType": "uint256", "name": "_upgradeTimestamp", "type": "uint256" }
+          ],
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setUpgradeTimestamp"
+        }
+      ],
+      "devdoc": { "kind": "dev", "methods": {}, "version": 1 },
+      "userdoc": { "kind": "user", "methods": {}, "version": 1 }
+    },
+    "settings": {
+      "remappings": [
+        "@ensdomains/=node_modules/@ensdomains/",
+        "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
+        "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
+        "ds-test/=lib/forge-std/lib/ds-test/src/",
+        "erc4626-tests/=lib/openzeppelin-contracts-v4/lib/erc4626-tests/",
+        "eth-gas-reporter/=node_modules/eth-gas-reporter/",
+        "forge-std/=lib/forge-std/src/",
+        "foundry-test/=test/foundry/",
+        "hardhat/=node_modules/hardhat/",
+        "l2-contracts/=../l2-contracts/contracts/",
+        "murky/=lib/murky/src/",
+        "openzeppelin-contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/",
+        "openzeppelin-contracts-v4/=lib/openzeppelin-contracts-v4/",
+        "openzeppelin-contracts/=lib/murky/lib/openzeppelin-contracts/"
+      ],
+      "optimizer": { "enabled": true, "runs": 9999999 },
+      "metadata": { "bytecodeHash": "ipfs" },
+      "compilationTarget": { "contracts/governance/IChainAdminOwnable.sol": "IChainAdminOwnable" },
+      "evmVersion": "prague",
+      "libraries": {}
+    },
+    "sources": {
+      "contracts/common/Config.sol": {
+        "keccak256": "0x3d3d593829f57f6d8954c98b570ebf0155f0f212e05b74c61e3f19e41f6d06a6",
+        "urls": [
+          "bzz-raw://f599fe9e8adc08ad0cbb963e1d1164d3dd0b6a6c6e0073c499f0972f77c81840",
+          "dweb:/ipfs/Qma5mNegQrt1JCcQC1NQLoGxhNq1m5SXEZHkJrEp3Mrdoy"
+        ],
+        "license": "MIT"
+      },
+      "contracts/common/L1ContractErrors.sol": {
+        "keccak256": "0x49442e2241f15613345b0ec5383fa51d27a246755c5fae37b0fd04446406b69f",
+        "urls": [
+          "bzz-raw://d0d3337e586ce99f8dc62e13ae5ef2c6c85161088c6fcc9b4a2db2bbd414cbfa",
+          "dweb:/ipfs/QmWT6Bqcpvd6D2ZATEEQyUbfbYT3V9VqDycMWscK5Adgai"
+        ],
+        "license": "MIT"
+      },
+      "contracts/common/Messaging.sol": {
+        "keccak256": "0xdf0cd5cf8d2648a02ef442a4c474bdf1ea9ebf38a76366a5d54150ed332a6c9c",
+        "urls": [
+          "bzz-raw://a9d2c39c46e834a9d0c0162c8f8bdd25bfc8fc586a23181ce1964ccc0deb9373",
+          "dweb:/ipfs/QmUidpZTTxnQrLMyh8RrSk5wpck8cZBGoVGPDEPoahyrqK"
+        ],
+        "license": "MIT"
+      },
+      "contracts/common/libraries/DynamicIncrementalMerkle.sol": {
+        "keccak256": "0x59ed03174453eec9cf7d8a14bb1db3d4b8f06d5c03ff72f9904c50ff2362f313",
+        "urls": [
+          "bzz-raw://c5fcb7fd74db8d7563af09bbcfb1c96eb5da364706c6370dc3cb8d031c04d5ae",
+          "dweb:/ipfs/QmSr9mCEBz7wzHHXtUcHjs3YcKkiyLJKEcyA3GxcoHCqRF"
+        ],
+        "license": "MIT"
+      },
+      "contracts/common/libraries/Merkle.sol": {
+        "keccak256": "0xc53f505619f7e7dc9b276a63d1bc743a588633457cefbb3a9bc8b20b42ada35f",
+        "urls": [
+          "bzz-raw://b13d1dead050a82e4ad6c5013c9f176818933ba4b843110dbaf0bbe6c1259ee8",
+          "dweb:/ipfs/Qmac9pko9bhqY4NzM9MeAdxumenNFwKNE5qY4gV3z2zDpz"
+        ],
+        "license": "MIT"
+      },
+      "contracts/common/libraries/UncheckedMath.sol": {
+        "keccak256": "0x0ff1407bcabd5a4349a0da1372afe1f2e449bbb5271a2d88d5b999e4dffe9728",
+        "urls": [
+          "bzz-raw://b9fde36c3cf8c7989ebe20c1a52676870e0d820dc43afd8f789b09eff620dd9b",
+          "dweb:/ipfs/QmbMNcimFvgE44idT1ZUSAEv74FkePodWQfCg4f8GhmHR8"
+        ],
+        "license": "MIT"
+      },
+      "contracts/governance/IChainAdminOwnable.sol": {
+        "keccak256": "0x0fa42fee9a5901774ccea805ca1bf066ebf5dcd98009decb60a59fa62ff93a34",
+        "urls": [
+          "bzz-raw://be5242f204257f1b7f76c9726e570e2f8693edf084c1ec0529faaadfd13bbf2a",
+          "dweb:/ipfs/QmSCZqDVorbtV1UYrhjRbnts87gFucZr8QqyJjy8CzdvQ8"
+        ],
+        "license": "MIT"
+      },
+      "contracts/state-transition/L1StateTransitionErrors.sol": {
+        "keccak256": "0x4d15ae1480bbcac836d833143a19ec3ca3770da8efe7a931127d69cf672e9a82",
+        "urls": [
+          "bzz-raw://90a827e15a84afd649f60ce17a8de17cba4e8b9b0612f4d5b2f008341216ffca",
+          "dweb:/ipfs/QmYjsrVjYgZnopo4Qhe6H3pAq6rFmtNs5sxSa8p4bHfaoT"
+        ],
+        "license": "MIT"
+      },
+      "contracts/state-transition/chain-deps/ZKChainStorage.sol": {
+        "keccak256": "0x76bc06660d08d5cd46d78b90f6032d9e0e5c13609255ebaf222a442a2cfb5307",
+        "urls": [
+          "bzz-raw://742bbe86cf0cd35b0127c3cd80f695d8608ba64751b30dbed0ee55b2831e0e04",
+          "dweb:/ipfs/QmP94UjQFDeduFNTYgaJkiW8pcvMayMCr8EyMY5w2eL16i"
+        ],
+        "license": "MIT"
+      },
+      "contracts/state-transition/chain-interfaces/IAdmin.sol": {
+        "keccak256": "0x1ef5314f4a0151c529be7981621afb0214a81e142ccc581d842538dc97fff741",
+        "urls": [
+          "bzz-raw://7b7eb04c6f2dce48c731cd08f0f9abf21bc5ac9b35885a7e38bfa3f88f8c15f1",
+          "dweb:/ipfs/QmNmcsi2akgyabYuFb6aMmNNcoWoT8P6geq5Tq2jbKhSUh"
+        ],
+        "license": "MIT"
+      },
+      "contracts/state-transition/chain-interfaces/IVerifier.sol": {
+        "keccak256": "0x3c21f4e849c2559b7ad47cc8074884d30ce9717ebfdbc7efb51ba5481adade9b",
+        "urls": [
+          "bzz-raw://b2bb2783feacfcf6b93e03e1d245792a071ce775d4063d2a56b280bdd79f124b",
+          "dweb:/ipfs/QmTGqzb9oqJbrQx8NqBCpY6vojGRHHmc1EuyGu1k4cxRFL"
+        ],
+        "license": "MIT"
+      },
+      "contracts/state-transition/chain-interfaces/IZKChainBase.sol": {
+        "keccak256": "0xee753576cca182c55b1bddb792eec0d60d83bdd3d7978049054fe9ad68423ab0",
+        "urls": [
+          "bzz-raw://01d17078b900f8c255cff82cd5691b1b520d54e15443396df69ce4a066eed9cb",
+          "dweb:/ipfs/QmaZnEav6Frr2wxrWiySwCJbXZrJXmu7kg42E86mUQf3fy"
+        ],
+        "license": "MIT"
+      },
+      "contracts/state-transition/libraries/Diamond.sol": {
+        "keccak256": "0xf29a63bc78a584575238c8e60823600897513b1c41ef509a09e201a2c0c8dd9a",
+        "urls": [
+          "bzz-raw://fc6f01507e108a0be1257c20c5ebd732a6912efc61a949a11c4de0f8a339e854",
+          "dweb:/ipfs/QmTofjv6R5EHSHdz6FTghRyw3tpzY76QXXweS5WscoyfGZ"
+        ],
+        "license": "MIT"
+      },
+      "contracts/state-transition/libraries/PriorityQueue.sol": {
+        "keccak256": "0x204e9a8db491dcc9873297aac4e2d6ba2a0df1cd3bba0f3a9e8f298865a0c036",
+        "urls": [
+          "bzz-raw://5bea0ceba523e14899751b5802cf8feb12723fa162c8da458285f7212f1dd832",
+          "dweb:/ipfs/QmQjQHiBptbdM7Ljo7aGndZiWDrKWFgjVM6Yv4EQZHdHE8"
+        ],
+        "license": "MIT"
+      },
+      "contracts/state-transition/libraries/PriorityTree.sol": {
+        "keccak256": "0x570ce5e67f2a6822ba9326a70f2ed5dbdfec6a8466b21984e9e613569016f2a9",
+        "urls": [
+          "bzz-raw://a42043735d5d87e51ba0ad0ecee6fb902a2f104c1146bef48faffb6b8f78769e",
+          "dweb:/ipfs/QmVA6MwvPqhnLdqwaFc1u6Ajwy5b1K38xnBVr13ngo9rhE"
+        ],
+        "license": "MIT"
+      },
+      "lib/openzeppelin-contracts-v4/contracts/utils/Arrays.sol": {
+        "keccak256": "0x104a08fc99d01f2229044fe3db7b3e0375b5d93cd7203f11db6ecdc9c8c8b0b9",
+        "urls": [
+          "bzz-raw://07efa42589f5c80e6aa4d7f9de54ae2a2e8de521a981d95f5a9536263eefa52e",
+          "dweb:/ipfs/QmWuJU8wGW52KQrh82oRwGJBBAEhyckv8f8zKSG7tCMzQH"
+        ],
+        "license": "MIT"
+      },
+      "lib/openzeppelin-contracts-v4/contracts/utils/StorageSlot.sol": {
+        "keccak256": "0xf09e68aa0dc6722a25bc46490e8d48ed864466d17313b8a0b254c36b54e49899",
+        "urls": [
+          "bzz-raw://e26daf81e2252dc1fe1ce0e4b55c2eb7c6d1ee84ae6558d1a9554432ea1d32da",
+          "dweb:/ipfs/Qmb1UANWiWq5pCKbmHSu772hd4nt374dVaghGmwSVNuk8Q"
+        ],
+        "license": "MIT"
+      },
+      "lib/openzeppelin-contracts-v4/contracts/utils/math/Math.sol": {
+        "keccak256": "0xe4455ac1eb7fc497bb7402579e7b4d64d928b846fce7d2b6fde06d366f21c2b3",
+        "urls": [
+          "bzz-raw://cc8841b3cd48ad125e2f46323c8bad3aa0e88e399ec62acb9e57efa7e7c8058c",
+          "dweb:/ipfs/QmSqE4mXHA2BXW58deDbXE8MTcsL5JSKNDbm23sVQxRLPS"
+        ],
+        "license": "MIT"
+      },
+      "lib/openzeppelin-contracts-v4/contracts/utils/math/SafeCast.sol": {
+        "keccak256": "0x52a8cfb0f5239d11b457dcdd1b326992ef672714ca8da71a157255bddd13f3ad",
+        "urls": [
+          "bzz-raw://495145362c7ff1c9ca88c58bbbbcb412e3c2004406647412394486552ff6c278",
+          "dweb:/ipfs/QmNNCeng6d5eRPDn6tkWSQhjE39XWfQEfjA63rRwHmr1iH"
+        ],
+        "license": "MIT"
+      }
+    },
+    "version": 1
+  },
+  "ast": {
+    "absolutePath": "contracts/governance/IChainAdminOwnable.sol",
+    "id": 39634,
+    "exportedSymbols": { "IAdmin": [59720], "IChainAdminOwnable": [39633] },
+    "nodeType": "SourceUnit",
+    "src": "33:1508:180",
+    "nodes": [
+      {
+        "id": 39566,
+        "nodeType": "PragmaDirective",
+        "src": "33:23:180",
+        "nodes": [],
+        "literals": ["solidity", "0.8", ".28"]
+      },
+      {
+        "id": 39568,
+        "nodeType": "ImportDirective",
+        "src": "58:71:180",
+        "nodes": [],
+        "absolutePath": "contracts/state-transition/chain-interfaces/IAdmin.sol",
+        "file": "../state-transition/chain-interfaces/IAdmin.sol",
+        "nameLocation": "-1:-1:-1",
+        "scope": 39634,
+        "sourceUnit": 59721,
+        "symbolAliases": [
+          {
+            "foreign": {
+              "id": 39567,
+              "name": "IAdmin",
+              "nodeType": "Identifier",
+              "overloadedDeclarations": [],
+              "referencedDeclaration": 59720,
+              "src": "66:6:180",
+              "typeDescriptions": {}
+            },
+            "nameLocation": "-1:-1:-1"
+          }
+        ],
+        "unitAlias": ""
+      },
+      {
+        "id": 39633,
+        "nodeType": "ContractDefinition",
+        "src": "249:1291:180",
+        "nodes": [
+          {
+            "id": 39577,
+            "nodeType": "StructDefinition",
+            "src": "565:86:180",
+            "nodes": [],
+            "canonicalName": "IChainAdminOwnable.Call",
+            "documentation": {
+              "id": 39570,
+              "nodeType": "StructuredDocumentation",
+              "src": "284:276:180",
+              "text": "@dev Represents a call to be made during multicall.\n @param target The address to which the call will be made.\n @param value The amount of Ether (in wei) to be sent along with the call.\n @param data The calldata to be executed on the `target` address."
+            },
+            "members": [
+              {
+                "constant": false,
+                "id": 39572,
+                "mutability": "mutable",
+                "name": "target",
+                "nameLocation": "595:6:180",
+                "nodeType": "VariableDeclaration",
+                "scope": 39577,
+                "src": "587:14:180",
+                "stateVariable": false,
+                "storageLocation": "default",
+                "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+                "typeName": {
+                  "id": 39571,
+                  "name": "address",
+                  "nodeType": "ElementaryTypeName",
+                  "src": "587:7:180",
+                  "stateMutability": "nonpayable",
+                  "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+                },
+                "visibility": "internal"
+              },
+              {
+                "constant": false,
+                "id": 39574,
+                "mutability": "mutable",
+                "name": "value",
+                "nameLocation": "619:5:180",
+                "nodeType": "VariableDeclaration",
+                "scope": 39577,
+                "src": "611:13:180",
+                "stateVariable": false,
+                "storageLocation": "default",
+                "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" },
+                "typeName": {
+                  "id": 39573,
+                  "name": "uint256",
+                  "nodeType": "ElementaryTypeName",
+                  "src": "611:7:180",
+                  "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" }
+                },
+                "visibility": "internal"
+              },
+              {
+                "constant": false,
+                "id": 39576,
+                "mutability": "mutable",
+                "name": "data",
+                "nameLocation": "640:4:180",
+                "nodeType": "VariableDeclaration",
+                "scope": 39577,
+                "src": "634:10:180",
+                "stateVariable": false,
+                "storageLocation": "default",
+                "typeDescriptions": { "typeIdentifier": "t_bytes_storage_ptr", "typeString": "bytes" },
+                "typeName": {
+                  "id": 39575,
+                  "name": "bytes",
+                  "nodeType": "ElementaryTypeName",
+                  "src": "634:5:180",
+                  "typeDescriptions": { "typeIdentifier": "t_bytes_storage_ptr", "typeString": "bytes" }
+                },
+                "visibility": "internal"
+              }
+            ],
+            "name": "Call",
+            "nameLocation": "572:4:180",
+            "scope": 39633,
+            "visibility": "public"
+          },
+          {
+            "id": 39584,
+            "nodeType": "EventDefinition",
+            "src": "757:90:180",
+            "nodes": [],
+            "anonymous": false,
+            "documentation": {
+              "id": 39578,
+              "nodeType": "StructuredDocumentation",
+              "src": "657:95:180",
+              "text": "@notice Emitted when the expected upgrade timestamp for a specific protocol version is set."
+            },
+            "eventSelector": "d50ef21701c8ef211433b140724b8d6de471e7d822c8a616c3d424fe2d0e98a9",
+            "name": "UpdateUpgradeTimestamp",
+            "nameLocation": "763:22:180",
+            "parameters": {
+              "id": 39583,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 39580,
+                  "indexed": true,
+                  "mutability": "mutable",
+                  "name": "_protocolVersion",
+                  "nameLocation": "802:16:180",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 39584,
+                  "src": "786:32:180",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" },
+                  "typeName": {
+                    "id": 39579,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "786:7:180",
+                    "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 39582,
+                  "indexed": false,
+                  "mutability": "mutable",
+                  "name": "_upgradeTimestamp",
+                  "nameLocation": "828:17:180",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 39584,
+                  "src": "820:25:180",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" },
+                  "typeName": {
+                    "id": 39581,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "820:7:180",
+                    "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "785:61:180"
+            }
+          },
+          {
+            "id": 39594,
+            "nodeType": "EventDefinition",
+            "src": "922:65:180",
+            "nodes": [],
+            "anonymous": false,
+            "documentation": {
+              "id": 39585,
+              "nodeType": "StructuredDocumentation",
+              "src": "853:64:180",
+              "text": "@notice Emitted when the call is executed from the contract."
+            },
+            "eventSelector": "157c677a40c50f832f816d7b59c8c3e94774acae328c8ccb145b73aea7566d75",
+            "name": "CallExecuted",
+            "nameLocation": "928:12:180",
+            "parameters": {
+              "id": 39593,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 39588,
+                  "indexed": false,
+                  "mutability": "mutable",
+                  "name": "_call",
+                  "nameLocation": "946:5:180",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 39594,
+                  "src": "941:10:180",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_struct$_Call_$39577_memory_ptr",
+                    "typeString": "struct IChainAdminOwnable.Call"
+                  },
+                  "typeName": {
+                    "id": 39587,
+                    "nodeType": "UserDefinedTypeName",
+                    "pathNode": {
+                      "id": 39586,
+                      "name": "Call",
+                      "nameLocations": ["941:4:180"],
+                      "nodeType": "IdentifierPath",
+                      "referencedDeclaration": 39577,
+                      "src": "941:4:180"
+                    },
+                    "referencedDeclaration": 39577,
+                    "src": "941:4:180",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_struct$_Call_$39577_storage_ptr",
+                      "typeString": "struct IChainAdminOwnable.Call"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 39590,
+                  "indexed": false,
+                  "mutability": "mutable",
+                  "name": "_success",
+                  "nameLocation": "958:8:180",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 39594,
+                  "src": "953:13:180",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_bool", "typeString": "bool" },
+                  "typeName": {
+                    "id": 39589,
+                    "name": "bool",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "953:4:180",
+                    "typeDescriptions": { "typeIdentifier": "t_bool", "typeString": "bool" }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 39592,
+                  "indexed": false,
+                  "mutability": "mutable",
+                  "name": "_returnData",
+                  "nameLocation": "974:11:180",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 39594,
+                  "src": "968:17:180",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_bytes_memory_ptr", "typeString": "bytes" },
+                  "typeName": {
+                    "id": 39591,
+                    "name": "bytes",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "968:5:180",
+                    "typeDescriptions": { "typeIdentifier": "t_bytes_storage_ptr", "typeString": "bytes" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "940:46:180"
+            }
+          },
+          {
+            "id": 39601,
+            "nodeType": "EventDefinition",
+            "src": "1063:101:180",
+            "nodes": [],
+            "anonymous": false,
+            "documentation": {
+              "id": 39595,
+              "nodeType": "StructuredDocumentation",
+              "src": "993:65:180",
+              "text": "@notice Emitted when the new token multiplier address is set."
+            },
+            "eventSelector": "5676714dac9c718b14138faa71ddc6c7fef1efbf765ec950cb0d2de714461aa1",
+            "name": "NewTokenMultiplierSetter",
+            "nameLocation": "1069:24:180",
+            "parameters": {
+              "id": 39600,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 39597,
+                  "indexed": false,
+                  "mutability": "mutable",
+                  "name": "_oldTokenMultiplierSetter",
+                  "nameLocation": "1102:25:180",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 39601,
+                  "src": "1094:33:180",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+                  "typeName": {
+                    "id": 39596,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1094:7:180",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 39599,
+                  "indexed": false,
+                  "mutability": "mutable",
+                  "name": "_newTokenMultiplierSetter",
+                  "nameLocation": "1137:25:180",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 39601,
+                  "src": "1129:33:180",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+                  "typeName": {
+                    "id": 39598,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1129:7:180",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1093:70:180"
+            }
+          },
+          {
+            "id": 39606,
+            "nodeType": "FunctionDefinition",
+            "src": "1170:75:180",
+            "nodes": [],
+            "functionSelector": "60144197",
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "setTokenMultiplierSetter",
+            "nameLocation": "1179:24:180",
+            "parameters": {
+              "id": 39604,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 39603,
+                  "mutability": "mutable",
+                  "name": "_tokenMultiplierSetter",
+                  "nameLocation": "1212:22:180",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 39606,
+                  "src": "1204:30:180",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+                  "typeName": {
+                    "id": 39602,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1204:7:180",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1203:32:180"
+            },
+            "returnParameters": { "id": 39605, "nodeType": "ParameterList", "parameters": [], "src": "1244:0:180" },
+            "scope": 39633,
+            "stateMutability": "nonpayable",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "id": 39613,
+            "nodeType": "FunctionDefinition",
+            "src": "1251:91:180",
+            "nodes": [],
+            "functionSelector": "e2a9d554",
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "setUpgradeTimestamp",
+            "nameLocation": "1260:19:180",
+            "parameters": {
+              "id": 39611,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 39608,
+                  "mutability": "mutable",
+                  "name": "_protocolVersion",
+                  "nameLocation": "1288:16:180",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 39613,
+                  "src": "1280:24:180",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" },
+                  "typeName": {
+                    "id": 39607,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1280:7:180",
+                    "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 39610,
+                  "mutability": "mutable",
+                  "name": "_upgradeTimestamp",
+                  "nameLocation": "1314:17:180",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 39613,
+                  "src": "1306:25:180",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" },
+                  "typeName": {
+                    "id": 39609,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1306:7:180",
+                    "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1279:53:180"
+            },
+            "returnParameters": { "id": 39612, "nodeType": "ParameterList", "parameters": [], "src": "1341:0:180" },
+            "scope": 39633,
+            "stateMutability": "nonpayable",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "id": 39622,
+            "nodeType": "FunctionDefinition",
+            "src": "1348:82:180",
+            "nodes": [],
+            "functionSelector": "69340beb",
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "multicall",
+            "nameLocation": "1357:9:180",
+            "parameters": {
+              "id": 39620,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 39617,
+                  "mutability": "mutable",
+                  "name": "_calls",
+                  "nameLocation": "1383:6:180",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 39622,
+                  "src": "1367:22:180",
+                  "stateVariable": false,
+                  "storageLocation": "calldata",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_array$_t_struct$_Call_$39577_calldata_ptr_$dyn_calldata_ptr",
+                    "typeString": "struct IChainAdminOwnable.Call[]"
+                  },
+                  "typeName": {
+                    "baseType": {
+                      "id": 39615,
+                      "nodeType": "UserDefinedTypeName",
+                      "pathNode": {
+                        "id": 39614,
+                        "name": "Call",
+                        "nameLocations": ["1367:4:180"],
+                        "nodeType": "IdentifierPath",
+                        "referencedDeclaration": 39577,
+                        "src": "1367:4:180"
+                      },
+                      "referencedDeclaration": 39577,
+                      "src": "1367:4:180",
+                      "typeDescriptions": {
+                        "typeIdentifier": "t_struct$_Call_$39577_storage_ptr",
+                        "typeString": "struct IChainAdminOwnable.Call"
+                      }
+                    },
+                    "id": 39616,
+                    "nodeType": "ArrayTypeName",
+                    "src": "1367:6:180",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_array$_t_struct$_Call_$39577_storage_$dyn_storage_ptr",
+                      "typeString": "struct IChainAdminOwnable.Call[]"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 39619,
+                  "mutability": "mutable",
+                  "name": "_requireSuccess",
+                  "nameLocation": "1396:15:180",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 39622,
+                  "src": "1391:20:180",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_bool", "typeString": "bool" },
+                  "typeName": {
+                    "id": 39618,
+                    "name": "bool",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1391:4:180",
+                    "typeDescriptions": { "typeIdentifier": "t_bool", "typeString": "bool" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1366:46:180"
+            },
+            "returnParameters": { "id": 39621, "nodeType": "ParameterList", "parameters": [], "src": "1429:0:180" },
+            "scope": 39633,
+            "stateMutability": "payable",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "id": 39632,
+            "nodeType": "FunctionDefinition",
+            "src": "1436:102:180",
+            "nodes": [],
+            "functionSelector": "4d4a1eca",
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "setTokenMultiplier",
+            "nameLocation": "1445:18:180",
+            "parameters": {
+              "id": 39630,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 39625,
+                  "mutability": "mutable",
+                  "name": "_chainContract",
+                  "nameLocation": "1471:14:180",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 39632,
+                  "src": "1464:21:180",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_contract$_IAdmin_$59720",
+                    "typeString": "contract IAdmin"
+                  },
+                  "typeName": {
+                    "id": 39624,
+                    "nodeType": "UserDefinedTypeName",
+                    "pathNode": {
+                      "id": 39623,
+                      "name": "IAdmin",
+                      "nameLocations": ["1464:6:180"],
+                      "nodeType": "IdentifierPath",
+                      "referencedDeclaration": 59720,
+                      "src": "1464:6:180"
+                    },
+                    "referencedDeclaration": 59720,
+                    "src": "1464:6:180",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_contract$_IAdmin_$59720",
+                      "typeString": "contract IAdmin"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 39627,
+                  "mutability": "mutable",
+                  "name": "_nominator",
+                  "nameLocation": "1495:10:180",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 39632,
+                  "src": "1487:18:180",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_uint128", "typeString": "uint128" },
+                  "typeName": {
+                    "id": 39626,
+                    "name": "uint128",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1487:7:180",
+                    "typeDescriptions": { "typeIdentifier": "t_uint128", "typeString": "uint128" }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 39629,
+                  "mutability": "mutable",
+                  "name": "_denominator",
+                  "nameLocation": "1515:12:180",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 39632,
+                  "src": "1507:20:180",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_uint128", "typeString": "uint128" },
+                  "typeName": {
+                    "id": 39628,
+                    "name": "uint128",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1507:7:180",
+                    "typeDescriptions": { "typeIdentifier": "t_uint128", "typeString": "uint128" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1463:65:180"
+            },
+            "returnParameters": { "id": 39631, "nodeType": "ParameterList", "parameters": [], "src": "1537:0:180" },
+            "scope": 39633,
+            "stateMutability": "nonpayable",
+            "virtual": false,
+            "visibility": "external"
+          }
+        ],
+        "abstract": false,
+        "baseContracts": [],
+        "canonicalName": "IChainAdminOwnable",
+        "contractDependencies": [],
+        "contractKind": "interface",
+        "documentation": {
+          "id": 39569,
+          "nodeType": "StructuredDocumentation",
+          "src": "131:118:180",
+          "text": "@title ChainAdmin contract interface\n @author Matter Labs\n @custom:security-contact security@matterlabs.dev"
+        },
+        "fullyImplemented": false,
+        "linearizedBaseContracts": [39633],
+        "name": "IChainAdminOwnable",
+        "nameLocation": "259:18:180",
+        "scope": 39634,
+        "usedErrors": [],
+        "usedEvents": [39584, 39594, 39601]
+      }
+    ],
+    "license": "MIT"
+  },
+  "id": 180
+}

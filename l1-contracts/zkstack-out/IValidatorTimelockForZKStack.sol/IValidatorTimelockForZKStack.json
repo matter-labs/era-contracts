@@ -1,1 +1,812 @@
-{"abi":[{"type":"function","name":"COMMITTER_ROLE","inputs":[],"outputs":[{"name":"","type":"bytes32","internalType":"bytes32"}],"stateMutability":"view"},{"type":"function","name":"EXECUTOR_ROLE","inputs":[],"outputs":[{"name":"","type":"bytes32","internalType":"bytes32"}],"stateMutability":"view"},{"type":"function","name":"PRECOMMITTER_ROLE","inputs":[],"outputs":[{"name":"","type":"bytes32","internalType":"bytes32"}],"stateMutability":"view"},{"type":"function","name":"PROVER_ROLE","inputs":[],"outputs":[{"name":"","type":"bytes32","internalType":"bytes32"}],"stateMutability":"view"},{"type":"function","name":"hasRole","inputs":[{"name":"_chainId","type":"uint256","internalType":"uint256"},{"name":"_role","type":"bytes32","internalType":"bytes32"},{"name":"_account","type":"address","internalType":"address"}],"outputs":[{"name":"","type":"bool","internalType":"bool"}],"stateMutability":"view"},{"type":"function","name":"hasRoleForChainId","inputs":[{"name":"_chainId","type":"uint256","internalType":"uint256"},{"name":"_role","type":"bytes32","internalType":"bytes32"},{"name":"_account","type":"address","internalType":"address"}],"outputs":[{"name":"","type":"bool","internalType":"bool"}],"stateMutability":"view"},{"type":"function","name":"validators","inputs":[{"name":"_chainId","type":"uint256","internalType":"uint256"},{"name":"_validator","type":"address","internalType":"address"}],"outputs":[{"name":"","type":"bool","internalType":"bool"}],"stateMutability":"view"}],"bytecode":{"object":"0x","sourceMap":"","linkReferences":{}},"deployedBytecode":{"object":"0x","sourceMap":"","linkReferences":{}},"methodIdentifiers":{"COMMITTER_ROLE()":"1a7c3f73","EXECUTOR_ROLE()":"07bd0265","PRECOMMITTER_ROLE()":"a86d67c5","PROVER_ROLE()":"dc9a4ef6","hasRole(uint256,bytes32,address)":"119345aa","hasRoleForChainId(uint256,bytes32,address)":"8e80aaf6","validators(uint256,address)":"91b19874"},"rawMetadata":"{\"compiler\":{\"version\":\"0.8.28+commit.7893614a\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"COMMITTER_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"EXECUTOR_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"PRECOMMITTER_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"PROVER_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_chainId\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"_role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"_account\",\"type\":\"address\"}],\"name\":\"hasRole\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_chainId\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"_role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"_account\",\"type\":\"address\"}],\"name\":\"hasRoleForChainId\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_chainId\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"_validator\",\"type\":\"address\"}],\"name\":\"validators\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"details\":\"This interface includes methods that may be legacy or specific to zkStack CLI needs\",\"kind\":\"dev\",\"methods\":{\"hasRole(uint256,bytes32,address)\":{\"params\":{\"_account\":\"The address to check.\",\"_chainId\":\"The chain Id of the ZK chain.\",\"_role\":\"The bytes32 ID of the role.\"}},\"hasRoleForChainId(uint256,bytes32,address)\":{\"params\":{\"_account\":\"The address to check.\",\"_chainId\":\"The chain Id of the ZK chain.\",\"_role\":\"The bytes32 ID of the role.\"}},\"validators(uint256,address)\":{\"details\":\"This function is deprecated but kept for backward compatibility with older zkStack CLI versions\",\"params\":{\"_chainId\":\"The chain Id of the ZK chain.\",\"_validator\":\"The address of the validator to check.\"},\"returns\":{\"_0\":\"Whether the validator has any roles for the chain.\"}}},\"title\":\"IValidatorTimelockForZKStack\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"COMMITTER_ROLE()\":{\"notice\":\"Role hash for addresses allowed to commit batches on a chain.\"},\"EXECUTOR_ROLE()\":{\"notice\":\"Role hash for addresses allowed to execute batches on a chain.\"},\"PRECOMMITTER_ROLE()\":{\"notice\":\"Role hash for addresses allowed to precommit batches on a chain.\"},\"PROVER_ROLE()\":{\"notice\":\"Role hash for addresses allowed to prove batches on a chain.\"},\"hasRole(uint256,bytes32,address)\":{\"notice\":\"Check if an address has a specific role for a chain\"},\"hasRoleForChainId(uint256,bytes32,address)\":{\"notice\":\"Check if an address has a specific role for a chain\"},\"validators(uint256,address)\":{\"notice\":\"Legacy function from pre-v29 for backward compatibility\"}},\"notice\":\"Interface for Validator Timelock specifically for zkStack CLI usage\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/script-interfaces/IValidatorTimelockForZKStack.sol\":\"IValidatorTimelockForZKStack\"},\"evmVersion\":\"prague\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":9999999},\"remappings\":[\":@ensdomains/=node_modules/@ensdomains/\",\":@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/\",\":@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/\",\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":erc4626-tests/=lib/openzeppelin-contracts-v4/lib/erc4626-tests/\",\":eth-gas-reporter/=node_modules/eth-gas-reporter/\",\":forge-std/=lib/forge-std/src/\",\":foundry-test/=test/foundry/\",\":hardhat/=node_modules/hardhat/\",\":l2-contracts/=../l2-contracts/contracts/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/\",\":openzeppelin-contracts-v4/=lib/openzeppelin-contracts-v4/\",\":openzeppelin-contracts/=lib/murky/lib/openzeppelin-contracts/\"]},\"sources\":{\"contracts/script-interfaces/IValidatorTimelockForZKStack.sol\":{\"keccak256\":\"0x59ac36520777d9e6d630c1ae56d12d5350a3e805ca861cfa6e6b99850dfe1d5c\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://839895e22b3b897785aa90abbc16581f42dcf2839c59b552dc146eb2baa8addd\",\"dweb:/ipfs/QmbTUt7Yk59Z3F59yDQCQovLyW7tv5MY9tPvhJPJJGmGfo\"]}},\"version\":1}","metadata":{"compiler":{"version":"0.8.28+commit.7893614a"},"language":"Solidity","output":{"abi":[{"inputs":[],"stateMutability":"view","type":"function","name":"COMMITTER_ROLE","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}]},{"inputs":[],"stateMutability":"view","type":"function","name":"EXECUTOR_ROLE","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}]},{"inputs":[],"stateMutability":"view","type":"function","name":"PRECOMMITTER_ROLE","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}]},{"inputs":[],"stateMutability":"view","type":"function","name":"PROVER_ROLE","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}]},{"inputs":[{"internalType":"uint256","name":"_chainId","type":"uint256"},{"internalType":"bytes32","name":"_role","type":"bytes32"},{"internalType":"address","name":"_account","type":"address"}],"stateMutability":"view","type":"function","name":"hasRole","outputs":[{"internalType":"bool","name":"","type":"bool"}]},{"inputs":[{"internalType":"uint256","name":"_chainId","type":"uint256"},{"internalType":"bytes32","name":"_role","type":"bytes32"},{"internalType":"address","name":"_account","type":"address"}],"stateMutability":"view","type":"function","name":"hasRoleForChainId","outputs":[{"internalType":"bool","name":"","type":"bool"}]},{"inputs":[{"internalType":"uint256","name":"_chainId","type":"uint256"},{"internalType":"address","name":"_validator","type":"address"}],"stateMutability":"view","type":"function","name":"validators","outputs":[{"internalType":"bool","name":"","type":"bool"}]}],"devdoc":{"kind":"dev","methods":{"hasRole(uint256,bytes32,address)":{"params":{"_account":"The address to check.","_chainId":"The chain Id of the ZK chain.","_role":"The bytes32 ID of the role."}},"hasRoleForChainId(uint256,bytes32,address)":{"params":{"_account":"The address to check.","_chainId":"The chain Id of the ZK chain.","_role":"The bytes32 ID of the role."}},"validators(uint256,address)":{"details":"This function is deprecated but kept for backward compatibility with older zkStack CLI versions","params":{"_chainId":"The chain Id of the ZK chain.","_validator":"The address of the validator to check."},"returns":{"_0":"Whether the validator has any roles for the chain."}}},"version":1},"userdoc":{"kind":"user","methods":{"COMMITTER_ROLE()":{"notice":"Role hash for addresses allowed to commit batches on a chain."},"EXECUTOR_ROLE()":{"notice":"Role hash for addresses allowed to execute batches on a chain."},"PRECOMMITTER_ROLE()":{"notice":"Role hash for addresses allowed to precommit batches on a chain."},"PROVER_ROLE()":{"notice":"Role hash for addresses allowed to prove batches on a chain."},"hasRole(uint256,bytes32,address)":{"notice":"Check if an address has a specific role for a chain"},"hasRoleForChainId(uint256,bytes32,address)":{"notice":"Check if an address has a specific role for a chain"},"validators(uint256,address)":{"notice":"Legacy function from pre-v29 for backward compatibility"}},"version":1}},"settings":{"remappings":["@ensdomains/=node_modules/@ensdomains/","@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/","@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/","ds-test/=lib/forge-std/lib/ds-test/src/","erc4626-tests/=lib/openzeppelin-contracts-v4/lib/erc4626-tests/","eth-gas-reporter/=node_modules/eth-gas-reporter/","forge-std/=lib/forge-std/src/","foundry-test/=test/foundry/","hardhat/=node_modules/hardhat/","l2-contracts/=../l2-contracts/contracts/","murky/=lib/murky/src/","openzeppelin-contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/","openzeppelin-contracts-v4/=lib/openzeppelin-contracts-v4/","openzeppelin-contracts/=lib/murky/lib/openzeppelin-contracts/"],"optimizer":{"enabled":true,"runs":9999999},"metadata":{"bytecodeHash":"ipfs"},"compilationTarget":{"contracts/script-interfaces/IValidatorTimelockForZKStack.sol":"IValidatorTimelockForZKStack"},"evmVersion":"prague","libraries":{}},"sources":{"contracts/script-interfaces/IValidatorTimelockForZKStack.sol":{"keccak256":"0x59ac36520777d9e6d630c1ae56d12d5350a3e805ca861cfa6e6b99850dfe1d5c","urls":["bzz-raw://839895e22b3b897785aa90abbc16581f42dcf2839c59b552dc146eb2baa8addd","dweb:/ipfs/QmbTUt7Yk59Z3F59yDQCQovLyW7tv5MY9tPvhJPJJGmGfo"],"license":"MIT"}},"version":1},"ast":{"absolutePath":"contracts/script-interfaces/IValidatorTimelockForZKStack.sol","id":46272,"exportedSymbols":{"IValidatorTimelockForZKStack":[46271]},"nodeType":"SourceUnit","src":"32:1960:217","nodes":[{"id":46211,"nodeType":"PragmaDirective","src":"32:23:217","nodes":[],"literals":["solidity","0.8",".28"]},{"id":46271,"nodeType":"ContractDefinition","src":"270:1721:217","nodes":[{"id":46218,"nodeType":"FunctionDefinition","src":"396:61:217","nodes":[],"documentation":{"id":46213,"nodeType":"StructuredDocumentation","src":"315:76:217","text":"@notice Role hash for addresses allowed to precommit batches on a chain."},"functionSelector":"a86d67c5","implemented":false,"kind":"function","modifiers":[],"name":"PRECOMMITTER_ROLE","nameLocation":"405:17:217","parameters":{"id":46214,"nodeType":"ParameterList","parameters":[],"src":"422:2:217"},"returnParameters":{"id":46217,"nodeType":"ParameterList","parameters":[{"constant":false,"id":46216,"mutability":"mutable","name":"","nameLocation":"-1:-1:-1","nodeType":"VariableDeclaration","scope":46218,"src":"448:7:217","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bytes32","typeString":"bytes32"},"typeName":{"id":46215,"name":"bytes32","nodeType":"ElementaryTypeName","src":"448:7:217","typeDescriptions":{"typeIdentifier":"t_bytes32","typeString":"bytes32"}},"visibility":"internal"}],"src":"447:9:217"},"scope":46271,"stateMutability":"view","virtual":false,"visibility":"external"},{"id":46224,"nodeType":"FunctionDefinition","src":"541:58:217","nodes":[],"documentation":{"id":46219,"nodeType":"StructuredDocumentation","src":"463:73:217","text":"@notice Role hash for addresses allowed to commit batches on a chain."},"functionSelector":"1a7c3f73","implemented":false,"kind":"function","modifiers":[],"name":"COMMITTER_ROLE","nameLocation":"550:14:217","parameters":{"id":46220,"nodeType":"ParameterList","parameters":[],"src":"564:2:217"},"returnParameters":{"id":46223,"nodeType":"ParameterList","parameters":[{"constant":false,"id":46222,"mutability":"mutable","name":"","nameLocation":"-1:-1:-1","nodeType":"VariableDeclaration","scope":46224,"src":"590:7:217","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bytes32","typeString":"bytes32"},"typeName":{"id":46221,"name":"bytes32","nodeType":"ElementaryTypeName","src":"590:7:217","typeDescriptions":{"typeIdentifier":"t_bytes32","typeString":"bytes32"}},"visibility":"internal"}],"src":"589:9:217"},"scope":46271,"stateMutability":"view","virtual":false,"visibility":"external"},{"id":46230,"nodeType":"FunctionDefinition","src":"682:55:217","nodes":[],"documentation":{"id":46225,"nodeType":"StructuredDocumentation","src":"605:72:217","text":"@notice Role hash for addresses allowed to prove batches on a chain."},"functionSelector":"dc9a4ef6","implemented":false,"kind":"function","modifiers":[],"name":"PROVER_ROLE","nameLocation":"691:11:217","parameters":{"id":46226,"nodeType":"ParameterList","parameters":[],"src":"702:2:217"},"returnParameters":{"id":46229,"nodeType":"ParameterList","parameters":[{"constant":false,"id":46228,"mutability":"mutable","name":"","nameLocation":"-1:-1:-1","nodeType":"VariableDeclaration","scope":46230,"src":"728:7:217","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bytes32","typeString":"bytes32"},"typeName":{"id":46227,"name":"bytes32","nodeType":"ElementaryTypeName","src":"728:7:217","typeDescriptions":{"typeIdentifier":"t_bytes32","typeString":"bytes32"}},"visibility":"internal"}],"src":"727:9:217"},"scope":46271,"stateMutability":"view","virtual":false,"visibility":"external"},{"id":46236,"nodeType":"FunctionDefinition","src":"822:57:217","nodes":[],"documentation":{"id":46231,"nodeType":"StructuredDocumentation","src":"743:74:217","text":"@notice Role hash for addresses allowed to execute batches on a chain."},"functionSelector":"07bd0265","implemented":false,"kind":"function","modifiers":[],"name":"EXECUTOR_ROLE","nameLocation":"831:13:217","parameters":{"id":46232,"nodeType":"ParameterList","parameters":[],"src":"844:2:217"},"returnParameters":{"id":46235,"nodeType":"ParameterList","parameters":[{"constant":false,"id":46234,"mutability":"mutable","name":"","nameLocation":"-1:-1:-1","nodeType":"VariableDeclaration","scope":46236,"src":"870:7:217","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bytes32","typeString":"bytes32"},"typeName":{"id":46233,"name":"bytes32","nodeType":"ElementaryTypeName","src":"870:7:217","typeDescriptions":{"typeIdentifier":"t_bytes32","typeString":"bytes32"}},"visibility":"internal"}],"src":"869:9:217"},"scope":46271,"stateMutability":"view","virtual":false,"visibility":"external"},{"id":46248,"nodeType":"FunctionDefinition","src":"1102:97:217","nodes":[],"documentation":{"id":46237,"nodeType":"StructuredDocumentation","src":"885:212:217","text":"@notice Check if an address has a specific role for a chain\n @param _chainId The chain Id of the ZK chain.\n @param _role The bytes32 ID of the role.\n @param _account The address to check."},"functionSelector":"119345aa","implemented":false,"kind":"function","modifiers":[],"name":"hasRole","nameLocation":"1111:7:217","parameters":{"id":46244,"nodeType":"ParameterList","parameters":[{"constant":false,"id":46239,"mutability":"mutable","name":"_chainId","nameLocation":"1127:8:217","nodeType":"VariableDeclaration","scope":46248,"src":"1119:16:217","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"},"typeName":{"id":46238,"name":"uint256","nodeType":"ElementaryTypeName","src":"1119:7:217","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"}},"visibility":"internal"},{"constant":false,"id":46241,"mutability":"mutable","name":"_role","nameLocation":"1145:5:217","nodeType":"VariableDeclaration","scope":46248,"src":"1137:13:217","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bytes32","typeString":"bytes32"},"typeName":{"id":46240,"name":"bytes32","nodeType":"ElementaryTypeName","src":"1137:7:217","typeDescriptions":{"typeIdentifier":"t_bytes32","typeString":"bytes32"}},"visibility":"internal"},{"constant":false,"id":46243,"mutability":"mutable","name":"_account","nameLocation":"1160:8:217","nodeType":"VariableDeclaration","scope":46248,"src":"1152:16:217","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46242,"name":"address","nodeType":"ElementaryTypeName","src":"1152:7:217","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"}],"src":"1118:51:217"},"returnParameters":{"id":46247,"nodeType":"ParameterList","parameters":[{"constant":false,"id":46246,"mutability":"mutable","name":"","nameLocation":"-1:-1:-1","nodeType":"VariableDeclaration","scope":46248,"src":"1193:4:217","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bool","typeString":"bool"},"typeName":{"id":46245,"name":"bool","nodeType":"ElementaryTypeName","src":"1193:4:217","typeDescriptions":{"typeIdentifier":"t_bool","typeString":"bool"}},"visibility":"internal"}],"src":"1192:6:217"},"scope":46271,"stateMutability":"view","virtual":false,"visibility":"external"},{"id":46260,"nodeType":"FunctionDefinition","src":"1422:107:217","nodes":[],"documentation":{"id":46249,"nodeType":"StructuredDocumentation","src":"1205:212:217","text":"@notice Check if an address has a specific role for a chain\n @param _chainId The chain Id of the ZK chain.\n @param _role The bytes32 ID of the role.\n @param _account The address to check."},"functionSelector":"8e80aaf6","implemented":false,"kind":"function","modifiers":[],"name":"hasRoleForChainId","nameLocation":"1431:17:217","parameters":{"id":46256,"nodeType":"ParameterList","parameters":[{"constant":false,"id":46251,"mutability":"mutable","name":"_chainId","nameLocation":"1457:8:217","nodeType":"VariableDeclaration","scope":46260,"src":"1449:16:217","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"},"typeName":{"id":46250,"name":"uint256","nodeType":"ElementaryTypeName","src":"1449:7:217","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"}},"visibility":"internal"},{"constant":false,"id":46253,"mutability":"mutable","name":"_role","nameLocation":"1475:5:217","nodeType":"VariableDeclaration","scope":46260,"src":"1467:13:217","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bytes32","typeString":"bytes32"},"typeName":{"id":46252,"name":"bytes32","nodeType":"ElementaryTypeName","src":"1467:7:217","typeDescriptions":{"typeIdentifier":"t_bytes32","typeString":"bytes32"}},"visibility":"internal"},{"constant":false,"id":46255,"mutability":"mutable","name":"_account","nameLocation":"1490:8:217","nodeType":"VariableDeclaration","scope":46260,"src":"1482:16:217","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46254,"name":"address","nodeType":"ElementaryTypeName","src":"1482:7:217","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"}],"src":"1448:51:217"},"returnParameters":{"id":46259,"nodeType":"ParameterList","parameters":[{"constant":false,"id":46258,"mutability":"mutable","name":"","nameLocation":"-1:-1:-1","nodeType":"VariableDeclaration","scope":46260,"src":"1523:4:217","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bool","typeString":"bool"},"typeName":{"id":46257,"name":"bool","nodeType":"ElementaryTypeName","src":"1523:4:217","typeDescriptions":{"typeIdentifier":"t_bool","typeString":"bool"}},"visibility":"internal"}],"src":"1522:6:217"},"scope":46271,"stateMutability":"view","virtual":false,"visibility":"external"},{"id":46270,"nodeType":"FunctionDefinition","src":"1902:87:217","nodes":[],"documentation":{"id":46261,"nodeType":"StructuredDocumentation","src":"1535:362:217","text":"@notice Legacy function from pre-v29 for backward compatibility\n @dev This function is deprecated but kept for backward compatibility with older zkStack CLI versions\n @param _chainId The chain Id of the ZK chain.\n @param _validator The address of the validator to check.\n @return Whether the validator has any roles for the chain."},"functionSelector":"91b19874","implemented":false,"kind":"function","modifiers":[],"name":"validators","nameLocation":"1911:10:217","parameters":{"id":46266,"nodeType":"ParameterList","parameters":[{"constant":false,"id":46263,"mutability":"mutable","name":"_chainId","nameLocation":"1930:8:217","nodeType":"VariableDeclaration","scope":46270,"src":"1922:16:217","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"},"typeName":{"id":46262,"name":"uint256","nodeType":"ElementaryTypeName","src":"1922:7:217","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"}},"visibility":"internal"},{"constant":false,"id":46265,"mutability":"mutable","name":"_validator","nameLocation":"1948:10:217","nodeType":"VariableDeclaration","scope":46270,"src":"1940:18:217","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46264,"name":"address","nodeType":"ElementaryTypeName","src":"1940:7:217","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"}],"src":"1921:38:217"},"returnParameters":{"id":46269,"nodeType":"ParameterList","parameters":[{"constant":false,"id":46268,"mutability":"mutable","name":"","nameLocation":"-1:-1:-1","nodeType":"VariableDeclaration","scope":46270,"src":"1983:4:217","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bool","typeString":"bool"},"typeName":{"id":46267,"name":"bool","nodeType":"ElementaryTypeName","src":"1983:4:217","typeDescriptions":{"typeIdentifier":"t_bool","typeString":"bool"}},"visibility":"internal"}],"src":"1982:6:217"},"scope":46271,"stateMutability":"view","virtual":false,"visibility":"external"}],"abstract":false,"baseContracts":[],"canonicalName":"IValidatorTimelockForZKStack","contractDependencies":[],"contractKind":"interface","documentation":{"id":46212,"nodeType":"StructuredDocumentation","src":"57:213:217","text":"@title IValidatorTimelockForZKStack\n @notice Interface for Validator Timelock specifically for zkStack CLI usage\n @dev This interface includes methods that may be legacy or specific to zkStack CLI needs"},"fullyImplemented":false,"linearizedBaseContracts":[46271],"name":"IValidatorTimelockForZKStack","nameLocation":"280:28:217","scope":46272,"usedErrors":[],"usedEvents":[]}],"license":"MIT"},"id":217}
+{
+  "abi": [
+    {
+      "type": "function",
+      "name": "COMMITTER_ROLE",
+      "inputs": [],
+      "outputs": [{ "name": "", "type": "bytes32", "internalType": "bytes32" }],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "EXECUTOR_ROLE",
+      "inputs": [],
+      "outputs": [{ "name": "", "type": "bytes32", "internalType": "bytes32" }],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "PRECOMMITTER_ROLE",
+      "inputs": [],
+      "outputs": [{ "name": "", "type": "bytes32", "internalType": "bytes32" }],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "PROVER_ROLE",
+      "inputs": [],
+      "outputs": [{ "name": "", "type": "bytes32", "internalType": "bytes32" }],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "hasRole",
+      "inputs": [
+        { "name": "_chainId", "type": "uint256", "internalType": "uint256" },
+        { "name": "_role", "type": "bytes32", "internalType": "bytes32" },
+        { "name": "_account", "type": "address", "internalType": "address" }
+      ],
+      "outputs": [{ "name": "", "type": "bool", "internalType": "bool" }],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "hasRoleForChainId",
+      "inputs": [
+        { "name": "_chainId", "type": "uint256", "internalType": "uint256" },
+        { "name": "_role", "type": "bytes32", "internalType": "bytes32" },
+        { "name": "_account", "type": "address", "internalType": "address" }
+      ],
+      "outputs": [{ "name": "", "type": "bool", "internalType": "bool" }],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "validators",
+      "inputs": [
+        { "name": "_chainId", "type": "uint256", "internalType": "uint256" },
+        { "name": "_validator", "type": "address", "internalType": "address" }
+      ],
+      "outputs": [{ "name": "", "type": "bool", "internalType": "bool" }],
+      "stateMutability": "view"
+    }
+  ],
+  "bytecode": { "object": "0x", "sourceMap": "", "linkReferences": {} },
+  "deployedBytecode": { "object": "0x", "sourceMap": "", "linkReferences": {} },
+  "methodIdentifiers": {
+    "COMMITTER_ROLE()": "1a7c3f73",
+    "EXECUTOR_ROLE()": "07bd0265",
+    "PRECOMMITTER_ROLE()": "a86d67c5",
+    "PROVER_ROLE()": "dc9a4ef6",
+    "hasRole(uint256,bytes32,address)": "119345aa",
+    "hasRoleForChainId(uint256,bytes32,address)": "8e80aaf6",
+    "validators(uint256,address)": "91b19874"
+  },
+  "rawMetadata": "{\"compiler\":{\"version\":\"0.8.28+commit.7893614a\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"COMMITTER_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"EXECUTOR_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"PRECOMMITTER_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"PROVER_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_chainId\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"_role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"_account\",\"type\":\"address\"}],\"name\":\"hasRole\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_chainId\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"_role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"_account\",\"type\":\"address\"}],\"name\":\"hasRoleForChainId\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_chainId\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"_validator\",\"type\":\"address\"}],\"name\":\"validators\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"details\":\"This interface includes methods that may be legacy or specific to zkStack CLI needs\",\"kind\":\"dev\",\"methods\":{\"hasRole(uint256,bytes32,address)\":{\"params\":{\"_account\":\"The address to check.\",\"_chainId\":\"The chain Id of the ZK chain.\",\"_role\":\"The bytes32 ID of the role.\"}},\"hasRoleForChainId(uint256,bytes32,address)\":{\"params\":{\"_account\":\"The address to check.\",\"_chainId\":\"The chain Id of the ZK chain.\",\"_role\":\"The bytes32 ID of the role.\"}},\"validators(uint256,address)\":{\"details\":\"This function is deprecated but kept for backward compatibility with older zkStack CLI versions\",\"params\":{\"_chainId\":\"The chain Id of the ZK chain.\",\"_validator\":\"The address of the validator to check.\"},\"returns\":{\"_0\":\"Whether the validator has any roles for the chain.\"}}},\"title\":\"IValidatorTimelockForZKStack\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"COMMITTER_ROLE()\":{\"notice\":\"Role hash for addresses allowed to commit batches on a chain.\"},\"EXECUTOR_ROLE()\":{\"notice\":\"Role hash for addresses allowed to execute batches on a chain.\"},\"PRECOMMITTER_ROLE()\":{\"notice\":\"Role hash for addresses allowed to precommit batches on a chain.\"},\"PROVER_ROLE()\":{\"notice\":\"Role hash for addresses allowed to prove batches on a chain.\"},\"hasRole(uint256,bytes32,address)\":{\"notice\":\"Check if an address has a specific role for a chain\"},\"hasRoleForChainId(uint256,bytes32,address)\":{\"notice\":\"Check if an address has a specific role for a chain\"},\"validators(uint256,address)\":{\"notice\":\"Legacy function from pre-v29 for backward compatibility\"}},\"notice\":\"Interface for Validator Timelock specifically for zkStack CLI usage\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/script-interfaces/IValidatorTimelockForZKStack.sol\":\"IValidatorTimelockForZKStack\"},\"evmVersion\":\"prague\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":9999999},\"remappings\":[\":@ensdomains/=node_modules/@ensdomains/\",\":@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/\",\":@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/\",\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":erc4626-tests/=lib/openzeppelin-contracts-v4/lib/erc4626-tests/\",\":eth-gas-reporter/=node_modules/eth-gas-reporter/\",\":forge-std/=lib/forge-std/src/\",\":foundry-test/=test/foundry/\",\":hardhat/=node_modules/hardhat/\",\":l2-contracts/=../l2-contracts/contracts/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/\",\":openzeppelin-contracts-v4/=lib/openzeppelin-contracts-v4/\",\":openzeppelin-contracts/=lib/murky/lib/openzeppelin-contracts/\"]},\"sources\":{\"contracts/script-interfaces/IValidatorTimelockForZKStack.sol\":{\"keccak256\":\"0x59ac36520777d9e6d630c1ae56d12d5350a3e805ca861cfa6e6b99850dfe1d5c\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://839895e22b3b897785aa90abbc16581f42dcf2839c59b552dc146eb2baa8addd\",\"dweb:/ipfs/QmbTUt7Yk59Z3F59yDQCQovLyW7tv5MY9tPvhJPJJGmGfo\"]}},\"version\":1}",
+  "metadata": {
+    "compiler": { "version": "0.8.28+commit.7893614a" },
+    "language": "Solidity",
+    "output": {
+      "abi": [
+        {
+          "inputs": [],
+          "stateMutability": "view",
+          "type": "function",
+          "name": "COMMITTER_ROLE",
+          "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }]
+        },
+        {
+          "inputs": [],
+          "stateMutability": "view",
+          "type": "function",
+          "name": "EXECUTOR_ROLE",
+          "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }]
+        },
+        {
+          "inputs": [],
+          "stateMutability": "view",
+          "type": "function",
+          "name": "PRECOMMITTER_ROLE",
+          "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }]
+        },
+        {
+          "inputs": [],
+          "stateMutability": "view",
+          "type": "function",
+          "name": "PROVER_ROLE",
+          "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }]
+        },
+        {
+          "inputs": [
+            { "internalType": "uint256", "name": "_chainId", "type": "uint256" },
+            { "internalType": "bytes32", "name": "_role", "type": "bytes32" },
+            { "internalType": "address", "name": "_account", "type": "address" }
+          ],
+          "stateMutability": "view",
+          "type": "function",
+          "name": "hasRole",
+          "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }]
+        },
+        {
+          "inputs": [
+            { "internalType": "uint256", "name": "_chainId", "type": "uint256" },
+            { "internalType": "bytes32", "name": "_role", "type": "bytes32" },
+            { "internalType": "address", "name": "_account", "type": "address" }
+          ],
+          "stateMutability": "view",
+          "type": "function",
+          "name": "hasRoleForChainId",
+          "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }]
+        },
+        {
+          "inputs": [
+            { "internalType": "uint256", "name": "_chainId", "type": "uint256" },
+            { "internalType": "address", "name": "_validator", "type": "address" }
+          ],
+          "stateMutability": "view",
+          "type": "function",
+          "name": "validators",
+          "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }]
+        }
+      ],
+      "devdoc": {
+        "kind": "dev",
+        "methods": {
+          "hasRole(uint256,bytes32,address)": {
+            "params": {
+              "_account": "The address to check.",
+              "_chainId": "The chain Id of the ZK chain.",
+              "_role": "The bytes32 ID of the role."
+            }
+          },
+          "hasRoleForChainId(uint256,bytes32,address)": {
+            "params": {
+              "_account": "The address to check.",
+              "_chainId": "The chain Id of the ZK chain.",
+              "_role": "The bytes32 ID of the role."
+            }
+          },
+          "validators(uint256,address)": {
+            "details": "This function is deprecated but kept for backward compatibility with older zkStack CLI versions",
+            "params": {
+              "_chainId": "The chain Id of the ZK chain.",
+              "_validator": "The address of the validator to check."
+            },
+            "returns": { "_0": "Whether the validator has any roles for the chain." }
+          }
+        },
+        "version": 1
+      },
+      "userdoc": {
+        "kind": "user",
+        "methods": {
+          "COMMITTER_ROLE()": { "notice": "Role hash for addresses allowed to commit batches on a chain." },
+          "EXECUTOR_ROLE()": { "notice": "Role hash for addresses allowed to execute batches on a chain." },
+          "PRECOMMITTER_ROLE()": { "notice": "Role hash for addresses allowed to precommit batches on a chain." },
+          "PROVER_ROLE()": { "notice": "Role hash for addresses allowed to prove batches on a chain." },
+          "hasRole(uint256,bytes32,address)": { "notice": "Check if an address has a specific role for a chain" },
+          "hasRoleForChainId(uint256,bytes32,address)": {
+            "notice": "Check if an address has a specific role for a chain"
+          },
+          "validators(uint256,address)": { "notice": "Legacy function from pre-v29 for backward compatibility" }
+        },
+        "version": 1
+      }
+    },
+    "settings": {
+      "remappings": [
+        "@ensdomains/=node_modules/@ensdomains/",
+        "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
+        "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
+        "ds-test/=lib/forge-std/lib/ds-test/src/",
+        "erc4626-tests/=lib/openzeppelin-contracts-v4/lib/erc4626-tests/",
+        "eth-gas-reporter/=node_modules/eth-gas-reporter/",
+        "forge-std/=lib/forge-std/src/",
+        "foundry-test/=test/foundry/",
+        "hardhat/=node_modules/hardhat/",
+        "l2-contracts/=../l2-contracts/contracts/",
+        "murky/=lib/murky/src/",
+        "openzeppelin-contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/",
+        "openzeppelin-contracts-v4/=lib/openzeppelin-contracts-v4/",
+        "openzeppelin-contracts/=lib/murky/lib/openzeppelin-contracts/"
+      ],
+      "optimizer": { "enabled": true, "runs": 9999999 },
+      "metadata": { "bytecodeHash": "ipfs" },
+      "compilationTarget": {
+        "contracts/script-interfaces/IValidatorTimelockForZKStack.sol": "IValidatorTimelockForZKStack"
+      },
+      "evmVersion": "prague",
+      "libraries": {}
+    },
+    "sources": {
+      "contracts/script-interfaces/IValidatorTimelockForZKStack.sol": {
+        "keccak256": "0x59ac36520777d9e6d630c1ae56d12d5350a3e805ca861cfa6e6b99850dfe1d5c",
+        "urls": [
+          "bzz-raw://839895e22b3b897785aa90abbc16581f42dcf2839c59b552dc146eb2baa8addd",
+          "dweb:/ipfs/QmbTUt7Yk59Z3F59yDQCQovLyW7tv5MY9tPvhJPJJGmGfo"
+        ],
+        "license": "MIT"
+      }
+    },
+    "version": 1
+  },
+  "ast": {
+    "absolutePath": "contracts/script-interfaces/IValidatorTimelockForZKStack.sol",
+    "id": 46272,
+    "exportedSymbols": { "IValidatorTimelockForZKStack": [46271] },
+    "nodeType": "SourceUnit",
+    "src": "32:1960:217",
+    "nodes": [
+      {
+        "id": 46211,
+        "nodeType": "PragmaDirective",
+        "src": "32:23:217",
+        "nodes": [],
+        "literals": ["solidity", "0.8", ".28"]
+      },
+      {
+        "id": 46271,
+        "nodeType": "ContractDefinition",
+        "src": "270:1721:217",
+        "nodes": [
+          {
+            "id": 46218,
+            "nodeType": "FunctionDefinition",
+            "src": "396:61:217",
+            "nodes": [],
+            "documentation": {
+              "id": 46213,
+              "nodeType": "StructuredDocumentation",
+              "src": "315:76:217",
+              "text": "@notice Role hash for addresses allowed to precommit batches on a chain."
+            },
+            "functionSelector": "a86d67c5",
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "PRECOMMITTER_ROLE",
+            "nameLocation": "405:17:217",
+            "parameters": { "id": 46214, "nodeType": "ParameterList", "parameters": [], "src": "422:2:217" },
+            "returnParameters": {
+              "id": 46217,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 46216,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46218,
+                  "src": "448:7:217",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_bytes32", "typeString": "bytes32" },
+                  "typeName": {
+                    "id": 46215,
+                    "name": "bytes32",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "448:7:217",
+                    "typeDescriptions": { "typeIdentifier": "t_bytes32", "typeString": "bytes32" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "447:9:217"
+            },
+            "scope": 46271,
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "id": 46224,
+            "nodeType": "FunctionDefinition",
+            "src": "541:58:217",
+            "nodes": [],
+            "documentation": {
+              "id": 46219,
+              "nodeType": "StructuredDocumentation",
+              "src": "463:73:217",
+              "text": "@notice Role hash for addresses allowed to commit batches on a chain."
+            },
+            "functionSelector": "1a7c3f73",
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "COMMITTER_ROLE",
+            "nameLocation": "550:14:217",
+            "parameters": { "id": 46220, "nodeType": "ParameterList", "parameters": [], "src": "564:2:217" },
+            "returnParameters": {
+              "id": 46223,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 46222,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46224,
+                  "src": "590:7:217",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_bytes32", "typeString": "bytes32" },
+                  "typeName": {
+                    "id": 46221,
+                    "name": "bytes32",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "590:7:217",
+                    "typeDescriptions": { "typeIdentifier": "t_bytes32", "typeString": "bytes32" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "589:9:217"
+            },
+            "scope": 46271,
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "id": 46230,
+            "nodeType": "FunctionDefinition",
+            "src": "682:55:217",
+            "nodes": [],
+            "documentation": {
+              "id": 46225,
+              "nodeType": "StructuredDocumentation",
+              "src": "605:72:217",
+              "text": "@notice Role hash for addresses allowed to prove batches on a chain."
+            },
+            "functionSelector": "dc9a4ef6",
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "PROVER_ROLE",
+            "nameLocation": "691:11:217",
+            "parameters": { "id": 46226, "nodeType": "ParameterList", "parameters": [], "src": "702:2:217" },
+            "returnParameters": {
+              "id": 46229,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 46228,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46230,
+                  "src": "728:7:217",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_bytes32", "typeString": "bytes32" },
+                  "typeName": {
+                    "id": 46227,
+                    "name": "bytes32",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "728:7:217",
+                    "typeDescriptions": { "typeIdentifier": "t_bytes32", "typeString": "bytes32" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "727:9:217"
+            },
+            "scope": 46271,
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "id": 46236,
+            "nodeType": "FunctionDefinition",
+            "src": "822:57:217",
+            "nodes": [],
+            "documentation": {
+              "id": 46231,
+              "nodeType": "StructuredDocumentation",
+              "src": "743:74:217",
+              "text": "@notice Role hash for addresses allowed to execute batches on a chain."
+            },
+            "functionSelector": "07bd0265",
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "EXECUTOR_ROLE",
+            "nameLocation": "831:13:217",
+            "parameters": { "id": 46232, "nodeType": "ParameterList", "parameters": [], "src": "844:2:217" },
+            "returnParameters": {
+              "id": 46235,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 46234,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46236,
+                  "src": "870:7:217",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_bytes32", "typeString": "bytes32" },
+                  "typeName": {
+                    "id": 46233,
+                    "name": "bytes32",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "870:7:217",
+                    "typeDescriptions": { "typeIdentifier": "t_bytes32", "typeString": "bytes32" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "869:9:217"
+            },
+            "scope": 46271,
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "id": 46248,
+            "nodeType": "FunctionDefinition",
+            "src": "1102:97:217",
+            "nodes": [],
+            "documentation": {
+              "id": 46237,
+              "nodeType": "StructuredDocumentation",
+              "src": "885:212:217",
+              "text": "@notice Check if an address has a specific role for a chain\n @param _chainId The chain Id of the ZK chain.\n @param _role The bytes32 ID of the role.\n @param _account The address to check."
+            },
+            "functionSelector": "119345aa",
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "hasRole",
+            "nameLocation": "1111:7:217",
+            "parameters": {
+              "id": 46244,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 46239,
+                  "mutability": "mutable",
+                  "name": "_chainId",
+                  "nameLocation": "1127:8:217",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46248,
+                  "src": "1119:16:217",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" },
+                  "typeName": {
+                    "id": 46238,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1119:7:217",
+                    "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 46241,
+                  "mutability": "mutable",
+                  "name": "_role",
+                  "nameLocation": "1145:5:217",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46248,
+                  "src": "1137:13:217",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_bytes32", "typeString": "bytes32" },
+                  "typeName": {
+                    "id": 46240,
+                    "name": "bytes32",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1137:7:217",
+                    "typeDescriptions": { "typeIdentifier": "t_bytes32", "typeString": "bytes32" }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 46243,
+                  "mutability": "mutable",
+                  "name": "_account",
+                  "nameLocation": "1160:8:217",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46248,
+                  "src": "1152:16:217",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+                  "typeName": {
+                    "id": 46242,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1152:7:217",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1118:51:217"
+            },
+            "returnParameters": {
+              "id": 46247,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 46246,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46248,
+                  "src": "1193:4:217",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_bool", "typeString": "bool" },
+                  "typeName": {
+                    "id": 46245,
+                    "name": "bool",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1193:4:217",
+                    "typeDescriptions": { "typeIdentifier": "t_bool", "typeString": "bool" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1192:6:217"
+            },
+            "scope": 46271,
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "id": 46260,
+            "nodeType": "FunctionDefinition",
+            "src": "1422:107:217",
+            "nodes": [],
+            "documentation": {
+              "id": 46249,
+              "nodeType": "StructuredDocumentation",
+              "src": "1205:212:217",
+              "text": "@notice Check if an address has a specific role for a chain\n @param _chainId The chain Id of the ZK chain.\n @param _role The bytes32 ID of the role.\n @param _account The address to check."
+            },
+            "functionSelector": "8e80aaf6",
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "hasRoleForChainId",
+            "nameLocation": "1431:17:217",
+            "parameters": {
+              "id": 46256,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 46251,
+                  "mutability": "mutable",
+                  "name": "_chainId",
+                  "nameLocation": "1457:8:217",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46260,
+                  "src": "1449:16:217",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" },
+                  "typeName": {
+                    "id": 46250,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1449:7:217",
+                    "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 46253,
+                  "mutability": "mutable",
+                  "name": "_role",
+                  "nameLocation": "1475:5:217",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46260,
+                  "src": "1467:13:217",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_bytes32", "typeString": "bytes32" },
+                  "typeName": {
+                    "id": 46252,
+                    "name": "bytes32",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1467:7:217",
+                    "typeDescriptions": { "typeIdentifier": "t_bytes32", "typeString": "bytes32" }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 46255,
+                  "mutability": "mutable",
+                  "name": "_account",
+                  "nameLocation": "1490:8:217",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46260,
+                  "src": "1482:16:217",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+                  "typeName": {
+                    "id": 46254,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1482:7:217",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1448:51:217"
+            },
+            "returnParameters": {
+              "id": 46259,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 46258,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46260,
+                  "src": "1523:4:217",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_bool", "typeString": "bool" },
+                  "typeName": {
+                    "id": 46257,
+                    "name": "bool",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1523:4:217",
+                    "typeDescriptions": { "typeIdentifier": "t_bool", "typeString": "bool" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1522:6:217"
+            },
+            "scope": 46271,
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "id": 46270,
+            "nodeType": "FunctionDefinition",
+            "src": "1902:87:217",
+            "nodes": [],
+            "documentation": {
+              "id": 46261,
+              "nodeType": "StructuredDocumentation",
+              "src": "1535:362:217",
+              "text": "@notice Legacy function from pre-v29 for backward compatibility\n @dev This function is deprecated but kept for backward compatibility with older zkStack CLI versions\n @param _chainId The chain Id of the ZK chain.\n @param _validator The address of the validator to check.\n @return Whether the validator has any roles for the chain."
+            },
+            "functionSelector": "91b19874",
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "validators",
+            "nameLocation": "1911:10:217",
+            "parameters": {
+              "id": 46266,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 46263,
+                  "mutability": "mutable",
+                  "name": "_chainId",
+                  "nameLocation": "1930:8:217",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46270,
+                  "src": "1922:16:217",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" },
+                  "typeName": {
+                    "id": 46262,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1922:7:217",
+                    "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 46265,
+                  "mutability": "mutable",
+                  "name": "_validator",
+                  "nameLocation": "1948:10:217",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46270,
+                  "src": "1940:18:217",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+                  "typeName": {
+                    "id": 46264,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1940:7:217",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1921:38:217"
+            },
+            "returnParameters": {
+              "id": 46269,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 46268,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46270,
+                  "src": "1983:4:217",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_bool", "typeString": "bool" },
+                  "typeName": {
+                    "id": 46267,
+                    "name": "bool",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1983:4:217",
+                    "typeDescriptions": { "typeIdentifier": "t_bool", "typeString": "bool" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1982:6:217"
+            },
+            "scope": 46271,
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          }
+        ],
+        "abstract": false,
+        "baseContracts": [],
+        "canonicalName": "IValidatorTimelockForZKStack",
+        "contractDependencies": [],
+        "contractKind": "interface",
+        "documentation": {
+          "id": 46212,
+          "nodeType": "StructuredDocumentation",
+          "src": "57:213:217",
+          "text": "@title IValidatorTimelockForZKStack\n @notice Interface for Validator Timelock specifically for zkStack CLI usage\n @dev This interface includes methods that may be legacy or specific to zkStack CLI needs"
+        },
+        "fullyImplemented": false,
+        "linearizedBaseContracts": [46271],
+        "name": "IValidatorTimelockForZKStack",
+        "nameLocation": "280:28:217",
+        "scope": 46272,
+        "usedErrors": [],
+        "usedEvents": []
+      }
+    ],
+    "license": "MIT"
+  },
+  "id": 217
+}

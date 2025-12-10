@@ -1,1 +1,1220 @@
-{"abi":[{"type":"function","name":"getConfig","inputs":[],"outputs":[{"name":"","type":"tuple","internalType":"struct RegisterZKChainConfig","components":[{"name":"deployerAddress","type":"address","internalType":"address"},{"name":"ownerAddress","type":"address","internalType":"address"},{"name":"chainChainId","type":"uint256","internalType":"uint256"},{"name":"validiumMode","type":"bool","internalType":"bool"},{"name":"bridgehubCreateNewChainSalt","type":"uint256","internalType":"uint256"},{"name":"validatorSenderOperatorEth","type":"address","internalType":"address"},{"name":"validatorSenderOperatorBlobsEth","type":"address","internalType":"address"},{"name":"validatorSenderOperatorProve","type":"address","internalType":"address"},{"name":"validatorSenderOperatorExecute","type":"address","internalType":"address"},{"name":"baseToken","type":"address","internalType":"address"},{"name":"baseTokenAssetId","type":"bytes32","internalType":"bytes32"},{"name":"baseTokenGasPriceMultiplierNominator","type":"uint128","internalType":"uint128"},{"name":"baseTokenGasPriceMultiplierDenominator","type":"uint128","internalType":"uint128"},{"name":"bridgehub","type":"address","internalType":"address"},{"name":"sharedBridgeProxy","type":"address","internalType":"address"},{"name":"nativeTokenVault","type":"address","internalType":"address"},{"name":"chainTypeManagerProxy","type":"address","internalType":"address"},{"name":"validatorTimelock","type":"address","internalType":"address"},{"name":"diamondCutData","type":"bytes","internalType":"bytes"},{"name":"forceDeployments","type":"bytes","internalType":"bytes"},{"name":"governanceSecurityCouncilAddress","type":"address","internalType":"address"},{"name":"governanceMinDelay","type":"uint256","internalType":"uint256"},{"name":"l1Nullifier","type":"address","internalType":"address"},{"name":"l1Erc20Bridge","type":"address","internalType":"address"},{"name":"initializeLegacyBridge","type":"bool","internalType":"bool"},{"name":"governance","type":"address","internalType":"address"},{"name":"create2FactoryAddress","type":"address","internalType":"address"},{"name":"create2Salt","type":"bytes32","internalType":"bytes32"},{"name":"allowEvmEmulator","type":"bool","internalType":"bool"}]}],"stateMutability":"view"},{"type":"function","name":"getOwnerAddress","inputs":[],"outputs":[{"name":"","type":"address","internalType":"address"}],"stateMutability":"view"},{"type":"function","name":"run","inputs":[{"name":"_bridgehub","type":"address","internalType":"address"},{"name":"_chainTypeManagerProxy","type":"address","internalType":"address"},{"name":"_chainChainId","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"runForTest","inputs":[{"name":"_bridgehub","type":"address","internalType":"address"},{"name":"_chainTypeManagerProxy","type":"address","internalType":"address"},{"name":"_chainChainId","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"}],"bytecode":{"object":"0x","sourceMap":"","linkReferences":{}},"deployedBytecode":{"object":"0x","sourceMap":"","linkReferences":{}},"methodIdentifiers":{"getConfig()":"c3f909d4","getOwnerAddress()":"0c4f65bd","run(address,address,uint256)":"8892170a","runForTest(address,address,uint256)":"0f024634"},"rawMetadata":"{\"compiler\":{\"version\":\"0.8.28+commit.7893614a\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"getConfig\",\"outputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"deployerAddress\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"ownerAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"chainChainId\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"validiumMode\",\"type\":\"bool\"},{\"internalType\":\"uint256\",\"name\":\"bridgehubCreateNewChainSalt\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"validatorSenderOperatorEth\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"validatorSenderOperatorBlobsEth\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"validatorSenderOperatorProve\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"validatorSenderOperatorExecute\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"baseToken\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"baseTokenAssetId\",\"type\":\"bytes32\"},{\"internalType\":\"uint128\",\"name\":\"baseTokenGasPriceMultiplierNominator\",\"type\":\"uint128\"},{\"internalType\":\"uint128\",\"name\":\"baseTokenGasPriceMultiplierDenominator\",\"type\":\"uint128\"},{\"internalType\":\"address\",\"name\":\"bridgehub\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"sharedBridgeProxy\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"nativeTokenVault\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"chainTypeManagerProxy\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"validatorTimelock\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"diamondCutData\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"forceDeployments\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"governanceSecurityCouncilAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"governanceMinDelay\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"l1Nullifier\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"l1Erc20Bridge\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"initializeLegacyBridge\",\"type\":\"bool\"},{\"internalType\":\"address\",\"name\":\"governance\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"create2FactoryAddress\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"create2Salt\",\"type\":\"bytes32\"},{\"internalType\":\"bool\",\"name\":\"allowEvmEmulator\",\"type\":\"bool\"}],\"internalType\":\"struct RegisterZKChainConfig\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getOwnerAddress\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_bridgehub\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_chainTypeManagerProxy\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_chainChainId\",\"type\":\"uint256\"}],\"name\":\"run\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_bridgehub\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_chainTypeManagerProxy\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_chainChainId\",\"type\":\"uint256\"}],\"name\":\"runForTest\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{\"getConfig()\":{\"returns\":{\"_0\":\"The RegisterZKChainConfig struct containing registration parameters\"}},\"getOwnerAddress()\":{\"returns\":{\"_0\":\"The owner address\"}},\"run(address,address,uint256)\":{\"params\":{\"_bridgehub\":\"Address of the bridgehub contract\",\"_chainChainId\":\"Chain ID for the new ZK chain\",\"_chainTypeManagerProxy\":\"Address of the chain type manager proxy\"}},\"runForTest(address,address,uint256)\":{\"params\":{\"_bridgehub\":\"Address of the bridgehub contract\",\"_chainChainId\":\"Chain ID for the new ZK chain\",\"_chainTypeManagerProxy\":\"Address of the chain type manager proxy\"}}},\"title\":\"IRegisterZKChain\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"getConfig()\":{\"notice\":\"Returns the registration configuration\"},\"getOwnerAddress()\":{\"notice\":\"Returns the owner address from configuration\"},\"run(address,address,uint256)\":{\"notice\":\"Runs the ZK chain registration with production configuration\"},\"runForTest(address,address,uint256)\":{\"notice\":\"Runs the ZK chain registration for testing purposes\"}},\"notice\":\"Interface for the RegisterZKChain deployment script\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/script-interfaces/IRegisterZKChain.sol\":\"IRegisterZKChain\"},\"evmVersion\":\"prague\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":9999999},\"remappings\":[\":@ensdomains/=node_modules/@ensdomains/\",\":@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/\",\":@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/\",\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":erc4626-tests/=lib/openzeppelin-contracts-v4/lib/erc4626-tests/\",\":eth-gas-reporter/=node_modules/eth-gas-reporter/\",\":forge-std/=lib/forge-std/src/\",\":foundry-test/=test/foundry/\",\":hardhat/=node_modules/hardhat/\",\":l2-contracts/=../l2-contracts/contracts/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/\",\":openzeppelin-contracts-v4/=lib/openzeppelin-contracts-v4/\",\":openzeppelin-contracts/=lib/murky/lib/openzeppelin-contracts/\"]},\"sources\":{\"contracts/script-interfaces/IRegisterZKChain.sol\":{\"keccak256\":\"0xcec88d7208dcd14c385a3429122ceff3960afd1d5383d23d1f6547bdd6f1d558\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://23ed8812f4e787ee0f4fb1d0dba07526b850a3f18417e22f094a920fc6082024\",\"dweb:/ipfs/QmV5GuwXndtXMRmwV5id3EPUcpUVM19THBLYFjc37XEQX1\"]}},\"version\":1}","metadata":{"compiler":{"version":"0.8.28+commit.7893614a"},"language":"Solidity","output":{"abi":[{"inputs":[],"stateMutability":"view","type":"function","name":"getConfig","outputs":[{"internalType":"struct RegisterZKChainConfig","name":"","type":"tuple","components":[{"internalType":"address","name":"deployerAddress","type":"address"},{"internalType":"address","name":"ownerAddress","type":"address"},{"internalType":"uint256","name":"chainChainId","type":"uint256"},{"internalType":"bool","name":"validiumMode","type":"bool"},{"internalType":"uint256","name":"bridgehubCreateNewChainSalt","type":"uint256"},{"internalType":"address","name":"validatorSenderOperatorEth","type":"address"},{"internalType":"address","name":"validatorSenderOperatorBlobsEth","type":"address"},{"internalType":"address","name":"validatorSenderOperatorProve","type":"address"},{"internalType":"address","name":"validatorSenderOperatorExecute","type":"address"},{"internalType":"address","name":"baseToken","type":"address"},{"internalType":"bytes32","name":"baseTokenAssetId","type":"bytes32"},{"internalType":"uint128","name":"baseTokenGasPriceMultiplierNominator","type":"uint128"},{"internalType":"uint128","name":"baseTokenGasPriceMultiplierDenominator","type":"uint128"},{"internalType":"address","name":"bridgehub","type":"address"},{"internalType":"address","name":"sharedBridgeProxy","type":"address"},{"internalType":"address","name":"nativeTokenVault","type":"address"},{"internalType":"address","name":"chainTypeManagerProxy","type":"address"},{"internalType":"address","name":"validatorTimelock","type":"address"},{"internalType":"bytes","name":"diamondCutData","type":"bytes"},{"internalType":"bytes","name":"forceDeployments","type":"bytes"},{"internalType":"address","name":"governanceSecurityCouncilAddress","type":"address"},{"internalType":"uint256","name":"governanceMinDelay","type":"uint256"},{"internalType":"address","name":"l1Nullifier","type":"address"},{"internalType":"address","name":"l1Erc20Bridge","type":"address"},{"internalType":"bool","name":"initializeLegacyBridge","type":"bool"},{"internalType":"address","name":"governance","type":"address"},{"internalType":"address","name":"create2FactoryAddress","type":"address"},{"internalType":"bytes32","name":"create2Salt","type":"bytes32"},{"internalType":"bool","name":"allowEvmEmulator","type":"bool"}]}]},{"inputs":[],"stateMutability":"view","type":"function","name":"getOwnerAddress","outputs":[{"internalType":"address","name":"","type":"address"}]},{"inputs":[{"internalType":"address","name":"_bridgehub","type":"address"},{"internalType":"address","name":"_chainTypeManagerProxy","type":"address"},{"internalType":"uint256","name":"_chainChainId","type":"uint256"}],"stateMutability":"nonpayable","type":"function","name":"run"},{"inputs":[{"internalType":"address","name":"_bridgehub","type":"address"},{"internalType":"address","name":"_chainTypeManagerProxy","type":"address"},{"internalType":"uint256","name":"_chainChainId","type":"uint256"}],"stateMutability":"nonpayable","type":"function","name":"runForTest"}],"devdoc":{"kind":"dev","methods":{"getConfig()":{"returns":{"_0":"The RegisterZKChainConfig struct containing registration parameters"}},"getOwnerAddress()":{"returns":{"_0":"The owner address"}},"run(address,address,uint256)":{"params":{"_bridgehub":"Address of the bridgehub contract","_chainChainId":"Chain ID for the new ZK chain","_chainTypeManagerProxy":"Address of the chain type manager proxy"}},"runForTest(address,address,uint256)":{"params":{"_bridgehub":"Address of the bridgehub contract","_chainChainId":"Chain ID for the new ZK chain","_chainTypeManagerProxy":"Address of the chain type manager proxy"}}},"version":1},"userdoc":{"kind":"user","methods":{"getConfig()":{"notice":"Returns the registration configuration"},"getOwnerAddress()":{"notice":"Returns the owner address from configuration"},"run(address,address,uint256)":{"notice":"Runs the ZK chain registration with production configuration"},"runForTest(address,address,uint256)":{"notice":"Runs the ZK chain registration for testing purposes"}},"version":1}},"settings":{"remappings":["@ensdomains/=node_modules/@ensdomains/","@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/","@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/","ds-test/=lib/forge-std/lib/ds-test/src/","erc4626-tests/=lib/openzeppelin-contracts-v4/lib/erc4626-tests/","eth-gas-reporter/=node_modules/eth-gas-reporter/","forge-std/=lib/forge-std/src/","foundry-test/=test/foundry/","hardhat/=node_modules/hardhat/","l2-contracts/=../l2-contracts/contracts/","murky/=lib/murky/src/","openzeppelin-contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/","openzeppelin-contracts-v4/=lib/openzeppelin-contracts-v4/","openzeppelin-contracts/=lib/murky/lib/openzeppelin-contracts/"],"optimizer":{"enabled":true,"runs":9999999},"metadata":{"bytecodeHash":"ipfs"},"compilationTarget":{"contracts/script-interfaces/IRegisterZKChain.sol":"IRegisterZKChain"},"evmVersion":"prague","libraries":{}},"sources":{"contracts/script-interfaces/IRegisterZKChain.sol":{"keccak256":"0xcec88d7208dcd14c385a3429122ceff3960afd1d5383d23d1f6547bdd6f1d558","urls":["bzz-raw://23ed8812f4e787ee0f4fb1d0dba07526b850a3f18417e22f094a920fc6082024","dweb:/ipfs/QmV5GuwXndtXMRmwV5id3EPUcpUVM19THBLYFjc37XEQX1"],"license":"MIT"}},"version":1},"ast":{"absolutePath":"contracts/script-interfaces/IRegisterZKChain.sol","id":46210,"exportedSymbols":{"IRegisterZKChain":[46209],"RegisterZKChainConfig":[46174]},"nodeType":"SourceUnit","src":"32:2309:216","nodes":[{"id":46115,"nodeType":"PragmaDirective","src":"32:23:216","nodes":[],"literals":["solidity","0.8",".28"]},{"id":46174,"nodeType":"StructDefinition","src":"105:981:216","nodes":[],"canonicalName":"RegisterZKChainConfig","members":[{"constant":false,"id":46117,"mutability":"mutable","name":"deployerAddress","nameLocation":"148:15:216","nodeType":"VariableDeclaration","scope":46174,"src":"140:23:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46116,"name":"address","nodeType":"ElementaryTypeName","src":"140:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46119,"mutability":"mutable","name":"ownerAddress","nameLocation":"177:12:216","nodeType":"VariableDeclaration","scope":46174,"src":"169:20:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46118,"name":"address","nodeType":"ElementaryTypeName","src":"169:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46121,"mutability":"mutable","name":"chainChainId","nameLocation":"203:12:216","nodeType":"VariableDeclaration","scope":46174,"src":"195:20:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"},"typeName":{"id":46120,"name":"uint256","nodeType":"ElementaryTypeName","src":"195:7:216","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"}},"visibility":"internal"},{"constant":false,"id":46123,"mutability":"mutable","name":"validiumMode","nameLocation":"226:12:216","nodeType":"VariableDeclaration","scope":46174,"src":"221:17:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bool","typeString":"bool"},"typeName":{"id":46122,"name":"bool","nodeType":"ElementaryTypeName","src":"221:4:216","typeDescriptions":{"typeIdentifier":"t_bool","typeString":"bool"}},"visibility":"internal"},{"constant":false,"id":46125,"mutability":"mutable","name":"bridgehubCreateNewChainSalt","nameLocation":"252:27:216","nodeType":"VariableDeclaration","scope":46174,"src":"244:35:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"},"typeName":{"id":46124,"name":"uint256","nodeType":"ElementaryTypeName","src":"244:7:216","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"}},"visibility":"internal"},{"constant":false,"id":46127,"mutability":"mutable","name":"validatorSenderOperatorEth","nameLocation":"293:26:216","nodeType":"VariableDeclaration","scope":46174,"src":"285:34:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46126,"name":"address","nodeType":"ElementaryTypeName","src":"285:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46129,"mutability":"mutable","name":"validatorSenderOperatorBlobsEth","nameLocation":"333:31:216","nodeType":"VariableDeclaration","scope":46174,"src":"325:39:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46128,"name":"address","nodeType":"ElementaryTypeName","src":"325:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46131,"mutability":"mutable","name":"validatorSenderOperatorProve","nameLocation":"378:28:216","nodeType":"VariableDeclaration","scope":46174,"src":"370:36:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46130,"name":"address","nodeType":"ElementaryTypeName","src":"370:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46133,"mutability":"mutable","name":"validatorSenderOperatorExecute","nameLocation":"420:30:216","nodeType":"VariableDeclaration","scope":46174,"src":"412:38:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46132,"name":"address","nodeType":"ElementaryTypeName","src":"412:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46135,"mutability":"mutable","name":"baseToken","nameLocation":"464:9:216","nodeType":"VariableDeclaration","scope":46174,"src":"456:17:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46134,"name":"address","nodeType":"ElementaryTypeName","src":"456:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46137,"mutability":"mutable","name":"baseTokenAssetId","nameLocation":"487:16:216","nodeType":"VariableDeclaration","scope":46174,"src":"479:24:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bytes32","typeString":"bytes32"},"typeName":{"id":46136,"name":"bytes32","nodeType":"ElementaryTypeName","src":"479:7:216","typeDescriptions":{"typeIdentifier":"t_bytes32","typeString":"bytes32"}},"visibility":"internal"},{"constant":false,"id":46139,"mutability":"mutable","name":"baseTokenGasPriceMultiplierNominator","nameLocation":"517:36:216","nodeType":"VariableDeclaration","scope":46174,"src":"509:44:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_uint128","typeString":"uint128"},"typeName":{"id":46138,"name":"uint128","nodeType":"ElementaryTypeName","src":"509:7:216","typeDescriptions":{"typeIdentifier":"t_uint128","typeString":"uint128"}},"visibility":"internal"},{"constant":false,"id":46141,"mutability":"mutable","name":"baseTokenGasPriceMultiplierDenominator","nameLocation":"567:38:216","nodeType":"VariableDeclaration","scope":46174,"src":"559:46:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_uint128","typeString":"uint128"},"typeName":{"id":46140,"name":"uint128","nodeType":"ElementaryTypeName","src":"559:7:216","typeDescriptions":{"typeIdentifier":"t_uint128","typeString":"uint128"}},"visibility":"internal"},{"constant":false,"id":46143,"mutability":"mutable","name":"bridgehub","nameLocation":"619:9:216","nodeType":"VariableDeclaration","scope":46174,"src":"611:17:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46142,"name":"address","nodeType":"ElementaryTypeName","src":"611:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46145,"mutability":"mutable","name":"sharedBridgeProxy","nameLocation":"642:17:216","nodeType":"VariableDeclaration","scope":46174,"src":"634:25:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46144,"name":"address","nodeType":"ElementaryTypeName","src":"634:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46147,"mutability":"mutable","name":"nativeTokenVault","nameLocation":"673:16:216","nodeType":"VariableDeclaration","scope":46174,"src":"665:24:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46146,"name":"address","nodeType":"ElementaryTypeName","src":"665:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46149,"mutability":"mutable","name":"chainTypeManagerProxy","nameLocation":"703:21:216","nodeType":"VariableDeclaration","scope":46174,"src":"695:29:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46148,"name":"address","nodeType":"ElementaryTypeName","src":"695:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46151,"mutability":"mutable","name":"validatorTimelock","nameLocation":"738:17:216","nodeType":"VariableDeclaration","scope":46174,"src":"730:25:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46150,"name":"address","nodeType":"ElementaryTypeName","src":"730:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46153,"mutability":"mutable","name":"diamondCutData","nameLocation":"767:14:216","nodeType":"VariableDeclaration","scope":46174,"src":"761:20:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bytes_storage_ptr","typeString":"bytes"},"typeName":{"id":46152,"name":"bytes","nodeType":"ElementaryTypeName","src":"761:5:216","typeDescriptions":{"typeIdentifier":"t_bytes_storage_ptr","typeString":"bytes"}},"visibility":"internal"},{"constant":false,"id":46155,"mutability":"mutable","name":"forceDeployments","nameLocation":"793:16:216","nodeType":"VariableDeclaration","scope":46174,"src":"787:22:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bytes_storage_ptr","typeString":"bytes"},"typeName":{"id":46154,"name":"bytes","nodeType":"ElementaryTypeName","src":"787:5:216","typeDescriptions":{"typeIdentifier":"t_bytes_storage_ptr","typeString":"bytes"}},"visibility":"internal"},{"constant":false,"id":46157,"mutability":"mutable","name":"governanceSecurityCouncilAddress","nameLocation":"823:32:216","nodeType":"VariableDeclaration","scope":46174,"src":"815:40:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46156,"name":"address","nodeType":"ElementaryTypeName","src":"815:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46159,"mutability":"mutable","name":"governanceMinDelay","nameLocation":"869:18:216","nodeType":"VariableDeclaration","scope":46174,"src":"861:26:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"},"typeName":{"id":46158,"name":"uint256","nodeType":"ElementaryTypeName","src":"861:7:216","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"}},"visibility":"internal"},{"constant":false,"id":46161,"mutability":"mutable","name":"l1Nullifier","nameLocation":"901:11:216","nodeType":"VariableDeclaration","scope":46174,"src":"893:19:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46160,"name":"address","nodeType":"ElementaryTypeName","src":"893:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46163,"mutability":"mutable","name":"l1Erc20Bridge","nameLocation":"926:13:216","nodeType":"VariableDeclaration","scope":46174,"src":"918:21:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46162,"name":"address","nodeType":"ElementaryTypeName","src":"918:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46165,"mutability":"mutable","name":"initializeLegacyBridge","nameLocation":"950:22:216","nodeType":"VariableDeclaration","scope":46174,"src":"945:27:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bool","typeString":"bool"},"typeName":{"id":46164,"name":"bool","nodeType":"ElementaryTypeName","src":"945:4:216","typeDescriptions":{"typeIdentifier":"t_bool","typeString":"bool"}},"visibility":"internal"},{"constant":false,"id":46167,"mutability":"mutable","name":"governance","nameLocation":"986:10:216","nodeType":"VariableDeclaration","scope":46174,"src":"978:18:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46166,"name":"address","nodeType":"ElementaryTypeName","src":"978:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46169,"mutability":"mutable","name":"create2FactoryAddress","nameLocation":"1010:21:216","nodeType":"VariableDeclaration","scope":46174,"src":"1002:29:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46168,"name":"address","nodeType":"ElementaryTypeName","src":"1002:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46171,"mutability":"mutable","name":"create2Salt","nameLocation":"1045:11:216","nodeType":"VariableDeclaration","scope":46174,"src":"1037:19:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bytes32","typeString":"bytes32"},"typeName":{"id":46170,"name":"bytes32","nodeType":"ElementaryTypeName","src":"1037:7:216","typeDescriptions":{"typeIdentifier":"t_bytes32","typeString":"bytes32"}},"visibility":"internal"},{"constant":false,"id":46173,"mutability":"mutable","name":"allowEvmEmulator","nameLocation":"1067:16:216","nodeType":"VariableDeclaration","scope":46174,"src":"1062:21:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_bool","typeString":"bool"},"typeName":{"id":46172,"name":"bool","nodeType":"ElementaryTypeName","src":"1062:4:216","typeDescriptions":{"typeIdentifier":"t_bool","typeString":"bool"}},"visibility":"internal"}],"name":"RegisterZKChainConfig","nameLocation":"112:21:216","scope":46210,"visibility":"public"},{"id":46209,"nodeType":"ContractDefinition","src":"1180:1160:216","nodes":[{"id":46185,"nodeType":"FunctionDefinition","src":"1487:97:216","nodes":[],"documentation":{"id":46176,"nodeType":"StructuredDocumentation","src":"1213:269:216","text":"@notice Runs the ZK chain registration with production configuration\n @param _bridgehub Address of the bridgehub contract\n @param _chainTypeManagerProxy Address of the chain type manager proxy\n @param _chainChainId Chain ID for the new ZK chain"},"functionSelector":"8892170a","implemented":false,"kind":"function","modifiers":[],"name":"run","nameLocation":"1496:3:216","parameters":{"id":46183,"nodeType":"ParameterList","parameters":[{"constant":false,"id":46178,"mutability":"mutable","name":"_bridgehub","nameLocation":"1508:10:216","nodeType":"VariableDeclaration","scope":46185,"src":"1500:18:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46177,"name":"address","nodeType":"ElementaryTypeName","src":"1500:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46180,"mutability":"mutable","name":"_chainTypeManagerProxy","nameLocation":"1528:22:216","nodeType":"VariableDeclaration","scope":46185,"src":"1520:30:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46179,"name":"address","nodeType":"ElementaryTypeName","src":"1520:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46182,"mutability":"mutable","name":"_chainChainId","nameLocation":"1560:13:216","nodeType":"VariableDeclaration","scope":46185,"src":"1552:21:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"},"typeName":{"id":46181,"name":"uint256","nodeType":"ElementaryTypeName","src":"1552:7:216","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"}},"visibility":"internal"}],"src":"1499:75:216"},"returnParameters":{"id":46184,"nodeType":"ParameterList","parameters":[],"src":"1583:0:216"},"scope":46209,"stateMutability":"nonpayable","virtual":false,"visibility":"external"},{"id":46195,"nodeType":"FunctionDefinition","src":"1855:104:216","nodes":[],"documentation":{"id":46186,"nodeType":"StructuredDocumentation","src":"1590:260:216","text":"@notice Runs the ZK chain registration for testing purposes\n @param _bridgehub Address of the bridgehub contract\n @param _chainTypeManagerProxy Address of the chain type manager proxy\n @param _chainChainId Chain ID for the new ZK chain"},"functionSelector":"0f024634","implemented":false,"kind":"function","modifiers":[],"name":"runForTest","nameLocation":"1864:10:216","parameters":{"id":46193,"nodeType":"ParameterList","parameters":[{"constant":false,"id":46188,"mutability":"mutable","name":"_bridgehub","nameLocation":"1883:10:216","nodeType":"VariableDeclaration","scope":46195,"src":"1875:18:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46187,"name":"address","nodeType":"ElementaryTypeName","src":"1875:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46190,"mutability":"mutable","name":"_chainTypeManagerProxy","nameLocation":"1903:22:216","nodeType":"VariableDeclaration","scope":46195,"src":"1895:30:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46189,"name":"address","nodeType":"ElementaryTypeName","src":"1895:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"},{"constant":false,"id":46192,"mutability":"mutable","name":"_chainChainId","nameLocation":"1935:13:216","nodeType":"VariableDeclaration","scope":46195,"src":"1927:21:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"},"typeName":{"id":46191,"name":"uint256","nodeType":"ElementaryTypeName","src":"1927:7:216","typeDescriptions":{"typeIdentifier":"t_uint256","typeString":"uint256"}},"visibility":"internal"}],"src":"1874:75:216"},"returnParameters":{"id":46194,"nodeType":"ParameterList","parameters":[],"src":"1958:0:216"},"scope":46209,"stateMutability":"nonpayable","virtual":false,"visibility":"external"},{"id":46202,"nodeType":"FunctionDefinition","src":"2104:74:216","nodes":[],"documentation":{"id":46196,"nodeType":"StructuredDocumentation","src":"1965:134:216","text":"@notice Returns the registration configuration\n @return The RegisterZKChainConfig struct containing registration parameters"},"functionSelector":"c3f909d4","implemented":false,"kind":"function","modifiers":[],"name":"getConfig","nameLocation":"2113:9:216","parameters":{"id":46197,"nodeType":"ParameterList","parameters":[],"src":"2122:2:216"},"returnParameters":{"id":46201,"nodeType":"ParameterList","parameters":[{"constant":false,"id":46200,"mutability":"mutable","name":"","nameLocation":"-1:-1:-1","nodeType":"VariableDeclaration","scope":46202,"src":"2148:28:216","stateVariable":false,"storageLocation":"memory","typeDescriptions":{"typeIdentifier":"t_struct$_RegisterZKChainConfig_$46174_memory_ptr","typeString":"struct RegisterZKChainConfig"},"typeName":{"id":46199,"nodeType":"UserDefinedTypeName","pathNode":{"id":46198,"name":"RegisterZKChainConfig","nameLocations":["2148:21:216"],"nodeType":"IdentifierPath","referencedDeclaration":46174,"src":"2148:21:216"},"referencedDeclaration":46174,"src":"2148:21:216","typeDescriptions":{"typeIdentifier":"t_struct$_RegisterZKChainConfig_$46174_storage_ptr","typeString":"struct RegisterZKChainConfig"}},"visibility":"internal"}],"src":"2147:30:216"},"scope":46209,"stateMutability":"view","virtual":false,"visibility":"external"},{"id":46208,"nodeType":"FunctionDefinition","src":"2279:59:216","nodes":[],"documentation":{"id":46203,"nodeType":"StructuredDocumentation","src":"2184:90:216","text":"@notice Returns the owner address from configuration\n @return The owner address"},"functionSelector":"0c4f65bd","implemented":false,"kind":"function","modifiers":[],"name":"getOwnerAddress","nameLocation":"2288:15:216","parameters":{"id":46204,"nodeType":"ParameterList","parameters":[],"src":"2303:2:216"},"returnParameters":{"id":46207,"nodeType":"ParameterList","parameters":[{"constant":false,"id":46206,"mutability":"mutable","name":"","nameLocation":"-1:-1:-1","nodeType":"VariableDeclaration","scope":46208,"src":"2329:7:216","stateVariable":false,"storageLocation":"default","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"},"typeName":{"id":46205,"name":"address","nodeType":"ElementaryTypeName","src":"2329:7:216","stateMutability":"nonpayable","typeDescriptions":{"typeIdentifier":"t_address","typeString":"address"}},"visibility":"internal"}],"src":"2328:9:216"},"scope":46209,"stateMutability":"view","virtual":false,"visibility":"external"}],"abstract":false,"baseContracts":[],"canonicalName":"IRegisterZKChain","contractDependencies":[],"contractKind":"interface","documentation":{"id":46175,"nodeType":"StructuredDocumentation","src":"1088:92:216","text":"@title IRegisterZKChain\n @notice Interface for the RegisterZKChain deployment script"},"fullyImplemented":false,"linearizedBaseContracts":[46209],"name":"IRegisterZKChain","nameLocation":"1190:16:216","scope":46210,"usedErrors":[],"usedEvents":[]}],"license":"MIT"},"id":216}
+{
+  "abi": [
+    {
+      "type": "function",
+      "name": "getConfig",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "tuple",
+          "internalType": "struct RegisterZKChainConfig",
+          "components": [
+            { "name": "deployerAddress", "type": "address", "internalType": "address" },
+            { "name": "ownerAddress", "type": "address", "internalType": "address" },
+            { "name": "chainChainId", "type": "uint256", "internalType": "uint256" },
+            { "name": "validiumMode", "type": "bool", "internalType": "bool" },
+            { "name": "bridgehubCreateNewChainSalt", "type": "uint256", "internalType": "uint256" },
+            { "name": "validatorSenderOperatorEth", "type": "address", "internalType": "address" },
+            { "name": "validatorSenderOperatorBlobsEth", "type": "address", "internalType": "address" },
+            { "name": "validatorSenderOperatorProve", "type": "address", "internalType": "address" },
+            { "name": "validatorSenderOperatorExecute", "type": "address", "internalType": "address" },
+            { "name": "baseToken", "type": "address", "internalType": "address" },
+            { "name": "baseTokenAssetId", "type": "bytes32", "internalType": "bytes32" },
+            { "name": "baseTokenGasPriceMultiplierNominator", "type": "uint128", "internalType": "uint128" },
+            { "name": "baseTokenGasPriceMultiplierDenominator", "type": "uint128", "internalType": "uint128" },
+            { "name": "bridgehub", "type": "address", "internalType": "address" },
+            { "name": "sharedBridgeProxy", "type": "address", "internalType": "address" },
+            { "name": "nativeTokenVault", "type": "address", "internalType": "address" },
+            { "name": "chainTypeManagerProxy", "type": "address", "internalType": "address" },
+            { "name": "validatorTimelock", "type": "address", "internalType": "address" },
+            { "name": "diamondCutData", "type": "bytes", "internalType": "bytes" },
+            { "name": "forceDeployments", "type": "bytes", "internalType": "bytes" },
+            { "name": "governanceSecurityCouncilAddress", "type": "address", "internalType": "address" },
+            { "name": "governanceMinDelay", "type": "uint256", "internalType": "uint256" },
+            { "name": "l1Nullifier", "type": "address", "internalType": "address" },
+            { "name": "l1Erc20Bridge", "type": "address", "internalType": "address" },
+            { "name": "initializeLegacyBridge", "type": "bool", "internalType": "bool" },
+            { "name": "governance", "type": "address", "internalType": "address" },
+            { "name": "create2FactoryAddress", "type": "address", "internalType": "address" },
+            { "name": "create2Salt", "type": "bytes32", "internalType": "bytes32" },
+            { "name": "allowEvmEmulator", "type": "bool", "internalType": "bool" }
+          ]
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getOwnerAddress",
+      "inputs": [],
+      "outputs": [{ "name": "", "type": "address", "internalType": "address" }],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "run",
+      "inputs": [
+        { "name": "_bridgehub", "type": "address", "internalType": "address" },
+        { "name": "_chainTypeManagerProxy", "type": "address", "internalType": "address" },
+        { "name": "_chainChainId", "type": "uint256", "internalType": "uint256" }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "runForTest",
+      "inputs": [
+        { "name": "_bridgehub", "type": "address", "internalType": "address" },
+        { "name": "_chainTypeManagerProxy", "type": "address", "internalType": "address" },
+        { "name": "_chainChainId", "type": "uint256", "internalType": "uint256" }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    }
+  ],
+  "bytecode": { "object": "0x", "sourceMap": "", "linkReferences": {} },
+  "deployedBytecode": { "object": "0x", "sourceMap": "", "linkReferences": {} },
+  "methodIdentifiers": {
+    "getConfig()": "c3f909d4",
+    "getOwnerAddress()": "0c4f65bd",
+    "run(address,address,uint256)": "8892170a",
+    "runForTest(address,address,uint256)": "0f024634"
+  },
+  "rawMetadata": "{\"compiler\":{\"version\":\"0.8.28+commit.7893614a\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"getConfig\",\"outputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"deployerAddress\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"ownerAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"chainChainId\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"validiumMode\",\"type\":\"bool\"},{\"internalType\":\"uint256\",\"name\":\"bridgehubCreateNewChainSalt\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"validatorSenderOperatorEth\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"validatorSenderOperatorBlobsEth\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"validatorSenderOperatorProve\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"validatorSenderOperatorExecute\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"baseToken\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"baseTokenAssetId\",\"type\":\"bytes32\"},{\"internalType\":\"uint128\",\"name\":\"baseTokenGasPriceMultiplierNominator\",\"type\":\"uint128\"},{\"internalType\":\"uint128\",\"name\":\"baseTokenGasPriceMultiplierDenominator\",\"type\":\"uint128\"},{\"internalType\":\"address\",\"name\":\"bridgehub\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"sharedBridgeProxy\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"nativeTokenVault\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"chainTypeManagerProxy\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"validatorTimelock\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"diamondCutData\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"forceDeployments\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"governanceSecurityCouncilAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"governanceMinDelay\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"l1Nullifier\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"l1Erc20Bridge\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"initializeLegacyBridge\",\"type\":\"bool\"},{\"internalType\":\"address\",\"name\":\"governance\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"create2FactoryAddress\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"create2Salt\",\"type\":\"bytes32\"},{\"internalType\":\"bool\",\"name\":\"allowEvmEmulator\",\"type\":\"bool\"}],\"internalType\":\"struct RegisterZKChainConfig\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getOwnerAddress\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_bridgehub\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_chainTypeManagerProxy\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_chainChainId\",\"type\":\"uint256\"}],\"name\":\"run\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_bridgehub\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_chainTypeManagerProxy\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_chainChainId\",\"type\":\"uint256\"}],\"name\":\"runForTest\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{\"getConfig()\":{\"returns\":{\"_0\":\"The RegisterZKChainConfig struct containing registration parameters\"}},\"getOwnerAddress()\":{\"returns\":{\"_0\":\"The owner address\"}},\"run(address,address,uint256)\":{\"params\":{\"_bridgehub\":\"Address of the bridgehub contract\",\"_chainChainId\":\"Chain ID for the new ZK chain\",\"_chainTypeManagerProxy\":\"Address of the chain type manager proxy\"}},\"runForTest(address,address,uint256)\":{\"params\":{\"_bridgehub\":\"Address of the bridgehub contract\",\"_chainChainId\":\"Chain ID for the new ZK chain\",\"_chainTypeManagerProxy\":\"Address of the chain type manager proxy\"}}},\"title\":\"IRegisterZKChain\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"getConfig()\":{\"notice\":\"Returns the registration configuration\"},\"getOwnerAddress()\":{\"notice\":\"Returns the owner address from configuration\"},\"run(address,address,uint256)\":{\"notice\":\"Runs the ZK chain registration with production configuration\"},\"runForTest(address,address,uint256)\":{\"notice\":\"Runs the ZK chain registration for testing purposes\"}},\"notice\":\"Interface for the RegisterZKChain deployment script\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/script-interfaces/IRegisterZKChain.sol\":\"IRegisterZKChain\"},\"evmVersion\":\"prague\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":9999999},\"remappings\":[\":@ensdomains/=node_modules/@ensdomains/\",\":@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/\",\":@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/\",\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":erc4626-tests/=lib/openzeppelin-contracts-v4/lib/erc4626-tests/\",\":eth-gas-reporter/=node_modules/eth-gas-reporter/\",\":forge-std/=lib/forge-std/src/\",\":foundry-test/=test/foundry/\",\":hardhat/=node_modules/hardhat/\",\":l2-contracts/=../l2-contracts/contracts/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/\",\":openzeppelin-contracts-v4/=lib/openzeppelin-contracts-v4/\",\":openzeppelin-contracts/=lib/murky/lib/openzeppelin-contracts/\"]},\"sources\":{\"contracts/script-interfaces/IRegisterZKChain.sol\":{\"keccak256\":\"0xcec88d7208dcd14c385a3429122ceff3960afd1d5383d23d1f6547bdd6f1d558\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://23ed8812f4e787ee0f4fb1d0dba07526b850a3f18417e22f094a920fc6082024\",\"dweb:/ipfs/QmV5GuwXndtXMRmwV5id3EPUcpUVM19THBLYFjc37XEQX1\"]}},\"version\":1}",
+  "metadata": {
+    "compiler": { "version": "0.8.28+commit.7893614a" },
+    "language": "Solidity",
+    "output": {
+      "abi": [
+        {
+          "inputs": [],
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getConfig",
+          "outputs": [
+            {
+              "internalType": "struct RegisterZKChainConfig",
+              "name": "",
+              "type": "tuple",
+              "components": [
+                { "internalType": "address", "name": "deployerAddress", "type": "address" },
+                { "internalType": "address", "name": "ownerAddress", "type": "address" },
+                { "internalType": "uint256", "name": "chainChainId", "type": "uint256" },
+                { "internalType": "bool", "name": "validiumMode", "type": "bool" },
+                { "internalType": "uint256", "name": "bridgehubCreateNewChainSalt", "type": "uint256" },
+                { "internalType": "address", "name": "validatorSenderOperatorEth", "type": "address" },
+                { "internalType": "address", "name": "validatorSenderOperatorBlobsEth", "type": "address" },
+                { "internalType": "address", "name": "validatorSenderOperatorProve", "type": "address" },
+                { "internalType": "address", "name": "validatorSenderOperatorExecute", "type": "address" },
+                { "internalType": "address", "name": "baseToken", "type": "address" },
+                { "internalType": "bytes32", "name": "baseTokenAssetId", "type": "bytes32" },
+                { "internalType": "uint128", "name": "baseTokenGasPriceMultiplierNominator", "type": "uint128" },
+                { "internalType": "uint128", "name": "baseTokenGasPriceMultiplierDenominator", "type": "uint128" },
+                { "internalType": "address", "name": "bridgehub", "type": "address" },
+                { "internalType": "address", "name": "sharedBridgeProxy", "type": "address" },
+                { "internalType": "address", "name": "nativeTokenVault", "type": "address" },
+                { "internalType": "address", "name": "chainTypeManagerProxy", "type": "address" },
+                { "internalType": "address", "name": "validatorTimelock", "type": "address" },
+                { "internalType": "bytes", "name": "diamondCutData", "type": "bytes" },
+                { "internalType": "bytes", "name": "forceDeployments", "type": "bytes" },
+                { "internalType": "address", "name": "governanceSecurityCouncilAddress", "type": "address" },
+                { "internalType": "uint256", "name": "governanceMinDelay", "type": "uint256" },
+                { "internalType": "address", "name": "l1Nullifier", "type": "address" },
+                { "internalType": "address", "name": "l1Erc20Bridge", "type": "address" },
+                { "internalType": "bool", "name": "initializeLegacyBridge", "type": "bool" },
+                { "internalType": "address", "name": "governance", "type": "address" },
+                { "internalType": "address", "name": "create2FactoryAddress", "type": "address" },
+                { "internalType": "bytes32", "name": "create2Salt", "type": "bytes32" },
+                { "internalType": "bool", "name": "allowEvmEmulator", "type": "bool" }
+              ]
+            }
+          ]
+        },
+        {
+          "inputs": [],
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getOwnerAddress",
+          "outputs": [{ "internalType": "address", "name": "", "type": "address" }]
+        },
+        {
+          "inputs": [
+            { "internalType": "address", "name": "_bridgehub", "type": "address" },
+            { "internalType": "address", "name": "_chainTypeManagerProxy", "type": "address" },
+            { "internalType": "uint256", "name": "_chainChainId", "type": "uint256" }
+          ],
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "run"
+        },
+        {
+          "inputs": [
+            { "internalType": "address", "name": "_bridgehub", "type": "address" },
+            { "internalType": "address", "name": "_chainTypeManagerProxy", "type": "address" },
+            { "internalType": "uint256", "name": "_chainChainId", "type": "uint256" }
+          ],
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "runForTest"
+        }
+      ],
+      "devdoc": {
+        "kind": "dev",
+        "methods": {
+          "getConfig()": { "returns": { "_0": "The RegisterZKChainConfig struct containing registration parameters" } },
+          "getOwnerAddress()": { "returns": { "_0": "The owner address" } },
+          "run(address,address,uint256)": {
+            "params": {
+              "_bridgehub": "Address of the bridgehub contract",
+              "_chainChainId": "Chain ID for the new ZK chain",
+              "_chainTypeManagerProxy": "Address of the chain type manager proxy"
+            }
+          },
+          "runForTest(address,address,uint256)": {
+            "params": {
+              "_bridgehub": "Address of the bridgehub contract",
+              "_chainChainId": "Chain ID for the new ZK chain",
+              "_chainTypeManagerProxy": "Address of the chain type manager proxy"
+            }
+          }
+        },
+        "version": 1
+      },
+      "userdoc": {
+        "kind": "user",
+        "methods": {
+          "getConfig()": { "notice": "Returns the registration configuration" },
+          "getOwnerAddress()": { "notice": "Returns the owner address from configuration" },
+          "run(address,address,uint256)": { "notice": "Runs the ZK chain registration with production configuration" },
+          "runForTest(address,address,uint256)": { "notice": "Runs the ZK chain registration for testing purposes" }
+        },
+        "version": 1
+      }
+    },
+    "settings": {
+      "remappings": [
+        "@ensdomains/=node_modules/@ensdomains/",
+        "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
+        "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
+        "ds-test/=lib/forge-std/lib/ds-test/src/",
+        "erc4626-tests/=lib/openzeppelin-contracts-v4/lib/erc4626-tests/",
+        "eth-gas-reporter/=node_modules/eth-gas-reporter/",
+        "forge-std/=lib/forge-std/src/",
+        "foundry-test/=test/foundry/",
+        "hardhat/=node_modules/hardhat/",
+        "l2-contracts/=../l2-contracts/contracts/",
+        "murky/=lib/murky/src/",
+        "openzeppelin-contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/",
+        "openzeppelin-contracts-v4/=lib/openzeppelin-contracts-v4/",
+        "openzeppelin-contracts/=lib/murky/lib/openzeppelin-contracts/"
+      ],
+      "optimizer": { "enabled": true, "runs": 9999999 },
+      "metadata": { "bytecodeHash": "ipfs" },
+      "compilationTarget": { "contracts/script-interfaces/IRegisterZKChain.sol": "IRegisterZKChain" },
+      "evmVersion": "prague",
+      "libraries": {}
+    },
+    "sources": {
+      "contracts/script-interfaces/IRegisterZKChain.sol": {
+        "keccak256": "0xcec88d7208dcd14c385a3429122ceff3960afd1d5383d23d1f6547bdd6f1d558",
+        "urls": [
+          "bzz-raw://23ed8812f4e787ee0f4fb1d0dba07526b850a3f18417e22f094a920fc6082024",
+          "dweb:/ipfs/QmV5GuwXndtXMRmwV5id3EPUcpUVM19THBLYFjc37XEQX1"
+        ],
+        "license": "MIT"
+      }
+    },
+    "version": 1
+  },
+  "ast": {
+    "absolutePath": "contracts/script-interfaces/IRegisterZKChain.sol",
+    "id": 46210,
+    "exportedSymbols": { "IRegisterZKChain": [46209], "RegisterZKChainConfig": [46174] },
+    "nodeType": "SourceUnit",
+    "src": "32:2309:216",
+    "nodes": [
+      {
+        "id": 46115,
+        "nodeType": "PragmaDirective",
+        "src": "32:23:216",
+        "nodes": [],
+        "literals": ["solidity", "0.8", ".28"]
+      },
+      {
+        "id": 46174,
+        "nodeType": "StructDefinition",
+        "src": "105:981:216",
+        "nodes": [],
+        "canonicalName": "RegisterZKChainConfig",
+        "members": [
+          {
+            "constant": false,
+            "id": 46117,
+            "mutability": "mutable",
+            "name": "deployerAddress",
+            "nameLocation": "148:15:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "140:23:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+            "typeName": {
+              "id": 46116,
+              "name": "address",
+              "nodeType": "ElementaryTypeName",
+              "src": "140:7:216",
+              "stateMutability": "nonpayable",
+              "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46119,
+            "mutability": "mutable",
+            "name": "ownerAddress",
+            "nameLocation": "177:12:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "169:20:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+            "typeName": {
+              "id": 46118,
+              "name": "address",
+              "nodeType": "ElementaryTypeName",
+              "src": "169:7:216",
+              "stateMutability": "nonpayable",
+              "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46121,
+            "mutability": "mutable",
+            "name": "chainChainId",
+            "nameLocation": "203:12:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "195:20:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" },
+            "typeName": {
+              "id": 46120,
+              "name": "uint256",
+              "nodeType": "ElementaryTypeName",
+              "src": "195:7:216",
+              "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46123,
+            "mutability": "mutable",
+            "name": "validiumMode",
+            "nameLocation": "226:12:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "221:17:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_bool", "typeString": "bool" },
+            "typeName": {
+              "id": 46122,
+              "name": "bool",
+              "nodeType": "ElementaryTypeName",
+              "src": "221:4:216",
+              "typeDescriptions": { "typeIdentifier": "t_bool", "typeString": "bool" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46125,
+            "mutability": "mutable",
+            "name": "bridgehubCreateNewChainSalt",
+            "nameLocation": "252:27:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "244:35:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" },
+            "typeName": {
+              "id": 46124,
+              "name": "uint256",
+              "nodeType": "ElementaryTypeName",
+              "src": "244:7:216",
+              "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46127,
+            "mutability": "mutable",
+            "name": "validatorSenderOperatorEth",
+            "nameLocation": "293:26:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "285:34:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+            "typeName": {
+              "id": 46126,
+              "name": "address",
+              "nodeType": "ElementaryTypeName",
+              "src": "285:7:216",
+              "stateMutability": "nonpayable",
+              "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46129,
+            "mutability": "mutable",
+            "name": "validatorSenderOperatorBlobsEth",
+            "nameLocation": "333:31:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "325:39:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+            "typeName": {
+              "id": 46128,
+              "name": "address",
+              "nodeType": "ElementaryTypeName",
+              "src": "325:7:216",
+              "stateMutability": "nonpayable",
+              "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46131,
+            "mutability": "mutable",
+            "name": "validatorSenderOperatorProve",
+            "nameLocation": "378:28:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "370:36:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+            "typeName": {
+              "id": 46130,
+              "name": "address",
+              "nodeType": "ElementaryTypeName",
+              "src": "370:7:216",
+              "stateMutability": "nonpayable",
+              "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46133,
+            "mutability": "mutable",
+            "name": "validatorSenderOperatorExecute",
+            "nameLocation": "420:30:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "412:38:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+            "typeName": {
+              "id": 46132,
+              "name": "address",
+              "nodeType": "ElementaryTypeName",
+              "src": "412:7:216",
+              "stateMutability": "nonpayable",
+              "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46135,
+            "mutability": "mutable",
+            "name": "baseToken",
+            "nameLocation": "464:9:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "456:17:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+            "typeName": {
+              "id": 46134,
+              "name": "address",
+              "nodeType": "ElementaryTypeName",
+              "src": "456:7:216",
+              "stateMutability": "nonpayable",
+              "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46137,
+            "mutability": "mutable",
+            "name": "baseTokenAssetId",
+            "nameLocation": "487:16:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "479:24:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_bytes32", "typeString": "bytes32" },
+            "typeName": {
+              "id": 46136,
+              "name": "bytes32",
+              "nodeType": "ElementaryTypeName",
+              "src": "479:7:216",
+              "typeDescriptions": { "typeIdentifier": "t_bytes32", "typeString": "bytes32" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46139,
+            "mutability": "mutable",
+            "name": "baseTokenGasPriceMultiplierNominator",
+            "nameLocation": "517:36:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "509:44:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_uint128", "typeString": "uint128" },
+            "typeName": {
+              "id": 46138,
+              "name": "uint128",
+              "nodeType": "ElementaryTypeName",
+              "src": "509:7:216",
+              "typeDescriptions": { "typeIdentifier": "t_uint128", "typeString": "uint128" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46141,
+            "mutability": "mutable",
+            "name": "baseTokenGasPriceMultiplierDenominator",
+            "nameLocation": "567:38:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "559:46:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_uint128", "typeString": "uint128" },
+            "typeName": {
+              "id": 46140,
+              "name": "uint128",
+              "nodeType": "ElementaryTypeName",
+              "src": "559:7:216",
+              "typeDescriptions": { "typeIdentifier": "t_uint128", "typeString": "uint128" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46143,
+            "mutability": "mutable",
+            "name": "bridgehub",
+            "nameLocation": "619:9:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "611:17:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+            "typeName": {
+              "id": 46142,
+              "name": "address",
+              "nodeType": "ElementaryTypeName",
+              "src": "611:7:216",
+              "stateMutability": "nonpayable",
+              "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46145,
+            "mutability": "mutable",
+            "name": "sharedBridgeProxy",
+            "nameLocation": "642:17:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "634:25:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+            "typeName": {
+              "id": 46144,
+              "name": "address",
+              "nodeType": "ElementaryTypeName",
+              "src": "634:7:216",
+              "stateMutability": "nonpayable",
+              "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46147,
+            "mutability": "mutable",
+            "name": "nativeTokenVault",
+            "nameLocation": "673:16:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "665:24:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+            "typeName": {
+              "id": 46146,
+              "name": "address",
+              "nodeType": "ElementaryTypeName",
+              "src": "665:7:216",
+              "stateMutability": "nonpayable",
+              "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46149,
+            "mutability": "mutable",
+            "name": "chainTypeManagerProxy",
+            "nameLocation": "703:21:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "695:29:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+            "typeName": {
+              "id": 46148,
+              "name": "address",
+              "nodeType": "ElementaryTypeName",
+              "src": "695:7:216",
+              "stateMutability": "nonpayable",
+              "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46151,
+            "mutability": "mutable",
+            "name": "validatorTimelock",
+            "nameLocation": "738:17:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "730:25:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+            "typeName": {
+              "id": 46150,
+              "name": "address",
+              "nodeType": "ElementaryTypeName",
+              "src": "730:7:216",
+              "stateMutability": "nonpayable",
+              "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46153,
+            "mutability": "mutable",
+            "name": "diamondCutData",
+            "nameLocation": "767:14:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "761:20:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_bytes_storage_ptr", "typeString": "bytes" },
+            "typeName": {
+              "id": 46152,
+              "name": "bytes",
+              "nodeType": "ElementaryTypeName",
+              "src": "761:5:216",
+              "typeDescriptions": { "typeIdentifier": "t_bytes_storage_ptr", "typeString": "bytes" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46155,
+            "mutability": "mutable",
+            "name": "forceDeployments",
+            "nameLocation": "793:16:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "787:22:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_bytes_storage_ptr", "typeString": "bytes" },
+            "typeName": {
+              "id": 46154,
+              "name": "bytes",
+              "nodeType": "ElementaryTypeName",
+              "src": "787:5:216",
+              "typeDescriptions": { "typeIdentifier": "t_bytes_storage_ptr", "typeString": "bytes" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46157,
+            "mutability": "mutable",
+            "name": "governanceSecurityCouncilAddress",
+            "nameLocation": "823:32:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "815:40:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+            "typeName": {
+              "id": 46156,
+              "name": "address",
+              "nodeType": "ElementaryTypeName",
+              "src": "815:7:216",
+              "stateMutability": "nonpayable",
+              "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46159,
+            "mutability": "mutable",
+            "name": "governanceMinDelay",
+            "nameLocation": "869:18:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "861:26:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" },
+            "typeName": {
+              "id": 46158,
+              "name": "uint256",
+              "nodeType": "ElementaryTypeName",
+              "src": "861:7:216",
+              "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46161,
+            "mutability": "mutable",
+            "name": "l1Nullifier",
+            "nameLocation": "901:11:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "893:19:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+            "typeName": {
+              "id": 46160,
+              "name": "address",
+              "nodeType": "ElementaryTypeName",
+              "src": "893:7:216",
+              "stateMutability": "nonpayable",
+              "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46163,
+            "mutability": "mutable",
+            "name": "l1Erc20Bridge",
+            "nameLocation": "926:13:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "918:21:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+            "typeName": {
+              "id": 46162,
+              "name": "address",
+              "nodeType": "ElementaryTypeName",
+              "src": "918:7:216",
+              "stateMutability": "nonpayable",
+              "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46165,
+            "mutability": "mutable",
+            "name": "initializeLegacyBridge",
+            "nameLocation": "950:22:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "945:27:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_bool", "typeString": "bool" },
+            "typeName": {
+              "id": 46164,
+              "name": "bool",
+              "nodeType": "ElementaryTypeName",
+              "src": "945:4:216",
+              "typeDescriptions": { "typeIdentifier": "t_bool", "typeString": "bool" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46167,
+            "mutability": "mutable",
+            "name": "governance",
+            "nameLocation": "986:10:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "978:18:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+            "typeName": {
+              "id": 46166,
+              "name": "address",
+              "nodeType": "ElementaryTypeName",
+              "src": "978:7:216",
+              "stateMutability": "nonpayable",
+              "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46169,
+            "mutability": "mutable",
+            "name": "create2FactoryAddress",
+            "nameLocation": "1010:21:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "1002:29:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+            "typeName": {
+              "id": 46168,
+              "name": "address",
+              "nodeType": "ElementaryTypeName",
+              "src": "1002:7:216",
+              "stateMutability": "nonpayable",
+              "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46171,
+            "mutability": "mutable",
+            "name": "create2Salt",
+            "nameLocation": "1045:11:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "1037:19:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_bytes32", "typeString": "bytes32" },
+            "typeName": {
+              "id": 46170,
+              "name": "bytes32",
+              "nodeType": "ElementaryTypeName",
+              "src": "1037:7:216",
+              "typeDescriptions": { "typeIdentifier": "t_bytes32", "typeString": "bytes32" }
+            },
+            "visibility": "internal"
+          },
+          {
+            "constant": false,
+            "id": 46173,
+            "mutability": "mutable",
+            "name": "allowEvmEmulator",
+            "nameLocation": "1067:16:216",
+            "nodeType": "VariableDeclaration",
+            "scope": 46174,
+            "src": "1062:21:216",
+            "stateVariable": false,
+            "storageLocation": "default",
+            "typeDescriptions": { "typeIdentifier": "t_bool", "typeString": "bool" },
+            "typeName": {
+              "id": 46172,
+              "name": "bool",
+              "nodeType": "ElementaryTypeName",
+              "src": "1062:4:216",
+              "typeDescriptions": { "typeIdentifier": "t_bool", "typeString": "bool" }
+            },
+            "visibility": "internal"
+          }
+        ],
+        "name": "RegisterZKChainConfig",
+        "nameLocation": "112:21:216",
+        "scope": 46210,
+        "visibility": "public"
+      },
+      {
+        "id": 46209,
+        "nodeType": "ContractDefinition",
+        "src": "1180:1160:216",
+        "nodes": [
+          {
+            "id": 46185,
+            "nodeType": "FunctionDefinition",
+            "src": "1487:97:216",
+            "nodes": [],
+            "documentation": {
+              "id": 46176,
+              "nodeType": "StructuredDocumentation",
+              "src": "1213:269:216",
+              "text": "@notice Runs the ZK chain registration with production configuration\n @param _bridgehub Address of the bridgehub contract\n @param _chainTypeManagerProxy Address of the chain type manager proxy\n @param _chainChainId Chain ID for the new ZK chain"
+            },
+            "functionSelector": "8892170a",
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "run",
+            "nameLocation": "1496:3:216",
+            "parameters": {
+              "id": 46183,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 46178,
+                  "mutability": "mutable",
+                  "name": "_bridgehub",
+                  "nameLocation": "1508:10:216",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46185,
+                  "src": "1500:18:216",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+                  "typeName": {
+                    "id": 46177,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1500:7:216",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 46180,
+                  "mutability": "mutable",
+                  "name": "_chainTypeManagerProxy",
+                  "nameLocation": "1528:22:216",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46185,
+                  "src": "1520:30:216",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+                  "typeName": {
+                    "id": 46179,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1520:7:216",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 46182,
+                  "mutability": "mutable",
+                  "name": "_chainChainId",
+                  "nameLocation": "1560:13:216",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46185,
+                  "src": "1552:21:216",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" },
+                  "typeName": {
+                    "id": 46181,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1552:7:216",
+                    "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1499:75:216"
+            },
+            "returnParameters": { "id": 46184, "nodeType": "ParameterList", "parameters": [], "src": "1583:0:216" },
+            "scope": 46209,
+            "stateMutability": "nonpayable",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "id": 46195,
+            "nodeType": "FunctionDefinition",
+            "src": "1855:104:216",
+            "nodes": [],
+            "documentation": {
+              "id": 46186,
+              "nodeType": "StructuredDocumentation",
+              "src": "1590:260:216",
+              "text": "@notice Runs the ZK chain registration for testing purposes\n @param _bridgehub Address of the bridgehub contract\n @param _chainTypeManagerProxy Address of the chain type manager proxy\n @param _chainChainId Chain ID for the new ZK chain"
+            },
+            "functionSelector": "0f024634",
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "runForTest",
+            "nameLocation": "1864:10:216",
+            "parameters": {
+              "id": 46193,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 46188,
+                  "mutability": "mutable",
+                  "name": "_bridgehub",
+                  "nameLocation": "1883:10:216",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46195,
+                  "src": "1875:18:216",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+                  "typeName": {
+                    "id": 46187,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1875:7:216",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 46190,
+                  "mutability": "mutable",
+                  "name": "_chainTypeManagerProxy",
+                  "nameLocation": "1903:22:216",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46195,
+                  "src": "1895:30:216",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+                  "typeName": {
+                    "id": 46189,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1895:7:216",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 46192,
+                  "mutability": "mutable",
+                  "name": "_chainChainId",
+                  "nameLocation": "1935:13:216",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46195,
+                  "src": "1927:21:216",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" },
+                  "typeName": {
+                    "id": 46191,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1927:7:216",
+                    "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1874:75:216"
+            },
+            "returnParameters": { "id": 46194, "nodeType": "ParameterList", "parameters": [], "src": "1958:0:216" },
+            "scope": 46209,
+            "stateMutability": "nonpayable",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "id": 46202,
+            "nodeType": "FunctionDefinition",
+            "src": "2104:74:216",
+            "nodes": [],
+            "documentation": {
+              "id": 46196,
+              "nodeType": "StructuredDocumentation",
+              "src": "1965:134:216",
+              "text": "@notice Returns the registration configuration\n @return The RegisterZKChainConfig struct containing registration parameters"
+            },
+            "functionSelector": "c3f909d4",
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "getConfig",
+            "nameLocation": "2113:9:216",
+            "parameters": { "id": 46197, "nodeType": "ParameterList", "parameters": [], "src": "2122:2:216" },
+            "returnParameters": {
+              "id": 46201,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 46200,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46202,
+                  "src": "2148:28:216",
+                  "stateVariable": false,
+                  "storageLocation": "memory",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_struct$_RegisterZKChainConfig_$46174_memory_ptr",
+                    "typeString": "struct RegisterZKChainConfig"
+                  },
+                  "typeName": {
+                    "id": 46199,
+                    "nodeType": "UserDefinedTypeName",
+                    "pathNode": {
+                      "id": 46198,
+                      "name": "RegisterZKChainConfig",
+                      "nameLocations": ["2148:21:216"],
+                      "nodeType": "IdentifierPath",
+                      "referencedDeclaration": 46174,
+                      "src": "2148:21:216"
+                    },
+                    "referencedDeclaration": 46174,
+                    "src": "2148:21:216",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_struct$_RegisterZKChainConfig_$46174_storage_ptr",
+                      "typeString": "struct RegisterZKChainConfig"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "2147:30:216"
+            },
+            "scope": 46209,
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "id": 46208,
+            "nodeType": "FunctionDefinition",
+            "src": "2279:59:216",
+            "nodes": [],
+            "documentation": {
+              "id": 46203,
+              "nodeType": "StructuredDocumentation",
+              "src": "2184:90:216",
+              "text": "@notice Returns the owner address from configuration\n @return The owner address"
+            },
+            "functionSelector": "0c4f65bd",
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "getOwnerAddress",
+            "nameLocation": "2288:15:216",
+            "parameters": { "id": 46204, "nodeType": "ParameterList", "parameters": [], "src": "2303:2:216" },
+            "returnParameters": {
+              "id": 46207,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 46206,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 46208,
+                  "src": "2329:7:216",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
+                  "typeName": {
+                    "id": 46205,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "2329:7:216",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "2328:9:216"
+            },
+            "scope": 46209,
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          }
+        ],
+        "abstract": false,
+        "baseContracts": [],
+        "canonicalName": "IRegisterZKChain",
+        "contractDependencies": [],
+        "contractKind": "interface",
+        "documentation": {
+          "id": 46175,
+          "nodeType": "StructuredDocumentation",
+          "src": "1088:92:216",
+          "text": "@title IRegisterZKChain\n @notice Interface for the RegisterZKChain deployment script"
+        },
+        "fullyImplemented": false,
+        "linearizedBaseContracts": [46209],
+        "name": "IRegisterZKChain",
+        "nameLocation": "1190:16:216",
+        "scope": 46210,
+        "usedErrors": [],
+        "usedEvents": []
+      }
+    ],
+    "license": "MIT"
+  },
+  "id": 216
+}

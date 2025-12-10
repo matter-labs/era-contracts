@@ -1,5 +1,5 @@
-import { promises as fs } from 'fs';
-import * as path from 'path';
+import { promises as fs } from "fs";
+import * as path from "path";
 
 /**
  * This script copies required contract JSON files from out/ to zkstack-out/out/
@@ -7,64 +7,64 @@ import * as path from 'path';
  */
 
 const REQUIRED_CONTRACTS = [
-    'L1Bridgehub.sol',
-    'IZKChain.sol',
-    'IChainTypeManagerForZKStack.sol',
-    'IValidatorTimelockForZKStack.sol',
-    'IChainAssetHandler.sol',
-    'IChainTypeManager.sol',
-    'IAdmin.sol',
-    'IChainAdminOwnable.sol',
-    'IRegisterZKChain.sol',
-    'IDeployL2Contracts.sol',
-    'DeployPaymaster.s.sol',
-    'GatewayVotePreparation.s.sol'
+  "L1Bridgehub.sol",
+  "IZKChain.sol",
+  "IChainTypeManagerForZKStack.sol",
+  "IValidatorTimelockForZKStack.sol",
+  "IChainAssetHandler.sol",
+  "IChainTypeManager.sol",
+  "IAdmin.sol",
+  "IChainAdminOwnable.sol",
+  "IRegisterZKChain.sol",
+  "IDeployL2Contracts.sol",
+  "DeployPaymaster.s.sol",
+  "GatewayVotePreparation.s.sol",
 ];
 
 async function copyDirectory(src: string, dest: string): Promise<void> {
-    await fs.mkdir(dest, { recursive: true });
-    const entries = await fs.readdir(src, { withFileTypes: true });
+  await fs.mkdir(dest, { recursive: true });
+  const entries = await fs.readdir(src, { withFileTypes: true });
 
-    for (const entry of entries) {
-        const srcPath = path.join(src, entry.name);
-        const destPath = path.join(dest, entry.name);
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
 
-        if (entry.isDirectory()) {
-            await copyDirectory(srcPath, destPath);
-        } else {
-            await fs.copyFile(srcPath, destPath);
-        }
+    if (entry.isDirectory()) {
+      await copyDirectory(srcPath, destPath);
+    } else {
+      await fs.copyFile(srcPath, destPath);
     }
+  }
 }
 
 async function main() {
-    const l1ContractsDir = path.resolve(__dirname, '..');
-    const outDir = path.join(l1ContractsDir, 'out');
-    const zkstackOutDir = path.join(l1ContractsDir, 'zkstack-out');
+  const l1ContractsDir = path.resolve(__dirname, "..");
+  const outDir = path.join(l1ContractsDir, "out");
+  const zkstackOutDir = path.join(l1ContractsDir, "zkstack-out");
 
-    console.log('Copying contract files to zkstack-out...');
+  console.log("Copying contract files to zkstack-out...");
 
-    // Create zkstack-out directory if it doesn't exist
-    await fs.mkdir(zkstackOutDir, { recursive: true });
+  // Create zkstack-out directory if it doesn't exist
+  await fs.mkdir(zkstackOutDir, { recursive: true });
 
-    // Copy each required contract directory
-    for (const contract of REQUIRED_CONTRACTS) {
-        const srcPath = path.join(outDir, contract);
-        const destPath = path.join(zkstackOutDir, contract);
+  // Copy each required contract directory
+  for (const contract of REQUIRED_CONTRACTS) {
+    const srcPath = path.join(outDir, contract);
+    const destPath = path.join(zkstackOutDir, contract);
 
-        try {
-            await fs.access(srcPath);
-            await copyDirectory(srcPath, destPath);
-            console.log(`Copied ${contract}`);
-        } catch (error) {
-            console.warn(`Warning: ${contract} not found in ${outDir}`);
-        }
+    try {
+      await fs.access(srcPath);
+      await copyDirectory(srcPath, destPath);
+      console.log(`Copied ${contract}`);
+    } catch (error) {
+      console.warn(`Warning: ${contract} not found in ${outDir}`);
     }
+  }
 
-    console.log('Done copying contract files to zkstack-out');
+  console.log("Done copying contract files to zkstack-out");
 }
 
 main().catch((error) => {
-    console.error('Error:', error);
-    process.exit(1);
+  console.error("Error:", error);
+  process.exit(1);
 });
