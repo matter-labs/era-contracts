@@ -16,8 +16,10 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
+import {ISetupLegacyBridge} from "contracts/script-interfaces/ISetupLegacyBridge.sol";
+
 /// This scripts is only for developer
-contract SetupLegacyBridge is Script {
+contract SetupLegacyBridge is Script, ISetupLegacyBridge {
     using stdToml for string;
 
     Config internal config;
@@ -43,8 +45,12 @@ contract SetupLegacyBridge is Script {
         address l1NullifierProxyImpl;
     }
 
-    function run(address _bridgehub, uint256 _chainId) public {
-        initializeConfig(_bridgehub, _chainId);
+    function run(
+        address _bridgehub,
+        uint256 _chainId,
+        address _diamondProxy
+    ) public {
+        initializeConfig(_bridgehub, _chainId, _diamondProxy);
         deploySharedBridgeImplementation();
         upgradeImplementation(addresses.sharedBridgeProxy, addresses.sharedBridgeProxyImpl);
         deployDummyErc20Bridge();
@@ -54,12 +60,22 @@ contract SetupLegacyBridge is Script {
         upgradeImplementation(addresses.l1Nullifier, addresses.l1NullifierProxyImpl);
     }
 
-    function initializeConfig(address bridgehub, uint256 chainId) internal {
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/setup-legacy-bridge.toml");
-        string memory toml = vm.readFile(path);
-
+    function initializeConfig(
+        address bridgehub,
+        uint256 chainId,
+        address diamondProxy
+    ) internal {
         addresses.bridgehub = bridgehub;
+        addresses.diamondProxy = diamondProxy;
+        config.chainId = chainId;
+
+        // Read create2 factory parameters from permanent-values.toml
+        string memory root = vm.projectRoot();
+        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
+        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
+
+        addresses.create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
+        config.create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
 
         // Use AddressIntrospector to get addresses from deployed contracts
         AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
@@ -71,17 +87,6 @@ contract SetupLegacyBridge is Script {
         addresses.transparentProxyAdmin = bhAddresses.transparentProxyAdmin;
         addresses.tokenWethAddress = bhAddresses.assetRouterAddresses.l1WethToken;
         addresses.erc20BridgeProxy = AddressIntrospector.getLegacyBridgeAddress(bhAddresses.assetRouter);
-
-        // Chain-specific configuration
-        addresses.diamondProxy = toml.readAddress("$.diamond_proxy");
-
-        // Read create2 factory values from permanent values file
-        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
-        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-        addresses.create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
-        config.create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
-
-        config.chainId = chainId;
     }
 
     // We need to deploy new shared bridge for changing chain id and diamond proxy address

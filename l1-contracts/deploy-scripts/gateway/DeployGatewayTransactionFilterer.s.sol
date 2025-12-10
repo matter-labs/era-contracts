@@ -11,24 +11,37 @@ import {stdToml} from "forge-std/StdToml.sol";
 
 /// @title DeployGatewayTransactionFilterer
 /// @notice This script deploys a GatewayTransactionFilterer behind a TransparentUpgradeableProxy,
-/// using Create2 with notify. It takes five parameters:
+/// using Create2 with notify. It takes three parameters:
 /// - bridgehub: The address of the Bridgehub contract.
 /// - chainAdmin: The admin to be set as the initial owner of the deployed filterer.
 /// - chainProxyAdmin: The pre-deployed proxy admin that manages the proxy.
-/// - create2FactoryAddress: The configured Create2 factory address.
-/// - create2FactorySalt: The salt for the Create2 deployment.
+/// Both create2FactoryAddress and create2FactorySalt are read from permanent-values.toml.
 contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils, IDeployGatewayTransactionFilterer {
     using stdToml for string;
+
+    function initializeConfig(
+        address bridgehub,
+        address chainAdmin,
+        address chainProxyAdmin
+    ) internal {
+        // Read create2 factory parameters from permanent-values.toml
+        string memory root = vm.projectRoot();
+        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
+        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
+
+        address create2FactoryAddress = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
+        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
+
+        _initCreate2FactoryParams(create2FactoryAddress, create2FactorySalt);
+    }
 
     function run(
         address bridgehub,
         address chainAdmin,
-        address chainProxyAdmin,
-        address create2FactoryAddress,
-        bytes32 create2FactorySalt
+        address chainProxyAdmin
     ) public returns (address proxy) {
-        // Initialize and instantiate Create2Factory before any deployment.
-        _initCreate2FactoryParams(create2FactoryAddress, create2FactorySalt);
+        // Initialize config and instantiate Create2Factory before any deployment.
+        initializeConfig(bridgehub, chainAdmin, chainProxyAdmin);
         instantiateCreate2Factory();
 
         // Query the L1 asset router from the Bridgehub.
@@ -68,16 +81,11 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils, IDeplo
         string memory configPath = string.concat(root, vm.envString("DEPLOY_GATEWAY_TX_FILTERER_INPUT"));
         string memory toml = vm.readFile(configPath);
 
-        // Read create2 factory values from permanent values file
-        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
-        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-
+        // create2FactoryAddress and create2FactorySalt are both read internally by initializeConfig
         address proxy = run(
             toml.readAddress("$.bridgehub_proxy_addr"),
             toml.readAddress("$.chain_admin"),
-            toml.readAddress("$.chain_proxy_admin"),
-            permanentValuesToml.readAddress("$.contracts.create2_factory_addr"),
-            permanentValuesToml.readBytes32("$.contracts.create2_factory_salt")
+            toml.readAddress("$.chain_proxy_admin")
         );
 
         // Save the address of the deployed proxy into an output TOML file.

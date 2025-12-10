@@ -53,8 +53,14 @@ contract DeployL2Script is Script, IDeployL2Contracts {
         address timestampAsserter;
     }
 
-    function run(address _bridgehub, uint256 _chainId) public {
-        initializeConfig(_bridgehub, _chainId);
+    function run(
+        address _bridgehub,
+        uint256 _chainId,
+        address _governance,
+        address _consensusRegistryOwner,
+        uint256 _daValidatorType
+    ) public {
+        initializeConfig(_bridgehub, _chainId, _governance, _consensusRegistryOwner, _daValidatorType);
 
         deploy(false);
     }
@@ -78,8 +84,14 @@ contract DeployL2Script is Script, IDeployL2Contracts {
         vm.stopPrank();
     }
 
-    function runWithLegacyBridge(address _bridgehub, uint256 _chainId) public {
-        initializeConfig(_bridgehub, _chainId);
+    function runWithLegacyBridge(
+        address _bridgehub,
+        uint256 _chainId,
+        address _governance,
+        address _consensusRegistryOwner,
+        uint256 _daValidatorType
+    ) public {
+        initializeConfig(_bridgehub, _chainId, _governance, _consensusRegistryOwner, _daValidatorType);
         deploy(true);
     }
 
@@ -93,16 +105,28 @@ contract DeployL2Script is Script, IDeployL2Contracts {
         saveOutput();
     }
 
-    function runDefaultUpgrader(address _bridgehub, uint256 _chainId) public {
-        initializeConfig(_bridgehub, _chainId);
+    function runDefaultUpgrader(
+        address _bridgehub,
+        uint256 _chainId,
+        address _governance,
+        address _consensusRegistryOwner,
+        uint256 _daValidatorType
+    ) public {
+        initializeConfig(_bridgehub, _chainId, _governance, _consensusRegistryOwner, _daValidatorType);
 
         deployForceDeployer();
 
         saveOutput();
     }
 
-    function runDeployConsensusRegistry(address _bridgehub, uint256 _chainId) public {
-        initializeConfig(_bridgehub, _chainId);
+    function runDeployConsensusRegistry(
+        address _bridgehub,
+        uint256 _chainId,
+        address _governance,
+        address _consensusRegistryOwner,
+        uint256 _daValidatorType
+    ) public {
+        initializeConfig(_bridgehub, _chainId, _governance, _consensusRegistryOwner, _daValidatorType);
 
         deployConsensusRegistry();
         deployConsensusRegistryProxy();
@@ -110,28 +134,48 @@ contract DeployL2Script is Script, IDeployL2Contracts {
         saveOutput();
     }
 
-    function runDeployMulticall3(address _bridgehub, uint256 _chainId) public {
-        initializeConfig(_bridgehub, _chainId);
+    function runDeployMulticall3(
+        address _bridgehub,
+        uint256 _chainId,
+        address _governance,
+        address _consensusRegistryOwner,
+        uint256 _daValidatorType
+    ) public {
+        initializeConfig(_bridgehub, _chainId, _governance, _consensusRegistryOwner, _daValidatorType);
 
         deployMulticall3();
 
         saveOutput();
     }
 
-    function runDeployTimestampAsserter(address _bridgehub, uint256 _chainId) public {
-        initializeConfig(_bridgehub, _chainId);
+    function runDeployTimestampAsserter(
+        address _bridgehub,
+        uint256 _chainId,
+        address _governance,
+        address _consensusRegistryOwner,
+        uint256 _daValidatorType
+    ) public {
+        initializeConfig(_bridgehub, _chainId, _governance, _consensusRegistryOwner, _daValidatorType);
 
         deployTimestampAsserter();
 
         saveOutput();
     }
 
-    function initializeConfig(address bridgehubAddress, uint256 chainId) internal {
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/config-deploy-l2-contracts.toml");
-        string memory toml = vm.readFile(path);
+    function initializeConfig(
+        address bridgehubAddress,
+        uint256 chainId,
+        address governance,
+        address consensusRegistryOwner,
+        uint256 daValidatorType
+    ) internal {
+        require(daValidatorType < 3, "Invalid DA validator type");
+
         config.bridgehubAddress = bridgehubAddress;
-        config.governance = toml.readAddress("$.governance");
+        config.governance = governance;
+        config.consensusRegistryOwner = consensusRegistryOwner;
+        config.chainId = chainId;
+        config.validatorType = DAValidatorType(daValidatorType);
 
         // Use AddressIntrospector to get addresses from deployed contracts
         AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
@@ -140,15 +184,6 @@ contract DeployL2Script is Script, IDeployL2Contracts {
         config.l1SharedBridgeProxy = bhAddresses.assetRouter;
         config.erc20BridgeProxy = AddressIntrospector.getLegacyBridgeAddress(bhAddresses.assetRouter);
         config.eraChainId = AddressIntrospector.getEraChainId(bhAddresses.assetRouter);
-
-        config.consensusRegistryOwner = toml.readAddress("$.consensus_registry_owner");
-        //config.chainRegistrar = toml.readAddress("$.chain_registrar");
-        //config.proposalAuthor = toml.readAddress("$.proposal_author");
-        config.chainId = chainId;
-
-        uint256 validatorTypeUint = toml.readUint("$.da_validator_type");
-        require(validatorTypeUint < 3, "Invalid DA validator type");
-        config.validatorType = DAValidatorType(validatorTypeUint);
     }
 
     function saveOutput() internal {

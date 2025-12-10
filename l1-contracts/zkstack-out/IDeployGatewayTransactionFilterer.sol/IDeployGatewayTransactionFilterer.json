@@ -17,16 +17,6 @@
         "name": "chainProxyAdmin",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "create2FactoryAddress",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "create2FactorySalt",
-        "type": "bytes32",
-        "internalType": "bytes32"
       }
     ],
     "outputs": [

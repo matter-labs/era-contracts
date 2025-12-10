@@ -8,8 +8,9 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Utils} from "../utils/Utils.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IDeployPaymaster} from "contracts/script-interfaces/IDeployPaymaster.sol";
 
-contract DeployPaymaster is Script {
+contract DeployPaymaster is Script, IDeployPaymaster {
     using stdToml for string;
     Config internal config;
 
@@ -22,18 +23,14 @@ contract DeployPaymaster is Script {
     }
 
     function initializeConfig(address bridgehubAddress, uint256 chainId) internal {
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/config-deploy-paymaster.toml");
-        string memory toml = vm.readFile(path);
         config.bridgehubAddress = bridgehubAddress;
+        config.chainId = chainId;
 
         // Use AddressIntrospector to get addresses from deployed contracts
         AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
             IL1Bridgehub(bridgehubAddress)
         );
         config.l1SharedBridgeProxy = bhAddresses.assetRouter;
-
-        config.chainId = chainId;
     }
 
     function saveOutput() internal {

@@ -20,6 +20,7 @@ const REQUIRED_CONTRACTS = [
   "IRegisterZKChain.sol",
   "IDeployL2Contracts.sol",
   "DeployPaymaster.s.sol",
+  "IDeployPaymaster.sol",
   "GatewayVotePreparation.s.sol",
   "AdminFunctions.s.sol",
   "EnableEvmEmulator.s.sol",
@@ -39,6 +40,7 @@ const REQUIRED_CONTRACTS = [
   "IL2AssetRouter.sol",
   "IL2AssetTracker.sol",
   "IChainAdmin.sol",
+  "ISetupLegacyBridge.sol",
 ];
 
 async function copyContractAbi(src: string, dest: string): Promise<void> {
