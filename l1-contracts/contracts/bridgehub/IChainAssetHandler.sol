@@ -3,11 +3,10 @@
 pragma solidity ^0.8.24;
 
 import {IAssetHandler} from "../bridge/interfaces/IAssetHandler.sol";
-import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IChainAssetHandler is IAssetHandler, IL1AssetHandler {
+interface IChainAssetHandler is IAssetHandler {
     /// @notice Emitted when the bridging to the chain is started.
     /// @param chainId Chain ID of the ZK chain
     /// @param assetId Asset ID of the token for the zkChain's CTM
@@ -25,4 +24,13 @@ interface IChainAssetHandler is IAssetHandler, IL1AssetHandler {
     function chainInitialMigrationNumber(uint256 _chainId) external view returns (uint256);
 
     function setMigrationNumberForV30(uint256 _chainId) external;
+
+    /// @dev Denotes whether the migrations of chains is paused.
+    function migrationPaused() external view returns (bool);
+
+    /// @notice Pauses migration functions.
+    function pauseMigration() external;
+
+    /// @notice Unpauses migration functions.
+    function unpauseMigration() external;
 }

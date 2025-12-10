@@ -26,8 +26,6 @@ contract L2MessageRoot is MessageRootBase {
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
     /// @dev Chain ID of L1 for bridging reasons.
-    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
-    /// the old version where it was an immutable.
     uint256 internal l1ChainId;
 
     /// @notice The chain id of the Gateway chain.

@@ -41,6 +41,8 @@ interface ISystemContext {
 
     function baseFee() external view returns (uint256);
 
+    function currentSettlementLayerChainId() external view returns (uint256);
+
     function txNumberInBlock() external view returns (uint16);
 
     function getBlockHashEVM(uint256 _block) external view returns (bytes32);
@@ -60,6 +62,4 @@ interface ISystemContext {
     function getCurrentPubdataSpent() external view returns (uint256 currentPubdataSpent);
 
     function setChainId(uint256 _newChainId) external;
-
-    function getSettlementLayerChainId() external view returns (uint256);
 }

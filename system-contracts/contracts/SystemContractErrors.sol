@@ -76,6 +76,8 @@ error InsufficientFunds(uint256 required, uint256 actual);
 error InvalidCall();
 // 0x6a84bc39
 error InvalidCodeHash(CodeHashReason);
+// 0x9e3eb73e
+error InvalidCompressionMetadata();
 // 0xc74537a1
 error InvalidDACommitmentScheme(uint256);
 // 0xb4fa3fb3

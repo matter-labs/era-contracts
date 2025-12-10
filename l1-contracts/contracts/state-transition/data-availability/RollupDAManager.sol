@@ -2,7 +2,7 @@
 pragma solidity ^0.8.18;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {InvalidL2DACommitmentScheme, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {ZeroAddress, InvalidL2DACommitmentScheme} from "../../common/L1ContractErrors.sol";
 import {L2DACommitmentScheme} from "../../common/Config.sol";
 
 /// @title The RollupManager contract
@@ -12,7 +12,8 @@ import {L2DACommitmentScheme} from "../../common/Config.sol";
 /// for permanent rollups.
 contract RollupDAManager is Ownable2Step {
     /// @dev Mapping to track the status (enabled/disabled) of each DAPair.
-    mapping(address l1DAValidator => mapping(L2DACommitmentScheme => bool)) public isAllowedDAConfiguration;
+    mapping(address l1DAValidator => mapping(L2DACommitmentScheme l2DACommitmentScheme => bool))
+        public isAllowedDAConfiguration;
 
     /// @dev Emitted when a DAPair is added or updated.
     /// @param l1DAValidator Address of the L1 data availability validator.

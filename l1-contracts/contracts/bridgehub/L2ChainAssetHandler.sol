@@ -7,6 +7,9 @@ import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {InvalidCaller} from "../common/L1ContractErrors.sol";
+import {IL1Bridgehub} from "./IL1Bridgehub.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
+import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -15,7 +18,7 @@ import {InvalidCaller} from "../common/L1ContractErrors.sol";
 /// between different settlement layers (for example from L1 to Gateway).
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2ChainAssetHandler is ChainAssetHandlerBase {
-    /// @dev The assetId of the base token.
+    /// @dev The assetId of the ETH.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
     bytes32 public override ETH_TOKEN_ASSET_ID;
@@ -28,17 +31,17 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     /// @dev The bridgehub contract.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    address public override BRIDGEHUB;
+    IL1Bridgehub public override BRIDGEHUB;
 
     /// @dev The message root contract.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    address public override MESSAGE_ROOT;
+    IMessageRoot public override MESSAGE_ROOT;
 
     /// @dev The asset router contract.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    address public override ASSET_ROUTER;
+    IAssetRouterBase public override ASSET_ROUTER;
 
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
@@ -52,15 +55,15 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
         return L1_CHAIN_ID;
     }
 
-    function _bridgehub() internal view override returns (address) {
+    function _bridgehub() internal view override returns (IL1Bridgehub) {
         return BRIDGEHUB;
     }
 
-    function _messageRoot() internal view override returns (address) {
+    function _messageRoot() internal view override returns (IMessageRoot) {
         return MESSAGE_ROOT;
     }
 
-    function _assetRouter() internal view override returns (address) {
+    function _assetRouter() internal view override returns (IAssetRouterBase) {
         return ASSET_ROUTER;
     }
 
@@ -101,10 +104,10 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
         address _assetRouter,
         address _messageRoot
     ) public onlyUpgrader {
-        BRIDGEHUB = _bridgehub;
+        BRIDGEHUB = IL1Bridgehub(_bridgehub);
         L1_CHAIN_ID = _l1ChainId;
-        ASSET_ROUTER = _assetRouter;
-        MESSAGE_ROOT = _messageRoot;
+        ASSET_ROUTER = IAssetRouterBase(_assetRouter);
+        MESSAGE_ROOT = IMessageRoot(_messageRoot);
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
     }
 }

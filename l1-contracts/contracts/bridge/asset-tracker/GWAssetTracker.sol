@@ -109,7 +109,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// @dev This function is called during upgrades to maintain backwards compatibility with pre-V30 chains.
     /// @dev Legacy bridges are needed to process withdrawal messages from chains that haven't upgraded yet.
     function setLegacySharedBridgeAddress() external onlyUpgrader {
-        address l1AssetRouter = L2_ASSET_ROUTER.L1_ASSET_ROUTER();
+        address l1AssetRouter = address(L2_ASSET_ROUTER.L1_ASSET_ROUTER());
         SharedBridgeOnChainId[] memory sharedBridgeOnChainIds = LegacySharedBridgeAddresses
             .getLegacySharedBridgeAddressOnGateway(l1AssetRouter);
         uint256 length = sharedBridgeOnChainIds.length;
