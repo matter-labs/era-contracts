@@ -15,6 +15,7 @@ import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
+import {ChainTypeManagerBase} from "../../../contracts/state-transition/ChainTypeManagerBase.sol";
 
 contract DefaultChainUpgrade is Script {
     using stdToml for string;
@@ -40,15 +41,45 @@ contract DefaultChainUpgrade is Script {
         // It is just a wrapper to easily call `upgradeChain`
     }
 
-    function run() public virtual {
-        prepareChain("/script-config/permanent-values.toml", "/script-config/chain-upgrade.toml");
+    function run(
+        address ctm,
+        uint256 chainChainId
+    ) public virtual {
+        IChainTypeManager ctm = IChainTypeManager(ctm);
+        address chainDiamondProxyAddress = ctm.getZKChain(chainChainId);
+        (uint256 major,uint256  minor, uint256  patch) = ctm.getSemverProtocolVersion();
+        uint256 newProtocolVersionSemVer = SemVer.packSemVer(major, minor, patch);
     }
 
-    function upgradeChain(uint256 oldProtocolVersion, Diamond.DiamondCutData memory upgradeCutData) public {
+    function getUpgradeCutData(uint256 protocolVersion, IChainTypeManager ctm) public returns (Diamond.DiamondCutData memory upgradeCutData) {
+        uint256 blockUpgrade = ctm.upgradeCutDataBlock(protocolVersion);
+
+        // Listen event NewUpgradeCutHash from block blockupgrade
+        // Pretend i have calldata from tx_hash
+//        bytes32 txHash;
+
+        bytes memory tx_calldata;
+
+        // try to decode
+        (Diamond.DiamondCutData calldata _cutData,
+            uint256 _oldProtocolVersion,
+            uint256 _oldProtocolVersionDeadline,
+            uint256 _newProtocolVersion) = abi.decode(
+            tx_calldata,
+            ChainTypeManagerBase.setNewVersionUpgrade
+        );
+
+        // if not success
+
+
+    }
+
+
+    function upgradeChain(address chainDiamondProxyAddress, uint256 oldProtocolVersion, Diamond.DiamondCutData memory upgradeCutData) public {
         Utils.adminExecute(
-            IZKChain(config.chainDiamondProxyAddress).getAdmin(),
+            IZKChain(chainDiamondProxyAddress).getAdmin(),
             address(0),
-            config.chainDiamondProxyAddress,
+            chainDiamondProxyAddress,
             abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
             0
         );
