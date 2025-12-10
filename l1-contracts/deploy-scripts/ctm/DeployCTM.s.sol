@@ -126,7 +126,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         IL1Bridgehub bridgehubProxy = IL1Bridgehub(bridgehub);
         // Populate discovered addresses via inspector
         discoveredBridgehub = AddressIntrospector.getBridgehubAddresses(bridgehubProxy);
-        config.eraChainId = L1Nullifier(discoveredBridgehub.assetRouterAddresses.l1Nullifier).ERA_CHAIN_ID();
+        config.eraChainId = AddressIntrospector.getEraChainId(discoveredBridgehub.assetRouter);
 
         if (reuseGovAndAdmin) {
             addresses.governance = discoveredBridgehub.governance;

@@ -155,9 +155,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         nonDisoverable.bytecodesSupplier = permanentConfig.bytecodesSupplier;
         nonDisoverable.rollupDAManager = permanentConfig.rollupDAManager;
         setAddressesBasedOnCTM();
-        config.eraChainId = L1Nullifier(discoveredBridgehub.assetRouterAddresses.l1Nullifier).ERA_CHAIN_ID();
+        config.eraChainId = AddressIntrospector.getEraChainId(discoveredBridgehub.assetRouter);
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
         config.contracts.chainCreationParams = chainCreationParams;
+
         if (governance != address(0)) {
             config.ownerAddress = governance;
         } else {

@@ -171,20 +171,15 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         facetCuts = getChainCreationFacetCuts(stateTransition);
         facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
         uint256 nonce = getProtocolUpgradeNonce(chainCreationParams.latestProtocolVersion);
-        ProposedUpgrade memory proposedUpgrade;
-        if (isPatchUpgrade(chainCreationParams.latestProtocolVersion)) {
-            proposedUpgrade = getProposedPatchUpgrade(stateTransition, chainCreationParams.latestProtocolVersion);
-        } else {
-            proposedUpgrade = getProposedUpgrade(
-                stateTransition,
-                chainCreationParams,
-                l1ChainId,
-                ownerAddress,
-                factoryDepsHashes,
-                nonce,
-                isZKsyncOS
-            );
-        }
+        ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(
+            stateTransition,
+            chainCreationParams,
+            l1ChainId,
+            ownerAddress,
+            factoryDepsHashes,
+            nonce,
+            isZKsyncOS
+        );
 
         upgradeCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
