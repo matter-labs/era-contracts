@@ -2,6 +2,9 @@
 
 pragma solidity 0.8.28;
 
+import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {PubdataPricingMode, L2DACommitmentScheme} from "contracts/common/Config.sol";
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IAdminFunctions {
@@ -11,7 +14,7 @@ interface IAdminFunctions {
 
     function governanceAcceptAdmin(address governor, address target) external;
 
-    function chainAdminAcceptAdmin(address chainAdmin, address target) external;
+    function chainAdminAcceptAdmin(ChainAdmin chainAdmin, address target) external;
 
     function chainSetTokenMultiplierSetter(
         address chainAdmin,
@@ -40,7 +43,7 @@ interface IAdminFunctions {
         uint256 timestamp
     ) external;
 
-    function makePermanentRollup(address chainAdmin, address target) external;
+    function makePermanentRollup(ChainAdmin chainAdmin, address target) external;
 
     function updateValidator(
         address adminAddr,
@@ -53,15 +56,15 @@ interface IAdminFunctions {
 
     function addL2WethToStore(
         address storeAddress,
-        address ecosystemAdmin,
+        ChainAdmin ecosystemAdmin,
         uint256 chainId,
         address l2WBaseToken
     ) external;
 
     function setPubdataPricingMode(
-        address chainAdmin,
+        ChainAdmin chainAdmin,
         address target,
-        uint8 pricingMode // Use uint8 for PubdataPricingMode
+        PubdataPricingMode pricingMode
     ) external;
 
     function notifyServerMigrationToGateway(address bridgehub, uint256 chainId, bool shouldSend) external;
@@ -105,7 +108,7 @@ interface IAdminFunctions {
         address bridgehub,
         uint256 chainId,
         address l1DaValidator,
-        uint8 l2DaCommitmentScheme, // Use uint8 for L2DACommitmentScheme
+        L2DACommitmentScheme l2DaCommitmentScheme,
         bool shouldSend
     ) external;
 
@@ -125,7 +128,7 @@ interface IAdminFunctions {
         uint256 l2ChainId,
         uint256 gatewayChainId,
         address l1DAValidator,
-        uint8 l2DACommitmentScheme, // Use uint8 for L2DACommitmentScheme
+        L2DACommitmentScheme l2DACommitmentScheme,
         address chainDiamondProxyOnGateway,
         address refundRecipient,
         bool shouldSend

@@ -45,11 +45,7 @@ contract SetupLegacyBridge is Script, ISetupLegacyBridge {
         address l1NullifierProxyImpl;
     }
 
-    function run(
-        address _bridgehub,
-        uint256 _chainId,
-        address _diamondProxy
-    ) public {
+    function run(address _bridgehub, uint256 _chainId, address _diamondProxy) public {
         initializeConfig(_bridgehub, _chainId, _diamondProxy);
         deploySharedBridgeImplementation();
         upgradeImplementation(addresses.sharedBridgeProxy, addresses.sharedBridgeProxyImpl);
@@ -60,11 +56,7 @@ contract SetupLegacyBridge is Script, ISetupLegacyBridge {
         upgradeImplementation(addresses.l1Nullifier, addresses.l1NullifierProxyImpl);
     }
 
-    function initializeConfig(
-        address bridgehub,
-        uint256 chainId,
-        address diamondProxy
-    ) internal {
+    function initializeConfig(address bridgehub, uint256 chainId, address diamondProxy) internal {
         addresses.bridgehub = bridgehub;
         addresses.diamondProxy = diamondProxy;
         config.chainId = chainId;

@@ -19,11 +19,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils, IDeployGatewayTransactionFilterer {
     using stdToml for string;
 
-    function initializeConfig(
-        address bridgehub,
-        address chainAdmin,
-        address chainProxyAdmin
-    ) internal {
+    function initializeConfig(address bridgehub, address chainAdmin, address chainProxyAdmin) internal {
         // Read create2 factory parameters from permanent-values.toml
         string memory root = vm.projectRoot();
         string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
@@ -35,11 +31,7 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils, IDeplo
         _initCreate2FactoryParams(create2FactoryAddress, create2FactorySalt);
     }
 
-    function run(
-        address bridgehub,
-        address chainAdmin,
-        address chainProxyAdmin
-    ) public returns (address proxy) {
+    function run(address bridgehub, address chainAdmin, address chainProxyAdmin) public returns (address proxy) {
         // Initialize config and instantiate Create2Factory before any deployment.
         initializeConfig(bridgehub, chainAdmin, chainProxyAdmin);
         instantiateCreate2Factory();
