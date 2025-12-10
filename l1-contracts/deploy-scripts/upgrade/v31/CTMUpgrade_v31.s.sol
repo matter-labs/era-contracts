@@ -9,6 +9,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
@@ -59,10 +60,6 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         super.initialize(permanentValuesInputPath, newConfigPath, upgradeEcosystemOutputPath);
     }
 
-    function getNewProtocolVersion() public view virtual override returns (uint256) {
-        return 0x1c00000001;
-    }
-
     /// @notice Deploy everything that should be deployed
     function deployNewCTMContracts() public virtual override {
         (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
@@ -70,6 +67,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
 
         deployVerifiers();
 
+        deployEIP7702Checker();
         deployUpgradeStageValidator();
         deployGovernanceUpgradeTimer();
 
