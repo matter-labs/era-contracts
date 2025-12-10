@@ -116,7 +116,7 @@ struct GeneratedData {
 abstract contract DeployCTMUtils is DeployUtils {
     using stdToml for string;
 
-    string public constant CHAIN_CREATION_PARAMS_PATH = "../../configs/genesis/era/latest.toml";
+    string public constant CHAIN_CREATION_PARAMS_PATH = "/../configs/genesis/era/latest.toml";
     Config public config;
     GeneratedData internal generatedData;
     CTMDeployedAddresses internal addresses;
@@ -160,8 +160,9 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.contracts.validatorTimelockExecutionDelay = toml.readUint(
             "$.contracts.validator_timelock_execution_delay"
         );
-
-        config.contracts.chainCreationParams = getChainCreationParams(CHAIN_CREATION_PARAMS_PATH);
+        config.contracts.chainCreationParams = getChainCreationParams(
+            string.concat(vm.projectRoot(), CHAIN_CREATION_PARAMS_PATH)
+        );
 
         if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
             config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
@@ -172,7 +173,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         string memory _config
     ) internal virtual returns (ChainCreationParamsConfig memory chainCreationParams) {
         string memory toml = vm.readFile(_config);
-        chainCreationParams.latestProtocolVersion = toml.readUint("protocol_semantic_version");
+        chainCreationParams.latestProtocolVersion = toml.readUint("$.protocol_semantic_version");
         chainCreationParams.genesisRoot = toml.readBytes32("$.genesis_root");
         chainCreationParams.genesisRollupLeafIndex = toml.readUint("$.genesis_rollup_leaf_index");
         chainCreationParams.genesisBatchCommitment = toml.readBytes32("$.genesis_batch_commitment");
