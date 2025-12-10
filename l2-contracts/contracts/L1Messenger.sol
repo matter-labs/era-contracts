@@ -47,8 +47,8 @@ contract L1Messenger is IL1Messenger {
     function burnGas(bytes calldata _message) internal {
         uint256 gasToBurn = estimateL1MessageGas(_message.length);
 
-        // If not enough gas to burn the desired amount, revert with your custom error
-        if (gasleft() <= gasToBurn) {
+        // If not enough gas to burn the desired amount, revert
+        if ((gasleft() * 63) / 64 < gasToBurn) {
             revert NotEnoughGasSupplied();
         }
 
@@ -72,7 +72,7 @@ contract L1Messenger is IL1Messenger {
     }
 
     // --- Burner entrypoint: only callable by self ---
-    fallback() external {
+    fallback() payable external {
         // This fallback is used *only* for self-call burning
         require(msg.sender == address(this), NotSelfCall());
         assembly {
