@@ -207,33 +207,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         });
     }
 
-    function initializeConfigForPatchUpgrade(
-        string memory permanentValuesInputPath,
-        string memory newConfigPath,
-        string memory outputPath
-    ) public virtual {
-        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
-        string memory toml = vm.readFile(newConfigPath);
-
-        address governance;
-        if (toml.keyExists("$.governance")) {
-            governance = toml.readAddress("$.governance");
-        } else {
-            governance = address(0);
-        }
-
-        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParams(CHAIN_CREATION_PARAMS_PATH);
-
-        PermanentCTMConfig memory permanentConfig = initializePermanentConfig(permanentValuesInputPath);
-
-        initializeConfig(chainCreationParams, permanentConfig, governance);
-        instantiateCreate2Factory();
-
-        console.log("Initialized config from %s", newConfigPath);
-        upgradeConfig.outputPath = outputPath;
-        upgradeConfig.initialized = true;
-    }
-
     function initializeConfigFromFile(
         string memory permanentValuesInputPath,
         string memory newConfigPath
@@ -328,21 +301,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         );
         prepareCTMUpgrade();
 
-        prepareDefaultGovernanceCalls();
-        prepareDefaultCTMAdminCalls();
-
-        prepareDefaultTestUpgradeCalls();
-    }
-
-    /// @notice E2e upgrade generation
-    function runPatchUpgrade() public virtual {
-        initializeConfigForPatchUpgrade(
-            vm.envString("PERMANENT_VALUES_INPUT"),
-            vm.envString("UPGRADE_CTM_INPUT"),
-            vm.envString("UPGRADE_CTM_OUTPUT")
-        );
-
-        deployVerifiers();
         prepareDefaultGovernanceCalls();
         prepareDefaultCTMAdminCalls();
 
