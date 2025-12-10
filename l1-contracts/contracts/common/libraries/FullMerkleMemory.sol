@@ -96,14 +96,6 @@ library FullMerkleMemory {
         if (index == 1 << self._height) {
             uint256 newHeight = self._height.uncheckedInc();
             self._height = newHeight;
-            bytes32 topZero = self._zeros[newHeight - 1];
-            bytes32 newZero = Merkle.efficientHash(topZero, topZero);
-            self._zeros[self._zerosLengthMemory] = newZero;
-            ++self._zerosLengthMemory;
-            bytes32[] memory newLevelZero = new bytes32[](1);
-            newLevelZero[0] = newZero;
-            self._nodes[self._nodesLengthMemory] = newLevelZero;
-            ++self._nodesLengthMemory;
         }
 
         if (index != 0) {
