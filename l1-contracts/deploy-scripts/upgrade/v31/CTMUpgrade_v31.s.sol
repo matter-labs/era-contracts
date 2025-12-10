@@ -70,6 +70,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
 
         deployVerifiers();
 
+        deployEIP7702Checker();
         deployUpgradeStageValidator();
         deployGovernanceUpgradeTimer();
 
