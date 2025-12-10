@@ -1,0 +1,19 @@
+[
+  {
+    "inputs": [{"internalType": "bytes32", "name": "assetId", "type": "bytes32"}],
+    "name": "initiateL1ToGatewayMigrationOnL2",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "uint256", "name": "chainId", "type": "uint256"},
+      {"internalType": "bytes32", "name": "assetId", "type": "bytes32"}
+    ],
+    "name": "initiateGatewayToL1MigrationOnGateway",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]

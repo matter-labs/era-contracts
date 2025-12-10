@@ -34,6 +34,11 @@ const REQUIRED_CONTRACTS = [
   "IRegisterCTM.sol",
   "IRegisterOnAllChains.sol",
   "IGatewayMigrateTokenBalances.sol",
+  "IFinalizeUpgrade.sol",
+  "IL2NativeTokenVault.sol",
+  "IL2AssetRouter.sol",
+  "IL2AssetTracker.sol",
+  "IChainAdmin.sol",
 ];
 
 async function copyContractAbi(src: string, dest: string): Promise<void> {
