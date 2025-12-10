@@ -357,63 +357,41 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
             // Need to check that each log was sent by the correct address.
             if (logKey == uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)) {
-                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, logKey);
                 logOutput.l2LogsTreeRoot = logValue;
             } else if (logKey == uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)) {
-                if (logSender != L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, logKey);
                 logOutput.packedBatchAndL2BlockTimestamp = uint256(logValue);
             } else if (logKey == uint256(SystemLogKey.PREV_BATCH_HASH_KEY)) {
-                if (logSender != L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, logKey);
                 logOutput.previousBatchHash = logValue;
             } else if (logKey == uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY)) {
-                if (logSender != L2_BOOTLOADER_ADDRESS) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_BOOTLOADER_ADDRESS, logKey);
                 logOutput.chainedPriorityTxsHash = logValue;
             } else if (logKey == uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)) {
-                if (logSender != L2_BOOTLOADER_ADDRESS) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_BOOTLOADER_ADDRESS, logKey);
                 logOutput.numberOfLayer1Txs = uint256(logValue);
             } else if (logKey == uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)) {
-                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, logKey);
                 if (uint256(s.l2DACommitmentScheme) != uint256(logValue)) {
                     revert MismatchL2DACommitmentScheme(uint256(logValue), uint256(s.l2DACommitmentScheme));
                 }
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
-                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, logKey);
                 logOutput.l2DAValidatorOutputHash = logValue;
             } else if (logKey == uint256(SystemLogKey.L2_TXS_STATUS_ROLLING_HASH_KEY)) {
-                if (logSender != L2_BOOTLOADER_ADDRESS) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_BOOTLOADER_ADDRESS, logKey);
                 logOutput.l2TxsStatusRollingHash = logValue;
             } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
-                if (logSender != L2_BOOTLOADER_ADDRESS) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_BOOTLOADER_ADDRESS, logKey);
                 if (_expectedSystemContractUpgradeTxHash != logValue) {
                     revert TxHashMismatch();
                 }
             } else if (logKey == uint256(SystemLogKey.MESSAGE_ROOT_ROLLING_HASH_KEY)) {
-                if (logSender != L2_BOOTLOADER_ADDRESS) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_BOOTLOADER_ADDRESS, logKey);
                 logOutput.dependencyRootsRollingHash = logValue;
             } else if (logKey == uint256(SystemLogKey.SETTLEMENT_LAYER_CHAIN_ID_KEY)) {
-                if (logSender != L2_BOOTLOADER_ADDRESS) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_BOOTLOADER_ADDRESS, logKey);
                 uint256 settlementLayerChainId = uint256(logValue);
                 require(settlementLayerChainId == block.chainid, SettlementLayerChainIdMismatch());
             } else if (logKey > MAX_LOG_KEY) {
@@ -425,6 +403,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 exponent = _expectedSystemContractUpgradeTxHash == bytes32(0) ? MAX_LOG_KEY : MAX_LOG_KEY + 1;
         if (processedLogs != 2 ** exponent - 1) {
             revert MissingSystemLogs(2 ** exponent - 1, processedLogs);
+        }
+    }
+
+    function _verifyLogSender(address _logSender, address _expected, uint256 _logKey) internal pure {
+        if (_logSender != _expected) {
+            revert InvalidLogSender(_logSender, _logKey);
         }
     }
 
