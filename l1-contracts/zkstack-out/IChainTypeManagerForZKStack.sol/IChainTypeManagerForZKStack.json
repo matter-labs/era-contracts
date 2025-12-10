@@ -1,507 +1,78 @@
-{
-  "abi": [
-    {
-      "type": "function",
-      "name": "forwardedBridgeMint",
-      "inputs": [
-        { "name": "_chainId", "type": "uint256", "internalType": "uint256" },
-        { "name": "_ctmData", "type": "bytes", "internalType": "bytes" }
-      ],
-      "outputs": [{ "name": "", "type": "address", "internalType": "address" }],
-      "stateMutability": "nonpayable"
-    },
-    {
-      "type": "function",
-      "name": "protocolVersion",
-      "inputs": [],
-      "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
-      "stateMutability": "view"
-    },
-    {
-      "type": "function",
-      "name": "serverNotifierAddress",
-      "inputs": [],
-      "outputs": [{ "name": "", "type": "address", "internalType": "address" }],
-      "stateMutability": "view"
-    },
-    {
-      "type": "function",
-      "name": "validatorTimelock",
-      "inputs": [],
-      "outputs": [{ "name": "", "type": "address", "internalType": "address" }],
-      "stateMutability": "view"
-    },
-    {
-      "type": "function",
-      "name": "validatorTimelockPostV29",
-      "inputs": [],
-      "outputs": [{ "name": "", "type": "address", "internalType": "address" }],
-      "stateMutability": "view"
-    }
-  ],
-  "bytecode": { "object": "0x", "sourceMap": "", "linkReferences": {} },
-  "deployedBytecode": { "object": "0x", "sourceMap": "", "linkReferences": {} },
-  "methodIdentifiers": {
-    "forwardedBridgeMint(uint256,bytes)": "e8a71ca9",
-    "protocolVersion()": "2ae9c600",
-    "serverNotifierAddress()": "f13ea178",
-    "validatorTimelock()": "e66c8c44",
-    "validatorTimelockPostV29()": "ef9955bc"
-  },
-  "rawMetadata": "{\"compiler\":{\"version\":\"0.8.28+commit.7893614a\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_chainId\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"_ctmData\",\"type\":\"bytes\"}],\"name\":\"forwardedBridgeMint\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"protocolVersion\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"serverNotifierAddress\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"validatorTimelock\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"validatorTimelockPostV29\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"details\":\"This interface includes methods that may be legacy or specific to zkStack CLI needs\",\"kind\":\"dev\",\"methods\":{\"forwardedBridgeMint(uint256,bytes)\":{\"params\":{\"_chainId\":\"The chain Id\",\"_ctmData\":\"Additional CTM data\"}},\"validatorTimelockPostV29()\":{\"details\":\"This method may be used for backward compatibility with migration scripts\"}},\"title\":\"IChainTypeManagerForZKStack\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"forwardedBridgeMint(uint256,bytes)\":{\"notice\":\"Handles forwarded mints from the bridgehub\"},\"protocolVersion()\":{\"notice\":\"Returns the protocol version\"},\"serverNotifierAddress()\":{\"notice\":\"Returns the server notifier address\"},\"validatorTimelock()\":{\"notice\":\"Returns the validator timelock address\"},\"validatorTimelockPostV29()\":{\"notice\":\"Returns the validator timelock address for post-v29 chains\"}},\"notice\":\"Interface for Chain Type Manager specifically for zkStack CLI usage\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/script-interfaces/IChainTypeManagerForZKStack.sol\":\"IChainTypeManagerForZKStack\"},\"evmVersion\":\"prague\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":9999999},\"remappings\":[\":@ensdomains/=node_modules/@ensdomains/\",\":@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/\",\":@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/\",\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":erc4626-tests/=lib/openzeppelin-contracts-v4/lib/erc4626-tests/\",\":eth-gas-reporter/=node_modules/eth-gas-reporter/\",\":forge-std/=lib/forge-std/src/\",\":foundry-test/=test/foundry/\",\":hardhat/=node_modules/hardhat/\",\":l2-contracts/=../l2-contracts/contracts/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/\",\":openzeppelin-contracts-v4/=lib/openzeppelin-contracts-v4/\",\":openzeppelin-contracts/=lib/murky/lib/openzeppelin-contracts/\"]},\"sources\":{\"contracts/script-interfaces/IChainTypeManagerForZKStack.sol\":{\"keccak256\":\"0x21005dd2dd0033d7114ddfcf03647846227855813c0f6dafdb26c4a5674e6055\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://3f2d3442bbe8bb8008dfbe7e6ecbae303bab15c6cc69d2d26b24de621faae580\",\"dweb:/ipfs/QmZhAG7KFHDAtkSMVRYXfB6A69Jkd8zN9qe4mcPPWy9Xih\"]}},\"version\":1}",
-  "metadata": {
-    "compiler": { "version": "0.8.28+commit.7893614a" },
-    "language": "Solidity",
-    "output": {
-      "abi": [
-        {
-          "inputs": [
-            { "internalType": "uint256", "name": "_chainId", "type": "uint256" },
-            { "internalType": "bytes", "name": "_ctmData", "type": "bytes" }
-          ],
-          "stateMutability": "nonpayable",
-          "type": "function",
-          "name": "forwardedBridgeMint",
-          "outputs": [{ "internalType": "address", "name": "", "type": "address" }]
-        },
-        {
-          "inputs": [],
-          "stateMutability": "view",
-          "type": "function",
-          "name": "protocolVersion",
-          "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }]
-        },
-        {
-          "inputs": [],
-          "stateMutability": "view",
-          "type": "function",
-          "name": "serverNotifierAddress",
-          "outputs": [{ "internalType": "address", "name": "", "type": "address" }]
-        },
-        {
-          "inputs": [],
-          "stateMutability": "view",
-          "type": "function",
-          "name": "validatorTimelock",
-          "outputs": [{ "internalType": "address", "name": "", "type": "address" }]
-        },
-        {
-          "inputs": [],
-          "stateMutability": "view",
-          "type": "function",
-          "name": "validatorTimelockPostV29",
-          "outputs": [{ "internalType": "address", "name": "", "type": "address" }]
-        }
-      ],
-      "devdoc": {
-        "kind": "dev",
-        "methods": {
-          "forwardedBridgeMint(uint256,bytes)": {
-            "params": { "_chainId": "The chain Id", "_ctmData": "Additional CTM data" }
-          },
-          "validatorTimelockPostV29()": {
-            "details": "This method may be used for backward compatibility with migration scripts"
-          }
-        },
-        "version": 1
-      },
-      "userdoc": {
-        "kind": "user",
-        "methods": {
-          "forwardedBridgeMint(uint256,bytes)": { "notice": "Handles forwarded mints from the bridgehub" },
-          "protocolVersion()": { "notice": "Returns the protocol version" },
-          "serverNotifierAddress()": { "notice": "Returns the server notifier address" },
-          "validatorTimelock()": { "notice": "Returns the validator timelock address" },
-          "validatorTimelockPostV29()": { "notice": "Returns the validator timelock address for post-v29 chains" }
-        },
-        "version": 1
-      }
-    },
-    "settings": {
-      "remappings": [
-        "@ensdomains/=node_modules/@ensdomains/",
-        "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
-        "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
-        "ds-test/=lib/forge-std/lib/ds-test/src/",
-        "erc4626-tests/=lib/openzeppelin-contracts-v4/lib/erc4626-tests/",
-        "eth-gas-reporter/=node_modules/eth-gas-reporter/",
-        "forge-std/=lib/forge-std/src/",
-        "foundry-test/=test/foundry/",
-        "hardhat/=node_modules/hardhat/",
-        "l2-contracts/=../l2-contracts/contracts/",
-        "murky/=lib/murky/src/",
-        "openzeppelin-contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/",
-        "openzeppelin-contracts-v4/=lib/openzeppelin-contracts-v4/",
-        "openzeppelin-contracts/=lib/murky/lib/openzeppelin-contracts/"
-      ],
-      "optimizer": { "enabled": true, "runs": 9999999 },
-      "metadata": { "bytecodeHash": "ipfs" },
-      "compilationTarget": {
-        "contracts/script-interfaces/IChainTypeManagerForZKStack.sol": "IChainTypeManagerForZKStack"
-      },
-      "evmVersion": "prague",
-      "libraries": {}
-    },
-    "sources": {
-      "contracts/script-interfaces/IChainTypeManagerForZKStack.sol": {
-        "keccak256": "0x21005dd2dd0033d7114ddfcf03647846227855813c0f6dafdb26c4a5674e6055",
-        "urls": [
-          "bzz-raw://3f2d3442bbe8bb8008dfbe7e6ecbae303bab15c6cc69d2d26b24de621faae580",
-          "dweb:/ipfs/QmZhAG7KFHDAtkSMVRYXfB6A69Jkd8zN9qe4mcPPWy9Xih"
-        ],
-        "license": "MIT"
-      }
-    },
-    "version": 1
-  },
-  "ast": {
-    "absolutePath": "contracts/script-interfaces/IChainTypeManagerForZKStack.sol",
-    "id": 45940,
-    "exportedSymbols": { "IChainTypeManagerForZKStack": [45939] },
-    "nodeType": "SourceUnit",
-    "src": "32:1114:211",
-    "nodes": [
+[
+  {
+    "type": "function",
+    "name": "forwardedBridgeMint",
+    "inputs": [
       {
-        "id": 45903,
-        "nodeType": "PragmaDirective",
-        "src": "32:23:211",
-        "nodes": [],
-        "literals": ["solidity", "0.8", ".28"]
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        "id": 45939,
-        "nodeType": "ContractDefinition",
-        "src": "269:876:211",
-        "nodes": [
-          {
-            "id": 45910,
-            "nodeType": "FunctionDefinition",
-            "src": "368:61:211",
-            "nodes": [],
-            "documentation": {
-              "id": 45905,
-              "nodeType": "StructuredDocumentation",
-              "src": "313:50:211",
-              "text": "@notice Returns the validator timelock address"
-            },
-            "functionSelector": "e66c8c44",
-            "implemented": false,
-            "kind": "function",
-            "modifiers": [],
-            "name": "validatorTimelock",
-            "nameLocation": "377:17:211",
-            "parameters": { "id": 45906, "nodeType": "ParameterList", "parameters": [], "src": "394:2:211" },
-            "returnParameters": {
-              "id": 45909,
-              "nodeType": "ParameterList",
-              "parameters": [
-                {
-                  "constant": false,
-                  "id": 45908,
-                  "mutability": "mutable",
-                  "name": "",
-                  "nameLocation": "-1:-1:-1",
-                  "nodeType": "VariableDeclaration",
-                  "scope": 45910,
-                  "src": "420:7:211",
-                  "stateVariable": false,
-                  "storageLocation": "default",
-                  "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
-                  "typeName": {
-                    "id": 45907,
-                    "name": "address",
-                    "nodeType": "ElementaryTypeName",
-                    "src": "420:7:211",
-                    "stateMutability": "nonpayable",
-                    "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
-                  },
-                  "visibility": "internal"
-                }
-              ],
-              "src": "419:9:211"
-            },
-            "scope": 45939,
-            "stateMutability": "view",
-            "virtual": false,
-            "visibility": "external"
-          },
-          {
-            "id": 45916,
-            "nodeType": "FunctionDefinition",
-            "src": "597:68:211",
-            "nodes": [],
-            "documentation": {
-              "id": 45911,
-              "nodeType": "StructuredDocumentation",
-              "src": "435:157:211",
-              "text": "@notice Returns the validator timelock address for post-v29 chains\n @dev This method may be used for backward compatibility with migration scripts"
-            },
-            "functionSelector": "ef9955bc",
-            "implemented": false,
-            "kind": "function",
-            "modifiers": [],
-            "name": "validatorTimelockPostV29",
-            "nameLocation": "606:24:211",
-            "parameters": { "id": 45912, "nodeType": "ParameterList", "parameters": [], "src": "630:2:211" },
-            "returnParameters": {
-              "id": 45915,
-              "nodeType": "ParameterList",
-              "parameters": [
-                {
-                  "constant": false,
-                  "id": 45914,
-                  "mutability": "mutable",
-                  "name": "",
-                  "nameLocation": "-1:-1:-1",
-                  "nodeType": "VariableDeclaration",
-                  "scope": 45916,
-                  "src": "656:7:211",
-                  "stateVariable": false,
-                  "storageLocation": "default",
-                  "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
-                  "typeName": {
-                    "id": 45913,
-                    "name": "address",
-                    "nodeType": "ElementaryTypeName",
-                    "src": "656:7:211",
-                    "stateMutability": "nonpayable",
-                    "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
-                  },
-                  "visibility": "internal"
-                }
-              ],
-              "src": "655:9:211"
-            },
-            "scope": 45939,
-            "stateMutability": "view",
-            "virtual": false,
-            "visibility": "external"
-          },
-          {
-            "id": 45926,
-            "nodeType": "FunctionDefinition",
-            "src": "811:99:211",
-            "nodes": [],
-            "documentation": {
-              "id": 45917,
-              "nodeType": "StructuredDocumentation",
-              "src": "671:135:211",
-              "text": "@notice Handles forwarded mints from the bridgehub\n @param _chainId The chain Id\n @param _ctmData Additional CTM data"
-            },
-            "functionSelector": "e8a71ca9",
-            "implemented": false,
-            "kind": "function",
-            "modifiers": [],
-            "name": "forwardedBridgeMint",
-            "nameLocation": "820:19:211",
-            "parameters": {
-              "id": 45922,
-              "nodeType": "ParameterList",
-              "parameters": [
-                {
-                  "constant": false,
-                  "id": 45919,
-                  "mutability": "mutable",
-                  "name": "_chainId",
-                  "nameLocation": "848:8:211",
-                  "nodeType": "VariableDeclaration",
-                  "scope": 45926,
-                  "src": "840:16:211",
-                  "stateVariable": false,
-                  "storageLocation": "default",
-                  "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" },
-                  "typeName": {
-                    "id": 45918,
-                    "name": "uint256",
-                    "nodeType": "ElementaryTypeName",
-                    "src": "840:7:211",
-                    "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" }
-                  },
-                  "visibility": "internal"
-                },
-                {
-                  "constant": false,
-                  "id": 45921,
-                  "mutability": "mutable",
-                  "name": "_ctmData",
-                  "nameLocation": "873:8:211",
-                  "nodeType": "VariableDeclaration",
-                  "scope": 45926,
-                  "src": "858:23:211",
-                  "stateVariable": false,
-                  "storageLocation": "calldata",
-                  "typeDescriptions": { "typeIdentifier": "t_bytes_calldata_ptr", "typeString": "bytes" },
-                  "typeName": {
-                    "id": 45920,
-                    "name": "bytes",
-                    "nodeType": "ElementaryTypeName",
-                    "src": "858:5:211",
-                    "typeDescriptions": { "typeIdentifier": "t_bytes_storage_ptr", "typeString": "bytes" }
-                  },
-                  "visibility": "internal"
-                }
-              ],
-              "src": "839:43:211"
-            },
-            "returnParameters": {
-              "id": 45925,
-              "nodeType": "ParameterList",
-              "parameters": [
-                {
-                  "constant": false,
-                  "id": 45924,
-                  "mutability": "mutable",
-                  "name": "",
-                  "nameLocation": "-1:-1:-1",
-                  "nodeType": "VariableDeclaration",
-                  "scope": 45926,
-                  "src": "901:7:211",
-                  "stateVariable": false,
-                  "storageLocation": "default",
-                  "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
-                  "typeName": {
-                    "id": 45923,
-                    "name": "address",
-                    "nodeType": "ElementaryTypeName",
-                    "src": "901:7:211",
-                    "stateMutability": "nonpayable",
-                    "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
-                  },
-                  "visibility": "internal"
-                }
-              ],
-              "src": "900:9:211"
-            },
-            "scope": 45939,
-            "stateMutability": "nonpayable",
-            "virtual": false,
-            "visibility": "external"
-          },
-          {
-            "id": 45932,
-            "nodeType": "FunctionDefinition",
-            "src": "968:65:211",
-            "nodes": [],
-            "documentation": {
-              "id": 45927,
-              "nodeType": "StructuredDocumentation",
-              "src": "916:47:211",
-              "text": "@notice Returns the server notifier address"
-            },
-            "functionSelector": "f13ea178",
-            "implemented": false,
-            "kind": "function",
-            "modifiers": [],
-            "name": "serverNotifierAddress",
-            "nameLocation": "977:21:211",
-            "parameters": { "id": 45928, "nodeType": "ParameterList", "parameters": [], "src": "998:2:211" },
-            "returnParameters": {
-              "id": 45931,
-              "nodeType": "ParameterList",
-              "parameters": [
-                {
-                  "constant": false,
-                  "id": 45930,
-                  "mutability": "mutable",
-                  "name": "",
-                  "nameLocation": "-1:-1:-1",
-                  "nodeType": "VariableDeclaration",
-                  "scope": 45932,
-                  "src": "1024:7:211",
-                  "stateVariable": false,
-                  "storageLocation": "default",
-                  "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" },
-                  "typeName": {
-                    "id": 45929,
-                    "name": "address",
-                    "nodeType": "ElementaryTypeName",
-                    "src": "1024:7:211",
-                    "stateMutability": "nonpayable",
-                    "typeDescriptions": { "typeIdentifier": "t_address", "typeString": "address" }
-                  },
-                  "visibility": "internal"
-                }
-              ],
-              "src": "1023:9:211"
-            },
-            "scope": 45939,
-            "stateMutability": "view",
-            "virtual": false,
-            "visibility": "external"
-          },
-          {
-            "id": 45938,
-            "nodeType": "FunctionDefinition",
-            "src": "1084:59:211",
-            "nodes": [],
-            "documentation": {
-              "id": 45933,
-              "nodeType": "StructuredDocumentation",
-              "src": "1039:40:211",
-              "text": "@notice Returns the protocol version"
-            },
-            "functionSelector": "2ae9c600",
-            "implemented": false,
-            "kind": "function",
-            "modifiers": [],
-            "name": "protocolVersion",
-            "nameLocation": "1093:15:211",
-            "parameters": { "id": 45934, "nodeType": "ParameterList", "parameters": [], "src": "1108:2:211" },
-            "returnParameters": {
-              "id": 45937,
-              "nodeType": "ParameterList",
-              "parameters": [
-                {
-                  "constant": false,
-                  "id": 45936,
-                  "mutability": "mutable",
-                  "name": "",
-                  "nameLocation": "-1:-1:-1",
-                  "nodeType": "VariableDeclaration",
-                  "scope": 45938,
-                  "src": "1134:7:211",
-                  "stateVariable": false,
-                  "storageLocation": "default",
-                  "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" },
-                  "typeName": {
-                    "id": 45935,
-                    "name": "uint256",
-                    "nodeType": "ElementaryTypeName",
-                    "src": "1134:7:211",
-                    "typeDescriptions": { "typeIdentifier": "t_uint256", "typeString": "uint256" }
-                  },
-                  "visibility": "internal"
-                }
-              ],
-              "src": "1133:9:211"
-            },
-            "scope": 45939,
-            "stateMutability": "view",
-            "virtual": false,
-            "visibility": "external"
-          }
-        ],
-        "abstract": false,
-        "baseContracts": [],
-        "canonicalName": "IChainTypeManagerForZKStack",
-        "contractDependencies": [],
-        "contractKind": "interface",
-        "documentation": {
-          "id": 45904,
-          "nodeType": "StructuredDocumentation",
-          "src": "57:212:211",
-          "text": "@title IChainTypeManagerForZKStack\n @notice Interface for Chain Type Manager specifically for zkStack CLI usage\n @dev This interface includes methods that may be legacy or specific to zkStack CLI needs"
-        },
-        "fullyImplemented": false,
-        "linearizedBaseContracts": [45939],
-        "name": "IChainTypeManagerForZKStack",
-        "nameLocation": "279:27:211",
-        "scope": 45940,
-        "usedErrors": [],
-        "usedEvents": []
+        "name": "_ctmData",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
-    "license": "MIT"
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "nonpayable"
   },
-  "id": 211
-}
+  {
+    "type": "function",
+    "name": "protocolVersion",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "serverNotifierAddress",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "validatorTimelock",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "validatorTimelockPostV29",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  }
+]
