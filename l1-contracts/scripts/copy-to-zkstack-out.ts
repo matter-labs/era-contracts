@@ -31,6 +31,9 @@ const REQUIRED_CONTRACTS = [
   "IDeployGatewayTransactionFilterer.sol",
   "IGatewayUtils.sol",
   "GatewayUtils.s.sol",
+  "IRegisterCTM.sol",
+  "IRegisterOnAllChains.sol",
+  "IGatewayMigrateTokenBalances.sol",
 ];
 
 async function copyContractAbi(src: string, dest: string): Promise<void> {

@@ -23,11 +23,12 @@ import {GW_ASSET_TRACKER, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDR, L2_NATIVE_TOKE
 import {ZKSProvider} from "../provider/ZKSProvider.s.sol";
 
 import {Utils} from "../utils/Utils.sol";
+import {IGatewayMigrateTokenBalances} from "contracts/script-interfaces/IGatewayMigrateTokenBalances.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 /// @dev IMPORTANT: this script is not intended to be used in production.
 /// TODO(EVM-925): support secure gateway deployment.
-contract GatewayMigrateTokenBalances is ZKSProvider {
+contract GatewayMigrateTokenBalances is ZKSProvider, IGatewayMigrateTokenBalances {
     using stdJson for string;
 
     IAssetTrackerBase l2AssetTrackerBase = IAssetTrackerBase(L2_ASSET_TRACKER_ADDR);
