@@ -1,0 +1,62 @@
+[
+  {
+    "type": "function",
+    "name": "IS_SCRIPT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "run",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "chainAdmin",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "chainProxyAdmin",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "proxy",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "runWithInputFromFile",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "error",
+    "name": "AddressHasNoCode",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  }
+]

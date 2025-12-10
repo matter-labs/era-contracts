@@ -1,68 +1,68 @@
 [
   {
+    "type": "function",
+    "name": "checkAllMigrated",
     "inputs": [
       {
-        "internalType": "bool",
-        "name": "toGateway",
-        "type": "bool"
-      },
-      {
-        "internalType": "address",
-        "name": "bridgehub",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
         "name": "chainId",
-        "type": "uint256"
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        "internalType": "uint256",
-        "name": "gatewayChainId",
-        "type": "uint256"
-      },
-      {
-        "internalType": "string",
         "name": "l2RpcUrl",
-        "type": "string"
-      },
-      {
-        "internalType": "string",
-        "name": "gwRpcUrl",
-        "type": "string"
-      },
-      {
-        "internalType": "bool",
-        "name": "onlyWaitForFinalization",
-        "type": "bool"
-      },
-      {
-        "internalType": "bytes32[]",
-        "name": "txHashes",
-        "type": "bytes32[]"
+        "type": "string",
+        "internalType": "string"
       }
     ],
-    "name": "finishMigrationOnL1",
     "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
+    "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "finishMigrationOnL1",
     "inputs": [
       {
-        "internalType": "uint256",
-        "name": "chainId",
-        "type": "uint256"
+        "name": "toGateway",
+        "type": "bool",
+        "internalType": "bool"
       },
       {
-        "internalType": "string",
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "gatewayChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
         "name": "l2RpcUrl",
-        "type": "string"
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "gwRpcUrl",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "onlyWaitForFinalization",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "txHashes",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
       }
     ],
-    "name": "checkAllMigrated",
     "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
+    "stateMutability": "nonpayable"
   }
 ]

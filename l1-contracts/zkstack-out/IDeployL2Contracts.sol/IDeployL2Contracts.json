@@ -25,6 +25,21 @@
         "name": "_chainId",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "_governance",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_consensusRegistryOwner",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_daValidatorType",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -41,6 +56,21 @@
       },
       {
         "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_governance",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_consensusRegistryOwner",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_daValidatorType",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -61,6 +91,21 @@
         "name": "_chainId",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "_governance",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_consensusRegistryOwner",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_daValidatorType",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -77,6 +122,21 @@
       },
       {
         "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_governance",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_consensusRegistryOwner",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_daValidatorType",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -97,6 +157,21 @@
         "name": "_chainId",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "_governance",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_consensusRegistryOwner",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_daValidatorType",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -113,6 +188,21 @@
       },
       {
         "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_governance",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_consensusRegistryOwner",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_daValidatorType",
         "type": "uint256",
         "internalType": "uint256"
       }

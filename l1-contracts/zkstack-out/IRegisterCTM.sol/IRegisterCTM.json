@@ -1,25 +1,25 @@
 [
   {
+    "type": "function",
+    "name": "registerCTM",
     "inputs": [
       {
-        "internalType": "address",
         "name": "bridgehub",
-        "type": "address"
+        "type": "address",
+        "internalType": "address"
       },
       {
-        "internalType": "address",
         "name": "chainTypeManagerProxy",
-        "type": "address"
+        "type": "address",
+        "internalType": "address"
       },
       {
-        "internalType": "bool",
         "name": "shouldSend",
-        "type": "bool"
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
-    "name": "registerCTM",
     "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
+    "stateMutability": "nonpayable"
   }
 ]

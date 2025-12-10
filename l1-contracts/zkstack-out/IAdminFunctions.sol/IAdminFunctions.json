@@ -11,7 +11,7 @@
       {
         "name": "ecosystemAdmin",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract ChainAdmin"
       },
       {
         "name": "chainId",
@@ -151,7 +151,7 @@
       {
         "name": "chainAdmin",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract ChainAdmin"
       },
       {
         "name": "target",
@@ -385,7 +385,7 @@
       {
         "name": "chainAdmin",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract ChainAdmin"
       },
       {
         "name": "target",
@@ -616,7 +616,7 @@
       {
         "name": "l2DaCommitmentScheme",
         "type": "uint8",
-        "internalType": "uint8"
+        "internalType": "enum L2DACommitmentScheme"
       },
       {
         "name": "shouldSend",
@@ -659,7 +659,7 @@
       {
         "name": "l2DACommitmentScheme",
         "type": "uint8",
-        "internalType": "uint8"
+        "internalType": "enum L2DACommitmentScheme"
       },
       {
         "name": "chainDiamondProxyOnGateway",
@@ -687,7 +687,7 @@
       {
         "name": "chainAdmin",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract ChainAdmin"
       },
       {
         "name": "target",
@@ -697,7 +697,7 @@
       {
         "name": "pricingMode",
         "type": "uint8",
-        "internalType": "uint8"
+        "internalType": "enum PubdataPricingMode"
       }
     ],
     "outputs": [],

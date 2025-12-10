@@ -1,25 +1,25 @@
 [
   {
+    "type": "function",
+    "name": "run",
     "inputs": [
       {
-        "internalType": "address",
         "name": "_bridgehub",
-        "type": "address"
+        "type": "address",
+        "internalType": "address"
       },
       {
-        "internalType": "uint256",
         "name": "_chainId",
-        "type": "uint256"
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        "internalType": "address",
         "name": "_diamondProxy",
-        "type": "address"
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    "name": "run",
     "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
+    "stateMutability": "nonpayable"
   }
 ]
