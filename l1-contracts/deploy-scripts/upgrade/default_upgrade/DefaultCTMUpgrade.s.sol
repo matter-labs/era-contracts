@@ -155,7 +155,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         nonDisoverable.bytecodesSupplier = permanentConfig.bytecodesSupplier;
         nonDisoverable.rollupDAManager = permanentConfig.rollupDAManager;
         setAddressesBasedOnCTM();
-        config.eraChainId = AddressIntrospector.getEraChainId(discoveredBridgehub.assetRouter);
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
         config.contracts.chainCreationParams = chainCreationParams;
 
@@ -366,6 +365,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         bridgehub = L1Bridgehub(ChainTypeManagerBase(ctm).BRIDGE_HUB());
         discoveredBridgehub = AddressIntrospector.getBridgehubAddresses(bridgehub);
         config.ownerAddress = discoveredCTM.governance;
+        config.eraChainId = AddressIntrospector.getEraChainId(discoveredBridgehub.assetRouter);
+
         discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(
             IZKChain(bridgehub.getZKChain(config.eraChainId))
         );
