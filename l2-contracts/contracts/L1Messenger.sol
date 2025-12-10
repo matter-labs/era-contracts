@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {L1_MESSENGER_HOOK, IL1Messenger} from "./L2ContractHelper.sol";
-import {L1MessengerHookFailed, NotEnoughGasSupplied} from "./errors/L2ContractErrors.sol";
+import {L1MessengerHookFailed, NotEnoughGasSupplied, NotSelfCall} from "./errors/L2ContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -50,9 +50,8 @@ contract L1Messenger is IL1Messenger {
         uint256 endGas = gasleft() - gasToBurn;
         require(endGas > 0, NotEnoughGasSupplied());
 
-        while (gasleft() > endGas) {
-            // Empty
-        }
+        (bool success, ) = address(this).call{gas: gasToBurn}("");
+        success; // ignored
     }
 
     /// @notice Public functionality to send messages to L1.
@@ -64,11 +63,18 @@ contract L1Messenger is IL1Messenger {
         // Call system hook at the known system address.
         // Calldata to the hook is exactly `message`.
         (bool ok, ) = L1_MESSENGER_HOOK.call(abi.encodePacked(msg.sender, _message));
-        if (!ok) {
-            revert L1MessengerHookFailed();
-        }
+        require(ok, L1MessengerHookFailed());
         hash = keccak256(_message);
 
         emit L1MessageSent(msg.sender, hash, _message);
+    }
+
+    // --- Burner entrypoint: only callable by self ---
+    fallback() external payable {
+        // This fallback is used *only* for self-call burning
+        require(msg.sender == address(this), NotSelfCall());
+        assembly {
+            invalid()
+        }
     }
 }

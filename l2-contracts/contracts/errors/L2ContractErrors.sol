@@ -14,6 +14,8 @@ error L1MessengerHookFailed();
 error L1MessengerSendFailed();
 // 0x497087ab
 error NotEnoughGasSupplied();
+// 0xec7cdc0a
+error NotSelfCall();
 // 0x058f5efe
 error SetBytecodeOnAddressHookFailed();
 // 0x8e4a23d6
