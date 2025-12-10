@@ -221,9 +221,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             governance = address(0);
         }
 
-        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParams(
-            string.concat(vm.projectRoot(), CHAIN_CREATION_PARAMS_PATH)
-        );
+        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParams(chainCreationParamsPath());
         PermanentCTMConfig memory permanentConfig = initializePermanentConfig(permanentValuesInputPath);
 
         initializeConfig(chainCreationParams, permanentConfig, governance);

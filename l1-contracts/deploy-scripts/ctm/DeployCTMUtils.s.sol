@@ -131,6 +131,10 @@ abstract contract DeployCTMUtils is DeployUtils {
         addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
+    function chainCreationParamsPath() internal virtual returns (string memory) {
+        return string.concat(vm.projectRoot(), CHAIN_CREATION_PARAMS_PATH);
+    }
+
     function initializeConfig(string memory configPath) internal virtual {
         string memory toml = vm.readFile(configPath);
 
@@ -160,9 +164,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.contracts.validatorTimelockExecutionDelay = toml.readUint(
             "$.contracts.validator_timelock_execution_delay"
         );
-        config.contracts.chainCreationParams = getChainCreationParams(
-            string.concat(vm.projectRoot(), CHAIN_CREATION_PARAMS_PATH)
-        );
+        config.contracts.chainCreationParams = getChainCreationParams(chainCreationParamsPath());
 
         if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
             config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
