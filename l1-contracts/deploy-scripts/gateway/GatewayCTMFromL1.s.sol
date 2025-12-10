@@ -180,6 +180,7 @@ contract GatewayCTMFromL1 is Script {
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
 
+        config.contracts.chainCreationParams = getChainCreationParams(CHAIN_CREATION_PARAMS_PATH);
         // Initializing all values at once is preferable to ensure type safety of
         // the fact that all values are initialized
         config = Config({
