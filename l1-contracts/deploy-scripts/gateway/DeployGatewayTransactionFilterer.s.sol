@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Script} from "forge-std/Script.sol";
+import {IDeployGatewayTransactionFilterer} from "contracts/script-interfaces/IDeployGatewayTransactionFilterer.sol";
 import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -16,7 +17,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 /// - chainProxyAdmin: The pre-deployed proxy admin that manages the proxy.
 /// - create2FactoryAddress: The configured Create2 factory address.
 /// - create2FactorySalt: The salt for the Create2 deployment.
-contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils {
+contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils, IDeployGatewayTransactionFilterer {
     using stdToml for string;
 
     function run(

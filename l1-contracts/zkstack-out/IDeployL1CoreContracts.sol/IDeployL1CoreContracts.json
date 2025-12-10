@@ -1,0 +1,276 @@
+[
+  {
+    "type": "function",
+    "name": "getAddresses",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct CoreDeployedAddresses",
+        "components": [
+          {
+            "name": "bridgehub",
+            "type": "tuple",
+            "internalType": "struct BridgehubDeployedAddresses",
+            "components": [
+              {
+                "name": "bridgehubImplementation",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "bridgehubProxy",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "ctmDeploymentTrackerImplementation",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "ctmDeploymentTrackerProxy",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "messageRootImplementation",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "messageRootProxy",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "chainAssetHandlerImplementation",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "chainAssetHandlerProxy",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "interopCenterImplementation",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "interopCenterProxy",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "chainRegistrationSenderProxy",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "chainRegistrationSenderImplementation",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "assetTrackerProxy",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "assetTrackerImplementation",
+                "type": "address",
+                "internalType": "address"
+              }
+            ]
+          },
+          {
+            "name": "bridges",
+            "type": "tuple",
+            "internalType": "struct BridgesDeployedAddresses",
+            "components": [
+              {
+                "name": "erc20BridgeImplementation",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "erc20BridgeProxy",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "l1AssetRouterImplementation",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "l1AssetRouterProxy",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "l1NullifierImplementation",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "l1NullifierProxy",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "bridgedStandardERC20Implementation",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "bridgedTokenBeacon",
+                "type": "address",
+                "internalType": "address"
+              }
+            ]
+          },
+          {
+            "name": "vaults",
+            "type": "tuple",
+            "internalType": "struct L1NativeTokenVaultAddresses",
+            "components": [
+              {
+                "name": "l1NativeTokenVaultImplementation",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "l1NativeTokenVaultProxy",
+                "type": "address",
+                "internalType": "address"
+              }
+            ]
+          },
+          {
+            "name": "transparentProxyAdmin",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "governance",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "chainAdmin",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "accessControlRestrictionAddress",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "create2Factory",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getConfig",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct Config",
+        "components": [
+          {
+            "name": "l1ChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "ownerAddress",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "deployerAddress",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "eraChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "eraDiamondProxyAddress",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "supportL2LegacySharedBridgeTest",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "contracts",
+            "type": "tuple",
+            "internalType": "struct ContractsConfig",
+            "components": [
+              {
+                "name": "governanceSecurityCouncilAddress",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "governanceMinDelay",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "maxNumberOfChains",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "tokens",
+            "type": "tuple",
+            "internalType": "struct TokensConfig",
+            "components": [
+              {
+                "name": "tokenWethAddress",
+                "type": "address",
+                "internalType": "address"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "run",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "runForTest",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  }
+]

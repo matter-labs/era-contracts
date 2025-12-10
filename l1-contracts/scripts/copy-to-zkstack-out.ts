@@ -21,6 +21,16 @@ const REQUIRED_CONTRACTS = [
   "IDeployL2Contracts.sol",
   "DeployPaymaster.s.sol",
   "GatewayVotePreparation.s.sol",
+  "AdminFunctions.s.sol",
+  "EnableEvmEmulator.s.sol",
+  "DeployGatewayTransactionFilterer.s.sol",
+  "IAdminFunctions.sol",
+  "IEnableEvmEmulator.sol",
+  "IDeployCTM.sol",
+  "IDeployL1CoreContracts.sol",
+  "IDeployGatewayTransactionFilterer.sol",
+  "IGatewayUtils.sol",
+  "GatewayUtils.s.sol",
 ];
 
 async function copyContractAbi(src: string, dest: string): Promise<void> {
@@ -71,7 +81,7 @@ async function main() {
       await copyContractAbi(srcPath, destPath);
       console.log(`Copied ${contract}`);
     } catch (error) {
-      console.warn(`Warning: ${contract} not found in ${outDir}`);
+      console.warn(`Warning: ${contract} not found in out`);
     }
   }
 
