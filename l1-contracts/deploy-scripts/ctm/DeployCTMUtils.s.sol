@@ -280,6 +280,14 @@ abstract contract DeployCTMUtils is DeployUtils {
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (DiamondInitializeDataNewChain memory) {
         require(stateTransition.verifier != address(0), "verifier is zero");
+        if (!config.isZKsyncOS) {
+            require(config.contracts.chainCreationParams.bootloaderHash != bytes32(0), "bootloader hash is zero");
+            require(
+                config.contracts.chainCreationParams.defaultAAHash != bytes32(0),
+                "default account abstraction hash is zero"
+            );
+            require(config.contracts.chainCreationParams.evmEmulatorHash != bytes32(0), "EVM emulator hash is zero");
+        }
 
         return
             DiamondInitializeDataNewChain({
