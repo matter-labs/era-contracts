@@ -22,10 +22,7 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
         transactionFiltererProxy.setDepositsAllowed(false);
 
         depositsAllowed = transactionFiltererProxy.depositsAllowed();
-        assertFalse(
-            depositsAllowed,
-            "Deposits should not be allowed after disabling them"
-        );
+        assertFalse(depositsAllowed, "Deposits should not be allowed after disabling them");
     }
 
     function test_DepositWhileDepositsNotAllowed() public {
