@@ -17,6 +17,7 @@ import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 contract UpgradeIntegrationTestBase is Test {
     using stdToml for string;
@@ -44,7 +45,7 @@ contract UpgradeIntegrationTestBase is Test {
         ctmUpgrade = new CTMUpgrade_v31();
         ctmUpgrade.setSkipFactoryDepsCheck_TestOnly(skipFactoryDepsCheck);
         ctmUpgrade.initialize(PERMANENT_VALUES_INPUT, CTM_INPUT, CTM_OUTPUT);
-        ctmUpgrade.setNewProtocolVersion(0x1d00000000);
+        ctmUpgrade.setNewProtocolVersion(SemVer.packSemVer(0, 32, 0));
 
         console.log("Preparing ecosystem upgrade");
         ecosystemUpgrade.prepareEcosystemUpgrade();

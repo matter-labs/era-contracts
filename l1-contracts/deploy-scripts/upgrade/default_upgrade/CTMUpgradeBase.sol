@@ -171,7 +171,6 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         facetCuts = getChainCreationFacetCuts(stateTransition);
         facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
         uint256 nonce = getProtocolUpgradeNonce(chainCreationParams.latestProtocolVersion);
-
         ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(
             stateTransition,
             chainCreationParams,
