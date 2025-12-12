@@ -57,7 +57,7 @@ contract UpgradeIntegrationTestBase is Test {
         ctmUpgrade.prepareCTMUpgrade();
 
         console.log("Preparing chain for the upgrade");
-        chainUpgrade.prepareChain(PERMANENT_VALUES_INPUT, CHAIN_INPUT);
+        chainUpgrade.prepareChain(PERMANENT_VALUES_INPUT);
     }
 
     function internalTest() internal {

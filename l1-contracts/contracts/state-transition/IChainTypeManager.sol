@@ -81,11 +81,7 @@ interface IChainTypeManager {
         bytes32 forceDeploymentHash
     );
 
-    /// @notice New UpgradeCutHash.
-    /// @notice Emitted when a new upgrade cut hash is set for a protocol version,
-    /// where protocol version is current protocol version of the chain. During the upgrade process,
-    /// we can have multiple upgrades inflight to the same protocol version, for different chains.
-
+    /// @notice New UpgradeCutHash
     event NewUpgradeCutHash(uint256 indexed protocolVersion, bytes32 indexed upgradeCutHash);
 
     /// @notice New UpgradeCutData

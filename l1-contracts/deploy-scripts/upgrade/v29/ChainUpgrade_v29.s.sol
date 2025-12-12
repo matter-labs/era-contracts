@@ -10,8 +10,4 @@ import {DefaultChainUpgrade} from "./default_upgrade/DefaultChainUpgrade.s.sol";
 
 contract ChainUpgrade_v29 is DefaultChainUpgrade {
     using stdToml for string;
-
-    function run() public {
-        super.run();
-    }
 }

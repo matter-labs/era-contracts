@@ -33,12 +33,22 @@ contract DefaultChainUpgrade is Script {
     address currentChainAdmin;
     ChainConfig config;
 
-    function prepareChain(string memory permanentValuesInputPath, string memory configPath) public {
+    function prepareChain(string memory permanentValuesInputPath) public {
         string memory root = vm.projectRoot();
-        configPath = string.concat(root, configPath);
         permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
 
-        initializeConfig(permanentValuesInputPath, configPath);
+        // Grab config from output of l1 deployment
+        string memory permanentValuesInputToml = vm.readFile(permanentValuesInputPath);
+
+        // Config file must be parsed key by key, otherwise values returned
+        // are parsed alfabetically and not by key.
+        // https://book.getfoundry.sh/cheatcodes/parse-toml
+
+        config.chainChainId = permanentValuesInputToml.readUint("$.chain.chain_id");
+        config.bridgehubProxyAddress = permanentValuesInputToml.readAddress("$.contracts.bridgehub_proxy_address");
+
+        address ctm = L1Bridgehub(config.bridgehubProxyAddress).chainTypeManager(config.chainChainId);
+        setupConfigFromOnchain(ctm, config.chainChainId);
 
         // This script does nothing, it only checks that the provided inputs are correct.
         // It is just a wrapper to easily call `upgradeChain`
@@ -88,21 +98,5 @@ contract DefaultChainUpgrade is Script {
         config.chainDiamondProxyAddress = chainTypeManager.getZKChain(chainChainId);
         IZKChain chain = IZKChain(config.chainDiamondProxyAddress);
         config.oldProtocolVersion = chain.getProtocolVersion();
-    }
-
-    function initializeConfig(string memory permanentValuesInputPath, string memory configPath) internal {
-        // Grab config from output of l1 deployment
-        string memory toml = vm.readFile(configPath);
-        string memory permanentValuesInputToml = vm.readFile(permanentValuesInputPath);
-
-        // Config file must be parsed key by key, otherwise values returned
-        // are parsed alfabetically and not by key.
-        // https://book.getfoundry.sh/cheatcodes/parse-toml
-
-        config.chainChainId = permanentValuesInputToml.readUint("$.chain.chain_id");
-        config.bridgehubProxyAddress = permanentValuesInputToml.readAddress("$.contracts.bridgehub_proxy_address");
-
-        address ctm = L1Bridgehub(config.bridgehubProxyAddress).chainTypeManager(config.chainChainId);
-        setupConfigFromOnchain(ctm, config.chainChainId);
     }
 }

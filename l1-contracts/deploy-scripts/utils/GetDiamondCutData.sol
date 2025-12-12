@@ -29,13 +29,6 @@ library GetDiamondCutData {
     }
 
     /// @notice Parse diamond cut data from already-recorded logs (e.g. in tests).
-    /// @dev Usage in tests:
-    /// ```solidity
-    /// vm.recordLogs();
-    /// // ... call that emits NewUpgradeCutData ...
-    /// Vm.Log[] memory logs = vm.getRecordedLogs();
-    /// Diamond.DiamondCutData memory cutData = GetDiamondCutData.getDiamondCutDataFromRecordedLogs(logs, ctm);
-    /// ```
     function getDiamondCutDataFromRecordedLogs(
         Vm.Log[] memory logs,
         address ctm

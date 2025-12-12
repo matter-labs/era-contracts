@@ -312,7 +312,9 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         _setProtocolVersionDeadline(_newProtocolVersion, type(uint256).max);
         protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
-        setUpgradeDiamondCut(_oldProtocolVersion, _cutData);
+        setUpgradeDiamondCut(_cutData, _oldProtocolVersion);
+        // Emit event with backward compatible hack.
+        emit NewUpgradeCutData(_newProtocolVersion, _cutData);
     }
 
     /// @dev check that the protocolVersion is active
@@ -334,7 +336,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     function setUpgradeDiamondCut(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion
-    ) external onlyOwner {
+    ) public onlyOwner {
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
         upgradeCutHash[_oldProtocolVersion] = newCutHash;
         upgradeCutDataBlock[_oldProtocolVersion] = block.number;
