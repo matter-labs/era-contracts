@@ -9,7 +9,7 @@ import {L1MessengerHookFailed, NotEnoughGasSupplied, NotSelfCall} from "./errors
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
  * @notice Smart contract for sending arbitrary length messages to L1
- * @dev by default ZkSync can send fixed length messages on L1.
+ * @dev by default ZKsync can send fixed length messages on L1.
  * A fixed length message has 4 parameters `senderAddress` `isService`, `key`, `value`,
  * the first one is taken from the context, the other three are chosen by the sender.
  * @dev To send a variable length message we use this trick:
