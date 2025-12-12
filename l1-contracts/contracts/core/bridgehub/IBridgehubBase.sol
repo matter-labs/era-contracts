@@ -5,7 +5,6 @@ pragma solidity ^0.8.21;
 import {L2Log, L2Message, TxStatus} from "../../common/Messaging.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "../message-root/IMessageRoot.sol";
-import {TxStatus} from "../../common/Messaging.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 
 struct L2TransactionRequestDirect {
@@ -170,8 +169,6 @@ interface IBridgehubBase {
     function removeChainTypeManager(address _chainTypeManager) external;
 
     function addTokenAssetId(bytes32 _baseTokenAssetId) external;
-
-    function setChainAssetHandler(address _chainAssetHandler) external;
 
     function setCTMAssetAddress(bytes32 _additionalData, address _assetAddress) external;
 

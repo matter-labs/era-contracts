@@ -22,6 +22,7 @@ import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/co
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
@@ -115,6 +116,7 @@ struct GeneratedData {
 abstract contract DeployCTMUtils is DeployUtils {
     using stdToml for string;
 
+    string public constant CHAIN_CREATION_PARAMS_PATH = "/../configs/genesis/era/latest.toml";
     Config public config;
     GeneratedData internal generatedData;
     CTMDeployedAddresses internal addresses;
@@ -129,6 +131,10 @@ abstract contract DeployCTMUtils is DeployUtils {
         addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
+    function chainCreationParamsPath() internal virtual returns (string memory) {
+        return string.concat(vm.projectRoot(), CHAIN_CREATION_PARAMS_PATH);
+    }
+
     function initializeConfig(string memory configPath) internal virtual {
         string memory toml = vm.readFile(configPath);
 
@@ -140,7 +146,6 @@ abstract contract DeployCTMUtils is DeployUtils {
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
-        config.eraChainId = toml.readUint("$.era_chain_id");
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
         if (toml.keyExists("$.is_zk_sync_os")) {
             config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
@@ -159,22 +164,31 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.contracts.validatorTimelockExecutionDelay = toml.readUint(
             "$.contracts.validator_timelock_execution_delay"
         );
-        config.contracts.chainCreationParams.genesisRoot = toml.readBytes32("$.contracts.genesis_root");
-        config.contracts.chainCreationParams.genesisRollupLeafIndex = toml.readUint(
-            "$.contracts.genesis_rollup_leaf_index"
-        );
-        config.contracts.chainCreationParams.genesisBatchCommitment = toml.readBytes32(
-            "$.contracts.genesis_batch_commitment"
-        );
-        config.contracts.chainCreationParams.latestProtocolVersion = toml.readUint(
-            "$.contracts.latest_protocol_version"
-        );
-        config.contracts.chainCreationParams.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
-        config.contracts.chainCreationParams.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
-        config.contracts.chainCreationParams.evmEmulatorHash = toml.readBytes32("$.contracts.evm_emulator_hash");
+        config.contracts.chainCreationParams = getChainCreationParams(chainCreationParamsPath());
 
         if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
             config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
+        }
+    }
+
+    function getChainCreationParams(
+        string memory _config
+    ) internal virtual returns (ChainCreationParamsConfig memory chainCreationParams) {
+        string memory toml = vm.readFile(_config);
+        chainCreationParams.latestProtocolVersion = toml.readUint("$.protocol_semantic_version");
+        chainCreationParams.genesisRoot = toml.readBytes32("$.genesis_root");
+        chainCreationParams.genesisRollupLeafIndex = toml.readUint("$.genesis_rollup_leaf_index");
+        chainCreationParams.genesisBatchCommitment = toml.readBytes32("$.genesis_batch_commitment");
+
+        // These fields are redundant for zksync_os.
+        if (toml.keyExists("$.default_aa_hash")) {
+            chainCreationParams.defaultAAHash = toml.readBytes32("$.default_aa_hash");
+        }
+        if (toml.keyExists("$.bootloader_hash")) {
+            chainCreationParams.bootloaderHash = toml.readBytes32("$.bootloader_hash");
+        }
+        if (toml.keyExists("$.evm_emulator_hash")) {
+            chainCreationParams.evmEmulatorHash = toml.readBytes32("$.evm_emulator_hash");
         }
     }
 
@@ -269,9 +283,14 @@ abstract contract DeployCTMUtils is DeployUtils {
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (DiamondInitializeDataNewChain memory) {
         require(stateTransition.verifier != address(0), "verifier is zero");
-        require(config.contracts.chainCreationParams.bootloaderHash != bytes32(0), "bootloader hash is zero");
-        require(config.contracts.chainCreationParams.defaultAAHash != bytes32(0), "default aa hash is zero");
-        require(config.contracts.chainCreationParams.evmEmulatorHash != bytes32(0), "evm emulator hash is zero");
+        if (!config.isZKsyncOS) {
+            require(config.contracts.chainCreationParams.bootloaderHash != bytes32(0), "bootloader hash is zero");
+            require(
+                config.contracts.chainCreationParams.defaultAAHash != bytes32(0),
+                "default account abstraction hash is zero"
+            );
+            require(config.contracts.chainCreationParams.evmEmulatorHash != bytes32(0), "EVM emulator hash is zero");
+        }
 
         return
             DiamondInitializeDataNewChain({

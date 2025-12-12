@@ -46,7 +46,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
             "/",
             CONTRACTS_PATH,
             "/l1-contracts",
-            "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml"
+            "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm.toml"
         );
         string memory permanentValuesInputPath = string.concat(
             root,

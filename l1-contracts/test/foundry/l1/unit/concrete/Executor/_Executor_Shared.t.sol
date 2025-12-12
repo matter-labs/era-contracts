@@ -225,7 +225,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             address(assetTracker),
             IL1Nullifier(address(0))
         );
-        dummyBridgehub.setChainAssetHandler(address(chainAssetHandler));
+        // dummyBridgehub.setChainAssetHandler(address(chainAssetHandler));
 
         dummyBridgehub.setSharedBridge(address(sharedBridge));
 
@@ -368,7 +368,9 @@ contract ExecutorTest is UtilsCallMockerTest {
             daCommitmentScheme: L2_DA_COMMITMENT_SCHEME,
             daCommitment: bytes32(""),
             firstBlockTimestamp: uint64(currentTimestamp),
+            firstBlockNumber: uint64(1),
             lastBlockTimestamp: uint64(currentTimestamp),
+            lastBlockNumber: uint64(2),
             chainId: l2ChainId,
             operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });

@@ -86,6 +86,7 @@ struct ChainCreationParamsConfig {
     bytes32 genesisRoot;
     uint256 genesisRollupLeafIndex;
     bytes32 genesisBatchCommitment;
+    // TODO probably move this to separate struct
     uint256 latestProtocolVersion;
     bytes32 bootloaderHash;
     bytes32 defaultAAHash;

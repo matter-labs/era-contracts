@@ -49,7 +49,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.18.0
+          node-version: 18.20.8
 
       - name: Install yarn
         run: npm install -g yarn license-checker

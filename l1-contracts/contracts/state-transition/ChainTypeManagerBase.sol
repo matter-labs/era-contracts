@@ -77,6 +77,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev Both validatorTimelock and validatorTimelockPostV29 getters are available for backward compatibility of nodes that rely on the validatorTimelock address being available.
     address public validatorTimelockPostV29;
 
+    /// @dev The block number when upgradeCutHash was saved for some protocolVersion.
+    /// @dev It's used for easier tracking the upgrade cutData off-chain.
+    mapping(uint256 protocolVersion => uint256) public upgradeCutDataBlock;
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     /// @dev Note, that while the contract does not use `nonReentrant` modifier, we still keep the `reentrancyGuardInitializer`
@@ -306,6 +310,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
         uint256 previousProtocolVersion = protocolVersion;
         upgradeCutHash[_oldProtocolVersion] = newCutHash;
+        upgradeCutDataBlock[_oldProtocolVersion] = block.number;
         _setProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
         _setProtocolVersionDeadline(_newProtocolVersion, type(uint256).max);
         protocolVersion = _newProtocolVersion;
@@ -336,6 +341,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     ) external onlyOwner {
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
         upgradeCutHash[_oldProtocolVersion] = newCutHash;
+        upgradeCutDataBlock[_oldProtocolVersion] = block.number;
         emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
     }
 
