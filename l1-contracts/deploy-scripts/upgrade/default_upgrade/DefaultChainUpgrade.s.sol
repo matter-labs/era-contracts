@@ -23,7 +23,6 @@ contract DefaultChainUpgrade is Script {
     using stdToml for string;
 
     struct ChainConfig {
-        address deployerAddress;
         uint256 chainChainId;
         address chainDiamondProxyAddress;
         address ctm;
@@ -46,16 +45,10 @@ contract DefaultChainUpgrade is Script {
     }
 
     function run(address ctm, uint256 chainChainId) public virtual {
-        IChainTypeManager chainTypeManager = IChainTypeManager(ctm);
-        config.bridgehubProxyAddress = chainTypeManager.BRIDGE_HUB();
-        config.chainDiamondProxyAddress = chainTypeManager.getZKChain(chainChainId);
-        IZKChain chain = IZKChain(config.chainDiamondProxyAddress);
-        config.ctm = ctm;
-        config.oldProtocolVersion = chain.getProtocolVersion();
-        uint256 ctmProtocolVersion = chainTypeManager.protocolVersion();
+        setupConfigFromOnchain(ctm, chainChainId);
         Diamond.DiamondCutData memory diamondCutData = GetDiamondCutData.getDiamondCutData(
-            config.ctm,
-            ctmProtocolVersion
+            ctm,
+            config.oldProtocolVersion
         );
         upgradeChain(diamondCutData);
     }
@@ -87,9 +80,17 @@ contract DefaultChainUpgrade is Script {
         chain.executeUpgrade(diamondCutData);
     }
 
-    function initializeConfig(string memory permanentValuesInputPath, string memory configPath) internal {
-        config.deployerAddress = msg.sender;
+    function setupConfigFromOnchain(address ctm, uint256 chainChainId) public {
+        config.ctm = ctm;
+        config.chainChainId = chainChainId;
+        IChainTypeManager chainTypeManager = IChainTypeManager(ctm);
+        config.bridgehubProxyAddress = chainTypeManager.BRIDGE_HUB();
+        config.chainDiamondProxyAddress = chainTypeManager.getZKChain(chainChainId);
+        IZKChain chain = IZKChain(config.chainDiamondProxyAddress);
+        config.oldProtocolVersion = chain.getProtocolVersion();
+    }
 
+    function initializeConfig(string memory permanentValuesInputPath, string memory configPath) internal {
         // Grab config from output of l1 deployment
         string memory toml = vm.readFile(configPath);
         string memory permanentValuesInputToml = vm.readFile(permanentValuesInputPath);
@@ -99,9 +100,9 @@ contract DefaultChainUpgrade is Script {
         // https://book.getfoundry.sh/cheatcodes/parse-toml
 
         config.chainChainId = permanentValuesInputToml.readUint("$.chain.chain_id");
-        address bridgehubProxyAddress = permanentValuesInputToml.readAddress("$.contracts.bridgehub_proxy_address");
+        config.bridgehubProxyAddress = permanentValuesInputToml.readAddress("$.contracts.bridgehub_proxy_address");
 
-        config.chainDiamondProxyAddress = L1Bridgehub(bridgehubProxyAddress).getZKChain(config.chainChainId);
-        config.ctm = L1Bridgehub(config.bridgehubProxyAddress).chainTypeManager(config.chainChainId);
+        address ctm = L1Bridgehub(config.bridgehubProxyAddress).chainTypeManager(config.chainChainId);
+        setupConfigFromOnchain(ctm, config.chainChainId);
     }
 }

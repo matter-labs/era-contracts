@@ -111,7 +111,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     EcosystemUpgradeConfig internal upgradeConfig;
 
     // Input for the script
-    AdditionalConfig public newConfig;
+    AdditionalConfig internal newConfig;
     GatewayConfig internal gatewayConfig;
 
     // Discovered addresses
