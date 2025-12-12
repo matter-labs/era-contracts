@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {IBaseToken} from "./interfaces/IBaseToken.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, L1_MESSENGER_CONTRACT, L2_ASSET_TRACKER, MSG_VALUE_SYSTEM_CONTRACT} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, L1_MESSENGER_CONTRACT, L2_ASSET_TRACKER, L2_COMPLEX_UPGRADER_ADDR, MSG_VALUE_SYSTEM_CONTRACT} from "./Constants.sol";
 import {IMailboxImpl} from "./interfaces/IMailboxImpl.sol";
 import {InsufficientFunds, Unauthorized} from "./SystemContractErrors.sol";
 
@@ -22,6 +22,19 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
 
     /// @notice The total amount of tokens that have been minted.
     uint256 public override totalSupply;
+
+
+    /// @dev Only allows calls from the complex upgrader contract on L2.
+    modifier onlyUpgrader() {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    function initV31() external onlyUpgrader {
+        balance[address(this)] = type(uint256).max - totalSupply;
+    }
 
     /// @notice Transfer tokens from one address to another.
     /// @param _from The address to transfer the ETH from.
@@ -69,6 +82,7 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
         L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(_amount);
         totalSupply += _amount;
         balance[_account] += _amount;
+        balance[address(this)] -= _amount;
         emit Mint(_account, _amount);
     }
 
@@ -110,7 +124,6 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
         unchecked {
             // This is safe, since this contract holds the ether balances, and if user
             // sends a `msg.value` it will be added to the contract (`this`) balance.
-            balance[address(this)] -= amount;
             totalSupply -= amount;
         }
     }
