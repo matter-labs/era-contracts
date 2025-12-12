@@ -16,8 +16,7 @@ contract Burner {
  * @custom:security-contact security@matterlabs.dev
  * @notice Native ETH contract.
  * @dev It does NOT provide interfaces for personal interaction with tokens like `transfer`, `approve`, and `transferFrom`.
- * Instead, this contract is used by the bootloader and `MsgValueSimulator`/`ContractDeployer` system contracts
- * to perform the balance changes while simulating the `msg.value` Ethereum behavior.
+ * Instead, this contract is used only as an entrypoint for native token withdrawals.
  */
 contract L2BaseToken is IBaseToken {
     /// @notice Initiate the withdrawal of the base token, funds will be available to claim on L1 `finalizeEthWithdrawal` method.

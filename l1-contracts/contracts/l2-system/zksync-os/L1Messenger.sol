@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {L1_MESSENGER_HOOK, IL1Messenger} from "./ZKOSContractHelper.sol";
 import {L1MessengerHookFailed, NotEnoughGasSupplied, NotSelfCall} from "./errors/ZKOSContractErrors.sol";
+import {L1MessageGasLib} from "./L1MessageGasLib.sol";
 
 /**
  * @author Matter Labs
@@ -19,33 +20,8 @@ import {L1MessengerHookFailed, NotEnoughGasSupplied, NotSelfCall} from "./errors
  * it requires that the preimage of `value` be provided.
  */
 contract L1Messenger is IL1Messenger {
-    uint256 private constant SHA3 = 30;
-    uint256 private constant SHA3WORD = 6;
-    uint256 private constant LOG = 375;
-    uint256 private constant LOGDATA = 8;
-    uint256 private constant L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
-
-    function ceilDiv(uint256 x, uint256 y) internal pure returns (uint256) {
-        return (x + y - 1) / y;
-    }
-
-    /// @dev Exact Solidity equivalent of `keccak256_ergs_cost(len) / ERGS_PER_GAS` in ZKsync OS
-    function gasKeccak(uint256 len) internal pure returns (uint256) {
-        uint256 words = ceilDiv(len, 32);
-        return SHA3 + SHA3WORD * words;
-    }
-
-    /// @dev Exact Solidity equivalent of l1_message_ergs_cost / ERGS_PER_GAS in ZKsync OS
-    function estimateL1MessageGas(uint256 messageLen) internal pure returns (uint256) {
-        uint256 hashing = gasKeccak(L2_TO_L1_LOG_SERIALIZE_SIZE) + gasKeccak(64) * 3 + gasKeccak(messageLen);
-
-        uint256 logCost = LOG + LOGDATA * messageLen;
-
-        return hashing + logCost;
-    }
-
     function burnGas(bytes calldata _message) internal {
-        uint256 gasToBurn = estimateL1MessageGas(_message.length);
+        uint256 gasToBurn = L1MessageGasLib.estimateL1MessageGas(_message.length);
 
         // If not enough gas to burn the desired amount, revert
         if ((gasleft() * 63) / 64 < gasToBurn) {
