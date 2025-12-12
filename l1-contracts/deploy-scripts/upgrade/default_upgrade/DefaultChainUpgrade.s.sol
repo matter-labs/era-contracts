@@ -73,10 +73,10 @@ contract DefaultChainUpgrade is Script {
 
     function executeUpgrade(address ctm, uint256 chainChainId) public {
         IChainTypeManager chainTypeManager = IChainTypeManager(ctm);
-        uint256 ctmProtocolVersion = chainTypeManager.protocolVersion();
         config.chainDiamondProxyAddress = chainTypeManager.getZKChain(chainChainId);
         IZKChain chain = IZKChain(config.chainDiamondProxyAddress);
-        Diamond.DiamondCutData memory diamondCutData = GetDiamondCutData.getDiamondCutData(ctm, ctmProtocolVersion);
+        uint256 oldProtocolVersion = chain.getProtocolVersion();
+        Diamond.DiamondCutData memory diamondCutData = GetDiamondCutData.getDiamondCutData(ctm, oldProtocolVersion);
         chain.executeUpgrade(diamondCutData);
     }
 
