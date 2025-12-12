@@ -9,6 +9,7 @@ import {Utils} from "../../utils/Utils.sol";
 
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 
@@ -16,6 +17,7 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {ChainTypeManagerBase} from "../../../contracts/state-transition/ChainTypeManagerBase.sol";
+import {GetDiamondCutData} from "../../utils/GetDiamondCutData.sol";
 
 contract DefaultChainUpgrade is Script {
     using stdToml for string;
@@ -24,6 +26,8 @@ contract DefaultChainUpgrade is Script {
         address deployerAddress;
         uint256 chainChainId;
         address chainDiamondProxyAddress;
+        address ctm;
+        uint256 oldProtocolVersion;
         address bridgehubProxyAddress;
     }
 
@@ -41,46 +45,27 @@ contract DefaultChainUpgrade is Script {
         // It is just a wrapper to easily call `upgradeChain`
     }
 
-    function run(
-        address ctm,
-        uint256 chainChainId
-    ) public virtual {
-        IChainTypeManager ctm = IChainTypeManager(ctm);
-        address chainDiamondProxyAddress = ctm.getZKChain(chainChainId);
-        (uint256 major,uint256  minor, uint256  patch) = ctm.getSemverProtocolVersion();
-        uint256 newProtocolVersionSemVer = SemVer.packSemVer(major, minor, patch);
-    }
-
-    function getUpgradeCutData(uint256 protocolVersion, IChainTypeManager ctm) public returns (Diamond.DiamondCutData memory upgradeCutData) {
-        uint256 blockUpgrade = ctm.upgradeCutDataBlock(protocolVersion);
-
-        // Listen event NewUpgradeCutHash from block blockupgrade
-        // Pretend i have calldata from tx_hash
-//        bytes32 txHash;
-
-        bytes memory tx_calldata;
-
-        // try to decode
-        (Diamond.DiamondCutData calldata _cutData,
-            uint256 _oldProtocolVersion,
-            uint256 _oldProtocolVersionDeadline,
-            uint256 _newProtocolVersion) = abi.decode(
-            tx_calldata,
-            ChainTypeManagerBase.setNewVersionUpgrade
+    function run(address ctm, uint256 chainChainId) public virtual {
+        IChainTypeManager chainTypeManager = IChainTypeManager(ctm);
+        config.bridgehubProxyAddress = chainTypeManager.BRIDGE_HUB();
+        config.chainDiamondProxyAddress = chainTypeManager.getZKChain(chainChainId);
+        IZKChain chain = IZKChain(config.chainDiamondProxyAddress);
+        config.ctm = ctm;
+        config.oldProtocolVersion = chain.getProtocolVersion();
+        uint256 ctmProtocolVersion = chainTypeManager.protocolVersion();
+        Diamond.DiamondCutData memory diamondCutData = GetDiamondCutData.getDiamondCutData(
+            config.ctm,
+            ctmProtocolVersion
         );
-
-        // if not success
-
-
+        upgradeChain(diamondCutData);
     }
 
-
-    function upgradeChain(address chainDiamondProxyAddress, uint256 oldProtocolVersion, Diamond.DiamondCutData memory upgradeCutData) public {
+    function upgradeChain(Diamond.DiamondCutData memory diamondCutData) public {
         Utils.adminExecute(
-            IZKChain(chainDiamondProxyAddress).getAdmin(),
+            IZKChain(config.chainDiamondProxyAddress).getAdmin(),
             address(0),
-            chainDiamondProxyAddress,
-            abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
+            config.chainDiamondProxyAddress,
+            abi.encodeCall(IAdmin.upgradeChainFromVersion, (config.oldProtocolVersion, diamondCutData)),
             0
         );
     }
@@ -91,6 +76,15 @@ contract DefaultChainUpgrade is Script {
 
         vm.startBroadcast(adminOwner);
         IChainAdminOwnable(admin).setUpgradeTimestamp(newProtocolVersion, timestamp);
+    }
+
+    function executeUpgrade(address ctm, uint256 chainChainId) public {
+        IChainTypeManager chainTypeManager = IChainTypeManager(ctm);
+        uint256 ctmProtocolVersion = chainTypeManager.protocolVersion();
+        config.chainDiamondProxyAddress = chainTypeManager.getZKChain(chainChainId);
+        IZKChain chain = IZKChain(config.chainDiamondProxyAddress);
+        Diamond.DiamondCutData memory diamondCutData = GetDiamondCutData.getDiamondCutData(ctm, ctmProtocolVersion);
+        chain.executeUpgrade(diamondCutData);
     }
 
     function initializeConfig(string memory permanentValuesInputPath, string memory configPath) internal {
@@ -105,8 +99,9 @@ contract DefaultChainUpgrade is Script {
         // https://book.getfoundry.sh/cheatcodes/parse-toml
 
         config.chainChainId = permanentValuesInputToml.readUint("$.chain.chain_id");
-        config.bridgehubProxyAddress = permanentValuesInputToml.readAddress("$.contracts.bridgehub_proxy_address");
+        address bridgehubProxyAddress = permanentValuesInputToml.readAddress("$.contracts.bridgehub_proxy_address");
 
-        config.chainDiamondProxyAddress = L1Bridgehub(config.bridgehubProxyAddress).getZKChain(config.chainChainId);
+        config.chainDiamondProxyAddress = L1Bridgehub(bridgehubProxyAddress).getZKChain(config.chainChainId);
+        config.ctm = L1Bridgehub(config.bridgehubProxyAddress).chainTypeManager(config.chainChainId);
     }
 }

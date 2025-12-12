@@ -343,6 +343,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         upgradeCutHash[_oldProtocolVersion] = newCutHash;
         upgradeCutDataBlock[_oldProtocolVersion] = block.number;
         emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
+        emit NewUpgradeCutData(_oldProtocolVersion, _cutData);
     }
 
     /// @dev freezes the specified chain
