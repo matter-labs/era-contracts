@@ -2,8 +2,8 @@
 pragma solidity 0.8.28;
 
 import {IZKOSContractDeployer} from "./interfaces/IZKOSContractDeployer.sol";
-import {SET_BYTECODE_ON_ADDRESS_HOOK, COMPLEX_UPGRADER_SYSTEM_CONTRACT} from "./L2ContractHelper.sol";
-import {SetBytecodeOnAddressHookFailed, Unauthorized} from "./errors/L2ContractErrors.sol";
+import {SET_BYTECODE_ON_ADDRESS_HOOK, COMPLEX_UPGRADER_SYSTEM_CONTRACT} from "./ZKOSContractHelper.sol";
+import {SetBytecodeOnAddressHookFailed, Unauthorized} from "./errors/ZKOSContractErrors.sol";
 
 /// @title ZKOSContractDeployer
 /// @notice Minimal wrapper that forwards to the set bytecode on address system hook at a hardcoded address.

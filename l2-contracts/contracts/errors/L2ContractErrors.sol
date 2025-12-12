@@ -8,16 +8,6 @@ error FailedToTransferTokens(address tokenContract, address to, uint256 amount);
 error InsufficientAllowance(uint256 providedAllowance, uint256 requiredAmount);
 // 0xb4fa3fb3
 error InvalidInput();
-// 0xf801b069
-error L1MessengerHookFailed();
-// 0xa3628b43
-error L1MessengerSendFailed();
-// 0x497087ab
-error NotEnoughGasSupplied();
-// 0xec7cdc0a
-error NotSelfCall();
-// 0x058f5efe
-error SetBytecodeOnAddressHookFailed();
 // 0x8e4a23d6
 error Unauthorized(address);
 // 0xff15b069

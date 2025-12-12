@@ -34,7 +34,7 @@
   },
   "scripts": {
     "build": "hardhat compile",
-    "build:foundry": "forge build --zksync --skip 'L2BaseToken.sol'",
+    "build:foundry": "forge build --zksync",
     "test:foundry": "forge test --zksync --gas-limit 2000000000",
     "clean": "hardhat clean",
     "test": "hardhat test",

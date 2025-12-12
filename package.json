@@ -43,6 +43,7 @@
     "l2": "yarn workspace l2-contracts",
     "sc": "yarn workspace system-contracts",
     "da": "yarn workspace da-contracts",
+    "zkos": "yarn workspace zksync-os-predeploys-contracts",
     "gas-bound-caller": "yarn workspace gas-bound-caller"
   }
 }

@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.28;
 
-import {L2_MESSENGER, IBaseToken, IMailbox} from "./L2ContractHelper.sol";
-import {L1MessengerSendFailed} from "./errors/L2ContractErrors.sol";
+import {L2_MESSENGER, IBaseToken, IMailbox} from "./ZKOSContractHelper.sol";
+import {L1MessengerSendFailed} from "./errors/ZKOSContractErrors.sol";
 
 contract Burner {
     constructor() payable {

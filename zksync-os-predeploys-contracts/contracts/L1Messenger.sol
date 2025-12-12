@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.28;
 
-import {L1_MESSENGER_HOOK, IL1Messenger} from "./L2ContractHelper.sol";
-import {L1MessengerHookFailed, NotEnoughGasSupplied, NotSelfCall} from "./errors/L2ContractErrors.sol";
+import {L1_MESSENGER_HOOK, IL1Messenger} from "./ZKOSContractHelper.sol";
+import {L1MessengerHookFailed, NotEnoughGasSupplied, NotSelfCall} from "./errors/ZKOSContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -72,7 +72,7 @@ contract L1Messenger is IL1Messenger {
     }
 
     // --- Burner entrypoint: only callable by self ---
-    fallback() external {
+    fallback() external payable {
         // This fallback is used *only* for self-call burning
         require(msg.sender == address(this), NotSelfCall());
         assembly {
