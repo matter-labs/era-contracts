@@ -15,15 +15,3 @@
 [submodule "lib/@matterlabs/zksync-contracts"]
 	path = lib/@matterlabs/zksync-contracts
 	url = https://github.com/matter-labs/v2-testnet-contracts
-[submodule "zksync-os-predeploys-contracts/lib/forge-std"]
-	path = zksync-os-predeploys-contracts/lib/forge-std
-	url = https://github.com/foundry-rs/forge-std
-[submodule "zksync-os-predeploys-contracts/lib/openzeppelin-contracts"]
-	path = zksync-os-predeploys-contracts/lib/openzeppelin-contracts
-	url = https://github.com/OpenZeppelin/openzeppelin-contracts
-[submodule "zksync-os-predeploys-contracts/lib/openzeppelin-contracts-upgradeable"]
-	path = zksync-os-predeploys-contracts/lib/openzeppelin-contracts-upgradeable
-	url = https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable
-[submodule "zksync-os-predeploys-contracts/lib/zksync-contracts"]
-	path = zksync-os-predeploys-contracts/lib/zksync-contracts
-	url = https://github.com/matter-labs/zksync-contracts

@@ -28,14 +28,9 @@ system-contracts/contracts/Constants.sol
 system-contracts/contracts/test-contracts
 system-contracts/contracts-preprocessed
 
-# zksync-os-predeploys-contracts
-zksync-os-predeploys-contracts/node_modules
-zksync-os-predeploys-contracts/test
-
 # gas-bound-caller
 gas-bound-caller
 
 lib/*
 l2-contracts/lib
 system-contracts/lib
-zksync-os-predeploys-contracts/lib
