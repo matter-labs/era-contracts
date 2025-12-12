@@ -25,6 +25,8 @@ l1-contracts/out/*
 l1-contracts/zkout/*
 l1-contracts/broadcast/*
 l1-contracts/script-config/*
+l1-contracts/script-config/v31-upgrade-ecosystem.toml
+l1-contracts/script-config/permanent-values.toml
 l1-contracts/snapshots/*
 !l1-contracts/script-config/artifacts
 l1-contracts/script-out/*
