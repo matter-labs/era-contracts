@@ -2,8 +2,9 @@
 pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
+import {L1_MESSENGER_HOOK} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import "contracts/l2-system/zksync-os/L1Messenger.sol";
-import {L1_MESSENGER_HOOK, IL1Messenger} from "contracts/l2-system/zksync-os/ZKOSContractHelper.sol";
+import {IL1Messenger} from "contracts/dev-contracts/interfaces/IL1Messenger.sol";
 
 contract L1MessengerTest is Test {
     L1Messenger messenger;

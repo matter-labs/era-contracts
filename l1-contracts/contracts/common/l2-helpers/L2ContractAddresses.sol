@@ -99,3 +99,12 @@ address constant L2_CHAIN_ASSET_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0
 address constant L2_NTV_BEACON_DEPLOYER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0b);
 
 address constant L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR = address(USER_CONTRACTS_OFFSET + 0x0c);
+
+/// @dev the offset for the system hooks for ZKsync OS
+uint160 constant SYSTEM_HOOKS_OFFSET = 0x7000;
+
+/// @dev The address of the L2ToL1Messenger system hook
+address constant L1_MESSENGER_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x01);
+
+/// @dev The address of the system hook responsible for setting bytecode on address. Can only be called from L2_COMPLEX_UPGRADER address
+address constant SET_BYTECODE_ON_ADDRESS_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x02);

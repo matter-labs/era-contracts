@@ -2,7 +2,9 @@
 
 pragma solidity 0.8.28;
 
-import {L2_MESSENGER, IBaseToken, IMailbox} from "./ZKOSContractHelper.sol";
+import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IMailbox} from "contracts/dev-contracts/interfaces/IMailbox.sol";
+import {IBaseToken} from "./ZKOSContractHelper.sol";
 import {L1MessengerSendFailed} from "./errors/ZKOSContractErrors.sol";
 
 contract Burner {
@@ -26,7 +28,7 @@ contract L2BaseToken is IBaseToken {
 
         // Send the L2 log, a user could use it as proof of the withdrawal
         bytes memory message = _getL1WithdrawMessage(_l1Receiver, amount);
-        bytes32 msgHash = L2_MESSENGER.sendToL1(message);
+        bytes32 msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(message);
         if (msgHash == bytes32(0)) revert L1MessengerSendFailed();
 
         emit Withdrawal(msg.sender, _l1Receiver, amount);
@@ -40,7 +42,7 @@ contract L2BaseToken is IBaseToken {
 
         // Send the L2 log, a user could use it as proof of the withdrawal
         bytes memory message = _getExtendedWithdrawMessage(_l1Receiver, amount, msg.sender, _additionalData);
-        bytes32 msgHash = L2_MESSENGER.sendToL1(message);
+        bytes32 msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(message);
         if (msgHash == bytes32(0)) revert L1MessengerSendFailed();
 
         emit WithdrawalWithMessage(msg.sender, _l1Receiver, amount, _additionalData);

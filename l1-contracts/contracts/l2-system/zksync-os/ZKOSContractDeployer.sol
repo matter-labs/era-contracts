@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {L2_COMPLEX_UPGRADER_ADDR, SET_BYTECODE_ON_ADDRESS_HOOK} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IZKOSContractDeployer} from "./interfaces/IZKOSContractDeployer.sol";
-import {SET_BYTECODE_ON_ADDRESS_HOOK, COMPLEX_UPGRADER_SYSTEM_CONTRACT} from "./ZKOSContractHelper.sol";
 import {SetBytecodeOnAddressHookFailed, Unauthorized} from "./errors/ZKOSContractErrors.sol";
 
 /// @title ZKOSContractDeployer
@@ -10,7 +10,7 @@ import {SetBytecodeOnAddressHookFailed, Unauthorized} from "./errors/ZKOSContrac
 contract ZKOSContractDeployer is IZKOSContractDeployer {
     /// @notice Checks that the message sender is the native token vault.
     modifier onlyComplexUpgrader() {
-        if (msg.sender != COMPLEX_UPGRADER_SYSTEM_CONTRACT) {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert Unauthorized(msg.sender);
         }
         _;

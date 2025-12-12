@@ -8,7 +8,7 @@ import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "..
 import {IL2WrappedBaseToken} from "../bridge/interfaces/IL2WrappedBaseToken.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {SystemContractProxyAdmin} from "./SystemContractProxyAdmin.sol";
-import {IZKOSContractDeployer} from "./IZKOSContractDeployer.sol";
+import {IZKOSContractDeployer} from "contracts/l2-system/zksync-os/interfaces/IZKOSContractDeployer.sol";
 import {L2NativeTokenVault} from "../bridge/ntv/L2NativeTokenVault.sol";
 import {L2MessageRoot} from "../bridgehub/L2MessageRoot.sol";
 import {L2Bridgehub} from "../bridgehub/L2Bridgehub.sol";
@@ -49,14 +49,16 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     function unsafeForceDeployZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
-        (bytes32 bytecodeHash, uint32 bytecodeLength, bytes32 observableBytecodeHash) = abi.decode(
-            _bytecodeInfo,
-            (bytes32, uint32, bytes32)
-        );
+        (
+            bytes32 bytecodeHash,
+            uint32 bytecodeLength,
+            bytes32 observableBytecodeHash,
+            uint32 observableBytecodeLength
+        ) = abi.decode(_bytecodeInfo, (bytes32, uint32, bytes32, uint32));
 
         bytes memory data = abi.encodeCall(
             IZKOSContractDeployer.setBytecodeDetailsEVM,
-            (_newAddress, bytecodeHash, bytecodeLength, observableBytecodeHash)
+            (_newAddress, bytecodeHash, bytecodeLength, observableBytecodeHash, observableBytecodeLength)
         );
 
         // Note, that we dont use interface, but raw call to avoid Solidity checking for empty bytecode

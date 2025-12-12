@@ -2,7 +2,8 @@
 
 pragma solidity 0.8.28;
 
-import {L1_MESSENGER_HOOK, IL1Messenger} from "./ZKOSContractHelper.sol";
+import {L1_MESSENGER_HOOK} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IL1Messenger} from "contracts/dev-contracts/interfaces/IL1Messenger.sol";
 import {L1MessengerHookFailed, NotEnoughGasSupplied, NotSelfCall} from "./errors/ZKOSContractErrors.sol";
 import {L1MessageGasLib} from "./L1MessageGasLib.sol";
 
