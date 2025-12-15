@@ -3,8 +3,7 @@
 pragma solidity 0.8.28;
 
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IMailbox} from "contracts/dev-contracts/interfaces/IMailbox.sol";
-import {IBaseToken} from "./ZKOSContractHelper.sol";
+import {IBaseToken, IMailbox} from "./ZKOSContractHelper.sol";
 import {L1MessengerSendFailed} from "./errors/ZKOSContractErrors.sol";
 
 contract Burner {
