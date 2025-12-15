@@ -92,13 +92,6 @@ import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerB
 contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
     using stdToml for string;
 
-    /**
-     * @dev Storage slot with the admin of the contract.
-     * This is the keccak-256 hash of "eip1967.proxy.admin" subtracted by 1, and is
-     * validated in the constructor.
-     */
-    bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
-
     uint256 internal constant MAX_ADDITIONAL_DELAY = 2 weeks;
 
     // solhint-disable-next-line gas-struct-packing
@@ -615,9 +608,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
 
         addresses.bridgehub.bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
 
-        addresses.transparentProxyAdmin = address(
-            uint160(uint256(vm.load(addresses.bridgehub.bridgehubProxy, ADMIN_SLOT)))
-        );
+        addresses.transparentProxyAdmin = Utils.getProxyAdminAddress(addresses.bridgehub.bridgehubProxy);
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
         newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
 
@@ -1237,9 +1228,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
     }
 
     function prepareUpgradeServerNotifierCall() public virtual returns (Call[] memory calls) {
-        address serverNotifierProxyAdmin = address(
-            uint160(uint256(vm.load(addresses.stateTransition.serverNotifierProxy, ADMIN_SLOT)))
-        );
+        address serverNotifierProxyAdmin = Utils.getProxyAdmin(addresses.stateTransition.serverNotifierProxy);
 
         Call memory call = Call({
             target: serverNotifierProxyAdmin,
