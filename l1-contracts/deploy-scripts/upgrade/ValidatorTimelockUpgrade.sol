@@ -1,25 +1,26 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.10;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console2 as console} from "forge-std/Script.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {Create2FactoryUtils} from "deploy-scripts/Create2FactoryUtils.s.sol";
 import {MultisigCommitter} from "contracts/state-transition/MultisigCommitter.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {Utils} from "deploy-scripts/Utils.sol";
 
 contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
     function run(address ctm, uint32 initialExecutionDelay) external {
+        instantiateCreate2Factory();
         ZKsyncOSChainTypeManager chainTypeManager = ZKsyncOSChainTypeManager(ctm);
+        console.logAddress(msg.sender);
         address validatorTimelock = chainTypeManager.validatorTimelockPostV29();
         address bridgehub = chainTypeManager.BRIDGE_HUB();
-        address proxyAdmin = MultisigCommitter(validatorTimelock).owner();
+        address proxyAdmin = Utils.getProxyAdminAddress(validatorTimelock);
 
-        vm.startBroadcast();
         address implementation = deployImplementation(proxyAdmin, bridgehub);
         upgradeValidatorTimelock(validatorTimelock, implementation, proxyAdmin, initialExecutionDelay);
-        vm.stopBroadcast();
     }
 
     function deployImplementation(address owner, address bridgehub) internal returns (address) {
@@ -32,18 +33,31 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
             );
     }
 
+    function isContract(address a) internal view returns (bool) {
+        return a.code.length > 0;
+    }
+
     function upgradeValidatorTimelock(
         address proxy,
         address newImplementation,
         address admin,
         uint32 _initialExecutionDelay
     ) internal {
-        vm.prank(ProxyAdmin(admin).owner());
-        ProxyAdmin(admin).upgradeAndCall(
-            ITransparentUpgradeableProxy(payable(proxy)),
-            newImplementation,
-            abi.encodeCall(MultisigCommitter.initializeV2, (admin, _initialExecutionDelay))
-        );
+        vm.startBroadcast();
+        if (isContract(admin)) {
+            ProxyAdmin(admin).upgradeAndCall(
+                ITransparentUpgradeableProxy(payable(proxy)),
+                newImplementation,
+                abi.encodeCall(MultisigCommitter.initializeV2, (admin, _initialExecutionDelay))
+            );
+        } else {
+            vm.prank(msg.sender);
+            ITransparentUpgradeableProxy(payable(proxy)).upgradeToAndCall(
+                newImplementation,
+                abi.encodeCall(MultisigCommitter.initializeV2, (admin, _initialExecutionDelay))
+            );
+        }
+        vm.stopBroadcast();
     }
 
     function useCustomSigningSet(address validatorTimelock, address chain) public {
