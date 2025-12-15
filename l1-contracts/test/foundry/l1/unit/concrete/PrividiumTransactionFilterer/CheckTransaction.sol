@@ -9,8 +9,30 @@ import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol
 import {InvalidSelector} from "contracts/common/L1ContractErrors.sol";
 import {IL2SharedBridgeLegacyFunctions} from "contracts/bridge/interfaces/IL2SharedBridgeLegacyFunctions.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {PrividiumTransactionFilterer} from "contracts/transactionFilterer/PrividiumTransactionFilterer.sol";
 
 contract CheckTransactionTest is PrividiumTransactionFiltererTest {
+    function test_DepositsAllowed() public {
+        bool depositsAllowed = transactionFiltererProxy.depositsAllowed();
+        assertTrue(depositsAllowed, "Deposits should be allowed");
+
+        vm.prank(owner);
+        vm.expectEmit(true, true, true, true);
+        emit PrividiumTransactionFilterer.DepositsPermissionChanged(false);
+        transactionFiltererProxy.setDepositsAllowed(false);
+
+        depositsAllowed = transactionFiltererProxy.depositsAllowed();
+        assertFalse(depositsAllowed, "Deposits should not be allowed after disabling them");
+    }
+
+    function test_DepositWhileDepositsNotAllowed() public {
+        vm.prank(owner);
+        transactionFiltererProxy.setDepositsAllowed(false);
+
+        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(sender, sender, 0, 1 ether, "", address(0));
+        assertFalse(isTxAllowed, "Transaction should not be allowed");
+    }
+
     function test_TransactionAllowedBaseTokenDeposit() public view {
         bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(sender, sender, 0, 1 ether, "", address(0));
         assertTrue(isTxAllowed, "Transaction should be allowed");

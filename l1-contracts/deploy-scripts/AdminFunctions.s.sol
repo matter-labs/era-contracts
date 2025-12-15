@@ -413,7 +413,7 @@ contract AdminFunctions is Script {
         uint256 _chainId,
         address _transactionFiltererAddress,
         bool _shouldSend
-    ) external {
+    ) public {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
         Call[] memory calls = new Call[](1);
