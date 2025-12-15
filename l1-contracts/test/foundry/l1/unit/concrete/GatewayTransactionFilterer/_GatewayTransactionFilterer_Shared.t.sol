@@ -13,11 +13,11 @@ import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayT
 contract GatewayTransactionFiltererTest is Test {
     GatewayTransactionFilterer internal transactionFiltererProxy;
     GatewayTransactionFilterer internal transactionFiltererImplementation;
-    address internal owner;
-    address internal admin;
-    address internal sender;
-    address internal bridgehub;
-    address internal assetRouter;
+    address internal owner = makeAddr("owner");
+    address internal admin = makeAddr("admin");
+    address internal sender = makeAddr("sender");
+    address internal bridgehub = makeAddr("bridgehub");
+    address internal assetRouter = makeAddr("assetRouter");
 
     constructor() {
         owner = makeAddr("owner");
