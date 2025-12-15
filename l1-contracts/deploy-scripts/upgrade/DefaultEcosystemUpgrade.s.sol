@@ -507,7 +507,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
 
         ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(stateTransition);
-
+        require(stateTransition.defaultUpgrade != address(0), "Diamond proxy init address can't be zero");
         upgradeCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: stateTransition.defaultUpgrade,

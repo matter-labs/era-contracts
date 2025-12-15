@@ -68,7 +68,7 @@ import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2G
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
 
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
-import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
+import {L1ZKsyncOSV30_1Upgrade} from "contracts/upgrades/L1ZKsyncOSV30_1Upgrade.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
@@ -96,7 +96,10 @@ contract EcosystemUpgrade_v30_1_zk_os is Script, DefaultEcosystemUpgrade {
 
         instantiateCreate2Factory();
 
+        // Deploy verifiers
         deployVerifiers();
+        // Deploy the Upgrade contract
+        (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
         console.log("Verifiers are deployed!");
 
         upgradeConfig.factoryDepsPublished = true;
@@ -205,9 +208,7 @@ contract EcosystemUpgrade_v30_1_zk_os is Script, DefaultEcosystemUpgrade {
      }
 
     // We don't remove facets as it is noop upgrade for L1 contracts
-    function getFacetCutsForDeletion(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal returns (Diamond.FacetCut[] memory facetCuts) {
+    function getFacetCutsForDeletion() internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
         facetCuts = new Diamond.FacetCut[](0);
      }
 
@@ -257,6 +258,20 @@ contract EcosystemUpgrade_v30_1_zk_os is Script, DefaultEcosystemUpgrade {
             upgradeTimestamp: 0,
             newProtocolVersion: getNewProtocolVersion()
         });
+    }
+
+    function getCreationCode(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view override returns (bytes memory) {
+        if (compareStrings(contractName, "L1ZKsyncOSV30_1Upgrade")) {
+            if (!isZKBytecode) {
+                return type(L1ZKsyncOSV30_1Upgrade).creationCode;
+            } else {
+                return ContractsBytecodesLib.getCreationCode("L1ZKsyncOSV30_1Upgrade", true);
+            }
+        }
+        return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function deployUsedUpgradeContract() internal virtual override returns (address) {
