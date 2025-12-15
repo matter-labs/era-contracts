@@ -1491,13 +1491,13 @@
   },
   {
     "contractName": "l1-contracts/PrividiumTransactionFilterer",
-    "zkBytecodeHash": "0x010001576cb187ad35d8b903f289568d0546bf0ab03769bc816ffc28170ca576",
+    "zkBytecodeHash": "0x010001691977d77ea39ce91ddfe6ef10e79e944947a337a50a1be3ecad48dda9",
     "zkBytecodePath": "/l1-contracts/zkout/PrividiumTransactionFilterer.sol/PrividiumTransactionFilterer.json",
-    "evmBytecodeHash": "0x8239157c76516fdcd6f39cfba491b25b66e8acd523a943398fb8604eec3fcef4",
+    "evmBytecodeHash": "0x46352f04ca971679645b5cf77b197ba82493f07ad26478afcb83e25236c9dae1",
     "evmBytecodePath": "/l1-contracts/out/PrividiumTransactionFilterer.sol/PrividiumTransactionFilterer.json",
-    "evmDeployedBytecodeHash": "0x0b8fb76fb029b6141d595f52cae6ab9d7ee36282eccfaf877484008b7a8b3de4",
-    "evmDeployedBytecodeBlakeHash": "0x8ab69811eda1170e03c78da4f380b1e7a018d888f7e6853546803133689fa02e",
-    "evmDeployedBytecodeLength": 4171
+    "evmDeployedBytecodeHash": "0xf0659bc039b12d10e7b2f194c36614e3dc1b4376459852ff954c698a10b5a3e7",
+    "evmDeployedBytecodeBlakeHash": "0x160ca34080b5083673341e27c058711d96ea00423857a92bd65a71fff957f178",
+    "evmDeployedBytecodeLength": 4423
   },
   {
     "contractName": "l1-contracts/ProxyAdmin",
