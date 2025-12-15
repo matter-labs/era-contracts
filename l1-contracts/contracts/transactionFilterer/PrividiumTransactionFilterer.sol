@@ -36,88 +36,88 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(address assetRouter) {
-        L1_ASSET_ROUTER = assetRouter;
+    constructor(address _assetRouter) {
+        L1_ASSET_ROUTER = _assetRouter;
         _disableInitializers();
     }
 
     /// @notice Initializes a contract filterer for later use. Expected to be used in the proxy.
-    /// @param owner The address which can upgrade the implementation.
-    function initialize(address owner) external initializer {
-        if (owner == address(0)) {
+    /// @param _owner The address which can upgrade the implementation.
+    function initialize(address _owner) external initializer {
+        if (_owner == address(0)) {
             revert ZeroAddress();
         }
-        _transferOwnership(owner);
+        _transferOwnership(_owner);
     }
 
     /// @notice Sets whether deposits are allowed from non-whitelisted addresses
-    /// @param allowed Whether deposits are allowed from non-whitelisted addresses
-    function setDepositsAllowed(bool allowed) external onlyOwner {
-        if (depositsAllowed == allowed) {
+    /// @param _allowed Whether deposits are allowed from non-whitelisted addresses
+    function setDepositsAllowed(bool _allowed) external onlyOwner {
+        if (depositsAllowed == _allowed) {
             return;
         }
-        depositsAllowed = allowed;
-        emit DepositsPermissionChanged(allowed);
+        depositsAllowed = _allowed;
+        emit DepositsPermissionChanged(_allowed);
     }
 
     /// @notice Whitelists the sender.
-    /// @param sender Address of the tx sender.
-    function grantWhitelist(address sender) external onlyOwner {
-        if (whitelistedSenders[sender]) {
-            revert AlreadyWhitelisted(sender);
+    /// @param _sender Address of the tx sender.
+    function grantWhitelist(address _sender) external onlyOwner {
+        if (whitelistedSenders[_sender]) {
+            revert AlreadyWhitelisted(_sender);
         }
-        if (sender == address(0)) {
+        if (_sender == address(0)) {
             revert ZeroAddress();
         }
-        whitelistedSenders[sender] = true;
-        emit WhitelistGranted(sender);
+        whitelistedSenders[_sender] = true;
+        emit WhitelistGranted(_sender);
     }
 
     /// @notice Revoke the sender from whitelist.
-    /// @param sender Address of the tx sender.
-    function revokeWhitelist(address sender) external onlyOwner {
-        if (!whitelistedSenders[sender]) {
-            revert NotWhitelisted(sender);
+    /// @param _sender Address of the tx sender.
+    function revokeWhitelist(address _sender) external onlyOwner {
+        if (!whitelistedSenders[_sender]) {
+            revert NotWhitelisted(_sender);
         }
-        whitelistedSenders[sender] = false;
-        emit WhitelistRevoked(sender);
+        whitelistedSenders[_sender] = false;
+        emit WhitelistRevoked(_sender);
     }
 
     /// @notice Checks if the transaction is allowed
-    /// @param sender The sender of the transaction
-    /// @param l2Value The value sent with the L2 transaction
-    /// @param l2Calldata The calldata of the L2 transaction
+    /// @param _sender The sender of the transaction
+    /// @param _l2Value The value sent with the L2 transaction
+    /// @param _l2Calldata The calldata of the L2 transaction
     /// @return Whether the transaction is allowed
     function isTransactionAllowed(
-        address sender,
-        address contractL2,
+        address _sender,
+        address _contractL2,
         uint256,
-        uint256 l2Value,
-        bytes calldata l2Calldata,
+        uint256 _l2Value,
+        bytes calldata _l2Calldata,
         address
     ) external view returns (bool) {
         // Only whitelisted senders are allowed to perform arbitrary transactions.
-        if (whitelistedSenders[sender]) {
+        if (whitelistedSenders[_sender]) {
             return true;
         }
 
         // Since contract addresses are aliased and we require that depositor == receiver,
         // only EOAs, 7702 delegators, or whitelisted contracts will be able to perform deposits.
-        if (sender == L1_ASSET_ROUTER) {
+        if (_sender == L1_ASSET_ROUTER) {
             // Non-base token deposit via `requestL2TransactionTwoBridges`
-            if (l2Value != 0 || contractL2 != L2_ASSET_ROUTER_ADDR) {
+            if (_l2Value != 0 || _contractL2 != L2_ASSET_ROUTER_ADDR) {
                 return false;
             }
-            bytes4 l2TxSelector = bytes4(l2Calldata[:4]);
+            bytes4 l2TxSelector = bytes4(_l2Calldata[:4]);
             if (l2TxSelector == AssetRouterBase.finalizeDeposit.selector) {
-                (, , bytes memory data) = abi.decode(l2Calldata[4:], (uint256, bytes32, bytes));
+                (, , bytes memory data) = abi.decode(_l2Calldata[4:], (uint256, bytes32, bytes));
                 // slither-disable-next-line unused-return
                 (address depositor, address receiver, , uint256 amount, ) = DataEncoding.decodeBridgeMintData(data);
                 return (depositor == receiver && amount > 0 && depositsAllowed) || whitelistedSenders[depositor];
             } else if (l2TxSelector == IL2SharedBridgeLegacyFunctions.finalizeDeposit.selector) {
                 // slither-disable-next-line unused-return
                 (address depositor, address receiver, , uint256 amount, ) = DataEncoding.decodeBridgeMintData(
-                    l2Calldata[4:]
+                    _l2Calldata[4:]
                 );
                 return (depositor == receiver && amount > 0 && depositsAllowed) || whitelistedSenders[depositor];
             } else {
@@ -125,7 +125,7 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
             }
         } else {
             // Base token deposit via `requestL2TransactionDirect`
-            return contractL2 == sender && l2Value > 0 && l2Calldata.length == 0 && depositsAllowed;
+            return _contractL2 == _sender && _l2Value > 0 && _l2Calldata.length == 0 && depositsAllowed;
         }
     }
 }
