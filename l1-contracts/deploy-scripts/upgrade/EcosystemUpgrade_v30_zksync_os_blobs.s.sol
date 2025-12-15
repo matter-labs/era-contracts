@@ -88,6 +88,7 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
     using stdToml for string;
 
     uint256 internal sampleChainId;
+    // In case the sampleChainId is not set, we can use this optional CTM address directly, instead of fetching it from Bridgehub.
     address internal optionalCTM;
 
     /// @notice E2e upgrade generation
@@ -356,7 +357,7 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
     }
 
     function getFacetCutsForDeletion() internal override returns (Diamond.FacetCut[] memory facetCuts) {
-        // One mainnet, we do not provide any facet cuts for deletion.
+        // On mainnet, we do not provide any facet cuts for deletion.
         // This may imply wrong behavior during the upgrade, but there are 
         // no existing zksync os chains on mainnet, so the upgrade will not be applied to any chain.
         if (sampleChainId != 0) {
