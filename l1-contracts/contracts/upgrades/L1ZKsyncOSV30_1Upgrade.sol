@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
-import {L2DACommitmentScheme} from "../common/Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
