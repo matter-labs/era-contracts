@@ -68,6 +68,7 @@ sample_chain_id = 0
 # Unlike stage or testnet, there is no sample chain to get the CTM from, so 
 # we have to provide it explicitly.
 optional_ctm_address = "0x1adf137f59949c9081157d5de1e002d1c992071f"
+current_dual_verifier = "0x5B4b58a5e65a0C4A054E0f4B67277a1bc6425bD2"
 
 [gateway.gateway_state_transition]
 chain_type_manager_proxy_addr = "0x912B84EEEEBeca74d307b9a2b09c68332aa5426C"
