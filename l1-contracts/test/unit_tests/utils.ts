@@ -40,6 +40,17 @@ export const PUBDATA_CHUNK_PUBLISHER_ADDRESS = "0x000000000000000000000000000000
 
 export const SYSTEM_UPGRADE_TX_TYPE = 254;
 
+export enum L2DACommitmentScheme {
+  NONE,
+  EMPTY_NO_DA,
+  PUBDATA_KECCAK256,
+  BLOBS_AND_PUBDATA_KECCAK256,
+  BLOBS_ZKSYNC_OS,
+}
+
+// Default L2 DA commitment scheme for tests
+export const L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.PUBDATA_KECCAK256;
+
 export function randomAddress() {
   return ethers.utils.hexlify(ethers.utils.randomBytes(20));
 }
@@ -254,7 +265,7 @@ export function createSystemLogs(
       true,
       L2_TO_L1_MESSENGER,
       SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY,
-      process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR
+      ethers.utils.hexZeroPad(ethers.utils.hexlify(L2_DA_COMMITMENT_SCHEME), 32)
     ),
   ];
 }
@@ -302,7 +313,7 @@ export function createSystemLogsWithUpgrade(
       true,
       L2_TO_L1_MESSENGER,
       SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY,
-      process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR || ethers.constants.AddressZero
+      ethers.utils.hexZeroPad(ethers.utils.hexlify(L2_DA_COMMITMENT_SCHEME), 32)
     ),
     constructL2Log(
       true,
