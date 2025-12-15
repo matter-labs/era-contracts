@@ -139,19 +139,19 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
     // Unlike the original one, we do not fetch the L1 da validator address
     function setAddressesBasedOnBridgehub() internal override {
         address ctm;
-        
+
         if (sampleChainId == 0) {
             ctm = optionalCTM;
             require(ctm != address(0), "CTM address is not provided");
         } else {
             ctm = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(getSampleChainId());
         }
-        
+
         config.ownerAddress = Ownable2StepUpgradeable(ctm).owner();
 
         addresses.stateTransition.chainTypeManagerProxy = ctm;
 
-        // In this upgrade, we never need to use this value, so set it to zer0.  
+        // In this upgrade, we never need to use this value, so set it to zer0.
         addresses.stateTransition.diamondProxy = address(0);
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         require(
@@ -193,9 +193,7 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         addresses.stateTransition.validatorTimelock = ChainTypeManagerBase(ctm).validatorTimelockPostV29();
         require(Ownable2StepUpgradeable(ctm).owner() == config.ownerAddress, "Incorrect owner");
 
-        addresses.transparentProxyAdmin = address(
-            uint160(uint256(vm.load(ctm, ADMIN_SLOT)))
-        );
+        addresses.transparentProxyAdmin = address(uint160(uint256(vm.load(ctm, ADMIN_SLOT))));
     }
 
     // Unlike the original one, we only deploy L1 contracts (no Gateway) and generate the upgrade data.
@@ -358,7 +356,7 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
 
     function getFacetCutsForDeletion() internal override returns (Diamond.FacetCut[] memory facetCuts) {
         // On mainnet, we do not provide any facet cuts for deletion.
-        // This may imply wrong behavior during the upgrade, but there are 
+        // This may imply wrong behavior during the upgrade, but there are
         // no existing zksync os chains on mainnet, so the upgrade will not be applied to any chain.
         if (sampleChainId != 0) {
             facetCuts = super.getFacetCutsForDeletion();
@@ -369,7 +367,9 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
     function prepareCreateNewChainCall(uint256 chainId) public view override returns (Call[] memory result) {
         require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
 
-        bytes32 newChainAssetId = L1Bridgehub(addresses.bridgehub.bridgehubProxy).baseTokenAssetId(sampleChainId != 0 ? sampleChainId : gatewayConfig.chainId);
+        bytes32 newChainAssetId = L1Bridgehub(addresses.bridgehub.bridgehubProxy).baseTokenAssetId(
+            sampleChainId != 0 ? sampleChainId : gatewayConfig.chainId
+        );
         result = new Call[](1);
         result[0] = Call({
             target: addresses.bridgehub.bridgehubProxy,
@@ -393,5 +393,5 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         if (sampleChainId != 0) {
             (calls, admin) = super.TESTONLY_prepareTestUpgradeChainCall();
         }
-    }   
+    }
 }
