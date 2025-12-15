@@ -67,11 +67,7 @@
       "contractName": "ZKsyncOSTestnetVerifier",
       "contractAddress": "0x1fa37a45b7b999dee86ec738e6e1c7f0d09e513e",
       "function": "addVerifier(uint32,address,address)",
-      "arguments": [
-        "6",
-        "0x506816f7f282F66184a63c5BD06829A25fe224F7",
-        "0x2d1Ee78AD2B56330e4B43FEC43F09AE98c07501a"
-      ],
+      "arguments": ["6", "0x506816f7f282F66184a63c5BD06829A25fe224F7", "0x2d1Ee78AD2B56330e4B43FEC43F09AE98c07501a"],
       "transaction": {
         "from": "0xf378708b88841abb63e2316e4fc8f29469bee885",
         "to": "0x1fa37a45b7b999dee86ec738e6e1c7f0d09e513e",
@@ -90,9 +86,7 @@
       "contractName": "ZKsyncOSTestnetVerifier",
       "contractAddress": "0x1fa37a45b7b999dee86ec738e6e1c7f0d09e513e",
       "function": "transferOwnership(address)",
-      "arguments": [
-        "0xC66f0B45c05cF654eeC093650FD67865E85E8566"
-      ],
+      "arguments": ["0xC66f0B45c05cF654eeC093650FD67865E85E8566"],
       "transaction": {
         "from": "0xf378708b88841abb63e2316e4fc8f29469bee885",
         "to": "0x1fa37a45b7b999dee86ec738e6e1c7f0d09e513e",

@@ -205,12 +205,12 @@ contract EcosystemUpgrade_v30_1_zk_os is Script, DefaultEcosystemUpgrade {
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
         facetCuts = new Diamond.FacetCut[](0);
-     }
+    }
 
     // We don't remove facets as it is noop upgrade for L1 contracts
     function getFacetCutsForDeletion() internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
         facetCuts = new Diamond.FacetCut[](0);
-     }
+    }
 
     // Unlike the original one, we skip stage 0 and stage 2 calls.
     function prepareStage0GovernanceCalls() public override returns (Call[] memory calls) {
