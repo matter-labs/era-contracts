@@ -33,10 +33,6 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
             );
     }
 
-    function isContract(address a) internal view returns (bool) {
-        return a.code.length > 0;
-    }
-
     function upgradeValidatorTimelock(
         address proxy,
         address newImplementation,
@@ -44,19 +40,11 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
         uint32 _initialExecutionDelay
     ) internal {
         vm.startBroadcast();
-        if (isContract(admin)) {
-            ProxyAdmin(admin).upgradeAndCall(
-                ITransparentUpgradeableProxy(payable(proxy)),
-                newImplementation,
-                abi.encodeCall(MultisigCommitter.initializeV2, (admin, _initialExecutionDelay))
-            );
-        } else {
-            vm.prank(msg.sender);
-            ITransparentUpgradeableProxy(payable(proxy)).upgradeToAndCall(
-                newImplementation,
-                abi.encodeCall(MultisigCommitter.initializeV2, (admin, _initialExecutionDelay))
-            );
-        }
+        ProxyAdmin(admin).upgradeAndCall(
+            ITransparentUpgradeableProxy(payable(proxy)),
+            newImplementation,
+            abi.encodeCall(MultisigCommitter.initializeV2, (admin, _initialExecutionDelay))
+        );
         vm.stopBroadcast();
     }
 
@@ -70,12 +58,11 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
         callWithoutUpgrade(proxy, data);
     }
 
-    function callWithoutUpgrade(address proxy, bytes memory data) internal {
-        address admin = MultisigCommitter(proxy).owner();
-        vm.prank(ProxyAdmin(admin).owner());
-        ITransparentUpgradeableProxy proxy = ITransparentUpgradeableProxy(payable(proxy));
-        address implementation = proxy.implementation();
+    function callWithoutUpgrade(address proxyAddress, bytes memory data) internal {
+        address proxyAdmin = Utils.getProxyAdminAddress(proxyAddress);
+        ITransparentUpgradeableProxy proxy = ITransparentUpgradeableProxy(payable(proxyAddress));
+        address implementation = Utils.getImplementation(proxyAddress);
         vm.broadcast();
-        ProxyAdmin(admin).upgradeAndCall(proxy, implementation, data);
+        ProxyAdmin(proxyAdmin).upgradeAndCall(proxy, implementation, data);
     }
 }
