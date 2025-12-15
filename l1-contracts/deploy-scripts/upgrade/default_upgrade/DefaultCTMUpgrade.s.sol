@@ -925,6 +925,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     function saveOutputVersionSpecific() internal virtual {}
 
+    function getCTMAddress() public view returns (address) {
+        return newConfig.ctm;
+    }
     ////////////////////////////// Misc utils /////////////////////////////////
 
     // add this to be excluded from coverage report
