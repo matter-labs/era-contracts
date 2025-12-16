@@ -223,7 +223,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 require(log.isService, InvalidServiceLog());
 
                 if (log.key == bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
-                    _handleInteropCenterMessage(_processLogsInputs.chainId, message, baseTokenAssetId);
+                    _handleInteropCenterMessage(_processLogsInputs.chainId, message);
                 } else if (log.key == bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR)))) {
                     _handleInteropHandlerReceiveMessage(_processLogsInputs.chainId, message, baseTokenAssetId);
                 } else if (log.key == bytes32(uint256(uint160(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)))) {
@@ -320,11 +320,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
     }
 
-    function _handleInteropCenterMessage(
-        uint256 _chainId,
-        bytes calldata _message,
-        bytes32 _baseTokenAssetId
-    ) internal {
+    function _handleInteropCenterMessage(uint256 _chainId, bytes calldata _message) internal {
         if (_message[0] != BUNDLE_IDENTIFIER) {
             // This should not be possible in V31. In V31 this will be a trigger.
             return;
@@ -357,7 +353,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             // solhint-disable-next-line
             _processInteropCall(_chainId, bundleHash, interopCall, interopBundle.destinationChainId);
         }
-        _decreaseChainBalance(_chainId, _baseTokenAssetId, totalBaseTokenAmount);
+        bytes32 destinationChainBaseTokenAssetId = _bridgehub().baseTokenAssetId(interopBundle.destinationChainId);
+        _decreaseChainBalance(_chainId, destinationChainBaseTokenAssetId, totalBaseTokenAmount);
         interopBalanceChange[interopBundle.destinationChainId][bundleHash].baseTokenAmount = totalBaseTokenAmount;
     }
 
