@@ -34,6 +34,7 @@ import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} 
 
 import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
 import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
+import {DeployCTMScript} from "../DeployCTM.s.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 /// @dev IMPORTANT: this script is not intended to be used in production.
@@ -358,10 +359,12 @@ contract GatewayCTMFromL1 is Script {
         );
         console.log("Admin facet deployed at", adminFacet);
 
+        DeployCTMScript.deployEIP7702Checker();
+        address eip7702Address = DeployCTMScript.getAddresses().eip7702Checker;
         address mailboxFacet = address(
             _deployInternal(
                 ContractsBytecodesLib.getCreationCode("MailboxFacet"),
-                abi.encode(config.l1ChainId, config.eraChainId) // TODO incorrect, missing last argument  _eip7702Checker!
+                abi.encode(config.l1ChainId, eip7702Address) // TODO incorrect, missing last argument  _eip7702Checker!
             )
         );
         console.log("Mailbox facet deployed at", mailboxFacet);
