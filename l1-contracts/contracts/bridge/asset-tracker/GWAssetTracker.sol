@@ -324,10 +324,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
     }
 
-    function _handleInteropCenterMessage(
-        uint256 _chainId,
-        bytes calldata _message
-    ) internal {
+    function _handleInteropCenterMessage(uint256 _chainId, bytes calldata _message) internal {
         if (_message[0] != BUNDLE_IDENTIFIER) {
             // This should not be possible in V30. In V31 this will be a trigger.
             return;
