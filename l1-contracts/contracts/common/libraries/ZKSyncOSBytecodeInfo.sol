@@ -16,10 +16,10 @@ library ZKSyncOSBytecodeInfo {
     /// @return The encoded bytecode info.
     function encodeZKSyncOSBytecodeInfo(
         bytes32 _bytecodeBlakeHash,
-        uint256 _bytecodeLength,
+        uint32 _bytecodeLength,
         bytes32 _observableBytecodeHash
     ) internal pure returns (bytes memory) {
-        return abi.encode(_bytecodeBlakeHash, uint32(_bytecodeLength), _observableBytecodeHash);
+        return abi.encode(_bytecodeBlakeHash, _bytecodeLength, _observableBytecodeHash);
     }
 
     /// @notice Decodes the ZKSync OS bytecode info.
