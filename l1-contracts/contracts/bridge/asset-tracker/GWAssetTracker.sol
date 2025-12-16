@@ -375,6 +375,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
         require(_chainId == fromChainId, InvalidInteropChainId(fromChainId, _destinationChainId));
 
+        // solhint-disable-next-line func-named-parameters
         uint256 amount = _handleAssetRouterMessageInner(_chainId, _destinationChainId, assetId, transferData, true);
 
         AssetBalanceChange memory change = AssetBalanceChange({assetId: assetId, amount: amount});
@@ -428,6 +429,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             functionSignature == AssetRouterBase.finalizeDeposit.selector,
             InvalidFunctionSignature(functionSignature)
         );
+        // solhint-disable-next-line func-named-parameters
         _handleAssetRouterMessageInner(_chainId, L1_CHAIN_ID, assetId, transferData, false);
     }
 
@@ -442,7 +444,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         uint256 _sourceChainId,
         uint256 _destinationChainId,
         bytes32 _assetId,
-        bytes memory _transferData, 
+        bytes memory _transferData,
         bool _isInteropCall
     ) internal returns (uint256 amount) {
         address originalToken;
@@ -499,7 +501,13 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
         // Process the withdrawal using the modern asset router logic
         // slither-disable-next-line unused-return
-        _handleAssetRouterMessageInner(_chainId, L1_CHAIN_ID, expectedAssetId, transferData, false);
+        _handleAssetRouterMessageInner({
+            _sourceChainId: _chainId,
+            _destinationChainId: L1_CHAIN_ID,
+            _assetId: expectedAssetId,
+            _transferData: transferData,
+            _isInteropCall: false
+        });
     }
 
     /// @notice L2->L1 base token withdrawals go through the L2BaseTokenSystemContract directly.
