@@ -241,12 +241,19 @@ address constant SERVICE_CALL_PSEUDO_CALLER = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFfff
 /// @param EMPTY_NO_DA No DA commitment, used by Validiums.
 /// @param PUBDATA_KECCAK256 Keccak of stateDiffHash and keccak(pubdata). Can be used by custom DA solutions.
 /// @param BLOBS_AND_PUBDATA_KECCAK256 This commitment includes EIP-4844 blobs data. Used by default RollupL1DAValidator.
+/// @param BLOBS_ZKSYNC_OS Keccak of blob versioned hashes filled with pubdata. This commitment scheme is used only for ZKsyncOS.
 enum L2DACommitmentScheme {
     NONE,
     EMPTY_NO_DA,
     PUBDATA_KECCAK256,
-    BLOBS_AND_PUBDATA_KECCAK256
+    BLOBS_AND_PUBDATA_KECCAK256,
+    BLOBS_ZKSYNC_OS
 }
 
 /// @dev The metadata version that is supported by the ZK Chains to prove that an L2->L1 log was included in a batch.
 uint256 constant SUPPORTED_PROOF_METADATA_VERSION = 1;
+
+/// @dev The server has a hardcoded chainId 270 which is updated to the real value in the L2GenesisUpgradeTxs
+/// see link: https://github.com/matter-labs/zksync-era/blob/54dc61c6faff53d314227ffe26961b1abfc999a7/core/node/genesis/src/lib.rs#L182
+/// https://github.com/matter-labs/zksync-era/blob/54dc61c6faff53d314227ffe26961b1abfc999a7/core/lib/basic_types/src/lib.rs#L228
+uint256 constant HARD_CODED_CHAIN_ID = 270;

@@ -9,10 +9,11 @@ import "forge-std/console.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-import {SETTLEMENT_LAYER_RELAY_SENDER, ZKChainCommitment} from "contracts/common/Config.sol";
+import {SETTLEMENT_LAYER_RELAY_SENDER, ZKChainCommitment, CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET} from "contracts/common/Config.sol";
 
-import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
-import {BridgehubBase} from "contracts/bridgehub/BridgehubBase.sol";
+import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {BridgehubBase} from "contracts/core/bridgehub/BridgehubBase.sol";
+import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
 
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
@@ -23,10 +24,16 @@ import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
 import {BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {BalanceChange} from "contracts/common/Messaging.sol";
-import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
+import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 
 abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
+
+    function _pauseDeposits(uint256 _chainId) public {
+        pauseDepositsBeforeInitiatingMigration(L2_BRIDGEHUB_ADDR, _chainId);
+        // As the priority queue was not empty before migration, we wait until the chain migration window starts
+        vm.warp(block.timestamp + CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET);
+    }
 
     function test_gatewayShouldFinalizeDeposit() public {
         finalizeDeposit();
@@ -74,9 +81,9 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
 
     function test_withdrawFromGateway() public {
         finalizeDeposit();
-        clearPriorityQueue(address(addresses.bridgehub.bridgehubProxy), mintChainId);
-        _pauseDeposits(L2_BRIDGEHUB_ADDR, mintChainId);
-        address newAdmin = address(0x1);
+        clearPriorityQueue(address(discoveredBridgehub.bridgehubProxy), mintChainId);
+        _pauseDeposits(mintChainId);
+        address newAdmin = makeAddr("newAdmin");
         bytes memory newDiamondCut = abi.encode();
         BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({
             chainId: mintChainId,

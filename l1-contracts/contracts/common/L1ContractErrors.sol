@@ -11,6 +11,8 @@ error AddressAlreadySet(address addr);
 error AddressHasNoCode(address);
 // 0x1f73225f
 error AddressMismatch(address expected, address supplied);
+// 0x42573d7a
+error AddressNotZero();
 // 0x2a5989a0
 error AlreadyPermanentRollup();
 // 0x0bfcef28
@@ -69,6 +71,10 @@ error ChainIdMismatch();
 error ChainIdNotRegistered(uint256 chainId);
 // 0x8f620a06
 error ChainIdTooBig();
+// 0x5e361ef9
+error ChainRequiresValidatorsSignaturesForCommit();
+// 0x8746f42f
+error ConstructorsNotSupported();
 // 0xec273439
 error CTMAlreadyRegistered();
 // 0xc630ef3c
@@ -119,6 +125,8 @@ error GasPerPubdataMismatch();
 error GenesisBatchCommitmentZero();
 // 0x7940c83f
 error GenesisBatchHashZero();
+// 0xb4fc6835
+error GenesisIndexStorageZero();
 // 0x3a1a8589
 error GenesisUpgradeZero();
 // 0xd356e6ba
@@ -140,24 +148,28 @@ error IncorrectBridgeHubAddress(address bridgehub);
 error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
 // 0x9bf8b9aa
 error InvalidBatchNumber(uint256 provided, uint256 expected);
+// 0xd438e1fa
+error InvalidBlockRange(uint64 batchNumber, uint64 from, uint64 to);
 // 0xcbd9d2e0
 error InvalidCaller(address);
 // 0x7a47c9a2
 error InvalidChainId();
 // 0x92daded2
 error InvalidDAForPermanentRollup();
-// 0x3f98a77e
-error InvalidL2DACommitmentScheme(uint8);
 // 0x4fbe5dba
 error InvalidDelay();
 // 0x075aaa80
 error InvalidInteropCalldata(bytes4);
+// 0x3f98a77e
+error InvalidL2DACommitmentScheme(uint8);
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
 // 0x6eca2e4b
 error InvalidMessage();
 // 0xa1ec1876
 error InvalidMessageRoot(bytes32 expectedMessageRoot, bytes32 providedMessageRoot);
+// 0xd08a97e6
+error InvalidMockProofLength();
 // 0xde4c0b96
 error InvalidNTVBurnData();
 // 0xd8e9405c
@@ -176,6 +188,8 @@ error InvalidPubdataPricingMode();
 error InvalidSelector(bytes4 func);
 // 0xbe7193d4
 error InvalidSystemLogsLength();
+// 0x7b7a98f1
+error InvalidThreshold(uint256 max, uint256 got);
 // 0x5f1aa154
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xfb5c22e6
@@ -218,6 +232,8 @@ error MigrationPaused();
 error MigrationsNotPaused();
 // 0xfa44b527
 error MissingSystemLogs(uint256 expected, uint256 actual);
+// 0x1508fb47
+error MockVerifierNotSupported();
 // 0x4a094431
 error MsgValueMismatch(uint256 expectedMsgValue, uint256 providedMsgValue);
 // 0xb385a3da
@@ -240,12 +256,16 @@ error NoLegacySharedBridge();
 error NonEmptyCalldata();
 // 0x536ec84b
 error NonEmptyMsgValue();
+// 0x230f9d11
+error NotEnoughSigners(uint256 provided, uint256 expected);
 // 0xd018e08e
 error NonIncreasingTimestamp();
 // 0x0105f9c0
 error NonSequentialBatch();
 // 0x0ac76f01
 error NonSequentialVersion();
+// 0x0e0ff4d9
+error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32 blobOpeningCommitment);
 // 0xfa5cd00f
 error NotAllowed(address addr);
 // 0x64846fe4
@@ -322,8 +342,18 @@ error SettlementLayersMustSettleOnL1();
 error SharedBridgeNotSet();
 // 0x7774d2f9
 error SharedBridgeValueNotSet(SharedBridgeKey);
+// 0xa665a34d
+error SignaturesLengthMismatch(uint256 expected, uint256 actual);
+// 0xa7781cbb
+error SignersNotSorted();
+// 0x3b94fe24
+error SignerNotAuthorized(address signer);
+// 0xabdc734e
+error SignatureNotValid(address signer);
 // 0xdf3a8fdd
 error SlotOccupied();
+// 0xcc0f168b
+error SystemContractProxyInitialized();
 // 0xae43b424
 error SystemLogsSizeTooBig();
 // 0x08753982
@@ -370,6 +400,8 @@ error UnsupportedEncodingVersion();
 error UnsupportedExecuteBatchEncoding(uint8 version);
 // 0xf338f830
 error UnsupportedProofBatchEncoding(uint8 version);
+// 0x1906f346
+error UnsupportedUpgradeType();
 // 0xf093c2e5
 error UpgradeBatchNumberIsNotZero();
 // 0x47b3b145
@@ -390,10 +422,12 @@ error WrongMagicValue(uint256 expectedMagicValue, uint256 providedMagicValue);
 error ZeroAddress();
 // 0xc84885d4
 error ZeroChainId();
-// 0x1bc36e67
-error ZeroGasPriceL1TxZKSyncOS();
+// 0xdb60e600
+error ZeroGasPriceL1TxZKsyncOS();
 // 0x601b6882
 error ZKChainLimitReached();
+// 0x646ac57e
+error ZKsyncOSNotForceDeployForExistingContract(address);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

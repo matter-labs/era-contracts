@@ -11,9 +11,9 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {IExecutor, LogProcessingOutput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 
 contract TestExecutorFacet is ExecutorFacet {
     constructor() ExecutorFacet(block.chainid) {}
@@ -49,8 +49,7 @@ contract TestExecutorFacet is ExecutorFacet {
 contract ExecutorProofTest is UtilsTest {
     UtilsFacet internal utilsFacet;
     TestExecutorFacet internal executor;
-    address internal testnetVerifier =
-        address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0), false));
+    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
     DummyBridgehub internal dummyBridgehub;
 
     function getTestExecutorFacetSelectors() private pure returns (bytes4[] memory) {

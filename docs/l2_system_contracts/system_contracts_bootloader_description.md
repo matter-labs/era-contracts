@@ -216,7 +216,7 @@ A call to a contract with invalid bytecode can not be proven. That is why it is 
 
 ## Account abstraction
 
-One of the other important features of ZKsync is the support of account abstraction. It is highly recommended to read the documentation on our AA protocol here: [https://docs.zksync.io/zk-stack/concepts/account-abstraction](https://docs.zksync.io/zk-stack/concepts/account-abstraction)
+One of the other important features of ZKsync is the support of account abstraction. It is highly recommended to read the documentation on our AA protocol here: [https://docs.zksync.io/zk-stack/concepts/account-abstraction](https://docs.zksync.io/zksync-protocol/era-vm/account-abstraction)
 
 #### Account versioning
 
@@ -386,7 +386,7 @@ On ZKsync, every address is a contract. Users can start transactions from their 
 
 Note, that if you call an account that is in kernel space and does not have any code deployed there, right now, the transaction will revert.
 
-We process the L2 transactions according to our account abstraction protocol: [https://docs.zksync.io/build/developer-reference/account-abstraction](https://docs.zksync.io/build/developer-reference/account-abstraction).
+We process the L2 transactions according to our account abstraction protocol: [https://docs.zksync.io/zksync-network/zksync-era/unique-features#native-account-abstraction](https://docs.zksync.io/zksync-network/zksync-era/unique-features#native-account-abstraction).
 
 1. We [deduct](../../system-contracts/bootloader/bootloader.yul#L1263) the transaction’s upfront payment for the overhead for the block’s processing. You can read more on how that works in the fee model [description](./zksync_fee_model.md).
 2. Then we calculate the gasPrice for these transactions according to the EIP1559 rules.
@@ -609,7 +609,7 @@ If the call succeeded, the address of the deployed contract is returned. If the 
 
 The implementation of the default account abstraction. This is the code that is used by default for all addresses that are not in kernel space and have no contract deployed on them. This address:
 
-- Contains minimal implementation of our account abstraction protocol. Note that it supports the [built-in paymaster flows](https://docs.zksync.io/build/developer-reference/account-abstraction/paymasters).
+- Contains minimal implementation of our account abstraction protocol. Note that it supports the [built-in paymaster flows](https://docs.zksync.io/zksync-protocol/era-vm/account-abstraction/paymasters).
 - When anyone (except bootloader) calls it, it behaves in the same way as a call to an EOA, i.e. it always returns `success = 1, returndatasize = 0` for calls from anyone except for the bootloader.
 
 ### L1Messenger
