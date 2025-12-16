@@ -44,7 +44,7 @@ abstract contract Create2FactoryUtils is Script {
     }
 
     function getCreate2FactoryParams() public view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
-        return (create2FactoryState.factoryAddress, create2FactoryParams.factorySalt);
+        return (create2FactoryState.create2FactoryAddress, create2FactoryParams.factorySalt);
     }
 
     /// @notice Instantiates the Create2Factory.
