@@ -603,7 +603,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             // this message is a token withdrawal
             address l1Token;
             // slither-disable-next-line unused-return
-            (, l1Token, transferData) = DataEncoding.decodeLegacyFinalizeWithdrawalData(_l2ToL1message);
+            (, l1Token, transferData) = DataEncoding.decodeLegacyFinalizeWithdrawalData(block.chainid, _l2ToL1message);
 
             assetId = l1NativeTokenVault.ensureTokenIsRegistered(l1Token);
             bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(block.chainid, l1Token);

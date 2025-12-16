@@ -486,7 +486,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// @param _message The raw legacy bridge message containing withdrawal data.
     function _handleLegacySharedBridgeMessage(uint256 _chainId, bytes memory _message) internal {
         (bytes4 functionSignature, address l1Token, bytes memory transferData) = DataEncoding
-            .decodeLegacyFinalizeWithdrawalData(_message);
+            .decodeLegacyFinalizeWithdrawalData(L1_CHAIN_ID, _message);
         require(
             functionSignature == IL1ERC20Bridge.finalizeWithdrawal.selector,
             InvalidFunctionSignature(functionSignature)
