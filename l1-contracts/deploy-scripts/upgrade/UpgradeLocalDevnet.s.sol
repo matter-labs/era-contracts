@@ -17,11 +17,14 @@ string constant ECOSYSTEM_INPUT = "/upgrade-envs/devnet.toml";
 string constant ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/devnet.toml";
 string constant CHAIN_INPUT = "/upgrade-envs/devnet-era.toml";
 string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/devnet-era.toml";
+import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
 
 contract UpgradeLocalDevnet is Script, EcosystemUpgrade {
     ChainUpgrade chainUpgrade;
 
     function run() public override {
+        vm.recordLogs();
+
         initialize(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT);
 
         chainUpgrade = new ChainUpgrade();
@@ -31,6 +34,7 @@ contract UpgradeLocalDevnet is Script, EcosystemUpgrade {
 
         console.log("Preparing chain for the upgrade");
         chainUpgrade.prepareChain(CHAIN_INPUT);
+        console.log("Prepare governance calls for the upgrade");
 
         (
             Call[] memory upgradeGovernanceStage1Calls,
@@ -49,9 +53,13 @@ contract UpgradeLocalDevnet is Script, EcosystemUpgrade {
 
         console.log("Upgrading Era");
 
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        Diamond.DiamondCutData memory diamondCutData = GetDiamondCutData.getDiamondCutDataFromRecordedLogs(
+            logs,
+            getCTMAddress()
+        );
         // Now, the admin of the Era needs to call the upgrade function.
-        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutData(getAddresses().stateTransition);
-        chainUpgrade.upgradeChain(getOldProtocolVersion(), upgradeCutData);
+        chainUpgrade.upgradeChain(diamondCutData);
 
         // Set timestamp of upgrade for server
         chainUpgrade.setUpgradeTimestamp(getNewProtocolVersion(), block.timestamp + 60);
