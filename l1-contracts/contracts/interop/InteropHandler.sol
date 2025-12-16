@@ -124,7 +124,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// @dev Marks bundle as Verified on success.
     /// @param _bundle ABI-encoded InteropBundle to verify.
     /// @param _proof Inclusion proof for the bundle message. The bundle message itself gets broadcasted by InteropCenter contract whenever a bundle is sent.
-    function verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public nonReentrant {
+    function verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
             _bundle,
