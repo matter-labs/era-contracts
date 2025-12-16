@@ -27,17 +27,16 @@ contract UpgradeIntegrationTestBase is Test {
     ChainUpgrade_v31 chainUpgrade;
 
     // For now, this test is testing "stage" - as mainnet wasn't updated yet.
-    string public ECOSYSTEM_INPUT;
-    string public ECOSYSTEM_UPGRADE_INPUT;
+    string public ECOSYSTEM_INPUT = "file_1.toml";
+    string public ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.31.0-interopB/shared.toml";
     string public PERMANENT_VALUES_INPUT;
-    string public ECOSYSTEM_OUTPUT;
-    string public CTM_INPUT;
-    string public CTM_OUTPUT;
+    string public ECOSYSTEM_OUTPUT = "file_3.toml";
+    string public CTM_INPUT = "/upgrade-envs/v0.31.0-interopB/shared.toml";
+    string public CTM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet-gateway.toml";
     string public CHAIN_INPUT;
     string public CHAIN_OUTPUT;
 
     function setupUpgrade(bool skipFactoryDepsCheck) public {
-        preparePermanentValues();
         ecosystemUpgrade = new EcosystemUpgrade_v31();
         ecosystemUpgrade.initialize(PERMANENT_VALUES_INPUT, ECOSYSTEM_UPGRADE_INPUT, ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT);
         ecosystemUpgrade.deployNewEcosystemContractsL1();
