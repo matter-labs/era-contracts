@@ -5,7 +5,6 @@ pragma solidity ^0.8.21;
 import {L2Log, L2Message, TxStatus} from "../../common/Messaging.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "../message-root/IMessageRoot.sol";
-import {TxStatus} from "../../common/Messaging.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 
 struct L2TransactionRequestDirect {

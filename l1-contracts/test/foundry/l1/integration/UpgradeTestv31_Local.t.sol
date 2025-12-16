@@ -38,7 +38,6 @@ contract UpgradeIntegrationTest_Local is
         CTM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/local.toml";
         CHAIN_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml";
         CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/local-gateway.toml";
-
         setupUpgrade(true);
         address bridgehub = ecosystemUpgrade.getDiscoveredBridgehub().bridgehubProxy;
         bytes32 eraBaseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(eraZKChainId);

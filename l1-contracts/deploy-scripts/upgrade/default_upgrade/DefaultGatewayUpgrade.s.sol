@@ -144,7 +144,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(discoveredCTM.validatorTimelockPostV29)
             .executionDelay();
         (bool ok, bytes memory data) = discoveredEraZkChain.verifier.staticcall(
-            abi.encodeWithSignature("isTestnetVerifier()")
+            abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
         );
         config.testnetVerifier = ok;
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
@@ -178,24 +178,9 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         if (permanentValuesToml.keyExists("$.is_zk_sync_os")) {
             isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
         }
-        ChainCreationParamsConfig memory chainCreationParams;
-
-        chainCreationParams.latestProtocolVersion = toml.readUint("$.contracts.latest_protocol_version");
-        // Protocol specific params for the entire CTM
-        chainCreationParams.genesisRoot = toml.readBytes32("$.contracts.genesis_root");
-        chainCreationParams.genesisRollupLeafIndex = toml.readUint("$.contracts.genesis_rollup_leaf_index");
-        chainCreationParams.genesisBatchCommitment = toml.readBytes32("$.contracts.genesis_batch_commitment");
-
-        // These fields are redundant for zksync_os.
-        if (toml.keyExists("$.contracts.default_aa_hash")) {
-            chainCreationParams.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
-        }
-        if (toml.keyExists("$.contracts.bootloader_hash")) {
-            chainCreationParams.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
-        }
-        if (toml.keyExists("$.contracts.evm_emulator_hash")) {
-            chainCreationParams.evmEmulatorHash = toml.readBytes32("$.contracts.evm_emulator_hash");
-        }
+        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParams(
+            string.concat(vm.projectRoot(), CHAIN_CREATION_PARAMS_PATH)
+        );
 
         Gateway memory gateway;
         // Gateway params
