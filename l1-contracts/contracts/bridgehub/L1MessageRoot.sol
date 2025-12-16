@@ -78,7 +78,10 @@ contract L1MessageRoot is MessageRootBase {
             _finalizeWithdrawalParams.message,
             offset
         );
-        require(v30UpgradeChainBatchNumber[chainId] == V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY, V30UpgradeChainBatchNumberAlreadySet());
+        require(
+            v30UpgradeChainBatchNumber[chainId] == V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY,
+            V30UpgradeChainBatchNumberAlreadySet()
+        );
         v30UpgradeChainBatchNumber[chainId] = receivedV30UpgradeChainBatchNumber;
     }
 
