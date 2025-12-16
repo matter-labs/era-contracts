@@ -9,10 +9,10 @@ import "forge-std/console.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
-import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {IInteropCenter, InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehubBase.sol";
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
 import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
@@ -29,12 +29,12 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {Utils} from "../Utils/Utils.sol";
 
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
-import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
-import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
+import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, MAX_NEW_FACTORY_DEPS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
 
-import {SecondBridgeAddressTooLow} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {SecondBridgeAddressTooLow} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdTooBig, MsgValueMismatch, SharedBridgeNotSet, SlotOccupied, Unauthorized, WrongMagicValue, ZeroChainId} from "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -123,7 +123,7 @@ contract ExperimentalBridgeTest is Test {
         weth = makeAddr("WETH");
         mockCTM = new DummyChainTypeManagerWBH(address(bridgehub));
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
-        mockChainContract = new DummyZKChain(address(bridgehub), eraChainId, block.chainid, address(0), eip7702Checker);
+        mockChainContract = new DummyZKChain(address(bridgehub), eraChainId, block.chainid, eip7702Checker);
 
         mockL2Contract = makeAddr("mockL2Contract");
         // mocks to use in bridges instead of using a dummy one
@@ -138,7 +138,13 @@ contract ExperimentalBridgeTest is Test {
 
         // kl todo: clean this up. NTV id deployed below in deployNTV. its was a mess before this upgrade.
         ntv = _deployNTVWithoutEthToken(address(mockSharedBridge));
-        assetTracker = new L1AssetTracker(address(bridgehub), address(ntv), address(0));
+        assetTracker = new L1AssetTracker(
+            block.chainid,
+            address(bridgehub),
+            address(mockSharedBridge),
+            address(ntv),
+            address(0)
+        );
 
         vm.prank(bridgeOwner);
         ntv.setAssetTracker(address(assetTracker));
@@ -239,7 +245,13 @@ contract ExperimentalBridgeTest is Test {
         vm.prank(bridgeOwner);
         addr.setAssetTracker(address(assetTracker));
 
-        L1AssetTracker assetTracker2 = new L1AssetTracker(address(bridgehub), address(addr), address(0));
+        L1AssetTracker assetTracker2 = new L1AssetTracker(
+            block.chainid,
+            address(bridgehub),
+            address(mockSharedBridge),
+            address(addr),
+            address(0)
+        );
 
         vm.etch(address(assetTracker), address(assetTracker2).code);
         console.log(address(ntv));
@@ -578,7 +590,7 @@ contract ExperimentalBridgeTest is Test {
         address randomCTMDeployer,
         address randomMessageRoot
     ) public {
-        vm.assume(randomCaller != bridgeOwner && randomCaller != L2_COMPLEX_UPGRADER_ADDR);
+        vm.assume(randomCaller != bridgeOwner);
 
         vm.prank(randomCaller);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));

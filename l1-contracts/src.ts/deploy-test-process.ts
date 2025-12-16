@@ -52,7 +52,6 @@ export async function loadDefaultEnvVarsForTests(deployWallet: Wallet) {
   process.env.CONTRACTS_L2_ERC20_BRIDGE_ADDR = ADDRESS_ONE;
   process.env.CONTRACTS_BRIDGEHUB_PROXY_ADDR = ADDRESS_ONE;
   process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR = ADDRESS_ONE;
-  process.env.CONTRACTS_CHAIN_ASSET_HANDLER_ADDR = ADDRESS_ONE;
 }
 
 export async function defaultDeployerForTests(deployWallet: Wallet, ownerAddress: string): Promise<Deployer> {

@@ -4,12 +4,12 @@ pragma solidity ^0.8.24;
 import {Test, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L2Utils} from "./L2Utils.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/Utils.sol";
-import {ADDRESS_ONE} from "deploy-scripts/utils/Utils.sol";
+import {ADDRESS_ONE} from "deploy-scripts/Utils.sol";
 
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -45,12 +45,12 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
             root,
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml"
         );
-        string memory permanentValuesInputPath = string.concat(
-            root,
-            "/test/foundry/l1/integration/deploy-scripts/script-config/permanent-values.toml"
-        );
         initializeConfig(inputPath);
-        addresses.transparentProxyAdmin = address(0x1);
+        addresses.transparentProxyAdmin = makeAddr("transparentProxyAdmin");
+        addresses.bridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
+        addresses.bridges.l1AssetRouterProxy = L2_ASSET_ROUTER_ADDR;
+        addresses.vaults.l1NativeTokenVaultProxy = L2_NATIVE_TOKEN_VAULT_ADDR;
+        addresses.bridgehub.interopCenterProxy = L2_INTEROP_CENTER_ADDR;
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         instantiateCreate2Factory();
@@ -68,27 +68,21 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         );
         addresses.stateTransition.executorFacet = address(new ExecutorFacet(config.l1ChainId));
         addresses.stateTransition.adminFacet = address(
-            new AdminFacet(config.l1ChainId, RollupDAManager(addresses.daAddresses.rollupDAManager), false)
+            new AdminFacet(config.l1ChainId, RollupDAManager(addresses.daAddresses.rollupDAManager))
         );
         addresses.stateTransition.mailboxFacet = address(
-            new MailboxFacet(
-                config.eraChainId,
-                config.l1ChainId,
-                L2_CHAIN_ASSET_HANDLER_ADDR,
-                IEIP7702Checker(address(0)),
-                false
-            )
+            new MailboxFacet(config.eraChainId, config.l1ChainId, IEIP7702Checker(address(0)))
         );
         addresses.stateTransition.gettersFacet = address(new GettersFacet());
         addresses.stateTransition.diamondInit = address(new DiamondInit(false));
         // Deploy ChainTypeManager implementation
         if (config.isZKsyncOS) {
             addresses.stateTransition.chainTypeManagerImplementation = address(
-                new ZKsyncOSChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
+                new ZKsyncOSChainTypeManager(addresses.bridgehub.bridgehubProxy, addresses.bridgehub.interopCenterProxy)
             );
         } else {
             addresses.stateTransition.chainTypeManagerImplementation = address(
-                new EraChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
+                new EraChainTypeManager(addresses.bridgehub.bridgehubProxy, addresses.bridgehub.interopCenterProxy)
             );
         }
 
@@ -117,4 +111,28 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
 
     // add this to be excluded from coverage report
     function test() internal virtual override {}
+
+    function getCreationCode(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view virtual override returns (bytes memory) {
+        revert("Not implemented");
+    }
+
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual override returns (bytes memory) {
+        return ("Not implemented initialize calldata");
+    }
+
+    function deployTuppWithContract(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual override returns (address implementation, address proxy) {
+        revert("Not implemented tupp");
+    }
+
+    // function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
+    // }
 }

@@ -7,7 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IL2AssetRouter} from "./IL2AssetRouter.sol";
-import {LEGACY_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
+import {IAssetRouterBase, LEGACY_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 import {IL1CrossChainSender} from "../interfaces/IL1CrossChainSender.sol";
 
@@ -25,13 +25,12 @@ import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
 import {AddressAlreadySet, LegacyBridgeUsesNonNativeToken, LegacyEncodingUsedForNonL1Token, NonEmptyMsgValue, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "../../bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
-import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
-import {TxStatus} from "../../common/Messaging.sol";
+import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -212,12 +211,13 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                             INITIATE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
+    /// @inheritdoc IAssetRouterBase
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         bytes32 _assetId,
         address _originalCaller,
         uint256 _amount
-    ) public payable virtual override onlyBridgehubOrEra(_chainId) whenNotPaused {
+    ) public payable virtual override(AssetRouterBase, IAssetRouterBase) onlyBridgehubOrEra(_chainId) whenNotPaused {
         _bridgehubDepositBaseToken(_chainId, _assetId, _originalCaller, _amount);
     }
 
@@ -292,28 +292,24 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            CONFIRM DEPOSIT Functions
+                            CLAIM FAILED DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IL1AssetRouter
-    function bridgeConfirmTransferResult(
+    function bridgeRecoverFailedTransfer(
         uint256 _chainId,
-        TxStatus _txStatus,
         address _depositSender,
         bytes32 _assetId,
         bytes calldata _assetData
     ) external override onlyNullifier nonReentrant whenNotPaused {
-        IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeConfirmTransferResult({
-            _chainId: _chainId,
-            _txStatus: _txStatus,
-            _assetId: _assetId,
-            _depositSender: _depositSender,
-            _data: _assetData
-        });
+        IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeRecoverFailedTransfer(
+            _chainId,
+            _assetId,
+            _depositSender,
+            _assetData
+        );
 
-        if (_txStatus == TxStatus.Failure) {
-            emit ClaimedFailedDepositAssetRouter(_chainId, _assetId, _assetData);
-        }
+        emit ClaimedFailedDepositAssetRouter(_chainId, _assetId, _assetData);
     }
 
     function bridgeRecoverFailedTransfer(
@@ -429,11 +425,12 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         return false;
     }
 
+    /// @inheritdoc IAssetRouterBase
     function getDepositCalldata(
         address _sender,
         bytes32 _assetId,
         bytes memory _assetData
-    ) public view override returns (bytes memory) {
+    ) public view override(AssetRouterBase, IAssetRouterBase) returns (bytes memory) {
         // First branch covers the case when asset is not registered with NTV (custom asset handler)
         // Second branch handles tokens registered with NTV and uses legacy calldata encoding
         // We need to use the legacy encoding to support the old SDK, which relies on a specific encoding of the data.

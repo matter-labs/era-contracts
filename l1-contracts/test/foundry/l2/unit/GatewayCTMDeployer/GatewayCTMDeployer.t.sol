@@ -35,7 +35,8 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -62,10 +63,10 @@ contract GatewayCTMDeployerTest is Test {
 
     // This is done merely to publish the respective bytecodes.
     function _predeployContracts() internal {
-        new MailboxFacet(1, 1, L2_CHAIN_ASSET_HANDLER_ADDR, IEIP7702Checker(address(0)), false);
+        new MailboxFacet(1, 1, IEIP7702Checker(address(0)));
         new ExecutorFacet(1);
         new GettersFacet();
-        new AdminFacet(1, RollupDAManager(address(0)), false);
+        new AdminFacet(1, RollupDAManager(address(0)));
 
         new DiamondInit(false);
         new L1GenesisUpgrade();
@@ -101,9 +102,24 @@ contract GatewayCTMDeployerTest is Test {
             executorSelectors: new bytes4[](2),
             mailboxSelectors: new bytes4[](2),
             gettersSelectors: new bytes4[](2),
+            verifierParams: VerifierParams({
+                recursionNodeLevelVkHash: bytes32(0),
+                recursionLeafLevelVkHash: bytes32(0),
+                recursionCircuitsSetVksHash: bytes32(0)
+            }),
+            feeParams: FeeParams({
+                // Just random values
+                pubdataPricingMode: PubdataPricingMode.Rollup,
+                batchOverheadL1Gas: uint32(1_000_000),
+                maxPubdataPerBatch: uint32(500_000),
+                maxL2GasPerBatch: uint32(2_000_000_000),
+                priorityTxMaxPubdata: uint32(99_000),
+                minimalL2GasPrice: uint64(20000000)
+            }),
             bootloaderHash: bytes32(uint256(0xabc)),
             defaultAccountHash: bytes32(uint256(0xdef)),
             evmEmulatorHash: bytes32(uint256(0xdef)),
+            priorityTxMaxGasLimit: 100000,
             genesisRoot: bytes32(uint256(0x123)),
             genesisRollupLeafIndex: 10,
             genesisBatchCommitment: bytes32(uint256(0x456)),

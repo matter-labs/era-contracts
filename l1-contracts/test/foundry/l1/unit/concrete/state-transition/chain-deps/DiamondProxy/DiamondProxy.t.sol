@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
-import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -27,7 +27,7 @@ contract TestFacet is ZKChainBase {
     function test() internal virtual {}
 }
 
-contract DiamondProxyTest is UtilsCallMockerTest {
+contract DiamondProxyTest is UtilsTest {
     Diamond.FacetCut[] internal facetCuts;
     address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
     DummyBridgehub internal dummyBridgehub;

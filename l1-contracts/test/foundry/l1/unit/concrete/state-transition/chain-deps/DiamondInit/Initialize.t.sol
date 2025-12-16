@@ -53,6 +53,19 @@ contract InitializeTest is DiamondInitTest {
         new DiamondProxy(block.chainid, diamondCutData);
     }
 
+    function test_revertWhen_priorityTxMaxGasLimitIsGreaterThanMaxGasPerTransaction() public {
+        initializeData.priorityTxMaxGasLimit = MAX_GAS_PER_TRANSACTION + 1;
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(new DiamondInit(false)),
+            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+        });
+
+        vm.expectRevert(TooMuchGas.selector);
+        new DiamondProxy(block.chainid, diamondCutData);
+    }
+
     function test_revertWhen_bridgehubAddressIsZero() public {
         initializeData.bridgehub = address(0);
 
@@ -113,8 +126,17 @@ contract InitializeTest is DiamondInitTest {
         assertEq(utilsFacet.util_getValidator(initializeData.validatorTimelock), true);
 
         assertEq(utilsFacet.util_getStoredBatchHashes(0), initializeData.storedBatchZero);
+        assertEq(
+            keccak256(abi.encode(utilsFacet.util_getVerifierParams())),
+            keccak256(abi.encode(initializeData.verifierParams))
+        );
         assertEq(utilsFacet.util_getL2BootloaderBytecodeHash(), initializeData.l2BootloaderBytecodeHash);
         assertEq(utilsFacet.util_getL2DefaultAccountBytecodeHash(), initializeData.l2DefaultAccountBytecodeHash);
         assertEq(utilsFacet.util_getL2EvmEmulatorBytecodeHash(), initializeData.l2EvmEmulatorBytecodeHash);
+        assertEq(utilsFacet.util_getPriorityTxMaxGasLimit(), initializeData.priorityTxMaxGasLimit);
+        assertEq(
+            keccak256(abi.encode(utilsFacet.util_getFeeParams())),
+            keccak256(abi.encode(initializeData.feeParams))
+        );
     }
 }

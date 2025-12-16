@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
-import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -16,14 +16,14 @@ import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifier
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
-contract AdminTest is UtilsCallMockerTest {
+contract AdminTest is UtilsTest {
     IAdmin internal adminFacet;
     UtilsFacet internal utilsFacet;
     address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
     DummyBridgehub internal dummyBridgehub;
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](16);
+        bytes4[] memory selectors = new bytes4[](14);
         uint256 i = 0;
         selectors[i++] = IAdmin.setPendingAdmin.selector;
         selectors[i++] = IAdmin.acceptAdmin.selector;
@@ -36,8 +36,6 @@ contract AdminTest is UtilsCallMockerTest {
         selectors[i++] = IAdmin.executeUpgrade.selector;
         selectors[i++] = IAdmin.freezeDiamond.selector;
         selectors[i++] = IAdmin.unfreezeDiamond.selector;
-        selectors[i++] = IAdmin.pauseDepositsBeforeInitiatingMigration.selector;
-        selectors[i++] = IAdmin.unpauseDeposits.selector;
         selectors[i++] = IAdmin.setTransactionFilterer.selector;
         selectors[i++] = IAdmin.setPubdataPricingMode.selector;
         selectors[i++] = IAdmin.setDAValidatorPair.selector;
@@ -47,7 +45,7 @@ contract AdminTest is UtilsCallMockerTest {
     function setUp() public virtual {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)), false)),
+            facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)))),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: getAdminSelectors()

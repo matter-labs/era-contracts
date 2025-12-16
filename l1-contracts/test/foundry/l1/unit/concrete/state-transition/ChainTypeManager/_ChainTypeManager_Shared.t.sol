@@ -7,13 +7,13 @@ import {console2 as console} from "forge-std/Script.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
-import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -29,10 +29,8 @@ import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestne
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
-import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
-import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
-
+import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
@@ -40,11 +38,10 @@ import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7
 
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
-import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
-import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
+import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
 
-contract ChainTypeManagerTest is UtilsCallMockerTest {
+contract ChainTypeManagerTest is UtilsTest {
     using stdStorage for StdStorage;
 
     EraChainTypeManager internal chainTypeManager;
@@ -76,9 +73,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     Diamond.FacetCut[] internal facetCuts;
 
     function deploy() public {
-        // Timestamp needs to be late enough for `pauseDepositsBeforeInitiatingMigration` time checks
-        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET + 1);
-
         interopCenterAddress = makeAddr("interopCenter");
         governor = makeAddr("governor");
         admin = makeAddr("admin");
@@ -99,7 +93,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         );
         stdstore
             .target(address(messageroot))
-            .sig(IL1MessageRoot.v31UpgradeChainBatchNumber.selector)
+            .sig(IMessageRoot.v30UpgradeChainBatchNumber.selector)
             .with_key(chainId)
             .checked_write(uint256(1));
         vm.prank(governor);
@@ -134,7 +128,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         );
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)), false)),
+                facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)))),
                 action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: Utils.getAdminSelectors()
@@ -159,13 +153,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         facetCuts.push(
             Diamond.FacetCut({
                 facet: address(
-                    new MailboxFacet(
-                        eraChainId,
-                        block.chainid,
-                        address(0),
-                        IEIP7702Checker(makeAddr("eip7702Checker")),
-                        false
-                    )
+                    new MailboxFacet(eraChainId, block.chainid, IEIP7702Checker(makeAddr("eip7702Checker")))
                 ),
                 action: Diamond.Action.Add,
                 isFreezable: false,
@@ -260,7 +248,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         );
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
-        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(18));
 
         mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge, baseTokenAssetId);
         return
@@ -298,7 +285,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         );
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
-        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(18));
 
         chainContractAddress.createNewChain({
             _chainId: id,

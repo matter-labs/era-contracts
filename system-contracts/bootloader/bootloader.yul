@@ -1220,22 +1220,15 @@ object "Bootloader" {
 
                 debugLog("Send message to L1", success)
 
-                switch isPriorityOp
-                case 1 {
-                    // Sending the L2->L1 log so users will be able to prove transaction execution result on L1.
-                    sendL2LogUsingL1Messenger(true, canonicalL1TxHash, success)
+                // Sending the L2->L1 log so users will be able to prove transaction execution result on L1.
+                sendL2LogUsingL1Messenger(true, canonicalL1TxHash, success)
 
+                if isPriorityOp {
                     // Update priority txs L1 data
                     mstore(0, mload(PRIORITY_TXS_L1_DATA_BEGIN_BYTE()))
                     mstore(32, canonicalL1TxHash)
                     mstore(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), keccak256(0, 64))
                     mstore(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32), add(mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)), 1))
-                } 
-                default {
-                    /// We need to set the settlement layer after the genesis upgrade, so we set it after all upgrade txs.
-                    /// @notice The settlement layer chain id.
-                    let SETTLEMENT_LAYER_CHAIN_ID := getSettlementLayerChainId()
-                    setSettlementLayerChainId(SETTLEMENT_LAYER_CHAIN_ID)
                 }
             }
 
@@ -3117,8 +3110,8 @@ object "Bootloader" {
                     debugLog("Failed to set new settlement layer chain id: ", currentSettlementLayerChainId)
 
                     /// here during the upgrade the setting of the settlement layer chain will fail, as the system context is not yet upgraded.
-                    /// todo remove after v31 upgrade.
-                    /// We want to check if the interop center is deployed or not, i.e. did we execute V31 upgrade.
+                    /// todo remove after v30 upgrade.
+                    /// We want to check if the interop center is deployed or not, i.e. did we execute V30 upgrade.
                     let codeSize := getCodeSize(L2_INTEROP_CENTER_ADDR())
                     debugLog("codeSize", codeSize)
                     /// nothing is deployed at this address.
@@ -4450,6 +4443,7 @@ object "Bootloader" {
                 }
 
                 setNewBatch(PREV_BATCH_HASH, NEW_BATCH_TIMESTAMP, NEW_BATCH_NUMBER, EXPECTED_BASE_FEE)
+
 
                 setSettlementLayerChainId(SETTLEMENT_LAYER_CHAIN_ID)
 

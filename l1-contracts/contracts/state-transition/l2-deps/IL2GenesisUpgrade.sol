@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {TokenMetadata, TokenBridgingData} from "../../common/Messaging.sol";
-
 /// @notice A struct that describes a forced deployment on an address
 struct ForceDeployment {
     // The bytecode hash to put on an address
@@ -19,13 +17,17 @@ struct ForceDeployment {
 
 // solhint-disable-next-line gas-struct-packing
 struct ZKChainSpecificForceDeploymentsData {
+    bytes32 baseTokenAssetId;
     address l2LegacySharedBridge;
     address predeployedL2WethAddress;
     address baseTokenL1Address;
     /// @dev Some info about the base token, it is
     /// needed to deploy weth token in case it is not present
-    TokenMetadata baseTokenMetadata;
-    TokenBridgingData baseTokenBridgingData;
+    string baseTokenName;
+    string baseTokenSymbol;
+    uint256 baseTokenOriginChainId;
+    /// The address of the base token on the origin chain.
+    address baseTokenOriginAddress;
 }
 
 /// @notice The structure that describes force deployments that are the same for each chain.

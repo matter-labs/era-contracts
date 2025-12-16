@@ -2,14 +2,14 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 // import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-// import {IBridgehub} from "contracts/core/bridgehub/IBridgehub.sol";
+// import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 // import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {GatewayGovernanceUtils} from "deploy-scripts/gateway/GatewayGovernanceUtils.s.sol";
-import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 
 import {DeployGatewayTransactionFilterer} from "deploy-scripts/gateway/DeployGatewayTransactionFilterer.s.sol";
 
-import {ChainInfoFromBridgehub, Utils} from "deploy-scripts/utils/Utils.sol";
+import {ChainInfoFromBridgehub, Utils} from "deploy-scripts/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {AdminFunctions} from "deploy-scripts/AdminFunctions.s.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -29,7 +29,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         // console.log("Gateway chain id skipped value = %s", toml.readUint("$.chain.chain_chain_id"));
 
         // Grab config from output of l1 deployment
-        path = string.concat(root, vm.envString("CTM_OUTPUT"));
+        path = string.concat(root, vm.envString("L1_OUTPUT"));
         toml = vm.readFile(path);
 
         // config.gatewayChainId = 506; //toml.readUint("$.chain.chain_chain_id");

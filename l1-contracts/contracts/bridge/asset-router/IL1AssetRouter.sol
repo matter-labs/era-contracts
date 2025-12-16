@@ -5,11 +5,10 @@ pragma solidity ^0.8.21;
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
-import {L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
+import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
 import {IL1SharedBridgeLegacy} from "../interfaces/IL1SharedBridgeLegacy.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IL1CrossChainSender} from "../interfaces/IL1CrossChainSender.sol";
-import {TxStatus} from "../../common/Messaging.sol";
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
@@ -95,9 +94,8 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy, IL1CrossCha
     /// @param _assetId The unique identifier of the deposited L1 token.
     /// @param _assetData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver. Might include extra information.
     /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
-    function bridgeConfirmTransferResult(
+    function bridgeRecoverFailedTransfer(
         uint256 _chainId,
-        TxStatus _txStatus,
         address _depositSender,
         bytes32 _assetId,
         bytes calldata _assetData

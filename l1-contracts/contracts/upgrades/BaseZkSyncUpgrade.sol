@@ -318,7 +318,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     ) internal virtual returns (uint32 newMinorVersion, bool patchOnly) {
         uint256 previousProtocolVersion = s.protocolVersion;
         if (_newProtocolVersion <= previousProtocolVersion) {
-            revert ProtocolVersionTooSmall(previousProtocolVersion, _newProtocolVersion);
+            revert ProtocolVersionTooSmall();
         }
         // slither-disable-next-line unused-return
         (uint32 previousMajorVersion, uint32 previousMinorVersion, ) = SemVer.unpackSemVer(

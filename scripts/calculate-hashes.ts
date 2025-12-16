@@ -3,7 +3,6 @@ import * as fs from "fs";
 import _ from "lodash";
 import os from "os";
 import { join } from "path";
-import * as blakejs from "blakejs";
 import { hashBytecode } from "zksync-ethers/build/utils";
 
 const SOLIDITY_SOURCE_CODE_PATHS = ["system-contracts/", "l2-contracts/", "l1-contracts/", "da-contracts/"];
@@ -113,8 +112,6 @@ type EvmCompilations = {
   evmBytecodePath: string | null;
   evmBytecodeHash: string | null;
   evmDeployedBytecodeHash: string | null;
-  evmDeployedBytecodeBlakeHash: string | null;
-  evmDeployedBytecodeLength: number | null;
 };
 
 type ZKCompilation = {
@@ -154,41 +151,21 @@ type EvmJsonFileContents = {
   deployedBytecode: { object: string };
 };
 
-type EVMBytecodeInfo = {
-  evmBytecodeHash: string;
-  evmDeployedBytecodeHash: string;
-  evmDeployedBytecodeBlakeHash: string;
-  evmDeployedBytecodeLength: number;
-};
-
-function defaultEVMBytecodeInfo(): EVMBytecodeInfo {
-  return {
-    evmBytecodeHash: "0x",
-    evmDeployedBytecodeHash: "0x",
-    evmDeployedBytecodeBlakeHash: "0x",
-    evmDeployedBytecodeLength: 0,
-  };
-}
-
-const getBytecodeInfoFromEvmJson = (jsonFileContents: EvmJsonFileContents): EVMBytecodeInfo => {
+const getBytecodeHashFromEvmJson = (jsonFileContents: EvmJsonFileContents) => {
   try {
     if (jsonFileContents.deployedBytecode.object == "0x") {
-      return defaultEVMBytecodeInfo();
+      return ["0x", "0x"];
     }
-    return {
-      evmBytecodeHash: ethers.utils.hexlify(
-        ethers.utils.keccak256(ethers.utils.arrayify(jsonFileContents.bytecode.object))
+    return [
+      ethers.utils.hexlify(
+        ethers.utils.keccak256(ethers.utils.arrayify(ethers.utils.hexlify(jsonFileContents.bytecode.object)))
       ),
-      evmDeployedBytecodeHash: ethers.utils.hexlify(
-        ethers.utils.keccak256(ethers.utils.arrayify(jsonFileContents.deployedBytecode.object))
+      ethers.utils.hexlify(
+        ethers.utils.keccak256(ethers.utils.arrayify(ethers.utils.hexlify(jsonFileContents.deployedBytecode.object)))
       ),
-      evmDeployedBytecodeBlakeHash: ethers.utils.hexlify(
-        blakejs.blake2s(ethers.utils.arrayify(jsonFileContents.deployedBytecode.object))
-      ),
-      evmDeployedBytecodeLength: ethers.utils.arrayify(jsonFileContents.deployedBytecode.object).length,
-    };
+    ];
   } catch (err) {
-    return defaultEVMBytecodeInfo();
+    return ["0x", "0x"];
   }
 };
 
@@ -261,7 +238,7 @@ const getEVMSolidityContractsDetailsWithArtifactsDir = (workDir: string): Source
     compiledFiles
       .map((jsonFile) => {
         const jsonFileContents = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
-        const info = getBytecodeInfoFromEvmJson(jsonFileContents);
+        const hashes = getBytecodeHashFromEvmJson(jsonFileContents);
 
         const evmBytecodePath = jsonFile.startsWith(join(__dirname, ".."))
           ? jsonFile.replace(join(__dirname, ".."), "")
@@ -272,10 +249,8 @@ const getEVMSolidityContractsDetailsWithArtifactsDir = (workDir: string): Source
         return {
           contractName: join(workDir, contractName),
           evmBytecodePath,
-          evmBytecodeHash: info.evmBytecodeHash,
-          evmDeployedBytecodeHash: info.evmDeployedBytecodeHash,
-          evmDeployedBytecodeBlakeHash: info.evmDeployedBytecodeBlakeHash,
-          evmDeployedBytecodeLength: info.evmDeployedBytecodeLength,
+          evmBytecodeHash: hashes[0],
+          evmDeployedBytecodeHash: hashes[1],
         };
       })
       // ---------------------------------------------------------------------
@@ -299,8 +274,6 @@ const getSolidityContractsDetails = (dir: string): ContractsInfo[] => {
       evmBytecodeHash: null,
       evmBytecodePath: null,
       evmDeployedBytecodeHash: null,
-      evmDeployedBytecodeBlakeHash: null,
-      evmDeployedBytecodeLength: null,
     };
     mergedContracts.push(newContract);
   });
@@ -312,16 +285,12 @@ const getSolidityContractsDetails = (dir: string): ContractsInfo[] => {
       existingContract.evmBytecodeHash = contract.evmBytecodeHash;
       existingContract.evmBytecodePath = contract.evmBytecodePath;
       existingContract.evmDeployedBytecodeHash = contract.evmDeployedBytecodeHash;
-      existingContract.evmDeployedBytecodeBlakeHash = contract.evmDeployedBytecodeBlakeHash;
-      existingContract.evmDeployedBytecodeLength = contract.evmDeployedBytecodeLength;
     } else {
       const newContract: ContractsInfo = {
         contractName: contract.contractName,
         evmBytecodeHash: contract.evmBytecodeHash,
         evmBytecodePath: contract.evmBytecodePath,
         evmDeployedBytecodeHash: contract.evmDeployedBytecodeHash,
-        evmDeployedBytecodeBlakeHash: contract.evmDeployedBytecodeBlakeHash,
-        evmDeployedBytecodeLength: contract.evmDeployedBytecodeLength,
         zkBytecodeHash: null,
         zkBytecodePath: null,
       };
@@ -369,8 +338,6 @@ const getYulContractsDetails = (dir: string): ContractsInfo[] => {
           evmBytecodePath: null,
           evmBytecodeHash: null,
           evmDeployedBytecodeHash: null,
-          evmDeployedBytecodeBlakeHash: null,
-          evmDeployedBytecodeLength: null,
         };
       })
       // ---------------------------------------------------------------------

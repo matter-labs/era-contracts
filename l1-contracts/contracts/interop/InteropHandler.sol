@@ -12,7 +12,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
 import {BundleAlreadyProcessed, BundleVerifiedAlready, CallAlreadyExecuted, CallNotExecutable, CanNotUnbundle, ExecutingNotAllowed, MessageNotIncluded, UnauthorizedMessageSender, UnbundlingNotAllowed, WrongCallStatusLength, WrongDestinationChainId, WrongSourceChainId, InvalidInteropBundleVersion, InvalidInteropCallVersion} from "./InteropErrors.sol";
 import {InvalidSelector, Unauthorized} from "../common/L1ContractErrors.sol";
-import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
+import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 
 /// @title InteropHandler
 /// @author Matter Labs
@@ -46,7 +46,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// @dev Reverts if any call fails, or if bundle has been processed already.
     /// @param _bundle ABI-encoded InteropBundle to execute.
     /// @param _proof Inclusion proof for the bundle message. The bundle message itself gets broadcasted by InteropCenter contract whenever a bundle is sent.
-    function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
+    function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public nonReentrant {
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
             _bundle,
@@ -165,7 +165,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         uint256 _sourceChainId,
         bytes memory _bundle,
         CallStatus[] calldata _providedCallStatus
-    ) public {
+    ) public nonReentrant {
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
             _bundle,
@@ -362,7 +362,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         bytes32 /* receiveId */,
         bytes calldata sender,
         bytes calldata payload
-    ) external payable returns (bytes4) {
+    ) external payable nonReentrant returns (bytes4) {
         // Verify that call to this function is a result of a call being executed, meaning this message came from a valid bundle.
         // This is the only way receiveMessage can be invoked on InteropHandler by itself.
         require(msg.sender == address(this), Unauthorized(msg.sender));

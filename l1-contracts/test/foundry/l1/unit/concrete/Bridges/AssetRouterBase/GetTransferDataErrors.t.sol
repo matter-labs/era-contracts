@@ -6,8 +6,8 @@ import {Test} from "forge-std/Test.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {BadTransferDataLength, UnsupportedEncodingVersion} from "contracts/common/L1ContractErrors.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 contract TestAssetRouterBase is AssetRouterBase {
     // constructor() AssetRouterBase(1, 1, IBridgehubBase(address(1))) {}

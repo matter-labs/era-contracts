@@ -7,8 +7,6 @@ import {ConfirmBalanceMigrationData} from "../../common/Messaging.sol";
 interface IL2AssetTracker {
     function setAddresses(uint256 _l1ChainId, bytes32 _baseTokenAssetId) external;
 
-    function migrateTokenBalanceFromNTVV31(bytes32 _assetId) external;
-
     function handleInitiateBridgingOnL2(bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId) external;
 
     function handleInitiateBaseTokenBridgingOnL2(uint256 _amount) external;

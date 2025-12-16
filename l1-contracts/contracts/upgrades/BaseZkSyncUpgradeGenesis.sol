@@ -24,7 +24,7 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
             // IMPORTANT Genesis Upgrade difference: Note this is the only thing change <= to <
             _newProtocolVersion < previousProtocolVersion
         ) {
-            revert ProtocolVersionTooSmall(previousProtocolVersion, _newProtocolVersion);
+            revert ProtocolVersionTooSmall();
         }
         // slither-disable-next-line unused-return
         (uint32 previousMajorVersion, uint32 previousMinorVersion, ) = SemVer.unpackSemVer(

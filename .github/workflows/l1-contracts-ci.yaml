@@ -29,7 +29,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.20.8
+          node-version: 18.18.0
           cache: yarn
 
       - name: Install dependencies
@@ -94,7 +94,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.20.8
+          node-version: 18.18.0
           cache: yarn
 
       - name: Install dependencies
@@ -117,7 +117,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.20.8
+          node-version: 18.18.0
           cache: yarn
       - name: Install dependencies
         run: yarn
@@ -159,7 +159,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.20.8
+          node-version: 18.18.0
           cache: yarn
       - name: Install dependencies
         run: yarn
@@ -198,7 +198,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.20.8
+          node-version: 18.18.0
           cache: yarn
 
       - name: Install foundry-zksync
@@ -253,7 +253,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.20.8
+          node-version: 18.18.0
           cache: yarn
 
       - name: Install foundry-zksync
@@ -342,7 +342,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.20.8
+          node-version: 18.18.0
           cache: yarn
 
       - name: Install foundry-zksync
@@ -431,7 +431,7 @@ jobs:
   #     - name: Use Node.js
   #       uses: actions/setup-node@v3
   #       with:
-  #         node-version: 18.20.8
+  #         node-version: 18.18.0
   #         cache: yarn
 
   #     - name: Install dependencies

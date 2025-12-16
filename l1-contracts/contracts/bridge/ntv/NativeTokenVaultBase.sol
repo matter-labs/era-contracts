@@ -19,7 +19,6 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {EmptyToken, TokenAlreadyInBridgedTokensList} from "../L1BridgeContractErrors.sol";
 import {AddressMismatch, AmountMustBeGreaterThanZero, AssetIdAlreadyRegistered, AssetIdMismatch, BurningNativeWETHNotSupported, DeployingBridgedTokenForNativeToken, EmptyDeposit, NonEmptyMsgValue, TokenNotLegacy, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, ZeroAddress} from "../../common/L1ContractErrors.sol";
@@ -316,23 +315,31 @@ abstract contract NativeTokenVaultBase is
         uint256 _amount,
         address _receiver,
         address _tokenAddress
-    ) internal returns (bytes memory _bridgeMintData) {
+    ) internal requireZeroValue(msg.value) returns (bytes memory _bridgeMintData) {
         require(_amount != 0, AmountMustBeGreaterThanZero());
-        _getTokenAndBridgeToChain({
-            _isBridgedToken: true,
-            _depositChecked: false,
-            _tokenAddress: _tokenAddress,
-            _depositAmount: _amount,
-            _chainId: _chainId,
-            _assetId: _assetId,
-            _originalCaller: _originalCaller
-        });
-        bytes memory erc20Metadata = _getERC20Metadata(_tokenAddress, _assetId, true);
 
+        IBridgedStandardToken(_tokenAddress).bridgeBurn(_originalCaller, _amount);
+        _handleBridgeToChain(_chainId, _assetId, _amount);
+
+        emit BridgeBurn({
+            chainId: _chainId,
+            assetId: _assetId,
+            sender: _originalCaller,
+            receiver: _receiver,
+            amount: _amount
+        });
+        bytes memory erc20Metadata;
+        {
+            // we set all originChainId for all already bridged tokens with the setLegacyTokenAssetId and updateChainBalancesFromSharedBridge functions.
+            // for native tokens the originChainId is set when they register.
+            uint256 originChainId = originChainId[_assetId];
+            require(originChainId != 0, ZeroAddress());
+            erc20Metadata = getERC20Getters(_tokenAddress, originChainId);
+        }
         address originToken;
         /// Note L2->L2 asset transfers will accrue a fee in some form in later versions.
         {
-            originToken = _getOriginTokenFromAddress(_tokenAddress);
+            originToken = IBridgedStandardToken(_tokenAddress).originToken();
             require(originToken != address(0), ZeroAddress());
         }
 
@@ -342,14 +349,6 @@ abstract contract NativeTokenVaultBase is
             _originToken: originToken,
             _amount: _amount,
             _erc20Metadata: erc20Metadata
-        });
-
-        emit BridgeBurn({
-            chainId: _chainId,
-            assetId: _assetId,
-            sender: _originalCaller,
-            receiver: _receiver,
-            amount: _amount
         });
     }
 
@@ -366,21 +365,27 @@ abstract contract NativeTokenVaultBase is
         // It can only be withdrawn from the chain where it has already gotten.
         require(_nativeToken != _wethToken(), BurningNativeWETHNotSupported());
 
-        _getTokenAndBridgeToChain({
-            _isBridgedToken: false,
-            _depositChecked: _depositChecked,
-            _tokenAddress: _nativeToken,
-            _depositAmount: _depositAmount,
-            _chainId: _chainId,
-            _assetId: _assetId,
-            _originalCaller: _originalCaller
-        });
+        if (_assetId == _baseTokenAssetId()) {
+            require(_depositAmount == msg.value, ValueMismatch(_depositAmount, msg.value));
+
+            _handleBridgeToChain(_chainId, _assetId, _depositAmount);
+        } else {
+            require(msg.value == 0, NonEmptyMsgValue());
+            _handleBridgeToChain(_chainId, _assetId, _depositAmount);
+            if (!_depositChecked) {
+                uint256 expectedDepositAmount = _depositFunds(_originalCaller, IERC20(_nativeToken), _depositAmount); // note if _originalCaller is this contract, this will return 0. This does not happen.
+                // The token has non-standard transfer logic
+                require(_depositAmount == expectedDepositAmount, TokensWithFeesNotSupported());
+            }
+        }
         // empty deposit amount
         require(_depositAmount != 0, EmptyDeposit());
         /// Note L2->L2 asset transfers will accrue a fee in some form in later versions.
 
-        bytes memory erc20Metadata = _getERC20Metadata(_nativeToken, _assetId, false);
-
+        bytes memory erc20Metadata;
+        {
+            erc20Metadata = getERC20Getters(_nativeToken, originChainId[_assetId]);
+        }
         _bridgeMintData = DataEncoding.encodeBridgeMintData({
             _originalCaller: _originalCaller,
             _remoteReceiver: _receiver,
@@ -396,56 +401,6 @@ abstract contract NativeTokenVaultBase is
             receiver: _receiver,
             amount: _depositAmount
         });
-    }
-
-    function _getERC20Metadata(
-        address _token,
-        bytes32 _assetId,
-        bool _bridgedToken
-    ) internal view virtual returns (bytes memory) {
-        uint256 originChainId = originChainId[_assetId];
-        if (_bridgedToken) {
-            // we set all originChainId for all already bridged tokens with the setLegacyTokenAssetId and updateChainBalancesFromSharedBridge functions.
-            // for native tokens the originChainId is set when they register.
-            require(originChainId != 0, ZeroAddress());
-        }
-        return getERC20Getters(_token, originChainId);
-    }
-
-    function _getTokenAndBridgeToChain(
-        bool _isBridgedToken,
-        bool _depositChecked,
-        address _tokenAddress,
-        uint256 _depositAmount,
-        uint256 _chainId,
-        bytes32 _assetId,
-        address _originalCaller
-    ) internal {
-        if (_assetId == _baseTokenAssetId()) {
-            require(_depositAmount == msg.value, ValueMismatch(_depositAmount, msg.value));
-            if (_isBridgedToken) {
-                // slither-disable-next-line arbitrary-send-eth
-                L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: msg.value}();
-            }
-            _handleBridgeToChain(_chainId, _assetId, _depositAmount);
-        } else {
-            require(msg.value == 0, NonEmptyMsgValue());
-            if (_isBridgedToken) {
-                IBridgedStandardToken(_tokenAddress).bridgeBurn(_originalCaller, _depositAmount);
-                _handleBridgeToChain(_chainId, _assetId, _depositAmount);
-            } else {
-                _handleBridgeToChain(_chainId, _assetId, _depositAmount);
-                if (!_depositChecked) {
-                    uint256 expectedDepositAmount = _depositFunds(
-                        _originalCaller,
-                        IERC20(_tokenAddress),
-                        _depositAmount
-                    ); // note if _originalCaller is this contract, this will return 0. This does not happen.
-                    // The token has non-standard transfer logic
-                    require(_depositAmount == expectedDepositAmount, TokensWithFeesNotSupported());
-                }
-            }
-        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -469,13 +424,6 @@ abstract contract NativeTokenVaultBase is
     /// @param _token The address of token of interest.
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
     function getERC20Getters(address _token, uint256 _originChainId) public view override returns (bytes memory) {
-        return _getERC20GettersInner(_token, _originChainId);
-    }
-
-    function _getERC20GettersInner(
-        address _token,
-        uint256 _originChainId
-    ) internal view virtual returns (bytes memory) {
         return BridgeHelper.getERC20Getters(_token, _originChainId);
     }
 

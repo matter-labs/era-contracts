@@ -6,13 +6,13 @@ import {stdToml} from "forge-std/StdToml.sol";
 
 import {Call as GovernanceCall} from "contracts/governance/Common.sol";
 
-import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {MulticallWithGas} from "../utils/MulticallWithGas.sol";
+import {MulticallWithGas} from "./MulticallWithGas.sol";
 
 /// @notice Script intended to help us finalize the governance upgrade
 contract FinalizeUpgrade is Script {

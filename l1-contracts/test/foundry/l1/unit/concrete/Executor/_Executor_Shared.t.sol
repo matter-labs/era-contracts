@@ -11,7 +11,6 @@ import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_DA_COMMITMENT_SCHEME} from "..
 import {TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {IAssetRouterShared} from "contracts/bridge/asset-router/IAssetRouterShared.sol";
 import {DummyChainTypeManagerForValidatorTimelock as DummyCTM} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
@@ -31,23 +30,23 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
-import {MessageRootBase} from "contracts/core/message-root/MessageRootBase.sol";
-import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
-import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
+import {MessageRootBase} from "contracts/bridgehub/MessageRootBase.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 
 bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
 bytes constant POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000100073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
 
-contract ExecutorTest is UtilsCallMockerTest {
+contract ExecutorTest is UtilsTest {
     address internal owner;
     address internal validator;
     address internal randomSigner;
@@ -193,14 +192,6 @@ contract ExecutorTest is UtilsCallMockerTest {
         randomSigner = makeAddr("randomSigner");
         dummyBridgehub = new DummyBridgehub();
         vm.mockCall(address(dummyBridgehub), abi.encodeWithSelector(IL1Bridgehub.L1_CHAIN_ID.selector), abi.encode(1));
-        uint256[] memory allZKChainChainIDsZero = new uint256[](0);
-        vm.mockCall(
-            address(dummyBridgehub),
-            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
-            abi.encode(allZKChainChainIDsZero)
-        );
-        messageRoot = new L1MessageRoot(address(dummyBridgehub), 1);
-
         uint256[] memory allZKChainChainIDs = new uint256[](1);
         allZKChainChainIDs[0] = 271;
         vm.mockCall(
@@ -214,6 +205,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             abi.encode(makeAddr("chainTypeManager"))
         );
         address interopCenter = makeAddr("interopCenter");
+        messageRoot = new L1MessageRoot(address(dummyBridgehub), 1);
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
         address assetTracker = makeAddr("assetTracker");
@@ -225,7 +217,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             address(assetTracker),
             IL1Nullifier(address(0))
         );
-        // dummyBridgehub.setChainAssetHandler(address(chainAssetHandler));
+        dummyBridgehub.setChainAssetHandler(address(chainAssetHandler));
 
         dummyBridgehub.setSharedBridge(address(sharedBridge));
 
@@ -240,10 +232,10 @@ contract ExecutorTest is UtilsCallMockerTest {
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
 
-        admin = new AdminFacet(block.chainid, RollupDAManager(address(0)), false);
+        admin = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         getters = new GettersFacet();
         executor = new TestExecutor();
-        mailbox = new MailboxFacet(l2ChainId, block.chainid, address(chainAssetHandler), eip7702Checker, false);
+        mailbox = new MailboxFacet(l2ChainId, block.chainid, eip7702Checker);
 
         DummyCTM chainTypeManager = new DummyCTM(owner, address(0));
         vm.mockCall(
@@ -281,9 +273,16 @@ contract ExecutorTest is UtilsCallMockerTest {
             baseTokenAssetId: baseTokenAssetId,
             storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
             verifier: IVerifier(testnetVerifier), // verifier
+            verifierParams: VerifierParams({
+                recursionNodeLevelVkHash: 0,
+                recursionLeafLevelVkHash: 0,
+                recursionCircuitsSetVksHash: 0
+            }),
             l2BootloaderBytecodeHash: dummyHash,
             l2DefaultAccountBytecodeHash: dummyHash,
-            l2EvmEmulatorBytecodeHash: dummyHash
+            l2EvmEmulatorBytecodeHash: dummyHash,
+            priorityTxMaxGasLimit: 1000000,
+            feeParams: defaultFeeParams()
         });
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), baseTokenAssetId);
 
@@ -368,9 +367,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             daCommitmentScheme: L2_DA_COMMITMENT_SCHEME,
             daCommitment: bytes32(""),
             firstBlockTimestamp: uint64(currentTimestamp),
-            firstBlockNumber: uint64(1),
             lastBlockTimestamp: uint64(currentTimestamp),
-            lastBlockNumber: uint64(2),
             chainId: l2ChainId,
             operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
@@ -382,7 +379,7 @@ contract ExecutorTest is UtilsCallMockerTest {
 
         vm.mockCall(
             address(sharedBridge),
-            abi.encodeWithSelector(IAssetRouterShared.bridgehubDepositBaseToken.selector),
+            abi.encodeWithSelector(IAssetRouterBase.bridgehubDepositBaseToken.selector),
             abi.encode(true)
         );
     }

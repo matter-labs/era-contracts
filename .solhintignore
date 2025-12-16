@@ -20,7 +20,6 @@ l1-contracts-foundry/lib
 # l2-contracts
 l2-contracts/cache-zk
 l2-contracts/node_modules
-l2-contracts/contracts/ConsensusRegistry.sol
 l2-contracts/contracts/dev-contracts
 l2-contracts/test
 
@@ -29,7 +28,6 @@ system-contracts/contracts/openzeppelin
 system-contracts/contracts/Constants.sol
 system-contracts/contracts/test-contracts
 system-contracts/contracts-preprocessed
-system-contracts/test/foundry/L2DAValidator.t.sol
 
 # gas-bound-caller
 gas-bound-caller

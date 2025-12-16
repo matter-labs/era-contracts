@@ -23,7 +23,6 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {AddressMismatch, AssetIdAlreadyRegistered, AssetIdNotSupported, DeployFailed, EmptyAddress, EmptyBytes32, InvalidCaller, NoLegacySharedBridge, TokenIsLegacy, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
-import {TokenMetadata, TokenBridgingData} from "../../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -66,15 +65,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// @dev The address of the base token on its origin chain
     address public BASE_TOKEN_ORIGIN_TOKEN;
 
-    /// @dev The name of the base token.
-    string public BASE_TOKEN_NAME;
-
-    /// @dev The symbol of the base token.
-    string public BASE_TOKEN_SYMBOL;
-
-    /// @dev The decimals of the base token.
-    uint256 public BASE_TOKEN_DECIMALS;
-
     /// @dev Only allows calls from the complex upgrader contract on L2.
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -91,8 +81,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
     /// @param _bridgedTokenBeacon The address of the L2 token beacon for legacy chains.
     /// @param _wethToken The address of the L2 weth token.
-    /// @param _baseTokenBridgingData The bridging data of the base token.
-    /// @param _baseTokenMetadata The metadata of the base token.
+    /// @param _baseTokenAssetId The asset ID of the base token.
     function initL2(
         uint256 _l1ChainId,
         address _aliasedOwner,
@@ -100,8 +89,9 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         address _legacySharedBridge,
         address _bridgedTokenBeacon,
         address _wethToken,
-        TokenBridgingData calldata _baseTokenBridgingData,
-        TokenMetadata calldata _baseTokenMetadata
+        bytes32 _baseTokenAssetId,
+        address _baseTokenOriginToken,
+        uint256 _baseTokenOriginChainId
     ) public onlyUpgrader {
         _disableInitializers();
         // solhint-disable-next-line func-named-parameters
@@ -110,8 +100,9 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             _l2TokenProxyBytecodeHash,
             _legacySharedBridge,
             _wethToken,
-            _baseTokenBridgingData,
-            _baseTokenMetadata
+            _baseTokenAssetId,
+            _baseTokenOriginToken,
+            _baseTokenOriginChainId
         );
         if (_aliasedOwner == address(0)) {
             revert EmptyAddress();
@@ -128,28 +119,25 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
     /// @param _wethToken The address of the WETH token.
-    /// @param _baseTokenBridgingData The bridging data of the base token.
-    /// @param _baseTokenMetadata The metadata of the base token.
+    /// @param _baseTokenAssetId The asset id of the base token.
     function updateL2(
         uint256 _l1ChainId,
         bytes32 _l2TokenProxyBytecodeHash,
         address _legacySharedBridge,
         address _wethToken,
-        TokenBridgingData calldata _baseTokenBridgingData,
-        TokenMetadata calldata _baseTokenMetadata
+        bytes32 _baseTokenAssetId,
+        address _baseTokenOriginToken,
+        uint256 _baseTokenOriginChainId
     ) public onlyUpgrader {
         WETH_TOKEN = _wethToken;
-        BASE_TOKEN_ASSET_ID = _baseTokenBridgingData.assetId;
+        BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         L1_CHAIN_ID = _l1ChainId;
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
-        BASE_TOKEN_ORIGIN_TOKEN = _baseTokenBridgingData.originToken;
-        BASE_TOKEN_NAME = _baseTokenMetadata.name;
-        BASE_TOKEN_SYMBOL = _baseTokenMetadata.symbol;
-        BASE_TOKEN_DECIMALS = _baseTokenMetadata.decimals;
+        BASE_TOKEN_ORIGIN_TOKEN = _baseTokenOriginToken;
 
-        tokenAddress[_baseTokenBridgingData.assetId] = L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
-        assetId[L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR] = _baseTokenBridgingData.assetId;
-        originChainId[_baseTokenBridgingData.assetId] = _baseTokenBridgingData.originChainId;
+        tokenAddress[_baseTokenAssetId] = L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
+        assetId[L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR] = _baseTokenAssetId;
+        originChainId[_baseTokenAssetId] = _baseTokenOriginChainId;
 
         require(_l2TokenProxyBytecodeHash != bytes32(0), EmptyBytes32());
 
@@ -399,24 +387,5 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             return BASE_TOKEN_ORIGIN_TOKEN;
         }
         return super._getOriginTokenFromAddress(_token);
-    }
-
-    function _getERC20GettersInner(
-        address _token,
-        uint256 _originChainId
-    ) internal view virtual override returns (bytes memory) {
-        if (_token == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR) {
-            bytes memory name = abi.encode(BASE_TOKEN_NAME);
-            bytes memory symbol = abi.encode(BASE_TOKEN_SYMBOL);
-            bytes memory decimals = abi.encode(uint8(BASE_TOKEN_DECIMALS));
-            return
-                DataEncoding.encodeTokenData({
-                    _chainId: _originChainId,
-                    _name: name,
-                    _symbol: symbol,
-                    _decimals: decimals
-                });
-        }
-        return super._getERC20GettersInner(_token, _originChainId);
     }
 }

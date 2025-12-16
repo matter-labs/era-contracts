@@ -59,7 +59,7 @@ jobs:
           # creates JSON files needed for `yarn l1 test:zkfoundry`
           yarn sc build:foundry
           cd l1-contracts
-          # creates `l1-contracts/script-out/diamond-selectors.toml` which is needed for `l1-contracts/deploy-scripts/utils/DeployUtils.s.sol`
+          # creates `l1-contracts/script-out/diamond-selectors.toml` which is needed for `l1-contracts/deploy-scripts/DeployUtils.s.sol`
           yarn test:zkfoundry
 
       - name: Run tests

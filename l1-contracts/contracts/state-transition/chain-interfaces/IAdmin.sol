@@ -6,8 +6,7 @@ import {IZKChainBase} from "../chain-interfaces/IZKChainBase.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
-import {L2DACommitmentScheme, ZKChainCommitment} from "../../common/Config.sol";
-import {TxStatus} from "../../common/Messaging.sol";
+import {ZKChainCommitment, L2DACommitmentScheme} from "../../common/Config.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
@@ -155,10 +154,11 @@ interface IAdmin is IZKChainBase {
 
     event DepositsUnpaused(uint256 chainId);
 
-    /// @notice Pauses deposits before initiating migration to the Gateway.
+    /// @notice Pauses deposits and initiates the migration to the Gateway.
     function pauseDepositsBeforeInitiatingMigration() external;
 
-    /// @notice Unpauses deposits, used after the chain is initialized
+    /// @notice Unpauses deposits. A typical migration on top of GW doesn't take too long,
+    ///         so we allow chain admin to unpause deposits earlier than default time window.
     function unpauseDeposits() external;
 
     /// @dev Similar to IL1AssetHandler interface, used to send chains.
@@ -169,9 +169,8 @@ interface IAdmin is IZKChainBase {
     ) external payable returns (bytes memory _bridgeMintData);
 
     /// @dev Similar to IL1AssetHandler interface, used to claim failed chain transfers.
-    function forwardedBridgeConfirmTransferResult(
+    function forwardedBridgeRecoverFailedTransfer(
         uint256 _chainId,
-        TxStatus _txStatus,
         bytes32 _assetInfo,
         address _originalCaller,
         bytes calldata _chainData

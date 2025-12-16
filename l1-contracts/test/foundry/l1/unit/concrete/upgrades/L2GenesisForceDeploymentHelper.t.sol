@@ -11,12 +11,12 @@ import "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 import "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import "contracts/core/message-root/IMessageRoot.sol";
-import "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
-import "contracts/core/bridgehub/L2Bridgehub.sol";
-import "contracts/core/message-root/L2MessageRoot.sol";
+import "contracts/bridgehub/IMessageRoot.sol";
+import "contracts/bridgehub/ICTMDeploymentTracker.sol";
+import "contracts/bridgehub/L2Bridgehub.sol";
+import "contracts/bridgehub/L2MessageRoot.sol";
 import "contracts/bridge/asset-router/L2AssetRouter.sol";
-import "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
+import "contracts/bridgehub/L2ChainAssetHandler.sol";
 import "contracts/bridge/ntv/L2NativeTokenVaultZKOS.sol";
 import "contracts/bridge/interfaces/IL2WrappedBaseToken.sol";
 import "contracts/bridge/UpgradeableBeaconDeployer.sol";
@@ -279,13 +279,10 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         returns (ZKChainSpecificForceDeploymentsData memory)
     {
         ZKChainSpecificForceDeploymentsData memory data;
-        data.baseTokenBridgingData.assetId = keccak256("baseTokenAsset");
+        data.baseTokenAssetId = keccak256("baseTokenAsset");
         data.baseTokenL1Address = baseTokenL1Address;
-        data.baseTokenBridgingData.originToken = address(1);
-        data.baseTokenBridgingData.originChainId = 1;
-        data.baseTokenMetadata.name = "Ether";
-        data.baseTokenMetadata.symbol = "ETH";
-        data.baseTokenMetadata.decimals = 18;
+        data.baseTokenName = "Ether";
+        data.baseTokenSymbol = "ETH";
         return data;
     }
 

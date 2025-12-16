@@ -2,32 +2,31 @@
 pragma solidity 0.8.28;
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+
 import {DeployL1CoreContractsIntegrationScript} from "./deploy-scripts/DeployL1CoreContractsIntegration.s.sol";
-import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {DeployCTMIntegrationScript} from "./deploy-scripts/DeployCTMIntegration.s.sol";
-import {RegisterCTM} from "../../../../deploy-scripts/ecosystem/RegisterCTM.s.sol";
-import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
+import {RegisterCTM} from "deploy-scripts/RegisterCTM.s.sol";
+import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
+import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {CoreDeployedAddresses} from "../../../../deploy-scripts/ecosystem/DeployL1CoreUtils.s.sol";
-import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
-import {Config, CTMDeployedAddresses} from "../../../../deploy-scripts/ctm/DeployCTMUtils.s.sol";
-import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
+import {Config, DeployedAddresses} from "deploy-scripts/DeployUtils.s.sol";
+import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 
-contract L1ContractDeployer is UtilsCallMockerTest {
+contract L1ContractDeployer is UtilsTest {
     using stdStorage for StdStorage;
 
     DeployL1CoreContractsIntegrationScript l1CoreContractsScript;
     DeployCTMIntegrationScript ctmScript;
     RegisterCTM registerCTMScript;
-
     struct AllAddresses {
+        DeployedAddresses ecosystemAddresses;
         address bridgehubProxyAddress;
         address bridgehubOwnerAddress;
         L1Bridgehub bridgehub;
@@ -44,13 +43,11 @@ contract L1ContractDeployer is UtilsCallMockerTest {
     Config public ecosystemConfig;
 
     AllAddresses public addresses;
-    CoreDeployedAddresses ecosystemAddresses;
-    CTMDeployedAddresses ctmAddresses;
 
-    function deployEcosystem() public returns (CoreDeployedAddresses memory ecosystemAddresses) {
+    function deployEcosystem() public returns (DeployedAddresses memory addresses) {
         l1CoreContractsScript = new DeployL1CoreContractsIntegrationScript();
         l1CoreContractsScript.runForTest();
-        ecosystemAddresses = l1CoreContractsScript.getAddresses();
+        addresses = l1CoreContractsScript.getAddresses();
     }
 
     function registerCTM(address bridgehub, address ctm) public {
@@ -61,8 +58,6 @@ contract L1ContractDeployer is UtilsCallMockerTest {
     function _deployL1Contracts() internal {
         vm.setEnv("L1_CONFIG", "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml");
         vm.setEnv("L1_OUTPUT", "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml");
-        vm.setEnv("CTM_CONFIG", "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm.toml");
-        vm.setEnv("CTM_OUTPUT", "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-ctm.toml");
         vm.setEnv(
             "ZK_CHAIN_CONFIG",
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-era.toml"
@@ -75,46 +70,48 @@ contract L1ContractDeployer is UtilsCallMockerTest {
             "GATEWAY_PREPARATION_L1_CONFIG",
             "/test/foundry/l1/integration/deploy-scripts/script-config/gateway-preparation-l1.toml"
         );
-        ecosystemAddresses = deployEcosystem();
+
+        DeployedAddresses memory coreContractsAddresses = deployEcosystem();
         ctmScript = new DeployCTMIntegrationScript();
-        ctmScript.runForTest(ecosystemAddresses.bridgehub.bridgehubProxy, false);
-        ctmAddresses = ctmScript.getAddresses();
-        registerCTM(ecosystemAddresses.bridgehub.bridgehubProxy, ctmAddresses.stateTransition.chainTypeManagerProxy);
+        ctmScript.runForTest(coreContractsAddresses.bridgehub.bridgehubProxy, false);
+        addresses.ecosystemAddresses = ctmScript.getAddresses();
+        registerCTM(
+            addresses.ecosystemAddresses.bridgehub.bridgehubProxy,
+            addresses.ecosystemAddresses.stateTransition.chainTypeManagerProxy
+        );
 
         ecosystemConfig = ctmScript.getConfig();
 
-        // Get bridgehub from the CTM script's discovered addresses
-        addresses.bridgehub = L1Bridgehub(ecosystemAddresses.bridgehub.bridgehubProxy);
-        addresses.chainTypeManager = IChainTypeManager(ctmAddresses.stateTransition.chainTypeManagerProxy);
-        addresses.ctmDeploymentTracker = CTMDeploymentTracker(address(addresses.bridgehub.l1CtmDeployer()));
-
-        addresses.sharedBridge = L1AssetRouter(ecosystemAddresses.bridges.l1AssetRouterProxy);
-        addresses.l1Nullifier = L1Nullifier(ecosystemAddresses.bridges.l1NullifierProxy);
-        addresses.l1NativeTokenVault = L1NativeTokenVault(payable(address(addresses.l1Nullifier.l1NativeTokenVault())));
-
-        addresses.chainRegistrationSender = ChainRegistrationSender(
-            ecosystemAddresses.bridgehub.chainRegistrationSenderProxy
+        addresses.bridgehub = L1Bridgehub(addresses.ecosystemAddresses.bridgehub.bridgehubProxy);
+        addresses.interopCenter = IInteropCenter(addresses.ecosystemAddresses.bridgehub.interopCenterProxy);
+        addresses.chainTypeManager = IChainTypeManager(
+            addresses.ecosystemAddresses.stateTransition.chainTypeManagerProxy
         );
-        _acceptOwnershipCore();
-        _acceptOwnershipCTM();
+        addresses.ctmDeploymentTracker = CTMDeploymentTracker(
+            addresses.ecosystemAddresses.bridgehub.ctmDeploymentTrackerProxy
+        );
+
+        addresses.sharedBridge = L1AssetRouter(addresses.ecosystemAddresses.bridges.l1AssetRouterProxy);
+        addresses.l1Nullifier = L1Nullifier(addresses.ecosystemAddresses.bridges.l1NullifierProxy);
+        addresses.l1NativeTokenVault = L1NativeTokenVault(
+            payable(addresses.ecosystemAddresses.vaults.l1NativeTokenVaultProxy)
+        );
+        addresses.l1AssetTracker = L1AssetTracker(addresses.ecosystemAddresses.bridgehub.assetTrackerProxy);
+        addresses.chainRegistrationSender = ChainRegistrationSender(
+            addresses.ecosystemAddresses.bridgehub.chainRegistrationSenderProxy
+        );
+
+        _acceptOwnership();
         _setEraBatch();
 
         addresses.bridgehubOwnerAddress = addresses.bridgehub.owner();
     }
 
-    function _acceptOwnershipCore() private {
+    function _acceptOwnership() private {
         vm.startPrank(addresses.bridgehub.pendingOwner());
         addresses.bridgehub.acceptOwnership();
         addresses.sharedBridge.acceptOwnership();
-        IOwnable(ecosystemAddresses.bridgehub.chainAssetHandlerProxy).acceptOwnership();
         addresses.ctmDeploymentTracker.acceptOwnership();
-        vm.stopPrank();
-    }
-
-    function _acceptOwnershipCTM() private {
-        vm.startPrank(IOwnable(address(addresses.chainTypeManager)).pendingOwner());
-        IOwnable(address(addresses.chainTypeManager)).acceptOwnership();
-        IOwnable(address(ctmAddresses.daAddresses.rollupDAManager)).acceptOwnership();
         vm.stopPrank();
     }
 

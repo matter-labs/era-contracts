@@ -8,11 +8,11 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {FinalizeL1DepositParams} from "contracts/common/Messaging.sol";
-import {Utils} from "../utils/Utils.sol";
+import {Utils} from "../Utils.sol";
 import {AltL2ToL1Log, AltLog, AltTransactionReceipt, L2ToL1Log, L2ToL1LogProof, Log, TransactionReceipt} from "./ReceipTypes.sol";
 
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IGetters} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -29,7 +29,7 @@ contract ZKSProvider is Script {
         FinalizeL1DepositParams memory params = getFinalizeWithdrawalParams(chainId, l2RpcUrl, withdrawalHash, index);
 
         IBridgehubBase bridgehub = IBridgehubBase(l1Bridgehub);
-        IL1AssetRouter assetRouter = IL1AssetRouter(address(bridgehub.assetRouter()));
+        IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
         IL1Nullifier nullifier = IL1Nullifier(assetRouter.L1_NULLIFIER());
 
         waitForBatchToBeExecuted(l1Bridgehub, chainId, params);
