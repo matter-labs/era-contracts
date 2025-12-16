@@ -43,6 +43,10 @@ abstract contract Create2FactoryUtils is Script {
         create2FactoryParams = Create2FactoryParams({factoryAddress: _factoryAddress, factorySalt: _factorySalt});
     }
 
+    function getCreate2FactoryParams() public view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
+        return (create2FactoryParams.factoryAddress, create2FactoryParams.factorySalt);
+    }
+
     /// @notice Instantiates the Create2Factory.
     /// If a factory address is configured and contains code, that address is used.
     /// Otherwise, if the deterministic address is deployed, then it is used.
@@ -64,6 +68,7 @@ abstract contract Create2FactoryUtils is Script {
             console.log("Using configured Create2Factory address:", deployedAddress);
         } else if (isDeterministicDeployed) {
             deployedAddress = DETERMINISTIC_CREATE2_ADDRESS;
+            create2FactoryParams.factoryAddress = DETERMINISTIC_CREATE2_ADDRESS;
             console.log("Using deterministic Create2Factory address:", deployedAddress);
         } else {
             deployedAddress = Utils.deployCreate2Factory();

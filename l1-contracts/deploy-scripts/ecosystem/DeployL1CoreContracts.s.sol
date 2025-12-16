@@ -307,6 +307,9 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
+
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = getCreate2FactoryParams();
+        savePermanentValues(create2FactorySalt, create2FactoryAddr);
     }
 
     function createPermanentValuesIfNeeded() internal virtual {
