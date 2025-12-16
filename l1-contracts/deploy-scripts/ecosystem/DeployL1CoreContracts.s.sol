@@ -334,9 +334,13 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         if (!vm.isFile(permanentValuesPath)) {
             vm.writeFile(permanentValuesPath, "[contracts]\n");
         }
-        
+
         vm.serializeAddress("contracts2", "create2_factory_addr", create2FactoryAddr);
-        string memory permanentContracts = vm.serializeString("contracts2", "create2_factory_salt", vm.toString(create2FactorySalt));
+        string memory permanentContracts = vm.serializeString(
+            "contracts2",
+            "create2_factory_salt",
+            vm.toString(create2FactorySalt)
+        );
         string memory toml1 = vm.serializeString("root3", "permanent_contracts", permanentContracts);
 
         vm.writeToml(toml1, permanentValuesPath);
@@ -350,9 +354,9 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
 
         address create2FactoryAddr;
         bytes32 create2FactorySalt;
-        if (vm.keyExistsToml(outputDeployL1Toml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = outputDeployL1Toml.readAddress("$.contracts.create2_factory_addr");
-            create2FactorySalt = outputDeployL1Toml.readBytes32("$.contracts.create2_factory_salt");
+        if (vm.keyExistsToml(outputDeployL1Toml, "$.permanent_contracts.create2_factory_addr")) {
+            create2FactoryAddr = outputDeployL1Toml.readAddress("$.permanent_contracts.create2_factory_addr");
+            create2FactorySalt = outputDeployL1Toml.readBytes32("$.permanent_contracts.create2_factory_salt");
         }
 
         // Only update if create2FactoryAddr is non-zero

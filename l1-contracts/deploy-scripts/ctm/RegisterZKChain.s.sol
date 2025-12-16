@@ -610,9 +610,9 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         string memory permanentValuesPath
     ) internal view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
         string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-        create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
-        if (vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
+        create2FactorySalt = permanentValuesToml.readBytes32("$.permanent_contracts.create2_factory_salt");
+        if (vm.keyExistsToml(permanentValuesToml, "$.permanent_contracts.create2_factory_addr")) {
+            create2FactoryAddr = permanentValuesToml.readAddress("$.permanent_contracts.create2_factory_addr");
         }
     }
 }

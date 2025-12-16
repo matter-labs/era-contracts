@@ -61,10 +61,10 @@ contract EcosystemUpgrade_v31 is Script, DefaultEcosystemUpgrade {
         string memory outputDeployL1Toml = vm.readFile(string.concat(root, "/script-out/output-deploy-l1.toml"));
         string memory outputDeployCTMToml = vm.readFile(string.concat(root, "/script-out/output-deploy-ctm.toml"));
 
-        bytes32 create2FactorySalt = outputDeployL1Toml.readBytes32("$.contracts.create2_factory_salt");
+        bytes32 create2FactorySalt = outputDeployL1Toml.readBytes32("$.permanent_contracts.create2_factory_salt");
         address create2FactoryAddr;
-        if (vm.keyExistsToml(outputDeployL1Toml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = outputDeployL1Toml.readAddress("$.contracts.create2_factory_addr");
+        if (vm.keyExistsToml(outputDeployL1Toml, "$.permanent_contracts.create2_factory_addr")) {
+            create2FactoryAddr = outputDeployL1Toml.readAddress("$.permanent_contracts.create2_factory_addr");
         }
         address ctm = outputDeployCTMToml.readAddress(
             "$.deployed_addresses.state_transition.state_transition_proxy_addr"

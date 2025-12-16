@@ -141,7 +141,6 @@ abstract contract DeployCTMUtils is DeployUtils {
         address bridgehubAddress
     ) internal virtual {
         string memory toml = vm.readFile(configPath);
-        string memory permanentToml = vm.readFile(permanentValuesPath);
 
         config.l1ChainId = block.chainid;
         config.deployerAddress = msg.sender;
@@ -163,12 +162,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
         }
 
-        // Read create2Factory values from permanent values file
-        bytes32 create2FactorySalt = permanentToml.readBytes32("$.contracts.create2_factory_salt");
-        address create2FactoryAddr;
-        if (vm.keyExistsToml(permanentToml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = permanentToml.readAddress("$.contracts.create2_factory_addr");
-        }
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesPath);
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"
