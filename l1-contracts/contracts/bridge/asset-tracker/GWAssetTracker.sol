@@ -505,7 +505,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes32 _baseTokenAssetId,
         bytes memory _message
     ) internal {
-        // slither-disable-next-line unused-return
+        // slither-disable-next-line unused-return 
         (bytes4 functionSignature, , uint256 amount) = DataEncoding.decodeBaseTokenFinalizeWithdrawalData(_message);
         require(
             functionSignature == IMailboxImpl.finalizeEthWithdrawal.selector,
