@@ -133,11 +133,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         string memory upgradeToml = vm.readFile(upgradeInputPath);
         string memory toml = vm.readFile(newConfigPath);
 
-        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
-        address create2FactoryAddr;
-        if (vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
-        }
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesInputPath);
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
         //        config.supportL2LegacySharedBridgeTest = permanentValuesToml.readBool("$.support_l2_legacy_shared_bridge_test");
         additionalConfig.newProtocolVersion = upgradeToml.readUint("$.contracts.new_protocol_version");

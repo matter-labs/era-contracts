@@ -157,11 +157,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
         string memory toml = vm.readFile(newConfigPath);
 
-        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
-        address create2FactoryAddr;
-        if (vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
-        }
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesInputPath);
 
         // Can we safely get it from the CTM? is it always exists even for zksync os ?
         uint256 eraChainId = permanentValuesToml.readUint("$.era_chain_id");

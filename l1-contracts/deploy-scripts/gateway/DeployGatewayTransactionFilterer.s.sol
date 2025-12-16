@@ -21,14 +21,14 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils, IDeplo
 
     function initializeConfig(address bridgehub, address chainAdmin, address chainProxyAdmin) internal {
         // Read create2 factory parameters from permanent-values.toml
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(getPermanentValuesPath());
+
+        _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
+    }
+
+    function getPermanentValuesPath() internal view returns (string memory) {
         string memory root = vm.projectRoot();
-        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
-        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-
-        address create2FactoryAddress = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
-        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
-
-        _initCreate2FactoryParams(create2FactoryAddress, create2FactorySalt);
+        return string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
     }
 
     function run(address bridgehub, address chainAdmin, address chainProxyAdmin) public returns (address proxy) {

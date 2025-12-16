@@ -181,11 +181,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     ) internal virtual returns (PermanentCTMConfig memory permanentConfig) {
         string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
 
-        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
-        address create2FactoryAddr;
-        if (vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
-        }
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesInputPath);
 
         address ctm = permanentValuesToml.readAddress("$.contracts.ctm_proxy_address");
         address bytecodesSupplier = permanentValuesToml.readAddress("$.contracts.l1_bytecodes_supplier_addr");

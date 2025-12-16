@@ -173,10 +173,9 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         config.governance = ctmAddresses.governance;
 
         // Read create2 factory values from permanent values file
-        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
-        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-        config.create2FactoryAddress = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
-        config.create2Salt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(getPermanentValuesPath());
+        config.create2FactoryAddress = create2FactoryAddr;
+        config.create2Salt = create2FactorySalt;
 
         config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
     }
@@ -221,10 +220,9 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         config.governance = ctmAddresses.governance;
 
         // Read create2 factory values from permanent values file
-        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
-        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-        config.create2FactoryAddress = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
-        config.create2Salt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(getPermanentValuesPath());
+        config.create2FactoryAddress = create2FactoryAddr;
+        config.create2Salt = create2FactorySalt;
 
         path = string.concat(root, vm.envString("ZK_CHAIN_CONFIG"));
         toml = vm.readFile(path);
@@ -601,5 +599,18 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         // We assume that the total value is 0
         governance.execute{value: 0}(operation);
         vm.stopBroadcast();
+    }
+
+    function getPermanentValuesPath() internal view returns (string memory) {
+        string memory root = vm.projectRoot();
+        return string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
+    }
+
+    function getPermanentValues(string memory permanentValuesPath) internal view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
+        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
+        create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
+        if (vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_addr")) {
+            create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
+        }
     }
 }

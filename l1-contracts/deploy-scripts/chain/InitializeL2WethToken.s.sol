@@ -46,10 +46,9 @@ contract InitializeL2WethTokenScript is Script {
         string memory root = vm.projectRoot();
 
         // Read create2 factory values from permanent values file
-        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
-        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-        config.create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
-        config.create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(getPermanentValuesPath());
+        config.create2FactoryAddr = create2FactoryAddr;
+        config.create2FactorySalt = create2FactorySalt;
 
         // Use AddressIntrospector to get addresses from deployed contracts
         AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
@@ -59,8 +58,8 @@ contract InitializeL2WethTokenScript is Script {
         config.bridgehubProxyAddr = bridgehubProxyAddr;
 
         // Parse some config from output of erc20 tokens deployment
-        path = string.concat(root, "/script-out/output-deploy-erc20.toml");
-        toml = vm.readFile(path);
+        string memory path = string.concat(root, "/script-out/output-deploy-erc20.toml");
+        string memory toml = vm.readFile(path);
 
         config.l1WethTokenAddr = toml.readAddress("$.tokens.WETH.address");
         config.l1WethTokenName = toml.readString("$.tokens.WETH.name");
@@ -125,5 +124,18 @@ contract InitializeL2WethTokenScript is Script {
             (config.l2WethTokenImplAddr, upgradeData)
         );
         return l2Calldata;
+    }
+
+    function getPermanentValuesPath() internal view returns (string memory) {
+        string memory root = vm.projectRoot();
+        return string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
+    }
+
+    function getPermanentValues(string memory permanentValuesPath) internal view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
+        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
+        create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
+        if (vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_addr")) {
+            create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
+        }
     }
 }

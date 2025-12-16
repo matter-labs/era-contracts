@@ -62,12 +62,9 @@ contract SetupLegacyBridge is Script, ISetupLegacyBridge {
         config.chainId = chainId;
 
         // Read create2 factory parameters from permanent-values.toml
-        string memory root = vm.projectRoot();
-        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
-        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-
-        addresses.create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
-        config.create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(getPermanentValuesPath());
+        addresses.create2FactoryAddr = create2FactoryAddr;
+        config.create2FactorySalt = create2FactorySalt;
 
         // Use AddressIntrospector to get addresses from deployed contracts
         AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
@@ -183,5 +180,18 @@ contract SetupLegacyBridge is Script, ISetupLegacyBridge {
 
     function deployViaCreate2(bytes memory _bytecode) internal returns (address) {
         return Utils.deployViaCreate2(_bytecode, config.create2FactorySalt, addresses.create2FactoryAddr);
+    }
+
+    function getPermanentValuesPath() internal view returns (string memory) {
+        string memory root = vm.projectRoot();
+        return string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
+    }
+
+    function getPermanentValues(string memory permanentValuesPath) internal view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
+        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
+        create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
+        if (vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_addr")) {
+            create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
+        }
     }
 }
