@@ -314,6 +314,11 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         string memory permanentValuesPath = getPermanentValuesPath();
         if (!vm.isFile(permanentValuesPath)) {
             savePermanentValues(hex"88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5", address(0));
+        } else {
+            string memory permanentValuesToml = vm.readFile(permanentValuesPath);
+            if (!vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_salt")) {
+                savePermanentValues(hex"88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5", address(0));
+            }
         }
         (address create2FactoryAddr, ) = getPermanentValues(getPermanentValuesPath());
         if (create2FactoryAddr.code.length == 0) {
