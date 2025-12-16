@@ -338,11 +338,11 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             vm.writeFile(permanentValuesPath, "[contracts]\n");
         }
 
-        vm.serializeAddress("contracts2", "create2_factory_addr", create2FactoryAddr);
-        string memory permanentContracts = vm.serializeString(
-            "contracts2",
-            "create2_factory_salt",
-            vm.toString(create2FactorySalt)
+        vm.serializeString("permanent_contracts", "create2_factory_salt", vm.toString(create2FactorySalt));
+        string memory permanentContracts = vm.serializeAddress(
+            "permanent_contracts",
+            "create2_factory_addr",
+            create2FactoryAddr
         );
         string memory toml1 = vm.serializeString("root3", "permanent_contracts", permanentContracts);
 
