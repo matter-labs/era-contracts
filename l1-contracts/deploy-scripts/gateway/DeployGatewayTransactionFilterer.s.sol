@@ -82,7 +82,7 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils, IDeplo
             toml.readAddress("$.chain_proxy_admin")
         );
     }
-    
+
     function saveOutput(address proxy) internal {
         // Save the address of the deployed proxy into an output TOML file.
         string memory outputToml = vm.serializeAddress("root", "gateway_tx_filterer_proxy", proxy);

@@ -131,7 +131,9 @@ contract InitializeL2WethTokenScript is Script {
         return string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
     }
 
-    function getPermanentValues(string memory permanentValuesPath) internal view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
+    function getPermanentValues(
+        string memory permanentValuesPath
+    ) internal view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
         string memory permanentValuesToml = vm.readFile(permanentValuesPath);
         create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
         if (vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_addr")) {

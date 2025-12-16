@@ -134,7 +134,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     function chainCreationParamsPath() internal virtual returns (string memory) {
         return string.concat(vm.projectRoot(), CHAIN_CREATION_PARAMS_PATH);
     }
-    
+
     function initializeConfig(
         string memory configPath,
         string memory permanentValuesPath,

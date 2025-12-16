@@ -315,7 +315,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         if (!vm.isFile(permanentValuesPath)) {
             savePermanentValues(hex"88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5", address(0));
         }
-        (address create2FactoryAddr,) = getPermanentValues(getPermanentValuesPath());
+        (address create2FactoryAddr, ) = getPermanentValues(getPermanentValuesPath());
         if (create2FactoryAddr.code.length == 0) {
             savePermanentValues(hex"88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5", address(0));
         }
@@ -346,7 +346,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             create2FactoryAddr = outputDeployL1Toml.readAddress("$.contracts.create2_factory_addr");
             create2FactorySalt = outputDeployL1Toml.readBytes32("$.contracts.create2_factory_salt");
         }
-
 
         // Only update if create2FactoryAddr is non-zero
         if (create2FactoryAddr != address(0)) {

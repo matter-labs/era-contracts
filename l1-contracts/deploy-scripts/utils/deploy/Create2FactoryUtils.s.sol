@@ -252,7 +252,9 @@ abstract contract Create2FactoryUtils is Script {
         return getPermanentValues(permanentValuesPath);
     }
 
-    function getPermanentValues(string memory permanentValuesPath) public view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
+    function getPermanentValues(
+        string memory permanentValuesPath
+    ) public view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
         // Read create2 factory values from permanent values file
         string memory permanentValuesToml = vm.readFile(permanentValuesPath);
 
