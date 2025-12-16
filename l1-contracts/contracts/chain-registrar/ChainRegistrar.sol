@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
 import {PubdataPricingMode} from "../state-transition/chain-deps/ZKChainStorage.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
@@ -196,7 +196,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
         address diamondProxy = IChainTypeManager(ctm).getZKChain(_chainId);
         address pendingChainAdmin = IGetters(diamondProxy).getPendingAdmin();
         address chainAdmin = IGetters(diamondProxy).getAdmin();
-        address l2BridgeAddress = IL1SharedBridgeLegacy(bridgehub.assetRouter()).l2BridgeAddress(_chainId);
+        address l2BridgeAddress = IL1SharedBridgeLegacy(address(bridgehub.assetRouter())).l2BridgeAddress(_chainId);
         if (l2BridgeAddress == address(0)) {
             revert BridgeIsNotRegistered();
         }

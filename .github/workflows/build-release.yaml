@@ -1,48 +1,57 @@
-name: Build and release(manual)
+name: Build and release(manual & tags)
 
 on:
   workflow_dispatch:
     inputs:
-      commit:
+      tag:
         type: string
-        description: SHA commit for build
-        required: false
-      prefix:
-        type: string
-        description: Prefix for release name
-        required: false
-        default: manual
+        description: tag to build from
+        required: true
+  create:
+    tags:
+      - "v*" # for main releases
+      - "zkos*" # for zk releases
 
 jobs:
   build-contracts:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Resolve tag
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "TAG=${{ inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            # For push/create on a tag, github.ref looks like 'refs/tags/<tag>'
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+          echo "Resolved TAG=${{ steps.vars.outputs.TAG }}"
+
       - name: Checkout the repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.commit }}
+          ref: ${{ steps.vars.outputs.TAG }}
           submodules: recursive
 
       - name: Install foundry-zksync
         run: |
           mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-34fe0bc655c6b15e869ffd465addde001f6b474d/foundry_nightly_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.30/foundry_zksync_v0.0.30_linux_amd64.tar.gz
+          tar zxf foundry_zksync_v0.0.30_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.18.0
+          node-version: 18.20.8
           cache: yarn
 
       - name: Init
         id: init
         run: |
           yarn
-          echo "release_tag=${{ inputs.prefix }}-${{ inputs.commit }}" >> $GITHUB_OUTPUT
 
       - name: Build l1 contracts
         working-directory: l1-contracts
@@ -67,12 +76,10 @@ jobs:
           tar -czvf system-contracts.tar.gz ./system-contracts
 
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.init.outputs.release_tag }}
+          tag_name: ${{ steps.vars.outputs.TAG }}
           fail_on_unmatched_files: true
-          target_commitish: ${{ inputs.commit }}
-          body: ""
           files: |
             l1-contracts.tar.gz
             l2-contracts.tar.gz

@@ -12,7 +12,6 @@ import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts
 
 import {RoleAccessDenied, TimeNotReached} from "contracts/common/L1ContractErrors.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
 
 contract ValidatorTimelockTest is Test {

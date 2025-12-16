@@ -163,6 +163,10 @@ interface IMailboxImpl is IZKChainBase {
         bytes32[] calldata _proof
     ) external view returns (bool);
 
+    /// @notice Returns whether deposits are paused on the chain.
+    /// @return Whether deposits are paused on the chain.
+    function depositsPaused() external view returns (bool);
+
     /// @notice New priority request event. Emitted when a request is placed into the priority queue.
     /// @param txId Serial number of the priority operation.
     /// @param txHash keccak256 hash of encoded transaction representation.

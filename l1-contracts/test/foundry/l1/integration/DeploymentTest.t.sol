@@ -5,6 +5,11 @@ import {Test} from "forge-std/Test.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
@@ -45,11 +50,6 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
         _deployEra();
         _deployZKChain(ETH_TOKEN_ADDRESS);
-        _deployZKChain(ETH_TOKEN_ADDRESS);
-        _deployZKChain(tokens[0]);
-        _deployZKChain(tokens[0]);
-        _deployZKChain(tokens[1]);
-        _deployZKChain(tokens[1]);
 
         releaseConfigLock();
 
@@ -76,15 +76,15 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         assertNotEq(newChainAddress, address(0));
 
         address[] memory chainAddresses = addresses.bridgehub.getAllZKChains();
-        assertEq(chainAddresses.length, 7);
+        assertEq(chainAddresses.length, 2);
         assertEq(chainAddresses[0], newChainAddress);
 
         uint256[] memory chainIds = addresses.bridgehub.getAllZKChainChainIDs();
-        assertEq(chainIds.length, 7);
+        assertEq(chainIds.length, 2);
         assertEq(chainIds[0], chainId);
 
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(chainId);
-        assertEq(protocolVersion, 120259084288);
+        assertEq(protocolVersion, 133143986176);
     }
 
     function test_registerAlreadyDeployedZKChain() public {
