@@ -86,16 +86,7 @@ contract DeployL1CoreUtils is DeployUtils {
         config.contracts.governanceMinDelay = toml.readUint("$.contracts.governance_min_delay");
         config.contracts.maxNumberOfChains = toml.readUint("$.contracts.max_number_of_chains");
 
-        // Read create2 factory values from permanent values file
-        string memory root = vm.projectRoot();
-        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
-        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-
-        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
-        address create2FactoryAddr;
-        if (vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
-        }
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(getPermanentValuesPath());
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
         instantiateCreate2Factory();
 
@@ -103,6 +94,11 @@ contract DeployL1CoreUtils is DeployUtils {
             config.eraDiamondProxyAddress = toml.readAddress("$.contracts.era_diamond_proxy_addr");
         }
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
+    }
+
+    function getPermanentValuesPath() internal view virtual returns (string memory) {
+        string memory root = vm.projectRoot();
+        return string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
     }
 
     ////////////////////////////// Contract deployment modes /////////////////////////////////

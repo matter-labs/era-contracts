@@ -201,10 +201,6 @@ library AddressIntrospector {
         return _zkChain.facetAddresses();
     }
 
-    function getEraChainId(address assetRouter) public view returns (uint256) {
-        return L1AssetRouter(assetRouter).ERA_CHAIN_ID();
-    }
-
     /// @notice Convenience method to fetch everything for a specific chainId via a Bridgehub instance
     function getAllForChain(
         IL1Bridgehub _bridgehub,
