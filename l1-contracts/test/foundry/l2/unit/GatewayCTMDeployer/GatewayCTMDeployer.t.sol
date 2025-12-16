@@ -7,6 +7,8 @@ import {console2 as console} from "forge-std/Script.sol";
 
 import {DAContracts, DeployedContracts, GatewayCTMDeployer, GatewayCTMDeployerConfig, StateTransitionContracts} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
+
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
@@ -23,16 +25,17 @@ import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifie
 import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
 import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
 import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
-import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
+import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -59,23 +62,24 @@ contract GatewayCTMDeployerTest is Test {
 
     // This is done merely to publish the respective bytecodes.
     function _predeployContracts() internal {
-        new MailboxFacet(1, 1);
+        new MailboxFacet(1, 1, L2_CHAIN_ASSET_HANDLER_ADDR, IEIP7702Checker(address(0)), false);
         new ExecutorFacet(1);
         new GettersFacet();
-        new AdminFacet(1, RollupDAManager(address(0)));
+        new AdminFacet(1, RollupDAManager(address(0)), false);
 
         new DiamondInit(false);
         new L1GenesisUpgrade();
         new RollupDAManager();
         new ValidiumL1DAValidator();
         new RelayedSLDAValidator();
-        new ChainTypeManager(address(0), address(0));
+        new ZKsyncOSChainTypeManager(address(0), address(0));
+        new EraChainTypeManager(address(0), address(0));
         new ProxyAdmin();
 
         new EraVerifierFflonk();
         new EraVerifierPlonk();
 
-        new TestnetVerifier(EraVerifierFflonk(address(0)), EraVerifierPlonk(address(0)), address(0), false);
+        new EraTestnetVerifier(EraVerifierFflonk(address(0)), EraVerifierPlonk(address(0)));
 
         new ValidatorTimelock(L2_BRIDGEHUB_ADDR);
         new ServerNotifier();
@@ -97,24 +101,9 @@ contract GatewayCTMDeployerTest is Test {
             executorSelectors: new bytes4[](2),
             mailboxSelectors: new bytes4[](2),
             gettersSelectors: new bytes4[](2),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            }),
-            feeParams: FeeParams({
-                // Just random values
-                pubdataPricingMode: PubdataPricingMode.Rollup,
-                batchOverheadL1Gas: uint32(1_000_000),
-                maxPubdataPerBatch: uint32(500_000),
-                maxL2GasPerBatch: uint32(2_000_000_000),
-                priorityTxMaxPubdata: uint32(99_000),
-                minimalL2GasPrice: uint64(20000000)
-            }),
             bootloaderHash: bytes32(uint256(0xabc)),
             defaultAccountHash: bytes32(uint256(0xdef)),
             evmEmulatorHash: bytes32(uint256(0xdef)),
-            priorityTxMaxGasLimit: 100000,
             genesisRoot: bytes32(uint256(0x123)),
             genesisRollupLeafIndex: 10,
             genesisBatchCommitment: bytes32(uint256(0x456)),
@@ -169,6 +158,7 @@ contract GatewayCTMDeployerTest is Test {
 
 library DeployedContractsComparator {
     function compareDeployedContracts(DeployedContracts memory a, DeployedContracts memory b) internal pure {
+        require(a.multicall3 == b.multicall3, "multicall3 differs");
         compareStateTransitionContracts(a.stateTransition, b.stateTransition);
         compareDAContracts(a.daContracts, b.daContracts);
         compareBytes(a.diamondCutData, b.diamondCutData, "diamondCutData");

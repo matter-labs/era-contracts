@@ -4,11 +4,11 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Utils} from "./Utils.sol";
-
+import {console} from "forge-std/console.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -22,10 +22,10 @@ contract UtilsCallMockerTest is Test {
         address assetRouter,
         bytes32 baseTokenAssetId
     ) public {
-        address assetTracker = address(0x1234567890876543567890);
-        address nativeTokenVault = address(0x1234567890876543567890);
+        address assetTracker = makeAddr("assetTracker");
+        address nativeTokenVault = makeAddr("nativeTokenVault");
         if (assetRouter == address(0)) {
-            assetRouter = address(0x1234567890876543567890);
+            assetRouter = makeAddr("assetRouter");
         } else if (assetRouter == L2_ASSET_ROUTER_ADDR) {
             nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
             assetTracker = L2_ASSET_TRACKER_ADDR;

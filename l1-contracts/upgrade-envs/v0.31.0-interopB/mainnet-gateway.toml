@@ -1,0 +1,5 @@
+[chain]
+chain_id = 9075
+
+[contracts]
+bridgehub_proxy_address = "0x303a465B659cBB0ab36eE643eA362c509EEb5213"

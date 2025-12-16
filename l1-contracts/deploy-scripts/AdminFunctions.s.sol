@@ -9,10 +9,10 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {ChainInfoFromBridgehub, Utils} from "./Utils.sol";
+import {ChainInfoFromBridgehub, Utils} from "./utils/Utils.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -22,9 +22,9 @@ import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainS
 
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehubBase.sol";
+import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {BridgehubBurnCTMAssetData} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
@@ -425,6 +425,28 @@ contract AdminFunctions is Script {
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
 
+    function pauseDepositsBeforeInitiatingMigration(address _bridgehub, uint256 _chainId, bool _shouldSend) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IAdmin.pauseDepositsBeforeInitiatingMigration, ())
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
+    }
+
+    function unpauseDeposits(address _bridgehub, uint256 _chainId, bool _shouldSend) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: chainInfo.diamondProxy, value: 0, data: abi.encodeCall(IAdmin.unpauseDeposits, ())});
+
+        saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
+    }
+
     function setDAValidatorPair(
         address _bridgehub,
         uint256 _chainId,
@@ -707,7 +729,7 @@ contract AdminFunctions is Script {
             BridgehubBurnCTMAssetData({
                 chainId: data.l2ChainId,
                 ctmData: abi.encode(l2ChainInfo.admin, data.l1DiamondCutData),
-                chainData: abi.encode(ChainTypeManager(l2ChainInfo.ctm).getProtocolVersion(data.l2ChainId))
+                chainData: abi.encode(IChainTypeManager(l2ChainInfo.ctm).getProtocolVersion(data.l2ChainId))
             })
         );
 

@@ -4,22 +4,27 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
+import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
+import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
-import {Utils} from "../Utils.sol";
+import {Utils} from "../utils/Utils.sol";
 
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
+
+import {DeployCTML1OrGateway, CTMCoreDeploymentConfig} from "../ctm/DeployCTML1OrGateway.sol";
+import {CTMContract} from "../ctm/DeployCTML1OrGateway.sol";
 
 // solhint-disable gas-custom-errors
 
@@ -51,19 +56,22 @@ library GatewayCTMDeployerHelper {
         uint256 eraChainId = config.eraChainId;
         uint256 l1ChainId = config.l1ChainId;
 
-        contracts.multicall3 = _deployInternal("Multicall3", "Multicall3.sol", hex"", innerConfig);
+        contracts.multicall3 = _deployInternalEmptyParams("Multicall3", "Multicall3.sol", innerConfig);
 
         contracts = _deployFacetsAndUpgrades(
             salt,
             eraChainId,
             l1ChainId,
             config.aliasedGovernanceAddress,
+            config.isZKsyncOS,
+            config,
             contracts,
             innerConfig
         );
         contracts = _deployVerifier(
             config.testnetVerifier,
             config.isZKsyncOS,
+            config,
             contracts,
             innerConfig,
             config.aliasedGovernanceAddress
@@ -72,18 +80,18 @@ library GatewayCTMDeployerHelper {
         contracts.stateTransition.validatorTimelockImplementation = _deployInternal(
             "ValidatorTimelock",
             "ValidatorTimelock.sol",
-            abi.encode(L2_BRIDGEHUB_ADDR),
-            innerConfig
+            innerConfig,
+            config,
+            contracts
         );
 
-        contracts.stateTransition.chainTypeManagerProxyAdmin = _deployInternal(
+        contracts.stateTransition.chainTypeManagerProxyAdmin = _deployInternalEmptyParams(
             "ProxyAdmin",
             "ProxyAdmin.sol",
-            hex"",
             innerConfig
         );
 
-        contracts.stateTransition.validatorTimelock = _deployInternal(
+        contracts.stateTransition.validatorTimelock = _deployInternalWithParams(
             "TransparentUpgradeableProxy",
             "TransparentUpgradeableProxy.sol",
             abi.encode(
@@ -97,26 +105,50 @@ library GatewayCTMDeployerHelper {
         contracts.stateTransition.serverNotifierProxy = _deployServerNotifier(
             contracts,
             innerConfig,
+            config,
+            contracts,
             ctmDeployerAddress
         );
 
         contracts = _deployCTM(salt, config, contracts, innerConfig);
     }
 
+    function getCTMCoreDeploymentConfig(
+        GatewayCTMDeployerConfig memory _config,
+        DeployedContracts memory _deployedContracts
+    ) internal returns (CTMCoreDeploymentConfig memory) {
+        return
+            CTMCoreDeploymentConfig({
+                isZKsyncOS: _config.isZKsyncOS,
+                testnetVerifier: _config.testnetVerifier,
+                eraChainId: _config.eraChainId,
+                l1ChainId: _config.l1ChainId,
+                bridgehubProxy: L2_BRIDGEHUB_ADDR,
+                interopCenterProxy: L2_INTEROP_CENTER_ADDR,
+                rollupDAManager: _deployedContracts.daContracts.rollupDAManager,
+                chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
+                eip7702Checker: address(0),
+                verifierFflonk: _deployedContracts.stateTransition.verifierFflonk,
+                verifierPlonk: _deployedContracts.stateTransition.verifierPlonk,
+                ownerAddress: _config.aliasedGovernanceAddress
+            });
+    }
+
     function _deployServerNotifier(
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig,
+        GatewayCTMDeployerConfig memory config,
+        DeployedContracts memory contracts,
         address ctmDeployerAddress
     ) internal returns (address) {
-        address serverNotifierImplementation = _deployInternal(
+        address serverNotifierImplementation = _deployInternalEmptyParams(
             "ServerNotifier",
             "ServerNotifier.sol",
-            abi.encode(),
             innerConfig
         );
         _deployedContracts.stateTransition.serverNotifierImplementation = serverNotifierImplementation;
 
-        address serverNotifier = _deployInternal(
+        address serverNotifier = _deployInternalWithParams(
             "TransparentUpgradeableProxy",
             "TransparentUpgradeableProxy.sol",
             abi.encode(
@@ -135,54 +167,52 @@ library GatewayCTMDeployerHelper {
         uint256 _eraChainId,
         uint256 _l1ChainId,
         address _governanceAddress,
+        bool _isZKsyncOS,
+        GatewayCTMDeployerConfig memory _config,
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig
     ) internal returns (DeployedContracts memory) {
         _deployedContracts.stateTransition.mailboxFacet = _deployInternal(
             "MailboxFacet",
             "Mailbox.sol",
-            abi.encode(_eraChainId, _l1ChainId),
-            innerConfig
+            innerConfig,
+            _config,
+            _deployedContracts
         );
 
         _deployedContracts.stateTransition.executorFacet = _deployInternal(
             "ExecutorFacet",
             "Executor.sol",
-            abi.encode(_l1ChainId),
-            innerConfig
+            innerConfig,
+            _config,
+            _deployedContracts
         );
 
-        _deployedContracts.stateTransition.gettersFacet = _deployInternal(
+        _deployedContracts.stateTransition.gettersFacet = _deployInternalEmptyParams(
             "GettersFacet",
             "Getters.sol",
-            hex"",
             innerConfig
         );
 
-        address rollupDAManager;
-        (_deployedContracts, rollupDAManager) = _deployRollupDAManager(
-            _salt,
-            _governanceAddress,
-            _deployedContracts,
-            innerConfig
-        );
+        (_deployedContracts) = _deployRollupDAManager(_salt, _governanceAddress, _deployedContracts, innerConfig);
         _deployedContracts.stateTransition.adminFacet = _deployInternal(
             "AdminFacet",
             "Admin.sol",
-            abi.encode(_l1ChainId, rollupDAManager),
-            innerConfig
+            innerConfig,
+            _config,
+            _deployedContracts
         );
 
         _deployedContracts.stateTransition.diamondInit = _deployInternal(
             "DiamondInit",
             "DiamondInit.sol",
-            abi.encode(false),
-            innerConfig
+            innerConfig,
+            _config,
+            _deployedContracts
         );
-        _deployedContracts.stateTransition.genesisUpgrade = _deployInternal(
+        _deployedContracts.stateTransition.genesisUpgrade = _deployInternalEmptyParams(
             "L1GenesisUpgrade",
             "L1GenesisUpgrade.sol",
-            hex"",
             innerConfig
         );
 
@@ -192,6 +222,7 @@ library GatewayCTMDeployerHelper {
     function _deployVerifier(
         bool _testnetVerifier,
         bool _isZKsyncOS,
+        GatewayCTMDeployerConfig memory _config,
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig,
         address _verifierOwner
@@ -200,42 +231,58 @@ library GatewayCTMDeployerHelper {
         address verifierPlonk;
 
         if (_isZKsyncOS) {
-            verifierFflonk = _deployInternal(
+            verifierFflonk = _deployInternalEmptyParams(
                 "ZKsyncOSVerifierFflonk",
                 "ZKsyncOSVerifierFflonk.sol",
-                hex"",
                 innerConfig
             );
-            verifierPlonk = _deployInternal("ZKsyncOSVerifierPlonk", "ZKsyncOSVerifierPlonk.sol", hex"", innerConfig);
+            verifierPlonk = _deployInternalEmptyParams(
+                "ZKsyncOSVerifierPlonk",
+                "ZKsyncOSVerifierPlonk.sol",
+                innerConfig
+            );
         } else {
-            verifierFflonk = _deployInternal("EraVerifierFflonk", "EraVerifierFflonk.sol", hex"", innerConfig);
-            verifierPlonk = _deployInternal("EraVerifierPlonk", "EraVerifierPlonk.sol", hex"", innerConfig);
+            verifierFflonk = _deployInternalEmptyParams("EraVerifierFflonk", "EraVerifierFflonk.sol", innerConfig);
+            verifierPlonk = _deployInternalEmptyParams("EraVerifierPlonk", "EraVerifierPlonk.sol", innerConfig);
         }
 
         _deployedContracts.stateTransition.verifierFflonk = verifierFflonk;
         _deployedContracts.stateTransition.verifierPlonk = verifierPlonk;
 
         if (_testnetVerifier) {
-            _deployedContracts.stateTransition.verifier = _deployInternal(
-                "TestnetVerifier",
-                "TestnetVerifier.sol",
-                abi.encode(verifierFflonk, verifierPlonk, _verifierOwner, _isZKsyncOS),
-                innerConfig
-            );
+            if (_isZKsyncOS) {
+                _deployedContracts.stateTransition.verifier = _deployInternal(
+                    "ZKsyncOSTestnetVerifier",
+                    "ZKsyncOSTestnetVerifier.sol",
+                    innerConfig,
+                    _config,
+                    _deployedContracts
+                );
+            } else {
+                _deployedContracts.stateTransition.verifier = _deployInternal(
+                    "EraTestnetVerifier",
+                    "EraTestnetVerifier.sol",
+                    innerConfig,
+                    _config,
+                    _deployedContracts
+                );
+            }
         } else {
             if (_isZKsyncOS) {
                 _deployedContracts.stateTransition.verifier = _deployInternal(
                     "ZKsyncOSDualVerifier",
                     "ZKsyncOSDualVerifier.sol",
-                    abi.encode(verifierFflonk, verifierPlonk, _verifierOwner),
-                    innerConfig
+                    innerConfig,
+                    _config,
+                    _deployedContracts
                 );
             } else {
                 _deployedContracts.stateTransition.verifier = _deployInternal(
                     "EraDualVerifier",
                     "EraDualVerifier.sol",
-                    abi.encode(verifierFflonk, verifierPlonk),
-                    innerConfig
+                    innerConfig,
+                    _config,
+                    _deployedContracts
                 );
             }
         }
@@ -247,20 +294,18 @@ library GatewayCTMDeployerHelper {
         address _governanceAddress,
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig
-    ) internal returns (DeployedContracts memory, address) {
-        address daManager = _deployInternal("RollupDAManager", "RollupDAManager.sol", hex"", innerConfig);
+    ) internal returns (DeployedContracts memory) {
+        address daManager = _deployInternalEmptyParams("RollupDAManager", "RollupDAManager.sol", innerConfig);
 
-        address validiumDAValidator = _deployInternal(
+        address validiumDAValidator = _deployInternalEmptyParams(
             "ValidiumL1DAValidator",
             "ValidiumL1DAValidator.sol",
-            hex"",
             innerConfig
         );
 
-        address relayedSLDAValidator = _deployInternal(
+        address relayedSLDAValidator = _deployInternalEmptyParams(
             "RelayedSLDAValidator",
             "RelayedSLDAValidator.sol",
-            hex"",
             innerConfig
         );
 
@@ -268,7 +313,7 @@ library GatewayCTMDeployerHelper {
         _deployedContracts.daContracts.relayedSLDAValidator = relayedSLDAValidator;
         _deployedContracts.daContracts.validiumDAValidator = validiumDAValidator;
 
-        return (_deployedContracts, daManager);
+        return (_deployedContracts);
     }
 
     function _deployCTM(
@@ -277,12 +322,23 @@ library GatewayCTMDeployerHelper {
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig
     ) internal returns (DeployedContracts memory) {
-        _deployedContracts.stateTransition.chainTypeManagerImplementation = _deployInternal(
-            "ChainTypeManager",
-            "ChainTypeManager.sol",
-            abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR),
-            innerConfig
-        );
+        if (_config.isZKsyncOS) {
+            _deployedContracts.stateTransition.chainTypeManagerImplementation = _deployInternal(
+                "ZKsyncOSChainTypeManager",
+                "ZKsyncOSChainTypeManager.sol",
+                innerConfig,
+                _config,
+                _deployedContracts
+            );
+        } else {
+            _deployedContracts.stateTransition.chainTypeManagerImplementation = _deployInternal(
+                "EraChainTypeManager",
+                "EraChainTypeManager.sol",
+                innerConfig,
+                _config,
+                _deployedContracts
+            );
+        }
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
@@ -312,12 +368,9 @@ library GatewayCTMDeployerHelper {
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(_deployedContracts.stateTransition.verifier),
-            verifierParams: _config.verifierParams,
             l2BootloaderBytecodeHash: _config.bootloaderHash,
             l2DefaultAccountBytecodeHash: _config.defaultAccountHash,
-            l2EvmEmulatorBytecodeHash: _config.evmEmulatorHash,
-            priorityTxMaxGasLimit: _config.priorityTxMaxGasLimit,
-            feeParams: _config.feeParams
+            l2EvmEmulatorBytecodeHash: _config.evmEmulatorHash
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
@@ -345,13 +398,15 @@ library GatewayCTMDeployerHelper {
             serverNotifier: _deployedContracts.stateTransition.serverNotifierProxy
         });
 
-        _deployedContracts.stateTransition.chainTypeManagerProxy = _deployInternal(
+        bytes memory initCalldata = abi.encodeCall(IChainTypeManager.initialize, (diamondInitData));
+
+        _deployedContracts.stateTransition.chainTypeManagerProxy = _deployInternalWithParams(
             "TransparentUpgradeableProxy",
             "TransparentUpgradeableProxy.sol",
             abi.encode(
                 _deployedContracts.stateTransition.chainTypeManagerImplementation,
                 _deployedContracts.stateTransition.chainTypeManagerProxyAdmin,
-                abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))
+                initCalldata
             ),
             innerConfig
         );
@@ -359,7 +414,44 @@ library GatewayCTMDeployerHelper {
         return _deployedContracts;
     }
 
+    function _deployInternalEmptyParams(
+        string memory contractName,
+        string memory fileName,
+        InnerDeployConfig memory config
+    ) private returns (address) {
+        return _deployInternalInner(contractName, fileName, hex"", config);
+    }
+
+    function _deployInternalWithParams(
+        string memory contractName,
+        string memory fileName,
+        bytes memory params,
+        InnerDeployConfig memory config
+    ) private returns (address) {
+        return _deployInternalInner(contractName, fileName, params, config);
+    }
+
     function _deployInternal(
+        string memory contractName,
+        string memory fileName,
+        InnerDeployConfig memory config,
+        GatewayCTMDeployerConfig memory _config,
+        DeployedContracts memory _deployedContracts
+    ) private returns (address) {
+        return
+            _deployInternalInner(
+                contractName,
+                fileName,
+                DeployCTML1OrGateway.getCreationCalldata(
+                    getCTMCoreDeploymentConfig(_config, _deployedContracts),
+                    DeployCTML1OrGateway.getCTMContractFromName(contractName),
+                    false
+                ),
+                config
+            );
+    }
+
+    function _deployInternalInner(
         string memory contractName,
         string memory fileName,
         bytes memory params,
@@ -379,7 +471,7 @@ library GatewayCTMDeployerHelper {
     /// @notice List of factory dependencies needed for the correct execution of
     /// CTMDeployer and healthy functionaling of the system overall
     function getListOfFactoryDeps() external returns (bytes[] memory dependencies) {
-        uint256 totalDependencies = 24;
+        uint256 totalDependencies = 25;
         dependencies = new bytes[](totalDependencies);
         uint256 index = 0;
 
@@ -399,11 +491,15 @@ library GatewayCTMDeployerHelper {
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraVerifierPlonk.sol", "EraVerifierPlonk");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSVerifierFflonk.sol", "ZKsyncOSVerifierFflonk");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSVerifierPlonk.sol", "ZKsyncOSVerifierPlonk");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("TestnetVerifier.sol", "TestnetVerifier");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraTestnetVerifier.sol", "EraTestnetVerifier");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraDualVerifier.sol", "EraDualVerifier");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSDualVerifier.sol", "ZKsyncOSDualVerifier");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ValidatorTimelock.sol", "ValidatorTimelock");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ChainTypeManager.sol", "ChainTypeManager");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1(
+            "ZKsyncOSChainTypeManager.sol",
+            "ZKsyncOSChainTypeManager"
+        );
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraChainTypeManager.sol", "EraChainTypeManager");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ProxyAdmin.sol", "ProxyAdmin");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1(
             "TransparentUpgradeableProxy.sol",

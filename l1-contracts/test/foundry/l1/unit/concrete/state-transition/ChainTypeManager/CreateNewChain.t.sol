@@ -6,10 +6,10 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {HashMismatch, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 contract createNewChainTest is ChainTypeManagerTest {
     function setUp() public {

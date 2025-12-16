@@ -13,7 +13,7 @@ import {BatchHashMismatch, CantExecuteUnprovenBatches, NonSequentialBatch, Prior
 import {PriorityOpsBatchInfo, PriorityTree} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InteropRoot} from "contracts/common/Messaging.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
 
 contract ExecutingTest is ExecutorTest {
     using stdStorage for StdStorage;
@@ -46,7 +46,7 @@ contract ExecutingTest is ExecutorTest {
         priorityOpsHashes = hashes;
     }
 
-    function getV30UpgradeChainBatchNumberLocation(bytes32 _chainId) internal pure returns (bytes32) {
+    function getV31UpgradeChainBatchNumberLocation(bytes32 _chainId) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(_chainId, uint256(11)));
     }
 
@@ -181,7 +181,7 @@ contract ExecutingTest is ExecutorTest {
             abi.encode()
         );
 
-        vm.store(address(messageRoot), getV30UpgradeChainBatchNumberLocation(bytes32(eraChainId)), bytes32(uint256(1)));
+        vm.store(address(messageRoot), getV31UpgradeChainBatchNumberLocation(bytes32(l2ChainId)), bytes32(uint256(1)));
         executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData);
     }
 

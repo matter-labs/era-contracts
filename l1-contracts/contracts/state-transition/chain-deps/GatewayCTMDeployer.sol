@@ -19,19 +19,21 @@ import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifier
 import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
 import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 
-import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
+import {IVerifier} from "../chain-interfaces/IVerifier.sol";
+import {IEIP7702Checker} from "../chain-interfaces/IEIP7702Checker.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
-import {TestnetVerifier} from "../verifiers/TestnetVerifier.sol";
+import {EraTestnetVerifier} from "../verifiers/EraTestnetVerifier.sol";
+import {ZKsyncOSTestnetVerifier} from "../verifiers/ZKsyncOSTestnetVerifier.sol";
 import {ValidatorTimelock} from "../ValidatorTimelock.sol";
-import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
 
 import {DiamondInit} from "./DiamondInit.sol";
 import {L1GenesisUpgrade} from "../../upgrades/L1GenesisUpgrade.sol";
 import {Diamond} from "../libraries/Diamond.sol";
 
-import {ChainTypeManager} from "../ChainTypeManager.sol";
+import {ZKsyncOSChainTypeManager} from "../ZKsyncOSChainTypeManager.sol";
+import {EraChainTypeManager} from "../EraChainTypeManager.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {ROLLUP_L2_DA_COMMITMENT_SCHEME} from "../../common/Config.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
@@ -63,21 +65,12 @@ struct GatewayCTMDeployerConfig {
     bytes4[] mailboxSelectors;
     /// @notice Array of function selectors for the Getters facet.
     bytes4[] gettersSelectors;
-    /// @notice Parameters for the verifier contract.
-    VerifierParams verifierParams;
-    /// @notice Parameters related to fees.
-    /// @dev They are mainly related to the L1->L2 transactions, fees for
-    /// which are not processed on Gateway. However, we still need these
-    /// values to deploy new chain's instances on Gateway.
-    FeeParams feeParams;
     /// @notice Hash of the bootloader bytecode.
     bytes32 bootloaderHash;
     /// @notice Hash of the default account bytecode.
     bytes32 defaultAccountHash;
     /// @notice Hash of the EVM emulator bytecode.
     bytes32 evmEmulatorHash;
-    /// @notice Maximum gas limit for priority transactions.
-    uint256 priorityTxMaxGasLimit;
     /// @notice Root hash of the genesis state.
     bytes32 genesisRoot;
     /// @notice Leaf index in the genesis rollup.
@@ -188,7 +181,8 @@ contract GatewayCTMDeployer {
             _eraChainId: eraChainId,
             _l1ChainId: l1ChainId,
             _aliasedGovernanceAddress: _config.aliasedGovernanceAddress,
-            _deployedContracts: contracts
+            _deployedContracts: contracts,
+            _testnetVerifier: _config.testnetVerifier
         });
         // solhint-disable-next-line func-named-parameters
         _deployVerifier(salt, _config.testnetVerifier, _config.isZKsyncOS, contracts, _config.aliasedGovernanceAddress);
@@ -222,10 +216,17 @@ contract GatewayCTMDeployer {
         uint256 _eraChainId,
         uint256 _l1ChainId,
         address _aliasedGovernanceAddress,
-        DeployedContracts memory _deployedContracts
+        DeployedContracts memory _deployedContracts,
+        bool _testnetVerifier
     ) internal {
         _deployedContracts.stateTransition.mailboxFacet = address(
-            new MailboxFacet{salt: _salt}(_eraChainId, _l1ChainId)
+            new MailboxFacet{salt: _salt}({
+                _eraChainId: _eraChainId,
+                _l1ChainId: _l1ChainId,
+                _chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
+                _eip7702Checker: IEIP7702Checker(address(0)),
+                _isTestnet: _testnetVerifier
+            })
         );
         _deployedContracts.stateTransition.executorFacet = address(new ExecutorFacet{salt: _salt}(_l1ChainId));
         _deployedContracts.stateTransition.gettersFacet = address(new GettersFacet{salt: _salt}());
@@ -236,7 +237,11 @@ contract GatewayCTMDeployer {
             _deployedContracts
         );
         _deployedContracts.stateTransition.adminFacet = address(
-            new AdminFacet{salt: _salt}(_l1ChainId, rollupDAManager)
+            new AdminFacet{salt: _salt}({
+                _l1ChainId: _l1ChainId,
+                _rollupDAManager: rollupDAManager,
+                _isTestnet: _testnetVerifier
+            })
         );
 
         _deployedContracts.stateTransition.diamondInit = address(new DiamondInit{salt: _salt}(false));
@@ -322,14 +327,19 @@ contract GatewayCTMDeployer {
         _deployedContracts.stateTransition.verifierFflonk = fflonkVerifier;
         _deployedContracts.stateTransition.verifierPlonk = verifierPlonk;
         if (_testnetVerifier) {
-            _deployedContracts.stateTransition.verifier = address(
-                new TestnetVerifier{salt: _salt}(
-                    IVerifierV2(fflonkVerifier),
-                    IVerifier(verifierPlonk),
-                    _verifierOwner,
-                    _isZKsyncOS
-                )
-            );
+            if (_isZKsyncOS) {
+                _deployedContracts.stateTransition.verifier = address(
+                    new ZKsyncOSTestnetVerifier{salt: _salt}(
+                        IVerifierV2(fflonkVerifier),
+                        IVerifier(verifierPlonk),
+                        _verifierOwner
+                    )
+                );
+            } else {
+                _deployedContracts.stateTransition.verifier = address(
+                    new EraTestnetVerifier{salt: _salt}(IVerifierV2(fflonkVerifier), IVerifier(verifierPlonk))
+                );
+            }
         } else {
             if (_isZKsyncOS) {
                 _deployedContracts.stateTransition.verifier = address(
@@ -384,9 +394,15 @@ contract GatewayCTMDeployer {
         GatewayCTMDeployerConfig memory _config,
         DeployedContracts memory _deployedContracts
     ) internal {
-        _deployedContracts.stateTransition.chainTypeManagerImplementation = address(
-            new ChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
-        );
+        if (_config.isZKsyncOS) {
+            _deployedContracts.stateTransition.chainTypeManagerImplementation = address(
+                new ZKsyncOSChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
+            );
+        } else {
+            _deployedContracts.stateTransition.chainTypeManagerImplementation = address(
+                new EraChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
+            );
+        }
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
@@ -416,12 +432,9 @@ contract GatewayCTMDeployer {
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(_deployedContracts.stateTransition.verifier),
-            verifierParams: _config.verifierParams,
             l2BootloaderBytecodeHash: _config.bootloaderHash,
             l2DefaultAccountBytecodeHash: _config.defaultAccountHash,
-            l2EvmEmulatorBytecodeHash: _config.evmEmulatorHash,
-            priorityTxMaxGasLimit: _config.priorityTxMaxGasLimit,
-            feeParams: _config.feeParams
+            l2EvmEmulatorBytecodeHash: _config.evmEmulatorHash
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
@@ -450,11 +463,13 @@ contract GatewayCTMDeployer {
             serverNotifier: _deployedContracts.stateTransition.serverNotifierProxy
         });
 
+        bytes memory initCalldata = abi.encodeCall(IChainTypeManager.initialize, (diamondInitData));
+
         _deployedContracts.stateTransition.chainTypeManagerProxy = address(
             new TransparentUpgradeableProxy{salt: _salt}(
                 _deployedContracts.stateTransition.chainTypeManagerImplementation,
                 address(_deployedContracts.stateTransition.chainTypeManagerProxyAdmin),
-                abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))
+                initCalldata
             )
         );
     }

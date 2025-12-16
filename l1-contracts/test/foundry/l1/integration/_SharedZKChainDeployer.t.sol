@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
-import {Config as ChainConfig, RegisterZKChainScript} from "deploy-scripts/RegisterZKChain.s.sol";
+import {Config as ChainConfig, RegisterZKChainScript} from "deploy-scripts/ctm/RegisterZKChain.s.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
@@ -12,6 +12,8 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 contract ZKChainDeployer is L1ContractDeployer {
     using stdStorage for StdStorage;
@@ -39,6 +41,14 @@ contract ZKChainDeployer is L1ContractDeployer {
     uint256[] public zkChainIds;
 
     function _deployEra() internal {
+        _deployEraDeposits(false);
+    }
+
+    function _deployEraWithPausedDeposits() internal {
+        _deployEraDeposits(true);
+    }
+
+    function _deployEraDeposits(bool _pausedDeposits) internal {
         vm.setEnv(
             "ZK_CHAIN_CONFIG",
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-era.toml"
@@ -48,10 +58,14 @@ contract ZKChainDeployer is L1ContractDeployer {
             "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml"
         );
         deployScript = new RegisterZKChainScript();
-        saveZKChainConfig(_getDefaultDescription(eraZKChainId, ETH_TOKEN_ADDRESS, eraZKChainId));
         vm.warp(100);
-        deployScript.runForTest();
-        zkChainIds.push(eraZKChainId);
+
+        _deployZKChainShared(eraZKChainId, ETH_TOKEN_ADDRESS);
+
+        address chainAddress = getZKChainAddress(eraZKChainId);
+        if (!_pausedDeposits) {
+            IAdmin(chainAddress).unpauseDeposits();
+        }
         eraConfig = deployScript.getConfig();
     }
 
@@ -60,7 +74,18 @@ contract ZKChainDeployer is L1ContractDeployer {
     }
 
     function _deployZKChain(address _baseToken, uint256 _chainId) internal {
-        uint256 chainId = _chainId == 0 ? currentZKChainId : _chainId;
+        uint256 chainId = _deployZKChainInner(_baseToken, _chainId);
+
+        address chainAddress = getZKChainAddress(chainId);
+        IAdmin(chainAddress).unpauseDeposits();
+    }
+
+    function _deployZKChainWithPausedDeposits(address _baseToken, uint256 _chainId) internal {
+        _deployZKChainInner(_baseToken, _chainId);
+    }
+
+    function _deployZKChainInner(address _baseToken, uint256 _chainId) internal returns (uint256 chainId) {
+        chainId = _chainId == 0 ? currentZKChainId : _chainId;
         vm.setEnv(
             "ZK_CHAIN_CONFIG",
             string.concat(
@@ -77,12 +102,35 @@ contract ZKChainDeployer is L1ContractDeployer {
                 ".toml"
             )
         );
-        zkChainIds.push(chainId);
-        saveZKChainConfig(_getDefaultDescription(chainId, _baseToken, chainId));
         if (chainId == currentZKChainId) {
             currentZKChainId++;
         }
+        _deployZKChainShared(chainId, _baseToken);
+    }
+
+    function _deployZKChainShared(uint256 _chainId, address _baseToken) internal {
+        saveZKChainConfig(_getDefaultDescription(_chainId, _baseToken, _chainId));
+        zkChainIds.push(_chainId);
         deployScript.runForTest();
+        _setDAValidatorPair(_chainId);
+        _processGenesisUpgrade(_chainId);
+    }
+
+    function _processGenesisUpgrade(uint256 _chainId) internal {
+        IZKChain chain = IZKChain(addresses.bridgehub.getZKChain(_chainId));
+        // Slot 34 is "l2SystemContractsUpgradeBatchNumber" in ZKChainStorage
+        vm.store(address(chain), bytes32(uint256(34)), bytes32(0));
+    }
+
+    function _setDAValidatorPair(uint256 _chainId) internal {
+        IZKChain chain = IZKChain(addresses.bridgehub.getZKChain(_chainId));
+        address admin = chain.getAdmin();
+        vm.startBroadcast(admin);
+        chain.setDAValidatorPair(
+            ctmAddresses.daAddresses.l1RollupDAValidator,
+            L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256
+        );
+        vm.stopBroadcast();
     }
 
     function _getDefaultDescription(
