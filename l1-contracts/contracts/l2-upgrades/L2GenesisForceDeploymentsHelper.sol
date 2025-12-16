@@ -71,9 +71,9 @@ library L2GenesisForceDeploymentsHelper {
     function forceDeployOnAddressZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
         require(_newAddress.code.length == 0, ZKsyncOSNotForceDeployForExistingContract(_newAddress));
 
-        // Block deployment to precompile addresses (0x01-0xFF)
+        // Block deployment to precompile addresses (0x01-0xFF) and zero address.
         uint160 addr = uint160(_newAddress);
-        require(addr == 0 || addr > 0xFF, ZKsyncOSNotForceDeployToPrecompileAddress(_newAddress));
+        require(addr > 0xFF, ZKsyncOSNotForceDeployToPrecompileAddress(_newAddress));
 
         unsafeForceDeployZKsyncOS(_bytecodeInfo, _newAddress);
     }
