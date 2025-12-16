@@ -145,11 +145,12 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
 
     function initializeL1CoreUtilsConfig() internal virtual {
         L1AssetRouter assetRouter = L1AssetRouter(discoveredBridgehub.assetRouter);
+        L1Bridgehub bridgehub = L1Bridgehub(discoveredBridgehub.bridgehubProxy);
         Governance governance = Governance(payable(discoveredBridgehub.governance));
         config.l1ChainId = block.chainid;
         config.deployerAddress = msg.sender;
         config.eraChainId = assetRouter.ERA_CHAIN_ID();
-        config.eraDiamondProxyAddress = address(assetRouter.ERA_DIAMOND_PROXY());
+        config.eraDiamondProxyAddress = bridgehub.getZKChain(assetRouter.ERA_CHAIN_ID());
 
         config.ownerAddress = assetRouter.owner();
 

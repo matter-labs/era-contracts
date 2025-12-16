@@ -139,7 +139,7 @@ library AddressIntrospector {
         info.transactionFilterer = _zkChain.getTransactionFilterer();
         info.settlementLayer = _zkChain.getSettlementLayer();
         (uint256 major, uint256 minor, uint256 patch) = _zkChain.getSemverProtocolVersion();
-        if (minor >= 29) {
+        if (minor > 29) {
             (info.l1DAValidator, info.l2DAValidatorScheme) = _zkChain.getDAValidatorPair();
         } else {
             (bool ok, bytes memory data) = address(_zkChain).staticcall(

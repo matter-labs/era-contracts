@@ -316,7 +316,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             savePermanentValues(hex"88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5", address(0));
         } else {
             string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-            if (!vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_salt")) {
+            if (!vm.keyExistsToml(permanentValuesToml, "$.permanent_contracts.create2_factory_salt")) {
                 savePermanentValues(hex"88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5", address(0));
             }
         }
@@ -334,9 +334,12 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         if (!vm.isFile(permanentValuesPath)) {
             vm.writeFile(permanentValuesPath, "[contracts]\n");
         }
+        
+        vm.serializeAddress("contracts2", "create2_factory_addr", create2FactoryAddr);
+        string memory permanentContracts = vm.serializeString("contracts2", "create2_factory_salt", vm.toString(create2FactorySalt));
+        string memory toml1 = vm.serializeString("root3", "permanent_contracts", permanentContracts);
 
-        vm.writeToml(vm.toString(create2FactoryAddr), permanentValuesPath, ".contracts.create2_factory_addr");
-        vm.writeToml(vm.toString(create2FactorySalt), permanentValuesPath, ".contracts.create2_factory_salt");
+        vm.writeToml(toml1, permanentValuesPath);
         console.log("Updated permanent values at:", permanentValuesPath);
         console.log("create2_factory_addr:", create2FactoryAddr);
     }

@@ -73,7 +73,7 @@ contract DefaultChainUpgrade is Script {
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
 
-        config.chainChainId = permanentValuesInputToml.readUint("$.chain.chain_id");
+        config.chainChainId = toml.readUint("$.chain.chain_id");
         config.bridgehubProxyAddress = permanentValuesInputToml.readAddress("$.contracts.bridgehub_proxy_address");
 
         config.chainDiamondProxyAddress = L1Bridgehub(config.bridgehubProxyAddress).getZKChain(config.chainChainId);
