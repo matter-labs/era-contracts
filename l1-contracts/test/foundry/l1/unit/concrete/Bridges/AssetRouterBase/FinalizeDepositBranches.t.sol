@@ -5,8 +5,8 @@ import {Test} from "forge-std/Test.sol";
 
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 contract MockAssetHandler is IAssetHandler {
     bool public called;

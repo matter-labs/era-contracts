@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
-import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
@@ -15,6 +15,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
+import {TokenMetadata, TokenBridgingData} from "../common/Messaging.sol";
 
 /// @title L1FixedForceDeploymentsHelper
 /// @author Matter Labs
@@ -43,47 +44,58 @@ abstract contract L1FixedForceDeploymentsHelper {
         }
 
         // It is required for a base token to implement the following methods
-        string memory baseTokenName;
-        string memory baseTokenSymbol;
+        TokenMetadata memory tokenData;
         if (_baseTokenAddress == ETH_TOKEN_ADDRESS) {
-            baseTokenName = string("Ether");
-            baseTokenSymbol = string("ETH");
+            tokenData = TokenMetadata({name: string("Ether"), symbol: string("ETH"), decimals: 18});
         } else {
-            (string memory stringResult, bool success) = _safeCallTokenMetadata(
+            (string memory stringResult, bool success) = _safeCallTokenMetadataString(
                 _baseTokenAddress,
                 abi.encodeCall(IERC20Metadata.name, ())
             );
             if (success) {
-                baseTokenName = stringResult;
+                tokenData.name = stringResult;
             } else {
-                baseTokenName = string("Base Token");
+                tokenData.name = string("Base Token");
             }
 
-            (stringResult, success) = _safeCallTokenMetadata(
+            (stringResult, success) = _safeCallTokenMetadataString(
                 _baseTokenAddress,
                 abi.encodeCall(IERC20Metadata.symbol, ())
             );
             if (success) {
-                baseTokenSymbol = stringResult;
+                tokenData.symbol = stringResult;
             } else {
                 // "BT" is an acronym for "Base Token"
-                baseTokenSymbol = string("BT");
+                tokenData.symbol = string("BT");
+            }
+
+            uint256 uintResult;
+            (uintResult, success) = _safeCallTokenMetadataUint256(
+                _baseTokenAddress,
+                abi.encodeCall(IERC20Metadata.decimals, ())
+            );
+            if (success) {
+                tokenData.decimals = uintResult;
+            } else {
+                tokenData.decimals = 18;
             }
         }
 
         INativeTokenVaultBase nativeTokenVault = IL1AssetRouter(sharedBridge).nativeTokenVault();
         bytes32 baseTokenAssetId = s.baseTokenAssetId;
+        TokenBridgingData memory baseTokenBridgingData = TokenBridgingData({
+            assetId: baseTokenAssetId,
+            originChainId: nativeTokenVault.originChainId(baseTokenAssetId),
+            originToken: nativeTokenVault.originToken(baseTokenAssetId)
+        });
 
         ZKChainSpecificForceDeploymentsData
             memory additionalForceDeploymentsData = ZKChainSpecificForceDeploymentsData({
-                baseTokenAssetId: s.baseTokenAssetId,
                 l2LegacySharedBridge: legacySharedBridge,
                 predeployedL2WethAddress: l2WBaseToken,
                 baseTokenL1Address: _baseTokenAddress,
-                baseTokenName: baseTokenName,
-                baseTokenSymbol: baseTokenSymbol,
-                baseTokenOriginChainId: nativeTokenVault.originChainId(baseTokenAssetId),
-                baseTokenOriginAddress: nativeTokenVault.originToken(baseTokenAssetId)
+                baseTokenMetadata: tokenData,
+                baseTokenBridgingData: baseTokenBridgingData
             });
         return abi.encode(additionalForceDeploymentsData);
     }
@@ -97,7 +109,7 @@ abstract contract L1FixedForceDeploymentsHelper {
     ///
     /// For all other cases, this function will panic and so such chains would not be
     /// deployable.
-    function _safeCallTokenMetadata(address _token, bytes memory data) internal view returns (string memory, bool) {
+    function _safeCallTokenMetadataBytes(address _token, bytes memory data) internal view returns (bytes memory, bool) {
         // We are not afraid if token returns large calldata, since it affects
         // only the deployment of the chain that uses such a malicious token.
         (bool callSuccess, bytes memory returnData) = _token.staticcall(data);
@@ -112,7 +124,28 @@ abstract contract L1FixedForceDeploymentsHelper {
             return ("", false);
         }
 
+        return (returnData, true);
+    }
+
+    function _safeCallTokenMetadataString(
+        address _token,
+        bytes memory data
+    ) internal view returns (string memory, bool) {
+        (bytes memory returnData, bool success) = _safeCallTokenMetadataBytes(_token, data);
+        if (!success) {
+            return ("", false);
+        }
+
         // Note, that the following line will panic in case the token has more non-standard behavior.
         return (abi.decode(returnData, (string)), true);
+    }
+
+    function _safeCallTokenMetadataUint256(address _token, bytes memory data) internal view returns (uint256, bool) {
+        (bytes memory returnData, bool success) = _safeCallTokenMetadataBytes(_token, data);
+        if (!success) {
+            return (0, false);
+        }
+
+        return (abi.decode(returnData, (uint256)), true);
     }
 }

@@ -13,12 +13,14 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
-import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
+import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
+import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
-contract MailboxTest is UtilsTest {
+contract MailboxTest is UtilsCallMockerTest {
     IMailbox internal mailboxFacet;
     UtilsFacet internal utilsFacet;
     IGetters internal gettersFacet;
@@ -42,7 +44,9 @@ contract MailboxTest is UtilsTest {
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(new MailboxFacet(eraChainId, block.chainid, eip7702Checker)),
+            facet: address(
+                new MailboxFacet(eraChainId, block.chainid, address(chainAssetHandler), eip7702Checker, false)
+            ),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: Utils.getMailboxSelectors()
@@ -70,6 +74,11 @@ contract MailboxTest is UtilsTest {
             address(chainAssetHandler),
             abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
             abi.encode(1)
+        );
+        vm.mockCall(
+            address(chainAssetHandler),
+            abi.encodeWithSelector(IL1ChainAssetHandler.isMigrationInProgress.selector),
+            abi.encode(false)
         );
         proxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, bridgehub);
         utilsFacet = UtilsFacet(proxy);

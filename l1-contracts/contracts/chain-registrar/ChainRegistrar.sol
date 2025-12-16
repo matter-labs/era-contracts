@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
 import {PubdataPricingMode} from "../state-transition/chain-deps/ZKChainStorage.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";

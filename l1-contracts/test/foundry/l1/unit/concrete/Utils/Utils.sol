@@ -21,9 +21,9 @@ import {InteropRoot, L2CanonicalTransaction, L2Log} from "contracts/common/Messa
 
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundry/L1TestsErrors.sol";
-import {Utils as DeployUtils} from "deploy-scripts/Utils.sol";
+import {Utils as DeployUtils} from "deploy-scripts/utils/Utils.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
-import {ContractsBytecodesLib} from "deploy-scripts/ContractsBytecodesLib.sol";
+import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -306,7 +306,7 @@ library Utils {
     }
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](13);
+        bytes4[] memory selectors = new bytes4[](14);
         uint256 i = 0;
         selectors[i++] = AdminFacet.setPendingAdmin.selector;
         selectors[i++] = AdminFacet.acceptAdmin.selector;
@@ -321,6 +321,7 @@ library Utils {
         selectors[i++] = AdminFacet.unfreezeDiamond.selector;
         selectors[i++] = AdminFacet.genesisUpgrade.selector;
         selectors[i++] = AdminFacet.setDAValidatorPair.selector;
+        selectors[i++] = AdminFacet.pauseDepositsBeforeInitiatingMigration.selector;
         return selectors;
     }
 
@@ -447,23 +448,6 @@ library Utils {
         return IVerifier(testnetVerifier);
     }
 
-    function makeVerifierParams() public pure returns (VerifierParams memory) {
-        return
-            VerifierParams({recursionNodeLevelVkHash: 0, recursionLeafLevelVkHash: 0, recursionCircuitsSetVksHash: 0});
-    }
-
-    function makeFeeParams() public pure returns (FeeParams memory) {
-        return
-            FeeParams({
-                pubdataPricingMode: PubdataPricingMode.Rollup,
-                batchOverheadL1Gas: 1_000_000,
-                maxPubdataPerBatch: 110_000,
-                maxL2GasPerBatch: 80_000_000,
-                priorityTxMaxPubdata: 99_000,
-                minimalL2GasPrice: 250_000_000
-            });
-    }
-
     function makeInitializeData(address testnetVerifier, address bridgehub) public returns (InitializeData memory) {
         return
             InitializeData({
@@ -477,12 +461,9 @@ library Utils {
                 baseTokenAssetId: bytes32(uint256(0x923645439232223445)),
                 storedBatchZero: bytes32(0),
                 verifier: makeVerifier(testnetVerifier),
-                verifierParams: makeVerifierParams(),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                priorityTxMaxGasLimit: 500000,
-                feeParams: makeFeeParams()
+                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
             });
     }
 
@@ -492,12 +473,9 @@ library Utils {
         return
             InitializeDataNewChain({
                 verifier: makeVerifier(testnetVerifier),
-                verifierParams: makeVerifierParams(),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                priorityTxMaxGasLimit: 80000000,
-                feeParams: makeFeeParams()
+                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
             });
     }
 

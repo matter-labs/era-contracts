@@ -13,12 +13,13 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 /// If the proof is not empty, it will verify it using the main verifier contract,
 /// otherwise, it will skip the verification.
 contract EraTestnetVerifier is IVerifier {
-    EraDualVerifier public immutable dualVerifier;
+    EraDualVerifier public immutable DUAL_VERIFIER;
+    bool public constant IS_TESTNET_VERIFIER = true;
 
     constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) {
         assert(block.chainid != 1);
 
-        dualVerifier = new EraDualVerifier(_fflonkVerifier, _plonkVerifier);
+        DUAL_VERIFIER = new EraDualVerifier(_fflonkVerifier, _plonkVerifier);
     }
 
     /// @dev Verifies a zk-SNARK proof, skipping the verification if the proof is empty.
@@ -30,11 +31,11 @@ contract EraTestnetVerifier is IVerifier {
             return true;
         }
 
-        return dualVerifier.verify(_publicInputs, _proof);
+        return DUAL_VERIFIER.verify(_publicInputs, _proof);
     }
 
     /// @inheritdoc IVerifier
     function verificationKeyHash() external view override returns (bytes32) {
-        return dualVerifier.verificationKeyHash();
+        return DUAL_VERIFIER.verificationKeyHash();
     }
 }

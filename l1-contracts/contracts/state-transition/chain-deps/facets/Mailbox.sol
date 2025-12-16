@@ -7,7 +7,7 @@ import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
 import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
-import {IBridgehubBase} from "../../../bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
 import {IEIP7702Checker} from "../../chain-interfaces/IEIP7702Checker.sol";
@@ -20,14 +20,15 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
-import {L1_GAS_PER_PUBDATA_BYTE, MAX_NEW_FACTORY_DEPS, PAUSE_DEPOSITS_TIME_WINDOW_END, PAUSE_DEPOSITS_TIME_WINDOW_START, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER} from "../../../common/Config.sol";
+import {L1_GAS_PER_PUBDATA_BYTE, MAX_NEW_FACTORY_DEPS, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "../../../common/Config.sol";
 import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
+import {IAssetRouterShared} from "../../../bridge/asset-router/IAssetRouterShared.sol";
 
 import {AddressNotZero, BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, NotAssetRouter, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
-import {RequireDepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
-import {DepthMoreThanOneForRecursiveMerkleProof} from "../../../bridgehub/L1BridgehubErrors.sol";
+import {DepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
+import {DepthMoreThanOneForRecursiveMerkleProof} from "../../../core/bridgehub/L1BridgehubErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -35,9 +36,9 @@ import {IMessageVerification, MessageVerification} from "../../../common/Message
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
 import {BALANCE_CHANGE_VERSION} from "../../../bridge/asset-tracker/IAssetTrackerBase.sol";
 import {INativeTokenVaultBase} from "../../../bridge/ntv/INativeTokenVaultBase.sol";
-import {V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../../bridgehub/IMessageRoot.sol";
-import {OnlyGateway} from "../../../bridgehub/L1BridgehubErrors.sol";
+import {OnlyGateway} from "../../../core/bridgehub/L1BridgehubErrors.sol";
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
+import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAssetHandler.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -47,6 +48,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZKChainBase
+    // solhint-disable-next-line const-name-snakecase
     string public constant override getName = "MailboxFacet";
 
     /// @dev Deployed utility contract to check that account is EIP7702 one
@@ -58,6 +60,13 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
     uint256 internal immutable L1_CHAIN_ID;
+
+    /// @dev The address of the L1ChainAssetHandler system contract. Only used on L1.
+    address internal immutable CHAIN_ASSET_HANDLER;
+
+    uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_START;
+
+    uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_END;
 
     modifier onlyL1() {
         if (block.chainid != L1_CHAIN_ID) {
@@ -73,7 +82,13 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         _;
     }
 
-    constructor(uint256 _eraChainId, uint256 _l1ChainId, IEIP7702Checker _eip7702Checker) {
+    constructor(
+        uint256 _eraChainId,
+        uint256 _l1ChainId,
+        address _chainAssetHandler,
+        IEIP7702Checker _eip7702Checker,
+        bool _isTestnet
+    ) {
         if (address(_eip7702Checker) == address(0) && block.chainid == _l1ChainId) {
             revert ZeroAddress();
         } else if (address(_eip7702Checker) != address(0) && block.chainid != _l1ChainId) {
@@ -81,7 +96,15 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         }
         ERA_CHAIN_ID = _eraChainId;
         L1_CHAIN_ID = _l1ChainId;
+        CHAIN_ASSET_HANDLER = _chainAssetHandler;
         EIP_7702_CHECKER = _eip7702Checker;
+
+        PAUSE_DEPOSITS_TIME_WINDOW_START = _isTestnet
+            ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET
+            : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET;
+        PAUSE_DEPOSITS_TIME_WINDOW_END = _isTestnet
+            ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+            : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET;
     }
 
     /// @inheritdoc IMailboxImpl
@@ -334,8 +357,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (IBridgehubBase(s.bridgehub).getZKChain(_chainId) != msg.sender) {
             revert NotHyperchain();
         }
-        // We pause L1->GW->L2 deposits.
-        require(_checkV30UpgradeProcessed(_chainId), RequireDepositsPaused());
+        // Note during the upgrade to V31 no chain will be on GW.
 
         BalanceChange memory balanceChange;
         if (_getBalanceChange) {
@@ -606,28 +628,16 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     }
 
     /// @notice Deposits are paused when a chain migrates to/from GW.
-    function _depositsPaused() internal view returns (bool) {
+    function depositsPaused() public view returns (bool) {
         uint256 timestamp = s.pausedDepositsTimestamp;
         /// We provide 3.5 days window to process all deposits.
         /// After that, the deposits are not being processed for 3.5 days.
-        return
-            timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START <= block.timestamp &&
+        bool inPausedWindow = timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START <= block.timestamp &&
             block.timestamp < timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END;
-    }
-
-    /// @notice Returns whether the chain has upgraded to V30 on GW.
-    /// if the chain is on L1 at V30, or is deployed V30 or after, then it returns true.
-    function _checkV30UpgradeProcessed(uint256 _chainId) internal view returns (bool) {
-        IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
-
-        if (
-            bridgehub.messageRoot().v30UpgradeChainBatchNumber(_chainId) ==
-            V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY
-        ) {
-            /// We pause deposits until the chain has upgraded on GW
-            return false;
-        }
-        return true;
+        return
+            inPausedWindow ||
+            (block.chainid == L1_CHAIN_ID &&
+                IL1ChainAssetHandler(CHAIN_ASSET_HANDLER).isMigrationInProgress(s.chainId));
     }
 
     /// @notice Stores a transaction record in storage & send event about that
@@ -641,7 +651,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
         /// We only check deposits paused on L1 to keep the GW and L1 Priority queues the same.
         if (block.chainid == L1_CHAIN_ID) {
-            require(!_depositsPaused(), RequireDepositsPaused());
+            require(!depositsPaused(), DepositsPaused());
         }
 
         // Data that is needed for the operator to simulate priority queue offchain
@@ -709,7 +719,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             })
         );
         address sharedBridge = address(IBridgehubBase(s.bridgehub).assetRouter());
-        IL1AssetRouter(sharedBridge).bridgehubDepositBaseToken{value: msg.value}(
+        IAssetRouterShared(sharedBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
             s.baseTokenAssetId,
             msg.sender,
