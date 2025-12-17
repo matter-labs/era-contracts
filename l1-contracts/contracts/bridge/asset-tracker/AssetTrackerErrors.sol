@@ -3,10 +3,10 @@ pragma solidity ^0.8.21;
 
 // 0xda72d995
 error AssetIdNotRegistered(bytes32 _assetId);
+// 0x624ecf69
+error IncorrectSettlementFeePayment(uint256 required, uint256 provided);
 // 0x07859b3b
 error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
-// 0x2fbb091f
-error IncorrectSettlementFeePayment(uint256 required, uint256 provided);
 // 0x2e19b556
 error InvalidAssetId(bytes32);
 // 0x95bddd6c
