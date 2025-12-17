@@ -13,8 +13,8 @@ import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 
 import {L2MessageVerification} from "contracts/interop/L2MessageVerification.sol";
 import {DummyL2InteropRootStorage} from "contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
@@ -23,9 +23,9 @@ import {InteropHandler} from "contracts/interop/InteropHandler.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 // import {InteropAccount} from "contracts/interop/InteropAccount.sol";
-import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
-import {IL2Bridgehub} from "contracts/bridgehub/IL2Bridgehub.sol";
-import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
+import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
+import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
+import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -34,8 +34,8 @@ import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
 
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
-import {Utils} from "deploy-scripts/Utils.sol";
-import {L2ChainAssetHandler} from "contracts/bridgehub/L2ChainAssetHandler.sol";
+import {Utils} from "deploy-scripts/utils/Utils.sol";
+import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {TokenMetadata, TokenBridgingData} from "contracts/common/Messaging.sol";
 
 library L2Utils {

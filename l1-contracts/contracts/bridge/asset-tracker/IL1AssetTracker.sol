@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {FinalizeL1DepositParams} from "../../common/Messaging.sol";
-import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 
 interface IL1AssetTracker {
     function BRIDGE_HUB() external view returns (IBridgehubBase);
@@ -24,7 +24,7 @@ interface IL1AssetTracker {
 
     function receiveMigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external;
 
-    function migrateTokenBalanceFromNTVV30(uint256 _chainId, bytes32 _assetId) external;
+    function migrateTokenBalanceFromNTVV31(uint256 _chainId, bytes32 _assetId) external;
 
     function consumeBalanceChange(
         uint256 _callerChainId,
@@ -33,5 +33,5 @@ interface IL1AssetTracker {
 
     function setAddresses() external;
 
-    function requestPauseDepositsForChainOnGateway(uint256 _chainId, uint256 _timestamp) external;
+    function requestPauseDepositsForChainOnGateway(uint256 _chainId) external;
 }

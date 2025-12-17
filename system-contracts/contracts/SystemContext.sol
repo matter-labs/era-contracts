@@ -6,7 +6,7 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {ISystemContextDeprecated} from "./interfaces/ISystemContextDeprecated.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, COMPLEX_UPGRADER_CONTRACT, L2_CHAIN_ASSET_HANDLER, SystemLogKey} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, COMPLEX_UPGRADER_CONTRACT, L2_CHAIN_ASSET_HANDLER, SystemLogKey, HARD_CODED_CHAIN_ID} from "./Constants.sol";
 import {CannotInitializeFirstVirtualBlock, CannotReuseL2BlockNumberFromPreviousBatch, CurrentBatchNumberMustBeGreaterThanZero, DeprecatedFunction, InconsistentNewBatchTimestamp, IncorrectL2BlockHash, IncorrectSameL2BlockPrevBlockHash, IncorrectSameL2BlockTimestamp, IncorrectVirtualBlockInsideMiniblock, InvalidNewL2BlockNumber, L2BlockAndBatchTimestampMismatch, L2BlockNumberZero, NoVirtualBlocks, NonMonotonicL2BlockTimestamp, PreviousL2BlockHashIsIncorrect, ProvidedBatchNumberIsNotCorrect, TimestampsShouldBeIncremental, UpgradeTransactionMustBeFirst} from "contracts/SystemContractErrors.sol";
 
 /**
@@ -83,7 +83,9 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     /// @notice The information about the virtual blocks upgrade, which tracks when the migration to the L2 blocks has started and finished.
     VirtualBlockUpgradeInfo internal virtualBlockUpgradeInfo;
 
-    uint256 internal currentSettlementLayerChainId;
+    /// @notice The chainId of the settlement layer.
+    /// @notice This value will be deprecated in the future, it should not be used by external contracts.
+    uint256 public currentSettlementLayerChainId;
 
     /// @notice Set the chainId origin.
     /// @param _newChainId The chainId
@@ -92,7 +94,9 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     }
 
     function setSettlementLayerChainId(uint256 _newSettlementLayerChainId) external onlyCallFromBootloader {
-        if (currentSettlementLayerChainId != _newSettlementLayerChainId) {
+        /// Before the genesis upgrade is processed, the block.chainid is wrong. So we skip the setting of the settlement layer chain id.
+        /// We set it again after the genesis upgrade is processed.
+        if (currentSettlementLayerChainId != _newSettlementLayerChainId && block.chainid != HARD_CODED_CHAIN_ID) {
             L2_CHAIN_ASSET_HANDLER.setSettlementLayerChainId(currentSettlementLayerChainId, _newSettlementLayerChainId);
             currentSettlementLayerChainId = _newSettlementLayerChainId;
         }

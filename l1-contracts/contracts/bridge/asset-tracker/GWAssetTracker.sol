@@ -4,16 +4,16 @@ pragma solidity 0.8.28;
 
 import {BALANCE_CHANGE_VERSION, SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, INTEROP_BALANCE_CHANGE_VERSION} from "./IAssetTrackerBase.sol";
 import {BUNDLE_IDENTIFIER, BalanceChange, InteropBalanceChange, ConfirmBalanceMigrationData, InteropBundle, InteropCall, L2Log, TokenBalanceMigrationData, TxStatus, AssetBalanceChange} from "../../common/Messaging.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR, L2_ASSET_ROUTER} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR, L2_ASSET_ROUTER} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AssetRouterBase} from "../asset-router/AssetRouterBase.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {ChainIdNotRegistered, InvalidInteropCalldata, InvalidMessage, ReconstructionMismatch, Unauthorized} from "../../common/L1ContractErrors.sol";
-import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH} from "../../bridgehub/IMessageRoot.sol";
+import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH} from "../../core/message-root/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "../../common/Config.sol";
-import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
 import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed, InvalidInteropBalanceChange} from "./AssetTrackerErrors.sol";
@@ -73,20 +73,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         _;
     }
 
-    modifier onlyL2NativeTokenVault() {
-        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    modifier onlyBaseTokenSystemContract() {
-        if (msg.sender != address(L2_BASE_TOKEN_SYSTEM_CONTRACT)) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
     modifier onlyChain(uint256 _chainId) {
         if (msg.sender != L2_BRIDGEHUB.getZKChain(_chainId)) {
             revert Unauthorized(msg.sender);
@@ -106,7 +92,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     }
 
     /// @notice Sets legacy shared bridge addresses for chains that used the old bridging system.
-    /// @dev This function is called during upgrades to maintain backwards compatibility with pre-V30 chains.
+    /// @dev This function is called during upgrades to maintain backwards compatibility with pre-V31 chains.
     /// @dev Legacy bridges are needed to process withdrawal messages from chains that haven't upgraded yet.
     function setLegacySharedBridgeAddress() external onlyUpgrader {
         address l1AssetRouter = address(L2_ASSET_ROUTER.L1_ASSET_ROUTER());
@@ -127,11 +113,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         legacySharedBridgeAddress[_chainId] = _legacySharedBridgeAddress;
     }
 
-    function _l1ChainId() internal view override returns (uint256) {
+    function _l1ChainId() internal view returns (uint256) {
         return L1_CHAIN_ID;
     }
 
-    function _bridgehub() internal view override returns (IBridgehubBase) {
+    function _bridgehub() internal view returns (IBridgehubBase) {
         return L2_BRIDGEHUB;
     }
 
@@ -139,7 +125,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         return L2_NATIVE_TOKEN_VAULT;
     }
 
-    function _messageRoot() internal view override returns (IMessageRoot) {
+    function _messageRoot() internal view returns (IMessageRoot) {
         return L2_MESSAGE_ROOT;
     }
 
@@ -328,7 +314,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         if (savedBalanceChange.amount > 0) {
             _decreaseChainBalance(_chainId, savedBalanceChange.assetId, savedBalanceChange.amount);
         }
-        /// Note the base token is never native to the chain as of V30.
+        /// Note the base token is never native to the chain as of V31.
         if (savedBalanceChange.baseTokenAmount > 0) {
             _decreaseChainBalance(_chainId, savedBalanceChange.baseTokenAssetId, savedBalanceChange.baseTokenAmount);
         }
@@ -336,7 +322,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     function _handleInteropCenterMessage(uint256 _chainId, bytes calldata _message) internal {
         if (_message[0] != BUNDLE_IDENTIFIER) {
-            // This should not be possible in V30. In V31 this will be a trigger.
+            // This should not be possible in V31. In V31 this will be a trigger.
             return;
         }
 
@@ -491,7 +477,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
     }
 
-    /// @notice Handles withdrawal messages from legacy shared bridge contracts on pre-V30 chains.
+    /// @notice Handles withdrawal messages from legacy shared bridge contracts on pre-V31 chains.
     /// @dev This function provides backwards compatibility for chains that used the old bridge system.
     /// @param _chainId The chain ID that sent the legacy withdrawal message.
     /// @param _message The raw legacy bridge message containing withdrawal data.
@@ -548,10 +534,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice used to pause deposits on Gateway from L1 for migration back to L1.
-    function requestPauseDepositsForChain(uint256 _chainId, uint256 _timestamp) external onlyServiceTransactionSender {
+    function requestPauseDepositsForChain(uint256 _chainId) external onlyServiceTransactionSender {
         address zkChain = _bridgehub().getZKChain(_chainId);
         require(zkChain != address(0), ChainIdNotRegistered(_chainId));
-        IMailboxImpl(zkChain).pauseDepositsOnGateway(_timestamp);
+        IMailboxImpl(zkChain).pauseDepositsOnGateway(block.timestamp);
     }
 
     /// @notice Migrates the token balance from Gateway to L1.
@@ -576,7 +562,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             chainMigrationNumber: chainMigrationNumber,
             assetMigrationNumber: assetMigrationNumber[_chainId][_assetId],
             originToken: originToken[_assetId],
-            chainInitialMigrationNumber: L2_CHAIN_ASSET_HANDLER.chainInitialMigrationNumber(_chainId),
             isL1ToGateway: false
         });
 

@@ -6,11 +6,9 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
 import {ConfirmBalanceMigrationData, TokenBalanceMigrationData} from "../../common/Messaging.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {Unauthorized, InvalidChainId} from "../../common/L1ContractErrors.sol";
-import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
-import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 
 import {AssetIdNotRegistered, MissingBaseTokenAssetId, OnlyGatewaySettlementLayer, TokenBalanceNotMigratedToGateway, MaxChainBalanceAlreadyAssigned} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
@@ -63,20 +61,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
     }
 
-    function _l1ChainId() internal view override returns (uint256) {
+    function _l1ChainId() internal view returns (uint256) {
         return L1_CHAIN_ID;
-    }
-
-    function _bridgehub() internal view override returns (IBridgehubBase) {
-        return L2_BRIDGEHUB;
     }
 
     function _nativeTokenVault() internal view override returns (INativeTokenVaultBase) {
         return L2_NATIVE_TOKEN_VAULT;
-    }
-
-    function _messageRoot() internal view override returns (IMessageRoot) {
-        return L2_MESSAGE_ROOT;
     }
 
     function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
@@ -94,17 +84,17 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     }
 
     /// @notice Registers a legacy token on this L2 chain for backwards compatibility.
-    /// @dev This function is used during upgrades to ensure pre-V30 tokens continue to work.
+    /// @dev This function is used during upgrades to ensure pre-V31 tokens continue to work.
     /// @param _assetId The asset ID of the legacy token to register.
     function registerLegacyTokenOnChain(bytes32 _assetId) external onlyNativeTokenVault {
         _registerTokenOnL2(_assetId);
     }
 
-    /// @notice Migrates token balance tracking from NativeTokenVault to AssetTracker for V30 upgrade.
+    /// @notice Migrates token balance tracking from NativeTokenVault to AssetTracker for V31 upgrade.
     /// @dev This function calculates the correct chainBalance by accounting for tokens currently held in the NTV.
     /// @dev The chainBalance represents how much of the token supply is "available" for bridging out.
     /// @param _assetId The asset id of the token to migrate the token balance for.
-    function migrateTokenBalanceFromNTVV30(bytes32 _assetId) external {
+    function migrateTokenBalanceFromNTVV31(bytes32 _assetId) external {
         INativeTokenVaultBase ntv = _nativeTokenVault();
 
         // Validate that this is a token native to the current L2
@@ -127,7 +117,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 ntvBalance = IERC20(tokenAddress).balanceOf(address(ntv));
         // First, flip the existing chainBalance calculation (was tracking bridged out, now tracks available)
         chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE - chainBalance[originChainId][_assetId];
-        // Then subtract tokens currently locked in NTV (these were already "bridged out" in pre-V30)
+        // Then subtract tokens currently locked in NTV (these were already "bridged out" in pre-V31)
         chainBalance[originChainId][_assetId] -= ntvBalance;
     }
 
@@ -297,8 +287,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             chainMigrationNumber: chainMigrationNumber,
             assetMigrationNumber: assetMigrationNumber[block.chainid][_assetId],
             originToken: originalToken,
-            isL1ToGateway: true,
-            chainInitialMigrationNumber: 0
+            isL1ToGateway: true
         });
         _sendMigrationDataToL1(tokenBalanceMigrationData);
     }
