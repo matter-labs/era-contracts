@@ -352,14 +352,20 @@ function collectErrorUsages(directories: string[], usedErrors: Set<string>, decl
               }
             }
           }
-          // const fileContent = fs.readFileSync(fullPath, "utf8");
-          // const revertRegex = /revert\s+([A-Za-z0-9_]+)/g;
-          // let match;
-          // while ((match = revertRegex.exec(fileContent)) !== null) usedErrors.add(match[1]);
 
-          // // Also check for error selector usage like ErrorName.selector
-          // const selectorRegex = /([A-Za-z0-9_]+)\.selector/g;
-          // while ((match = selectorRegex.exec(fileContent)) !== null) usedErrors.add(match[1]);
+          // Check for errors used in revert statements like revert ErrorName(...)
+          const fileContent = fs.readFileSync(fullPath, "utf8");
+          const revertRegex = /revert\s+([A-Za-z0-9_]+)/g;
+          let match;
+          while ((match = revertRegex.exec(fileContent)) !== null) usedErrors.add(match[1]);
+
+          // Also check for error selector usage like ErrorName.selector
+          const selectorRegex = /([A-Za-z0-9_]+)\.selector/g;
+          while ((match = selectorRegex.exec(fileContent)) !== null) usedErrors.add(match[1]);
+
+          // Check for errors used in require statements like require(condition, ErrorName(...))
+          const requireRegex = /require\s*\([^,]+,\s*([A-Za-z0-9_]+)\s*\(/g;
+          while ((match = requireRegex.exec(fileContent)) !== null) usedErrors.add(match[1]);
         }
       }
     } else if (stat.isFile() && absoluteDir.endsWith(".sol")) {

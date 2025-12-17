@@ -111,9 +111,6 @@ uint256 constant L1_TX_CALLDATA_COST_NATIVE_ZKSYNC_OS = 1;
 /// @dev The intrinsic cost of the L1->l2 transaction in pubdata for ZKsync OS
 uint256 constant L1_TX_INTRINSIC_PUBDATA_ZSKYNC_OS = 88;
 
-/// @dev The minimal L1->L2 transaction gas limit in ZKsync OS to be extra safe
-uint256 constant L1_TX_MINIMAL_GAS_LIMIT_ZSKYNC_OS = 200_000;
-
 /// @dev The native per gas ratio for upgrade transactions in ZKsync OS.
 uint256 constant UPGRADE_TX_NATIVE_PER_GAS = 10_000;
 
@@ -219,11 +216,13 @@ uint256 constant PACKED_L2_PRECOMMITMENT_LENGTH = 33;
 /// @param EMPTY_NO_DA No DA commitment, used by Validiums.
 /// @param PUBDATA_KECCAK256 Keccak of stateDiffHash and keccak(pubdata). Can be used by custom DA solutions.
 /// @param BLOBS_AND_PUBDATA_KECCAK256 This commitment includes EIP-4844 blobs data. Used by default RollupL1DAValidator.
+/// @param BLOBS_ZKSYNC_OS Keccak of blob versioned hashes filled with pubdata. This commitment scheme is used only for ZKsyncOS.
 enum L2DACommitmentScheme {
     NONE,
     EMPTY_NO_DA,
     PUBDATA_KECCAK256,
-    BLOBS_AND_PUBDATA_KECCAK256
+    BLOBS_AND_PUBDATA_KECCAK256,
+    BLOBS_ZKSYNC_OS
 }
 
 /// @dev The L2 data availability commitment scheme that permanent rollups are expected to use.

@@ -238,6 +238,20 @@ library Utils {
         );
     }
 
+    function encodeCommitBatchesDataZKsyncOS(
+        IExecutor.StoredBatchInfo memory _lastCommittedBatchData,
+        IExecutor.CommitBatchInfoZKsyncOS[] memory _newBatchesData
+    ) internal pure returns (uint256, uint256, bytes memory) {
+        return (
+            _newBatchesData[0].batchNumber,
+            _newBatchesData[_newBatchesData.length - 1].batchNumber,
+            bytes.concat(
+                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS),
+                abi.encode(_lastCommittedBatchData, _newBatchesData)
+            )
+        );
+    }
+
     function encodeProveBatchesData(
         IExecutor.StoredBatchInfo memory _prevBatch,
         IExecutor.StoredBatchInfo[] memory _committedBatches,
@@ -377,7 +391,7 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](46);
+        bytes4[] memory selectors = new bytes4[](45);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
@@ -690,6 +704,18 @@ library Utils {
 
     function deployL1RollupDAValidatorBytecode() internal returns (address) {
         bytes memory bytecode = ContractsBytecodesLib.getCreationCodeEVM("RollupL1DAValidator");
+
+        return deployViaCreate(bytecode);
+    }
+
+    function deployEIP7702Checker() internal returns (address) {
+        bytes memory bytecode = ContractsBytecodesLib.getCreationCodeEVM("EIP7702Checker");
+
+        return deployViaCreate(bytecode);
+    }
+
+    function deployBlobsL1DAValidatorZKsyncOSBytecode() internal returns (address) {
+        bytes memory bytecode = ContractsBytecodesLib.getCreationCodeEVM("BlobsL1DAValidatorZKsyncOS");
 
         return deployViaCreate(bytecode);
     }

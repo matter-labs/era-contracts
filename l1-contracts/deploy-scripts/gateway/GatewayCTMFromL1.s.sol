@@ -25,7 +25,7 @@ import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.s
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {EraChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
@@ -403,12 +403,21 @@ contract GatewayCTMFromL1 is Script {
         }
 
         if (config.testnetVerifier) {
-            verifier = address(
-                _deployInternal(
-                    ContractsBytecodesLib.getCreationCode("TestnetVerifier"),
-                    abi.encode(verifierFflonk, verifierPlonk, config.governanceAddr, config.isZKsyncOS)
-                )
-            );
+            if (config.isZKsyncOS) {
+                verifier = address(
+                    _deployInternal(
+                        ContractsBytecodesLib.getCreationCode("ZKsyncOSTestnetVerifier"),
+                        abi.encode(verifierFflonk, verifierPlonk, config.governanceAddr)
+                    )
+                );
+            } else {
+                verifier = address(
+                    _deployInternal(
+                        ContractsBytecodesLib.getCreationCode("EraTestnetVerifier"),
+                        abi.encode(verifierFflonk, verifierPlonk)
+                    )
+                );
+            }
         } else {
             if (config.isZKsyncOS) {
                 verifier = address(
@@ -451,8 +460,9 @@ contract GatewayCTMFromL1 is Script {
         address dp = address(_deployInternal(ContractsBytecodesLib.getCreationCode("DiamondProxy"), hex""));
         console.log("Dummy diamond proxy deployed at", dp);
 
+        string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
         output.gatewayStateTransition.chainTypeManagerImplementation = address(
-            _deployInternal(ContractsBytecodesLib.getCreationCode("ChainTypeManager"), abi.encode(L2_BRIDGEHUB_ADDR))
+            _deployInternal(ContractsBytecodesLib.getCreationCode(ctmContractName), abi.encode(L2_BRIDGEHUB_ADDR))
         );
         console.log(
             "StateTransitionImplementation deployed at",
@@ -542,7 +552,7 @@ contract GatewayCTMFromL1 is Script {
             abi.encode(
                 output.gatewayStateTransition.chainTypeManagerImplementation,
                 deployerAddress,
-                abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))
+                abi.encodeCall(EraChainTypeManager.initialize, (diamondInitData))
             )
         );
 
