@@ -295,6 +295,7 @@ library DataEncoding {
     }
 
     function decodeLegacyFinalizeWithdrawalData(
+        uint256 _l1ChainId,
         bytes memory _l2ToL1message
     ) internal pure returns (bytes4 functionSignature, address l1Token, bytes memory transferData) {
         (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
@@ -317,7 +318,7 @@ library DataEncoding {
             _remoteReceiver: l1Receiver,
             _originToken: l1Token,
             _amount: amount,
-            _erc20Metadata: new bytes(0)
+            _erc20Metadata: DataEncoding.encodeTokenData(_l1ChainId, bytes(""), bytes(""), bytes(""))
         });
     }
 
