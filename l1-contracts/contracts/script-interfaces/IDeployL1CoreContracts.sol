@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Config, CoreDeployedAddresses} from "../../deploy-scripts/ecosystem/DeployL1CoreUtils.s.sol";
+import {Config} from "../../deploy-scripts/ecosystem/DeployL1CoreUtils.s.sol";
+import {CoreDeployedAddresses} from "../../deploy-scripts/utils/Types.sol";
 
 /// @title IDeployL1CoreContracts
 /// @notice Interface for the L1 Core Contracts deployment script

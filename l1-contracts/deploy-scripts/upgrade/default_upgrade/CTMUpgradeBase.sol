@@ -18,6 +18,7 @@ import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerif
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {DeployCTMScript} from "../../ctm/DeployCTM.s.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 abstract contract CTMUpgradeBase is DeployCTMScript {
     function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual returns (bool);
@@ -139,9 +140,13 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         }
     }
 
+    error NotLatestProtocolVersion();
+
     /// @notice Get facet cuts that should be removed
     function getFacetCutsForDeletion(address diamond) internal view returns (Diamond.FacetCut[] memory facetCuts) {
         IZKChain.Facet[] memory facets = IZKChain(diamond).facets();
+
+        require(IZKChain(diamond).getProtocolVersion() == IChainTypeManager(IZKChain(diamond).getChainTypeManager()).protocolVersion(), NotLatestProtocolVersion());
 
         // Freezability does not matter when deleting, so we just put false everywhere
         facetCuts = new Diamond.FacetCut[](facets.length);

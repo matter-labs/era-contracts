@@ -117,6 +117,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     // Discovered addresses
     AddressIntrospector.CTMAddresses internal discoveredCTM;
     AddressIntrospector.ZkChainAddresses internal discoveredEraZkChain;
+    AddressIntrospector.ZkChainAddresses internal upToDateZkChain;
     AddressIntrospector.NonDisoverable internal nonDisoverable;
     L1Bridgehub internal bridgehub;
 
@@ -283,7 +284,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             config.l1ChainId,
             config.ownerAddress,
             factoryDepsHashes,
-            discoveredEraZkChain.zkChainProxy,
+            upToDateZkChain.zkChainProxy,
             config.isZKsyncOS
         );
     }
@@ -332,7 +333,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         require(discoveredBridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
 
         bytes32 newChainAssetId = L1Bridgehub(discoveredBridgehub.bridgehubProxy).baseTokenAssetId(
-            gatewayConfig.chainId
+            upToDateZkChain.chainId
         );
         result = new Call[](1);
         result[0] = Call({
@@ -364,6 +365,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(
             IZKChain(bridgehub.getZKChain(config.eraChainId))
         );
+        upToDateZkChain = AddressIntrospector.getUptoDateZkChainAddresses(ChainTypeManagerBase(ctm));
 
         addresses.daAddresses.l1RollupDAValidator = discoveredEraZkChain.l1DAValidator;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
@@ -776,7 +778,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     /// @notice Tests that it is possible to upgrade a chain to the new version
     function TESTONLY_prepareTestUpgradeChainCall() private returns (Call[] memory calls, address admin) {
         address chainDiamondProxyAddress = L1Bridgehub(discoveredBridgehub.bridgehubProxy).getZKChain(
-            gatewayConfig.chainId
+            upToDateZkChain.chainId
         );
         uint256 oldProtocolVersion = getOldProtocolVersion();
         Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutDataFromLocalConfig(addresses.stateTransition);
