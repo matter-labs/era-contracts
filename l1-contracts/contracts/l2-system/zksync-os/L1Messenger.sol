@@ -35,7 +35,7 @@ contract L1Messenger is IL2ToL1MessengerZKSyncOS {
 
     /// @notice Public functionality to send messages to L1.
     /// @param _message The message intended to be sent to L1.
-    function sendToL1(bytes calldata _message) external returns (bytes32 hash) {
+    function sendToL1(bytes calldata _message) external override returns (bytes32 hash) {
         // As a first step we burn the respective amount of gas, which is the explicit cost of sending L2->L1 message.
         burnGas(_message);
 
