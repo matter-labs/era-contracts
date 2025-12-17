@@ -6,7 +6,6 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
 import {SERVICE_TRANSACTION_SENDER} from "../common/Config.sol";
-import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {Unauthorized} from "../common/L1ContractErrors.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
