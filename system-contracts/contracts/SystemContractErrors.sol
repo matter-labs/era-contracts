@@ -134,8 +134,6 @@ error NotAllowedToDeployInKernelSpace();
 error NotEnoughGas();
 // 0xdcdfb0da
 error NoVirtualBlocks();
-// 0x1d983f45
-error OnlyL2AssetTrackerOrInteropCenterOrInteropHandler();
 // 0x35278d12
 error Overflow();
 // 0x43197434
