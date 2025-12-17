@@ -138,7 +138,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         //        config.supportL2LegacySharedBridgeTest = permanentValuesToml.readBool("$.support_l2_legacy_shared_bridge_test");
         additionalConfig.newProtocolVersion = upgradeToml.readUint("$.contracts.new_protocol_version");
 
-        bridgehub = L1Bridgehub(permanentValuesToml.readAddress("$.contracts.bridgehub_proxy_address"));
+        bridgehub = L1Bridgehub(permanentValuesToml.readAddress("$.core_contracts.bridgehub_proxy_addr"));
         setAddressesBasedOnBridgehub();
         initializeL1CoreUtilsConfig();
     }
@@ -155,7 +155,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         config.ownerAddress = assetRouter.owner();
 
         config.contracts.governanceSecurityCouncilAddress = governance.securityCouncil();
-        config.contracts.governanceMinDelay = governance.minDelay();
+        // config.contracts.governanceMinDelay = governance.minDelay();
 
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
 

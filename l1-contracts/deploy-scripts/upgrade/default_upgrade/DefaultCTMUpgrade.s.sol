@@ -183,9 +183,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesInputPath);
 
-        address ctm = permanentValuesToml.readAddress("$.contracts.ctm_proxy_address");
-        address bytecodesSupplier = permanentValuesToml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
-        address rollupDAManager = permanentValuesToml.readAddress("$.contracts.rollup_da_manager");
+        address ctm = permanentValuesToml.readAddress("$.ctm_contracts.ctm_proxy_addr");
+        address bytecodesSupplier = permanentValuesToml.readAddress("$.ctm_contracts.l1_bytecodes_supplier_addr");
+        address rollupDAManager = permanentValuesToml.readAddress("$.ctm_contracts.rollup_da_manager");
 
         // TODO can we discover it?. Try to get it from the chain
         bool isZKsyncOS;

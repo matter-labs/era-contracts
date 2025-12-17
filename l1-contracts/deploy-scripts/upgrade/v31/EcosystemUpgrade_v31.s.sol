@@ -76,13 +76,32 @@ contract EcosystemUpgrade_v31 is Script, DefaultEcosystemUpgrade {
         address rollupDAManager = outputDeployCTMToml.readAddress("$.deployed_addresses.l1_rollup_da_manager");
         uint256 eraChainId = outputDeployL1Toml.readUint("$.era_chain_id");
 
-        vm.serializeString("contracts", "create2_factory_salt", vm.toString(create2FactorySalt));
-        vm.serializeAddress("contracts", "create2_factory_addr", create2FactoryAddr);
-        vm.serializeAddress("contracts", "ctm_proxy_address", ctm);
-        vm.serializeAddress("contracts", "bridgehub_proxy_address", l1Bridgehub);
-        vm.serializeAddress("contracts", "rollup_da_manager", rollupDAManager);
-        string memory contracts = vm.serializeAddress("contracts", "l1_bytecodes_supplier_addr", bytecodesSupplier);
-        vm.serializeString("root", "contracts", contracts);
+        // Serialize permanent_contracts section
+        {
+            vm.serializeString("permanent_contracts", "create2_factory_salt", vm.toString(create2FactorySalt));
+            string memory permanent_contracts = vm.serializeAddress(
+                "permanent_contracts",
+                "create2_factory_addr",
+                create2FactoryAddr
+            );
+            vm.serializeString("root", "permanent_contracts", permanent_contracts);
+        }
+
+        // Serialize ctm_contracts section
+        {
+            vm.serializeAddress("ctm_contracts", "ctm_proxy_addr", ctm);
+            vm.serializeAddress("ctm_contracts", "rollup_da_manager", rollupDAManager);
+            string memory ctm_contracts = vm.serializeAddress("ctm_contracts", "l1_bytecodes_supplier_addr", bytecodesSupplier);
+            vm.serializeString("root", "ctm_contracts", ctm_contracts);
+        }
+
+        // Serialize core_contracts section
+        {
+            string memory core_contracts = vm.serializeAddress("core_contracts", "bridgehub_proxy_addr", l1Bridgehub);
+            vm.serializeString("root", "core_contracts", core_contracts);
+        }
+
+        // Write the final TOML
         string memory permanentValuesToml = vm.serializeUint("root", "era_chain_id", eraChainId);
         vm.writeToml(permanentValuesToml, permanentValuesInputPath);
     }

@@ -25,6 +25,8 @@ import {GetDiamondCutData} from "../../../../deploy-scripts/utils/GetDiamondCutD
 contract UpgradeIntegrationTestBase is Test {
     using stdToml for string;
 
+    uint256 chainId;
+
     EcosystemUpgrade_v31 ecosystemUpgrade;
     CTMUpgrade_v31 ctmUpgrade;
     ChainUpgrade_v31 chainUpgrade;
@@ -56,7 +58,7 @@ contract UpgradeIntegrationTestBase is Test {
         ctmUpgrade.prepareCTMUpgrade();
 
         console.log("Preparing chain for the upgrade");
-        chainUpgrade.prepareChain(PERMANENT_VALUES_INPUT);
+        chainUpgrade.prepareChain(chainId,PERMANENT_VALUES_INPUT);
     }
 
     function internalTest() internal {
@@ -162,14 +164,39 @@ contract UpgradeIntegrationTestBase is Test {
         address rollupDAManager = outputDeployCTMToml.readAddress("$.deployed_addresses.l1_rollup_da_manager");
         uint256 eraChainId = outputDeployL1Toml.readUint("$.era_chain_id");
 
-        vm.serializeString("contracts", "create2_factory_salt", vm.toString(create2FactorySalt));
-        vm.serializeAddress("contracts", "create2_factory_addr", create2FactoryAddr);
-        vm.serializeAddress("contracts", "ctm_proxy_address", ctm);
-        vm.serializeAddress("contracts", "bridgehub_proxy_address", l1Bridgehub);
-        vm.serializeAddress("contracts", "rollup_da_manager", rollupDAManager);
-        string memory contracts = vm.serializeAddress("contracts", "l1_bytecodes_supplier_addr", bytecodesSupplier);
-        vm.serializeString("root", "contracts", contracts);
-        string memory permanentValuesToml = vm.serializeUint("root", "era_chain_id", eraChainId);
-        vm.writeToml(permanentValuesToml, permanentValuesInputPath);
+        // Serialize permanent_contracts section
+        {
+            vm.serializeString("permanent_contracts", "create2_factory_salt", vm.toString(create2FactorySalt));
+            string memory permanent_contracts = vm.serializeAddress(
+                "permanent_contracts",
+                "create2_factory_addr",
+                create2FactoryAddr
+            );
+            vm.serializeString("root2", "permanent_contracts", permanent_contracts);
+        }
+
+        // Serialize ctm_contracts section
+        {
+            vm.serializeAddress("ctm_contracts", "ctm_proxy_addr", ctm);
+            vm.serializeAddress("ctm_contracts", "rollup_da_manager", rollupDAManager);
+            string memory ctm_contracts = vm.serializeAddress("ctm_contracts", "l1_bytecodes_supplier_addr", bytecodesSupplier);
+            vm.serializeString("root2", "ctm_contracts", ctm_contracts);
+        }
+
+        // Serialize core_contracts section
+        {
+            string memory core_contracts = vm.serializeAddress("core_contracts", "bridgehub_proxy_addr", l1Bridgehub);
+            vm.serializeString("root2", "core_contracts", core_contracts);
+        }
+
+        // Serialize chain2 section
+        {
+            string memory chain2 = vm.serializeUint("chain2", "chain_id", eraChainId);
+            vm.serializeString("root2", "chain2", chain2);
+        }
+
+        // Write the final TOML
+        string memory permanentValuesToml2 = vm.serializeUint("root2", "era_chain_id", eraChainId);
+        vm.writeToml(permanentValuesToml2, permanentValuesInputPath);
     }
 }

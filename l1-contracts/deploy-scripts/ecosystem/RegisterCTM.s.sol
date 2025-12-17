@@ -94,7 +94,7 @@ contract RegisterCTM is Script, IRegisterCTM {
 
             bytes32 assetId = bridgehub.ctmAssetIdFromAddress(chainTypeManagerProxy);
             console.log(
-                "CTM in router 1",
+                "CTM in router 2",
                 sharedBridge.assetHandlerAddress(assetId),
                 bridgehub.ctmAssetIdToAddress(assetId)
             );

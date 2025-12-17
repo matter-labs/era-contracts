@@ -28,6 +28,7 @@ contract UpgradeIntegrationTest_Local is
         _registerNewTokens(tokens);
 
         _deployEra();
+        chainId = eraZKChainId;
         acceptPendingAdmin();
         PERMANENT_VALUES_INPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/permanent-ctm.toml";
 
