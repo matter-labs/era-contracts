@@ -28,12 +28,6 @@ import {InteropDataEncoding} from "../../interop/InteropDataEncoding.sol";
 import {IInteropHandler} from "../../interop/IInteropHandler.sol";
 
 contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
-    /// @notice Emitted when the gateway settlement fee is updated.
-    ///         This is the fee that operator must pay for each interop bundle that was sent by user without paying fixed ZK fee.
-    ///         It's paid by operator of source chain of interop bundle on the moment of chain settling on GW.
-    /// @param oldFee Previous fee amount.
-    /// @param newFee New fee amount.
-    event GatewaySettlementFeeUpdated(uint256 indexed oldFee, uint256 indexed newFee);
     using FullMerkleMemory for FullMerkleMemory.FullTree;
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
 
