@@ -85,17 +85,6 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
 
     uint256 internal currentSettlementLayerChainId;
 
-    modifier onlyL2AssetTrackerOrInteropCenterOrInteropHandler() {
-        if (
-            msg.sender != L2_ASSET_TRACKER_ADDRESS &&
-            msg.sender != L2_INTEROP_CENTER_ADDRESS &&
-            msg.sender != L2_INTEROP_HANDLER_ADDRESS
-        ) {
-            revert OnlyL2AssetTrackerOrInteropCenterOrInteropHandler();
-        }
-        _;
-    }
-
     /// @notice Set the chainId origin.
     /// @param _newChainId The chainId
     function setChainId(uint256 _newChainId) external onlyCallFrom(address(COMPLEX_UPGRADER_CONTRACT)) {
