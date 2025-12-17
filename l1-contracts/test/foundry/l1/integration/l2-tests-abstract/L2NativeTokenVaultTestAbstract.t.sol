@@ -32,7 +32,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 
 import {BridgeMintNotImplemented, TokenIsLegacy, TokenNotLegacy, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
-import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
+import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol"; //@check 
 import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
 
 abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeployer {
@@ -42,8 +42,8 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         address l2Token = makeAddr("l2Token");
         address l1Token = makeAddr("l1Token");
         vm.mockCall(
-            sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),
+            sharedBridgeLegacy,  //@check tract set place
+            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),//@rev remove or keep?
             abi.encode(l1Token)
         );
         L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).setLegacyTokenAssetId(l2Token);
@@ -77,10 +77,10 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
 
         vm.mockCall(
             sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),
+            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),//@rev remove or keep?
             abi.encode(l1Token)
         );
-        L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).setLegacyTokenAssetId(l2Token);
+        L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).setLegacyTokenAssetId(l2Token);//@rev remove or keep?
 
         assertNotEq(l2NativeTokenVault.originChainId(assetId), 0);
         assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
@@ -98,7 +98,7 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         address l1Token = makeAddr("l1Token");
         vm.mockCall(
             sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),
+            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),//@rev remove or keep? the test might be interesting to avoid mistakes though
             abi.encode(l1Token)
         );
 
@@ -135,7 +135,7 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         // this `mockCall` ensures the branch for legacy tokens is chosen
         vm.mockCall(
             sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (expectedL2TokenAddress)),
+            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (expectedL2TokenAddress)),//@rev remove or keep?
             abi.encode(originToken)
         );
         // fails on the following line without this `mockCall`

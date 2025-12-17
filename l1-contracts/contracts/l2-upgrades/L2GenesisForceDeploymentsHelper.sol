@@ -14,7 +14,7 @@ import {L2MessageRoot} from "../bridgehub/L2MessageRoot.sol";
 import {L2Bridgehub} from "../bridgehub/L2Bridgehub.sol";
 import {L2AssetRouter} from "../bridge/asset-router/L2AssetRouter.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
-import {IL2SharedBridgeLegacy} from "../bridge/interfaces/IL2SharedBridgeLegacy.sol";
+import {IL2SharedBridgeLegacy} from "../bridge/interfaces/IL2SharedBridgeLegacy.sol"; //@check 
 import {L2ChainAssetHandler} from "../bridgehub/L2ChainAssetHandler.sol";
 import {DeployFailed, UnsupportedUpgradeType, ZKsyncOSNotForceDeployForExistingContract} from "../common/L1ContractErrors.sol";
 
@@ -201,7 +201,7 @@ library L2GenesisForceDeploymentsHelper {
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.eraChainId,
                 IL1AssetRouter(fixedForceDeploymentsData.l1AssetRouter),
-                IL2SharedBridgeLegacy(l2LegacySharedBridge),
+                IL2SharedBridgeLegacy(l2LegacySharedBridge),//@rev remove or keep?
                 additionalForceDeploymentsData.baseTokenAssetId,
                 fixedForceDeploymentsData.aliasedL1Governance
             );
@@ -211,7 +211,7 @@ library L2GenesisForceDeploymentsHelper {
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.eraChainId,
                 IL1AssetRouter(fixedForceDeploymentsData.l1AssetRouter),
-                IL2SharedBridgeLegacy(l2LegacySharedBridge),
+                IL2SharedBridgeLegacy(l2LegacySharedBridge),//@rev remove or keep?
                 additionalForceDeploymentsData.baseTokenAssetId
             );
         }

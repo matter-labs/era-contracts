@@ -11,11 +11,11 @@ import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTER
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
-import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
+import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol"; //@check 
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
-import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol";
+import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol"; //@check 
 
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
@@ -60,7 +60,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     INativeTokenVaultBase public nativeTokenVault;
 
     /// @dev Address of legacy bridge.
-    IL1ERC20Bridge public legacyBridge;
+    IL1ERC20Bridge public legacyBridge; //@check 
 
     /// @notice Legacy function to get the L2 shared bridge address for a chain.
     /// @dev In case the chain has been deployed after the gateway release,
@@ -89,7 +89,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Checks that the message sender is the legacy bridge.
-    modifier onlyLegacyBridge() {
+    modifier onlyLegacyBridge() { //@check 
         if (msg.sender != address(legacyBridge)) {
             revert Unauthorized(msg.sender);
         }
@@ -158,7 +158,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @notice Sets the L1ERC20Bridge contract address.
     /// @dev Should be called only once by the owner.
     /// @param _legacyBridge The address of the legacy bridge.
-    function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external override onlyOwner {
+    function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external override onlyOwner { //@check 
         if (address(legacyBridge) != address(0)) {
             revert AddressAlreadySet(address(legacyBridge));
         }
@@ -454,7 +454,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         // Do the transfer if allowance to Shared bridge is bigger than amount
         // And if there is not enough allowance for the NTV
         bool weCanTransfer = false;
-        if (l1Token.allowance(address(legacyBridge), address(this)) >= _amount) {
+        if (l1Token.allowance(address(legacyBridge), address(this)) >= _amount) { //@check 
             _originalCaller = address(legacyBridge);
             weCanTransfer = true;
         } else if (
@@ -538,7 +538,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     ) internal pure returns (bytes memory) {
         return
             abi.encodeCall(
-                IL2SharedBridgeLegacyFunctions.finalizeDeposit,
+                IL2SharedBridgeLegacyFunctions.finalizeDeposit, //@check is this selector handled or should this be removed?
                 (_sender, _receiver, _parsedNativeToken, _amount, _gettersData)
             );
     }
@@ -556,7 +556,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
-    ) external payable override onlyLegacyBridge nonReentrant whenNotPaused returns (bytes32 txHash) {
+    ) external payable override onlyLegacyBridge nonReentrant whenNotPaused returns (bytes32 txHash) { //@check 
         if (_l1Token == L1_WETH_TOKEN) {
             revert TokenNotSupported(L1_WETH_TOKEN);
         }

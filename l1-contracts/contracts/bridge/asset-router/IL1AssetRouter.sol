@@ -6,8 +6,8 @@ import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
-import {IL1SharedBridgeLegacy} from "../interfaces/IL1SharedBridgeLegacy.sol";
-import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
+import {IL1SharedBridgeLegacy} from "../interfaces/IL1SharedBridgeLegacy.sol"; //@check 
+import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol"; //@check 
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
@@ -85,7 +85,7 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
 
     function setNativeTokenVault(INativeTokenVaultBase _nativeTokenVault) external;
 
-    function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external;
+    function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external; //@check 
 
     /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on L2.
     /// @param _chainId The ZK chain id to which the deposit was initiated.

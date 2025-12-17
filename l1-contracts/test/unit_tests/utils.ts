@@ -4,7 +4,7 @@ import { BigNumber, ethers } from "ethers";
 import type { Address } from "zksync-ethers/build/types";
 
 import type { IBridgehub } from "../../typechain/IBridgehub";
-import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
+import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge"; //@check 
 
 import type { ExecutorFacet } from "../../typechain";
 
@@ -340,7 +340,7 @@ export interface PriorityOpsBatchInfo {
 }
 
 export async function depositERC20(
-  bridge: IL1ERC20Bridge,
+  bridge: IL1ERC20Bridge, //@check 
   bridgehubContract: IBridgehub,
   chainId: string,
   l1ChainId: number,

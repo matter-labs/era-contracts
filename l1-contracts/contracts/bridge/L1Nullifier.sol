@@ -12,7 +12,7 @@ import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "./asset-router/IAss
 import {AssetRouterBase} from "./asset-router/AssetRouterBase.sol";
 import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 
-import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
+import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol"; //@check 
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 
 import {FinalizeL1DepositParams, IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
@@ -69,7 +69,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     uint256 internal eraLegacyBridgeLastDepositTxNumber;
 
     /// @dev Legacy bridge smart contract that used to hold ERC20 tokens.
-    IL1ERC20Bridge public override legacyBridge;
+    IL1ERC20Bridge public override legacyBridge; //@check 
 
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
     // slither-disable-next-line uninitialized-state
@@ -217,7 +217,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @notice Sets the L1ERC20Bridge contract address.
     /// @dev Should be called only once by the owner.
     /// @param _legacyBridge The address of the legacy bridge.
-    function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external onlyOwner {
+    function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external onlyOwner { //@check 
         if (address(legacyBridge) != address(0)) {
             revert AddressAlreadySet(address(legacyBridge));
         }
@@ -580,7 +580,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 _amount: amount,
                 _erc20Metadata: new bytes(0)
             });
-        } else if (bytes4(functionSignature) == IL1ERC20Bridge.finalizeWithdrawal.selector) {
+        } else if (bytes4(functionSignature) == IL1ERC20Bridge.finalizeWithdrawal.selector) { //@check  keep interface for selector?
             // this message is a token withdrawal
 
             // Check that the message length is correct.

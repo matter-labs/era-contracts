@@ -10,8 +10,8 @@ import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.so
 import {IL1NativeTokenVault} from "../../bridge/ntv/L1NativeTokenVault.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
-import {IL2SharedBridgeLegacy} from "../../bridge/interfaces/IL2SharedBridgeLegacy.sol";
-import {IL2SharedBridgeLegacyFunctions} from "../../bridge/interfaces/IL2SharedBridgeLegacyFunctions.sol";
+import {IL2SharedBridgeLegacy} from "../../bridge/interfaces/IL2SharedBridgeLegacy.sol"; //@check 
+import {IL2SharedBridgeLegacyFunctions} from "../../bridge/interfaces/IL2SharedBridgeLegacyFunctions.sol"; //@check 
 
 contract DummySharedBridge is PausableUpgradeable {
     using SafeERC20 for IERC20;
@@ -192,7 +192,7 @@ contract DummySharedBridge is PausableUpgradeable {
         }
 
         bytes memory l2TxCalldata = abi.encodeCall(
-            IL2SharedBridgeLegacyFunctions.finalizeDeposit,
+            IL2SharedBridgeLegacyFunctions.finalizeDeposit,//@rev remove or keep?
             (_originalCaller, _l2Receiver, _l1Token, amount, new bytes(0))
         );
         bytes32 txDataHash = keccak256(abi.encode(_originalCaller, _l1Token, amount));

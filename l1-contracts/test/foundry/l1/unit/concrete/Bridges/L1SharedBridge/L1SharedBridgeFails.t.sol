@@ -17,7 +17,7 @@ import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol"; //@check 
 
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -77,14 +77,14 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         address currentBridge = address(sharedBridge.legacyBridge());
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(AddressAlreadySet.selector, currentBridge));
-        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(address(0)));
+        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(address(0))); //@check 
     }
 
     function test_setL1Erc20Bridge_emptyAddressProvided() public {
         stdstore.target(address(sharedBridge)).sig(sharedBridge.legacyBridge.selector).checked_write(address(0));
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
-        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(address(0)));
+        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(address(0))); //@check 
     }
 
     function test_setNativeTokenVault_alreadySet() public {
@@ -529,7 +529,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         uint256 legacyBatchNumber = 0;
 
         vm.mockCall(
-            l1ERC20BridgeAddress,
+            l1ERC20BridgeAddress, //@check where is this set?
             abi.encodeWithSelector(IL1ERC20Bridge.isWithdrawalFinalized.selector),
             abi.encode(false)
         );

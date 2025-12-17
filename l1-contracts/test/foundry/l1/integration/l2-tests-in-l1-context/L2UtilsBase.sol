@@ -16,7 +16,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2
 import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
+import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol"; //@check 
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {L2ChainAssetHandler} from "contracts/bridgehub/L2ChainAssetHandler.sol";
 import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
@@ -94,7 +94,7 @@ library L2UtilsBase {
             _args.l1ChainId,
             _args.eraChainId,
             IL1AssetRouter(_args.l1AssetRouter),
-            IL2SharedBridgeLegacy(_args.legacySharedBridge),
+            IL2SharedBridgeLegacy(_args.legacySharedBridge),//@rev remove or keep?
             baseTokenAssetId,
             _args.aliasedOwner
         );
