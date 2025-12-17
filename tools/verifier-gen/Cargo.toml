@@ -15,4 +15,5 @@ handlebars = "4.4.0"
 sha3 = "0.10.8"
 hex = "0.4.3"
 
+# Use workspace to allow using the tool from other workspaces without conflicts
 [workspace]
