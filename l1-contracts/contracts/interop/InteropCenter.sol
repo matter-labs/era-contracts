@@ -11,14 +11,14 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IInteropCenter} from "./IInteropCenter.sol";
 
-import {GW_ASSET_TRACKER, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_COMPLEX_UPGRADER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BUNDLE_IDENTIFIER, BalanceChange, BundleAttributes, CallAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal} from "../common/Messaging.sol";
 import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
-import {AttributeAlreadySet, AttributeViolatesRestriction, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty, UseFixedFeeRequired, InvalidRecipientAddress, FeeWithdrawalFailed} from "./InteropErrors.sol";
+import {AttributeAlreadySet, AttributeViolatesRestriction, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty, UseFixedFeeRequired, InvalidRecipientAddress, FeeWithdrawalFailed, ZKTokenNotAvailable} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
@@ -72,8 +72,11 @@ contract InteropCenter is
     /// @notice Fixed fee amount in ZK tokens per interop bundle (when useFixedFee=true).
     uint256 public constant ZK_INTEROP_FEE = 1e18;
 
-    /// @notice ZK token contract address.
-    IERC20 public ZK_TOKEN;
+    /// @notice ZK token asset ID for resolving token address via native token vault.
+    bytes32 public ZK_TOKEN_ASSET_ID;
+
+    /// @notice Cached ZK token contract address (resolved from asset ID).
+    IERC20 private zkToken;
 
     /// @notice Accumulated protocol fees awaiting withdrawal.
     uint256 public accumulatedProtocolFees;
@@ -101,16 +104,47 @@ contract InteropCenter is
         _;
     }
 
+    /// @notice Returns ZK token address if available, zero address otherwise.
+    /// @dev View function to check ZK token availability without modifying state.
+    /// @return The ZK token address or zero address if not available.
+    function getZKTokenAddress() external view returns (address) {
+        // Check cached token first
+        if (address(zkToken) != address(0)) {
+            return address(zkToken);
+        }
+
+        // Try to resolve from asset ID
+        return L2_NATIVE_TOKEN_VAULT.tokenAddress(ZK_TOKEN_ASSET_ID);
+    }
+
+    /// @notice Resolves ZK token address from asset ID with caching.
+    /// @dev Uses native token vault to resolve asset ID to token address.
+    /// @return The ZK token contract interface.
+    function _getZKToken() internal returns (IERC20) {
+        // Return cached token if available
+        if (address(zkToken) != address(0)) {
+            return zkToken;
+        }
+
+        // Resolve token address from asset ID
+        address tokenAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(ZK_TOKEN_ASSET_ID);
+        require(tokenAddress != address(0), ZKTokenNotAvailable());
+
+        // Cache the resolved token
+        zkToken = IERC20(tokenAddress);
+        return zkToken;
+    }
+
     /// @notice To avoid parity hack
     function initL2(
         uint256 _l1ChainId,
         address _owner,
-        address _zkToken
+        bytes32 _zkTokenAssetId
     ) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
         L1_CHAIN_ID = _l1ChainId;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
-        ZK_TOKEN = IERC20(_zkToken);
+        ZK_TOKEN_ASSET_ID = _zkTokenAssetId;
 
         _transferOwnership(_owner); // vg todo: contract assumes this is the operator, which is incorrect, to be fixed
     }
@@ -567,7 +601,7 @@ contract InteropCenter is
 
                 // If using fixed fees, collect ZK tokens immediately
                 if (useFixed) {
-                    ZK_TOKEN.transferFrom(msg.sender, owner(), ZK_INTEROP_FEE);
+                    _getZKToken().transferFrom(msg.sender, owner(), ZK_INTEROP_FEE);
                 }
             } else {
                 revert IERC7786GatewaySource.UnsupportedAttribute(selector);

@@ -118,7 +118,7 @@ contract ExperimentalBridgeTest is Test {
         bridgehub = L1Bridgehub(address(dummyBridgehub));
         interopCenter = new InteropCenter();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        interopCenter.initL2(l1ChainId, bridgeOwner, address(3));
+        interopCenter.initL2(l1ChainId, bridgeOwner, keccak256("zkTokenAssetId"));
         messageRoot = new L1MessageRoot(address(bridgehub), 1);
         weth = makeAddr("WETH");
         mockCTM = new DummyChainTypeManagerWBH(address(bridgehub));

@@ -68,7 +68,11 @@ library L2UtilsBase {
             address interopCenter = address(new InteropCenter());
             vm.etch(L2_INTEROP_CENTER_ADDR, interopCenter.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner, address(3));
+            InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
+                _args.l1ChainId,
+                _args.aliasedOwner,
+                keccak256("zkTokenAssetId")
+            );
         }
 
         {

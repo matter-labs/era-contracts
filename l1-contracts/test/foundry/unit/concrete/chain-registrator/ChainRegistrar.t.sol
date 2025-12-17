@@ -49,7 +49,7 @@ contract ChainRegistrarTest is Test {
         bridgeHub = new DummyBridgehub();
         interopCenter = new InteropCenter();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        interopCenter.initL2(block.chainid, makeAddr("admin"), address(3));
+        interopCenter.initL2(block.chainid, makeAddr("admin"), keccak256("zkTokenAssetId"));
         messageRoot = new L1MessageRoot(address(bridgeHub), 1);
         ctm = new DummyChainTypeManagerWBH(address(bridgeHub));
         admin = makeAddr("admin");
