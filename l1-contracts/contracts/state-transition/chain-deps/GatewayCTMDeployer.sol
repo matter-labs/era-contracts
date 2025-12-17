@@ -396,11 +396,11 @@ contract GatewayCTMDeployer {
     ) internal {
         if (_config.isZKsyncOS) {
             _deployedContracts.stateTransition.chainTypeManagerImplementation = address(
-                new ZKsyncOSChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
+                new ZKsyncOSChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0))
             );
         } else {
             _deployedContracts.stateTransition.chainTypeManagerImplementation = address(
-                new EraChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
+                new EraChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0))
             );
         }
 

@@ -58,7 +58,7 @@ contract UpgradeIntegrationTestBase is Test {
         ctmUpgrade.prepareCTMUpgrade();
 
         console.log("Preparing chain for the upgrade");
-        chainUpgrade.prepareChain(chainId,PERMANENT_VALUES_INPUT);
+        chainUpgrade.prepareChain(chainId, PERMANENT_VALUES_INPUT);
     }
 
     function internalTest() internal {
@@ -179,7 +179,11 @@ contract UpgradeIntegrationTestBase is Test {
         {
             vm.serializeAddress("ctm_contracts", "ctm_proxy_addr", ctm);
             vm.serializeAddress("ctm_contracts", "rollup_da_manager", rollupDAManager);
-            string memory ctm_contracts = vm.serializeAddress("ctm_contracts", "l1_bytecodes_supplier_addr", bytecodesSupplier);
+            string memory ctm_contracts = vm.serializeAddress(
+                "ctm_contracts",
+                "l1_bytecodes_supplier_addr",
+                bytecodesSupplier
+            );
             vm.serializeString("root2", "ctm_contracts", ctm_contracts);
         }
 

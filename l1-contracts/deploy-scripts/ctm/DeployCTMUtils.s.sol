@@ -474,6 +474,7 @@ abstract contract DeployCTMUtils is DeployUtils {
                 interopCenterProxy: discoveredBridgehub.interopCenterProxy,
                 rollupDAManager: addresses.daAddresses.rollupDAManager,
                 chainAssetHandler: discoveredBridgehub.chainAssetHandler,
+                l1BytecodesSupplier: addresses.stateTransition.bytecodesSupplier,
                 eip7702Checker: addresses.eip7702Checker,
                 verifierFflonk: addresses.stateTransition.verifierFflonk,
                 verifierPlonk: addresses.stateTransition.verifierPlonk,

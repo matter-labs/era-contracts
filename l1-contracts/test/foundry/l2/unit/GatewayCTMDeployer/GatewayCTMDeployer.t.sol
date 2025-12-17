@@ -72,8 +72,8 @@ contract GatewayCTMDeployerTest is Test {
         new RollupDAManager();
         new ValidiumL1DAValidator();
         new RelayedSLDAValidator();
-        new ZKsyncOSChainTypeManager(address(0), address(0));
-        new EraChainTypeManager(address(0), address(0));
+        new ZKsyncOSChainTypeManager(address(0), address(0), address(0));
+        new EraChainTypeManager(address(0), address(0), address(0));
         new ProxyAdmin();
 
         new EraVerifierFflonk();

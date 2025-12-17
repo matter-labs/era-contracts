@@ -91,7 +91,11 @@ contract EcosystemUpgrade_v31 is Script, DefaultEcosystemUpgrade {
         {
             vm.serializeAddress("ctm_contracts", "ctm_proxy_addr", ctm);
             vm.serializeAddress("ctm_contracts", "rollup_da_manager", rollupDAManager);
-            string memory ctm_contracts = vm.serializeAddress("ctm_contracts", "l1_bytecodes_supplier_addr", bytecodesSupplier);
+            string memory ctm_contracts = vm.serializeAddress(
+                "ctm_contracts",
+                "l1_bytecodes_supplier_addr",
+                bytecodesSupplier
+            );
             vm.serializeString("root", "ctm_contracts", ctm_contracts);
         }
 

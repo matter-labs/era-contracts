@@ -127,6 +127,7 @@ library GatewayCTMDeployerHelper {
                 interopCenterProxy: L2_INTEROP_CENTER_ADDR,
                 rollupDAManager: _deployedContracts.daContracts.rollupDAManager,
                 chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
+                l1BytecodesSupplier: address(0),
                 eip7702Checker: address(0),
                 verifierFflonk: _deployedContracts.stateTransition.verifierFflonk,
                 verifierPlonk: _deployedContracts.stateTransition.verifierPlonk,
