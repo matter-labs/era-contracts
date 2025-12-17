@@ -5,6 +5,8 @@ pragma solidity ^0.8.21;
 error AssetIdNotRegistered(bytes32 _assetId);
 // 0x07859b3b
 error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
+// 0x2fbb091f
+error IncorrectSettlementFeePayment(uint256 required, uint256 provided);
 // 0x2e19b556
 error InvalidAssetId(bytes32);
 // 0x95bddd6c
@@ -47,6 +49,8 @@ error L1TotalSupplyAlreadyMigrated();
 error MaxChainBalanceAlreadyAssigned(bytes32 assetId);
 // 0x7e472272
 error MissingBaseTokenAssetId();
+// 0xf4b3b1bc
+error NativeTransferFailed();
 // 0x8dfed13a
 error NotMigratedChain();
 // 0x4a22c4b8

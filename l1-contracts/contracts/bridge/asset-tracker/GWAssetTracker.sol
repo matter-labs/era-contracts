@@ -8,7 +8,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRA
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AssetRouterBase} from "../asset-router/AssetRouterBase.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
-import {ChainIdNotRegistered, InvalidInteropCalldata, InvalidMessage, ReconstructionMismatch, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {ChainIdNotRegistered, InvalidInteropCalldata, InvalidMessage, ReconstructionMismatch, Unauthorized, NonEmptyMsgValue} from "../../common/L1ContractErrors.sol";
 import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH} from "../../core/message-root/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
@@ -16,8 +16,7 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed, InvalidInteropBalanceChange, InvalidFeeRecipient} from "./AssetTrackerErrors.sol";
-import {IChainEscrowRegistry} from "../../interop/IChainEscrowRegistry.sol";
+import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed, InvalidInteropBalanceChange, InvalidFeeRecipient, IncorrectSettlementFeePayment, NativeTransferFailed} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
@@ -27,7 +26,6 @@ import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {LegacySharedBridgeAddresses, SharedBridgeOnChainId} from "./LegacySharedBridgeAddresses.sol";
 import {InteropDataEncoding} from "../../interop/InteropDataEncoding.sol";
 import {IInteropHandler} from "../../interop/IInteropHandler.sol";
-import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// @notice Emitted when the gateway settlement fee is updated.
@@ -75,23 +73,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         internal interopBalanceChange;
 
     /// @notice Gateway settlement fee per interop operation in ZK tokens.
-    /// @dev Set by gateway governance, charged to chain operators during settlement.
+    /// @dev Set by gateway governance, paid by chain operators during settlement.
+    /// @dev On Gateway, ZK is the base token, so fees are paid via msg.value.
     uint256 public gatewaySettlementFee;
-
-    /// @notice ZK token contract for gateway settlement fee collection.
-    /// @dev Immutable, set during initialization.
-    IERC20 public immutable ZK_TOKEN;
-
-    /// @notice Chain escrow registry for managing operator escrows.
-    /// @dev Immutable, set during initialization.
-    IChainEscrowRegistry public immutable CHAIN_ESCROW_REGISTRY;
-
-    /// @param _zkToken Address of the ZK token contract.
-    /// @param _chainEscrowRegistry Address of the chain escrow registry contract.
-    constructor(address _zkToken, address _chainEscrowRegistry) {
-        ZK_TOKEN = IERC20(_zkToken);
-        CHAIN_ESCROW_REGISTRY = IChainEscrowRegistry(_chainEscrowRegistry);
-    }
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -128,15 +112,16 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     }
 
     /// @notice Withdraws collected gateway fees to specified recipient
-    /// @dev Only callable by owner.
+    /// @dev Only callable by owner. Withdraws native ZK tokens collected as settlement fees.
     /// @param _recipient Address to receive the collected fees
     function withdrawGatewayFees(address _recipient) external onlyOwner {
         if (_recipient == address(0)) {
             revert InvalidFeeRecipient();
         }
-        uint256 balance = ZK_TOKEN.balanceOf(address(this));
+        uint256 balance = address(this).balance;
         if (balance > 0) {
-            ZK_TOKEN.transfer(_recipient, balance);
+            (bool success, ) = _recipient.call{value: balance}("");
+            require(success, NativeTransferFailed());
         }
     }
 
@@ -241,7 +226,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// @param _processLogsInputs The input containing logs, messages, and chain information to process.
     function processLogsAndMessages(
         ProcessLogsInput calldata _processLogsInputs
-    ) external onlyChain(_processLogsInputs.chainId) {
+    ) external payable onlyChain(_processLogsInputs.chainId) {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory reconstructedLogsTree;
         reconstructedLogsTree.createTree(L2_TO_L1_LOGS_MERKLE_TREE_DEPTH);
 
@@ -326,10 +311,15 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             chainBatchRootHash
         );
 
-        // Collect ZK settlement fees from chain escrow after processing.
+        // Collect ZK settlement fees directly from chain operator.
         if (chargeableInteropCount > 0 && gatewaySettlementFee > 0) {
             uint256 totalFee = gatewaySettlementFee * chargeableInteropCount;
-            CHAIN_ESCROW_REGISTRY.paySettlementFees(_processLogsInputs.chainId, totalFee);
+            require(msg.value == totalFee, IncorrectSettlementFeePayment(totalFee, msg.value));
+
+            // Settlement fees are now held by this contract (Gateway treasury)
+        } else {
+            // No fees required, no value should be sent
+            require(msg.value == 0, NonEmptyMsgValue());
         }
     }
 

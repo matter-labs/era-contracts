@@ -152,7 +152,7 @@ library L2Utils {
     }
 
     function forceDeployGWAssetTracker(SystemContractsArgs memory _args) internal {
-        new GWAssetTracker(address(1), address(2));
+        new GWAssetTracker();
 
         forceDeployWithoutConstructor("GWAssetTracker", GW_ASSET_TRACKER_ADDR);
     }

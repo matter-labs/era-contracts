@@ -14,7 +14,7 @@ interface IGWAssetTracker {
         BalanceChange calldata _balanceChange
     ) external;
 
-    function processLogsAndMessages(ProcessLogsInput calldata) external;
+    function processLogsAndMessages(ProcessLogsInput calldata) external payable;
 
     function initiateGatewayToL1MigrationOnGateway(uint256 _chainId, bytes32 _assetId) external;
 
