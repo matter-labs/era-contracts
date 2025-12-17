@@ -63,7 +63,7 @@ struct Config {
     address governanceSecurityCouncilAddress;
     uint256 governanceMinDelay;
     address l1Nullifier;
-    address l1Erc20Bridge;
+    address l1Erc20Bridge; //@rev rm or keep
     bool initializeLegacyBridge;
     address governance;
     address create2FactoryAddress;
@@ -161,7 +161,7 @@ contract RegisterZKChainScript is Script {
         config.nativeTokenVault = toml.readAddress("$.deployed_addresses.native_token_vault_addr");
         config.sharedBridgeProxy = toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr");
         config.l1Nullifier = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
-        config.l1Erc20Bridge = toml.readAddress("$.deployed_addresses.bridges.erc20_bridge_proxy_addr");
+        config.l1Erc20Bridge = toml.readAddress("$.deployed_addresses.bridges.erc20_bridge_proxy_addr"); //@rev 
 
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
@@ -285,7 +285,7 @@ contract RegisterZKChainScript is Script {
         console.log("Using base token address:", config.baseToken);
     }
 
-    function setUpLegacySharedBridgeParams() internal {
+    function setUpLegacySharedBridgeParams() internal { //@rev rm or keep
         // Ecosystem governance is the owner of the L1Nullifier
         address ecosystemGovernance = L1NullifierDev(config.l1Nullifier).owner();
         address bridgeAddress = L2LegacySharedBridgeTestHelper.calculateL2LegacySharedBridgeProxyAddr(
@@ -542,7 +542,7 @@ contract RegisterZKChainScript is Script {
         output.chainProxyAdmin = address(proxyAdmin);
     }
 
-    function deployLegacySharedBridge() internal {
+    function deployLegacySharedBridge() internal { //@rev most liekely rm
         bytes[] memory emptyDeps = new bytes[](0);
         address legacyBridgeImplAddr = Utils.deployThroughL1Deterministic({
             bytecode: ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacyDev"),

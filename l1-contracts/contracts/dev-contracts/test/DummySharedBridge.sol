@@ -62,7 +62,7 @@ contract DummySharedBridge is PausableUpgradeable {
         uint256, //_l2TxGasLimit,
         uint256, //_l2TxGasPerPubdataByte,
         address //_refundRecipient
-    ) external payable returns (bytes32 txHash) {
+    ) external payable returns (bytes32 txHash) { //@rev remove or keep
         txHash = dummyL2DepositTxHash;
 
         // Legacy bridge requires this logic to work properly
@@ -78,7 +78,7 @@ contract DummySharedBridge is PausableUpgradeable {
         uint256, //_l2MessageIndex,
         uint16, //_l2TxNumberInBatch,
         bytes32[] calldata // _merkleProof
-    ) external {}
+    ) external {} //@check rm
 
     function claimFailedDeposit(
         uint256, // _chainId,
@@ -90,7 +90,7 @@ contract DummySharedBridge is PausableUpgradeable {
         uint256, // _l2MessageIndex,
         uint16, // _l2TxNumberInBatch,
         bytes32[] calldata //_merkleProof
-    ) external {}
+    ) external {} //@check rm
 
     function finalizeWithdrawalLegacyErc20Bridge(
         uint256, //_l2BatchNumber,
@@ -98,7 +98,7 @@ contract DummySharedBridge is PausableUpgradeable {
         uint16, //_l2TxNumberInBatch,
         bytes calldata, //_message,
         bytes32[] calldata //_merkleProof
-    ) external view returns (address l1Receiver, address l1Token, uint256 amount) {
+    ) external view returns (address l1Receiver, address l1Token, uint256 amount) { //@rev remove or keep
         l1Receiver = l1ReceiverReturnInFinalizeWithdrawal;
         l1Token = l1TokenReturnInFinalizeWithdrawal;
         amount = amountReturnInFinalizeWithdrawal;
@@ -208,7 +208,7 @@ contract DummySharedBridge is PausableUpgradeable {
 
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {}
 
-    /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
+    /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.  //@info incorrect comment?
     function setNativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external {
         require(address(nativeTokenVault) == address(0), "L1AR: legacy bridge already set");
         require(address(_nativeTokenVault) != address(0), "L1AR: legacy bridge 0");

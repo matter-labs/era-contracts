@@ -22,7 +22,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IRollupDAManager} from "./interfaces/IRollupDAManager.sol";
 import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
-import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
+import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol"; //@check 
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
@@ -41,7 +41,6 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
@@ -120,7 +119,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         address l1CtmDeployer = address(bridgehubProxy.l1CtmDeployer());
         address chainAssetHandler = address(bridgehubProxy.chainAssetHandler());
         address nativeTokenVault = address(assetRouter.nativeTokenVault());
-        address erc20Bridge = address(assetRouter.legacyBridge());
+        address erc20Bridge = address(assetRouter.legacyBridge()); //@rev remove or keep
         address l1Nullifier = address(assetRouter.L1_NULLIFIER());
 
         addresses.bridgehub.bridgehubProxy = bridgehub;
@@ -133,8 +132,8 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         addresses.bridgehub.chainAssetHandlerImplementation = Utils.getImplementation(chainAssetHandler);
 
         // Bridges
-        addresses.bridges.erc20BridgeProxy = erc20Bridge;
-        addresses.bridges.erc20BridgeImplementation = Utils.getImplementation(erc20Bridge);
+        addresses.bridges.erc20BridgeProxy = erc20Bridge; //@rev do we want to remove this from the struct?
+        addresses.bridges.erc20BridgeImplementation = Utils.getImplementation(erc20Bridge); //@rev do we want to remove this from the struct?
         addresses.bridges.l1NullifierProxy = l1Nullifier;
         addresses.bridges.l1NullifierImplementation = Utils.getImplementation(l1Nullifier);
         addresses.bridges.l1AssetRouterProxy = address(assetRouter);
@@ -382,8 +381,8 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             addresses.stateTransition.diamondProxy
         );
 
-        vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", addresses.bridges.erc20BridgeImplementation);
-        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", addresses.bridges.erc20BridgeProxy);
+        vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", addresses.bridges.erc20BridgeImplementation);//@rev do we want to remove this from the struct?
+        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", addresses.bridges.erc20BridgeProxy);//@rev do we want to remove this from the struct?
         vm.serializeAddress("bridges", "l1_nullifier_implementation_addr", addresses.bridges.l1NullifierImplementation);
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", addresses.bridges.l1NullifierProxy);
         vm.serializeAddress(
@@ -519,7 +518,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         require(addresses.governance != address(0), "Governance address is not set");
 
         address dangerousTestOnlyForcedBeacon;
-        if (config.supportL2LegacySharedBridgeTest) {
+        if (config.supportL2LegacySharedBridgeTest) { //@rev remove or keep
             (dangerousTestOnlyForcedBeacon, ) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
                 addresses.bridges.erc20BridgeProxy,
                 addresses.bridges.l1NullifierProxy,
@@ -554,7 +553,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
                 : abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
-            l2SharedBridgeLegacyImpl: address(0),
+            l2SharedBridgeLegacyImpl: address(0), //@rev do we want to remove this from the struct?
             l2BridgedStandardERC20Impl: address(0),
             dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon
         });

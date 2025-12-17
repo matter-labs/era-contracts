@@ -646,7 +646,7 @@ export class Deployer {
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest,
     dummy: boolean = false
-  ) {
+  ) { //@check 
     const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
     const contractAddress = await this.deployViaCreate2(
       dummy ? "DummyL1ERC20Bridge" : "L1ERC20Bridge",
@@ -669,7 +669,7 @@ export class Deployer {
 
   public async setParametersSharedBridge() {
     const sharedBridge = L1AssetRouterFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
-    const data1 = sharedBridge.interface.encodeFunctionData("setL1Erc20Bridge", [
+    const data1 = sharedBridge.interface.encodeFunctionData("setL1Erc20Bridge", [//@rev rm or keep
       this.addresses.Bridges.ERC20BridgeProxy,
     ]);
     await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data1);
@@ -799,7 +799,7 @@ export class Deployer {
 
   // used for testing, mimics original deployment process.
   // we don't use the real implementation, as we need the address to be independent
-  public async deployERC20BridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployERC20BridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) { //@check 
     const initCalldata = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi).encodeFunctionData(
       "initialize"
     );

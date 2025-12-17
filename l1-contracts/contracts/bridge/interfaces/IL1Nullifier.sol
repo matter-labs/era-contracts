@@ -26,7 +26,7 @@ struct FinalizeL1DepositParams {
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IL1Nullifier {
+interface IL1Nullifier { //@check adjust IFace after cleaning L1Nullifier
     event BridgehubDepositFinalized(
         uint256 indexed chainId,
         bytes32 indexed txDataHash,

@@ -161,7 +161,7 @@ async function main() {
   promises.push(promise9);
 
   // bridges
-  const promise10 = verifyPromise(
+  const promise10 = verifyPromise(//@rev rm or keep
     addresses.Bridges.ERC20BridgeImplementation,
     [addresses.Bridges.SharedBridgeProxy],
     undefined,

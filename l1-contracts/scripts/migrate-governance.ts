@@ -95,12 +95,12 @@ async function main() {
       const zkSync = deployer.stateTransitionContract(deployWallet);
       const validatorTimelock = deployer.validatorTimelock(deployWallet);
 
-      const l1Erc20Bridge = deployer.transparentUpgradableProxyContract(
+      const l1Erc20Bridge = deployer.transparentUpgradableProxyContract( //@check 
         deployer.addresses.Bridges.ERC20BridgeProxy,
         deployWallet
       );
 
-      const erc20MigrationTx = l1Erc20Bridge.interface.encodeFunctionData("changeAdmin", [governanceAddressFromEnv]);
+      const erc20MigrationTx = l1Erc20Bridge.interface.encodeFunctionData("changeAdmin", [governanceAddressFromEnv]); //@check 
       displayTx("L1 ERC20 bridge migration calldata:", {
         data: erc20MigrationTx,
         target: l1Erc20Bridge.address,

@@ -10,7 +10,7 @@ import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Legacy Bridge interface before ZK chain migration, used for backward compatibility with ZKsync Era
-interface IL1ERC20Bridge {
+interface IL1ERC20Bridge { //@q to review which we should keep for selector referencing, adjust comments later
     event DepositInitiated(
         bytes32 indexed l2DepositTxHash,
         address indexed from,

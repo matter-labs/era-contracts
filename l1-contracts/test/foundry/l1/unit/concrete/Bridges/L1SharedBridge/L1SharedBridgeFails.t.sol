@@ -73,18 +73,18 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         nativeTokenVault.registerToken(address(0));
     }
 
-    function test_setL1Erc20Bridge_alreadySet() public {
+    function test_setL1Erc20Bridge_alreadySet() public {//@rev rm or keep
         address currentBridge = address(sharedBridge.legacyBridge());
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(AddressAlreadySet.selector, currentBridge));
-        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(address(0))); //@check 
+        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(address(0))); 
     }
 
-    function test_setL1Erc20Bridge_emptyAddressProvided() public {
+    function test_setL1Erc20Bridge_emptyAddressProvided() public {//@rev rm or keep
         stdstore.target(address(sharedBridge)).sig(sharedBridge.legacyBridge.selector).checked_write(address(0));
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
-        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(address(0))); //@check 
+        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(address(0))); 
     }
 
     function test_setNativeTokenVault_alreadySet() public {
@@ -530,7 +530,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
         vm.mockCall(
             l1ERC20BridgeAddress, //@check where is this set?
-            abi.encodeWithSelector(IL1ERC20Bridge.isWithdrawalFinalized.selector),
+            abi.encodeWithSelector(IL1ERC20Bridge.isWithdrawalFinalized.selector),//@rev keep if?
             abi.encode(false)
         );
 
@@ -551,7 +551,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         );
 
         bytes memory message = abi.encodePacked(
-            IL1ERC20Bridge.finalizeWithdrawal.selector,
+            IL1ERC20Bridge.finalizeWithdrawal.selector, //@rev keep if
             alice,
             address(token),
             amount
@@ -574,7 +574,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.deal(address(nativeTokenVault), amount);
 
         bytes memory message = abi.encodePacked(
-            IL1ERC20Bridge.finalizeWithdrawal.selector,
+            IL1ERC20Bridge.finalizeWithdrawal.selector, //@rev keep if?
             alice,
             address(token),
             amount
@@ -596,7 +596,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.deal(address(nativeTokenVault), amount);
 
         bytes memory message = abi.encodePacked(
-            IL1ERC20Bridge.finalizeWithdrawal.selector,
+            IL1ERC20Bridge.finalizeWithdrawal.selector,  //@rev keep if?
             alice,
             address(token),
             amount
@@ -618,7 +618,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.deal(address(nativeTokenVault), amount);
 
         bytes memory message = abi.encodePacked(
-            IL1ERC20Bridge.finalizeWithdrawal.selector,
+            IL1ERC20Bridge.finalizeWithdrawal.selector, //@rev keep if?
             alice,
             address(token),
             amount
@@ -729,7 +729,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(ETH_TOKEN_ADDRESS)
         );
 
-        bytes memory message = abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, alice, amount);
+        bytes memory message = abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, alice, amount); //@rev keep if
         // should have more data here
 
         vm.expectRevert(abi.encodeWithSelector(L2WithdrawalMessageWrongLength.selector, message.length));
@@ -755,58 +755,6 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             _l2TxNumberInBatch: l2TxNumberInBatch,
             _message: message,
             _merkleProof: merkleProof
-        });
-    }
-
-    function test_depositLegacyERC20Bridge_weth() public {
-        uint256 l2TxGasLimit = 100000;
-        uint256 l2TxGasPerPubdataByte = 100;
-        address refundRecipient = address(0);
-
-        vm.expectRevert(abi.encodeWithSelector(TokenNotSupported.selector, l1WethAddress));
-        vm.prank(l1ERC20BridgeAddress);
-        sharedBridge.depositLegacyErc20Bridge({
-            _originalCaller: alice,
-            _l2Receiver: bob,
-            _l1Token: l1WethAddress,
-            _amount: amount,
-            _l2TxGasLimit: l2TxGasLimit,
-            _l2TxGasPerPubdataByte: l2TxGasPerPubdataByte,
-            _refundRecipient: refundRecipient
-        });
-    }
-
-    function test_depositLegacyERC20Bridge_refundRecipient() public {
-        uint256 l2TxGasLimit = 100000;
-        uint256 l2TxGasPerPubdataByte = 100;
-
-        // solhint-disable-next-line func-named-parameters
-        vm.expectEmit(true, true, true, true, address(sharedBridge));
-
-        emit LegacyDepositInitiated({
-            chainId: eraChainId,
-            l2DepositTxHash: txHash,
-            from: alice,
-            to: bob,
-            l1Token: address(token),
-            amount: amount
-        });
-
-        vm.mockCall(
-            bridgehubAddress,
-            abi.encodeWithSelector(IL1Bridgehub.requestL2TransactionDirect.selector),
-            abi.encode(txHash)
-        );
-
-        vm.prank(l1ERC20BridgeAddress);
-        sharedBridge.depositLegacyErc20Bridge({
-            _originalCaller: alice,
-            _l2Receiver: bob,
-            _l1Token: address(token),
-            _amount: amount,
-            _l2TxGasLimit: l2TxGasLimit,
-            _l2TxGasPerPubdataByte: l2TxGasPerPubdataByte,
-            _refundRecipient: address(1)
         });
     }
 }

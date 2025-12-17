@@ -27,7 +27,6 @@ import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
@@ -109,11 +108,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         ) = deployTuppWithContract("L1NativeTokenVault", false);
         setL1NativeTokenVaultParams();
 
-        (addresses.bridges.erc20BridgeImplementation, addresses.bridges.erc20BridgeProxy) = deployTuppWithContract(
-            "L1ERC20Bridge",
-            false
-        );
-        updateSharedBridge();
         (
             addresses.bridgehub.ctmDeploymentTrackerImplementation,
             addresses.bridgehub.ctmDeploymentTrackerProxy
@@ -142,13 +136,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         );
         vm.stopBroadcast();
         console.log("SharedBridge registered");
-    }
-
-    function updateSharedBridge() internal {
-        IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
-        vm.broadcast(msg.sender);
-        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(addresses.bridges.erc20BridgeProxy)); //@check 
-        console.log("SharedBridge updated with ERC20Bridge address");
     }
 
     function setL1NativeTokenVaultParams() internal {

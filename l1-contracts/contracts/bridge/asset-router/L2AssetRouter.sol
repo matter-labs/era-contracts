@@ -50,7 +50,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     /// @dev The address of the L2 legacy shared bridge.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    IL2SharedBridgeLegacy public L2_LEGACY_SHARED_BRIDGE; //@check 
+    IL2SharedBridgeLegacy public L2_LEGACY_SHARED_BRIDGE; //@rev
 
     /// @dev The asset id of the base token.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
@@ -256,7 +256,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
             // slither-disable-next-line unused-return
             (uint256 amount, address l1Receiver, ) = DataEncoding.decodeBridgeBurnData(_assetData);
             message = _getSharedBridgeWithdrawMessage(l1Receiver, l1Token, amount);
-            txHash = IL2SharedBridgeLegacy(L2_LEGACY_SHARED_BRIDGE).sendMessageToL1(message); //@check 
+            txHash = IL2SharedBridgeLegacy(L2_LEGACY_SHARED_BRIDGE).sendMessageToL1(message);
         }
 
         emit WithdrawalInitiatedAssetRouter(L1_CHAIN_ID, _sender, _assetId, _assetData);
@@ -278,13 +278,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         address _l1Receiver,
         address _l1Token,
         uint256 _amount
-    ) internal pure returns (bytes memory) {
+    ) internal pure returns (bytes memory) { //TODO deprecate, eventually
         // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _l1Receiver, _l1Token, _amount); //@check keep selector?
+        return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _l1Receiver, _l1Token, _amount);
     }
 
     /*//////////////////////////////////////////////////////////////
-                            LEGACY FUNCTIONS
+                            LEGACY FUNCTIONS  //TODO deprecate all the below, eventually
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Legacy finalizeDeposit.
@@ -300,7 +300,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external payable onlyAssetRouterCounterpart(L1_CHAIN_ID) {
+    ) external payable onlyAssetRouterCounterpart(L1_CHAIN_ID) {//@rev remove or keep
         _translateLegacyFinalizeDeposit({
             _l1Sender: _l1Sender,
             _l2Receiver: _l2Receiver,
@@ -316,7 +316,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external onlyLegacyBridge {
+    ) external onlyLegacyBridge { //@rev remove or keep
         _translateLegacyFinalizeDeposit({
             _l1Sender: _l1Sender,
             _l2Receiver: _l2Receiver,
@@ -332,7 +332,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) internal {
+    ) internal { //@rev remove or keep
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
         // solhint-disable-next-line func-named-parameters
         bytes memory data = DataEncoding.encodeBridgeMintData(_l1Sender, _l2Receiver, _l1Token, _amount, _data);

@@ -500,7 +500,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         }
 
         bytes memory message = abi.encodePacked(
-            IL1ERC20Bridge.finalizeWithdrawal.selector, //@check keep if for selector?
+            IL1ERC20Bridge.finalizeWithdrawal.selector,  //@rev keep if?
             currentUser,
             currentTokenAddress,
             amountToWithdraw

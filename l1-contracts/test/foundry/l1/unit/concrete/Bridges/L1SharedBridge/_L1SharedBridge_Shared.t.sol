@@ -52,15 +52,6 @@ contract L1AssetRouterTest is Test {
 
     event ClaimedFailedDepositAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
-    event LegacyDepositInitiated(
-        uint256 indexed chainId,
-        bytes32 indexed l2DepositTxHash,
-        address indexed from,
-        address to,
-        address l1Token,
-        uint256 amount
-    );
-
     L1AssetRouter sharedBridgeImpl;
     L1AssetRouter sharedBridge;
     L1NativeTokenVault nativeTokenVaultImpl;
@@ -68,7 +59,7 @@ contract L1AssetRouterTest is Test {
     L1Nullifier l1NullifierImpl;
     L1Nullifier l1Nullifier;
     address bridgehubAddress;
-    address l1ERC20BridgeAddress;
+    address l1ERC20BridgeAddress;//@rev rm or keep
     address l1WethAddress;
     address l2SharedBridge;
     address l1NullifierAddress;
@@ -112,7 +103,7 @@ contract L1AssetRouterTest is Test {
         alice = makeAddr("alice");
         // bob = makeAddr("bob");
         l1WethAddress = address(new ERC20("Wrapped ETH", "WETH"));
-        l1ERC20BridgeAddress = makeAddr("l1ERC20Bridge");
+        l1ERC20BridgeAddress = makeAddr("l1ERC20Bridge");//@rev rm or keep
         l2SharedBridge = makeAddr("l2SharedBridge");
 
         txHash = bytes32(uint256(uint160(makeAddr("txHash"))));
@@ -175,9 +166,9 @@ contract L1AssetRouterTest is Test {
         vm.prank(owner);
         l1Nullifier.setL1NativeTokenVault(nativeTokenVault);
         vm.prank(owner);
-        l1Nullifier.setL1Erc20Bridge(IL1ERC20Bridge(l1ERC20BridgeAddress)); //@check 
+        l1Nullifier.setL1Erc20Bridge(IL1ERC20Bridge(l1ERC20BridgeAddress)); //@rev rm or keep
         vm.prank(owner);
-        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(l1ERC20BridgeAddress)); //@check 
+        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(l1ERC20BridgeAddress)); //@rev rm or keep
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
         vm.prank(owner);
         sharedBridge.setNativeTokenVault(INativeTokenVaultBase(address(nativeTokenVault)));

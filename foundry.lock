@@ -1,0 +1,23 @@
+{
+  "lib/@matterlabs/zksync-contracts": {
+    "rev": "e554ae64ec150c47d6f17786e7f4aacebc7bf945"
+  },
+  "lib/forge-std": {
+    "rev": "77041d2ce690e692d6e03cc812b57d1ddaa4d505"
+  },
+  "lib/murky": {
+    "rev": "5feccd1253d7da820f7cccccdedf64471025455d"
+  },
+  "lib/openzeppelin-contracts-upgradeable-v4": {
+    "branch": {
+      "name": "release-v4.9",
+      "rev": "2d081f24cac1a867f6f73d512f2022e1fa987854"
+    }
+  },
+  "lib/openzeppelin-contracts-v4": {
+    "branch": {
+      "name": "release-v4.9",
+      "rev": "dc44c9f1a4c3b10af99492eed84f83ed244203f6"
+    }
+  }
+}

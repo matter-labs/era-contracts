@@ -60,7 +60,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     INativeTokenVaultBase public nativeTokenVault;
 
     /// @dev Address of legacy bridge.
-    IL1ERC20Bridge public legacyBridge; //@check 
+    IL1ERC20Bridge public legacyBridge; //@rev 
 
     /// @notice Legacy function to get the L2 shared bridge address for a chain.
     /// @dev In case the chain has been deployed after the gateway release,
@@ -79,18 +79,10 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
     /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
-        //@check deprecate?
+        //@rev remove in favor or onlyBridgeHub?
         if (
             msg.sender != address(BRIDGE_HUB) && (_chainId != ERA_CHAIN_ID || msg.sender != address(ERA_DIAMOND_PROXY))
         ) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    /// @notice Checks that the message sender is the legacy bridge.
-    modifier onlyLegacyBridge() { //@check 
-        if (msg.sender != address(legacyBridge)) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -158,7 +150,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @notice Sets the L1ERC20Bridge contract address.
     /// @dev Should be called only once by the owner.
     /// @param _legacyBridge The address of the legacy bridge.
-    function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external override onlyOwner { //@check 
+    function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external override onlyOwner {  //@rev remove or keep
         if (address(legacyBridge) != address(0)) {
             revert AddressAlreadySet(address(legacyBridge));
         }
@@ -454,7 +446,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         // Do the transfer if allowance to Shared bridge is bigger than amount
         // And if there is not enough allowance for the NTV
         bool weCanTransfer = false;
-        if (l1Token.allowance(address(legacyBridge), address(this)) >= _amount) { //@check 
+        if (l1Token.allowance(address(legacyBridge), address(this)) >= _amount) { //@rev remove or keep
             _originalCaller = address(legacyBridge);
             weCanTransfer = true;
         } else if (
@@ -548,93 +540,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IL1AssetRouter
-    function depositLegacyErc20Bridge(
-        address _originalCaller,
-        address _l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        uint256 _l2TxGasLimit,
-        uint256 _l2TxGasPerPubdataByte,
-        address _refundRecipient
-    ) external payable override onlyLegacyBridge nonReentrant whenNotPaused returns (bytes32 txHash) { //@check 
-        if (_l1Token == L1_WETH_TOKEN) {
-            revert TokenNotSupported(L1_WETH_TOKEN);
-        }
-
-        bytes32 _assetId;
-        {
-            // Note, that to keep the code simple, while avoiding "stack too deep" error,
-            // this `bridgeData` variable is reused in two places with different meanings:
-            // - Firstly, it denotes the bridgeBurn data to be used for the NativeTokenVault
-            // - Secondly, after the call to `_burn` function, it denotes the `bridgeMint` data that
-            // will be sent to the L2 counterpart of the L1NTV.
-            bytes memory bridgeData = DataEncoding.encodeBridgeBurnData(_amount, _l2Receiver, _l1Token);
-            // Inner call to encode data to decrease local var numbers
-            _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
-            // Legacy bridge is only expected to use native tokens for L1.
-            if (_assetId != DataEncoding.encodeNTVAssetId(block.chainid, _l1Token)) {
-                revert LegacyBridgeUsesNonNativeToken();
-            }
-
-            // Note, that starting from here `bridgeData` starts denoting bridgeMintData.
-            bridgeData = _burn({
-                _chainId: ERA_CHAIN_ID,
-                _nextMsgValue: 0,
-                _assetId: _assetId,
-                _originalCaller: _originalCaller,
-                _transferData: bridgeData,
-                _passValue: false,
-                _nativeTokenVault: address(nativeTokenVault)
-            });
-
-            bytes memory l2TxCalldata = getDepositCalldata(_originalCaller, _assetId, bridgeData);
-
-            // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
-            // Otherwise, the refund will be sent to the specified address.
-            // If the recipient is a contract on L1, the address alias will be applied.
-            address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, _originalCaller);
-
-            L2TransactionRequestDirect memory request = L2TransactionRequestDirect({
-                chainId: ERA_CHAIN_ID,
-                l2Contract: L2_ASSET_ROUTER_ADDR,
-                mintValue: msg.value, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the base token bridge for gas
-                l2Value: 0, // L2 msg.value, this contract doesn't support base token deposits or wrapping functionality, for direct deposits use bridgehub
-                l2Calldata: l2TxCalldata,
-                l2GasLimit: _l2TxGasLimit,
-                l2GasPerPubdataByteLimit: _l2TxGasPerPubdataByte,
-                factoryDeps: new bytes[](0),
-                refundRecipient: refundRecipient
-            });
-            txHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
-        }
-
-        {
-            bytes memory transferData = DataEncoding.encodeBridgeBurnData(_amount, _l2Receiver, _l1Token);
-            // Save the deposited amount to claim funds on L1 if the deposit failed on L2
-            L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(
-                ERA_CHAIN_ID,
-                DataEncoding.encodeTxDataHash({
-                    _encodingVersion: LEGACY_ENCODING_VERSION,
-                    _originalCaller: _originalCaller,
-                    _assetId: _assetId,
-                    _nativeTokenVault: address(nativeTokenVault),
-                    _transferData: transferData
-                }),
-                txHash
-            );
-        }
-
-        emit LegacyDepositInitiated({
-            chainId: ERA_CHAIN_ID,
-            l2DepositTxHash: txHash,
-            from: _originalCaller,
-            to: _l2Receiver,
-            l1Token: _l1Token,
-            amount: _amount
-        });
-    }
-
-    /// @inheritdoc IL1AssetRouter
     function finalizeWithdrawal(
         uint256 _chainId,
         uint256 _l2BatchNumber,
@@ -642,7 +547,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external override {
+    ) external override { //TODO deprecate, eventually
         L1_NULLIFIER.finalizeWithdrawal({
             _chainId: _chainId,
             _l2BatchNumber: _l2BatchNumber,

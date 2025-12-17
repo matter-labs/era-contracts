@@ -6,7 +6,7 @@ import type { L1ERC20Bridge } from "../../typechain";
 import { L1ERC20BridgeTestFactory } from "../../typechain";
 import type { ITransparentUpgradeableProxy } from "../../typechain/ITransparentUpgradeableProxy";
 import { ITransparentUpgradeableProxyFactory } from "../../typechain/ITransparentUpgradeableProxyFactory";
-
+ //@check probably remove file
 // TODO: change to the mainnet config
 const L1_ERC20_BRIDGE = "0x927DdFcc55164a59E0F33918D13a2D559bC10ce7";
 const GOVERNOR_ADDRESS = "0x98591957D9741e7E7d58FC253044e0A014A3a323";

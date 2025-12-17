@@ -451,7 +451,7 @@ async function checkSharedBridge() {
   console.log("L1 shared bridge correct!");
 }
 
-async function checkLegacyBridge() {
+async function checkLegacyBridge() { //@check 
   const artifact = await hardhat.artifacts.readArtifact("L1ERC20Bridge");
   const contract = new ethers.Contract(legacyBridgeImpl, artifact.abi, l1Provider);
 
