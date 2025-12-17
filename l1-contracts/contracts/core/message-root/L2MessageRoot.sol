@@ -13,7 +13,6 @@ import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 import {InvalidCaller, Unauthorized} from "../../common/L1ContractErrors.sol";
 import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
-import {L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -42,10 +41,12 @@ contract L2MessageRoot is MessageRootBase {
     }
 
     // A method for backwards compatibility with the old implementation
+    // solhint-disable-next-line func-name-mixedcase
     function BRIDGE_HUB() public view returns (address) {
         return L2_BRIDGEHUB_ADDR;
     }
 
+    // solhint-disable-next-line func-name-mixedcase
     function L1_CHAIN_ID() public view override returns (uint256) {
         return l1ChainId;
     }

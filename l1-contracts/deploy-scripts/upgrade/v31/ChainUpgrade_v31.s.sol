@@ -20,8 +20,8 @@ import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol"
 contract ChainUpgrade_v31 is DefaultChainUpgrade {
     using stdToml for string;
 
-    function run() public override {
-        super.run();
+    function run(address ctm, uint256 chainChainId) public override {
+        super.run(ctm, chainChainId);
         migrateTokenBalanceFromNTV(config.bridgehubProxyAddress, block.chainid); // todo fix inputs.
     }
 

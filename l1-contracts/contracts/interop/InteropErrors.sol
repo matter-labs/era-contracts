@@ -27,6 +27,10 @@ error InteroperableAddressChainReferenceNotEmpty(bytes interoperableAddress);
 error InteroperableAddressNotEmpty(bytes interoperableAddress);
 // 0x44d99fea
 error InvalidRecipientAddress();
+// 0xeae192ef
+error InvalidInteropBundleVersion();
+// 0xd5f13973
+error InvalidInteropCallVersion();
 // 0x32c2e156
 error MessageNotIncluded();
 // 0x89fd2c76

@@ -15,6 +15,7 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
@@ -95,6 +96,15 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         string outputPath;
     }
 
+    struct PermanentCTMConfig {
+        address create2FactoryAddr;
+        bytes32 create2FactorySalt;
+        address ctmProxy;
+        address bytecodesSupplier;
+        address rollupDAManager;
+        bool isZKsyncOS;
+    }
+
     // The output of the script
     NewlyGeneratedData internal newlyGeneratedData;
     UpgradeDeployedAddresses internal upgradeAddresses;
@@ -134,27 +144,20 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function initializeConfig(
-        bytes32 create2FactorySalt,
-        address create2FactoryAddr,
-        address ctmProxy,
-        bool isZKsyncOS,
         ChainCreationParamsConfig memory chainCreationParams,
-        uint256 eraChainId,
-        // Should be discoverable
-        address bytecodesSupplier,
-        address rollupDAManager,
+        PermanentCTMConfig memory permanentConfig,
         // Optional
         address governance
     ) public {
-        _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
+        _initCreate2FactoryParams(permanentConfig.create2FactoryAddr, permanentConfig.create2FactorySalt);
         config.l1ChainId = block.chainid;
-        newConfig.ctm = ctmProxy;
-        config.eraChainId = eraChainId;
-        nonDisoverable.bytecodesSupplier = bytecodesSupplier;
-        nonDisoverable.rollupDAManager = rollupDAManager;
+        newConfig.ctm = permanentConfig.ctmProxy;
+        nonDisoverable.bytecodesSupplier = permanentConfig.bytecodesSupplier;
+        nonDisoverable.rollupDAManager = permanentConfig.rollupDAManager;
         setAddressesBasedOnCTM();
-        config.isZKsyncOS = isZKsyncOS;
+        config.isZKsyncOS = permanentConfig.isZKsyncOS;
         config.contracts.chainCreationParams = chainCreationParams;
+
         if (governance != address(0)) {
             config.ownerAddress = governance;
         } else {
@@ -167,10 +170,41 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(discoveredCTM.validatorTimelockPostV29)
             .executionDelay();
         (bool ok, bytes memory data) = discoveredEraZkChain.verifier.staticcall(
-            abi.encodeWithSignature("isTestnetVerifier()")
+            abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
         );
         config.testnetVerifier = ok;
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
+    }
+
+    function initializePermanentConfig(
+        string memory permanentValuesInputPath
+    ) internal virtual returns (PermanentCTMConfig memory permanentConfig) {
+        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
+
+        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
+        address create2FactoryAddr;
+        if (vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_addr")) {
+            create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
+        }
+
+        address ctm = permanentValuesToml.readAddress("$.contracts.ctm_proxy_address");
+        address bytecodesSupplier = permanentValuesToml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
+        address rollupDAManager = permanentValuesToml.readAddress("$.contracts.rollup_da_manager");
+
+        // TODO can we discover it?. Try to get it from the chain
+        bool isZKsyncOS;
+        if (permanentValuesToml.keyExists("$.is_zk_sync_os")) {
+            isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
+        }
+
+        permanentConfig = PermanentCTMConfig({
+            ctmProxy: ctm,
+            bytecodesSupplier: bytecodesSupplier,
+            rollupDAManager: rollupDAManager,
+            isZKsyncOS: isZKsyncOS,
+            create2FactoryAddr: create2FactoryAddr,
+            create2FactorySalt: create2FactorySalt
+        });
     }
 
     function initializeConfigFromFile(
@@ -180,21 +214,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
         string memory toml = vm.readFile(newConfigPath);
 
-        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
-        address create2FactoryAddr;
-        if (vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
-        }
-
-        address ctm = permanentValuesToml.readAddress("$.contracts.ctm_proxy_address");
-        // Can we safely get it from the CTM? is it always exists even for zksync os ?
-        uint256 eraChainId = permanentValuesToml.readUint("$.era_chain_id");
-
-        address bytecodesSupplier = permanentValuesToml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
-        address rollupDAManager = permanentValuesToml.readAddress("$.contracts.rollup_da_manager");
-
-        addresses.eip7702Checker = toml.readAddress("$.deployed_addresses.state_transition.eip7702_checker_addr");
-
         address governance;
         if (toml.keyExists("$.governance")) {
             governance = toml.readAddress("$.governance");
@@ -202,43 +221,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             governance = address(0);
         }
 
-        // TODO can we discover it?. Try to get it from the chain
-        bool isZKsyncOS;
-        if (permanentValuesToml.keyExists("$.is_zk_sync_os")) {
-            isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
-        }
-        ChainCreationParamsConfig memory chainCreationParams;
+        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParams(chainCreationParamsPath());
+        PermanentCTMConfig memory permanentConfig = initializePermanentConfig(permanentValuesInputPath);
 
-        chainCreationParams.latestProtocolVersion = toml.readUint("$.chain_creation_params.latest_protocol_version");
-        // Protocol specific params for the entire CTM
-        chainCreationParams.genesisRoot = toml.readBytes32("$.chain_creation_params.genesis_root");
-        chainCreationParams.genesisRollupLeafIndex = toml.readUint("$.chain_creation_params.genesis_rollup_leaf_index");
-        chainCreationParams.genesisBatchCommitment = toml.readBytes32(
-            "$.chain_creation_params.genesis_batch_commitment"
-        );
-
-        // These fields are redundant for zksync_os.
-        if (toml.keyExists("$.chain_creation_params.default_aa_hash")) {
-            chainCreationParams.defaultAAHash = toml.readBytes32("$.chain_creation_params.default_aa_hash");
-        }
-        if (toml.keyExists("$.chain_creation_params.bootloader_hash")) {
-            chainCreationParams.bootloaderHash = toml.readBytes32("$.chain_creation_params.bootloader_hash");
-        }
-        if (toml.keyExists("$.chain_creation_params.evm_emulator_hash")) {
-            chainCreationParams.evmEmulatorHash = toml.readBytes32("$.chain_creation_params.evm_emulator_hash");
-        }
-
-        initializeConfig(
-            create2FactorySalt,
-            create2FactoryAddr,
-            ctm,
-            isZKsyncOS,
-            chainCreationParams,
-            eraChainId,
-            bytecodesSupplier,
-            rollupDAManager,
-            governance
-        );
+        initializeConfig(chainCreationParams, permanentConfig, governance);
     }
 
     /// @notice Full default upgrade preparation flow
@@ -377,6 +363,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         bridgehub = L1Bridgehub(ChainTypeManagerBase(ctm).BRIDGE_HUB());
         discoveredBridgehub = AddressIntrospector.getBridgehubAddresses(bridgehub);
         config.ownerAddress = discoveredCTM.governance;
+        config.eraChainId = AddressIntrospector.getEraChainId(discoveredBridgehub.assetRouter);
+
         discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(
             IZKChain(bridgehub.getZKChain(config.eraChainId))
         );
@@ -937,6 +925,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     function saveOutputVersionSpecific() internal virtual {}
 
+    function getCTMAddress() public view returns (address) {
+        return newConfig.ctm;
+    }
     ////////////////////////////// Misc utils /////////////////////////////////
 
     // add this to be excluded from coverage report

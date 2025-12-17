@@ -5,6 +5,7 @@ pragma solidity ^0.8.24;
 
 import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 import {EcosystemUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/EcosystemUpgrade_v31.s.sol";
 // import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default_upgrade/DefaultChainUpgrade.s.sol";
@@ -17,6 +18,9 @@ import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {GetDiamondCutData} from "../../../../deploy-scripts/utils/GetDiamondCutData.sol";
 
 contract UpgradeIntegrationTestBase is Test {
     using stdToml for string;
@@ -44,7 +48,7 @@ contract UpgradeIntegrationTestBase is Test {
         ctmUpgrade = new CTMUpgrade_v31();
         ctmUpgrade.setSkipFactoryDepsCheck_TestOnly(skipFactoryDepsCheck);
         ctmUpgrade.initialize(PERMANENT_VALUES_INPUT, CTM_INPUT, CTM_OUTPUT);
-        ctmUpgrade.setNewProtocolVersion(0x1d00000000);
+        ctmUpgrade.setNewProtocolVersion(SemVer.packSemVer(0, 32, 0));
 
         console.log("Preparing ecosystem upgrade");
         ecosystemUpgrade.prepareEcosystemUpgrade();
@@ -53,10 +57,11 @@ contract UpgradeIntegrationTestBase is Test {
         ctmUpgrade.prepareCTMUpgrade();
 
         console.log("Preparing chain for the upgrade");
-        chainUpgrade.prepareChain(PERMANENT_VALUES_INPUT, CHAIN_INPUT);
+        chainUpgrade.prepareChain(PERMANENT_VALUES_INPUT);
     }
 
     function internalTest() internal {
+        vm.recordLogs();
         (
             Call[] memory upgradeGovernanceStage0Calls,
             Call[] memory upgradeGovernanceStage1Calls,
@@ -95,12 +100,15 @@ contract UpgradeIntegrationTestBase is Test {
 
         console.log("Upgrading gateway");
 
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        Diamond.DiamondCutData memory diamondCutData = GetDiamondCutData.getDiamondCutDataFromRecordedLogs(
+            logs,
+            ctmUpgrade.getCTMAddress()
+        );
+
         // Now, the admin of the Era needs to call the upgrade function.
         // TODO: We do not include calls that ensure that the server is ready for the sake of brevity.
-        chainUpgrade.upgradeChain(
-            ctmUpgrade.getOldProtocolVersion(),
-            ctmUpgrade.generateUpgradeCutDataFromLocalConfig(ctmUpgrade.getAddresses().stateTransition)
-        );
+        chainUpgrade.upgradeChain(diamondCutData);
 
         console.log("Creating new chain");
         address admin = ctmUpgrade.getBridgehubAdmin();

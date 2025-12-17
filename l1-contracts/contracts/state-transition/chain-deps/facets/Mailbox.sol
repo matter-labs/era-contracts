@@ -48,6 +48,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZKChainBase
+    // solhint-disable-next-line const-name-snakecase
     string public constant override getName = "MailboxFacet";
 
     /// @dev Deployed utility contract to check that account is EIP7702 one

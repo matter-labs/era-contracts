@@ -3,6 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
@@ -14,6 +15,7 @@ import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseToken
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {Utils} from "../utils/Utils.sol";
 
 library AddressIntrospector {
@@ -156,6 +158,10 @@ library AddressIntrospector {
 
     function getZkChainFacetAddresses(IZKChain _zkChain) public view returns (address[] memory) {
         return _zkChain.facetAddresses();
+    }
+
+    function getEraChainId(address assetRouter) public view returns (uint256) {
+        return L1AssetRouter(assetRouter).ERA_CHAIN_ID();
     }
 
     /// @notice Convenience method to fetch everything for a specific chainId via a Bridgehub instance

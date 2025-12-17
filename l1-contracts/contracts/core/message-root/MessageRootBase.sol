@@ -34,6 +34,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
 
     function _bridgehub() internal view virtual returns (address);
 
+    // solhint-disable-next-line func-name-mixedcase
     function L1_CHAIN_ID() public view virtual returns (uint256);
 
     function _eraGatewayChainId() internal view virtual returns (uint256);
