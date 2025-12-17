@@ -171,7 +171,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         );
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
-            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId.selector),
+            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
             abi.encode(block.chainid)
         );
         vm.prank(L2_BRIDGEHUB_ADDR);
@@ -244,7 +244,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
         L2SharedBridgeLegacy bridge = new L2SharedBridgeLegacy();
         console.log("bridge", address(bridge));
-        address proxyAdmin = address(0x1);
+        address proxyAdmin = makeAddr("proxyAdmin");
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(bridge),
             proxyAdmin,

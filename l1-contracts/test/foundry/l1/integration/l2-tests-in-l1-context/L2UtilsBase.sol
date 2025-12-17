@@ -17,8 +17,9 @@ import {GW_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_B
 import {L2_INTEROP_ACCOUNT_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "../l2-tests-abstract/Utils.sol";
 
 import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
-
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {L2ChainAssetHandler} from "contracts/bridgehub/L2ChainAssetHandler.sol";
 import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
@@ -27,7 +28,6 @@ import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {L2MessageVerification} from "../../../../../contracts/interop/L2MessageVerification.sol";
 import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
-import {L2_COMPLEX_UPGRADER_ADDR} from "../../../../../contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
 import {InteropHandler} from "../../../../../contracts/interop/InteropHandler.sol";
@@ -39,6 +39,7 @@ import {DummyL2InteropAccount} from "../../../../../contracts/dev-contracts/test
 
 import {SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {TokenMetadata, TokenBridgingData} from "contracts/common/Messaging.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 library L2UtilsBase {
     using stdToml for string;
@@ -155,8 +156,8 @@ library L2UtilsBase {
             L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
                 _args.l1ChainId,
                 _args.eraChainId,
-                _args.l1AssetRouter,
-                _args.legacySharedBridge,
+                IL1AssetRouter(_args.l1AssetRouter),
+                IL2SharedBridgeLegacy(_args.legacySharedBridge),
                 baseTokenAssetId,
                 _args.aliasedOwner
             );

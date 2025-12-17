@@ -6,8 +6,6 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {BridgehubBurnCTMAssetData, IBridgehubBase, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
-
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
 import {CallNotAllowed, InvalidSelector, NotAllowed, RemovingPermanentRestriction, UnallowedImplementation, ZeroAddress} from "contracts/common/L1ContractErrors.sol";

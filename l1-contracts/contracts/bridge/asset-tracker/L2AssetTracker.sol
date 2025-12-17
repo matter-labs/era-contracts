@@ -88,7 +88,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     function _registerTokenOnL2(bytes32 _assetId) internal {
         /// If the chain is settling on Gateway, then withdrawals are not automatically allowed for new tokens.
-        if (L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() == _l1ChainId()) {
+        if (L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == _l1ChainId()) {
             assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.migrationNumber(block.chainid);
         }
     }
@@ -162,7 +162,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         /// otherwise withdrawals might fail in the GWAssetTracker when the chain settles.
         require(
             savedAssetMigrationNumber == migrationNumber ||
-                L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() == _l1ChainId(),
+                L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == _l1ChainId(),
             TokenBalanceNotMigratedToGateway(_assetId, savedAssetMigrationNumber, migrationNumber)
         );
     }
@@ -273,7 +273,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @dev This function is permissionless, it does not affect the state of the contract substantially, and can be called multiple times.
     function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external {
         require(
-            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() != L1_CHAIN_ID,
+            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
             OnlyGatewaySettlementLayer()
         );
         address tokenAddress = _tryGetTokenAddress(_assetId);
@@ -297,7 +297,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             chainMigrationNumber: chainMigrationNumber,
             assetMigrationNumber: assetMigrationNumber[block.chainid][_assetId],
             originToken: originalToken,
-            isL1ToGateway: true
+            isL1ToGateway: true,
+            chainInitialMigrationNumber: 0
         });
         _sendMigrationDataToL1(tokenBalanceMigrationData);
     }

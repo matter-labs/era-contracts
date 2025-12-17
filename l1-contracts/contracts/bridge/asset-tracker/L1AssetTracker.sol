@@ -111,6 +111,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     function migrateTokenBalanceFromNTVV30(uint256 _chainId, bytes32 _assetId) external {
         IL1NativeTokenVault l1NTV = IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT));
         uint256 originChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
+        require(originChainId != 0, InvalidChainId());
         // We do not migrate the chainBalance for the originChain directly, but indirectly by subtracting from MAX_TOKEN_BALANCE.
         // Its important to call this for all chains in the ecosystem so that the sum is accurate.
         require(_chainId != originChainId, InvalidChainId());
@@ -270,8 +271,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             InvalidFunctionSignature(functionSignature)
         );
         require(data.version == TOKEN_BALANCE_MIGRATION_DATA_VERSION, InvalidVersion());
+
+        uint256 savedAssetMigrationNumber = assetMigrationNumber[data.chainId][data.assetId];
         require(
-            assetMigrationNumber[data.chainId][data.assetId] < data.chainMigrationNumber,
+            savedAssetMigrationNumber + 1 == data.chainMigrationNumber ||
+                savedAssetMigrationNumber + 1 == data.chainInitialMigrationNumber,
             InvalidAssetMigrationNumber()
         );
 
