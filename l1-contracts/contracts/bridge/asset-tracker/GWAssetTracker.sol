@@ -769,7 +769,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             return false;
         }
 
-        // Only charge gateway fee if user didn't prepay with fixed ZK fees
-        return !bundle.bundleAttributes.useFixedFee;
+        // Charge gateway settlement fee for all interop operations.
+        return true;
     }
 }
