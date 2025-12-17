@@ -83,8 +83,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     /// @notice The information about the virtual blocks upgrade, which tracks when the migration to the L2 blocks has started and finished.
     VirtualBlockUpgradeInfo internal virtualBlockUpgradeInfo;
 
-    /// @notice The chainId of the settlement layer.
-    uint256 public currentSettlementLayerChainId;
+    uint256 internal currentSettlementLayerChainId;
 
     /// @notice Set the chainId origin.
     /// @param _newChainId The chainId
