@@ -12,7 +12,7 @@ import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "./asset-router/IAss
 import {AssetRouterBase} from "./asset-router/AssetRouterBase.sol";
 import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 
-import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol"; //@check 
+import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol"; //@check
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 
 import {FinalizeL1DepositParams, IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
@@ -60,16 +60,16 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// This variable (together with eraLegacyBridgeLastDepositTxNumber) is used to differentiate between pre-upgrade and post-upgrade deposits. Deposits processed in older batches
     /// than this value are considered to have been processed prior to the upgrade and handled separately.
     /// We use this both for Eth and erc20 token deposits, so we need to update the diamond and bridge simultaneously.
-    uint256 internal eraLegacyBridgeLastDepositBatch;//@rev remove or keep
+    uint256 internal eraLegacyBridgeLastDepositBatch; //@rev remove or keep
 
     /// @dev The tx number in the _eraLegacyBridgeLastDepositBatch that comes *right after* the last deposit tx initiated by the legacy bridge.
     /// This variable (together with eraLegacyBridgeLastDepositBatch) is used to differentiate between pre-upgrade and post-upgrade deposits. Deposits processed in older txs
     /// than this value are considered to have been processed prior to the upgrade and handled separately.
     /// We use this both for Eth and erc20 token deposits, so we need to update the diamond and bridge simultaneously.
-    uint256 internal eraLegacyBridgeLastDepositTxNumber;//@rev remove or keep
+    uint256 internal eraLegacyBridgeLastDepositTxNumber; //@rev remove or keep
 
     /// @dev Legacy bridge smart contract that used to hold ERC20 tokens.
-    IL1ERC20Bridge public override legacyBridge; //@check 
+    IL1ERC20Bridge public override legacyBridge; //@check
 
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
     // slither-disable-next-line uninitialized-state
@@ -126,7 +126,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     }
 
     /// @notice Checks that the message sender is the legacy bridge.
-    modifier onlyLegacyBridge() {//@rev remove or keep
+    modifier onlyLegacyBridge() {
+        //@rev remove or keep
         if (msg.sender != address(legacyBridge)) {
             revert Unauthorized(msg.sender);
         }
@@ -153,9 +154,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     function initialize(
         address _owner,
         uint256 _eraPostDiamondUpgradeFirstBatch,
-        uint256 _eraPostLegacyBridgeUpgradeFirstBatch,//@rev remove or keep
-        uint256 _eraLegacyBridgeLastDepositBatch,//@rev remove or keep
-        uint256 _eraLegacyBridgeLastDepositTxNumber//@rev remove or keep
+        uint256 _eraPostLegacyBridgeUpgradeFirstBatch, //@rev remove or keep
+        uint256 _eraLegacyBridgeLastDepositBatch, //@rev remove or keep
+        uint256 _eraLegacyBridgeLastDepositTxNumber //@rev remove or keep
     ) external reentrancyGuardInitializer initializer {
         if (_owner == address(0)) {
             revert ZeroAddress();
@@ -217,7 +218,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @notice Sets the L1ERC20Bridge contract address.
     /// @dev Should be called only once by the owner.
     /// @param _legacyBridge The address of the legacy bridge.
-    function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external onlyOwner { //@rev remove or keep 
+    function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external onlyOwner {
+        //@rev remove or keep
         if (address(legacyBridge) != address(0)) {
             revert AddressAlreadySet(address(legacyBridge));
         }
@@ -359,7 +361,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         }
 
         bool notCheckedInLegacyBridgeOrWeCanCheckDeposit;
-        {//@rev remove or keep
+        {
+            //@rev remove or keep
             // Deposits that happened before the upgrade cannot be checked here, they have to be claimed and checked in the legacyBridge
             bool weCanCheckDepositHere = !_isPreSharedBridgeDepositOnEra(_chainId, _l2BatchNumber, _l2TxNumberInBatch);
             // Double claims are not possible, as depositHappened is checked here for all except legacy deposits (which have to happen through the legacy bridge)
@@ -368,7 +371,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             notCheckedInLegacyBridgeOrWeCanCheckDeposit = (!_checkedInLegacyBridge) || weCanCheckDepositHere;
         }
 
-        if (notCheckedInLegacyBridgeOrWeCanCheckDeposit) {//@rev remove or keep
+        if (notCheckedInLegacyBridgeOrWeCanCheckDeposit) {
+            //@rev remove or keep
             bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
             // Determine if the given dataHash matches the calculated legacy transaction hash.
             bool isLegacyTxDataHash = _isLegacyTxDataHash(_depositSender, _assetId, _assetData, dataHash);
@@ -485,7 +489,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint256 _chainId,
         uint256 _l2BatchNumber,
         uint256 _l2TxNumberInBatch
-    ) internal view returns (bool) {//@rev remove or keep
+    ) internal view returns (bool) {
+        //@rev remove or keep
         if ((_chainId == ERA_CHAIN_ID) && (eraLegacyBridgeLastDepositBatch == 0)) {
             revert SharedBridgeValueNotSet(SharedBridgeKey.LegacyBridgeLastDepositBatch);
         }
@@ -580,7 +585,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 _amount: amount,
                 _erc20Metadata: new bytes(0)
             });
-        } else if (bytes4(functionSignature) == IL1ERC20Bridge.finalizeWithdrawal.selector) { //@rev  keep interface for selector?
+        } else if (bytes4(functionSignature) == IL1ERC20Bridge.finalizeWithdrawal.selector) {
+            //@rev  keep interface for selector?
             // this message is a token withdrawal
 
             // Check that the message length is correct.
@@ -705,7 +711,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
-    ) external override onlyLegacyBridge { //@check in doubt of removing this one, double check beforehand
+    ) external override onlyLegacyBridge {
+        //@check in doubt of removing this one, double check beforehand
         // For legacy deposits, the l2 receiver is not required to check tx data hash
         // The token address does not have to be provided for this functionality either.
         bytes memory assetData = DataEncoding.encodeBridgeBurnData(_amount, address(0), address(0));
@@ -760,7 +767,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external override { //@rev remove or keep
+    ) external override {
+        //@rev remove or keep
         /// @dev We use a deprecated field to support L2->L1 legacy withdrawals, which were started
         /// by the legacy bridge.
         address legacyL2Bridge = __DEPRECATED_l2BridgeAddress[_chainId];

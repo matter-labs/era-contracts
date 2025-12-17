@@ -121,7 +121,8 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
                 return type(CTMDeploymentTracker).creationCode;
             } else if (compareStrings(contractName, "L1Nullifier")) {
-                if (config.supportL2LegacySharedBridgeTest) { //@rev rm or keep
+                if (config.supportL2LegacySharedBridgeTest) {
+                    //@rev rm or keep
                     return type(L1NullifierDev).creationCode;
                 } else {
                     return type(L1Nullifier).creationCode;

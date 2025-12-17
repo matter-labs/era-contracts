@@ -62,12 +62,13 @@ async function main() {
     console.log("validatorTimelock owner: ", await validatorTimelock.owner());
     console.log("validatorTimelock pendingOwner: ", await validatorTimelock.pendingOwner());
 
-    const l1Erc20Bridge = deployer.transparentUpgradableProxyContract( //@check 
+    const l1Erc20Bridge = deployer.transparentUpgradableProxyContract(
+      //@check
       deployer.addresses.Bridges.ERC20BridgeProxy,
       deployWallet
     );
 
-    console.log("l1Erc20Bridge proxy admin: ", await proxyGov(l1Erc20Bridge.address, deployWallet.provider)); //@check 
+    console.log("l1Erc20Bridge proxy admin: ", await proxyGov(l1Erc20Bridge.address, deployWallet.provider)); //@check
 
     // Now, starting to deploy the info about the L2 contracts
 

@@ -14,9 +14,9 @@ import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
-contract L1AssetRouterLegacyTest is L1AssetRouterTest {  
-
-    function test_finalizeWithdrawalLegacyErc20Bridge_EthOnEth() public { //TODO deprecate eventually
+contract L1AssetRouterLegacyTest is L1AssetRouterTest {
+    function test_finalizeWithdrawalLegacyErc20Bridge_EthOnEth() public {
+        //TODO deprecate eventually
         vm.deal(address(sharedBridge), amount);
 
         /// storing chainBalance
@@ -64,7 +64,8 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         l1Nullifier.finalizeDeposit(finalizeWithdrawalParams);
     }
 
-    function test_finalizeWithdrawalLegacyErc20Bridge_ErcOnEth() public { //TODO deprecate eventually
+    function test_finalizeWithdrawalLegacyErc20Bridge_ErcOnEth() public {
+        //TODO deprecate eventually
         /// storing chainBalance
         _setNativeTokenVaultChainBalance(eraChainId, address(token), amount);
 

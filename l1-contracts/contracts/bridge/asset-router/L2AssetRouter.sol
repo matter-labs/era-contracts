@@ -8,9 +8,9 @@ import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 
 import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
 import {NativeTokenVaultBase} from "../ntv/NativeTokenVaultBase.sol";
-import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol"; //@check 
+import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol"; //@check
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
-import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol"; //@check 
+import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol"; //@check
 import {IL2Bridgehub} from "../../bridgehub/IL2Bridgehub.sol";
 
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
@@ -87,7 +87,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Checks that the message sender is the legacy L2 bridge.
-    modifier onlyLegacyBridge() { //@check 
+    modifier onlyLegacyBridge() {
+        //@check
         if (msg.sender != address(L2_LEGACY_SHARED_BRIDGE)) {
             revert InvalidCaller(msg.sender);
         }
@@ -121,7 +122,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         uint256 _l1ChainId,
         uint256 _eraChainId,
         IL1AssetRouter _l1AssetRouter,
-        IL2SharedBridgeLegacy _legacySharedBridge, //@check 
+        IL2SharedBridgeLegacy _legacySharedBridge, //@check
         bytes32 _baseTokenAssetId,
         address _aliasedOwner
     ) public reentrancyGuardInitializer onlyUpgrader {
@@ -145,7 +146,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         uint256 _l1ChainId,
         uint256 _eraChainId,
         IL1AssetRouter _l1AssetRouter,
-        IL2SharedBridgeLegacy _legacySharedBridge, //@check 
+        IL2SharedBridgeLegacy _legacySharedBridge, //@check
         bytes32 _baseTokenAssetId
     ) public onlyUpgrader {
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
@@ -278,7 +279,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         address _l1Receiver,
         address _l1Token,
         uint256 _amount
-    ) internal pure returns (bytes memory) { //TODO deprecate, eventually
+    ) internal pure returns (bytes memory) {
+        //TODO deprecate, eventually
         // solhint-disable-next-line func-named-parameters
         return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _l1Receiver, _l1Token, _amount);
     }
@@ -300,7 +302,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external payable onlyAssetRouterCounterpart(L1_CHAIN_ID) {//@rev remove or keep
+    ) external payable onlyAssetRouterCounterpart(L1_CHAIN_ID) {
+        //@rev remove or keep
         _translateLegacyFinalizeDeposit({
             _l1Sender: _l1Sender,
             _l2Receiver: _l2Receiver,
@@ -316,7 +319,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external onlyLegacyBridge { //@rev remove or keep
+    ) external onlyLegacyBridge {
+        //@rev remove or keep
         _translateLegacyFinalizeDeposit({
             _l1Sender: _l1Sender,
             _l2Receiver: _l2Receiver,
@@ -332,7 +336,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) internal { //@rev remove or keep
+    ) internal {
+        //@rev remove or keep
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
         // solhint-disable-next-line func-named-parameters
         bytes memory data = DataEncoding.encodeBridgeMintData(_l1Sender, _l2Receiver, _l1Token, _amount, _data);

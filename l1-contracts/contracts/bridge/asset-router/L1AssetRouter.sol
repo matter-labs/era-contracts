@@ -11,23 +11,22 @@ import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTER
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
-import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol"; //@check 
+import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol"; //@check
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
-import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol"; //@check 
+import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol"; //@check
 
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
-import {AddressAlreadySet, AssetHandlerDoesNotExist, AssetIdNotSupported, LegacyBridgeUsesNonNativeToken, LegacyEncodingUsedForNonL1Token, NonEmptyMsgValue, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, UnsupportedEncodingVersion, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {AddressAlreadySet, AssetHandlerDoesNotExist, AssetIdNotSupported, LegacyEncodingUsedForNonL1Token, NonEmptyMsgValue, TokensWithFeesNotSupported, Unauthorized, UnsupportedEncodingVersion, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1Bridgehub} from "../../bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
+import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
 
@@ -60,7 +59,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     INativeTokenVaultBase public nativeTokenVault;
 
     /// @dev Address of legacy bridge.
-    IL1ERC20Bridge public legacyBridge; //@rev 
+    IL1ERC20Bridge public legacyBridge; //@rev
 
     /// @notice Legacy function to get the L2 shared bridge address for a chain.
     /// @dev In case the chain has been deployed after the gateway release,
@@ -150,7 +149,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @notice Sets the L1ERC20Bridge contract address.
     /// @dev Should be called only once by the owner.
     /// @param _legacyBridge The address of the legacy bridge.
-    function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external override onlyOwner {  //@rev remove or keep
+    function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external override onlyOwner {
+        //@rev remove or keep
         if (address(legacyBridge) != address(0)) {
             revert AddressAlreadySet(address(legacyBridge));
         }
@@ -446,7 +446,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         // Do the transfer if allowance to Shared bridge is bigger than amount
         // And if there is not enough allowance for the NTV
         bool weCanTransfer = false;
-        if (l1Token.allowance(address(legacyBridge), address(this)) >= _amount) { //@rev remove or keep
+        if (l1Token.allowance(address(legacyBridge), address(this)) >= _amount) {
+            //@rev remove or keep
             _originalCaller = address(legacyBridge);
             weCanTransfer = true;
         } else if (
@@ -547,7 +548,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external override { //TODO deprecate, eventually
+    ) external override {
+        //TODO deprecate, eventually
         L1_NULLIFIER.finalizeWithdrawal({
             _chainId: _chainId,
             _l2BatchNumber: _l2BatchNumber,

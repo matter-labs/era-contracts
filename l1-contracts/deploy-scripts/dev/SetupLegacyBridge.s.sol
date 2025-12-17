@@ -15,7 +15,9 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 
 /// This scripts is only for developer
-contract SetupLegacyBridge is Script { //@check most likely rm
+contract SetupLegacyBridge is
+    Script //@check most likely rm
+{
     using stdToml for string;
 
     Config internal config;

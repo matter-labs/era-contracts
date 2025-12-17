@@ -22,7 +22,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IRollupDAManager} from "./interfaces/IRollupDAManager.sol";
 import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
-import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol"; //@check 
+import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol"; //@check
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
@@ -381,8 +381,8 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             addresses.stateTransition.diamondProxy
         );
 
-        vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", addresses.bridges.erc20BridgeImplementation);//@rev do we want to remove this from the struct?
-        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", addresses.bridges.erc20BridgeProxy);//@rev do we want to remove this from the struct?
+        vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", addresses.bridges.erc20BridgeImplementation); //@rev do we want to remove this from the struct?
+        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", addresses.bridges.erc20BridgeProxy); //@rev do we want to remove this from the struct?
         vm.serializeAddress("bridges", "l1_nullifier_implementation_addr", addresses.bridges.l1NullifierImplementation);
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", addresses.bridges.l1NullifierProxy);
         vm.serializeAddress(
@@ -518,7 +518,8 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         require(addresses.governance != address(0), "Governance address is not set");
 
         address dangerousTestOnlyForcedBeacon;
-        if (config.supportL2LegacySharedBridgeTest) { //@rev remove or keep
+        if (config.supportL2LegacySharedBridgeTest) {
+            //@rev remove or keep
             (dangerousTestOnlyForcedBeacon, ) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
                 addresses.bridges.erc20BridgeProxy,
                 addresses.bridges.l1NullifierProxy,

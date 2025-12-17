@@ -11,7 +11,7 @@ import {IContractDeployer, L2ContractHelper} from "contracts/common/l2-helpers/L
 
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol"; //@check 
+import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol"; //@check
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
@@ -104,7 +104,7 @@ library L2Utils {
             _args.l1ChainId,
             _args.eraChainId,
             IL1AssetRouter(_args.l1AssetRouter),
-            IL2SharedBridgeLegacy(_args.legacySharedBridge),//@rev remove or keep?
+            IL2SharedBridgeLegacy(_args.legacySharedBridge), //@rev remove or keep?
             ethAssetId,
             _args.aliasedOwner
         );

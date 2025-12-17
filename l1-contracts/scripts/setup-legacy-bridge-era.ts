@@ -20,7 +20,8 @@ import beaconProxy = require("../../l2-contracts/artifacts-zk/@openzeppelin/cont
 
 const provider = web3Provider();
 
-async function main() { //@check probably to delete alltogether
+async function main() {
+  //@check probably to delete alltogether
   const program = new Command();
 
   program.version("0.1.0").name("upgrade-shared-bridge-era").description("upgrade shared bridge for era diamond proxy");

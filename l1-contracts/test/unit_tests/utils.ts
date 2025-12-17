@@ -4,7 +4,7 @@ import { BigNumber, ethers } from "ethers";
 import type { Address } from "zksync-ethers/build/types";
 
 import type { IBridgehub } from "../../typechain/IBridgehub";
-import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge"; //@check 
+import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge"; //@check
 
 import type { ExecutorFacet } from "../../typechain";
 
@@ -340,7 +340,7 @@ export interface PriorityOpsBatchInfo {
 }
 
 export async function depositERC20(
-  bridge: IL1ERC20Bridge, 
+  bridge: IL1ERC20Bridge,
   bridgehubContract: IBridgehub,
   chainId: string,
   l1ChainId: number,
@@ -349,7 +349,8 @@ export async function depositERC20(
   amount: ethers.BigNumber,
   l2GasLimit: number,
   l2RefundRecipient = ethers.constants.AddressZero
-) { //@rev rm or keep
+) {
+  //@rev rm or keep
   const gasPrice = await bridge.provider.getGasPrice();
   const gasPerPubdata = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
   const neededValue = await bridgehubContract.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, gasPerPubdata);

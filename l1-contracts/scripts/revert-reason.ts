@@ -6,7 +6,7 @@ import { ethers } from "ethers";
 import { Interface } from "ethers/lib/utils";
 import { web3Url } from "./utils";
 
-const erc20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi); //@check 
+const erc20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi); //@check
 const zkSyncInterface = new Interface(hardhat.artifacts.readArtifactSync("IZKChain").abi);
 const verifierInterface = new Interface(hardhat.artifacts.readArtifactSync("Verifier").abi);
 const bridgehubInterface = new Interface(hardhat.artifacts.readArtifactSync("Bridgehub").abi);

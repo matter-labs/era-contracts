@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol"; //@check 
+import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol"; //@check
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
@@ -137,7 +137,7 @@ contract L2V29Upgrade {
     /// @param _l2LegacySharedBridge Address of the legacy shared bridge proxy.
     /// @param _aliasedGovernance    New owner of the beacon.
     function migrateBeaconProxyOwner(address _l2LegacySharedBridge, address _aliasedGovernance) internal {
-        UpgradeableBeacon l2TokenBeacon = IL2SharedBridgeLegacy(_l2LegacySharedBridge).l2TokenBeacon();//@rev remove or keep?
+        UpgradeableBeacon l2TokenBeacon = IL2SharedBridgeLegacy(_l2LegacySharedBridge).l2TokenBeacon(); //@rev remove or keep?
 
         address currentOwner = l2TokenBeacon.owner();
         if (currentOwner == _aliasedGovernance) {

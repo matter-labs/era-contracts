@@ -675,7 +675,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         addresses.bridges.l1NullifierProxy = address(
             L1AssetRouter(addresses.bridges.l1AssetRouterProxy).L1_NULLIFIER()
         );
-        addresses.bridges.erc20BridgeProxy = address(//@rev rm or keep
+        addresses.bridges.erc20BridgeProxy = address( //@rev rm or keep
             L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
         );
 
@@ -689,7 +689,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             L1Bridgehub(addresses.bridgehub.bridgehubProxy).chainAssetHandler()
         );
 
-        addresses.bridges.erc20BridgeProxy = address(//@rev rm or keep
+        addresses.bridges.erc20BridgeProxy = address( //@rev rm or keep
             L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
         );
         newConfig.oldValidatorTimelock = IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy)
@@ -734,7 +734,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         string[] memory additionalForceDeployments = getAdditionalDependenciesNames();
 
         bytes[] memory additionalDependencies = new bytes[](7 + additionalForceDeployments.length); // Deps after Gateway upgrade
-        additionalDependencies[0] = ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");//@rev rm or keep
+        additionalDependencies[0] = ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy"); //@rev rm or keep
         additionalDependencies[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
         additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
         additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
@@ -767,7 +767,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             messageRootBytecodeInfo: abi.encode(getL2BytecodeHash("L2MessageRoot")),
             chainAssetHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
             beaconDeployerInfo: abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
-            l2SharedBridgeLegacyImpl: address(0),//@rev modify struct?
+            l2SharedBridgeLegacyImpl: address(0), //@rev modify struct?
             l2BridgedStandardERC20Impl: address(0),
             dangerousTestOnlyForcedBeacon: address(0)
         });
@@ -1017,11 +1017,11 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
         vm.serializeAddress("contracts_newConfig", "old_validator_timelock", newConfig.oldValidatorTimelock);
 
-        string memory contractsConfig = vm.serializeAddress(//@rev rm or keep
-            "contracts_newConfig",
-            "l1_legacy_shared_bridge",
-            addresses.bridges.l1AssetRouterProxy
-        );
+        string memory contractsConfig = vm.serializeAddress( //@rev rm or keep
+                "contracts_newConfig",
+                "l1_legacy_shared_bridge",
+                addresses.bridges.l1AssetRouterProxy
+            );
 
         vm.serializeAddress(
             "deployed_addresses",
@@ -1802,7 +1802,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
                 return Utils.readZKFoundryBytecodeL1("TransitionaryOwner.sol", "TransitionaryOwner");
             } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
                 return Utils.readZKFoundryBytecodeL1("GovernanceUpgradeTimer.sol", "GovernanceUpgradeTimer");
-            } else if (compareStrings(contractName, "L2LegacySharedBridge")) {//@rev rm or keep
+            } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
+                //@rev rm or keep
                 return ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
             } else if (compareStrings(contractName, "L2StandardERC20")) {
                 return ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
@@ -1832,7 +1833,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
             uint256 initialDelay = newConfig.governanceUpgradeTimerInitialDelay;
             return abi.encode(initialDelay, MAX_ADDITIONAL_DELAY, config.ownerAddress, newConfig.ecosystemAdminAddress);
-        } else if (compareStrings(contractName, "L2LegacySharedBridge")) {//@rev rm or keep
+        } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
+            //@rev rm or keep
             return abi.encode();
         } else if (compareStrings(contractName, "L2StandardERC20")) {
             return abi.encode();

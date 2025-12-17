@@ -104,7 +104,7 @@ describe("L2V29Upgrade fork tests", function () {
     it("Ownership of legacy shared bridge and its beacon proxy get migrated, if applicable", async function (this: Context) {
       // Migration is only needed if legacy shared bridge exists, test is skipped if not
       const assetRouter = await ethers.getContractAt("IL2AssetRouter", REAL_L2_ASSET_ROUTER_ADDRESS);
-      const l2LegacySharedBridge = await assetRouter.L2_LEGACY_SHARED_BRIDGE(); //@check 
+      const l2LegacySharedBridge = await assetRouter.L2_LEGACY_SHARED_BRIDGE(); //@check
       if (l2LegacySharedBridge === ethers.constants.AddressZero) {
         doesL2LegacySharedBridgeExist = false;
         console.log("Legacy shared bridge does not exist, skipping ownership migration test");
@@ -119,7 +119,7 @@ describe("L2V29Upgrade fork tests", function () {
       expect(await proxyAdmin.owner()).to.equal(aliasedGovernanceAddress);
 
       // Migrates ownership of the beacon proxy to the aliased governance address
-      const sharedBridgeLegacy = await ethers.getContractAt("IL2SharedBridgeLegacy", l2LegacySharedBridge); //@check 
+      const sharedBridgeLegacy = await ethers.getContractAt("IL2SharedBridgeLegacy", l2LegacySharedBridge); //@check
       const l2TokenBeaconAddress = await sharedBridgeLegacy.l2TokenBeacon();
       const l2TokenBeacon = await ethers.getContractAt("UpgradeableBeacon", l2TokenBeaconAddress);
       expect(await l2TokenBeacon.owner()).to.equal(aliasedGovernanceAddress);

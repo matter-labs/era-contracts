@@ -160,7 +160,7 @@ async function loadAllConfirmedTokensFromL1(
 ) {
   const blocksRange = 50000;
   const endBlock = await l1Provider.getBlockNumber();
-  const abi = (await hardhat.artifacts.readArtifact("IL1ERC20Bridge")).abi;//@rev rm or keep
+  const abi = (await hardhat.artifacts.readArtifact("IL1ERC20Bridge")).abi; //@rev rm or keep
   const contract = new ethers.Contract(bridgeAddress, abi, l1Provider);
   const filter = contract.filters.DepositInitiated();
 

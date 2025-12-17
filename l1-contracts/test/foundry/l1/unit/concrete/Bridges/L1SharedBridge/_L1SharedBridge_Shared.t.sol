@@ -19,7 +19,7 @@ import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol"; //@check 
+import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol"; //@check
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -59,7 +59,7 @@ contract L1AssetRouterTest is Test {
     L1Nullifier l1NullifierImpl;
     L1Nullifier l1Nullifier;
     address bridgehubAddress;
-    address l1ERC20BridgeAddress;//@rev rm or keep
+    address l1ERC20BridgeAddress; //@rev rm or keep
     address l1WethAddress;
     address l2SharedBridge;
     address l1NullifierAddress;
@@ -103,7 +103,7 @@ contract L1AssetRouterTest is Test {
         alice = makeAddr("alice");
         // bob = makeAddr("bob");
         l1WethAddress = address(new ERC20("Wrapped ETH", "WETH"));
-        l1ERC20BridgeAddress = makeAddr("l1ERC20Bridge");//@rev rm or keep
+        l1ERC20BridgeAddress = makeAddr("l1ERC20Bridge"); //@rev rm or keep
         l2SharedBridge = makeAddr("l2SharedBridge");
 
         txHash = bytes32(uint256(uint160(makeAddr("txHash"))));
