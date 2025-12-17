@@ -18,7 +18,7 @@ import {BUNDLE_IDENTIFIER, BalanceChange, BundleAttributes, CallAttributes, INTE
 import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
-import {AttributeAlreadySet, AttributeViolatesRestriction, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty, UseFixedFeeRequired, FeeCollectionFailed} from "./InteropErrors.sol";
+import {AttributeAlreadySet, AttributeViolatesRestriction, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty, UseFixedFeeRequired, InvalidRecipientAddress, FeeWithdrawalFailed} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
@@ -45,6 +45,15 @@ contract InteropCenter is
     /// @param newFee New fee amount.
     event InteropFeeUpdated(uint256 indexed oldFee, uint256 indexed newFee);
 
+    /// @notice Emitted when protocol fees are accumulated for withdrawal.
+    /// @param amount Amount of fees accumulated.
+    event ProtocolFeesAccumulated(uint256 amount);
+
+    /// @notice Emitted when protocol fees are withdrawn.
+    /// @param to Address that received the fees.
+    /// @param amount Amount of fees withdrawn.
+    event ProtocolFeesWithdrawn(address indexed to, uint256 amount);
+
     /// @notice The chain ID of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
     uint256 public L1_CHAIN_ID;
@@ -65,6 +74,9 @@ contract InteropCenter is
 
     /// @notice ZK token contract address.
     IERC20 public ZK_TOKEN;
+
+    /// @notice Accumulated protocol fees awaiting withdrawal.
+    uint256 public accumulatedProtocolFees;
 
     modifier onlyL1() {
         require(L1_CHAIN_ID == block.chainid, NotL1(L1_CHAIN_ID, block.chainid));
@@ -315,12 +327,10 @@ contract InteropCenter is
                 );
             }
         }
-        // Send protocol fee to operator (owner) if applicable
+        // Accumulate protocol fee for withdrawal by operator (owner)
         if (protocolFee > 0) {
-            (bool success, ) = owner().call{value: protocolFee}("");
-            if (!success) {
-                revert FeeCollectionFailed();
-            }
+            accumulatedProtocolFees += protocolFee;
+            emit ProtocolFeesAccumulated(protocolFee);
         }
     }
 
@@ -621,5 +631,20 @@ contract InteropCenter is
         uint256 oldFee = interopProtocolFee;
         interopProtocolFee = _fee;
         emit InteropFeeUpdated(oldFee, _fee);
+    }
+
+    /// @notice Allows the owner to withdraw accumulated protocol fees to a specified address.
+    /// @dev Uses pull-over-push pattern to prevent reverts from blocking interop operations.
+    /// @param _to Address to send the accumulated fees to.
+    function withdrawProtocolFees(address _to) external onlyOwner {
+        require(_to != address(0), InvalidRecipientAddress());
+        uint256 amount = accumulatedProtocolFees;
+
+        accumulatedProtocolFees = 0;
+
+        (bool success, ) = _to.call{value: amount}("");
+        require(success, FeeWithdrawalFailed());
+
+        emit ProtocolFeesWithdrawn(_to, amount);
     }
 }

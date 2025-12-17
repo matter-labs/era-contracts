@@ -242,8 +242,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function processLogsAndMessages(
         ProcessLogsInput calldata _processLogsInputs
     ) external onlyChain(_processLogsInputs.chainId) {
-        // Collect ZK settlement fees from chain escrow before processing.
-        _collectGatewaySettlementFees(_processLogsInputs);
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory reconstructedLogsTree;
         reconstructedLogsTree.createTree(L2_TO_L1_LOGS_MERKLE_TREE_DEPTH);
 
@@ -253,6 +251,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         uint256 msgCount = 0;
         uint256 logsLength = _processLogsInputs.logs.length;
         bytes32 baseTokenAssetId = _bridgehub().baseTokenAssetId(_processLogsInputs.chainId);
+
+        // Count chargeable interop messages during processing
+        uint256 chargeableInteropCount = 0;
         for (uint256 logCount = 0; logCount < logsLength; ++logCount) {
             L2Log memory log = _processLogsInputs.logs[logCount];
             {
@@ -274,6 +275,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
                 if (log.key == bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
                     _handleInteropCenterMessage(_processLogsInputs.chainId, message, baseTokenAssetId);
+
+                    // Check if this message should incur gateway settlement fees
+                    if (_isChargeableInteropMessage(log, message, _processLogsInputs.chainId)) {
+                        ++chargeableInteropCount;
+                    }
                 } else if (log.key == bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR)))) {
                     _handleInteropHandlerReceiveMessage(_processLogsInputs.chainId, message, baseTokenAssetId);
                 } else if (log.key == bytes32(uint256(uint160(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)))) {
@@ -319,6 +325,12 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             _processLogsInputs.batchNumber,
             chainBatchRootHash
         );
+
+        // Collect ZK settlement fees from chain escrow after processing.
+        if (chargeableInteropCount > 0 && gatewaySettlementFee > 0) {
+            uint256 totalFee = gatewaySettlementFee * chargeableInteropCount;
+            CHAIN_ESCROW_REGISTRY.paySettlementFees(_processLogsInputs.chainId, totalFee);
+        }
     }
 
     function _getEmptyMessageRoot(uint256 _chainId) internal returns (bytes32) {
@@ -723,56 +735,41 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                         Gateway Settlement Fee Collection
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Collects ZK settlement fees from chain escrows during batch processing.
-    /// @param _processLogsInputs The input containing logs and messages being processed.
-    /// @dev This function analyzes the logs to count interop operations and charges fees from the chain's escrow.
-    /// @dev Chain operators must ensure sufficient escrow balance before settlement.
-    function _collectGatewaySettlementFees(ProcessLogsInput calldata _processLogsInputs) internal {
-        // Only collect fees if gateway settlement fee is non-zero.
-        if (gatewaySettlementFee == 0) {
-            return;
+    /// @notice Checks if a log represents a chargeable interop message.
+    /// @param _log The L2Log to check.
+    /// @param _message The corresponding message data.
+    /// @param _chainId The chain ID for validation.
+    /// @return Whether this message should incur gateway settlement fees.
+    function _isChargeableInteropMessage(
+        L2Log memory _log,
+        bytes calldata _message,
+        uint256 _chainId
+    ) internal pure returns (bool) {
+        // Must be from L2ToL1Messenger (where system contracts send messages)
+        if (_log.sender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
+            return false;
         }
 
-        uint256 chainId = _processLogsInputs.chainId;
-
-        // Count interop bundles that require gateway fees.
-        uint256 chargeableInteropCount = 0;
-        uint256 logsLength = _processLogsInputs.logs.length;
-        uint256 msgCount = 0;
-
-        for (uint256 i = 0; i < logsLength; ++i) {
-            L2Log memory log = _processLogsInputs.logs[i];
-
-            // Check if this log is from L2ToL1Messenger (where InteropCenter sends messages).
-            if (log.sender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
-                bytes calldata message = _processLogsInputs.messages[msgCount];
-                ++msgCount;
-
-                // Check if it's an interop bundle message (starts with BUNDLE_IDENTIFIER)
-                if (message.length > 32 && bytes32(message[:32]) == BUNDLE_IDENTIFIER) {
-                    // Extract and decode the bundle to check fee payment status
-                    bytes memory bundleData = message[32:];
-
-                    // Decode the bundle directly instead of using try-catch
-                    InteropBundle memory bundle = abi.decode(bundleData, (InteropBundle));
-
-                    // Validate this bundle is from the correct source chain
-                    if (bundle.sourceChainId == chainId) {
-                        // Only charge gateway fee if user didn't prepay with fixed ZK fees
-                        if (!bundle.bundleAttributes.useFixedFee) {
-                            ++chargeableInteropCount;
-                        }
-                    }
-                }
-            }
+        // The log.key must indicate this message originated from InteropCenter
+        if (_log.key != bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
+            return false;
         }
 
-        // Collect ZK fees from chain escrow if there are chargeable interop operations.
-        if (chargeableInteropCount > 0) {
-            uint256 totalFee = gatewaySettlementFee * chargeableInteropCount;
-
-            // Pay settlement fees directly from the chain's escrow
-            CHAIN_ESCROW_REGISTRY.paySettlementFees(chainId, totalFee);
+        // Must be an interop bundle message (starts with BUNDLE_IDENTIFIER)
+        if (_message.length <= 32 || bytes32(_message[:32]) != BUNDLE_IDENTIFIER) {
+            return false;
         }
+
+        // Decode the bundle to check fee payment status
+        bytes memory bundleData = _message[32:];
+        InteropBundle memory bundle = abi.decode(bundleData, (InteropBundle));
+
+        // Validate this bundle is from the correct source chain
+        if (bundle.sourceChainId != _chainId) {
+            return false;
+        }
+
+        // Only charge gateway fee if user didn't prepay with fixed ZK fees
+        return !bundle.bundleAttributes.useFixedFee;
     }
 }
