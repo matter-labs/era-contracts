@@ -17,6 +17,7 @@ interface IZKOSContractDeployer {
         address _addr,
         bytes32 _bytecodeHash,
         uint32 _bytecodeLength,
-        bytes32 _observableBytecodeHash
+        bytes32 _observableBytecodeHash,
+        uint32 _observableBytecodeLength
     ) external;
 }

@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IL2ToL1Messenger} from "./IL2ToL1Messenger.sol";
+import {IL2ToL1MessengerEra} from "./IL2ToL1MessengerEra.sol";
 import {IL2InteropRootStorage} from "../interfaces/IL2InteropRootStorage.sol";
 import {IMessageVerification} from "../../state-transition/chain-interfaces/IMessageVerification.sol";
 
@@ -33,7 +33,7 @@ address constant L2_FORCE_DEPLOYER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x07
 /// @dev The address of the L2ToL1Messenger system contract
 address constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x08);
 /// @dev The address of the special smart contract that can send arbitrary length message as an L2 log
-IL2ToL1Messenger constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT = IL2ToL1Messenger(
+IL2ToL1MessengerEra constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT = IL2ToL1MessengerEra(
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 );
 
@@ -99,3 +99,12 @@ address constant L2_CHAIN_ASSET_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0
 address constant L2_NTV_BEACON_DEPLOYER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0b);
 
 address constant L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR = address(USER_CONTRACTS_OFFSET + 0x0c);
+
+/// @dev the offset for the system hooks for ZKsync OS
+uint160 constant SYSTEM_HOOKS_OFFSET = 0x7000;
+
+/// @dev The address of the L2ToL1Messenger system hook
+address constant L1_MESSENGER_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x01);
+
+/// @dev The address of the system hook responsible for setting bytecode on address. Can only be called from L2_COMPLEX_UPGRADER address
+address constant SET_BYTECODE_ON_ADDRESS_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x02);
