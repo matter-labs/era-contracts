@@ -16,12 +16,13 @@ import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {Utils} from "../utils/Utils.sol";
 import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {BridgehubAddresses, BridgehubContracts, ZkChainAddresses, L2ERC20BridgeAddresses, StateTransitionDeployedAddresses, StateTransitionContracts, Verifiers, Facets, BridgesDeployedAddresses, BridgeContracts, CTMDeployedAddresses, CTMAdminAddresses, DataAvailabilityDeployedAddresses} from "./Types.sol";
+import {CoreDeployedAddresses, BridgehubAddresses, BridgehubContracts, ZkChainAddresses, L2ERC20BridgeAddresses, StateTransitionDeployedAddresses, StateTransitionContracts, Verifiers, Facets, BridgesDeployedAddresses, BridgeContracts, CTMDeployedAddresses, CTMAdminAddresses, DataAvailabilityDeployedAddresses} from "./Types.sol";
 
 library AddressIntrospector {
     function getBridgehubAddresses(IL1Bridgehub _bridgehub) public view returns (BridgehubAddresses memory info) {
@@ -53,10 +54,7 @@ library AddressIntrospector {
                 chainAssetHandler: Utils.getImplementation(chainAssetHandler),
                 chainRegistrationSender: address(0),
                 assetTracker: address(0)
-            }),
-            bridgehubAdmin: address(_bridgehub.admin()),
-            governance: IOwnable(bridgehubProxy).owner(),
-            transparentProxyAdmin: Utils.getProxyAdmin(bridgehubProxy)
+            })
         });
     }
 
@@ -80,16 +78,103 @@ library AddressIntrospector {
                 chainAssetHandler: address(0),
                 chainRegistrationSender: address(0),
                 assetTracker: address(0)
-            }),
-            bridgehubAdmin: address(_bridgehub.admin()),
-            governance: IOwnable(L2_BRIDGEHUB_ADDR).owner(),
-            transparentProxyAdmin: Utils.getProxyAdmin(L2_BRIDGEHUB_ADDR)
+            })
+        });
+    }
+
+    function _getUptoDateZkChainAddress(ChainTypeManagerBase _ctm) private view returns (address) {
+        address ctmAddr = address(_ctm);
+        IBridgehubBase bridgehub = IBridgehubBase(_ctm.BRIDGE_HUB());
+        uint256 protocolVersion = _ctm.protocolVersion();
+        address[] memory zkChains = bridgehub.getAllZKChains();
+
+        for (uint256 i = 0; i < zkChains.length; i++) {
+            IZKChain zkChain = IZKChain(zkChains[i]);
+            address chainCTM;
+            try zkChain.getChainTypeManager() {
+                chainCTM = zkChain.getChainTypeManager();
+            } catch {
+                continue;
+            }
+            if (chainCTM != ctmAddr) {
+                continue;
+            }
+            uint256 zkChainProtocolVersion = zkChain.getProtocolVersion();
+            if (zkChainProtocolVersion == protocolVersion) {
+                return address(zkChain);
+            }
+        }
+        return address(0);
+    }
+
+    function _getVerifierFromUptoDateZkChain(ChainTypeManagerBase _ctm) private view returns (address verifier) {
+        address zkChainAddr = _getUptoDateZkChainAddress(_ctm);
+        if (zkChainAddr == address(0)) {
+            return address(0);
+        }
+        return address(IZKChain(zkChainAddr).getVerifier());
+    }
+
+    function _getFacetsFromUptoDateZkChain(
+        ChainTypeManagerBase _ctm
+    ) private view returns (Facets memory facetsResult) {
+        address zkChainAddr = _getUptoDateZkChainAddress(_ctm);
+        if (zkChainAddr != address(0)) {
+            IZKChain zkChain = IZKChain(zkChainAddr);
+            // Get facets from the zkChain using the diamond loupe
+            IGetters.Facet[] memory facets = zkChain.facets();
+
+            address adminFacet = address(0);
+            address mailboxFacet = address(0);
+            address executorFacet = address(0);
+            address gettersFacet = address(0);
+
+            // Iterate through facets to identify each one by calling getName()
+            for (uint256 j = 0; j < facets.length; j++) {
+                address facetAddr = facets[j].addr;
+                // Call getName() on the facet
+                (bool success, bytes memory data) = facetAddr.staticcall(abi.encodeWithSignature("getName()"));
+                if (success && data.length > 0) {
+                    string memory name = abi.decode(data, (string));
+                    if (keccak256(bytes(name)) == keccak256(bytes("AdminFacet"))) {
+                        adminFacet = facetAddr;
+                    } else if (keccak256(bytes(name)) == keccak256(bytes("MailboxFacet"))) {
+                        mailboxFacet = facetAddr;
+                    } else if (keccak256(bytes(name)) == keccak256(bytes("ExecutorFacet"))) {
+                        executorFacet = facetAddr;
+                    } else if (keccak256(bytes(name)) == keccak256(bytes("GettersFacet"))) {
+                        gettersFacet = facetAddr;
+                    }
+                }
+            }
+
+            facetsResult = Facets({
+                adminFacet: adminFacet,
+                mailboxFacet: mailboxFacet,
+                executorFacet: executorFacet,
+                gettersFacet: gettersFacet,
+                diamondInit: address(0) // Not available from CTM directly
+            });
+            return facetsResult;
+        }
+
+        // If no up-to-date zkChain is found, return empty facets
+        facetsResult = Facets({
+            adminFacet: address(0),
+            mailboxFacet: address(0),
+            executorFacet: address(0),
+            gettersFacet: address(0),
+            diamondInit: address(0)
         });
     }
 
     function getCTMAddresses(ChainTypeManagerBase _ctm) public view returns (CTMDeployedAddresses memory info) {
         address ctmAddr = address(_ctm);
         address validatorTimelockPostV29 = _tryAddress(ctmAddr, "validatorTimelockPostV29()");
+
+        // Try to get facet addresses and verifier from an up-to-date zkChain
+        Facets memory facets = _getFacetsFromUptoDateZkChain(_ctm);
+        address verifier = _getVerifierFromUptoDateZkChain(_ctm);
 
         info = CTMDeployedAddresses({
             stateTransition: StateTransitionDeployedAddresses({
@@ -106,22 +191,16 @@ library AddressIntrospector {
                     validatorTimelock: address(0) // Not available from CTM directly
                 }),
                 verifiers: Verifiers({
-                    verifier: address(0), // Not available from CTM directly
+                    verifier: verifier,
                     verifierFflonk: address(0), // Not available from CTM directly
                     verifierPlonk: address(0) // Not available from CTM directly
                 }),
-                facets: Facets({
-                    adminFacet: address(0), // Not available from CTM directly
-                    mailboxFacet: address(0), // Not available from CTM directly
-                    executorFacet: address(0), // Not available from CTM directly
-                    gettersFacet: address(0), // Not available from CTM directly
-                    diamondInit: address(0) // Not available from CTM directly
-                }),
+                facets: facets,
                 genesisUpgrade: _ctm.l1GenesisUpgrade(),
                 defaultUpgrade: address(0), // Not available from CTM directly
                 legacyValidatorTimelock: _ctm.validatorTimelock(),
                 eraDiamondProxy: address(0), // Not available from CTM directly
-                bytecodesSupplier: address(0), // Not available from CTM directly
+                bytecodesSupplier: _ctm.L1_BYTECODES_SUPPLIER(),
                 rollupDAManager: address(0), // Not available from CTM directly
                 rollupSLDAValidator: address(0) // Not available from CTM directly
             }),
@@ -134,8 +213,8 @@ library AddressIntrospector {
                 l1BlobsDAValidatorZKsyncOS: address(0) // Not available from CTM directly
             }),
             admin: CTMAdminAddresses({
-                transparentProxyAdmin: address(0), // Not available from CTM directly
-                governance: address(0), // Not available from CTM directly
+                transparentProxyAdmin: Utils.getProxyAdmin(ctmAddr),
+                governance: IOwnable(ctmAddr).owner(),
                 accessControlRestrictionAddress: address(0), // Not available from CTM directly
                 eip7702Checker: address(0), // Not available from CTM directly
                 chainTypeManagerAdmin: address(0), // Not available from CTM directly
@@ -255,6 +334,22 @@ library AddressIntrospector {
             l1WethToken: address(0), // Not available from asset router
             ethTokenAssetId: bytes32(0) // Not available from asset router
         });
+    }
+
+    function getCoreDeployedAddresses(
+        address _bridgehubProxy
+    ) public view returns (CoreDeployedAddresses memory coreAddresses) {
+        // Get bridgehub addresses
+        coreAddresses.bridgehub = getBridgehubAddresses(IL1Bridgehub(_bridgehubProxy));
+
+        // Get bridges addresses
+        address assetRouter = address(IL1Bridgehub(_bridgehubProxy).assetRouter());
+        coreAddresses.bridges = getBridgesDeployedAddresses(assetRouter);
+
+        // Populate shared admin addresses
+        coreAddresses.shared.transparentProxyAdmin = Utils.getProxyAdmin(_bridgehubProxy);
+        coreAddresses.shared.bridgehubAdmin = address(IL1Bridgehub(_bridgehubProxy).admin());
+        coreAddresses.shared.governance = IOwnable(_bridgehubProxy).owner();
     }
 
     function getLegacyBridgeAddress(address _assetRouter) public view returns (address legacyBridge) {

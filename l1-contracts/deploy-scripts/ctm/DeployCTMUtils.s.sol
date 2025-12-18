@@ -60,7 +60,7 @@ import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.so
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
-import {StateTransitionDeployedAddresses, DataAvailabilityDeployedAddresses, ChainCreationParamsConfig, BridgehubAddresses} from "../utils/Types.sol";
+import {StateTransitionDeployedAddresses, DataAvailabilityDeployedAddresses, ChainCreationParamsConfig, BridgehubAddresses, CoreDeployedAddresses} from "../utils/Types.sol";
 
 import {DeployCTML1OrGateway, CTMCoreDeploymentConfig, CTMContract} from "./DeployCTML1OrGateway.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
@@ -106,8 +106,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     GeneratedData internal generatedData;
     CTMDeployedAddresses internal ctmAddresses;
     // Addresses discovered from already deployed core contracts (Bridgehub, AssetRouter, etc.)
-    BridgehubAddresses internal discoveredBridgehub;
-    BridgesDeployedAddresses internal discoveredBridges;
+    CoreDeployedAddresses internal coreAddresses;
 
     function deployStateTransitionDiamondFacets() internal {
         ctmAddresses.stateTransition.facets.executorFacet = deploySimpleContract("ExecutorFacet", false);
@@ -433,10 +432,10 @@ abstract contract DeployCTMUtils is DeployUtils {
             return
                 abi.encode(
                     config.l1ChainId,
-                    discoveredBridgehub.proxies.bridgehub,
-                    discoveredBridges.proxies.l1AssetRouter,
-                    discoveredBridges.proxies.l1NativeTokenVault,
-                    discoveredBridgehub.proxies.messageRoot
+                    coreAddresses.bridgehub.proxies.bridgehub,
+                    coreAddresses.bridges.proxies.l1AssetRouter,
+                    coreAddresses.bridges.proxies.l1NativeTokenVault,
+                    coreAddresses.bridgehub.proxies.messageRoot
                 );
         } else {
             return
@@ -455,10 +454,10 @@ abstract contract DeployCTMUtils is DeployUtils {
                 testnetVerifier: _config.testnetVerifier,
                 eraChainId: _config.eraChainId,
                 l1ChainId: _config.l1ChainId,
-                bridgehubProxy: discoveredBridgehub.proxies.bridgehub,
+                bridgehubProxy: coreAddresses.bridgehub.proxies.bridgehub,
                 interopCenterProxy: L2_INTEROP_CENTER_ADDR,
                 rollupDAManager: ctmAddresses.daAddresses.rollupDAManager,
-                chainAssetHandler: discoveredBridgehub.proxies.chainAssetHandler,
+                chainAssetHandler: coreAddresses.bridgehub.proxies.chainAssetHandler,
                 l1BytecodesSupplier: ctmAddresses.stateTransition.bytecodesSupplier,
                 eip7702Checker: ctmAddresses.admin.eip7702Checker,
                 verifierFflonk: ctmAddresses.stateTransition.verifiers.verifierFflonk,

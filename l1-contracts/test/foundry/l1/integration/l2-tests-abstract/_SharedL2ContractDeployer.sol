@@ -121,7 +121,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         interopTargetContract = makeAddr("interopTargetContract");
         originalChainId = block.chainid;
 
-        discoveredBridgehub.proxies.bridgehub = L2_BRIDGEHUB_ADDR;
+        coreAddresses.bridgehub.proxies.bridgehub = L2_BRIDGEHUB_ADDR;
         sharedBridgeLegacy = deployL2SharedBridgeLegacy(
             L1_CHAIN_ID,
             ERA_CHAIN_ID,

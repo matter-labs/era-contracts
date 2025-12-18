@@ -62,8 +62,8 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
 
     /// @notice Deploy everything that should be deployed
     function deployNewCTMContracts() public virtual override {
-        (ctmDeployedAddresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
-        (ctmDeployedAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
+        (ctmAddresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
+        (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
 
         deployVerifiers();
 
@@ -71,7 +71,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         deployUpgradeStageValidator();
         deployGovernanceUpgradeTimer();
 
-        ctmDeployedAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(
+        ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(
             "EraChainTypeManager",
             false
         );

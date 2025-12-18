@@ -126,15 +126,14 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         console.log("Initializing core contracts from BH");
         IL1Bridgehub bridgehubProxy = IL1Bridgehub(bridgehub);
         // Populate discovered addresses via inspector
-        discoveredBridgehub = AddressIntrospector.getBridgehubAddresses(bridgehubProxy);
+        coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehub);
         address assetRouterAddr = address(bridgehubProxy.assetRouter());
-        discoveredBridges = AddressIntrospector.getBridgesDeployedAddresses(assetRouterAddr);
         config.eraChainId = AddressIntrospector.getEraChainId(assetRouterAddr);
 
         if (reuseGovAndAdmin) {
-            ctmAddresses.admin.governance = discoveredBridgehub.governance;
-            ctmAddresses.chainAdmin = discoveredBridgehub.bridgehubAdmin;
-            ctmAddresses.admin.transparentProxyAdmin = discoveredBridgehub.transparentProxyAdmin;
+            ctmAddresses.admin.governance = coreAddresses.shared.governance;
+            ctmAddresses.chainAdmin = coreAddresses.shared.bridgehubAdmin;
+            ctmAddresses.admin.transparentProxyAdmin = coreAddresses.shared.transparentProxyAdmin;
         } else {
             (ctmAddresses.admin.governance) = deploySimpleContract("Governance", false);
             (ctmAddresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
@@ -318,16 +317,16 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         string memory bridgehub = vm.serializeAddress(
             "bridgehub",
             "bridgehub_proxy_addr",
-            discoveredBridgehub.proxies.bridgehub
+            coreAddresses.bridgehub.proxies.bridgehub
         );
         // Note: AssetRouterAddresses doesn't have legacyBridge, so we get it directly
-        L1AssetRouter assetRouter = L1AssetRouter(discoveredBridges.proxies.l1AssetRouter);
+        L1AssetRouter assetRouter = L1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
         vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", address(assetRouter.legacyBridge()));
-        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", discoveredBridges.proxies.l1Nullifier);
+        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", coreAddresses.bridges.proxies.l1Nullifier);
         string memory bridges = vm.serializeAddress(
             "bridges",
             "shared_bridge_proxy_addr",
-            discoveredBridges.proxies.l1AssetRouter
+            coreAddresses.bridges.proxies.l1AssetRouter
         );
         // TODO(EVM-744): this has to be renamed to chain type manager
         vm.serializeAddress(
@@ -459,10 +458,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             return address(0);
         }
 
-        L1AssetRouter assetRouter = L1AssetRouter(discoveredBridges.proxies.l1AssetRouter);
+        L1AssetRouter assetRouter = L1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
         (address beacon, ) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
             address(assetRouter.legacyBridge()),
-            discoveredBridges.proxies.l1Nullifier,
+            coreAddresses.bridges.proxies.l1Nullifier,
             ctmAddresses.admin.governance
         );
         return beacon;
@@ -475,7 +474,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             l1ChainId: config.l1ChainId,
             gatewayChainId: config.gatewayChainId,
             eraChainId: config.eraChainId,
-            l1AssetRouter: discoveredBridges.proxies.l1AssetRouter,
+            l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(ctmAddresses.admin.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
@@ -511,7 +510,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
-                discoveredBridgehub.proxies.chainRegistrationSender
+                coreAddresses.bridgehub.proxies.chainRegistrationSender
             ),
             dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon
         });
@@ -530,7 +529,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         MailboxFacet mailboxFacet = new MailboxFacet(
             1,
             1,
-            discoveredBridgehub.proxies.chainAssetHandler,
+            coreAddresses.bridgehub.proxies.chainAssetHandler,
             IEIP7702Checker(address(0)),
             false
         );

@@ -111,28 +111,21 @@ contract EcosystemUpgrade_v31 is Script, DefaultEcosystemUpgrade {
     }
 
     function deployNewEcosystemContractsL1() public virtual override {
-        DeployL1CoreUtils l1CoreDeployer = new DeployL1CoreUtils();
-        string memory root = vm.projectRoot();
-        string memory upgradeInputPath = string.concat(root, vm.envString("L1_CONFIG"));
-        l1CoreDeployer.initializeConfig(upgradeInputPath);
-        coreAddresses.bridgehub.implementations.bridgehub = l1CoreDeployer.deploySimpleContract("L1Bridgehub", false);
-        coreAddresses.bridgehub.implementations.messageRoot = l1CoreDeployer.deploySimpleContract("L1MessageRoot", false);
-        bridges.implementations.l1Nullifier = l1CoreDeployer.deploySimpleContract("L1Nullifier", false);
-        bridges.implementations.l1AssetRouter = l1CoreDeployer.deploySimpleContract("L1AssetRouter", false);
-        bridges.implementations.l1NativeTokenVault = l1CoreDeployer.deploySimpleContract("L1NativeTokenVault", false);
+        coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub", false);
+        coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot", false);
+        coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier", false);
+        coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter", false);
+        coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault", false);
         (
             coreAddresses.bridgehub.implementations.assetTracker,
             coreAddresses.bridgehub.proxies.assetTracker
         ) = deployTuppWithContract("L1AssetTracker", false);
-        coreAddresses.bridgehub.implementations.ctmDeploymentTracker = l1CoreDeployer.deploySimpleContract(
+        coreAddresses.bridgehub.implementations.ctmDeploymentTracker = deploySimpleContract(
             "CTMDeploymentTracker",
             false
         );
-        coreAddresses.bridgehub.implementations.chainAssetHandler = l1CoreDeployer.deploySimpleContract(
-            "L1ChainAssetHandler",
-            false
-        );
-        coreAddresses.bridgehub.implementations.chainRegistrationSender = l1CoreDeployer.deploySimpleContract(
+        coreAddresses.bridgehub.implementations.chainAssetHandler = deploySimpleContract("L1ChainAssetHandler", false);
+        coreAddresses.bridgehub.implementations.chainRegistrationSender = deploySimpleContract(
             "ChainRegistrationSender",
             false
         );

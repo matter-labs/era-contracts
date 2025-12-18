@@ -17,9 +17,6 @@ struct BridgehubContracts {
 struct BridgehubAddresses {
     BridgehubContracts proxies;
     BridgehubContracts implementations;
-    address bridgehubAdmin;
-    address governance;
-    address transparentProxyAdmin;
 }
 
 struct ZkChainAddresses {

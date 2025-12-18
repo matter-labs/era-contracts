@@ -238,8 +238,8 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
             newConfig.priorityTxsL2GasLimit,
             new bytes[](0),
             gatewayConfig.chainId,
-            discoveredBridgehub.proxies.bridgehub,
-            discoveredBridges.proxies.l1AssetRouter
+            coreAddresses.bridgehub.proxies.bridgehub,
+            coreAddresses.bridges.proxies.l1AssetRouter
         );
         notifyAboutDeployment(contractAddress, contractName, creationCalldata, contractName, true);
     }
@@ -290,9 +290,8 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     }
 
     function setAddressesBasedOnBridgehub() internal virtual {
-        discoveredBridgehub = AddressIntrospector.getBridgehubAddresses(bridgehub);
-        discoveredBridges = AddressIntrospector.getBridgesDeployedAddresses(address(bridgehub.assetRouter()));
-        config.ownerAddress = discoveredBridgehub.governance;
+        coreAddresses = AddressIntrospector.getCoreDeployedAddresses(address(bridgehub));
+        config.ownerAddress = coreAddresses.shared.governance;
         address ctm = bridgehub.chainTypeManager(config.eraChainId);
         ctmDeployedAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
         discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(
@@ -308,7 +307,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         );
 
         newConfig.oldValidatorTimelock = ctmDeployedAddresses.stateTransition.proxies.validatorTimelock;
-        newConfig.ecosystemAdminAddress = discoveredBridgehub.bridgehubAdmin;
+        newConfig.ecosystemAdminAddress = coreAddresses.shared.bridgehubAdmin;
     }
 
     ////////////////////////////// Preparing calls /////////////////////////////////
@@ -572,9 +571,9 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     ) internal view returns (Call[] memory calls) {
         require(gatewayConfig.chainId != 0, "Chain id of gateway is zero in newConfig");
 
-        require(discoveredBridgehub.proxies.bridgehub != address(0), "bridgehubProxyAddress is zero in newConfig");
+        require(coreAddresses.bridgehub.proxies.bridgehub != address(0), "bridgehubProxyAddress is zero in newConfig");
         require(
-            discoveredBridges.proxies.l1AssetRouter != address(0),
+            coreAddresses.bridges.proxies.l1AssetRouter != address(0),
             "l1AssetRouterProxyAddress is zero in newConfig"
         );
 
@@ -585,8 +584,8 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
             new bytes[](0),
             dstAddress,
             gatewayConfig.chainId,
-            discoveredBridgehub.proxies.bridgehub,
-            discoveredBridges.proxies.l1AssetRouter,
+            coreAddresses.bridgehub.proxies.bridgehub,
+            coreAddresses.bridges.proxies.l1AssetRouter,
             msg.sender
         );
     }
@@ -595,7 +594,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         address spender,
         uint256 amount
     ) public virtual returns (Call[] memory calls) {
-        address token = IL1Bridgehub(discoveredBridgehub.proxies.bridgehub).baseToken(gatewayConfig.chainId);
+        address token = IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).baseToken(gatewayConfig.chainId);
         require(token != address(0), "Base token for Gateway is zero");
         calls = new Call[](1);
         calls[0] = Call({target: token, data: abi.encodeCall(IERC20.approve, (spender, amount)), value: 0});

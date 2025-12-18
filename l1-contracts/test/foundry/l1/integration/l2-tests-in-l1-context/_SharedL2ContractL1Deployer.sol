@@ -53,7 +53,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
             "/test/foundry/l1/integration/deploy-scripts/script-config/permanent-values.toml"
         );
         initializeConfig(inputPath, permanentValuesInputPath, L2_BRIDGEHUB_ADDR);
-        discoveredBridgehub.proxies.bridgehub = L2_BRIDGEHUB_ADDR;
+        coreAddresses.bridgehub.proxies.bridgehub = L2_BRIDGEHUB_ADDR;
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         if (!_skip) {
