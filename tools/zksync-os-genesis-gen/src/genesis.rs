@@ -1,5 +1,9 @@
+use crate::consts::{
+    EIP1967_ADMIN_SLOT, EIP1967_IMPLEMENTATION_SLOT, INITIAL_CONTRACTS, L2_COMPLEX_UPGRADER_ADDR,
+    L2_COMPLEX_UPGRADER_IMPL_ADDR, SYSTEM_CONTRACT_PROXY_ADMIN, SYSTEM_PROXY_ADMIN_OWNER_SLOT,
+};
 use crate::types::{InitialGenesisInput, LeafInfo, MAX_B256_VALUE, MERKLE_TREE_DEPTH};
-use crate::{bytecode_to_code, construct_additional_storage, INITIAL_CONTRACTS};
+use crate::utils::{address_to_b256, bytecode_to_code};
 use alloy::consensus::{Header, EMPTY_OMMER_ROOT_HASH};
 use alloy::eips::eip1559::INITIAL_BASE_FEE;
 use alloy::primitives::{Address, Bloom, B256, B64, U256};
@@ -225,4 +229,31 @@ pub fn build_genesis_root_hash(genesis_input: &InitialGenesisInput) -> anyhow::R
         requests_hash: None,
     };
     build_initial_genesis_commitment(storage_logs, header)
+}
+
+fn construct_additional_storage() -> BTreeMap<Address, BTreeMap<B256, B256>> {
+    let mut map: BTreeMap<Address, BTreeMap<B256, B256>> = BTreeMap::new();
+
+    let mut system_contract_proxy_admin_storage = BTreeMap::new();
+    system_contract_proxy_admin_storage.insert(
+        SYSTEM_PROXY_ADMIN_OWNER_SLOT,
+        address_to_b256(&L2_COMPLEX_UPGRADER_ADDR),
+    );
+    map.insert(
+        SYSTEM_CONTRACT_PROXY_ADMIN,
+        system_contract_proxy_admin_storage,
+    );
+
+    let mut l2_complex_upgrader_storage = BTreeMap::new();
+    l2_complex_upgrader_storage.insert(
+        EIP1967_IMPLEMENTATION_SLOT,
+        address_to_b256(&L2_COMPLEX_UPGRADER_IMPL_ADDR),
+    );
+    l2_complex_upgrader_storage.insert(
+        EIP1967_ADMIN_SLOT,
+        address_to_b256(&SYSTEM_CONTRACT_PROXY_ADMIN),
+    );
+    map.insert(L2_COMPLEX_UPGRADER_ADDR, l2_complex_upgrader_storage);
+
+    map
 }
