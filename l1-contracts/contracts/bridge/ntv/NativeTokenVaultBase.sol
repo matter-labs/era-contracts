@@ -23,6 +23,7 @@ import {BridgeHelper} from "../BridgeHelper.sol";
 import {EmptyToken} from "../L1BridgeContractErrors.sol";
 import {AddressMismatch, AmountMustBeGreaterThanZero, AssetIdAlreadyRegistered, AssetIdMismatch, BurningNativeWETHNotSupported, DeployingBridgedTokenForNativeToken, EmptyDeposit, NonEmptyMsgValue, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
+import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -31,6 +32,7 @@ import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 abstract contract NativeTokenVaultBase is
     INativeTokenVaultBase,
     IAssetHandler,
+    ReentrancyGuard,
     Ownable2StepUpgradeable,
     PausableUpgradeable,
     AssetHandlerModifiers
