@@ -302,14 +302,15 @@ contract GatewayCTMDeployer {
     /// @param _testnetVerifier Whether testnet verifier should be used.
     /// @param _isZKsyncOS Whether ZKsync OS mode should be used.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
-    /// @param _verifierOwner The owner that can add additional verification keys.
+    /// @param _accessControlManager When _isZKsyncOS is false: direct verifier owner that can add additional verification keys.
+    ///                              When _isZKsyncOS is true: ZKsyncOSChainTypeManager used for access control.
     /// in the process of the execution of this function.
     function _deployVerifier(
         bytes32 _salt,
         bool _testnetVerifier,
         bool _isZKsyncOS,
         DeployedContracts memory _deployedContracts,
-        address _verifierOwner
+        address _accessControlManager
     ) internal {
         address fflonkVerifier;
         address verifierPlonk;
@@ -330,7 +331,7 @@ contract GatewayCTMDeployer {
                     new ZKsyncOSTestnetVerifier{salt: _salt}(
                         IVerifierV2(fflonkVerifier),
                         IVerifier(verifierPlonk),
-                        _verifierOwner
+                        _accessControlManager
                     )
                 );
             } else {
@@ -344,7 +345,7 @@ contract GatewayCTMDeployer {
                     new ZKsyncOSDualVerifier{salt: _salt}(
                         IVerifierV2(fflonkVerifier),
                         IVerifier(verifierPlonk),
-                        _verifierOwner
+                        _accessControlManager
                     )
                 );
             } else {

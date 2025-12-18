@@ -29,8 +29,8 @@ interface IL1Bridgehub is IBridgehubBase {
         bytes[] calldata _factoryDeps
     ) external returns (uint256 chainId);
 
-    /// @notice Register settlement layer
-    function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external;
+    /// @notice Set settlement layer status
+    function setSettlementLayerStatus(uint256 _settlementLayerChainId, bool _isWhitelisted) external;
 
     /// @notice Register already deployed ZK chain
     function registerAlreadyDeployedZKChain(uint256 _chainId, address _hyperchain) external;

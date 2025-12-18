@@ -250,7 +250,7 @@ contract L1GatewayTests is
         bytes32 assetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
 
         vm.startBroadcast(Ownable(address(addresses.bridgehub)).owner());
-        addresses.bridgehub.registerSettlementLayer(gatewayChainId, true);
+        addresses.bridgehub.setSettlementLayerStatus(gatewayChainId, true);
         vm.stopBroadcast();
 
         bytes32 baseTokenAssetId = eraConfig.baseTokenAssetId;
