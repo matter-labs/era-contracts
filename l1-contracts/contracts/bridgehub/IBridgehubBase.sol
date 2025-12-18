@@ -4,7 +4,7 @@ pragma solidity ^0.8.21;
 
 import {L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
+import {IMessageRootBase} from "./IMessageRootBase.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 struct L2TransactionRequestDirect {
@@ -99,7 +99,7 @@ interface IBridgehubBase {
 
     function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 
-    function messageRoot() external view returns (IMessageRoot);
+    function messageRoot() external view returns (IMessageRootBase);
 
     function getZKChain(uint256 _chainId) external view returns (address);
 

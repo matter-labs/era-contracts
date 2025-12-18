@@ -12,16 +12,16 @@ import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1Bridgehub} from "./IL1Bridgehub.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
+import {IMessageRootBase} from "./IMessageRootBase.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
+import {IMessageRootBase} from "./IMessageRootBase.sol";
 import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, NotAssetRouter, SLHasDifferentCTM} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused} from "../common/L1ContractErrors.sol";
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
-import {IChainAssetHandler} from "./IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "./IChainAssetHandlerBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -29,7 +29,7 @@ import {IChainAssetHandler} from "./IChainAssetHandler.sol";
 /// it is the IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
 abstract contract ChainAssetHandlerBase is
-    IChainAssetHandler,
+    IChainAssetHandlerBase,
     ReentrancyGuard,
     Ownable2StepUpgradeable,
     PausableUpgradeable,
@@ -51,7 +51,7 @@ abstract contract ChainAssetHandlerBase is
     function BRIDGEHUB() external view virtual returns (IL1Bridgehub);
 
     /// @notice The message root contract
-    function MESSAGE_ROOT() external view virtual returns (IMessageRoot);
+    function MESSAGE_ROOT() external view virtual returns (IMessageRootBase);
 
     /// @notice The asset router contract
     function ASSET_ROUTER() external view virtual returns (IAssetRouterBase);
@@ -66,7 +66,7 @@ abstract contract ChainAssetHandlerBase is
 
     function _bridgehub() internal view virtual returns (IL1Bridgehub);
 
-    function _messageRoot() internal view virtual returns (IMessageRoot);
+    function _messageRoot() internal view virtual returns (IMessageRootBase);
 
     function _assetRouter() internal view virtual returns (IAssetRouterBase);
 
@@ -87,7 +87,7 @@ abstract contract ChainAssetHandlerBase is
 
     /// @dev The message root contract.
     /// @dev Kept here for storage layout compatibility with previous versions.
-    IMessageRoot internal DEPRECATED_MESSAGE_ROOT;
+    IMessageRootBase internal DEPRECATED_MESSAGE_ROOT;
 
     /// @dev The asset router contract.
     /// @dev Kept here for storage layout compatibility with previous versions.
@@ -226,7 +226,7 @@ abstract contract ChainAssetHandlerBase is
             }
             // We want to allow any chain to be migrated,
             IBridgehubBase(_bridgehub()).registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
-            IMessageRoot(_messageRoot()).addNewChain(bridgehubMintData.chainId);
+            IMessageRootBase(_messageRoot()).addNewChain(bridgehubMintData.chainId);
         }
 
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);

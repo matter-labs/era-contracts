@@ -8,7 +8,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {InvalidCaller} from "../common/L1ContractErrors.sol";
 import {IL1Bridgehub} from "./IL1Bridgehub.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
+import {IMessageRootBase} from "./IMessageRootBase.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 /// @author Matter Labs
@@ -36,7 +36,7 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     /// @dev The message root contract.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    IMessageRoot public override MESSAGE_ROOT;
+    IMessageRootBase public override MESSAGE_ROOT;
 
     /// @dev The asset router contract.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
@@ -59,7 +59,7 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
         return BRIDGEHUB;
     }
 
-    function _messageRoot() internal view override returns (IMessageRoot) {
+    function _messageRoot() internal view override returns (IMessageRootBase) {
         return MESSAGE_ROOT;
     }
 
@@ -103,7 +103,7 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
         BRIDGEHUB = IL1Bridgehub(_bridgehub);
         L1_CHAIN_ID = _l1ChainId;
         ASSET_ROUTER = IAssetRouterBase(_assetRouter);
-        MESSAGE_ROOT = IMessageRoot(_messageRoot);
+        MESSAGE_ROOT = IMessageRootBase(_messageRoot);
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
     }
 }

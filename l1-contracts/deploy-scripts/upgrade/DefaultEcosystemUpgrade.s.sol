@@ -16,7 +16,7 @@ import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
 import {L2_BRIDGEHUB_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
-import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "contracts/bridgehub/IChainAssetHandlerBase.sol";
 
 import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
 import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
@@ -1366,7 +1366,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         result[0] = Call({
             target: addresses.bridgehub.chainAssetHandlerProxy,
             value: 0,
-            data: abi.encodeCall(IChainAssetHandler.pauseMigration, ())
+            data: abi.encodeCall(IChainAssetHandlerBase.pauseMigration, ())
         });
     }
 
@@ -1399,7 +1399,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         result[0] = Call({
             target: addresses.bridgehub.chainAssetHandlerProxy,
             value: 0,
-            data: abi.encodeCall(IChainAssetHandler.unpauseMigration, ())
+            data: abi.encodeCall(IChainAssetHandlerBase.unpauseMigration, ())
         });
     }
 
@@ -1513,7 +1513,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeCall(IChainAssetHandler.pauseMigration, ());
+        bytes memory l2Calldata = abi.encodeCall(IChainAssetHandlerBase.pauseMigration, ());
 
         calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_CHAIN_ASSET_HANDLER_ADDR);
     }
@@ -1522,7 +1522,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeCall(IChainAssetHandler.unpauseMigration, ());
+        bytes memory l2Calldata = abi.encodeCall(IChainAssetHandlerBase.unpauseMigration, ());
 
         calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_CHAIN_ASSET_HANDLER_ADDR);
     }

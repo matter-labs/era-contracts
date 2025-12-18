@@ -10,7 +10,7 @@ import {BridgehubBase} from "./BridgehubBase.sol";
 import {IL2Bridgehub} from "./IL2Bridgehub.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
+import {IMessageRootBase} from "./IMessageRootBase.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {NotInGatewayMode, NotRelayedSender} from "./L1BridgehubErrors.sol";
 
@@ -114,7 +114,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     function setAddresses(
         address _assetRouter,
         ICTMDeploymentTracker _l1CtmDeployer,
-        IMessageRoot _messageRoot,
+        IMessageRootBase _messageRoot,
         address _chainAssetHandler
     ) external override onlyOwnerOrUpgrader {
         assetRouter = IAssetRouterBase(_assetRouter);
