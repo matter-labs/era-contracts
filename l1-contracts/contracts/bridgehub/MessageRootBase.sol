@@ -96,11 +96,11 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
-        if (msg.sender != _bridgehub() && msg.sender != address(IBridgehubBase(_bridgehub()).chainAssetHandler())) {
+        if (msg.sender != _bridgehub() && msg.sender != IBridgehubBase(_bridgehub()).chainAssetHandler()) {
             revert OnlyBridgehubOrChainAssetHandler(
                 msg.sender,
-                address(_bridgehub()),
-                address(IBridgehubBase(_bridgehub()).chainAssetHandler())
+                _bridgehub(),
+                IBridgehubBase(_bridgehub()).chainAssetHandler()
             );
         }
         _;
