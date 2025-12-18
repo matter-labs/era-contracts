@@ -29,50 +29,6 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
         bytes32 indexed additionalData
     );
 
-    event LegacyDepositInitiated(
-        uint256 indexed chainId,
-        bytes32 indexed l2DepositTxHash,
-        address indexed from,
-        address to,
-        address l1Token,
-        uint256 amount
-    );
-
-    /// @notice Initiates a deposit by locking funds on the contract and sending the request
-    /// of processing an L2 transaction where tokens would be minted.
-    /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the
-    /// newly-deployed token does not support any custom logic, i.e. rebase tokens' functionality is not supported.
-    /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
-    /// @param _l2Receiver The account address that should receive funds on L2.
-    /// @param _l1Token The L1 token address which is deposited.
-    /// @param _amount The total amount of tokens to be bridged.
-    /// @param _l2TxGasLimit The L2 gas limit to be used in the corresponding L2 transaction.
-    /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction.
-    /// @param _refundRecipient The address on L2 that will receive the refund for the transaction.
-    /// @dev If the L2 deposit finalization transaction fails, the `_refundRecipient` will receive the `_l2Value`.
-    /// Please note, the contract may change the refund recipient's address to eliminate sending funds to addresses
-    /// out of control.
-    /// - If `_refundRecipient` is a contract on L1, the refund will be sent to the aliased `_refundRecipient`.
-    /// - If `_refundRecipient` is set to `address(0)` and the sender has NO deployed bytecode on L1, the refund will
-    /// be sent to the `msg.sender` address.
-    /// - If `_refundRecipient` is set to `address(0)` and the sender has deployed bytecode on L1, the refund will be
-    /// sent to the aliased `msg.sender` address.
-    /// @dev The address aliasing of L1 contracts as refund recipient on L2 is necessary to guarantee that the funds
-    /// are controllable through the Mailbox, since the Mailbox applies address aliasing to the from address for the
-    /// L2 tx if the L1 msg.sender is a contract. Without address aliasing for L1 contracts as refund recipients they
-    /// would not be able to make proper L2 tx requests through the Mailbox to use or withdraw the funds from L2, and
-    /// the funds would be lost.
-    /// @return txHash The L2 transaction hash of deposit finalization.
-    function depositLegacyErc20Bridge(
-        address _originalCaller,
-        address _l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        uint256 _l2TxGasLimit,
-        uint256 _l2TxGasPerPubdataByte,
-        address _refundRecipient
-    ) external payable returns (bytes32 txHash);
-
     function L1_NULLIFIER() external view returns (IL1Nullifier);
 
     function L1_WETH_TOKEN() external view returns (address);

@@ -186,8 +186,6 @@ error L2TimestampTooBig();
 error L2WithdrawalMessageWrongLength(uint256 messageLen);
 // 0x8efef97a
 error LegacyBridgeNotSet();
-// 0x29963361
-error LegacyBridgeUsesNonNativeToken();
 // 0xfade089a
 error LegacyEncodingUsedForNonL1Token();
 // 0x767eed08

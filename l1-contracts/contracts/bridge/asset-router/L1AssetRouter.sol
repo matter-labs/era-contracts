@@ -19,15 +19,14 @@ import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegac
 
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
-import {AddressAlreadySet, AssetHandlerDoesNotExist, AssetIdNotSupported, LegacyBridgeUsesNonNativeToken, LegacyEncodingUsedForNonL1Token, NonEmptyMsgValue, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, UnsupportedEncodingVersion, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {AddressAlreadySet, AssetHandlerDoesNotExist, AssetIdNotSupported, LegacyEncodingUsedForNonL1Token, NonEmptyMsgValue, TokensWithFeesNotSupported, Unauthorized, UnsupportedEncodingVersion, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1Bridgehub} from "../../bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
+import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
 
@@ -546,93 +545,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /*//////////////////////////////////////////////////////////////
                      Legacy Functions
     //////////////////////////////////////////////////////////////*/
-
-    /// @inheritdoc IL1AssetRouter
-    function depositLegacyErc20Bridge(
-        address _originalCaller,
-        address _l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        uint256 _l2TxGasLimit,
-        uint256 _l2TxGasPerPubdataByte,
-        address _refundRecipient
-    ) external payable override onlyLegacyBridge nonReentrant whenNotPaused returns (bytes32 txHash) {
-        if (_l1Token == L1_WETH_TOKEN) {
-            revert TokenNotSupported(L1_WETH_TOKEN);
-        }
-
-        bytes32 _assetId;
-        {
-            // Note, that to keep the code simple, while avoiding "stack too deep" error,
-            // this `bridgeData` variable is reused in two places with different meanings:
-            // - Firstly, it denotes the bridgeBurn data to be used for the NativeTokenVault
-            // - Secondly, after the call to `_burn` function, it denotes the `bridgeMint` data that
-            // will be sent to the L2 counterpart of the L1NTV.
-            bytes memory bridgeData = DataEncoding.encodeBridgeBurnData(_amount, _l2Receiver, _l1Token);
-            // Inner call to encode data to decrease local var numbers
-            _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
-            // Legacy bridge is only expected to use native tokens for L1.
-            if (_assetId != DataEncoding.encodeNTVAssetId(block.chainid, _l1Token)) {
-                revert LegacyBridgeUsesNonNativeToken();
-            }
-
-            // Note, that starting from here `bridgeData` starts denoting bridgeMintData.
-            bridgeData = _burn({
-                _chainId: ERA_CHAIN_ID,
-                _nextMsgValue: 0,
-                _assetId: _assetId,
-                _originalCaller: _originalCaller,
-                _transferData: bridgeData,
-                _passValue: false,
-                _nativeTokenVault: address(nativeTokenVault)
-            });
-
-            bytes memory l2TxCalldata = getDepositCalldata(_originalCaller, _assetId, bridgeData);
-
-            // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
-            // Otherwise, the refund will be sent to the specified address.
-            // If the recipient is a contract on L1, the address alias will be applied.
-            address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, _originalCaller);
-
-            L2TransactionRequestDirect memory request = L2TransactionRequestDirect({
-                chainId: ERA_CHAIN_ID,
-                l2Contract: L2_ASSET_ROUTER_ADDR,
-                mintValue: msg.value, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the base token bridge for gas
-                l2Value: 0, // L2 msg.value, this contract doesn't support base token deposits or wrapping functionality, for direct deposits use bridgehub
-                l2Calldata: l2TxCalldata,
-                l2GasLimit: _l2TxGasLimit,
-                l2GasPerPubdataByteLimit: _l2TxGasPerPubdataByte,
-                factoryDeps: new bytes[](0),
-                refundRecipient: refundRecipient
-            });
-            txHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
-        }
-
-        {
-            bytes memory transferData = DataEncoding.encodeBridgeBurnData(_amount, _l2Receiver, _l1Token);
-            // Save the deposited amount to claim funds on L1 if the deposit failed on L2
-            L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(
-                ERA_CHAIN_ID,
-                DataEncoding.encodeTxDataHash({
-                    _encodingVersion: LEGACY_ENCODING_VERSION,
-                    _originalCaller: _originalCaller,
-                    _assetId: _assetId,
-                    _nativeTokenVault: address(nativeTokenVault),
-                    _transferData: transferData
-                }),
-                txHash
-            );
-        }
-
-        emit LegacyDepositInitiated({
-            chainId: ERA_CHAIN_ID,
-            l2DepositTxHash: txHash,
-            from: _originalCaller,
-            to: _l2Receiver,
-            l1Token: _l1Token,
-            amount: _amount
-        });
-    }
 
     /// @inheritdoc IL1AssetRouter
     function finalizeWithdrawal(

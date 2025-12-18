@@ -15,7 +15,6 @@ import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contract
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 contract L1AssetRouterLegacyTest is L1AssetRouterTest {
-
     function test_finalizeWithdrawalLegacyErc20Bridge_EthOnEth() public {
         vm.deal(address(sharedBridge), amount);
 
