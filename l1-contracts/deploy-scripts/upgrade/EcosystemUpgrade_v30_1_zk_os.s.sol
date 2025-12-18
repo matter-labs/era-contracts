@@ -131,6 +131,15 @@ contract EcosystemUpgrade_v30_1_zk_os is Script, DefaultEcosystemUpgrade {
         string memory toml = vm.readFile(fullPath);
 
         sampleChainId = toml.readUint("$.zksync_os.sample_chain_id");
+        
+        // We want to save old facets to reuse it for setting chain params as this upgrade only changes
+        // the verifier contract.
+        addresses.stateTransition.adminFacet = toml.readAddress("$.state_transition.admin_facet_addr");
+        addresses.stateTransition.executorFacet = toml.readAddress("$.state_transition.executor_facet_addr");
+        addresses.stateTransition.mailboxFacet = toml.readAddress("$.state_transition.mailbox_facet_addr");
+        addresses.stateTransition.gettersFacet = toml.readAddress("$.state_transition.getters_facet_addr");
+        addresses.stateTransition.diamondInit = toml.readAddress("$.state_transition.diamond_init_addr");
+        generatedData.forceDeploymentsData = toml.readBytes("$.state_transition.force_deployments_data");
 
         super.initialize(newConfigPath, _outputPath);
     }
@@ -194,6 +203,7 @@ contract EcosystemUpgrade_v30_1_zk_os is Script, DefaultEcosystemUpgrade {
     // Unlike the original one, we skip the GW-related parts.
     function generateUpgradeData() public virtual override {
         console.log("Generated fixed force deployments data");
+        newlyGeneratedData.diamondCutData = abi.encode(getChainCreationDiamondCutData(addresses.stateTransition));
         generateUpgradeCutData(addresses.stateTransition);
         upgradeConfig.upgradeCutPrepared = true;
         console.log("UpgradeCutGenerated");
@@ -214,18 +224,20 @@ contract EcosystemUpgrade_v30_1_zk_os is Script, DefaultEcosystemUpgrade {
 
     // Unlike the original one, we skip stage 0 and stage 2 calls.
     function prepareStage0GovernanceCalls() public override returns (Call[] memory calls) {
-        // No stage 0 calls, since the zksync os governor does not control the ecosystem.
+        // No stage 1 calls, since the zksync os governor does not control the ecosystem.
     }
 
     // Unlike the original one, since we do not control the main ecosystem governance,
     // we skip upgrading lots of contracts, as well as anything related to ZK Gateway.
     function prepareStage1GovernanceCalls() public override returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](2);
+        Call[][] memory allCalls = new Call[][](3);
 
+        console.log("prepareStage1GovernanceCalls: prepareNewChainCreationParamsCall");
+        allCalls[0] = prepareNewChainCreationParamsCall();
         console.log("prepareStage1GovernanceCalls: provideSetNewVersionUpgradeCall");
-        allCalls[0] = provideSetNewVersionUpgradeCall();
+        allCalls[1] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: acceptZKSyncOSVerifierOwnershipCalls");
-        allCalls[1] = acceptZKSyncOSVerifierOwnershipCalls();
+        allCalls[2] = acceptZKSyncOSVerifierOwnershipCalls();
 
         calls = mergeCallsArray(allCalls);
     }
