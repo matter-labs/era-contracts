@@ -5,14 +5,14 @@ pragma solidity 0.8.28;
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
-import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
 import {IL2Bridgehub} from "./IL2Bridgehub.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
-import {NotInGatewayMode, NotRelayedSender} from "./L1BridgehubErrors.sol";
+import {NotInGatewayMode} from "./L1BridgehubErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -84,14 +84,6 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     /// @dev Returns the L1 chain ID for internal use.
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
-    }
-
-    modifier onlySettlementLayerRelayedSender() override {
-        /// There is no sender for the wrapping, we use a virtual address.
-        if (msg.sender != SETTLEMENT_LAYER_RELAY_SENDER) {
-            revert NotRelayedSender(msg.sender, SETTLEMENT_LAYER_RELAY_SENDER);
-        }
-        _;
     }
 
     /// @notice Used to forward a transaction on the gateway to the chains mailbox.
