@@ -53,7 +53,7 @@ library FullMerkle {
         if (index != 0) {
             uint256 oldMaxNodeNumber = index - 1;
             uint256 maxNodeNumber = index;
-            for (uint256 i; i < self._height; i = i.uncheckedInc()) {
+            for (uint256 i; i < self._height; ++i) {
                 if (oldMaxNodeNumber == maxNodeNumber) {
                     break;
                 }
@@ -77,7 +77,7 @@ library FullMerkle {
         }
         self._nodes[0][_index] = _itemHash;
         bytes32 currentHash = _itemHash;
-        for (uint256 i; i < self._height; i = i.uncheckedInc()) {
+        for (uint256 i; i < self._height; ++i) {
             if (_index % 2 == 0) {
                 currentHash = Merkle.efficientHash(
                     currentHash,
@@ -123,7 +123,7 @@ library FullMerkle {
         bytes32[] memory _newRow = new bytes32[](newRowLength);
 
         uint256 length = _newNodes.length;
-        for (uint256 i; i < length; i = i.uncheckedAdd(2)) {
+        for (uint256 i; i < length; i += 2) {
             self._nodes[_height][i] = _newNodes[i];
             if (i + 1 < length) {
                 self._nodes[_height][i + 1] = _newNodes[i + 1];
