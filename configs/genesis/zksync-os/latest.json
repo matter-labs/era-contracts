@@ -30,11 +30,11 @@
       "0x0000000000000000000000000000000000000000000000000000000000000000": "0x000000000000000000000000000000000000000000000000000000000000800f"
     }
   },
-  "execution_version": 3,
+  "genesis_root": "0xa317d183fd2ed701814a993cfa76e458401bfa81c5da85e309dab4f92ebcba2e",
   "protocol_semantic_version": {
     "major": 0,
     "minor": 31,
     "patch": 0
   },
-  "genesis_root": "0xa317d183fd2ed701814a993cfa76e458401bfa81c5da85e309dab4f92ebcba2e"
+  "execution_version": 3
 }

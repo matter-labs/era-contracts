@@ -1,9 +1,8 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use crate::genesis::build_genesis_root_hash;
-use crate::types::{Genesis, InitialGenesisInput, ProtocolVersion};
+use crate::types::{Genesis, InitialGenesisInput};
 use alloy::primitives::{Address, FixedBytes, B256};
-use structopt::StructOpt;
 mod genesis;
 mod types;
 
@@ -100,41 +99,15 @@ fn main() -> anyhow::Result<()> {
 
 fn update_local_genesis() -> anyhow::Result<()> {
     const PATH_TO_LOCAL_GENESIS: &str = "../../configs/genesis/zksync-os/latest.json";
-    let original_genesis: Genesis = serde_json::from_str(
+    // Load the original genesis file for getting the correct version fields
+    let mut genesis: Genesis = serde_json::from_str(
         &std::fs::read_to_string(PATH_TO_LOCAL_GENESIS).expect("Failed to read local genesis file"),
     )?;
-    let result = build_genesis_with_default_input(
-        original_genesis.initial_genesis.execution_version,
-        original_genesis.protocol_semantic_version,
-    )?;
+    genesis.initial_genesis = InitialGenesisInput::local();
+    genesis.genesis_root = build_genesis_root_hash(&genesis.initial_genesis)?;
 
-    let json = serde_json::to_string_pretty(&result)?;
+    let json = serde_json::to_string_pretty(&genesis)?;
     std::fs::write(PATH_TO_LOCAL_GENESIS, json)?;
 
     Ok(())
-}
-
-fn build_genesis_with_default_input(
-    execution_version: u32,
-    protocol_version: ProtocolVersion,
-) -> anyhow::Result<Genesis> {
-    let initial_genesis_input = InitialGenesisInput {
-        initial_contracts: INITIAL_CONTRACTS
-            .iter()
-            .map(|(addr, name)| {
-                let code = bytecode_to_code(name);
-                (*addr, alloy::primitives::Bytes::from(code))
-            })
-            .collect(),
-        additional_storage: construct_additional_storage(),
-        additional_storage_raw: Default::default(),
-        execution_version,
-    };
-
-    Ok(Genesis {
-        initial_genesis: initial_genesis_input.clone(),
-        protocol_semantic_version: protocol_version,
-        genesis_root: build_genesis_root_hash(initial_genesis_input)?,
-        other: Default::default(),
-    })
 }

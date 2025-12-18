@@ -29,9 +29,6 @@ pub struct InitialGenesisInput {
     /// Same format as before.
     #[serde(skip)]
     pub additional_storage_raw: Vec<(B256, B256)>,
-
-    /// Execution version used for genesis.
-    pub execution_version: u32,
 }
 
 /// A leaf in the genesis state Merkle tree.
@@ -79,8 +76,10 @@ pub const MAX_B256_VALUE: B256 = FixedBytes::<32>([0xFF; 32]);
 pub struct Genesis {
     #[serde(flatten)]
     pub initial_genesis: InitialGenesisInput,
-    pub protocol_semantic_version: ProtocolVersion,
     pub genesis_root: B256,
+    pub protocol_semantic_version: ProtocolVersion,
+    /// Execution version used for genesis.
+    pub execution_version: u32,
     #[serde(flatten)]
     pub other: serde_json::Value,
 }

@@ -1,4 +1,5 @@
 use crate::types::{InitialGenesisInput, LeafInfo, MAX_B256_VALUE, MERKLE_TREE_DEPTH};
+use crate::{bytecode_to_code, construct_additional_storage, INITIAL_CONTRACTS};
 use alloy::consensus::{Header, EMPTY_OMMER_ROOT_HASH};
 use alloy::eips::eip1559::INITIAL_BASE_FEE;
 use alloy::primitives::{Address, Bloom, B256, B64, U256};
@@ -8,6 +9,22 @@ use zk_os_api::helpers::{set_properties_code, set_properties_nonce};
 use zk_os_basic_system::system_implementation::flat_storage_model::{
     AccountProperties, ACCOUNT_PROPERTIES_STORAGE_ADDRESS,
 };
+
+impl InitialGenesisInput {
+    pub(crate) fn local() -> Self {
+        InitialGenesisInput {
+            initial_contracts: INITIAL_CONTRACTS
+                .iter()
+                .map(|(addr, name)| {
+                    let code = bytecode_to_code(name);
+                    (*addr, alloy::primitives::Bytes::from(code))
+                })
+                .collect(),
+            additional_storage: construct_additional_storage(),
+            additional_storage_raw: Default::default(),
+        }
+    }
+}
 
 /// Calculates the Merkle root of a tree of given depth from the provided leaves.
 ///
@@ -139,7 +156,7 @@ fn account_properties_flat_key(address: Address) -> B256 {
     )
 }
 
-pub fn build_genesis_root_hash(genesis_input: InitialGenesisInput) -> anyhow::Result<B256> {
+pub fn build_genesis_root_hash(genesis_input: &InitialGenesisInput) -> anyhow::Result<B256> {
     // BTreeMap is used to ensure that the storage logs are sorted by key, so that the order is deterministic
     // which is important for tree.
     let mut storage_logs: BTreeMap<B256, B256> = BTreeMap::new();
