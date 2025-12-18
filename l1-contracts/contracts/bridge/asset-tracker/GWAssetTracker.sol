@@ -153,6 +153,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _balanceChange.assetId)) {
             _forceSetAssetMigrationNumber(_chainId, _balanceChange.assetId);
         }
+        if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _balanceChange.baseTokenAssetId)) {
+            _forceSetAssetMigrationNumber(_chainId, _balanceChange.baseTokenAssetId);
+        }
 
         /// Note we don't decrease L1ChainBalance here, since we don't track L1 chainBalance on Gateway.
         _increaseAndSaveChainBalance(_chainId, _balanceChange.assetId, _balanceChange.amount, chainMigrationNumber);

@@ -497,6 +497,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         s.settlementLayer = address(0);
 
         _setDAValidatorPair(address(0), L2DACommitmentScheme.NONE);
+        _unpauseDeposits();
 
         emit MigrationComplete();
     }

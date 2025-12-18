@@ -509,18 +509,18 @@ abstract contract DeployCTMUtils is DeployUtils {
     function test() internal virtual {}
 }
 
-contract ChainCreationParamsLib is Script {
+library ChainCreationParamsLib {
     using stdJson for string;
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
     Vm internal constant vm = Vm(VM_ADDRESS);
 
     function getChainCreationParams(
         string memory _config
-    ) internal virtual returns (ChainCreationParamsConfig memory chainCreationParams) {
+    ) public returns (ChainCreationParamsConfig memory chainCreationParams) {
         string memory json = vm.readFile(_config);
-        uint256 major = json.readUint("$.protocol_semantic_version.major");
-        uint256 minor = json.readUint("$.protocol_semantic_version.minor");
-        uint256 patch = json.readUint("$.protocol_semantic_version.patch");
+        uint32 major = uint32(json.readUint("$.protocol_semantic_version.major"));
+        uint32 minor = uint32(json.readUint("$.protocol_semantic_version.minor"));
+        uint32 patch = uint32(json.readUint("$.protocol_semantic_version.patch"));
         chainCreationParams.latestProtocolVersion = SemVer.packSemVer(major, minor, patch);
         chainCreationParams.genesisRoot = json.readBytes32("$.genesis_root");
         // These fields are redundant for zksync_os.
