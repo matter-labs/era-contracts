@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::genesis::build_genesis_root_hash;
-use crate::types::{Genesis, InitialGenesisInput};
+use crate::types::{Genesis, InitialGenesisInput, ProtocolVersion};
 use alloy::primitives::{Address, FixedBytes, B256};
 use structopt::StructOpt;
 mod genesis;
@@ -99,17 +99,16 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn update_local_genesis() -> anyhow::Result<()> {
-    const PATH_TO_LOCAL_GENESIS: &str = "../../configs/genesis/zksync-os/latest.toml";
-    let original_genesis: Genesis = toml::from_str(
+    const PATH_TO_LOCAL_GENESIS: &str = "../../configs/genesis/zksync-os/latest.json";
+    let original_genesis: Genesis = serde_json::from_str(
         &std::fs::read_to_string(PATH_TO_LOCAL_GENESIS).expect("Failed to read local genesis file"),
     )?;
-    let mut result = build_genesis_with_default_input(
+    let result = build_genesis_with_default_input(
         original_genesis.initial_genesis.execution_version,
         original_genesis.protocol_semantic_version,
     )?;
-    result.initial_genesis.additional_storage = BTreeMap::new();
 
-    let json = toml::to_string_pretty(&result)?;
+    let json = serde_json::to_string_pretty(&result)?;
     std::fs::write(PATH_TO_LOCAL_GENESIS, json)?;
 
     Ok(())
@@ -117,7 +116,7 @@ fn update_local_genesis() -> anyhow::Result<()> {
 
 fn build_genesis_with_default_input(
     execution_version: u32,
-    protocol_version: u64,
+    protocol_version: ProtocolVersion,
 ) -> anyhow::Result<Genesis> {
     let initial_genesis_input = InitialGenesisInput {
         initial_contracts: INITIAL_CONTRACTS

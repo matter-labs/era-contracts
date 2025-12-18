@@ -1,9 +1,8 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
-use alloy::primitives::{Address, Bloom, FixedBytes, B256, B64, U256};
+use alloy::primitives::{Address, FixedBytes, B256};
 
 use blake2::{Blake2s256, Digest};
-use serde::{Deserialize, Serialize};
 
 /// The depth of the Merkle tree used for the genesis state.
 pub const MERKLE_TREE_DEPTH: usize = 64;
@@ -78,9 +77,17 @@ pub const MAX_B256_VALUE: B256 = FixedBytes::<32>([0xFF; 32]);
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct Genesis {
+    #[serde(flatten)]
     pub initial_genesis: InitialGenesisInput,
-    pub protocol_semantic_version: u64,
+    pub protocol_semantic_version: ProtocolVersion,
     pub genesis_root: B256,
     #[serde(flatten)]
     pub other: serde_json::Value,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub struct ProtocolVersion {
+    pub major: u16,
+    pub minor: u16,
+    pub patch: u16,
 }

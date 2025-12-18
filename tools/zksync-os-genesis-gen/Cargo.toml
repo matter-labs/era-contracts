@@ -13,7 +13,6 @@ serde_json = "1"
 blake2 = "0.10.6"
 zk_os_api = { package = "zksync_os_api", git = "https://github.com/matter-labs/zksync-os", tag = "v0.0.26" }
 zk_os_basic_system = { package = "basic_system", git = "https://github.com/matter-labs/zksync-os", tag = "v0.0.26" }
-toml = "0.8"
 
 anyhow = "1"
 hex = "0.4"
