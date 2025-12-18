@@ -52,15 +52,6 @@ contract L1AssetRouterTest is Test {
 
     event ClaimedFailedDepositAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
-    event LegacyDepositInitiated(
-        uint256 indexed chainId,
-        bytes32 indexed l2DepositTxHash,
-        address indexed from,
-        address to,
-        address l1Token,
-        uint256 amount
-    );
-
     L1AssetRouter sharedBridgeImpl;
     L1AssetRouter sharedBridge;
     L1NativeTokenVault nativeTokenVaultImpl;

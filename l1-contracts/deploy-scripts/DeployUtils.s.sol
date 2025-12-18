@@ -374,14 +374,6 @@ abstract contract DeployUtils is Create2FactoryUtils {
                     config.eraChainId,
                     addresses.stateTransition.diamondProxy
                 );
-        } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-            return
-                abi.encode(
-                    addresses.bridges.l1NullifierProxy,
-                    addresses.bridges.l1AssetRouterProxy,
-                    addresses.vaults.l1NativeTokenVaultProxy,
-                    config.eraChainId
-                );
         } else if (compareStrings(contractName, "L1NativeTokenVault")) {
             return
                 abi.encode(

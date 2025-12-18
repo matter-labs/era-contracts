@@ -203,7 +203,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         addresses.bridges.l1NullifierImplementation = deploySimpleContract("L1Nullifier", false);
         addresses.bridges.l1AssetRouterImplementation = deploySimpleContract("L1AssetRouter", false);
         addresses.vaults.l1NativeTokenVaultImplementation = deploySimpleContract("L1NativeTokenVault", false);
-        addresses.bridges.erc20BridgeImplementation = deploySimpleContract("L1ERC20Bridge", false);
         addresses.bridges.bridgedStandardERC20Implementation = deploySimpleContract("BridgedStandardERC20", false);
 
         upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
