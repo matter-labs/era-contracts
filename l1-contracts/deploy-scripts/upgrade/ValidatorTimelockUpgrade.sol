@@ -48,14 +48,47 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
         vm.stopBroadcast();
     }
 
-    function useCustomSigningSet(address validatorTimelock, address chain) public {
+    function addSharedValidators(address[] memory validators, address ctm) public {
+        ZKsyncOSChainTypeManager chainTypeManager = ZKsyncOSChainTypeManager(ctm);
+        address validatorTimelock = chainTypeManager.validatorTimelockPostV29();
+        for (uint256 i = 0; i < validators.length; i++) {
+            bytes memory data = abi.encodeCall(MultisigCommitter.addSharedValidator, (validators[i]));
+            callWithoutUpgrade(validatorTimelock, data);
+        }
+    }
+
+    function removeSharedValidators(address[] memory validators, address ctm) public {
+        ZKsyncOSChainTypeManager chainTypeManager = ZKsyncOSChainTypeManager(ctm);
+        address validatorTimelock = chainTypeManager.validatorTimelockPostV29();
+        for (uint256 i = 0; i < validators.length; i++) {
+            bytes memory data = abi.encodeCall(MultisigCommitter.removeSharedValidator, (validators[i]));
+            callWithoutUpgrade(validatorTimelock, data);
+        }
+    }
+
+    function useSharedSigningSet(address ctm, uint256 chainId) public {
+        (address validatorTimelock, address chain) = getValidatorAndChainAddreess(ctm, chainId);
+        bytes memory data = abi.encodeCall(MultisigCommitter.useSharedSigningSet, (chain));
+        callWithoutUpgrade(validatorTimelock, data);
+    }
+
+    function useCustomSigningSet(address ctm, uint256 chainId) public {
+        (address validatorTimelock, address chain) = getValidatorAndChainAddreess(ctm, chainId);
         bytes memory data = abi.encodeCall(MultisigCommitter.useCustomSigningSet, (chain));
         callWithoutUpgrade(validatorTimelock, data);
     }
 
-    function setCustomSigningThreshold(address proxy, address chainAddress, uint64 newThreshold) public {
-        bytes memory data = abi.encodeCall(MultisigCommitter.setCustomSigningThreshold, (chainAddress, newThreshold));
-        callWithoutUpgrade(proxy, data);
+    function setCustomSigningThreshold(address ctm, uint256 chainId, uint64 newThreshold) public {
+        (address validatorTimelock, address chain) = getValidatorAndChainAddreess(ctm, chainId);
+        bytes memory data = abi.encodeCall(MultisigCommitter.setCustomSigningThreshold, (chain, newThreshold));
+        callWithoutUpgrade(validatorTimelock, data);
+    }
+
+    function getValidatorAndChainAddreess(address ctm, uint256 chainId) internal view returns (address, address) {
+        ZKsyncOSChainTypeManager chainTypeManager = ZKsyncOSChainTypeManager(ctm);
+        address validatorTimelock = chainTypeManager.validatorTimelockPostV29();
+        address chain = chainTypeManager.getZKChain(chainId);
+        return (validatorTimelock, chain);
     }
 
     function callWithoutUpgrade(address proxyAddress, bytes memory data) internal {
