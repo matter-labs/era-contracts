@@ -6,7 +6,6 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
 import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
-import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
@@ -45,8 +44,8 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
 
     modifier onlyChainRegistrationSender() {
         if (
-            msg.sender != AddressAliasHelper.undoL1ToL2Alias(chainRegistrationSender) &&
-            msg.sender != SERVICE_TRANSACTION_SENDER
+            /// Note on the L2 the chainRegistrationSender is aliased.
+            msg.sender != chainRegistrationSender && msg.sender != SERVICE_TRANSACTION_SENDER
         ) {
             revert Unauthorized(msg.sender);
         }

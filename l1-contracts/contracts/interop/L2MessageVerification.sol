@@ -40,12 +40,13 @@ contract L2MessageVerification is MessageVerification {
         // that never happened.
 
         return
-            this.proveL2LeafInclusionShared({
+            this.proveL2LeafInclusionSharedRecursive({
                 _chainId: proofData.settlementLayerChainId,
                 _blockOrBatchNumber: proofData.settlementLayerBatchNumber, // SL block number
                 _leafProofMask: proofData.settlementLayerBatchRootMask,
                 _leaf: proofData.chainIdLeaf,
-                _proof: MessageHashing.extractSliceUntilEnd(_proof, proofData.ptr)
+                _proof: MessageHashing.extractSliceUntilEnd(_proof, proofData.ptr),
+                _depth: _depth + 1
             });
     }
 }

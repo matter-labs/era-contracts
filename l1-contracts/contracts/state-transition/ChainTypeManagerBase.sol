@@ -307,15 +307,13 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion
     ) internal {
-        bytes32 newCutHash = keccak256(abi.encode(_cutData));
         uint256 previousProtocolVersion = protocolVersion;
-        upgradeCutHash[_oldProtocolVersion] = newCutHash;
-        upgradeCutDataBlock[_oldProtocolVersion] = block.number;
         _setProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
         _setProtocolVersionDeadline(_newProtocolVersion, type(uint256).max);
         protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
-        emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
+        setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
+        // Emit event with backward compatible hack.
         emit NewUpgradeCutData(_newProtocolVersion, _cutData);
     }
 
@@ -339,10 +337,18 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion
     ) external onlyOwner {
+        setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
+    }
+
+    /// @dev set upgrade for some protocolVersion
+    /// @param _cutData the new diamond cut data
+    /// @param _oldProtocolVersion the old protocol version
+    function setUpgradeDiamondCutInner(Diamond.DiamondCutData calldata _cutData, uint256 _oldProtocolVersion) internal {
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
         upgradeCutHash[_oldProtocolVersion] = newCutHash;
         upgradeCutDataBlock[_oldProtocolVersion] = block.number;
         emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
+        emit NewUpgradeCutData(_oldProtocolVersion, _cutData);
     }
 
     /// @dev freezes the specified chain

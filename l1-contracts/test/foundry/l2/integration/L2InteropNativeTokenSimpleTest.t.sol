@@ -8,13 +8,13 @@ import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {SystemContractsArgs} from "./L2Utils.sol";
-import {L2InteropCenterTestAbstract} from "../../l1/integration/l2-tests-abstract/L2InteropCenterTestAbstract.t.sol";
+import {L2InteropNativeTokenSimpleTestAbstract} from "../../l1/integration/l2-tests-abstract/L2InteropNativeTokenSimpleTestAbstract.t.sol";
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
 
 import {Create2FactoryUtils} from "deploy-scripts/utils/deploy/Create2FactoryUtils.s.sol";
 
-contract L2InteropCenterTest is Test, L2InteropCenterTestAbstract, SharedL2ContractL2Deployer {
+contract L2InteropNativeTokenSimpleTest is Test, L2InteropNativeTokenSimpleTestAbstract, SharedL2ContractL2Deployer {
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL2Deployer) {}
 
     function initSystemContracts(
