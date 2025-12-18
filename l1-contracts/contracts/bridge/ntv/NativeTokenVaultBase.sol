@@ -248,7 +248,7 @@ abstract contract NativeTokenVaultBase is
     function _decodeBurnAndCheckAssetId(
         bytes calldata _data,
         bytes32 _suppliedAssetId
-    ) internal returns (uint256 amount, address receiver, address parsedTokenAddress) {
+    ) internal view returns (uint256 amount, address receiver, address parsedTokenAddress) {
         (amount, receiver, parsedTokenAddress) = DataEncoding.decodeBridgeBurnData(_data);
 
         if (parsedTokenAddress == address(0)) {
@@ -472,7 +472,7 @@ abstract contract NativeTokenVaultBase is
     }
 
     /// @notice Checks that the assetId is correct for the origin token and chain.
-    function _assetIdCheck(uint256 _tokenOriginChainId, bytes32 _assetId, address _originToken) internal view {
+    function _assetIdCheck(uint256 _tokenOriginChainId, bytes32 _assetId, address _originToken) internal pure {
         bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(_tokenOriginChainId, _originToken);
         if (_assetId != expectedAssetId) {
             // Make sure that a NativeTokenVault sent the message

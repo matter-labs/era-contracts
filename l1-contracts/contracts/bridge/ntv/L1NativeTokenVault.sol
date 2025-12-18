@@ -260,7 +260,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
                             INTERNAL & HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function _registerTokenIfBridgedLegacy(address) internal override returns (bytes32) {
+    function _registerTokenIfBridgedLegacy(address) internal pure override returns (bytes32) {
         // There are no legacy tokens present on L1.
         return bytes32(0);
     }

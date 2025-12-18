@@ -147,7 +147,7 @@ contract AdminFunctions is Script {
         saveAndSendAdminTx(ecosystemAdminAddr, calls, true);
     }
 
-    function adminEncodeMulticall(bytes memory callsToExecute) external {
+    function adminEncodeMulticall(bytes memory callsToExecute) external pure {
         Call[] memory calls = abi.decode(callsToExecute, (Call[]));
 
         bytes memory result = abi.encodeCall(ChainAdmin.multicall, (calls, true));

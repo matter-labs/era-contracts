@@ -573,7 +573,7 @@ contract RegisterZKChainScript is Script {
         });
     }
 
-    function getFactoryDeps() internal view returns (bytes[] memory) {
+    function getFactoryDeps() internal pure returns (bytes[] memory) {
         bytes[] memory factoryDeps = new bytes[](0);
         return factoryDeps;
     }
