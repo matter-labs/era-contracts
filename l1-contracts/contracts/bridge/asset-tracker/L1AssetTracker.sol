@@ -260,9 +260,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 toChainId;
 
         // We check the assetId to make sure the chain is not lying about it.
-        if (data.assetId != BRIDGE_HUB.baseTokenAssetId(data.tokenOriginChainId)) {
-            DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
-        }
+        DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
 
         if (data.isL1ToGateway) {
             uint256 chainMigrationNumber = _getChainMigrationNumber(data.chainId);
