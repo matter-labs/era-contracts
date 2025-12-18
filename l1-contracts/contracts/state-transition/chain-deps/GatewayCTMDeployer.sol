@@ -56,7 +56,8 @@ struct GatewayCTMDeployerConfig {
     uint256 l1ChainId;
     /// @notice Flag indicating whether to use the testnet verifier.
     bool testnetVerifier;
-    /// @notice Flag indicating whether to use ZKsync OS mode.
+    /// @notice Flag indicating whether to use ZKsync OS mode. There are some contract (like CTM) which depend on whether they are tied to ZKsync Era or ZKsync OS.
+    ///         This flag determines which contracts to deploy/what to pass to constructors.
     bool isZKsyncOS;
     /// @notice Array of function selectors for the Admin facet.
     bytes4[] adminSelectors;
@@ -191,6 +192,7 @@ contract GatewayCTMDeployer {
             _eraChainId: eraChainId,
             _l1ChainId: l1ChainId,
             _aliasedGovernanceAddress: _config.aliasedGovernanceAddress,
+            _isZKsyncOS: _config.isZKsyncOS,
             _deployedContracts: contracts
         });
         // solhint-disable-next-line func-named-parameters
@@ -218,6 +220,8 @@ contract GatewayCTMDeployer {
     /// @param _l1ChainId L1 Chain ID.
     /// used by permanent rollups.
     /// @param _aliasedGovernanceAddress The aliased address of the governnace.
+    /// @param _isZKsyncOS Whether ZKsync OS mode should be used. There are some contract (like CTM) which depend on whether they are tied to ZKsync Era or ZKsync OS.
+    ///                    This flag determines which contracts to deploy/what to pass to constructors.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
     /// in the process of the execution of this function.
     function _deployFacetsAndUpgrades(
@@ -225,6 +229,7 @@ contract GatewayCTMDeployer {
         uint256 _eraChainId,
         uint256 _l1ChainId,
         address _aliasedGovernanceAddress,
+        bool _isZKsyncOS,
         DeployedContracts memory _deployedContracts
     ) internal {
         _deployedContracts.stateTransition.mailboxFacet = address(
@@ -242,7 +247,7 @@ contract GatewayCTMDeployer {
             new AdminFacet{salt: _salt}(_l1ChainId, rollupDAManager)
         );
 
-        _deployedContracts.stateTransition.diamondInit = address(new DiamondInit{salt: _salt}(false));
+        _deployedContracts.stateTransition.diamondInit = address(new DiamondInit{salt: _salt}(_isZKsyncOS));
         _deployedContracts.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade{salt: _salt}());
     }
 
@@ -300,7 +305,8 @@ contract GatewayCTMDeployer {
     /// @notice Deploys verifier.
     /// @param _salt Salt used for CREATE2 deployments.
     /// @param _testnetVerifier Whether testnet verifier should be used.
-    /// @param _isZKsyncOS Whether ZKsync OS mode should be used.
+    /// @param _isZKsyncOS Whether ZKsync OS mode should be used. There are some contract (like CTM) which depend on whether they are tied to ZKsync Era or ZKsync OS.
+    ///                    This flag determines which contracts to deploy/what to pass to constructors.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
     /// @param _verifierOwner The owner that can add additional verification keys.
     /// in the process of the execution of this function.
