@@ -20,9 +20,8 @@ import {L2NativeTokenVault} from "./L2NativeTokenVault.sol";
 contract L2NativeTokenVaultZKOS is L2NativeTokenVault {
     using SafeERC20 for IERC20;
 
-    /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
-    /// @dev This function uses raw call to ContractDeployer to make sure that exactly `L2_TOKEN_PROXY_BYTECODE_HASH` is used
-    /// for the code of the proxy.
+    /// @notice Deploys the beacon proxy for the L2 token using OpenZeppelin's Create2 library.
+    /// @dev This function uses Create2 deployment to deterministically deploy the beacon proxy.
     /// @param _salt The salt used for beacon proxy deployment of L2 bridged token.
     /// @return proxy The beacon proxy, i.e. L2 bridged token.
     function _deployBeaconProxy(
