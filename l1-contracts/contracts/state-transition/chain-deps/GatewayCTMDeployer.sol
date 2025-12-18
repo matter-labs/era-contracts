@@ -327,11 +327,7 @@ contract GatewayCTMDeployer {
         if (_testnetVerifier) {
             if (_isZKsyncOS) {
                 _deployedContracts.stateTransition.verifier = address(
-                    new ZKsyncOSTestnetVerifier{salt: _salt}(
-                        IVerifierV2(fflonkVerifier),
-                        IVerifier(verifierPlonk),
-                        _verifierOwner
-                    )
+                    new ZKsyncOSTestnetVerifier{salt: _salt}(IVerifier(verifierPlonk), _verifierOwner)
                 );
             } else {
                 _deployedContracts.stateTransition.verifier = address(
@@ -341,11 +337,7 @@ contract GatewayCTMDeployer {
         } else {
             if (_isZKsyncOS) {
                 _deployedContracts.stateTransition.verifier = address(
-                    new ZKsyncOSDualVerifier{salt: _salt}(
-                        IVerifierV2(fflonkVerifier),
-                        IVerifier(verifierPlonk),
-                        _verifierOwner
-                    )
+                    new ZKsyncOSDualVerifier{salt: _salt}(IVerifier(verifierPlonk), _verifierOwner)
                 );
             } else {
                 _deployedContracts.stateTransition.verifier = address(

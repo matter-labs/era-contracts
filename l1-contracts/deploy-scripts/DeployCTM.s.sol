@@ -226,7 +226,6 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             vm.startBroadcast(msg.sender);
             ZKsyncOSDualVerifier(addresses.stateTransition.verifier).addVerifier(
                 DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
-                IVerifierV2(addresses.stateTransition.verifierFflonk),
                 IVerifier(addresses.stateTransition.verifierPlonk)
             );
             ZKsyncOSDualVerifier(addresses.stateTransition.verifier).transferOwnership(config.ownerAddress);
