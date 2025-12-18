@@ -178,11 +178,11 @@ contract DeployL2Script is Script, IDeployL2Contracts {
         config.validatorType = DAValidatorType(daValidatorType);
 
         // Use AddressIntrospector to get addresses from deployed contracts
-        AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
+        BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
             IL1Bridgehub(bridgehubAddress)
         );
         config.l1SharedBridgeProxy = bhAddresses.assetRouter;
-        config.erc20BridgeProxy = AddressIntrospector.getLegacyBridgeAddress(bhAddresses.assetRouter);
+        config.proxies.erc20Bridge = AddressIntrospector.getLegacyBridgeAddress(bhAddresses.assetRouter);
         config.eraChainId = AddressIntrospector.getEraChainId(bhAddresses.assetRouter);
     }
 

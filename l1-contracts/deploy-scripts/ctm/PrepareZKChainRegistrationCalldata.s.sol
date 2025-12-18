@@ -143,13 +143,11 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         config.stateTransitionProxy = stateTransitionProxy;
 
         // Use AddressIntrospector to get addresses from deployed contracts
-        AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
-            IL1Bridgehub(bridgehub)
-        );
+        BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(IL1Bridgehub(bridgehub));
         ecosystem.bridgehub = bridgehub;
         ecosystem.l1SharedBridgeProxy = bhAddresses.assetRouter;
         ecosystem.governance = bhAddresses.governance;
-        config.erc20BridgeProxy = AddressIntrospector.getLegacyBridgeAddresses(bhAddresses.assetRouter);
+        config.proxies.erc20Bridge = AddressIntrospector.getLegacyBridgeAddresses(bhAddresses.assetRouter);
 
         config.chainId = chainId;
         config.eraChainId = toml.readUint("$.chain.era_chain_id");
@@ -251,7 +249,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         bytes memory proxyInitializationParams = abi.encodeWithSignature(
             "initialize(address,address,bytes32,address)",
             ecosystem.l1SharedBridgeProxy,
-            config.erc20BridgeProxy,
+            config.proxies.erc20Bridge,
             l2StandardErc20BytecodeHash,
             l2GovernanceAddress
         );
@@ -271,7 +269,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
 
         console.log("Computed L2 bridge proxy address:", proxyContractAddress);
         console.log("L1 shared bridge proxy:", ecosystem.l1SharedBridgeProxy);
-        console.log("L1 ERC20 bridge proxy:", config.erc20BridgeProxy);
+        console.log("L1 ERC20 bridge proxy:", config.proxies.erc20Bridge);
         console.log("L2 governor addr:", l2GovernanceAddress);
 
         return proxyContractAddress;

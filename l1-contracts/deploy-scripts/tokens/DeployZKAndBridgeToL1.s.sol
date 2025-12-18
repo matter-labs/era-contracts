@@ -88,9 +88,7 @@ contract DeployZKScript is Script {
 
         // Use AddressIntrospector to get addresses from deployed contracts
         config.bridgehub = bridgehub;
-        AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
-            IL1Bridgehub(bridgehub)
-        );
+        BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(IL1Bridgehub(bridgehub));
         config.l1SharedBridge = bhAddresses.assetRouter;
         config.l1Nullifier = bhAddresses.assetRouterAddresses.l1Nullifier;
         config.chainId = chainId;

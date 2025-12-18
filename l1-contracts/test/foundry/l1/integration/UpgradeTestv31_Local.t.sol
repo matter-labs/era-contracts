@@ -41,7 +41,7 @@ contract UpgradeIntegrationTest_Local is
         CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/local-gateway.toml";
         preparePermanentValues();
         setupUpgrade(true);
-        address bridgehub = ecosystemUpgrade.getDiscoveredBridgehub().bridgehubProxy;
+        address bridgehub = ecosystemUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
         bytes32 eraBaseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(eraZKChainId);
 
         vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.baseTokenAssetId, 0), abi.encode(eraBaseTokenAssetId));

@@ -146,7 +146,11 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     function getFacetCutsForDeletion(address diamond) internal view returns (Diamond.FacetCut[] memory facetCuts) {
         IZKChain.Facet[] memory facets = IZKChain(diamond).facets();
 
-        require(IZKChain(diamond).getProtocolVersion() == IChainTypeManager(IZKChain(diamond).getChainTypeManager()).protocolVersion(), NotLatestProtocolVersion());
+        require(
+            IZKChain(diamond).getProtocolVersion() ==
+                IChainTypeManager(IZKChain(diamond).getChainTypeManager()).protocolVersion(),
+            NotLatestProtocolVersion()
+        );
 
         // Freezability does not matter when deleting, so we just put false everywhere
         facetCuts = new Diamond.FacetCut[](facets.length);
@@ -203,7 +207,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
             evmEmulatorHash: bytes32(0),
-            verifier: stateTransition.verifier,
+            verifier: stateTransition.verifiers.verifier,
             verifierParams: verifierParams,
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: new bytes(0),
@@ -247,7 +251,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             verifierParams: verifierParams,
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
-            verifier: stateTransition.verifier,
+            verifier: stateTransition.verifiers.verifier,
             upgradeTimestamp: 0,
             newProtocolVersion: chainCreationParams.latestProtocolVersion
         });

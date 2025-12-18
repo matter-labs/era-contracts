@@ -115,7 +115,27 @@ contract EcosystemUpgrade_v31 is Script, DefaultEcosystemUpgrade {
         string memory root = vm.projectRoot();
         string memory upgradeInputPath = string.concat(root, vm.envString("L1_CONFIG"));
         l1CoreDeployer.initializeConfig(upgradeInputPath);
-        bridgehubAddresses.bridgehubImplementation = l1CoreDeployer.deploySimpleContract("L1Bridgehub", false);
+        coreAddresses.bridgehub.implementations.bridgehub = l1CoreDeployer.deploySimpleContract("L1Bridgehub", false);
+        coreAddresses.bridgehub.implementations.messageRoot = l1CoreDeployer.deploySimpleContract("L1MessageRoot", false);
+        bridges.implementations.l1Nullifier = l1CoreDeployer.deploySimpleContract("L1Nullifier", false);
+        bridges.implementations.l1AssetRouter = l1CoreDeployer.deploySimpleContract("L1AssetRouter", false);
+        bridges.implementations.l1NativeTokenVault = l1CoreDeployer.deploySimpleContract("L1NativeTokenVault", false);
+        (
+            coreAddresses.bridgehub.implementations.assetTracker,
+            coreAddresses.bridgehub.proxies.assetTracker
+        ) = deployTuppWithContract("L1AssetTracker", false);
+        coreAddresses.bridgehub.implementations.ctmDeploymentTracker = l1CoreDeployer.deploySimpleContract(
+            "CTMDeploymentTracker",
+            false
+        );
+        coreAddresses.bridgehub.implementations.chainAssetHandler = l1CoreDeployer.deploySimpleContract(
+            "L1ChainAssetHandler",
+            false
+        );
+        coreAddresses.bridgehub.implementations.chainRegistrationSender = l1CoreDeployer.deploySimpleContract(
+            "ChainRegistrationSender",
+            false
+        );
         // deploySimpleContract("L1ChainTypeManager", false);
     }
 

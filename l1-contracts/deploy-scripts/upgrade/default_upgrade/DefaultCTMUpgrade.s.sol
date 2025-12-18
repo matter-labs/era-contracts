@@ -10,7 +10,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Utils} from "../../utils/Utils.sol";
-import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../../utils/Types.sol";
+import {StateTransitionDeployedAddresses, ChainCreationParamsConfig, StateTransitionDeployedAddresses, StateTransitionDeployedAddresses, ZkChainAddresses} from "../../utils/Types.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
@@ -115,11 +115,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     GatewayConfig internal gatewayConfig;
 
     // Discovered addresses
-    AddressIntrospector.CTMAddresses internal discoveredCTM;
-    AddressIntrospector.ZkChainAddresses internal discoveredEraZkChain;
-    AddressIntrospector.ZkChainAddresses internal upToDateZkChain;
-    AddressIntrospector.NonDisoverable internal nonDisoverable;
+    ZkChainAddresses internal discoveredEraZkChain;
+    ZkChainAddresses internal upToDateZkChain;
     L1Bridgehub internal bridgehub;
+    CTMDeployedAddresses internal ctmDeployedAddresses;
 
     uint256[] internal factoryDepsHashes;
     mapping(bytes32 => bool) internal isHashInFactoryDeps;
@@ -153,8 +152,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         _initCreate2FactoryParams(permanentConfig.create2FactoryAddr, permanentConfig.create2FactorySalt);
         config.l1ChainId = block.chainid;
         newConfig.ctm = permanentConfig.ctmProxy;
-        nonDisoverable.bytecodesSupplier = permanentConfig.bytecodesSupplier;
-        nonDisoverable.rollupDAManager = permanentConfig.rollupDAManager;
+        ctmDeployedAddresses.stateTransition.bytecodesSupplier = permanentConfig.bytecodesSupplier;
+        ctmDeployedAddresses.stateTransition.rollupDAManager = permanentConfig.rollupDAManager;
         setAddressesBasedOnCTM();
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
         config.contracts.chainCreationParams = chainCreationParams;
@@ -162,15 +161,16 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         if (governance != address(0)) {
             config.ownerAddress = governance;
         } else {
-            config.ownerAddress = discoveredCTM.governance;
+            config.ownerAddress = ctmDeployedAddresses.admin.governance;
         }
-        newConfig.ecosystemAdminAddress = discoveredCTM.governance;
-        config.contracts.governanceSecurityCouncilAddress = Governance(payable(discoveredCTM.governance))
+        newConfig.ecosystemAdminAddress = ctmDeployedAddresses.admin.governance;
+        config.contracts.governanceSecurityCouncilAddress = Governance(payable(ctmDeployedAddresses.admin.governance))
             .securityCouncil();
-        config.contracts.governanceMinDelay = Governance(payable(discoveredCTM.governance)).minDelay();
-        config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(discoveredCTM.validatorTimelockPostV29)
-            .executionDelay();
-        (bool ok, bytes memory data) = discoveredEraZkChain.verifier.staticcall(
+        // config.contracts.governanceMinDelay = Governance(payable(ctmDeployedAddresses.admin.governance)).minDelay();
+        config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(
+            ctmDeployedAddresses.stateTransition.proxies.validatorTimelock
+        ).executionDelay();
+        (bool ok, bytes memory data) = ctmDeployedAddresses.stateTransition.verifiers.verifier.staticcall(
             abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
         );
         config.testnetVerifier = ok;
@@ -263,12 +263,14 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         // Important, this must come after the initializeExpectedL2Addresses
         generateFixedForceDeploymentsData();
         console.log("Generated fixed force deployments data");
-        Diamond.DiamondCutData memory diamondCut = getChainCreationDiamondCutData(addresses.stateTransition);
+        Diamond.DiamondCutData memory diamondCut = getChainCreationDiamondCutData(ctmDeployedAddresses.stateTransition);
         // TODO probably don't need to assign it to diamondCutData
         config.contracts.diamondCutData = abi.encode(diamondCut);
         newlyGeneratedData.diamondCutData = config.contracts.diamondCutData;
         console.log("Prepared diamond cut data");
-        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutDataFromLocalConfig(addresses.stateTransition);
+        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutDataFromLocalConfig(
+            ctmDeployedAddresses.stateTransition
+        );
         newlyGeneratedData.upgradeCutData = abi.encode(upgradeCutData);
         upgradeConfig.upgradeCutPrepared = true;
         console.log("UpgradeCutGenerated");
@@ -321,7 +323,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function getBridgehubAdmin() public virtual returns (address admin) {
-        return discoveredBridgehub.admin;
+        return discoveredBridgehub.bridgehubAdmin;
     }
 
     function getGatewayConfig() public virtual returns (GatewayConfig memory) {
@@ -330,20 +332,20 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     /// @notice This function is meant to only be used in tests
     function prepareCreateNewChainCall(uint256 chainId) public view virtual returns (Call[] memory result) {
-        require(discoveredBridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
+        require(discoveredBridgehub.proxies.bridgehub != address(0), "bridgehubProxyAddress is zero in newConfig");
 
-        bytes32 newChainAssetId = L1Bridgehub(discoveredBridgehub.bridgehubProxy).baseTokenAssetId(
+        bytes32 newChainAssetId = L1Bridgehub(discoveredBridgehub.proxies.bridgehub).baseTokenAssetId(
             upToDateZkChain.chainId
         );
         result = new Call[](1);
         result[0] = Call({
-            target: discoveredBridgehub.bridgehubProxy,
+            target: discoveredBridgehub.proxies.bridgehub,
             value: 0,
             data: abi.encodeCall(
                 IL1Bridgehub.createNewChain,
                 (
                     chainId,
-                    discoveredCTM.ctmProxy,
+                    ctmDeployedAddresses.stateTransition.proxies.chainTypeManager,
                     newChainAssetId,
                     5,
                     msg.sender,
@@ -356,18 +358,19 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     function setAddressesBasedOnCTM() internal virtual {
         address ctm = newConfig.ctm;
-        discoveredCTM = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
+        ctmDeployedAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
         bridgehub = L1Bridgehub(ChainTypeManagerBase(ctm).BRIDGE_HUB());
         discoveredBridgehub = AddressIntrospector.getBridgehubAddresses(bridgehub);
-        config.ownerAddress = discoveredCTM.governance;
-        config.eraChainId = AddressIntrospector.getEraChainId(discoveredBridgehub.assetRouter);
+        discoveredBridges = AddressIntrospector.getBridgesDeployedAddresses(address(bridgehub.assetRouter()));
+        config.ownerAddress = ctmDeployedAddresses.admin.governance;
+        config.eraChainId = AddressIntrospector.getEraChainId(discoveredBridges.proxies.l1AssetRouter);
 
         discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(
             IZKChain(bridgehub.getZKChain(config.eraChainId))
         );
         upToDateZkChain = AddressIntrospector.getUptoDateZkChainAddresses(ChainTypeManagerBase(ctm));
 
-        addresses.daAddresses.l1RollupDAValidator = discoveredEraZkChain.l1DAValidator;
+        ctmDeployedAddresses.daAddresses.l1RollupDAValidator = discoveredEraZkChain.l1DAValidator;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         newConfig.oldProtocolVersion = ctmProtocolVersion;
         require(
@@ -410,7 +413,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
             gatewayChainId: config.gatewayChainId,
-            l1AssetRouter: discoveredBridgehub.assetRouter,
+            l1AssetRouter: discoveredBridges.proxies.l1AssetRouter,
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
@@ -426,7 +429,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
-                discoveredBridgehub.chainRegistrationSenderProxy
+                discoveredBridgehub.proxies.chainRegistrationSender
             ),
             // upgradeAddresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
             dangerousTestOnlyForcedBeacon: address(0)
@@ -452,7 +455,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         uint256[] memory factoryDeps = new uint256[](allDeps.length);
         require(factoryDeps.length <= 64, "Too many deps");
 
-        BytecodePublisher.publishBytecodesInBatches(BytecodesSupplier(nonDisoverable.bytecodesSupplier), allDeps);
+        BytecodePublisher.publishBytecodesInBatches(
+            BytecodesSupplier(ctmDeployedAddresses.stateTransition.bytecodesSupplier),
+            allDeps
+        );
 
         for (uint256 i = 0; i < allDeps.length; i++) {
             bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(allDeps[i]);
@@ -545,15 +551,17 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function prepareUpgradeServerNotifierCall() public virtual returns (Call[] memory calls) {
-        address serverNotifierProxyAdmin = address(uint160(uint256(vm.load(discoveredCTM.serverNotifier, ADMIN_SLOT))));
+        address serverNotifierProxyAdmin = address(
+            uint160(uint256(vm.load(ctmDeployedAddresses.stateTransition.proxies.serverNotifier, ADMIN_SLOT)))
+        );
 
         Call memory call = Call({
             target: serverNotifierProxyAdmin,
             data: abi.encodeCall(
                 ProxyAdmin.upgrade,
                 (
-                    ITransparentUpgradeableProxy(payable(discoveredCTM.serverNotifier)),
-                    addresses.stateTransition.serverNotifierImplementation
+                    ITransparentUpgradeableProxy(payable(ctmDeployedAddresses.stateTransition.proxies.serverNotifier)),
+                    ctmDeployedAddresses.stateTransition.implementations.serverNotifier
                 )
             ),
             value: 0
@@ -619,7 +627,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function provideSetNewVersionUpgradeCall() public virtual returns (Call[] memory calls) {
-        require(discoveredCTM.ctmProxy != address(0), "stateTransitionManagerAddress is zero in newConfig");
+        require(
+            ctmDeployedAddresses.stateTransition.proxies.chainTypeManager != address(0),
+            "stateTransitionManagerAddress is zero in newConfig"
+        );
 
         // Just retrieved it from the contract
         uint256 previousProtocolVersion = getOldProtocolVersion();
@@ -630,7 +641,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             (Diamond.DiamondCutData)
         );
         Call memory ctmCall = Call({
-            target: discoveredCTM.ctmProxy,
+            target: ctmDeployedAddresses.stateTransition.proxies.chainTypeManager,
             data: abi.encodeCall(
                 IChainTypeManager.setNewVersionUpgrade,
                 (upgradeCut, previousProtocolVersion, deadline, newProtocolVersion)
@@ -643,11 +654,14 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
-        require(discoveredBridgehub.chainAssetHandler != address(0), "chainAssetHandlerProxy is zero in newConfig");
+        require(
+            discoveredBridgehub.proxies.chainAssetHandler != address(0),
+            "chainAssetHandlerProxy is zero in newConfig"
+        );
 
         result = new Call[](1);
         result[0] = Call({
-            target: discoveredBridgehub.chainAssetHandler,
+            target: discoveredBridgehub.proxies.chainAssetHandler,
             value: 0,
             data: abi.encodeCall(IChainAssetHandler.pauseMigration, ())
         });
@@ -679,14 +693,17 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function prepareNewChainCreationParamsCall() public virtual returns (Call[] memory calls) {
-        require(discoveredCTM.ctmProxy != address(0), "stateTransitionManagerAddress is zero in newConfig");
+        require(
+            ctmDeployedAddresses.stateTransition.proxies.chainTypeManager != address(0),
+            "stateTransitionManagerAddress is zero in newConfig"
+        );
         calls = new Call[](1);
 
         calls[0] = Call({
-            target: discoveredCTM.ctmProxy,
+            target: ctmDeployedAddresses.stateTransition.proxies.chainTypeManager,
             data: abi.encodeCall(
                 IChainTypeManager.setChainCreationParams,
-                (getChainCreationParams(addresses.stateTransition))
+                (getChainCreationParams(ctmDeployedAddresses.stateTransition))
             ),
             value: 0
         });
@@ -736,8 +753,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         calls = new Call[](1);
 
         calls[0] = _buildCallProxyUpgrade(
-            discoveredCTM.ctmProxy,
-            addresses.stateTransition.chainTypeManagerImplementation
+            ctmDeployedAddresses.stateTransition.proxies.chainTypeManager,
+            ctmDeployedAddresses.stateTransition.implementations.chainTypeManager
         );
     }
 
@@ -759,29 +776,32 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     /// @notice Additional calls to newConfigure contracts
     function prepareDAValidatorCall() public virtual returns (Call[] memory calls) {
-        calls = new Call[](1);
+        calls = new Call[](0);
 
-        calls[0] = Call({
-            target: nonDisoverable.rollupDAManager,
-            data: abi.encodeCall(
-                RollupDAManager.updateDAPair,
-                (addresses.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true)
-            ),
-            value: 0
-        });
+        /// kl todo add back, figure out how we deploy/upgrade the rollup da manager
+        // calls[0] = Call({
+        //     target: nonDisoverable.rollupDAManager,
+        //     data: abi.encodeCall(
+        //         RollupDAManager.updateDAPair,
+        //         (ctmDeployedAddresses.stateTransition.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true)
+        //     ),
+        //     value: 0
+        // });
     }
 
     function getAddresses() public view override returns (CTMDeployedAddresses memory) {
-        return addresses;
+        return ctmDeployedAddresses;
     }
 
     /// @notice Tests that it is possible to upgrade a chain to the new version
     function TESTONLY_prepareTestUpgradeChainCall() private returns (Call[] memory calls, address admin) {
-        address chainDiamondProxyAddress = L1Bridgehub(discoveredBridgehub.bridgehubProxy).getZKChain(
+        address chainDiamondProxyAddress = L1Bridgehub(discoveredBridgehub.proxies.bridgehub).getZKChain(
             upToDateZkChain.chainId
         );
         uint256 oldProtocolVersion = getOldProtocolVersion();
-        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutDataFromLocalConfig(addresses.stateTransition);
+        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutDataFromLocalConfig(
+            ctmDeployedAddresses.stateTransition
+        );
 
         admin = IZKChain(chainDiamondProxyAddress).getAdmin();
 
@@ -828,7 +848,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     ) internal view virtual override returns (bytes memory) {
         require(!isZKBytecode, "ZK bytecodes are not supported in CTM upgrade");
         if (compareStrings(contractName, "UpgradeStageValidator")) {
-            return abi.encode(discoveredCTM.ctmProxy, getNewProtocolVersion());
+            return abi.encode(ctmDeployedAddresses.stateTransition.proxies.chainTypeManager, getNewProtocolVersion());
         } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
             uint256 initialDelay = newConfig.governanceUpgradeTimerInitialDelay;
             uint256 maxAdditionalDelay = 2 weeks;
@@ -843,49 +863,85 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         vm.serializeAddress(
             "state_transition",
             "chain_type_manager_implementation_addr",
-            addresses.stateTransition.chainTypeManagerImplementation
+            ctmDeployedAddresses.stateTransition.implementations.chainTypeManager
         );
-        vm.serializeAddress("state_transition", "verifier_addr", addresses.stateTransition.verifier);
-        vm.serializeAddress("state_transition", "admin_facet_addr", addresses.stateTransition.adminFacet);
-        vm.serializeAddress("state_transition", "mailbox_facet_addr", addresses.stateTransition.mailboxFacet);
-        vm.serializeAddress("state_transition", "executor_facet_addr", addresses.stateTransition.executorFacet);
-        vm.serializeAddress("state_transition", "getters_facet_addr", addresses.stateTransition.gettersFacet);
-        vm.serializeAddress("state_transition", "diamond_init_addr", addresses.stateTransition.diamondInit);
-        vm.serializeAddress("state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
-        vm.serializeAddress("state_transition", "verifier_fflonk_addr", addresses.stateTransition.verifierFflonk);
-        vm.serializeAddress("state_transition", "verifier_plonk_addr", addresses.stateTransition.verifierPlonk);
+        vm.serializeAddress(
+            "state_transition",
+            "verifier_addr",
+            ctmDeployedAddresses.stateTransition.verifiers.verifier
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "admin_facet_addr",
+            ctmDeployedAddresses.stateTransition.facets.adminFacet
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "mailbox_facet_addr",
+            ctmDeployedAddresses.stateTransition.facets.mailboxFacet
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "executor_facet_addr",
+            ctmDeployedAddresses.stateTransition.facets.executorFacet
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "getters_facet_addr",
+            ctmDeployedAddresses.stateTransition.facets.gettersFacet
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "diamond_init_addr",
+            ctmDeployedAddresses.stateTransition.facets.diamondInit
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "genesis_upgrade_addr",
+            ctmDeployedAddresses.stateTransition.genesisUpgrade
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "verifier_fflonk_addr",
+            ctmDeployedAddresses.stateTransition.verifiers.verifierFflonk
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "verifier_plonk_addr",
+            ctmDeployedAddresses.stateTransition.verifiers.verifierPlonk
+        );
         vm.serializeAddress(
             "state_transition",
             "validator_timelock_implementation_addr",
-            addresses.stateTransition.validatorTimelockImplementation
+            ctmDeployedAddresses.stateTransition.implementations.validatorTimelock
         );
-        vm.serializeAddress("state_transition", "validator_timelock_addr", addresses.stateTransition.validatorTimelock);
-        vm.serializeAddress("state_transition", "bytecodes_supplier_addr", addresses.stateTransition.bytecodesSupplier);
+        vm.serializeAddress(
+            "state_transition",
+            "validator_timelock_addr",
+            ctmDeployedAddresses.stateTransition.proxies.validatorTimelock
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "bytecodes_supplier_addr",
+            ctmDeployedAddresses.stateTransition.bytecodesSupplier
+        );
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
-            addresses.stateTransition.defaultUpgrade
+            ctmDeployedAddresses.stateTransition.defaultUpgrade
         );
 
         // Serialize newly deployed upgrade addresses
-        vm.serializeAddress("deployed_addresses", "chain_admin", addresses.chainAdmin);
+        vm.serializeAddress("deployed_addresses", "chain_admin", discoveredEraZkChain.chainAdmin);
+        vm.serializeAddress("deployed_addresses", "access_control_restriction_addr", address(0));
+        vm.serializeAddress("deployed_addresses", "transparent_proxy_admin", discoveredBridgehub.transparentProxyAdmin);
+        vm.serializeAddress("deployed_addresses", "rollup_l1_da_validator_addr", discoveredEraZkChain.l1DAValidator);
+        vm.serializeAddress("deployed_addresses", "validium_l1_da_validator_addr", address(0));
         vm.serializeAddress(
             "deployed_addresses",
-            "access_control_restriction_addr",
-            addresses.accessControlRestrictionAddress
+            "l1_rollup_da_manager",
+            ctmDeployedAddresses.stateTransition.rollupDAManager
         );
-        vm.serializeAddress("deployed_addresses", "transparent_proxy_admin", addresses.transparentProxyAdmin);
-        vm.serializeAddress(
-            "deployed_addresses",
-            "rollup_l1_da_validator_addr",
-            addresses.daAddresses.l1RollupDAValidator
-        );
-        vm.serializeAddress(
-            "deployed_addresses",
-            "validium_l1_da_validator_addr",
-            addresses.daAddresses.noDAValidiumL1DAValidator
-        );
-        vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
         vm.serializeAddress("deployed_addresses", "upgrade_stage_validator", upgradeAddresses.upgradeStageValidator);
 
         string memory deployedAddresses = vm.serializeAddress(

@@ -51,11 +51,11 @@ contract InitializeL2WethTokenScript is Script {
         config.create2FactorySalt = create2FactorySalt;
 
         // Use AddressIntrospector to get addresses from deployed contracts
-        AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
+        BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
             IL1Bridgehub(bridgehubProxyAddr)
         );
         config.eraChainId = AddressIntrospector.getEraChainId(bhAddresses.assetRouter);
-        config.bridgehubProxyAddr = bridgehubProxyAddr;
+        config.proxies.bridgehubAddr = bridgehubProxyAddr;
 
         // Parse some config from output of erc20 tokens deployment
         string memory path = string.concat(root, "/script-out/output-deploy-erc20.toml");
@@ -79,7 +79,7 @@ contract InitializeL2WethTokenScript is Script {
     }
 
     function initializeL2WethToken() internal {
-        IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehubProxyAddr);
+        IL1Bridgehub bridgehub = IL1Bridgehub(config.proxies.bridgehubAddr);
 
         uint256 gasPrice = Utils.bytesToUint256(vm.rpc("eth_gasPrice", "[]")) * config.gasMultiplier;
         uint256 requiredValueToInitializeBridge = bridgehub.l2TransactionBaseCost(

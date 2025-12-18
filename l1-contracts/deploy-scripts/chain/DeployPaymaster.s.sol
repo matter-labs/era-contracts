@@ -27,7 +27,7 @@ contract DeployPaymaster is Script, IDeployPaymaster {
         config.chainId = chainId;
 
         // Use AddressIntrospector to get addresses from deployed contracts
-        AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
+        BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
             IL1Bridgehub(bridgehubAddress)
         );
         config.l1SharedBridgeProxy = bhAddresses.assetRouter;

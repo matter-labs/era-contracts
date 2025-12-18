@@ -146,7 +146,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 factoryDeps: localDeps,
                 dstAddress: address(0),
                 chainId: gatewayChainId,
-                bridgehubAddress: discoveredBridgehub.bridgehubProxy,
+                bridgehubAddress: discoveredBridgehub.proxies.bridgehub,
                 l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
                 refundRecipient: msg.sender
             });
@@ -159,7 +159,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: L2_CREATE2_FACTORY_ADDR,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
+            bridgehubAddress: discoveredBridgehub.proxies.bridgehub,
             l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
             refundRecipient: msg.sender
         });
@@ -224,10 +224,10 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         initializeConfig(configPath, permanentValuesPath, bridgehubProxy, ctmRepresentativeChainId);
         _initializeGatewayGovernanceConfig(
             GatewayGovernanceConfig({
-                bridgehubProxy: discoveredBridgehub.bridgehubProxy,
+                bridgehubProxy: discoveredBridgehub.proxies.bridgehub,
                 l1AssetRouterProxy: discoveredBridgehub.assetRouter,
                 chainTypeManagerProxy: ctm,
-                ctmDeploymentTrackerProxy: discoveredBridgehub.l1CtmDeployer,
+                ctmDeploymentTrackerProxy: discoveredBridgehub.proxies.ctmDeploymentTracker,
                 gatewayChainId: gatewayChainId
             })
         );

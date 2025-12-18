@@ -39,7 +39,7 @@ import {Call} from "contracts/governance/Common.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Create2AndTransfer} from "../utils/deploy/Create2AndTransfer.sol";
-import {ZkChainAddresses} from "../utils/Types.sol";
+import {ZkChainAddresses, BridgehubAddresses, StateTransitionDeployedAddresses, BridgesDeployedAddresses, CTMDeployedAddresses} from "../utils/Types.sol";
 import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 import {IRegisterZKChain, RegisterZKChainConfig} from "contracts/script-interfaces/IRegisterZKChain.sol";
 
@@ -122,18 +122,18 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         config.chainTypeManagerProxy = chainTypeManagerProxy;
 
         // Use AddressIntrospector to get addresses from deployed contracts
-        AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
-            IL1Bridgehub(bridgehub)
-        );
-        AddressIntrospector.CTMAddresses memory ctmAddresses = AddressIntrospector.getCTMAddresses(
+        BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(IL1Bridgehub(bridgehub));
+        CTMDeployedAddresses memory ctmAddresses = AddressIntrospector.getCTMAddresses(
             ChainTypeManagerBase(chainTypeManagerProxy)
         );
+        address assetRouter = address(IL1Bridgehub(bridgehub).assetRouter());
+        BridgesDeployedAddresses memory bridgeAddresses = AddressIntrospector.getBridgesDeployedAddresses(assetRouter);
 
-        config.validatorTimelock = ctmAddresses.validatorTimelockPostV29;
-        config.nativeTokenVault = bhAddresses.assetRouterAddresses.nativeTokenVault;
-        config.sharedBridgeProxy = bhAddresses.assetRouter;
-        config.l1Nullifier = bhAddresses.assetRouterAddresses.l1Nullifier;
-        config.l1Erc20Bridge = AddressIntrospector.getLegacyBridgeAddress(bhAddresses.assetRouter);
+        config.validatorTimelock = ctmAddresses.stateTransition.proxies.validatorTimelock;
+        config.nativeTokenVault = address(bridgeAddresses.proxies.l1NativeTokenVault);
+        config.sharedBridgeProxy = bridgeAddresses.proxies.l1AssetRouter;
+        config.l1Nullifier = address(bridgeAddresses.proxies.l1Nullifier);
+        config.l1Erc20Bridge = address(bridgeAddresses.proxies.erc20Bridge);
 
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
@@ -170,7 +170,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
 
         config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
 
-        config.governance = ctmAddresses.governance;
+        config.governance = ctmAddresses.admin.governance;
 
         // Read create2 factory values from permanent values file
         (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(getPermanentValuesPath());
@@ -200,24 +200,24 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         config.chainTypeManagerProxy = chainTypeManagerProxy;
 
         // Use AddressIntrospector to get addresses from deployed contracts
-        AddressIntrospector.BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
-            IL1Bridgehub(bridgehub)
-        );
-        AddressIntrospector.CTMAddresses memory ctmAddresses = AddressIntrospector.getCTMAddresses(
+        BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(IL1Bridgehub(bridgehub));
+        CTMDeployedAddresses memory ctmAddresses = AddressIntrospector.getCTMAddresses(
             ChainTypeManagerBase(chainTypeManagerProxy)
         );
+        address assetRouter = address(IL1Bridgehub(bridgehub).assetRouter());
+        BridgesDeployedAddresses memory bridgeAddresses = AddressIntrospector.getBridgesDeployedAddresses(assetRouter);
 
-        config.validatorTimelock = ctmAddresses.validatorTimelockPostV29;
-        config.nativeTokenVault = bhAddresses.assetRouterAddresses.nativeTokenVault;
-        config.sharedBridgeProxy = bhAddresses.assetRouter;
-        config.l1Nullifier = bhAddresses.assetRouterAddresses.l1Nullifier;
+        config.validatorTimelock = ctmAddresses.stateTransition.proxies.validatorTimelock;
+        config.nativeTokenVault = address(bridgeAddresses.proxies.l1NativeTokenVault);
+        config.sharedBridgeProxy = bridgeAddresses.proxies.l1AssetRouter;
+        config.l1Nullifier = address(bridgeAddresses.proxies.l1Nullifier);
 
         path = string.concat(root, vm.envString("CTM_OUTPUT"));
         toml = vm.readFile(path);
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
 
-        config.governance = ctmAddresses.governance;
+        config.governance = ctmAddresses.admin.governance;
 
         // Read create2 factory values from permanent values file
         (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(getPermanentValuesPath());
