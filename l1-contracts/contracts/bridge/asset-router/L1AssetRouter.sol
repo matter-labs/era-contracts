@@ -11,7 +11,7 @@ import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTER
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
-import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
+import {IL1ERC20BridgeLegacy} from "../interfaces/IL1ERC20BridgeLegacy.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
@@ -59,7 +59,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     INativeTokenVaultBase public nativeTokenVault;
 
     /// @dev Address of legacy bridge.
-    IL1ERC20Bridge public legacyBridge;
+    IL1ERC20BridgeLegacy public legacyBridge;
 
     /// @notice Legacy function to get the L2 shared bridge address for a chain.
     /// @dev In case the chain has been deployed after the gateway release,
@@ -157,7 +157,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @notice Sets the L1ERC20Bridge contract address.
     /// @dev Should be called only once by the owner.
     /// @param _legacyBridge The address of the legacy bridge.
-    function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external override onlyOwner {
+    function setL1Erc20Bridge(IL1ERC20BridgeLegacy _legacyBridge) external override onlyOwner {
         if (address(legacyBridge) != address(0)) {
             revert AddressAlreadySet(address(legacyBridge));
         }

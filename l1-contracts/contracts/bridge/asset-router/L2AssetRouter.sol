@@ -10,7 +10,7 @@ import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
 import {NativeTokenVaultBase} from "../ntv/NativeTokenVaultBase.sol";
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
-import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
+import {IL1ERC20BridgeLegacy} from "../interfaces/IL1ERC20BridgeLegacy.sol";
 import {IL2Bridgehub} from "../../bridgehub/IL2Bridgehub.sol";
 
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
@@ -280,7 +280,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         uint256 _amount
     ) internal pure returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _l1Receiver, _l1Token, _amount);
+        return abi.encodePacked(IL1ERC20BridgeLegacy.finalizeWithdrawal.selector, _l1Receiver, _l1Token, _amount);
     }
 
     /*//////////////////////////////////////////////////////////////

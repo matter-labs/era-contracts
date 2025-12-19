@@ -19,7 +19,7 @@ import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+import {IL1ERC20BridgeLegacy} from "contracts/bridge/interfaces/IL1ERC20BridgeLegacy.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -166,9 +166,9 @@ contract L1AssetRouterTest is Test {
         vm.prank(owner);
         l1Nullifier.setL1NativeTokenVault(nativeTokenVault);
         vm.prank(owner);
-        l1Nullifier.setL1Erc20Bridge(IL1ERC20Bridge(l1ERC20BridgeAddress));
+        l1Nullifier.setL1Erc20Bridge(IL1ERC20BridgeLegacy(l1ERC20BridgeAddress));
         vm.prank(owner);
-        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(l1ERC20BridgeAddress));
+        sharedBridge.setL1Erc20Bridge(IL1ERC20BridgeLegacy(l1ERC20BridgeAddress));
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
         vm.prank(owner);
         sharedBridge.setNativeTokenVault(INativeTokenVaultBase(address(nativeTokenVault)));
