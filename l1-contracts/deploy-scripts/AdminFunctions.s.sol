@@ -452,7 +452,8 @@ contract AdminFunctions is Script {
             saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
         } else {
             console.log("Deposits are already unpaused");
-            saveOutput(Output({admin: chainInfo.admin, encodedData: hex""}));
+            Call[] memory calls = new Call[](0);
+            saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
         }
     }
 
