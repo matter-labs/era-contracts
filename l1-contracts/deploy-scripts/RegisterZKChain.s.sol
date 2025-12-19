@@ -27,7 +27,6 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 
-import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -64,7 +63,6 @@ struct Config {
     uint256 governanceMinDelay;
     address l1Nullifier;
     address l1Erc20Bridge;
-    bool initializeLegacyBridge;
     address governance;
     address create2FactoryAddress;
     bytes32 create2Salt;
@@ -80,19 +78,10 @@ contract RegisterZKChainScript is Script {
         address governance;
         address diamondProxy;
         address chainAdmin;
-        address l2LegacySharedBridge;
+        address l2LegacySharedBridge; //@check keep?
         address accessControlRestrictionAddress;
         address chainProxyAdmin;
     }
-
-    struct LegacySharedBridgeParams {
-        bytes implementationConstructorParams;
-        address implementationAddress;
-        bytes proxyConstructorParams;
-        address proxyAddress;
-    }
-
-    LegacySharedBridgeParams internal legacySharedBridgeParams;
 
     Config internal config;
     Output internal output;
@@ -117,11 +106,6 @@ contract RegisterZKChainScript is Script {
 
         outputPath = string.concat(root, outputPath);
 
-        if (config.initializeLegacyBridge) {
-            // This must be run before the chain is deployed
-            setUpLegacySharedBridgeParams();
-        }
-
         deployGovernance();
         deployChainAdmin();
         deployChainProxyAddress();
@@ -132,10 +116,6 @@ contract RegisterZKChainScript is Script {
         addValidators();
         configureZkSyncStateTransition();
         setPendingAdmin();
-
-        if (config.initializeLegacyBridge) {
-            deployLegacySharedBridge();
-        }
 
         saveOutput(outputPath);
     }
@@ -195,8 +175,6 @@ contract RegisterZKChainScript is Script {
         } else {
             config.validatorSenderOperatorExecute = address(0);
         }
-
-        config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
 
         config.governance = toml.readAddress("$.governance");
         config.create2FactoryAddress = toml.readAddress("$.create2_factory_address");
@@ -283,18 +261,6 @@ contract RegisterZKChainScript is Script {
         }
 
         console.log("Using base token address:", config.baseToken);
-    }
-
-    function setUpLegacySharedBridgeParams() internal {
-        // Ecosystem governance is the owner of the L1Nullifier
-        address ecosystemGovernance = L1NullifierDev(config.l1Nullifier).owner();
-        address bridgeAddress = L2LegacySharedBridgeTestHelper.calculateL2LegacySharedBridgeProxyAddr(
-            config.l1Erc20Bridge,
-            config.l1Nullifier,
-            ecosystemGovernance
-        );
-        vm.broadcast();
-        L1NullifierDev(config.l1Nullifier).setL2LegacySharedBridge(config.chainChainId, bridgeAddress);
     }
 
     function registerAssetIdOnBridgehub() internal {
@@ -542,37 +508,6 @@ contract RegisterZKChainScript is Script {
         output.chainProxyAdmin = address(proxyAdmin);
     }
 
-    function deployLegacySharedBridge() internal {
-        bytes[] memory emptyDeps = new bytes[](0);
-        address legacyBridgeImplAddr = Utils.deployThroughL1Deterministic({
-            bytecode: ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacyDev"),
-            constructorargs: hex"",
-            create2salt: "",
-            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-            factoryDeps: emptyDeps,
-            chainId: config.chainChainId,
-            bridgehubAddress: config.bridgehub,
-            l1SharedBridgeProxy: config.sharedBridgeProxy
-        });
-
-        output.l2LegacySharedBridge = Utils.deployThroughL1Deterministic({
-            bytecode: ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy"),
-            constructorargs: L2LegacySharedBridgeTestHelper.getLegacySharedBridgeProxyConstructorParams(
-                legacyBridgeImplAddr,
-                config.l1Erc20Bridge,
-                config.l1Nullifier,
-                // Ecosystem governance is the owner of the L1Nullifier
-                L1NullifierDev(config.l1Nullifier).owner()
-            ),
-            create2salt: "",
-            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-            factoryDeps: emptyDeps,
-            chainId: config.chainChainId,
-            bridgehubAddress: config.bridgehub,
-            l1SharedBridgeProxy: config.sharedBridgeProxy
-        });
-    }
-
     function getFactoryDeps() internal view returns (bytes[] memory) {
         bytes[] memory factoryDeps = new bytes[](0);
         return factoryDeps;
@@ -581,9 +516,6 @@ contract RegisterZKChainScript is Script {
     function saveOutput(string memory outputPath) internal {
         vm.serializeAddress("root", "diamond_proxy_addr", output.diamondProxy);
         vm.serializeAddress("root", "chain_admin_addr", output.chainAdmin);
-        if (output.l2LegacySharedBridge != address(0)) {
-            vm.serializeAddress("root", "l2_legacy_shared_bridge_addr", output.l2LegacySharedBridge);
-        }
         vm.serializeAddress("root", "access_control_restriction_addr", output.accessControlRestrictionAddress);
         vm.serializeAddress("root", "chain_proxy_admin_addr", output.chainProxyAdmin);
 

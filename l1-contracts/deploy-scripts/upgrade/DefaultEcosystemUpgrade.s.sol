@@ -100,7 +100,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     struct ExpectedL2Addresses {
         address expectedRollupL2DAValidator;
         address expectedValidiumL2DAValidator;
-        address l2SharedBridgeLegacyImpl;
+        address l2SharedBridgeLegacyImpl; //TODO deprecate, eventually
         address l2BridgedStandardERC20Impl;
     }
 
@@ -733,7 +733,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         string[] memory additionalForceDeployments = getAdditionalDependenciesNames();
 
         bytes[] memory additionalDependencies = new bytes[](7 + additionalForceDeployments.length); // Deps after Gateway upgrade
-        additionalDependencies[0] = ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
+        additionalDependencies[0] = ""; //@rev rm? check impact of index changes 
         additionalDependencies[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
         additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
         additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
@@ -1801,8 +1801,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
                 return Utils.readZKFoundryBytecodeL1("TransitionaryOwner.sol", "TransitionaryOwner");
             } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
                 return Utils.readZKFoundryBytecodeL1("GovernanceUpgradeTimer.sol", "GovernanceUpgradeTimer");
-            } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
-                return ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
             } else if (compareStrings(contractName, "L2StandardERC20")) {
                 return ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
             } else if (compareStrings(contractName, "RollupL2DAValidator")) {

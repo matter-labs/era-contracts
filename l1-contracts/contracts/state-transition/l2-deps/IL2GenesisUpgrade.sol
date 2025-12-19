@@ -44,7 +44,7 @@ struct FixedForceDeploymentsData {
     bytes messageRootBytecodeInfo;
     bytes chainAssetHandlerBytecodeInfo;
     bytes beaconDeployerInfo;
-    address l2SharedBridgeLegacyImpl;
+    address l2SharedBridgeLegacyImpl; //TODO deprecate, eventually
     address l2BridgedStandardERC20Impl;
     // The forced beacon address. It is needed only for internal testing.
     // MUST be equal to 0 in production.

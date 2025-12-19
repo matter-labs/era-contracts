@@ -15,7 +15,7 @@ import {IL1ERC20BridgeLegacy} from "../interfaces/IL1ERC20BridgeLegacy.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
-import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol";
+import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
@@ -537,7 +537,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     ) internal pure returns (bytes memory) {
         return
             abi.encodeCall(
-                IL2SharedBridgeLegacyFunctions.finalizeDeposit,
+                IL2SharedBridgeLegacy.finalizeDeposit,
                 (_sender, _receiver, _parsedNativeToken, _amount, _gettersData)
             );
     }
@@ -554,7 +554,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external override {
+    ) external override { 
         L1_NULLIFIER.finalizeWithdrawal({
             _chainId: _chainId,
             _l2BatchNumber: _l2BatchNumber,

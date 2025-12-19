@@ -51,7 +51,7 @@ library ContractsBytecodesLib {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCode.
-        string[44] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[42] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction", /// ??
             "BeaconProxy",
             "BridgedStandardERC20",
@@ -76,8 +76,6 @@ library ContractsBytecodesLib {
             "L2AdminFactory",
             "L2AssetRouter",
             "L2NativeTokenVault",
-            "L2SharedBridgeLegacy",
-            "L2SharedBridgeLegacyDev",
             "EraTestnetVerifier",
             "L2ProxyAdminDeployer",
             "L2WrappedBaseToken",

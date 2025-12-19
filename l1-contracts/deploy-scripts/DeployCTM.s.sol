@@ -22,7 +22,6 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IRollupDAManager} from "./interfaces/IRollupDAManager.sol";
 import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
-import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
@@ -517,15 +516,6 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
     function prepareForceDeploymentsData() internal returns (bytes memory) {
         require(addresses.governance != address(0), "Governance address is not set");
 
-        address dangerousTestOnlyForcedBeacon;
-        if (config.supportL2LegacySharedBridgeTest) {
-            (dangerousTestOnlyForcedBeacon, ) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
-                addresses.bridges.erc20BridgeProxy,
-                addresses.bridges.l1NullifierProxy,
-                addresses.governance
-            );
-        }
-
         FixedForceDeploymentsData memory data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
@@ -555,7 +545,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
-            dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon
+            dangerousTestOnlyForcedBeacon: address(0)
         });
 
         return abi.encode(data);
