@@ -18,10 +18,10 @@ redeploy_da_manager = true
 governance_min_delay = 0
 
 max_number_of_chains = 100
-create2_factory_salt = "0x55de3677ffea74c9815331db7f4c737a32c161db4cae7d47504a336c4c5bcfbc"
+create2_factory_salt = "0x85de5677ffea74c9815331db7f5c737a33c161db4cae7d47504a336c4c5bcfdc"
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 validator_timelock_execution_delay = 0
-genesis_root = "0xc346a158cce093e99ab65a95c884a26629d0e4f8d00ae20bbca4bfc4b204eec2"
+genesis_root = "0x423c107626aff95d3d086eabd92132dc9485e021ae3cb4c7735d5e963578e3d0"
 genesis_rollup_leaf_index = 0
 genesis_batch_commitment = "0000000000000000000000000000000000000000000000000000000000000001"
 recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"

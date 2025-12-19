@@ -88,6 +88,8 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
     using stdToml for string;
 
     uint256 internal sampleChainId;
+    // In case the sampleChainId is not set, we can use this optional CTM address directly, instead of fetching it from Bridgehub.
+    address internal optionalCTM;
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
@@ -114,6 +116,9 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
     }
 
     function getSampleChainId() public view override returns (uint256) {
+        if (sampleChainId == 0) {
+            revert("Sample chain id is not set");
+        }
         return sampleChainId;
     }
 
@@ -124,20 +129,30 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         string memory toml = vm.readFile(fullPath);
 
         sampleChainId = toml.readUint("$.zksync_os.sample_chain_id");
+        if (sampleChainId == 0) {
+            optionalCTM = toml.readAddress("$.zksync_os.optional_ctm_address");
+        }
 
         super.initialize(newConfigPath, _outputPath);
     }
 
     // Unlike the original one, we do not fetch the L1 da validator address
     function setAddressesBasedOnBridgehub() internal override {
-        address ctm = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(getSampleChainId());
+        address ctm;
+
+        if (sampleChainId == 0) {
+            ctm = optionalCTM;
+            require(ctm != address(0), "CTM address is not provided");
+        } else {
+            ctm = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(getSampleChainId());
+        }
+
         config.ownerAddress = Ownable2StepUpgradeable(ctm).owner();
 
         addresses.stateTransition.chainTypeManagerProxy = ctm;
-        // We have to set the diamondProxy address here - as it is used by multiple constructors (for example L1Nullifier etc)
-        addresses.stateTransition.diamondProxy = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
-            getSampleChainId()
-        );
+
+        // In this upgrade, we never need to use this value, so set it to zer0.
+        addresses.stateTransition.diamondProxy = address(0);
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         require(
             ctmProtocolVersion != getNewProtocolVersion(),
@@ -177,6 +192,8 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
 
         addresses.stateTransition.validatorTimelock = ChainTypeManagerBase(ctm).validatorTimelockPostV29();
         require(Ownable2StepUpgradeable(ctm).owner() == config.ownerAddress, "Incorrect owner");
+
+        addresses.transparentProxyAdmin = address(uint160(uint256(vm.load(ctm, ADMIN_SLOT))));
     }
 
     // Unlike the original one, we only deploy L1 contracts (no Gateway) and generate the upgrade data.
@@ -314,12 +331,12 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
 
         proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: transaction,
-            // Unused in zksync os context
-            bootloaderHash: config.contracts.bootloaderHash,
-            // Unused in zksync os context
-            defaultAccountHash: config.contracts.defaultAAHash,
-            // Unused in zksync os context
-            evmEmulatorHash: config.contracts.evmEmulatorHash,
+            // Unused in zksync os context, so we dont change it
+            bootloaderHash: bytes32(0),
+            // Unused in zksync os context, so we dont change it
+            defaultAccountHash: bytes32(0),
+            // Unused in zksync os context, so we dont change it
+            evmEmulatorHash: bytes32(0),
             verifier: stateTransition.verifier,
             verifierParams: VerifierParams({
                 recursionNodeLevelVkHash: bytes32(0),
@@ -335,5 +352,46 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
 
     function deployUsedUpgradeContract() internal virtual override returns (address) {
         return deploySimpleContract("L1ZKsyncOSV30Upgrade", false);
+    }
+
+    function getFacetCutsForDeletion() internal override returns (Diamond.FacetCut[] memory facetCuts) {
+        // On mainnet, we do not provide any facet cuts for deletion.
+        // This may imply wrong behavior during the upgrade, but there are
+        // no existing zksync os chains on mainnet, so the upgrade will not be applied to any chain.
+        if (sampleChainId != 0) {
+            facetCuts = super.getFacetCutsForDeletion();
+        }
+    }
+
+    // Same, as in the base contract, but we use chain asset id of the ZK gateway chain (i.e. ZK)
+    function prepareCreateNewChainCall(uint256 chainId) public view override returns (Call[] memory result) {
+        require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
+
+        bytes32 newChainAssetId = L1Bridgehub(addresses.bridgehub.bridgehubProxy).baseTokenAssetId(
+            sampleChainId != 0 ? sampleChainId : gatewayConfig.chainId
+        );
+        result = new Call[](1);
+        result[0] = Call({
+            target: addresses.bridgehub.bridgehubProxy,
+            value: 0,
+            data: abi.encodeCall(
+                IL1Bridgehub.createNewChain,
+                (
+                    chainId,
+                    addresses.stateTransition.chainTypeManagerProxy,
+                    newChainAssetId,
+                    5,
+                    msg.sender,
+                    abi.encode(newlyGeneratedData.diamondCutData, newlyGeneratedData.fixedForceDeploymentsData),
+                    new bytes[](0)
+                )
+            )
+        });
+    }
+
+    function TESTONLY_prepareTestUpgradeChainCall() internal override returns (Call[] memory calls, address admin) {
+        if (sampleChainId != 0) {
+            (calls, admin) = super.TESTONLY_prepareTestUpgradeChainCall();
+        }
     }
 }

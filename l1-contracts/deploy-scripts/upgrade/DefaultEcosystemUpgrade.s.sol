@@ -615,9 +615,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
 
         addresses.bridgehub.bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
 
-        addresses.transparentProxyAdmin = address(
-            uint160(uint256(vm.load(addresses.bridgehub.bridgehubProxy, ADMIN_SLOT)))
-        );
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
         newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
 
@@ -732,6 +729,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
 
         address eraDiamondProxy = L1Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(config.eraChainId);
         (addresses.daAddresses.l1RollupDAValidator, ) = GettersFacet(eraDiamondProxy).getDAValidatorPair();
+
+        addresses.transparentProxyAdmin = address(uint160(uint256(vm.load(ctm, ADMIN_SLOT))));
 
         require(Ownable2StepUpgradeable(ctm).owner() == config.ownerAddress, "Incorrect owner");
     }
@@ -1854,7 +1853,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
     }
 
     /// @notice Tests that it is possible to upgrade a chain to the new version
-    function TESTONLY_prepareTestUpgradeChainCall() private returns (Call[] memory calls, address admin) {
+    function TESTONLY_prepareTestUpgradeChainCall() internal virtual returns (Call[] memory calls, address admin) {
         address chainDiamondProxyAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
             getSampleChainId()
         );

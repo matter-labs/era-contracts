@@ -1,7 +1,10 @@
-era_chain_id = 531050204
+# Not exactly right, but it is what is present inside l1 asset router, so 
+# it is better to keep it same for consistency
+era_chain_id = 270
 testnet_verifier = true
-governance_upgrade_timer_initial_delay = 1200
-owner_address = "0xe3a615778aeEC76df1B368948a1D1614497Db858"
+governance_upgrade_timer_initial_delay = 0
+# Owner of the CTM
+owner_address = "0xcf96aab01347ba96050f39ff6dcbc6138b462b58"
 
 # This should always be false for non-loadtest environments.
 support_l2_legacy_shared_bridge_test = false
@@ -11,15 +14,16 @@ old_protocol_version = "0x1d00000001"
 priority_txs_l2_gas_limit = 2000000
 max_expected_l1_gas_price = 50000000000
 is_zk_sync_os = true
+redeploy_da_manager = true
 
 [contracts]
 governance_min_delay = 0
 
 max_number_of_chains = 100
-create2_factory_salt = "0x55de3677ffea74c9815331db7f4c737a32c161db4cae7d47504a336c4c5bcfb5"
+create2_factory_salt = "0x96de9677ffea74c9815331db7f5c737a33c161db4cae7d47504a336c4c5bcfdc"
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 validator_timelock_execution_delay = 0
-genesis_root = "0x6ef70107782e23150da78ff573ce332747a988e77518739723924e4f5593be22"
+genesis_root = "0x423c107626aff95d3d086eabd92132dc9485e021ae3cb4c7735d5e963578e3d0"
 genesis_rollup_leaf_index = 0
 genesis_batch_commitment = "0000000000000000000000000000000000000000000000000000000000000001"
 recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -36,25 +40,24 @@ bootloader_hash = "0x00000000000000000000000000000000000000000000000000000000000
 default_aa_hash = "0x0000000000000000000000000000000000000000000000000000000000000001"
 evm_emulator_hash = "0x0000000000000000000000000000000000000000000000000000000000000001"
 bridgehub_proxy_address = "0xc4fd2580c3487bba18d63f50301020132342fdbd"
+# Does not matter, will be redeployed
 rollup_da_manager = "0xB168490e38E5E7e1B8eB256a701Ee8314Cbf0E15"
 
+# Does not matter.
 governance_security_council_address = "0x25Ab0397DA109A50C8921A1d4a034e0973602469"
-latest_protocol_version = "0x1e00000000"
-l1_bytecodes_supplier_addr = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
-protocol_upgrade_handler_proxy_address = "0xe3a615778aeEC76df1B368948a1D1614497Db858"
+latest_protocol_version = 0x1e00000000
+# Unused as bytecode supplier is not supported in this upgrade.
+l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
 
 [tokens]
 token_weth_address = "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"
 
-
-# Note, that we actually dont contain the gateway on this env, but we need
-# for the script. We reuse era chain id.
 [gateway]
-chain_id = 531050204
+chain_id = 32657
 
 [zksync_os]
-state_transition_manager = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
-sample_chain_id = 531050204
+sample_chain_id = 8022833
+current_dual_verifier = "0xBe953765e45FE69A6Fb9Abcc263c6Ed564e6B0b9"
 
 [state_transition]
 admin_facet_addr = "0x493EE7a0AbB24C0550BB57243ff3Fe93D169842B"
