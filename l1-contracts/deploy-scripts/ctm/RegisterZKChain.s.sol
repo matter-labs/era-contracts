@@ -131,6 +131,7 @@ contract RegisterZKChainScript is Script {
         setPendingAdmin();
 
         if (config.initializeLegacyBridge) {
+            unpauseDeposits();
             deployLegacySharedBridge();
         }
 
@@ -529,6 +530,15 @@ contract RegisterZKChainScript is Script {
         zkChain.setPendingAdmin(output.chainAdmin);
         vm.stopBroadcast();
         console.log("Owner for ", output.diamondProxy, "set to", output.chainAdmin);
+    }
+
+    function unpauseDeposits() internal {
+        IZKChain zkChain = IZKChain(output.diamondProxy);
+        if (zkChain.depositsPaused()) {
+            vm.broadcast(msg.sender);
+            zkChain.unpauseDeposits();
+            console.log("Deposits unpaused");
+        }
     }
 
     function deployChainProxyAddress() internal {
