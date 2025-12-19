@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 // solhint-disable no-console, gas-custom-errors, reason-string
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-// import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 // It's required to disable lints to force the compiler to compile the contracts
@@ -61,6 +60,18 @@ import {GatewayGovernanceUtils} from "./GatewayGovernanceUtils.s.sol";
 contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
     using stdToml for string;
 
+    // =========================================================================
+    // NEW: stepped (zkSyncOS/EVM-style) deployment toggle
+    // =========================================================================
+
+    /// @dev For now required by the task statement: must be true.
+    bool internal constant shouldUseZksyncOS = true;
+
+    /// @dev Factory address for stepped deployments.
+    /// IMPORTANT: replace with the actual constant create2 factory for zkSyncOS/EVM environment if different.
+    /// For now we keep it aliased to the existing constant to avoid wide refactors.
+    address internal constant CREATE2_CONTRACT_ADDRESS = L2_CREATE2_FACTORY_ADDR;
+
     struct GatewayCTMOutput {
         StateTransitionDeployedAddresses gatewayStateTransition;
         address multicall3;
@@ -73,8 +84,6 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
     GatewayCTMOutput internal output;
 
     uint256 constant EXPECTED_MAX_L1_GAS_PRICE = 50 gwei;
-
-    uint256 internal eraChainId;
 
     uint256 internal eraChainId;
     uint256 internal gatewayChainId;
@@ -91,8 +100,6 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
 
         addresses.bridgehub.bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
         refundRecipient = toml.readAddress("$.refund_recipient");
-
-        eraChainId = toml.readUint("$.era_chain_id");
 
         eraChainId = toml.readUint("$.era_chain_id");
         gatewayChainId = toml.readUint("$.gateway_chain_id");
@@ -176,15 +183,79 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
         addresses.chainAdmin = L1Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
     }
 
+    // =========================================================================
+    // NEW: Create2 deploy helper for stepped mode
+    // =========================================================================
+
+    function _deployOnL2ViaCreate2(bytes32 _salt, bytes memory _initCode) internal returns (address expectedAddr) {
+        expectedAddr = vm.computeCreate2Address(_salt, keccak256(_initCode), CREATE2_CONTRACT_ADDRESS);
+
+        Utils.runL1L2Transaction({
+            l2Calldata: abi.encodePacked(_salt, _initCode),
+            l2GasLimit: 72_000_000,
+            l2Value: 0,
+            factoryDeps: new bytes[](0),
+            dstAddress: CREATE2_CONTRACT_ADDRESS,
+            chainId: gatewayChainId,
+            bridgehubAddress: addresses.bridgehub.bridgehubProxy,
+            l1SharedBridgeProxy: addresses.bridges.l1AssetRouterProxy,
+            refundRecipient: msg.sender
+        });
+    }
+
     function deployGatewayCTM() internal {
-        (DeployedContracts memory expectedGatewayContracts, bytes memory create2Calldata, ) = GatewayCTMDeployerHelper
-            .calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
+        // Legacy path (unchanged)
+        if (!shouldUseZksyncOS) {
+            (DeployedContracts memory expectedGatewayContracts, bytes memory create2Calldata, ) = GatewayCTMDeployerHelper
+                .calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
 
-        bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps();
+            bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps();
 
-        for (uint i = 0; i < deps.length; i++) {
-            bytes[] memory localDeps = new bytes[](1);
-            localDeps[0] = deps[i];
+            for (uint i = 0; i < deps.length; i++) {
+                bytes[] memory localDeps = new bytes[](1);
+                localDeps[0] = deps[i];
+                Utils.runL1L2Transaction({
+                    l2Calldata: hex"",
+                    l2GasLimit: 72_000_000,
+                    l2Value: 0,
+                    factoryDeps: localDeps,
+                    dstAddress: address(0),
+                    chainId: gatewayChainId,
+                    bridgehubAddress: addresses.bridgehub.bridgehubProxy,
+                    l1SharedBridgeProxy: addresses.bridges.l1AssetRouterProxy,
+                    refundRecipient: msg.sender
+                });
+            }
+
+            Utils.runL1L2Transaction({
+                l2Calldata: create2Calldata,
+                l2GasLimit: 72_000_000,
+                l2Value: 0,
+                factoryDeps: new bytes,
+                dstAddress: L2_CREATE2_FACTORY_ADDR,
+                chainId: gatewayChainId,
+                bridgehubAddress: addresses.bridgehub.bridgehubProxy,
+                l1SharedBridgeProxy: addresses.bridges.l1AssetRouterProxy,
+                refundRecipient: msg.sender
+            });
+
+            _saveExpectedGatewayContractsToOutput(expectedGatewayContracts);
+            return;
+        }
+
+        // =========================================================================
+        // NEW: stepped deployment path (zkSyncOS/EVM-style)
+        // =========================================================================
+        (
+            DeployedContracts memory expectedGatewayContracts,
+            GatewayCTMDeployerHelper.SteppedDeploymentPlan memory plan
+        ) = GatewayCTMDeployerHelper.buildSteppedDeployment(bytes32(0), gatewayCTMDeployerConfig, CREATE2_CONTRACT_ADDRESS);
+
+        // Publish dependencies (same pattern as legacy; avoids per-tx payload bloat)
+        bytes[] memory depsStepped = GatewayCTMDeployerHelper.getListOfFactoryDepsStepped();
+        for (uint i = 0; i < depsStepped.length; i++) {
+            bytes;
+            localDeps[0] = depsStepped[i];
             Utils.runL1L2Transaction({
                 l2Calldata: hex"",
                 l2GasLimit: 72_000_000,
@@ -198,17 +269,15 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
             });
         }
 
-        Utils.runL1L2Transaction({
-            l2Calldata: create2Calldata,
-            l2GasLimit: 72_000_000,
-            l2Value: 0,
-            factoryDeps: new bytes[](0),
-            dstAddress: L2_CREATE2_FACTORY_ADDR,
-            chainId: gatewayChainId,
-            bridgehubAddress: addresses.bridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: addresses.bridges.l1AssetRouterProxy,
-            refundRecipient: msg.sender
-        });
+        // Deploy step contracts one-by-one via CREATE2_CONTRACT_ADDRESS
+        // Note: Only the *step* contracts are deployed this way; inner deployments happen inside constructors.
+        _deployOnL2ViaCreate2(plan.outerSalt, plan.step0InitCode);
+        _deployOnL2ViaCreate2(plan.outerSalt, plan.step1InitCode);
+        _deployOnL2ViaCreate2(plan.outerSalt, plan.step2InitCode);
+        _deployOnL2ViaCreate2(plan.outerSalt, plan.step3InitCode);
+        _deployOnL2ViaCreate2(plan.outerSalt, plan.step4InitCode);
+        _deployOnL2ViaCreate2(plan.outerSalt, plan.step5InitCode);
+        _deployOnL2ViaCreate2(plan.outerSalt, plan.step6InitCode);
 
         _saveExpectedGatewayContractsToOutput(expectedGatewayContracts);
     }
@@ -283,7 +352,7 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
             ServerNotifier(serverNotifier).transferOwnership(addresses.chainAdmin);
             vm.stopBroadcast();
 
-            ecosystemAdminCalls = new Call[](2);
+            ecosystemAdminCalls = new Call;
             ecosystemAdminCalls[0] = Call({
                 target: addresses.stateTransition.chainTypeManagerProxy,
                 value: 0,
@@ -296,7 +365,7 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
             });
         }
 
-        // Firstly, we deploy Gateway CTM
+        // Firstly, we deploy Gateway CTM (legacy or stepped depending on shouldUseZksyncOS)
         deployGatewayCTM();
 
         Call[] memory governanceCalls = _prepareGatewayGovernanceCalls(
