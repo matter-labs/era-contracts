@@ -27,10 +27,12 @@ import {LegacySharedBridgeAddresses, SharedBridgeOnChainId} from "./LegacyShared
 import {InteropDataEncoding} from "../../interop/InteropDataEncoding.sol";
 import {IInteropHandler} from "../../interop/IInteropHandler.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     using FullMerkleMemory for FullMerkleMemory.FullTree;
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
+    using SafeERC20 for IERC20;
 
     uint256 public L1_CHAIN_ID;
 
@@ -127,7 +129,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
         uint256 balance = wrappedZKToken.balanceOf(address(this));
         if (balance > 0) {
-            wrappedZKToken.transfer(_recipient, balance);
+            wrappedZKToken.safeTransfer(_recipient, balance);
         }
     }
 
@@ -324,7 +326,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             uint256 totalFee = gatewaySettlementFee * chargeableInteropCount;
 
             // Transfer Wrapped ZK tokens from the chain operator (msg.sender) to this contract
-            wrappedZKToken.transferFrom(msg.sender, address(this), totalFee);
+            wrappedZKToken.safeTransferFrom(msg.sender, address(this), totalFee);
 
             // Settlement fees are now held by this contract (Gateway treasury)
         }

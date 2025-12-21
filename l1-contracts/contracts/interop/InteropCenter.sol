@@ -5,6 +5,7 @@ pragma solidity ^0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
@@ -40,6 +41,8 @@ contract InteropCenter is
     Ownable2StepUpgradeable,
     PausableUpgradeable
 {
+    using SafeERC20 for IERC20;
+
     /// @notice Emitted when the interop protocol fee is updated.
     /// @param oldFee Previous fee amount.
     /// @param newFee New fee amount.
@@ -417,7 +420,7 @@ contract InteropCenter is
         // If using fixed fees, collect ZK tokens per-call
         if (_bundleAttributes.useFixedFee) {
             uint256 totalZKFee = ZK_INTEROP_FEE * callStartersLength;
-            _getZKToken().transferFrom(msg.sender, owner(), totalZKFee);
+            _getZKToken().safeTransferFrom(msg.sender, owner(), totalZKFee);
         }
 
         // Ensure that tokens required for bundle execution were received.
