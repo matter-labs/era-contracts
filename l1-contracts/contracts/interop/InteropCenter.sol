@@ -66,10 +66,10 @@ contract InteropCenter is
     ///         is to ensure that each bundle has a unique hash.
     mapping(address sender => uint256 numberOfBundlesSent) public interopBundleNonce;
 
-    /// @notice Operator-set fee in base token per interop bundle (when useFixedFee=false).
+    /// @notice Operator-set fee in base token per interop call (when useFixedFee=false).
     uint256 public interopProtocolFee;
 
-    /// @notice Fixed fee amount in ZK tokens per interop bundle (when useFixedFee=true).
+    /// @notice Fixed fee amount in ZK tokens per interop call (when useFixedFee=true).
     uint256 public constant ZK_INTEROP_FEE = 1e18;
 
     /// @notice ZK token asset ID for resolving token address via native token vault.
@@ -325,18 +325,21 @@ contract InteropCenter is
     /// @param _totalBurnedCallsValue Sum of requested interop call values.
     /// @param _totalIndirectCallsValue Sum of requested indirect call values.
     /// @param _useFixedFee Whether fixed ZK fees were used (true) or base token fees required (false).
+    /// @param _callCount Number of calls in the bundle for per-call fee calculation.
     function _ensureCorrectTotalValue(
         uint256 _destinationChainId,
         uint256 _totalBurnedCallsValue,
         uint256 _totalIndirectCallsValue,
-        bool _useFixedFee
+        bool _useFixedFee,
+        uint256 _callCount
     ) internal {
         bytes32 destinationChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
         // We burn the value that is passed along the bundle here, on source chain.
         bytes32 thisChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(block.chainid);
 
         // Calculate protocol fee - only charge base token fee if not using fixed ZK fees.
-        uint256 protocolFee = _useFixedFee ? 0 : interopProtocolFee;
+        // Fee is charged per-call.
+        uint256 protocolFee = _useFixedFee ? 0 : interopProtocolFee * _callCount;
 
         if (destinationChainBaseTokenAssetId == thisChainBaseTokenAssetId) {
             uint256 expectedValue = _totalBurnedCallsValue + _totalIndirectCallsValue + protocolFee;
@@ -411,12 +414,20 @@ contract InteropCenter is
             }
         }
 
+        // If using fixed fees, collect ZK tokens per-call
+        if (_bundleAttributes.useFixedFee) {
+            uint256 totalZKFee = ZK_INTEROP_FEE * callStartersLength;
+            _getZKToken().transferFrom(msg.sender, owner(), totalZKFee);
+        }
+
         // Ensure that tokens required for bundle execution were received.
+        // solhint-disable-next-line
         _ensureCorrectTotalValue(
             bundle.destinationChainId,
             totalBurnedCallsValue,
             totalIndirectCallsValue,
-            _bundleAttributes.useFixedFee
+            _bundleAttributes.useFixedFee,
+            callStartersLength
         );
 
         bytes32 msgHash;
@@ -598,11 +609,6 @@ contract InteropCenter is
                 // Decode the boolean parameter using AttributesDecoder
                 bool useFixed = AttributesDecoder.decodeBool(_attributes[i]);
                 bundleAttributes.useFixedFee = useFixed;
-
-                // If using fixed fees, collect ZK tokens immediately
-                if (useFixed) {
-                    _getZKToken().transferFrom(msg.sender, owner(), ZK_INTEROP_FEE);
-                }
             } else {
                 revert IERC7786GatewaySource.UnsupportedAttribute(selector);
             }
@@ -658,7 +664,7 @@ contract InteropCenter is
                             Fee Management
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Sets the base token fee per interop bundle (used when useFixedFee=false).
+    /// @notice Sets the base token fee per interop call (used when useFixedFee=false).
     /// @dev Can be set to 0 to disable base token fees for users.
     /// @param _fee New fee amount in base token wei.
     function setInteropFee(uint256 _fee) external onlyOwner {

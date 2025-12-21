@@ -96,7 +96,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         L1_CHAIN_ID = _l1ChainId;
     }
 
-    /// @notice Sets the gateway settlement fee per interop bundle.
+    /// @notice Sets the gateway settlement fee per interop call.
     /// @dev Only callable by owner.
     /// @param _fee New fee amount in ZK tokens
     function setGatewaySettlementFee(uint256 _fee) external onlyOwner {
@@ -256,10 +256,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 if (log.key == bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
                     _handleInteropCenterMessage(_processLogsInputs.chainId, message);
 
-                    // Check if this message should incur gateway settlement fees
-                    if (_isChargeableInteropMessage(log, message, _processLogsInputs.chainId)) {
-                        ++chargeableInteropCount;
-                    }
+                    // Count the number of calls that should incur gateway settlement fees
+                    chargeableInteropCount += _countChargeableInteropCalls(log, message, _processLogsInputs.chainId);
                 } else if (log.key == bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR)))) {
                     _handleInteropHandlerReceiveMessage(_processLogsInputs.chainId, message, baseTokenAssetId);
                 } else if (log.key == bytes32(uint256(uint160(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)))) {
@@ -737,29 +735,29 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                         Gateway Settlement Fee Collection
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Checks if a log represents a chargeable interop message.
+    /// @notice Counts the number of chargeable interop calls in a message.
     /// @param _log The L2Log to check.
     /// @param _message The corresponding message data.
     /// @param _chainId The chain ID for validation.
-    /// @return Whether this message should incur gateway settlement fees.
-    function _isChargeableInteropMessage(
+    /// @return callCount Number of calls that should incur gateway settlement fees (0 if not chargeable).
+    function _countChargeableInteropCalls(
         L2Log memory _log,
         bytes calldata _message,
         uint256 _chainId
-    ) internal pure returns (bool) {
+    ) internal pure returns (uint256 callCount) {
         // Must be from L2ToL1Messenger (where system contracts send messages)
         if (_log.sender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
-            return false;
+            return 0;
         }
 
         // The log.key must indicate this message originated from InteropCenter
         if (_log.key != bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
-            return false;
+            return 0;
         }
 
         // Must be an interop bundle message (starts with BUNDLE_IDENTIFIER)
         if (_message.length <= 32 || bytes32(_message[:32]) != BUNDLE_IDENTIFIER) {
-            return false;
+            return 0;
         }
 
         // Decode the bundle to check fee payment status
@@ -768,10 +766,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
         // Validate this bundle is from the correct source chain
         if (bundle.sourceChainId != _chainId) {
-            return false;
+            return 0;
         }
 
-        // Charge gateway settlement fee for all interop operations.
-        return true;
+        // Return the number of calls in the bundle for per-call fee calculation
+        return bundle.calls.length;
     }
 }
