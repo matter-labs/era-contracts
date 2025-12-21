@@ -120,7 +120,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// @notice Withdraws collected gateway fees to specified recipient
     /// @dev Only callable by owner. Withdraws Wrapped ZK tokens collected as settlement fees.
     /// @param _recipient Address to receive the collected fees
-    function withdrawGatewayFees(address _recipient) external onlyOwner {
+    function withdrawGatewayFees(address _recipient) external onlyOwner { // vg todo. Only withdrawable by governance now. TBD who has control over this.
         if (_recipient == address(0)) {
             revert InvalidFeeRecipient();
         }
