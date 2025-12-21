@@ -8,7 +8,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRA
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AssetRouterBase} from "../asset-router/AssetRouterBase.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
-import {ChainIdNotRegistered, InvalidInteropCalldata, InvalidMessage, ReconstructionMismatch, Unauthorized, NonEmptyMsgValue} from "../../common/L1ContractErrors.sol";
+import {ChainIdNotRegistered, InvalidInteropCalldata, InvalidMessage, ReconstructionMismatch, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH} from "../../core/message-root/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
@@ -16,7 +16,7 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed, InvalidInteropBalanceChange, InvalidFeeRecipient, IncorrectSettlementFeePayment, NativeTransferFailed} from "./AssetTrackerErrors.sol";
+import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed, InvalidInteropBalanceChange, InvalidFeeRecipient} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
@@ -68,8 +68,13 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     /// @notice Gateway settlement fee per interop operation in ZK tokens.
     /// @dev Set by gateway governance, paid by chain operators during settlement.
-    /// @dev On Gateway, ZK is the base token, so fees are paid via msg.value.
+    /// @dev On Gateway, ZK is the base token, fees are paid using Wrapped ZK token.
     uint256 public gatewaySettlementFee;
+
+    /// @notice Wrapped ZK token contract used for settlement fee collection.
+    /// @dev Since ZK is the base token on Gateway, we use the wrapped version for transfers.
+    /// @dev This is fetched from L2NativeTokenVault.WETH_TOKEN on initialization.
+    IERC20 public wrappedZKToken;
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -94,6 +99,12 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     function setAddresses(uint256 _l1ChainId) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
+
+        // Fetch wrapped ZK token from Native Token Vault
+        // On Gateway, ZK is the base token, so WETH_TOKEN is actually the wrapped ZK token
+        address wrappedZK = L2_NATIVE_TOKEN_VAULT.WETH_TOKEN();
+        require(wrappedZK != address(0), ZeroAddress());
+        wrappedZKToken = IERC20(wrappedZK);
     }
 
     /// @notice Sets the gateway settlement fee per interop call.
@@ -106,16 +117,15 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     }
 
     /// @notice Withdraws collected gateway fees to specified recipient
-    /// @dev Only callable by owner. Withdraws native ZK tokens collected as settlement fees.
+    /// @dev Only callable by owner. Withdraws Wrapped ZK tokens collected as settlement fees.
     /// @param _recipient Address to receive the collected fees
     function withdrawGatewayFees(address _recipient) external onlyOwner {
         if (_recipient == address(0)) {
             revert InvalidFeeRecipient();
         }
-        uint256 balance = address(this).balance;
+        uint256 balance = wrappedZKToken.balanceOf(address(this));
         if (balance > 0) {
-            (bool success, ) = _recipient.call{value: balance}("");
-            require(success, NativeTransferFailed());
+            wrappedZKToken.transfer(_recipient, balance);
         }
     }
 
@@ -221,7 +231,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// @param _processLogsInputs The input containing logs, messages, and chain information to process.
     function processLogsAndMessages(
         ProcessLogsInput calldata _processLogsInputs
-    ) external payable onlyChain(_processLogsInputs.chainId) {
+    ) external onlyChain(_processLogsInputs.chainId) {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory reconstructedLogsTree;
         reconstructedLogsTree.createTree(L2_TO_L1_LOGS_MERKLE_TREE_DEPTH);
 
@@ -304,15 +314,14 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             chainBatchRootHash
         );
 
-        // Collect ZK settlement fees directly from chain operator.
+        // Collect ZK settlement fees from chain operator using Wrapped ZK token.
         if (chargeableInteropCount > 0 && gatewaySettlementFee > 0) {
             uint256 totalFee = gatewaySettlementFee * chargeableInteropCount;
-            require(msg.value == totalFee, IncorrectSettlementFeePayment(totalFee, msg.value));
+
+            // Transfer Wrapped ZK tokens from the chain operator (msg.sender) to this contract
+            wrappedZKToken.transferFrom(msg.sender, address(this), totalFee);
 
             // Settlement fees are now held by this contract (Gateway treasury)
-        } else {
-            // No fees required, no value should be sent
-            require(msg.value == 0, NonEmptyMsgValue());
         }
     }
 
