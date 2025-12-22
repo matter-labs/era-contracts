@@ -7,13 +7,14 @@ pragma solidity ^0.8.20;
 import {StdStorage, Test, console2 as console, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {SETTLEMENT_LAYER_RELAY_SENDER, ZKChainCommitment, CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET} from "contracts/common/Config.sol";
 
 import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {BridgehubBase} from "contracts/core/bridgehub/BridgehubBase.sol";
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
+import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
@@ -61,6 +62,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     function test_forwardToL2OnGateway_L2() public {
         // todo fix this test
         finalizeDeposit();
+        vm.etch(L2_INTEROP_CENTER_ADDR, address(new InteropCenter()).code);
         vm.prank(SETTLEMENT_LAYER_RELAY_SENDER);
         vm.mockCall(
             L2_CHAIN_ASSET_HANDLER_ADDR,
