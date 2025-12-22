@@ -933,11 +933,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @inheritdoc IExecutor
     function activatePriorityMode() external onlySettlementLayer notPriorityMode {
         uint256 firstUnprocessedTx = s.priorityTree.getFirstUnprocessedPriorityTx();
-        uint256 unproccessedTxRequestedAt = s.priorityOpsRequestTimestamp[firstUnprocessedTx];
-        if (unproccessedTxRequestedAt == 0) {
+        uint256 unprocessedTxRequestedAt = s.priorityOpsRequestTimestamp[firstUnprocessedTx];
+        if (unprocessedTxRequestedAt == 0) {
             revert PriorityOpsRequestTimestampMissing(firstUnprocessedTx);
         }
-        uint256 earliestActivationTimestamp = unproccessedTxRequestedAt + PRIORITY_EXPIRATION;
+        uint256 earliestActivationTimestamp = unprocessedTxRequestedAt + PRIORITY_EXPIRATION;
         if (block.timestamp < earliestActivationTimestamp) {
             revert PriorityModeActivationTooEarly(earliestActivationTimestamp, block.timestamp);
         }
