@@ -535,6 +535,8 @@ library ChainCreationParamsLib {
         }
         if (json.keyExists("$.genesis_batch_commitment")) {
             chainCreationParams.genesisBatchCommitment = json.readBytes32("$.genesis_batch_commitment");
+        } else {
+            chainCreationParams.genesisBatchCommitment = bytes32(uint256(1));
         }
 
         if (json.keyExists("$.default_aa_hash")) {
