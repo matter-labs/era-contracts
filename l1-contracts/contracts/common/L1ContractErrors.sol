@@ -428,6 +428,14 @@ error ZeroGasPriceL1TxZKsyncOS();
 error ZKChainLimitReached();
 // 0x646ac57e
 error ZKsyncOSNotForceDeployForExistingContract(address);
+// 0xbeda0935
+error PriorityOpsRequestTimestampMissing(uint256 requestId);
+// 0x67c198fe
+error PriorityModeActivationTooEarly(uint256 earliestActivationTimestamp, uint256 currentTimestamp);
+// 0x9d7bb13f
+error OnlyNormalMode();
+// 0xdda650de
+error ActivatePriorityModeNotImplelemtedInValidatorContract();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

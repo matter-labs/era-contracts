@@ -68,7 +68,7 @@ import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2G
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
 
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
-import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
+import {L1ZKsyncOSV30_1Upgrade} from "contracts/upgrades/L1ZKsyncOSV30_1Upgrade.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
@@ -84,7 +84,7 @@ import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerB
 /// - This upgrade is done for zksync os only and so only CTM is upgraded.
 /// - No gateway related parts are present, as zksync os does not use the gateway.
 /// - Stage0 and stage2 governance calls are skipped, as zksync os governance does not control the ecosystem.
-contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade {
+contract EcosystemUpgrade_v30_1_zk_os is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
     uint256 internal sampleChainId;
@@ -94,9 +94,16 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         config.isZKsyncOS = true;
         initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
 
-        require(newConfig.redeployDAManager, "This upgrade script requires redeploying the DA manager");
+        instantiateCreate2Factory();
 
-        prepareEcosystemUpgrade();
+        // Deploy verifiers
+        deployVerifiers();
+        // Deploy the Upgrade contract
+        (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
+        console.log("Verifiers are deployed!");
+
+        upgradeConfig.factoryDepsPublished = true;
+        generateUpgradeData();
         console.log("Ecosystem upgrade prepared!");
 
         prepareDefaultGovernanceCalls();
@@ -109,7 +116,7 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
 
         require(
             Ownable2StepUpgradeable(addresses.stateTransition.verifier).pendingOwner() == config.ownerAddress,
-            "Incorrect owner of the DA manager before transfer"
+            "Incorrect owner of the verifier manager before transfer"
         );
     }
 
@@ -124,6 +131,15 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         string memory toml = vm.readFile(fullPath);
 
         sampleChainId = toml.readUint("$.zksync_os.sample_chain_id");
+        
+        // We want to save old facets to reuse it for setting chain params as this upgrade only changes
+        // the verifier contract.
+        addresses.stateTransition.adminFacet = toml.readAddress("$.state_transition.admin_facet_addr");
+        addresses.stateTransition.executorFacet = toml.readAddress("$.state_transition.executor_facet_addr");
+        addresses.stateTransition.mailboxFacet = toml.readAddress("$.state_transition.mailbox_facet_addr");
+        addresses.stateTransition.gettersFacet = toml.readAddress("$.state_transition.getters_facet_addr");
+        addresses.stateTransition.diamondInit = toml.readAddress("$.state_transition.diamond_init_addr");
+        generatedData.forceDeploymentsData = toml.readBytes("$.state_transition.force_deployments_data");
 
         super.initialize(newConfigPath, _outputPath);
     }
@@ -179,18 +195,6 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         require(Ownable2StepUpgradeable(ctm).owner() == config.ownerAddress, "Incorrect owner");
     }
 
-    // Unlike the original one, we only deploy L1 contracts (no Gateway) and generate the upgrade data.
-    function prepareEcosystemUpgrade() public virtual override {
-        deployNewEcosystemContractsL1();
-        console.log("Ecosystem contracts are deployed!");
-
-        publishBytecodes();
-        console.log("Bytecodes published!");
-
-        generateUpgradeData();
-        console.log("Upgrade data generated!");
-    }
-
     // Factory deps are not supported yet, so we just mark those as published.
     function publishBytecodes() public override {
         upgradeConfig.factoryDepsPublished = true;
@@ -198,57 +202,42 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
 
     // Unlike the original one, we skip the GW-related parts.
     function generateUpgradeData() public virtual override {
-        require(upgradeConfig.initialized, "Not initialized");
-        require(upgradeConfig.ecosystemContractsDeployed, "Ecosystem contracts not deployed");
-
-        // Important, this must come after the initializeExpectedL2Addresses
-        generateFixedForceDeploymentsData();
         console.log("Generated fixed force deployments data");
-        getChainCreationDiamondCutData(addresses.stateTransition);
-        newlyGeneratedData.diamondCutData = config.contracts.diamondCutData;
-        console.log("Prepared diamond cut data");
+        newlyGeneratedData.diamondCutData = abi.encode(getChainCreationDiamondCutData(addresses.stateTransition));
         generateUpgradeCutData(addresses.stateTransition);
         upgradeConfig.upgradeCutPrepared = true;
         console.log("UpgradeCutGenerated");
         saveOutput(upgradeConfig.outputPath);
     }
 
-    // Unlike the original one, we skip stage 0 and stage 2 calls.
-    function prepareStage0GovernanceCalls() public override returns (Call[] memory calls) {
-        // No stage 0 calls, since the zksync os governor does not control the ecosystem.
+    // We don't add facets as it is noop upgrade for L1 contracts
+    function getUpgradeAddedFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
+        facetCuts = new Diamond.FacetCut[](0);
     }
 
-    // Unlike the original one, we only upgrade the CTM and ValidatorTimelock.
-    function prepareUpgradeProxiesCalls() public override returns (Call[] memory calls) {
-        calls = new Call[](2);
+    // We don't remove facets as it is noop upgrade for L1 contracts
+    function getFacetCutsForDeletion() internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
+        facetCuts = new Diamond.FacetCut[](0);
+    }
 
-        // We can only upgrade the CTM
-        calls[0] = _buildCallProxyUpgrade(
-            addresses.stateTransition.chainTypeManagerProxy,
-            addresses.stateTransition.chainTypeManagerImplementation
-        );
-        calls[1] = _buildCallProxyUpgrade(
-            addresses.stateTransition.validatorTimelock,
-            addresses.stateTransition.validatorTimelockImplementation
-        );
+    // Unlike the original one, we skip stage 0 and stage 2 calls.
+    function prepareStage0GovernanceCalls() public override returns (Call[] memory calls) {
+        // No stage 1 calls, since the zksync os governor does not control the ecosystem.
     }
 
     // Unlike the original one, since we do not control the main ecosystem governance,
     // we skip upgrading lots of contracts, as well as anything related to ZK Gateway.
     function prepareStage1GovernanceCalls() public override returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](5);
-
-        // We can only upgrade the CTM
-        allCalls[0] = prepareUpgradeProxiesCalls();
+        Call[][] memory allCalls = new Call[][](3);
 
         console.log("prepareStage1GovernanceCalls: prepareNewChainCreationParamsCall");
-        allCalls[1] = prepareNewChainCreationParamsCall();
+        allCalls[0] = prepareNewChainCreationParamsCall();
         console.log("prepareStage1GovernanceCalls: provideSetNewVersionUpgradeCall");
-        allCalls[2] = provideSetNewVersionUpgradeCall();
-        console.log("prepareStage1GovernanceCalls: prepareDAValidatorCall");
-        allCalls[3] = acceptDAValidatorOwnershipCalls();
+        allCalls[1] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: acceptZKSyncOSVerifierOwnershipCalls");
-        allCalls[4] = acceptZKSyncOSVerifierOwnershipCalls();
+        allCalls[2] = acceptZKSyncOSVerifierOwnershipCalls();
 
         calls = mergeCallsArray(allCalls);
     }
@@ -258,68 +247,18 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         // No stage 2 calls, since the zksync os governor does not control the ecosystem.
     }
 
+    /// Empty upgrade, just set the new protocol version
     function getProposedUpgrade(
         StateTransitionDeployedAddresses memory stateTransition
     ) public override returns (ProposedUpgrade memory proposedUpgrade) {
-        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract(
-            "L2V30TestnetSystemProxiesUpgrade.sol",
-            "L2V30TestnetSystemProxiesUpgrade"
-        );
-
-        address upgradeImplAddress = L2GenesisForceDeploymentsHelper.generateRandomAddress(bytecodeInfo);
-
-        // Note, that for the upgrade we need to take into account the legacy interface.
-        IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[]
-            memory forceDeployments = new IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[](1);
-        forceDeployments[0] = IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo({
-            isZKsyncOS: true,
-            deployedBytecodeInfo: bytecodeInfo,
-            newAddress: upgradeImplAddress
-        });
-
-        bytes memory upgradeImplData = abi.encodeCall(
-            L2V30TestnetSystemProxiesUpgrade.upgrade,
-            (
-                newlyGeneratedData.fixedForceDeploymentsData,
-                Utils.getZKOSBytecodeInfoForContract("SystemContractProxyAdmin.sol", "SystemContractProxyAdmin"),
-                Utils.getZKOSProxyUpgradeBytecodeInfo("L2ComplexUpgrader.sol", "L2ComplexUpgrader")
-            )
-        );
-
-        L2CanonicalTransaction memory transaction = L2CanonicalTransaction({
-            txType: ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
-            from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
-            to: uint256(uint160(L2_COMPLEX_UPGRADER_ADDR)),
-            // TODO: dont use hardcoded values
-            gasLimit: 72_000_000,
-            gasPerPubdataByteLimit: 800,
-            maxFeePerGas: 0,
-            maxPriorityFeePerGas: 0,
-            paymaster: uint256(uint160(address(0))),
-            nonce: getProtocolUpgradeNonce(),
-            value: 0,
-            reserved: [uint256(0), uint256(0), uint256(0), uint256(0)],
-            data: abi.encodeCall(
-                IComplexUpgraderZKsyncOSV29.forceDeployAndUpgradeUniversal,
-                (forceDeployments, upgradeImplAddress, upgradeImplData)
-            ),
-            signature: new bytes(0),
-            // All factory deps should've been published before
-            factoryDeps: new uint256[](0),
-            paymasterInput: new bytes(0),
-            // Reserved dynamic type for the future use-case. Using it should be avoided,
-            // But it is still here, just in case we want to enable some additional functionality
-            reservedDynamic: new bytes(0)
-        });
-
         proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: transaction,
+            l2ProtocolUpgradeTx: _emptyUpgradeTx(),
             // Unused in zksync os context
-            bootloaderHash: config.contracts.bootloaderHash,
+            bootloaderHash: bytes32(0),
             // Unused in zksync os context
-            defaultAccountHash: config.contracts.defaultAAHash,
+            defaultAccountHash: bytes32(0),
             // Unused in zksync os context
-            evmEmulatorHash: config.contracts.evmEmulatorHash,
+            evmEmulatorHash: bytes32(0),
             verifier: stateTransition.verifier,
             verifierParams: VerifierParams({
                 recursionNodeLevelVkHash: bytes32(0),
@@ -333,7 +272,21 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         });
     }
 
+    function getCreationCode(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view override returns (bytes memory) {
+        if (compareStrings(contractName, "L1ZKsyncOSV30_1Upgrade")) {
+            if (!isZKBytecode) {
+                return type(L1ZKsyncOSV30_1Upgrade).creationCode;
+            } else {
+                return ContractsBytecodesLib.getCreationCode("L1ZKsyncOSV30_1Upgrade", true);
+            }
+        }
+        return super.getCreationCode(contractName, isZKBytecode);
+    }
+
     function deployUsedUpgradeContract() internal virtual override returns (address) {
-        return deploySimpleContract("L1ZKsyncOSV30Upgrade", false);
+        return deploySimpleContract("L1ZKsyncOSV30_1Upgrade", false);
     }
 }

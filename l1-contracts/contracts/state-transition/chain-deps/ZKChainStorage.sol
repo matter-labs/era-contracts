@@ -52,6 +52,13 @@ struct FeeParams {
     uint64 minimalL2GasPrice;
 }
 
+/// @notice Stores the current Priority Mode (escape hatch) configuration.
+/// @dev When `activated` is true, privileged actions are restricted to `permissionlessValidator`.
+struct PriorityModeInformation {
+    bool activated;
+    address permissionlessValidator;
+}
+
 /// @dev storing all storage variables for ZK chain diamond facets
 /// NOTE: It is used in a proxy, so it is possible to add new variables to the end
 /// but NOT to modify already existing variables or change their order.
@@ -231,4 +238,11 @@ struct ZKChainStorage {
     /// @dev Timestamp when deposits were paused for chain migration to/from Gateway. 0 = not paused.
     /// @dev STORAGE SLOT: 64
     uint256 pausedDepositsTimestamp;
+    /// @dev Information required in the priority mode packed in one storage slot.
+    /// @dev STORAGE SLOT: 65
+    PriorityModeInformation priorityModeInfo;
+    /// @dev Timestamp when a priority tx request was made for the specified tx index from priorityTree.
+    /// @dev STORAGE SLOT: 66
+    mapping(uint256 => uint256) priorityOpsRequestTimestamp;
+
 }

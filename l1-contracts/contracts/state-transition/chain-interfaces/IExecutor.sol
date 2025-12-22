@@ -241,6 +241,10 @@ interface IExecutor is IZKChainBase {
     /// counters that are responsible for the number of batches
     function revertBatchesSharedBridge(address _chainAddress, uint256 _newLastBatch) external;
 
+    /// @notice Activates the escape hatch mechanism if the whitelisted operator fails
+    /// to process priority transactions within the allotted time.
+    function activatePriorityMode() external;
+
     /// @notice Event emitted when a batch is committed
     /// @param batchNumber Number of the batch committed
     /// @param batchHash Hash of the L2 batch
@@ -286,4 +290,7 @@ interface IExecutor is IZKChainBase {
         uint64 indexed firstBlockNumber,
         uint64 indexed lastBlockNumber
     );
+
+    /// @notice Emitted when Priority Mode is activated for the chain.
+    event PriorityModeActivated();
 }

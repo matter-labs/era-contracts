@@ -39,8 +39,7 @@ uint256 constant ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE = 126;
 uint256 constant MAX_ALLOWED_MINOR_VERSION_DELTA = 100;
 
 /// @dev The amount of time in seconds the validator has to process the priority transaction
-/// NOTE: The constant is set to zero for the Alpha release period
-uint256 constant PRIORITY_EXPIRATION = 0 days;
+uint256 constant PRIORITY_EXPIRATION = 8 days;
 
 // @dev The chainId of Ethereum Mainnet
 uint256 constant MAINNET_CHAIN_ID = 1;

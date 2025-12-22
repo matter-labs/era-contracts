@@ -404,8 +404,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external override onlyBridgehubOrInteropCenter {
-        _writePriorityOpHash(_canonicalTxHash, _expirationTimestamp);
-        emit NewRelayedPriorityTransaction(_getTotalPriorityTxs(), _canonicalTxHash, _expirationTimestamp);
+        _writePriorityOpHash(_canonicalTxHash);
+        emit NewRelayedPriorityTransaction(_getTotalPriorityTxs(), _canonicalTxHash, 0);
         emit NewPriorityRequestId(_getTotalPriorityTxs(), _canonicalTxHash);
     }
 
@@ -463,7 +463,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
                 _chainId: s.chainId,
                 _canonicalTxHash: canonicalTxHash,
-                _expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION),
+                _expirationTimestamp: 0,
                 _baseTokenAmount: 0,
                 _getBalanceChange: false
             });
@@ -546,12 +546,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (request.sender != tx.origin && !is7702AccountSender) {
             request.sender = AddressAliasHelper.applyL1ToL2Alias(request.sender);
         }
-        // populate missing fields
-        _params.expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast
         L2CanonicalTransaction memory transaction;
         (transaction, canonicalTxHash) = _validateTx(_params);
 
-        _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
+        _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash);
         if (s.settlementLayer != address(0)) {
             address assetRouter = address(IBridgehubBase(s.bridgehub).assetRouter());
             bool getBalanceChange = _params.request.sender == AddressAliasHelper.applyL1ToL2Alias(assetRouter);
@@ -560,7 +558,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
                 _chainId: s.chainId,
                 _canonicalTxHash: canonicalTxHash,
-                _expirationTimestamp: _params.expirationTimestamp,
+                _expirationTimestamp: 0,
                 _baseTokenAmount: _params.request.mintValue,
                 _getBalanceChange: getBalanceChange
             });
@@ -577,13 +575,12 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         WritePriorityOpParams memory params = WritePriorityOpParams({
             request: _request,
             txId: _nextPriorityTxId(),
-            l2GasPrice: 0,
-            expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION)
+            l2GasPrice: 0
         });
 
         L2CanonicalTransaction memory transaction;
         (transaction, canonicalTxHash) = _validateTx(params);
-        _writePriorityOp(transaction, params.request.factoryDeps, canonicalTxHash, params.expirationTimestamp);
+        _writePriorityOp(transaction, params.request.factoryDeps, canonicalTxHash);
     }
 
     function _serializeL2Transaction(
@@ -644,10 +641,9 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     function _writePriorityOp(
         L2CanonicalTransaction memory _transaction,
         bytes[] memory _factoryDeps,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
+        bytes32 _canonicalTxHash
     ) internal {
-        _writePriorityOpHash(_canonicalTxHash, _expirationTimestamp);
+        _writePriorityOpHash(_canonicalTxHash);
 
         /// We only check deposits paused on L1 to keep the GW and L1 Priority queues the same.
         if (block.chainid == L1_CHAIN_ID) {
@@ -656,13 +652,16 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
         // Data that is needed for the operator to simulate priority queue offchain
         // solhint-disable-next-line func-named-parameters
-        emit NewPriorityRequest(_transaction.nonce, _canonicalTxHash, _expirationTimestamp, _transaction, _factoryDeps);
+        emit NewPriorityRequest(_transaction.nonce, _canonicalTxHash, 0, _transaction, _factoryDeps);
         emit NewPriorityRequestId(_transaction.nonce, _canonicalTxHash);
     }
 
     // solhint-disable-next-line no-unused-vars
-    function _writePriorityOpHash(bytes32 _canonicalTxHash, uint64 _expirationTimestamp) internal {
+    function _writePriorityOpHash(bytes32 _canonicalTxHash) internal {
         s.priorityTree.push(_canonicalTxHash);
+        uint256 totalPriorityTxs = s.priorityTree.getTotalPriorityTxs();
+        uint256 newRequestId = totalPriorityTxs - 1;
+        s.priorityOpsRequestTimestamp[newRequestId] = block.timestamp;
     }
 
     ///////////////////////////////////////////////////////
