@@ -798,11 +798,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // During migration to the new protocol version, there will be a period when
         // the bridgehub does not yet provide the `messageRoot` functionality.
         // To ease up the migration, we never append messages to message root on L1.
-        if (block.chainid != L1_CHAIN_ID) {
+        // if (block.chainid != L1_CHAIN_ID) {
             // Once the batch is executed, we include its message to the message root.
             L2MessageRoot messageRootContract = L2MessageRoot(address(IL1Bridgehub(s.bridgehub).messageRoot()));
             messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
-        }
+        // }
     }
 
     /// @inheritdoc IExecutor

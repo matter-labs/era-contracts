@@ -194,10 +194,15 @@ fn build_initial_genesis_commitment(
 
     let mut hasher = Blake2s256::new();
     hasher.update(genesis_root.as_slice());
+    println!("Hash part - genesis_root: {:?}", genesis_root);
     hasher.update(leaves_count.to_be_bytes());
+    println!("Hash part - leaves_count: {:?}", leaves_count.to_be_bytes());
     hasher.update(number.to_be_bytes());
+    println!("Hash part - number: {:?}", number.to_be_bytes());
     hasher.update(last_256_block_hashes_blake);
+    println!("Hash part - last_256_block_hashes_blake: {:?}", last_256_block_hashes_blake);
     hasher.update(timestamp.to_be_bytes());
+    println!("Hash part - timestamp: {:?}", timestamp.to_be_bytes());
     let state_commitment = B256::from_slice(&hasher.finalize());
     Ok(state_commitment)
 }

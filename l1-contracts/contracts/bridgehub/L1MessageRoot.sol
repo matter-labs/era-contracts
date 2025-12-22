@@ -4,6 +4,8 @@ pragma solidity 0.8.28;
 
 import {MessageRootBase} from "./MessageRootBase.sol";
 
+event AppendedChainRoot(uint256 indexed chainId, uint256 indexed batchNumber, bytes32 indexed chainRoot);
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
@@ -35,5 +37,10 @@ contract L1MessageRoot is MessageRootBase {
 
     function L1_CHAIN_ID() public view override returns (uint256) {
         return block.chainid;
+    }
+
+    // FIXME: temporary method.
+    function addChainBatchRoot(uint256 chainId, uint256 batchNumber, bytes32 messageRoot) external {
+        emit AppendedChainRoot(chainId, batchNumber, messageRoot);
     }
 }

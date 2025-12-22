@@ -14,6 +14,10 @@ const SYSTEM_CONTRACT_PROXY_ADMIN: Address = Address(FixedBytes::<20>(hex_litera
 // We need it predeployed to make the genesis upgrade work at all.
 const L2_COMPLEX_UPGRADER_IMPL_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!("d704e29df32c189b8613f79fcc043b2dc01d5f53")));
 
+const L2_INTEROP_ROOT_STORAGE: Address = Address(FixedBytes::<20>(hex_literal::hex!("0000000000000000000000000000000000010008")));
+const L2_MESSAGE_VERIFICATION: Address = Address(FixedBytes::<20>(hex_literal::hex!("0000000000000000000000000000000000010009")));
+
+
 const SYSTEM_PROXY_ADMIN_OWNER_SLOT: B256 = B256::ZERO;
 const EIP1967_IMPLEMENTATION_SLOT: B256 = FixedBytes::<32>(hex_literal::hex!(
     "360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
@@ -22,12 +26,15 @@ const EIP1967_ADMIN_SLOT: B256 = FixedBytes::<32>(hex_literal::hex!(
     "b53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103"
 ));
 
-const INITIAL_CONTRACTS: [(Address, &str); 5] = [
+const INITIAL_CONTRACTS: [(Address, &str); 7] = [
     (L2_COMPLEX_UPGRADER_ADDR, "SystemContractProxy"),
     (L2_GENESIS_UPGRADE, "L2GenesisUpgrade"),
     (L2_WRAPPED_BASE_TOKEN, "L2WrappedBaseToken"),
     (SYSTEM_CONTRACT_PROXY_ADMIN, "SystemContractProxyAdmin"),
     (L2_COMPLEX_UPGRADER_IMPL_ADDR, "L2ComplexUpgrader"),
+    // FIXME should be deployed correctly,
+    (L2_INTEROP_ROOT_STORAGE, "L2InteropRootStorage"),
+    (L2_MESSAGE_VERIFICATION, "L2MessageVerification"),
 ];
 
 fn bytecode_to_code(contract_name: &str) -> Vec<u8> {
