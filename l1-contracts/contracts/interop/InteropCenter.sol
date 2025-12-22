@@ -618,7 +618,12 @@ contract InteropCenter is
         }
 
         // Enforce useFixedFee attribute as required for all interop calls. This ensures that interop fee is being paid in one way or another.
-        if (!attributeUsed[4]) {
+        // Only enforce this requirement when parsing bundle attributes.
+        if (
+            !attributeUsed[4] &&
+            (_restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
+                _restriction == AttributeParsingRestrictions.CallAndBundleAttributes)
+        ) {
             revert UseFixedFeeRequired();
         }
     }

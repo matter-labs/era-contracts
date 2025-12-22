@@ -18,7 +18,7 @@ abstract contract L2InteropNativeTokenSimpleTestAbstract is L2InteropTestUtils {
         vm.deal(address(this), 1000 ether);
         vm.recordLogs();
 
-        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100);
+        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100, false);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         extractAndExecuteSingleBundle(logs, destinationChainId, EXECUTION_ADDRESS);
     }

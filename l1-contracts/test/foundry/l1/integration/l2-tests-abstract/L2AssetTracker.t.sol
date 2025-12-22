@@ -13,6 +13,7 @@ import {MAX_TOKEN_BALANCE} from "contracts/bridge/asset-tracker/IAssetTrackerBas
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 
 import {L2AssetTrackerData} from "./L2AssetTrackerData.sol";
+import {L2UtilsBase} from "../l2-tests-in-l1-context/L2UtilsBase.sol";
 
 abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
@@ -22,6 +23,12 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         finalizeDepositWithChainId(260);
 
         vm.chainId(GATEWAY_CHAIN_ID);
+
+        // Set up token balances for chain operators to pay settlement fees
+        uint256[] memory chainIds = new uint256[](2);
+        chainIds[0] = 271;
+        chainIds[1] = 260;
+        L2UtilsBase.setupTokenBalancesForChainOperators(chainIds);
 
         bytes[] memory input2 = L2AssetTrackerData.getData2();
         for (uint256 i = 0; i < input2.length; i++) {
@@ -44,6 +51,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         }
 
         for (uint256 i = 0; i < testData.length; i++) {
+            console.log("Processing test data index", i, "for chainId", testData[i].chainId);
             // Set the current batch number to 4 so that batch 5 can be added next
             if (testData[i].batchNumber > 0) {
                 stdstore
@@ -103,11 +111,17 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
                 vm.store(address(GW_ASSET_TRACKER), structSlot, bytes32(uint256(1)));
             }
 
+            console.log("About to call processLogsAndMessages for index", i);
             vm.prank(L2_BRIDGEHUB.getZKChain(testData[i].chainId));
 
-            (bool success, ) = GW_ASSET_TRACKER_ADDR.call(
+            (bool success, bytes memory returnData) = GW_ASSET_TRACKER_ADDR.call(
                 abi.encodeCall(GW_ASSET_TRACKER.processLogsAndMessages, testData[i])
             );
+
+            if (!success) {
+                console.log("Call failed for index", i);
+                console.logBytes(returnData);
+            }
 
             require(success, string.concat("Failed to call GWAssetTracker ", vm.toString(i)));
             console.log("success", i);

@@ -4,17 +4,14 @@ pragma solidity ^0.8.20;
 import {Vm} from "forge-std/Vm.sol";
 
 import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
-import {console2 as console} from "forge-std/Script.sol";
 
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
-import {GW_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2_INTEROP_ACCOUNT_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "../l2-tests-abstract/Utils.sol";
 
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
@@ -22,6 +19,7 @@ import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -32,7 +30,6 @@ import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/
 
 import {InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
 import {InteropHandler} from "../../../../../contracts/interop/InteropHandler.sol";
-import {DummyL2L1Messenger} from "../../../../../contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 
 import {DummyL2StandardTriggerAccount} from "../../../../../contracts/dev-contracts/test/DummyL2StandardTriggerAccount.sol";
 import {DummyL2BaseTokenSystemContract} from "../../../../../contracts/dev-contracts/test/DummyBaseTokenSystemContract.sol";
@@ -41,6 +38,7 @@ import {DummyL2InteropAccount} from "../../../../../contracts/dev-contracts/test
 import {SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {TokenMetadata, TokenBridgingData} from "contracts/common/Messaging.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 library L2UtilsBase {
     using stdToml for string;
@@ -49,6 +47,10 @@ library L2UtilsBase {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
     Vm internal constant vm = Vm(VM_ADDRESS);
+
+    // Storage slots for reentrancy guards (from OpenZeppelin ReentrancyGuard)
+    bytes32 internal constant REENTRANCY_GUARD_STORAGE_SLOT =
+        0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4;
 
     /// @dev We provide a fast form of debugging the L2 contracts using L1 foundry. We also test using zk foundry.
     function initSystemContracts(SystemContractsArgs memory _args) internal {
@@ -119,25 +121,6 @@ library L2UtilsBase {
             );
         }
         {
-            address interopHandler = address(new InteropHandler());
-            vm.etch(L2_INTEROP_HANDLER_ADDR, interopHandler.code);
-            /// storing the reentrancy guard as the constructor is not called.
-            vm.store(
-                L2_INTEROP_HANDLER_ADDR,
-                bytes32(0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4),
-                bytes32(uint256(1))
-            );
-            address l2AssetTrackerAddress = address(new L2AssetTracker());
-            vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
-            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            L2AssetTracker(L2_ASSET_TRACKER_ADDR).setAddresses(_args.l1ChainId, bytes32(0));
-
-            address gwAssetTrackerAddress = address(new GWAssetTracker());
-            vm.etch(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAddress.code);
-            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            GWAssetTracker(GW_ASSET_TRACKER_ADDR).setAddresses(_args.l1ChainId);
-        }
-        {
             address l2StandardTriggerAccount = address(new DummyL2StandardTriggerAccount());
             vm.etch(L2_STANDARD_TRIGGER_ACCOUNT_ADDR, l2StandardTriggerAccount.code);
             address l2InteropAccount = address(new DummyL2InteropAccount());
@@ -149,8 +132,6 @@ library L2UtilsBase {
             vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, l2DummyBaseTokenSystemContract.code);
         }
 
-        // DummyL2L1Messenger dummyL2L1Messenger = new DummyL2L1Messenger();
-        // vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(dummyL2L1Messenger).code);
         {
             address assetRouter = address(new L2AssetRouter());
             vm.etch(L2_ASSET_ROUTER_ADDR, assetRouter.code);
@@ -166,13 +147,8 @@ library L2UtilsBase {
         }
 
         {
-            // Initializing reentrancy guard
-            // stdstore.target(address(L2_ASSET_ROUTER_ADDR)).sig("l1AssetRouter()").checked_write(_args.l1AssetRouter);
-            vm.store(
-                L2_ASSET_ROUTER_ADDR,
-                bytes32(0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4),
-                bytes32(uint256(1))
-            );
+            // Initialize reentrancy guard for AssetRouter
+            _initializeReentrancyGuard(L2_ASSET_ROUTER_ADDR);
         }
 
         {
@@ -202,5 +178,69 @@ library L2UtilsBase {
             );
             L2NativeTokenVaultDev(L2_NATIVE_TOKEN_VAULT_ADDR).deployBridgedStandardERC20(_args.aliasedOwner);
         }
+
+        {
+            address interopHandler = address(new InteropHandler());
+            vm.etch(L2_INTEROP_HANDLER_ADDR, interopHandler.code);
+            // Initialize reentrancy guard for InteropHandler
+            _initializeReentrancyGuard(L2_INTEROP_HANDLER_ADDR);
+            address l2AssetTrackerAddress = address(new L2AssetTracker());
+            vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            L2AssetTracker(L2_ASSET_TRACKER_ADDR).setAddresses(_args.l1ChainId, bytes32(0));
+
+            // Deploy a real ERC20 token for the wrapped ZK token BEFORE setting up GWAssetTracker
+            TestnetERC20Token wrappedZKToken = new TestnetERC20Token("Wrapped ZK", "WZK", 18);
+            address wrappedZKTokenAddr = address(wrappedZKToken);
+
+            // Mock L2_NATIVE_TOKEN_VAULT.WETH_TOKEN() to return our token BEFORE setAddresses
+            vm.mockCall(
+                L2_NATIVE_TOKEN_VAULT_ADDR,
+                abi.encodeWithSelector(IL2NativeTokenVault.WETH_TOKEN.selector),
+                abi.encode(wrappedZKTokenAddr)
+            );
+
+            address gwAssetTrackerAddress = address(new GWAssetTracker());
+            vm.etch(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAddress.code);
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            GWAssetTracker(GW_ASSET_TRACKER_ADDR).setAddresses(_args.l1ChainId);
+
+            // Set a small settlement fee for testing fee collection logic
+            uint256 settlementFee = 0.001 ether; // Small fee for testing
+            vm.prank(GWAssetTracker(GW_ASSET_TRACKER_ADDR).owner());
+            GWAssetTracker(GW_ASSET_TRACKER_ADDR).setGatewaySettlementFee(settlementFee);
+        }
+    }
+
+    /// @notice Sets up token balances and approvals for chain operators to pay settlement fees
+    /// @param chainIds Array of chain IDs whose operators need token balances
+    function setupTokenBalancesForChainOperators(uint256[] memory chainIds) internal {
+        // Get the wrapped ZK token address directly from the GWAssetTracker
+        address wrappedZKTokenAddr = address(GWAssetTracker(GW_ASSET_TRACKER_ADDR).wrappedZKToken());
+
+        if (wrappedZKTokenAddr == address(0)) {
+            return; // No token set up, skip
+        }
+
+        TestnetERC20Token wrappedZKToken = TestnetERC20Token(wrappedZKTokenAddr);
+        uint256 tokenAmount = 1000 ether; // Plenty of tokens for testing
+
+        for (uint256 i = 0; i < chainIds.length; i++) {
+            address chainOperator = L2Bridgehub(L2_BRIDGEHUB_ADDR).getZKChain(chainIds[i]);
+            if (chainOperator != address(0)) {
+                // Mint tokens to the chain operator
+                wrappedZKToken.mint(chainOperator, tokenAmount);
+
+                // Approve GWAssetTracker to spend tokens on behalf of the chain operator
+                vm.prank(chainOperator);
+                wrappedZKToken.approve(GW_ASSET_TRACKER_ADDR, type(uint256).max);
+            }
+        }
+    }
+
+    /// @notice Initialize reentrancy guard for a contract
+    /// @dev This sets the reentrancy guard storage slot to 1 (NOT_ENTERED state)
+    function _initializeReentrancyGuard(address contractAddr) internal {
+        vm.store(contractAddr, REENTRANCY_GUARD_STORAGE_SLOT, bytes32(uint256(1)));
     }
 }

@@ -18,7 +18,7 @@ abstract contract L2InteropExecuteBundleTestAbstract is L2InteropTestUtils {
         vm.deal(address(this), 1000 ether);
         vm.recordLogs();
 
-        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100);
+        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100, false);
         Vm.Log[] memory logs1 = vm.getRecordedLogs();
         bytes memory logsData = extractFirstBundleFromLogs(logs1);
         (bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle memory interopBundle) = abi.decode(

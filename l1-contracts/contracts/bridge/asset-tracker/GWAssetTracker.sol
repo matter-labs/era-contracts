@@ -772,17 +772,27 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
 
         // Must be an interop bundle message (starts with BUNDLE_IDENTIFIER)
-        if (_message.length <= 32 || bytes32(_message[:32]) != BUNDLE_IDENTIFIER) {
+        if (_message.length <= 0 || _message[0] != BUNDLE_IDENTIFIER) {
             return 0;
         }
 
         // Decode the bundle to check fee payment status
-        bytes memory bundleData = _message[32:];
+        bytes memory bundleData = _message[1:];
         InteropBundle memory bundle = abi.decode(bundleData, (InteropBundle));
 
         // Validate this bundle is from the correct source chain
         if (bundle.sourceChainId != _chainId) {
             return 0;
+        }
+
+        // If bundle has no calls, return 0
+        if (bundle.calls.length == 0) {
+            return 0;
+        }
+
+        // Check if bundle uses fixed fees - if so, no gateway settlement fees apply
+        if (bundle.bundleAttributes.useFixedFee) {
+            return 0; // No settlement fees for fixed fee calls
         }
 
         // Return the number of calls in the bundle for per-call fee calculation
