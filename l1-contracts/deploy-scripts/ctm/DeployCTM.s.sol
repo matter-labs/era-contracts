@@ -40,6 +40,7 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 
@@ -250,7 +251,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         if (config.isZKsyncOS) {
             rollupDAManager.updateDAPair(
                 addresses.daAddresses.l1BlobsDAValidatorZKsyncOS,
-                getRollupL2DACommitmentScheme(),
+                L2DACommitmentScheme.BLOBS_ZKSYNC_OS,
                 true
             );
         }
@@ -349,19 +350,21 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
         vm.serializeAddress(
             "deployed_addresses",
-            "rollup_l1_da_validator_addr",
-            addresses.daAddresses.l1RollupDAValidator
-        );
-        vm.serializeAddress(
-            "deployed_addresses",
             "no_da_validium_l1_validator_addr",
             addresses.daAddresses.noDAValidiumL1DAValidator
         );
         if (config.isZKsyncOS) {
+            // FIXME: use another field for ZKsyncOS blobs DA validator
             vm.serializeAddress(
                 "deployed_addresses",
-                "blobs_zksync_os_l1_da_validator_addr",
+                "rollup_l1_da_validator_addr",
                 addresses.daAddresses.l1BlobsDAValidatorZKsyncOS
+            );
+        } else {
+            vm.serializeAddress(
+                "deployed_addresses",
+                "rollup_l1_da_validator_addr",
+                addresses.daAddresses.l1RollupDAValidator
             );
         }
         vm.serializeAddress(
