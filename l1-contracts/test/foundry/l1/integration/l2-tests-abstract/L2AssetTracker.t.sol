@@ -105,9 +105,15 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
 
             vm.prank(L2_BRIDGEHUB.getZKChain(testData[i].chainId));
 
-            (bool success, ) = GW_ASSET_TRACKER_ADDR.call(
+            (bool success, bytes memory data) = GW_ASSET_TRACKER_ADDR.call(
                 abi.encodeCall(GW_ASSET_TRACKER.processLogsAndMessages, testData[i])
             );
+
+            if (!success) {
+                assembly {
+                    revert(add(data, 0x20), mload(data))
+                }
+            }
 
             require(success, string.concat("Failed to call GWAssetTracker ", vm.toString(i)));
             console.log("success", i);

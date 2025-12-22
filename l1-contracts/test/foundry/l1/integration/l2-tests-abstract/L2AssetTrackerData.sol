@@ -133,7 +133,7 @@ library L2AssetTrackerData {
                 isService: true,
                 txNumberInBatch: 2,
                 sender: 0x0000000000000000000000000000000000008008,
-                key: 0x000000000000000000000000000000000000000000000000000000000001000c,
+                key: 0x0000000000000000000000000000000000000000000000000000000000010010,
                 value: 0x5ee7fcf8302406f5bdfe9904379b5f6d6895cce5a0dd3b19b0bc148120bf662c
             });
             bytes[] memory messages1 = new bytes[](1);
@@ -398,7 +398,7 @@ library L2AssetTrackerData {
                 isService: true,
                 txNumberInBatch: 0,
                 sender: 0x0000000000000000000000000000000000008008,
-                key: 0x000000000000000000000000000000000000000000000000000000000001000c,
+                key: 0x0000000000000000000000000000000000000000000000000000000000010010,
                 value: 0x82c5000834b4778afdbe040aef4f3329636b3d085d7ce6992f93f87541aff8fc
             });
             j = 0;
@@ -508,7 +508,7 @@ library L2AssetTrackerData {
                 isService: true,
                 txNumberInBatch: 2,
                 sender: 0x0000000000000000000000000000000000008008,
-                key: 0x000000000000000000000000000000000000000000000000000000000001000c,
+                key: 0x0000000000000000000000000000000000000000000000000000000000010010,
                 value: 0x5edef2810a95cec7f08b758bdd9e808b9d81bc5bb9778ddd821a2cd31b731dab
             });
             j = 0;
