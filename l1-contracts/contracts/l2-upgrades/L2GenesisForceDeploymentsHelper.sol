@@ -209,7 +209,7 @@ library L2GenesisForceDeploymentsHelper {
         bool _isGenesisUpgrade,
         bool _isZKsyncOS
     ) private {
-        if (!_isZKsyncOS) {
+        if (!(_isZKsyncOS && _isGenesisUpgrade)) {
             conductContractUpgrade(
                 expectedUpgradeType,
                 fixedForceDeploymentsData.messageRootBytecodeInfo,
@@ -225,7 +225,7 @@ library L2GenesisForceDeploymentsHelper {
             );
         }
 
-        if (!_isZKsyncOS) {
+        if (!(_isZKsyncOS && _isGenesisUpgrade)) {
             conductContractUpgrade(
                 expectedUpgradeType,
                 fixedForceDeploymentsData.bridgehubBytecodeInfo,
@@ -250,7 +250,7 @@ library L2GenesisForceDeploymentsHelper {
         address l2LegacySharedBridge = _isGenesisUpgrade
             ? address(0)
             : address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
-        if (!_isZKsyncOS) {
+        if (!(_isZKsyncOS && _isGenesisUpgrade)) {
             conductContractUpgrade(
                 expectedUpgradeType,
                 fixedForceDeploymentsData.l2AssetRouterBytecodeInfo,
@@ -303,7 +303,7 @@ library L2GenesisForceDeploymentsHelper {
             _baseTokenSymbol: additionalForceDeploymentsData.baseTokenMetadata.symbol
         });
 
-        if (!_isZKsyncOS) {
+        if (!(_isZKsyncOS && _isGenesisUpgrade)) {
             // Now initializing the upgradeable token beacon
             conductContractUpgrade(
                 expectedUpgradeType,
@@ -356,7 +356,7 @@ library L2GenesisForceDeploymentsHelper {
             );
         }
 
-        if (!_isZKsyncOS) {
+        if (!(_isZKsyncOS && _isGenesisUpgrade)) {
             conductContractUpgrade(
                 expectedUpgradeType,
                 fixedForceDeploymentsData.chainAssetHandlerBytecodeInfo,
@@ -380,7 +380,7 @@ library L2GenesisForceDeploymentsHelper {
                 L2_MESSAGE_ROOT_ADDR
             );
         }
-        if (!_isZKsyncOS) {
+        if (!(_isZKsyncOS && _isGenesisUpgrade)) {
             conductContractUpgrade(
                 expectedUpgradeType,
                 fixedForceDeploymentsData.assetTrackerBytecodeInfo,
@@ -399,7 +399,7 @@ library L2GenesisForceDeploymentsHelper {
                 fixedForceDeploymentsData.aliasedL1Governance
             );
         }
-        if (!_isZKsyncOS) {
+        if (!(_isZKsyncOS && _isGenesisUpgrade)) {
             conductContractUpgrade(
                 expectedUpgradeType,
                 fixedForceDeploymentsData.interopHandlerBytecodeInfo,
