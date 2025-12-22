@@ -131,7 +131,7 @@ contract EcosystemUpgrade_v30_1_zk_os is Script, DefaultEcosystemUpgrade {
         string memory toml = vm.readFile(fullPath);
 
         sampleChainId = toml.readUint("$.zksync_os.sample_chain_id");
-        
+
         // We want to save old facets to reuse it for setting chain params as this upgrade only changes
         // the verifier contract.
         addresses.stateTransition.adminFacet = toml.readAddress("$.state_transition.admin_facet_addr");

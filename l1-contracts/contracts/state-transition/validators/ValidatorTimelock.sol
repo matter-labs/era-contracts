@@ -274,7 +274,7 @@ contract ValidatorTimelock is
 
     /// @inheritdoc IValidatorTimelock
     function activatePriorityMode() external override {
-        revert  ActivatePriorityModeNotImplelemtedInValidatorContract();
+        revert ActivatePriorityModeNotImplelemtedInValidatorContract();
     }
 
     /// @dev Call the zkChain diamond contract with the same calldata as this contract was called.

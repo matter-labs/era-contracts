@@ -244,5 +244,4 @@ struct ZKChainStorage {
     /// @dev Timestamp when a priority tx request was made for the specified tx index from priorityTree.
     /// @dev STORAGE SLOT: 66
     mapping(uint256 => uint256) priorityOpsRequestTimestamp;
-
 }

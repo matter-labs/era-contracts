@@ -8,13 +8,13 @@ import {IExecutor} from "../chain-interfaces/IExecutor.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Smart contract used as an entry point for settling batches in Priority Mode.
 /// It allows anyone to commit, prove, and execute batches in one go.
-/// 
+///
 /// @dev The smart contract is intended to be used for Stage 1 ZK chains when their operators
-/// fail to process priority transactions and priority mode is activated. 
+/// fail to process priority transactions and priority mode is activated.
 /// The chain contract is responsible for enforcing proper access control
 /// (i.e., ensuring that only this contract can settle batches after Priority Mode is entered).
 contract PermissionlessValidator is ReentrancyGuard {
-    constructor() reentrancyGuardInitializer { }
+    constructor() reentrancyGuardInitializer {}
 
     /// @notice Commit, prove, and execute the same batch range atomically.
     /// @param _chainAddress The ZKsync chain contract address where to settle batches.
@@ -31,8 +31,23 @@ contract PermissionlessValidator is ReentrancyGuard {
         bytes calldata _proveData,
         bytes calldata _executeData
     ) external nonReentrant {
-        IExecutor(_chainAddress).commitBatchesSharedBridge(_chainAddress, _processBatchFrom, _processBatchTo, _commitData);
-        IExecutor(_chainAddress).proveBatchesSharedBridge(_chainAddress, _processBatchFrom, _processBatchTo, _proveData);
-        IExecutor(_chainAddress).executeBatchesSharedBridge(_chainAddress, _processBatchFrom, _processBatchTo, _executeData);
+        IExecutor(_chainAddress).commitBatchesSharedBridge(
+            _chainAddress,
+            _processBatchFrom,
+            _processBatchTo,
+            _commitData
+        );
+        IExecutor(_chainAddress).proveBatchesSharedBridge(
+            _chainAddress,
+            _processBatchFrom,
+            _processBatchTo,
+            _proveData
+        );
+        IExecutor(_chainAddress).executeBatchesSharedBridge(
+            _chainAddress,
+            _processBatchFrom,
+            _processBatchTo,
+            _executeData
+        );
     }
 }
