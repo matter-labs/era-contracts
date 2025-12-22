@@ -10,7 +10,7 @@ pub const L2_WRAPPED_BASE_TOKEN: Address = Address(FixedBytes::<20>(hex_literal:
     "0000000000000000000000000000000000010007"
 )));
 pub const SYSTEM_CONTRACT_PROXY_ADMIN: Address = Address(FixedBytes::<20>(hex_literal::hex!(
-    "0000000000000000000000000000000000010010"
+    "000000000000000000000000000000000001000c"
 )));
 
 pub const L2_MESSAGE_ROOT_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
@@ -42,7 +42,7 @@ pub const L2_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal:
 )));
 
 pub const L2_INTEROP_CENTER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
-    "000000000000000000000000000000000001000c"
+    "0000000000000000000000000000000000010010"
 )));
 
 pub const L2_INTEROP_HANDLER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(

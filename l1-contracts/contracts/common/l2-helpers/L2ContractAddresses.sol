@@ -126,7 +126,7 @@ IChainAssetHandler constant L2_CHAIN_ASSET_HANDLER = IChainAssetHandler(L2_CHAIN
 address constant L2_NTV_BEACON_DEPLOYER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0b);
 
 /// @dev the address of the L2 interop center
-address constant L2_INTEROP_CENTER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0c);
+address constant L2_INTEROP_CENTER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x10);
 IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(L2_INTEROP_CENTER_ADDR);
 
 /// @dev the address of the L2 interop handler
@@ -142,4 +142,4 @@ address constant GW_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0
 IGWAssetTracker constant GW_ASSET_TRACKER = IGWAssetTracker(GW_ASSET_TRACKER_ADDR);
 
 /// @dev the address of the L2 system contract proxy admin
-address constant L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x10);
+address constant L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0c);
