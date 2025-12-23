@@ -143,7 +143,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         if (reuseGovAndAdmin) {
             addresses.governance = IOwnable(bridgehub).owner();
             addresses.chainAdmin = bridgehubProxy.admin();
-            addresses.transparentProxyAdmin = Utils.getProxyAdmin(bridgehub);
+            addresses.transparentProxyAdmin = Utils.getProxyAdminAddress(bridgehub);
         } else {
             (addresses.governance) = deploySimpleContract("Governance", false);
             (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);

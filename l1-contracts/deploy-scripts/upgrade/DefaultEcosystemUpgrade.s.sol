@@ -1228,7 +1228,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
     }
 
     function prepareUpgradeServerNotifierCall() public virtual returns (Call[] memory calls) {
-        address serverNotifierProxyAdmin = Utils.getProxyAdmin(addresses.stateTransition.serverNotifierProxy);
+        address serverNotifierProxyAdmin = Utils.getProxyAdminAddress(addresses.stateTransition.serverNotifierProxy);
 
         Call memory call = Call({
             target: serverNotifierProxyAdmin,
