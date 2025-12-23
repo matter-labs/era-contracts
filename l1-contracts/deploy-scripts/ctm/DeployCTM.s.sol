@@ -61,7 +61,7 @@ import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2G
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 // TODO: pass this value from zkstack_cli
-uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 5;
+uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 6;
 
 contract DeployCTMScript is Script, DeployCTMUtils {
     using stdToml for string;

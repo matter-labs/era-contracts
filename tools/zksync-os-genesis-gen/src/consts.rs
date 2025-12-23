@@ -67,6 +67,10 @@ pub const EIP1967_ADMIN_SLOT: B256 = FixedBytes::<32>(hex_literal::hex!(
     "b53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103"
 ));
 
+const L2_INTEROP_ROOT_STORAGE: Address = Address(FixedBytes::<20>(hex_literal::hex!("0000000000000000000000000000000000010008")));
+const L2_MESSAGE_VERIFICATION: Address = Address(FixedBytes::<20>(hex_literal::hex!("0000000000000000000000000000000000010009")));
+
+// FIXME: consider reducing the size of the genesis by deploying those inside L2GensisUpgrade
 pub const INITIAL_CONTRACTS: [(Address, &str); 15] = [
     (L2_COMPLEX_UPGRADER_ADDR, "SystemContractProxy"),
     (L2_GENESIS_UPGRADE, "L2GenesisUpgrade"),
@@ -83,4 +87,6 @@ pub const INITIAL_CONTRACTS: [(Address, &str); 15] = [
     (GW_ASSET_TRACKER_ADDR, "GWAssetTracker"),
     (L2_INTEROP_CENTER_ADDR, "InteropCenter"),
     (L2_INTEROP_HANDLER_ADDR, "InteropHandler"),
+    (L2_INTEROP_ROOT_STORAGE, "L2InteropRootStorage"),
+    (L2_MESSAGE_VERIFICATION, "L2MessageVerification")
 ];
