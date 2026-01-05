@@ -174,20 +174,20 @@ library L2GenesisForceDeploymentsHelper {
             : IComplexUpgrader.ContractUpgradeType.EraForceDeployment;
 
         _setupProxyAdmin();
-        _deployCoreContracts(
-            expectedUpgradeType,
-            fixedForceDeploymentsData,
-            additionalForceDeploymentsData,
-            _isGenesisUpgrade,
-            _isZKsyncOS
-        );
-        _deployTokenInfrastructure(
-            expectedUpgradeType,
-            fixedForceDeploymentsData,
-            additionalForceDeploymentsData,
-            _isGenesisUpgrade,
-            _isZKsyncOS
-        );
+        _deployCoreContracts({
+            expectedUpgradeType: expectedUpgradeType,
+            fixedForceDeploymentsData: fixedForceDeploymentsData,
+            additionalForceDeploymentsData: additionalForceDeploymentsData,
+            _isGenesisUpgrade: _isGenesisUpgrade,
+            _isZKsyncOS: _isZKsyncOS
+        });
+        _deployTokenInfrastructure({
+            expectedUpgradeType: expectedUpgradeType,
+            fixedForceDeploymentsData: fixedForceDeploymentsData,
+            additionalForceDeploymentsData: additionalForceDeploymentsData,
+            _isGenesisUpgrade: _isGenesisUpgrade,
+            _isZKsyncOS: _isZKsyncOS
+        });
         _finalizeDeployments(_ctmDeployer, fixedForceDeploymentsData, additionalForceDeploymentsData);
     }
 
