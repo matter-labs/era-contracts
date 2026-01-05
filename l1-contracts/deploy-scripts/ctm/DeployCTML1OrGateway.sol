@@ -14,7 +14,7 @@ struct CTMCoreDeploymentConfig {
     address eip7702Checker;
     address verifierFflonk;
     address verifierPlonk;
-    address ownerAddress;
+    address verifierOwner;
 }
 
 enum CTMContract {
@@ -55,7 +55,7 @@ library DeployCTML1OrGateway {
         } else if (contractName == CTMContract.Verifier) {
             if (config.testnetVerifier) {
                 if (config.isZKsyncOS) {
-                    return abi.encode(config.verifierFflonk, config.verifierPlonk, msg.sender);
+                    return abi.encode(config.verifierFflonk, config.verifierPlonk, config.verifierOwner);
                 } else {
                     return abi.encode(config.verifierFflonk, config.verifierPlonk);
                 }
@@ -104,7 +104,7 @@ library DeployCTML1OrGateway {
         }
     }
 
-    function compareStrings(string memory a, string memory b) public pure returns (bool) {
+    function compareStrings(string memory a, string memory b) private view returns (bool) {
         return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 }

@@ -26,12 +26,8 @@ contract L2InteropRootStorage {
     /// @param blockOrBatchNumber The block or batch number of the message root. Either of block number or batch number will be used,
     /// depends on finality form of interop, mentioned above.
     /// @param sides The message root sides. Note, that `sides` here are coming from `DynamicIncrementalMerkle` nomenclature.
-    /// @dev FIXME: for the demo purposes, remove onlyCallFromBootloader modifier 
-    function addInteropRoot(
-        uint256 chainId,
-        uint256 blockOrBatchNumber,
-        bytes32[] calldata sides
-    ) external {
+    /// @dev FIXME: for the demo purposes, remove onlyCallFromBootloader modifier
+    function addInteropRoot(uint256 chainId, uint256 blockOrBatchNumber, bytes32[] calldata sides) external {
         // In the current code sides should only contain the Interop Root itself, as mentioned above.
         if (sides.length != 1) {
             revert SidesLengthNotOne();

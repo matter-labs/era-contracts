@@ -209,6 +209,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
                 IVerifierV2(addresses.stateTransition.verifierFflonk),
                 IVerifier(addresses.stateTransition.verifierPlonk)
             );
+            ZKsyncOSDualVerifier(addresses.stateTransition.verifier).transferOwnership(config.ownerAddress);
             vm.stopBroadcast();
         }
     }
@@ -353,20 +354,16 @@ contract DeployCTMScript is Script, DeployCTMUtils {
             "no_da_validium_l1_validator_addr",
             addresses.daAddresses.noDAValidiumL1DAValidator
         );
-        if (config.isZKsyncOS) {
-            // FIXME: use another field for ZKsyncOS blobs DA validator
-            vm.serializeAddress(
-                "deployed_addresses",
-                "rollup_l1_da_validator_addr",
-                addresses.daAddresses.l1BlobsDAValidatorZKsyncOS
-            );
-        } else {
-            vm.serializeAddress(
-                "deployed_addresses",
-                "rollup_l1_da_validator_addr",
-                addresses.daAddresses.l1RollupDAValidator
-            );
-        }
+        vm.serializeAddress(
+            "deployed_addresses",
+            "blobs_zksync_os_l1_da_validator_addr",
+            addresses.daAddresses.l1BlobsDAValidatorZKsyncOS
+        );
+        vm.serializeAddress(
+            "deployed_addresses",
+            "rollup_l1_da_validator_addr",
+            addresses.daAddresses.l1RollupDAValidator
+        );
         vm.serializeAddress(
             "deployed_addresses",
             "avail_l1_da_validator_addr",
@@ -417,6 +414,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts", contracts);
+        vm.serializeBool("root", "is_zk_sync_os", config.isZKsyncOS);
         string memory toml = vm.serializeString("root", "contracts_config", contractsConfig);
         vm.writeToml(toml, outputPath);
     }

@@ -174,20 +174,20 @@ library L2GenesisForceDeploymentsHelper {
             : IComplexUpgrader.ContractUpgradeType.EraForceDeployment;
 
         _setupProxyAdmin();
-        _deployCoreContracts(
-            expectedUpgradeType,
-            fixedForceDeploymentsData,
-            additionalForceDeploymentsData,
-            _isGenesisUpgrade,
-            _isZKsyncOS
-        );
-        _deployTokenInfrastructure(
-            expectedUpgradeType,
-            fixedForceDeploymentsData,
-            additionalForceDeploymentsData,
-            _isGenesisUpgrade,
-            _isZKsyncOS
-        );
+        _deployCoreContracts({
+            expectedUpgradeType: expectedUpgradeType,
+            fixedForceDeploymentsData: fixedForceDeploymentsData,
+            additionalForceDeploymentsData: additionalForceDeploymentsData,
+            _isGenesisUpgrade: _isGenesisUpgrade,
+            _isZKsyncOS: _isZKsyncOS
+        });
+        _deployTokenInfrastructure({
+            expectedUpgradeType: expectedUpgradeType,
+            fixedForceDeploymentsData: fixedForceDeploymentsData,
+            additionalForceDeploymentsData: additionalForceDeploymentsData,
+            _isGenesisUpgrade: _isGenesisUpgrade,
+            _isZKsyncOS: _isZKsyncOS
+        });
         _finalizeDeployments(_ctmDeployer, fixedForceDeploymentsData, additionalForceDeploymentsData);
     }
 
@@ -209,6 +209,8 @@ library L2GenesisForceDeploymentsHelper {
         bool _isGenesisUpgrade,
         bool _isZKsyncOS
     ) private {
+        // During the genesis of zksync os. Contracts has been already deployed and initialized.
+        // It's not necessary to redeploy or reinitialize them.
         if (!(_isZKsyncOS && _isGenesisUpgrade)) {
             conductContractUpgrade(
                 expectedUpgradeType,
@@ -225,6 +227,8 @@ library L2GenesisForceDeploymentsHelper {
             );
         }
 
+        // During the genesis of zksync os. Contracts has been already deployed and initialized.
+        // It's not necessary to redeploy or reinitialize them.
         if (!(_isZKsyncOS && _isGenesisUpgrade)) {
             conductContractUpgrade(
                 expectedUpgradeType,
@@ -250,6 +254,9 @@ library L2GenesisForceDeploymentsHelper {
         address l2LegacySharedBridge = _isGenesisUpgrade
             ? address(0)
             : address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
+
+        // During the genesis of zksync os. Contracts has been already deployed and initialized.
+        // It's not necessary to redeploy or reinitialize them.
         if (!(_isZKsyncOS && _isGenesisUpgrade)) {
             conductContractUpgrade(
                 expectedUpgradeType,

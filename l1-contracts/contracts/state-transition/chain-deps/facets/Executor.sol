@@ -816,10 +816,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         //         GW_ASSET_TRACKER.processLogsAndMessages(processLogsInput);
         //     }
         // } else {
-            uint256 batchesDataLength = batchesData.length;
-            for (uint256 i = 0; i < batchesDataLength; i = i.uncheckedInc()) {
-                _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
-            }
+        uint256 batchesDataLength = batchesData.length;
+        for (uint256 i = 0; i < batchesDataLength; i = i.uncheckedInc()) {
+            _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
+        }
         // }
 
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
