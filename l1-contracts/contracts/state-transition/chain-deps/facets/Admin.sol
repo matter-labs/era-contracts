@@ -15,7 +15,7 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAssetHandler.sol";
-import {AlreadyMigrated, PriorityQueueNotFullyProcessed, TotalPriorityTxsIsZero, ContractNotDeployed, DepositsAlreadyPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted, MigrationInProgress} from "../../L1StateTransitionErrors.sol";
+import {AlreadyMigrated, PriorityQueueNotFullyProcessed, TotalPriorityTxsIsZero, ContractNotDeployed, DepositsAlreadyPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted, MigrationInProgress, PriorityModeAlreadyAllowed} from "../../L1StateTransitionErrors.sol";
 import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, NotAZKChain, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
@@ -224,6 +224,15 @@ contract AdminFacet is ZKChainBase, IAdmin {
         }
 
         s.isPermanentRollup = true;
+    }
+
+    /// @inheritdoc IAdmin
+    function allowPriorityMode() external onlyChainTypeManager onlyL1 {
+        if (s.priorityModeInfo.canBeActivated) {
+            revert PriorityModeAlreadyAllowed();
+        }
+        s.priorityModeInfo.canBeActivated = true;
+        emit PriorityModeAllowed();
     }
 
     /// @inheritdoc IAdmin

@@ -14,7 +14,7 @@ import {GW_ASSET_TRACKER, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_SYSTEM_CONTRA
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {BatchHashMismatch, BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, EmptyPrecommitData, HashMismatch, IncorrectBatchChainId, InvalidBatchNumber, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidPackedPrecommitmentLength, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, PrecommitmentMismatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches, NonZeroBlobToVerifyZKsyncOS, InvalidBlockRange, PriorityOpsRequestTimestampMissing, PriorityModeActivationTooEarly, InvalidL2TxCountInPriorityMode} from "../../../common/L1ContractErrors.sol";
+import {BatchHashMismatch, BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, EmptyPrecommitData, HashMismatch, IncorrectBatchChainId, InvalidBatchNumber, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidPackedPrecommitmentLength, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, PrecommitmentMismatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches, NonZeroBlobToVerifyZKsyncOS, InvalidBlockRange, PriorityOpsRequestTimestampMissing, PriorityModeActivationTooEarly, InvalidL2TxCountInPriorityMode, PriorityModeIsNotAllowed} from "../../../common/L1ContractErrors.sol";
 import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MessageRootIsZero, MismatchL2DACommitmentScheme, MismatchNumberOfLayer1Txs, SettlementLayerChainIdMismatch} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -938,6 +938,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     /// @inheritdoc IExecutor
     function activatePriorityMode() external onlySettlementLayer notPriorityMode {
+        if (!s.priorityModeInfo.canBeActivated) {
+            revert PriorityModeIsNotAllowed();
+        }
         uint256 firstUnprocessedTx = s.priorityTree.getFirstUnprocessedPriorityTx();
         uint256 unprocessedTxRequestedAt = s.priorityOpsRequestTimestamp[firstUnprocessedTx];
         if (unprocessedTxRequestedAt == 0) {

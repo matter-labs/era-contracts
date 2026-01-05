@@ -53,8 +53,10 @@ struct FeeParams {
 }
 
 /// @notice Stores the current Priority Mode (escape hatch) configuration.
+/// @dev Only when `canBeActivated` is true, it is possible to enter Priority Mode.
 /// @dev When `activated` is true, privileged actions are restricted to `permissionlessValidator`.
 struct PriorityModeInformation {
+    bool canBeActivated;
     bool activated;
     address permissionlessValidator;
 }
@@ -238,7 +240,7 @@ struct ZKChainStorage {
     /// @dev Timestamp when deposits were paused for chain migration to/from Gateway. 0 = not paused.
     /// @dev STORAGE SLOT: 64
     uint256 pausedDepositsTimestamp;
-    /// @dev Information required in the priority mode packed in one storage slot.
+    /// @dev Information required in the Priority Mode packed in one storage slot.
     /// @dev STORAGE SLOT: 65
     PriorityModeInformation priorityModeInfo;
     /// @dev Timestamp when a priority tx request was made for the specified tx index from priorityTree.
