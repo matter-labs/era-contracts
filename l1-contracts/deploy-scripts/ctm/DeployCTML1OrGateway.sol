@@ -14,7 +14,7 @@ struct CTMCoreDeploymentConfig {
     address eip7702Checker;
     address verifierFflonk;
     address verifierPlonk;
-    address ownerAddress;
+    address verfierOwner;
 }
 
 enum CTMContract {
@@ -55,7 +55,7 @@ library DeployCTML1OrGateway {
         } else if (contractName == CTMContract.Verifier) {
             if (config.testnetVerifier) {
                 if (config.isZKsyncOS) {
-                    return abi.encode(config.verifierFflonk, config.verifierPlonk, msg.sender);
+                    return abi.encode(config.verifierFflonk, config.verifierPlonk, config.verfierOwner);
                 } else {
                     return abi.encode(config.verifierFflonk, config.verifierPlonk);
                 }

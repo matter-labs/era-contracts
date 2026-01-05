@@ -130,7 +130,7 @@ library GatewayCTMDeployerHelper {
                 eip7702Checker: address(0),
                 verifierFflonk: _deployedContracts.stateTransition.verifierFflonk,
                 verifierPlonk: _deployedContracts.stateTransition.verifierPlonk,
-                ownerAddress: _config.aliasedGovernanceAddress
+                verfierOwner: _config.aliasedGovernanceAddress
             });
     }
 

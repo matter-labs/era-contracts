@@ -467,7 +467,9 @@ abstract contract DeployCTMUtils is DeployUtils {
                 eip7702Checker: addresses.eip7702Checker,
                 verifierFflonk: addresses.stateTransition.verifierFflonk,
                 verifierPlonk: addresses.stateTransition.verifierPlonk,
-                ownerAddress: config.ownerAddress
+                // For L1 deployment we need to use the deployer as the owner of the verifier,
+                // because we set the dual verifier later
+                verfierOwner: msg.sender
             });
     }
 
