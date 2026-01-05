@@ -436,6 +436,8 @@ error PriorityModeActivationTooEarly(uint256 earliestActivationTimestamp, uint25
 error OnlyNormalMode();
 // 0xdda650de
 error ActivatePriorityModeNotImplelemtedInValidatorContract();
+// 0x7833d1cd
+error InvalidL2TxCountInPriorityMode(uint256 l2TxCount);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

@@ -26,6 +26,7 @@ enum SystemLogKey {
 
 struct LogProcessingOutput {
     uint256 numberOfLayer1Txs;
+    uint256 numberOfLayer2Txs;
     bytes32 chainedPriorityTxsHash;
     bytes32 previousBatchHash;
     bytes32 pubdataHash;
