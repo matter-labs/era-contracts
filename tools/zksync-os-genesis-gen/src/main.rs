@@ -23,7 +23,11 @@ fn main() -> anyhow::Result<()> {
     let opt = Opt::from_args();
     println!("Output file: {}", opt.output_file);
 
-    let genesis = update_local_genesis()?;
+    let mut genesis = update_local_genesis()?;
+    if let Some(execution_version) = opt.execution_version {
+        println!("Setting execution version to {}", execution_version);
+        genesis.execution_version = execution_version;
+    }
 
     let json = serde_json::to_string_pretty(&genesis)?;
     std::fs::write(PATH_TO_LOCAL_GENESIS, &json)?;

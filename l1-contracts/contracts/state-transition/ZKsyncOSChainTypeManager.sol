@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {ChainTypeManagerBase} from "./ChainTypeManagerBase.sol";
 import {Diamond} from "./libraries/Diamond.sol";
 import {ChainCreationParams} from "./IChainTypeManager.sol";
-import {GenesisBatchHashZero, GenesisUpgradeZero} from "../common/L1ContractErrors.sol";
+import {GenesisBatchHashZero, GenesisBatchCommitmentIncorrect, GenesisUpgradeZero} from "../common/L1ContractErrors.sol";
 
 /// @title ZKsync OS Chain Type Manager contract
 /// @author Matter Labs
@@ -20,7 +20,10 @@ contract ZKsyncOSChainTypeManager is ChainTypeManagerBase {
         // Validate common parameters
         _validateChainCreationParams(_chainCreationParams);
 
-        // No additional validation needed for ZKsync OS
+        // For ZKsync OS, the genesis batch commitment must be equal to 1
+        if (_chainCreationParams.genesisBatchCommitment != bytes32(uint256(1))) {
+            revert GenesisBatchCommitmentIncorrect();
+        }
 
         // Process the validated parameters
         _processValidatedChainCreationParams(_chainCreationParams);
