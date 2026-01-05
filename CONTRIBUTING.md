@@ -33,7 +33,7 @@ license.
 We aim to make it as easy as possible to contribute to the mission. This is still WIP, and we're happy for contributions
 and suggestions here too. Some resources to help:
 
-1. [Docs aimed at developers](https://docs.zksync.io/zksync-protocol)
+1. [In-repo docs aimed at developers are stored in zksync-era repository.](https://github.com/matter-labs/zksync-era/blob/main/docs)
 2. [ZK Stack docs!](https://docs.zksync.io/zk-stack)
 3. Company links can be found in the [repo's readme](README.md)
 
