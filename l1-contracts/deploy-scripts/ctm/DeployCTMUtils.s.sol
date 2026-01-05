@@ -469,7 +469,7 @@ abstract contract DeployCTMUtils is DeployUtils {
                 verifierPlonk: addresses.stateTransition.verifierPlonk,
                 // For L1 deployment we need to use the deployer as the owner of the verifier,
                 // because we set the dual verifier later
-                verfierOwner: msg.sender
+                verifierOwner: msg.sender
             });
     }
 
