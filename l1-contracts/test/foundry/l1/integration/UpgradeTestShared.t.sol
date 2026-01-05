@@ -160,7 +160,7 @@ contract UpgradeIntegrationTestBase is Test {
             "$.deployed_addresses.state_transition.bytecodes_supplier_addr"
         );
         address l1Bridgehub = outputDeployL1Toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
-        bool isZKsyncOs = outputDeployCTMToml.readBool("$.is_zksync_os");
+        bool isZKsyncOs = outputDeployCTMToml.readBool("$.is_zk_sync_os");
 
         address rollupDAManager;
         if (isZKsyncOs) {

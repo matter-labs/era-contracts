@@ -414,7 +414,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts", contracts);
-        vm.serializeBool("root", "is_zksync_os", config.isZKsyncOS);
+        vm.serializeBool("root", "is_zk_sync_os", config.isZKsyncOS);
         string memory toml = vm.serializeString("root", "contracts_config", contractsConfig);
         vm.writeToml(toml, outputPath);
     }

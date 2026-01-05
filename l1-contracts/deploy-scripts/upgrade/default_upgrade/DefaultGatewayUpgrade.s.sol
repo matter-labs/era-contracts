@@ -178,7 +178,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         if (permanentValuesToml.keyExists("$.is_zk_sync_os")) {
             isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
         }
-        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParams(
+        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(
             chainCreationParamsPath(isZKsyncOS)
         );
 

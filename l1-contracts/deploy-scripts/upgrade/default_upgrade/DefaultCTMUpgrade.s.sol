@@ -222,7 +222,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         }
 
         PermanentCTMConfig memory permanentConfig = initializePermanentConfig(permanentValuesInputPath);
-        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParams(
+        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(
             chainCreationParamsPath(permanentConfig.isZKsyncOS)
         );
 

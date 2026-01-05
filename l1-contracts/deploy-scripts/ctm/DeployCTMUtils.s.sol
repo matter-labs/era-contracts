@@ -3,7 +3,8 @@ pragma solidity ^0.8.24;
 
 // solhint-disable no-console, gas-custom-errors
 
-import {console2 as console} from "forge-std/Script.sol";
+import {Script, console2 as console} from "forge-std/Script.sol";
+
 import {stdToml} from "forge-std/StdToml.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {stdJson} from "forge-std/StdJson.sol";
@@ -173,14 +174,14 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.contracts.validatorTimelockExecutionDelay = toml.readUint(
             "$.contracts.validator_timelock_execution_delay"
         );
-        config.contracts.chainCreationParams = getChainCreationParams(chainCreationParamsPath(config.isZKsyncOS));
+        config.contracts.chainCreationParams = getChainCreationParamsConfig(chainCreationParamsPath(config.isZKsyncOS));
 
         if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
             config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
         }
     }
 
-    function getChainCreationParams(
+    function getChainCreationParamsConfig(
         string memory _config
     ) internal virtual returns (ChainCreationParamsConfig memory chainCreationParams) {
         return ChainCreationParamsLib.getChainCreationParams(_config, config.isZKsyncOS);
