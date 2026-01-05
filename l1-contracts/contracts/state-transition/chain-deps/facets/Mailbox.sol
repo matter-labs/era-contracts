@@ -521,8 +521,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         // Checking that the user provided enough ether to pay for the transaction.
         _params.l2GasPrice = _deriveL2GasPrice(tx.gasprice, request.l2GasPerPubdataByteLimit);
         uint256 baseCost = _params.l2GasPrice * request.l2GasLimit;
-        if (request.mintValue < baseCost + request.l2Value) {
-            revert MsgValueTooLow(baseCost + request.l2Value, request.mintValue);
+        if (request.mintValue < baseCost) {
+            revert MsgValueTooLow(baseCost, request.mintValue);
         }
 
         bool is7702AccountRefundRecipient = false;
