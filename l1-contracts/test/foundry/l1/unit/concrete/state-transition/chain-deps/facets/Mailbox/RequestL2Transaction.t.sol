@@ -66,10 +66,9 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
 
         uint256 baseCost = mailboxFacet.l2TransactionBaseCost(10000000, 1000000, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
         uint256 l2Value = 1 ether;
-        uint256 mintValue = baseCost + l2Value;
 
-        vm.expectRevert(abi.encodeWithSelector(MsgValueTooLow.selector, mintValue, mintValue - 1));
-        mailboxFacet.requestL2Transaction{value: mintValue - 1}({
+        vm.expectRevert(abi.encodeWithSelector(MsgValueTooLow.selector, baseCost, baseCost - 1));
+        mailboxFacet.requestL2Transaction{value: baseCost - 1}({
             _contractL2: tempAddress,
             _l2Value: l2Value,
             _calldata: tempBytes,
