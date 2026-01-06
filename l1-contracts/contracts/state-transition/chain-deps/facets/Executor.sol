@@ -113,7 +113,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // When priority mode is activated, the batch must contain only priority transactions
         if (s.priorityModeInfo.activated && logOutput.numberOfLayer2Txs != 0) {
             revert InvalidL2TxCountInPriorityMode(logOutput.numberOfLayer2Txs);
-        } 
+        }
 
         // Create batch commitment for the proof verification
         (bytes32 metadataHash, bytes32 auxiliaryOutputHash, bytes32 commitment) = _createBatchCommitment(
@@ -948,7 +948,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
-    function activatePriorityMode() external onlySettlementLayer onlyL1 notPriorityMode {
+    function activatePriorityMode() external onlySettlementLayer onlyL1 notPriorityMode nonReentrant {
         if (!s.priorityModeInfo.canBeActivated) {
             revert PriorityModeIsNotAllowed();
         }
