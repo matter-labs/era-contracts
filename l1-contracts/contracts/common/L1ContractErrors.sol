@@ -440,6 +440,8 @@ error ActivatePriorityModeNotImplelemtedInValidatorContract();
 error InvalidL2TxCountInPriorityMode(uint256 l2TxCount);
 // 0xdbfcbbef
 error PriorityModeIsNotAllowed();
+// 0x7fdf8632
+error NotCompatibleWithPriorityMode();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
