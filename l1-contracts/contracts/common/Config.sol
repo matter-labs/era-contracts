@@ -39,8 +39,7 @@ uint256 constant ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE = 126;
 uint256 constant MAX_ALLOWED_MINOR_VERSION_DELTA = 100;
 
 /// @dev The amount of time in seconds the validator has to process the priority transaction
-/// NOTE: The constant is set to zero for the Alpha release period
-uint256 constant PRIORITY_EXPIRATION = 0 days;
+uint256 constant PRIORITY_EXPIRATION = 8 days;
 
 // @dev The chainId of Ethereum Mainnet
 uint256 constant MAINNET_CHAIN_ID = 1;
@@ -281,3 +280,7 @@ PubdataPricingMode constant DEFAULT_PUBDATA_PRICING_MODE = PubdataPricingMode.Ro
 
 /// @dev Default maximum gas limit for priority transactions during chain creation.
 uint64 constant DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
+
+/// @dev The mask that should be applied to the packed log data containing both the number of L2 and L1 transactions
+/// processed in the batch. Applying this mask is equivalent to calculating modulo 2**128.
+uint256 constant PACKED_NUMBER_OF_L1_TRANSACTIONS_LOG_MASK = 0xffffffffffffffffffffffffffffffff;

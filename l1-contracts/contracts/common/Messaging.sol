@@ -47,12 +47,10 @@ struct L2Message {
 /// @dev Internal structure that contains the parameters for the writePriorityOp internal function.
 /// @param txId The id of the priority transaction.
 /// @param l2GasPrice The gas price for the l2 priority operation.
-/// @param expirationTimestamp The timestamp by which the priority operation must be processed by the operator.
 /// @param request The external calldata request for the priority operation.
 struct WritePriorityOpParams {
     uint256 txId;
     uint256 l2GasPrice;
-    uint64 expirationTimestamp;
     BridgehubL2TransactionRequest request;
 }
 

@@ -1139,8 +1139,7 @@ object "Bootloader" {
                 // they were provided on L1. In the future, we may apply a new logic for it.
                 let gasPrice := getMaxFeePerGas(innerTxDataOffset)
                 let txInternalCost := safeMul(gasPrice, gasLimit, "poa")
-                let value := getValue(innerTxDataOffset)
-                if lt(getReserved0(innerTxDataOffset), safeAdd(value, txInternalCost, "ol")) {
+                if lt(getReserved0(innerTxDataOffset), txInternalCost) {
                     assertionError("deposited eth too low")
                 }
 
@@ -1187,25 +1186,13 @@ object "Bootloader" {
                 // Paying the fee to the operator
                 mintEther(BOOTLOADER_FORMAL_ADDR(), payToOperator, false)
 
-                let toRefundRecipient
-                switch success
-                case 0 {
-                    if iszero(isPriorityOp) {
-                        // Upgrade transactions must always succeed
-                        assertionError("Upgrade tx failed")
-                    }
-
-                    // If the transaction reverts, then minting the msg.value to the user has been reverted
-                    // as well, so we can simply mint everything that the user has deposited to
-                    // the refund recipient
-                    toRefundRecipient := safeSub(getReserved0(innerTxDataOffset), payToOperator, "vji")
+                if and(iszero(isPriorityOp), iszero(success)) {
+                    // Upgrade transactions must always succeed
+                    assertionError("Upgrade tx failed")
                 }
-                default {
-                    // If the transaction succeeds, then it is assumed that msg.value was transferred correctly. However, the remaining
-                    // ETH deposited will be given to the refund recipient.
 
-                    toRefundRecipient := safeSub(getReserved0(innerTxDataOffset), safeAdd(getValue(innerTxDataOffset), payToOperator, "kpa"), "ysl")
-                }
+                // Mint everything that the user has deposited to the refund recipient
+                let toRefundRecipient := safeSub(getReserved0(innerTxDataOffset), payToOperator, "vji")
 
                 if gt(toRefundRecipient, 0) {
                     let refundRecipient := getReserved1(innerTxDataOffset)
@@ -1229,6 +1216,10 @@ object "Bootloader" {
                     mstore(0, mload(PRIORITY_TXS_L1_DATA_BEGIN_BYTE()))
                     mstore(32, canonicalL1TxHash)
                     mstore(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), keccak256(0, 64))
+                    // PRIORITY_TXS_L1_DATA[1] packs two counters into one word:
+                    // - bits 0..127   : number of processed L1→L2 priority txs
+                    // - bits 128..255 : number of processed L2 txs
+                    // Increment the L1 counter (lower 128 bits) by adding 1.  
                     mstore(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32), add(mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)), 1))
                 } 
                 default {
@@ -1401,6 +1392,11 @@ object "Bootloader" {
 
                 notifyAboutRefund(refund)
                 mstore(resultPtr, success)
+                // PRIORITY_TXS_L1_DATA[1] packs two counters into one word:
+                // - bits 0..127   : number of processed L1→L2 priority txs
+                // - bits 128..255 : number of processed L2 txs
+                // Increment the L2 counter (upper 128 bits) by adding 1<<128.  
+                mstore(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32), add(mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)), TWO_POW_128()))
             }
 
             /// @dev Calculates the L2 gas limit for the transaction
@@ -2052,10 +2048,6 @@ object "Bootloader" {
 
                 debugLog("execution itself", 0)
 
-                let value := getValue(innerTxDataOffset)
-                if value {
-                    mintEther(from, value, true)
-                }
 
                 success := executeL1Tx(innerTxDataOffset, from)
 
@@ -2315,6 +2307,11 @@ object "Bootloader" {
             /// @dev Returns constant that is equal to `keccak256("")`
             function EMPTY_STRING_KECCAK() -> ret {
                 ret := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
+            }
+
+            /// @dev Returns constant that is equal to 2^128
+            function TWO_POW_128() -> ret {
+                ret := shl(128,1)
             }
 
             /// @dev Returns whether x <= y

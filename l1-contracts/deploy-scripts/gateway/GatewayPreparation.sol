@@ -18,7 +18,7 @@ import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS} from "../Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";

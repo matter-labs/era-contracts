@@ -24,7 +24,7 @@ import {IEIP7702Checker} from "../chain-interfaces/IEIP7702Checker.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {EraTestnetVerifier} from "../verifiers/EraTestnetVerifier.sol";
 import {ZKsyncOSTestnetVerifier} from "../verifiers/ZKsyncOSTestnetVerifier.sol";
-import {ValidatorTimelock} from "../ValidatorTimelock.sol";
+import {ValidatorTimelock} from "../validators/ValidatorTimelock.sol";
 
 import {DiamondInit} from "./DiamondInit.sol";
 import {L1GenesisUpgrade} from "../../upgrades/L1GenesisUpgrade.sol";

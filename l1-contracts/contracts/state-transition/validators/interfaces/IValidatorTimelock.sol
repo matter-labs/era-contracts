@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
-import {IExecutor} from "./chain-interfaces/IExecutor.sol";
+import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
+import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -140,4 +140,7 @@ interface IValidatorTimelock is IExecutor {
         uint256 _processBatchTo,
         bytes calldata _batchData
     ) external;
+    /// @dev Declared just to formally satisfy the inherited {IExecutor} interface.
+    /// NOTE: calls to this function revert in this contract.
+    function activatePriorityMode() external;
 }
