@@ -2,6 +2,8 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
+import {L2DACommitmentScheme} from "../Constants.sol";
+
 /// @dev The log passed from L2
 /// @param l2ShardId The shard identifier, 0 - rollup, 1 - porter. All other values are not used but are reserved for the future
 /// @param isService A boolean flag that is part of the log along with `key`, `value`, and `sender` address.
@@ -40,4 +42,10 @@ interface IL1Messenger {
 
     // This function is expected to be called only by the KnownCodesStorage system contract
     function requestBytecodeL1Publication(bytes32 _bytecodeHash) external;
+
+    // This function is expected to be called only by the Bootloader system contract
+    function publishPubdataAndClearState(
+        L2DACommitmentScheme _l2DACommitmentScheme,
+        bytes calldata _operatorInput
+    ) external;
 }

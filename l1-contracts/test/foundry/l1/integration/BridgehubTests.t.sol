@@ -5,8 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/console2.sol";
 
-import {IL1Bridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -19,12 +19,13 @@ import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
+
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
 
     bytes32 constant NEW_PRIORITY_REQUEST_HASH =
@@ -669,7 +670,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         return addressesToExclude;
     }
 
-    function prepare() public {
+    function prepare() public virtual {
         _generateUserAddresses();
 
         _deployL1Contracts();
@@ -677,12 +678,8 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         _registerNewTokens(tokens);
 
         _deployEra();
-        _deployZKChain(ETH_TOKEN_ADDRESS);
-        _deployZKChain(ETH_TOKEN_ADDRESS);
+        // _deployZKChain(ETH_TOKEN_ADDRESS);
         _deployZKChain(tokens[0]);
-        _deployZKChain(tokens[0]);
-        _deployZKChain(tokens[1]);
-        _deployZKChain(tokens[1]);
 
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
@@ -695,111 +692,3 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
     // add this to be excluded from coverage report
     function test() internal override {}
 }
-
-contract BoundedBridgeHubInvariantTests is BridgeHubInvariantTests {
-    function test_DepositEthBase7702() external {
-        prepare();
-        uint256 randomCallerPk = uint256(keccak256("RANDOM_CALLER"));
-        address payable randomCaller = payable(vm.addr(randomCallerPk));
-        currentUser = randomCaller;
-        uint256 l2Value = 100;
-        uint256 currentChainId = 10;
-        uint256 gasPrice = 10000000;
-        vm.txGasPrice(gasPrice);
-
-        simpleExecutor = new SimpleExecutor();
-
-        uint256 l2GasLimit = 1000000; // reverts with 8
-        uint256 minRequiredGas = _getMinRequiredGasPriceForChain(
-            currentChainId,
-            gasPrice,
-            l2GasLimit,
-            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-        );
-
-        uint256 mintValue = l2Value + minRequiredGas;
-        vm.deal(currentUser, mintValue);
-
-        bytes memory callData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
-        L2TransactionRequestDirect memory txRequest = _createL2TransactionRequestDirect({
-            _chainId: currentChainId,
-            _mintValue: mintValue,
-            _l2Value: l2Value,
-            _l2GasLimit: l2GasLimit,
-            _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _l2CallData: callData
-        });
-
-        bytes memory calldataForExecutor = abi.encodeWithSelector(
-            IL1Bridgehub.requestL2TransactionDirect.selector,
-            txRequest
-        );
-
-        vm.signAndAttachDelegation(address(simpleExecutor), randomCallerPk);
-        vm.recordLogs();
-        vm.prank(randomCaller);
-        SimpleExecutor(randomCaller).execute(address(addresses.bridgehub), mintValue, calldataForExecutor);
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-
-        NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
-
-        assertEq(currentUser, address(uint160(request.transaction.from)));
-        assertNotEq(request.txHash, bytes32(0));
-        _handleRequestByMockL2Contract(request, RequestType.DIRECT);
-
-        depositsUsers[currentUser][ETH_TOKEN_ADDRESS] += mintValue;
-        depositsBridge[currentChainAddress][ETH_TOKEN_ADDRESS] += mintValue;
-        tokenSumDeposit[ETH_TOKEN_ADDRESS] += mintValue;
-        l2ValuesSum[ETH_TOKEN_ADDRESS] += l2Value;
-    }
-
-    function depositEthSuccess(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 l2Value) public {
-        uint64 MAX = 2 ** 64 - 1;
-        uint256 l2Value = bound(l2Value, 0.1 ether, MAX);
-
-        emit log_string("DEPOSIT ETH");
-        super.depositEthToBridgeSuccess(userIndexSeed, chainIndexSeed, l2Value);
-    }
-
-    function depositERC20Success(
-        uint256 userIndexSeed,
-        uint256 chainIndexSeed,
-        uint256 tokenIndexSeed,
-        uint256 l2Value
-    ) public {
-        uint64 MAX = 2 ** 64 - 1;
-        uint256 l2Value = bound(l2Value, 0.1 ether, MAX);
-
-        emit log_string("DEPOSIT ERC20");
-        super.depositERC20ToBridgeSuccess(userIndexSeed, chainIndexSeed, tokenIndexSeed, l2Value);
-    }
-
-    function withdrawERC20Success(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 amountToWithdraw) public {
-        uint64 MAX = (2 ** 32 - 1) + 0.1 ether;
-        uint256 amountToWithdraw = bound(amountToWithdraw, 0.1 ether, MAX);
-
-        emit log_string("WITHDRAW ERC20");
-        super.withdrawSuccess(userIndexSeed, chainIndexSeed, amountToWithdraw);
-    }
-
-    // add this to be excluded from coverage report
-    function testBoundedBridgeHubInvariant() internal {}
-}
-
-// contract InvariantTesterZKChains is Test {
-//     BoundedBridgeHubInvariantTests tests;
-
-//     function setUp() public {
-//         tests = new BoundedBridgeHubInvariantTests();
-//         tests.prepare();
-//     }
-
-//     // Check whether the sum of ETH deposits from tests, updated on each deposit and withdrawal,
-//     // equals the balance of L1Shared bridge.
-//     function test_ETHbalanceStaysEqual() public {
-//         require(1 == 1);
-//     }
-
-//     // add this to be excluded from coverage report
-//     function test() internal {}
-// }

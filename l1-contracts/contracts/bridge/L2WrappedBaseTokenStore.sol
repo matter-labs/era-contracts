@@ -46,18 +46,14 @@ contract L2WrappedBaseTokenStore is Ownable2Step {
     /// @param _initialOwner The initial owner.
     /// @param _admin The address of the admin.
     constructor(address _initialOwner, address _admin) {
-        if (_admin == address(0) || _initialOwner == address(0)) {
-            revert ZeroAddress();
-        }
+        require(_admin != address(0) && _initialOwner != address(0), ZeroAddress());
         admin = _admin;
         _transferOwnership(_initialOwner);
     }
 
     /// @notice Throws if called by any account other than the owner or admin.
     modifier onlyOwnerOrAdmin() {
-        if (msg.sender != owner() && msg.sender != admin) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == owner() || msg.sender == admin, Unauthorized(msg.sender));
         _;
     }
 
@@ -66,24 +62,18 @@ contract L2WrappedBaseTokenStore is Ownable2Step {
     /// @param _chainId The ID of the blockchain network.
     /// @param _l2WBaseToken The address of the L2 WBaseToken token.
     function initializeChain(uint256 _chainId, address _l2WBaseToken) external onlyOwnerOrAdmin {
-        if (_l2WBaseToken == address(0)) {
-            revert ZeroAddress();
-        }
-        if (l2WBaseTokenAddress[_chainId] != address(0)) {
-            revert WrappedBaseTokenAlreadyRegistered();
-        }
+        require(_l2WBaseToken != address(0), ZeroAddress());
+        require(l2WBaseTokenAddress[_chainId] == address(0), WrappedBaseTokenAlreadyRegistered());
         _setWBaseTokenAddress(_chainId, _l2WBaseToken);
     }
 
     /// @notice Reinitializes the L2 WBaseToken address for a specific chain ID.
-    /// @dev Can only be called by the owner. It can not be called by the admin second time
-    /// to prevent retroactively damaging existing chains.
+    /// @dev Can only be called by the owner. Unlike initializeChain, this allows overwriting existing addresses.
+    /// @dev It can not be called by the admin to prevent retroactively damaging existing chains.
     /// @param _chainId The ID of the blockchain network.
     /// @param _l2WBaseToken The new address of the L2 WBaseToken token.
     function reinitializeChain(uint256 _chainId, address _l2WBaseToken) external onlyOwner {
-        if (_l2WBaseToken == address(0)) {
-            revert ZeroAddress();
-        }
+        require(_l2WBaseToken != address(0), ZeroAddress());
         _setWBaseTokenAddress(_chainId, _l2WBaseToken);
     }
 
@@ -101,9 +91,7 @@ contract L2WrappedBaseTokenStore is Ownable2Step {
     /// @dev Please note, if the owner wants to enforce the admin change it must execute both `setPendingAdmin` and
     /// `acceptAdmin` atomically. Otherwise `admin` can set different pending admin and so fail to accept the admin rights.
     function setPendingAdmin(address _newPendingAdmin) external onlyOwnerOrAdmin {
-        if (_newPendingAdmin == address(0)) {
-            revert ZeroAddress();
-        }
+        require(_newPendingAdmin != address(0), ZeroAddress());
         // Save previous value into the stack to put it into the event later
         address oldPendingAdmin = pendingAdmin;
         // Change pending admin
@@ -115,9 +103,7 @@ contract L2WrappedBaseTokenStore is Ownable2Step {
     function acceptAdmin() external {
         address currentPendingAdmin = pendingAdmin;
         // Only proposed by current admin address can claim the admin rights
-        if (msg.sender != currentPendingAdmin) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == currentPendingAdmin, Unauthorized(msg.sender));
 
         address previousAdmin = admin;
         admin = currentPendingAdmin;

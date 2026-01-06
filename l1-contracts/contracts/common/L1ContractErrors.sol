@@ -31,6 +31,8 @@ error AssetIdMismatch(bytes32 expected, bytes32 supplied);
 error AssetIdNotSupported(bytes32 assetId);
 // 0x11832de8
 error AssetRouterAllowanceNotZero();
+// 0x9b821ed7
+error BadTransferDataLength();
 // 0x6ef9a972
 error BaseTokenGasPriceDenominatorNotSet();
 // 0x55ad3fd3
@@ -89,8 +91,8 @@ error DenominatorIsZero();
 error DeployFailed();
 // 0x138ee1a3
 error DeployingBridgedTokenForNativeToken();
-// 0xc7c9660f
-error DepositDoesNotExist();
+// 0x42bce528
+error DepositDoesNotExist(bytes32, bytes32);
 // 0xad2fa98e
 error DepositExists();
 // 0x0e7ee319
@@ -113,6 +115,8 @@ error EmptyPrecommitData(uint256 batchNumber);
 error EmptyProofLength();
 // 0x627e0872
 error ETHDepositNotSupported();
+// 0xf4072616
+error ExecuteMessageFailed();
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
 // 0xc91cf3b1
@@ -142,8 +146,6 @@ error IncorrectBatchChainId(uint256, uint256);
 error IncorrectBridgeHubAddress(address bridgehub);
 // 0x1929b7de
 error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
-// 0x826fb11e
-error InsufficientChainBalance();
 // 0x9bf8b9aa
 error InvalidBatchNumber(uint256 provided, uint256 expected);
 // 0xd438e1fa
@@ -156,10 +158,14 @@ error InvalidChainId();
 error InvalidDAForPermanentRollup();
 // 0x4fbe5dba
 error InvalidDelay();
+// 0x075aaa80
+error InvalidInteropCalldata(bytes4);
 // 0x3f98a77e
 error InvalidL2DACommitmentScheme(uint8);
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
+// 0x6eca2e4b
+error InvalidMessage();
 // 0xa1ec1876
 error InvalidMessageRoot(bytes32 expectedMessageRoot, bytes32 providedMessageRoot);
 // 0xd08a97e6
@@ -264,10 +270,18 @@ error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32
 error NotAllowed(address addr);
 // 0x64846fe4
 error NotARestriction(address addr);
+// 0xf306a770
+error NotAssetRouter(address _sender, address _assetRouter);
 // 0xb49df1f2
 error NotAZKChain(address addr);
+// 0x5e67e793
+error NotCurrentSettlementLayer();
 // 0xdd7e3621
 error NotInitializedReentrancyGuard();
+// 0xecb34449
+error NotL1(uint256 l1ChainId, uint256 blockChainId);
+// 0xc5441a63
+error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
 // 0xdf17e316
 error NotWhitelisted(address);
 // 0xf3ed9dfa
@@ -282,6 +296,8 @@ error OperationMustBePending();
 error OperationMustBeReady();
 // 0xb926450e
 error OriginChainIdNotFound();
+// 0x97da9c1c
+error PayloadTooShort();
 // 0x688c63e5
 error PrecommitmentMismatch(uint256 batchNumber, bytes32 expected, bytes32 found);
 // 0x9b48e060
@@ -298,6 +314,8 @@ error ProtocolIdNotGreater();
 error PubdataGreaterThanLimit(uint256 limit, uint256 length);
 // 0x63c36549
 error QueueIsEmpty();
+// 0x0a6c1a5c
+error ReconstructionMismatch(bytes32, bytes32);
 // 0xab143c06
 error Reentrancy();
 // 0x667d17de

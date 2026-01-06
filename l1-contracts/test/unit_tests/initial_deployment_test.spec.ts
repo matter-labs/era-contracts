@@ -13,7 +13,7 @@ import {
 } from "../../typechain";
 
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
-import { ethTestConfig } from "../../src.ts/utils";
+import { ethTestConfig } from "../../src.ts/constants";
 
 import type { Deployer } from "../../src.ts/deploy";
 import { registerZKChain } from "../../src.ts/deploy-process";

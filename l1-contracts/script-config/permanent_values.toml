@@ -1,0 +1,9 @@
+era_chain_id = 270
+
+[contracts]
+create2_factory_salt = "0x5449093bca2c6304d500f9189bf24b3a1aae8b2a2306bda4c6efa7d039849abc"
+
+create2_factory_addr = "0x0000000000FFe8B47B3e2130213B802212439497"
+ctm_proxy_address = "0x0000000000FFe8B47B3e2130213B802212439497"
+l1_bytecodes_supplier_address = "0x0000000000FFe8B47B3e2130213B802212439497"
+rollup_da_manager = "0x0000000000FFe8B47B3e2130213B802212439497"

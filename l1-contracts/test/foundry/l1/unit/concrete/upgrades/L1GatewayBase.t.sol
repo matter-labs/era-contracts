@@ -4,10 +4,12 @@ pragma solidity 0.8.28;
 import "forge-std/Test.sol";
 import {L1FixedForceDeploymentsHelper} from "contracts/upgrades/L1FixedForceDeploymentsHelper.sol"; // Adjust the import path accordingly
 import {ZKChainStorage} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1SharedBridgeLegacy} from "contracts/bridge/interfaces/IL1SharedBridgeLegacy.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 
 // Concrete implementation of L1FixedForceDeploymentsHelper for testing
 contract TestL1FixedForceDeploymentsHelper is L1FixedForceDeploymentsHelper {
@@ -59,6 +61,7 @@ contract L1FixedForceDeploymentsHelperTest is Test {
     // Mocks for dependencies
     address bridgehubMock;
     address sharedBridgeMock;
+    address nativeTokenVaultMock;
     // MockL2WrappedBaseTokenStore wrappedBaseTokenStoreMock;
 
     // Addresses
@@ -73,6 +76,7 @@ contract L1FixedForceDeploymentsHelperTest is Test {
         baseTokenAssetId = bytes32("baseTokenAssetId");
         bridgehubMock = makeAddr("bridgehubMock");
         sharedBridgeMock = makeAddr("sharedBridgeMock");
+        nativeTokenVaultMock = makeAddr("nativeTokenVaultMock");
         legacySharedBridgeAddress = makeAddr("legacySharedBridgeAddress");
 
         testGateway = new TestL1FixedForceDeploymentsHelper();
@@ -88,6 +92,21 @@ contract L1FixedForceDeploymentsHelperTest is Test {
             sharedBridgeMock,
             abi.encodeCall(IL1SharedBridgeLegacy.l2BridgeAddress, (chainId)),
             abi.encode(address(legacySharedBridgeAddress))
+        );
+        vm.mockCall(
+            sharedBridgeMock,
+            abi.encodeCall(IL1AssetRouter.nativeTokenVault, ()),
+            abi.encode(nativeTokenVaultMock)
+        );
+        vm.mockCall(
+            nativeTokenVaultMock,
+            abi.encodeCall(INativeTokenVaultBase.originChainId, (baseTokenAssetId)),
+            abi.encode(chainId)
+        );
+        vm.mockCall(
+            nativeTokenVaultMock,
+            abi.encodeCall(INativeTokenVaultBase.originToken, (baseTokenAssetId)),
+            abi.encode(ETH_TOKEN_ADDRESS)
         );
     }
 
@@ -106,12 +125,13 @@ contract L1FixedForceDeploymentsHelperTest is Test {
         ZKChainSpecificForceDeploymentsData memory chainData = abi.decode(data, (ZKChainSpecificForceDeploymentsData));
 
         // Check the values
-        assertEq(chainData.baseTokenAssetId, baseTokenAssetId);
+        assertEq(chainData.baseTokenBridgingData.assetId, baseTokenAssetId);
         assertEq(chainData.l2LegacySharedBridge, legacySharedBridgeAddress);
         assertEq(chainData.predeployedL2WethAddress, address(0));
         assertEq(chainData.baseTokenL1Address, ETH_TOKEN_ADDRESS);
-        assertEq(chainData.baseTokenName, "Ether");
-        assertEq(chainData.baseTokenSymbol, "ETH");
+        assertEq(chainData.baseTokenMetadata.name, "Ether");
+        assertEq(chainData.baseTokenMetadata.symbol, "ETH");
+        assertEq(chainData.baseTokenMetadata.decimals, 18);
     }
 
     // Test with ERC20 that correctly implements metadata
@@ -132,12 +152,13 @@ contract L1FixedForceDeploymentsHelperTest is Test {
         ZKChainSpecificForceDeploymentsData memory chainData = abi.decode(data, (ZKChainSpecificForceDeploymentsData));
 
         // Check the values
-        assertEq(chainData.baseTokenAssetId, baseTokenAssetId);
+        assertEq(chainData.baseTokenBridgingData.assetId, baseTokenAssetId);
         assertEq(chainData.l2LegacySharedBridge, legacySharedBridgeAddress);
         assertEq(chainData.predeployedL2WethAddress, address(0));
         assertEq(chainData.baseTokenL1Address, address(token));
-        assertEq(chainData.baseTokenName, "Test Token");
-        assertEq(chainData.baseTokenSymbol, "TTK");
+        assertEq(chainData.baseTokenMetadata.name, "Test Token");
+        assertEq(chainData.baseTokenMetadata.symbol, "TTK");
+        assertEq(chainData.baseTokenMetadata.decimals, 18);
     }
 
     // Test with ERC20 that does not implement metadata
@@ -158,11 +179,12 @@ contract L1FixedForceDeploymentsHelperTest is Test {
         ZKChainSpecificForceDeploymentsData memory chainData = abi.decode(data, (ZKChainSpecificForceDeploymentsData));
 
         // Check the values
-        assertEq(chainData.baseTokenAssetId, baseTokenAssetId);
+        assertEq(chainData.baseTokenBridgingData.assetId, baseTokenAssetId);
         assertEq(chainData.l2LegacySharedBridge, legacySharedBridgeAddress);
         assertEq(chainData.predeployedL2WethAddress, address(0));
         assertEq(chainData.baseTokenL1Address, address(token));
-        assertEq(chainData.baseTokenName, "Base Token");
-        assertEq(chainData.baseTokenSymbol, "BT");
+        assertEq(chainData.baseTokenMetadata.name, "Base Token");
+        assertEq(chainData.baseTokenMetadata.symbol, "BT");
+        assertEq(chainData.baseTokenMetadata.decimals, 18);
     }
 }

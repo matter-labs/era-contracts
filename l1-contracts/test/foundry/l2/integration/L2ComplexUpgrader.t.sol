@@ -8,7 +8,7 @@ import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {MockContract} from "contracts/dev-contracts/MockContract.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {Utils} from "deploy-scripts/Utils.sol";
+import {Utils} from "deploy-scripts/utils/Utils.sol";
 
 contract L2ComplexUpgraderTest is Test {
     MockContract public dummyUpgrade;

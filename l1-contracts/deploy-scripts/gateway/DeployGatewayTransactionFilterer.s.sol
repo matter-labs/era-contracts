@@ -2,10 +2,10 @@
 pragma solidity 0.8.28;
 
 import {Script} from "forge-std/Script.sol";
-import {Create2FactoryUtils} from "../Create2FactoryUtils.s.sol";
+import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 /// @title DeployGatewayTransactionFilterer
@@ -71,8 +71,8 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils {
             toml.readAddress("$.bridgehub_proxy_addr"),
             toml.readAddress("$.chain_admin"),
             toml.readAddress("$.chain_proxy_admin"),
-            toml.readAddress("$.create2_factory_addr"),
-            toml.readBytes32("$.create2_factory_salt")
+            toml.readAddress("$.contracts.create2_factory_addr"),
+            toml.readBytes32("$.contracts.create2_factory_salt")
         );
 
         // Save the address of the deployed proxy into an output TOML file.

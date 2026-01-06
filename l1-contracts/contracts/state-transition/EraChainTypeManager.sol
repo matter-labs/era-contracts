@@ -6,15 +6,15 @@ import {ChainTypeManagerBase} from "./ChainTypeManagerBase.sol";
 import {Diamond} from "./libraries/Diamond.sol";
 import {ChainCreationParams} from "./IChainTypeManager.sol";
 import {GenesisIndexStorageZero, MigrationsNotPaused} from "../common/L1ContractErrors.sol";
-import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
-import {IChainAssetHandler} from "../bridgehub/IChainAssetHandler.sol";
+import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
+import {IChainAssetHandler} from "../core/chain-asset-handler/IChainAssetHandler.sol";
 
 /// @title Era Chain Type Manager contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract EraChainTypeManager is ChainTypeManagerBase {
     /// @dev Contract is expected to be used as proxy implementation.
-    constructor(address _bridgehub) ChainTypeManagerBase(_bridgehub) {}
+    constructor(address _bridgehub, address _interopCenter) ChainTypeManagerBase(_bridgehub, _interopCenter) {}
 
     /// @notice Updates the parameters with which a new chain is created
     /// @param _chainCreationParams The new chain creation parameters

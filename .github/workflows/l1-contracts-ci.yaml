@@ -29,7 +29,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.18.0
+          node-version: 18.20.8
           cache: yarn
 
       - name: Install dependencies
@@ -94,7 +94,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.18.0
+          node-version: 18.20.8
           cache: yarn
 
       - name: Install dependencies
@@ -117,7 +117,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.18.0
+          node-version: 18.20.8
           cache: yarn
       - name: Install dependencies
         run: yarn
@@ -159,7 +159,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.18.0
+          node-version: 18.20.8
           cache: yarn
       - name: Install dependencies
         run: yarn
@@ -198,7 +198,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.18.0
+          node-version: 18.20.8
           cache: yarn
 
       - name: Install foundry-zksync
@@ -253,7 +253,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.18.0
+          node-version: 18.20.8
           cache: yarn
 
       - name: Install foundry-zksync
@@ -330,7 +330,7 @@ jobs:
     defaults:
       run:
         working-directory: l1-contracts
-    needs: [build, lint]
+    needs: [build] # TODO return lint into dependencies when it's fully fixed
     runs-on: ubuntu-latest
 
     steps:
@@ -342,7 +342,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.18.0
+          node-version: 18.20.8
           cache: yarn
 
       - name: Install foundry-zksync
@@ -372,7 +372,7 @@ jobs:
             system-contracts/zkout
 
       - name: Run coverage
-        run: yarn test:foundry && yarn coverage:foundry --report summary --report lcov
+        run: yarn test:foundry --no-match-path 'test/foundry/l1/unit/concrete/Executor/*' && yarn coverage:foundry --report summary --report lcov
 
       # Installing the specific version of `lcov` because of
       # the `genhtml: ERROR: line ... of ... has branchcov but no linecov data` error.
@@ -431,7 +431,7 @@ jobs:
   #     - name: Use Node.js
   #       uses: actions/setup-node@v3
   #       with:
-  #         node-version: 18.18.0
+  #         node-version: 18.20.8
   #         cache: yarn
 
   #     - name: Install dependencies

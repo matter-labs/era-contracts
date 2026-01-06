@@ -3,12 +3,11 @@ use colored::Colorize;
 use once_cell::sync::OnceCell;
 use std::process;
 use zksync_multivm::interface::{
-    L1BatchEnv, L2BlockEnv, SystemEnv, TxExecutionMode, InspectExecutionMode, VmFactory, VmInterface,
+    InspectExecutionMode, L1BatchEnv, L2BlockEnv, SystemEnv, TxExecutionMode, VmFactory,
+    VmInterface,
 };
 use zksync_multivm::vm_latest::{HistoryDisabled, ToTracerPointer, TracerDispatcher, Vm};
-use zksync_state::interface::{
-    InMemoryStorage, StoragePtr, StorageView, IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID,
-};
+use zksync_state::interface::{InMemoryStorage, StorageView, IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID};
 use zksync_types::fee_model::BatchFeeInput;
 
 use std::{env, sync::Arc};
@@ -16,14 +15,15 @@ use tracing_subscriber::fmt;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use zksync_contracts::{
-    BaseSystemContracts, ContractLanguage, SystemContractCode,
-    SystemContractsRepo,
+    BaseSystemContracts, ContractLanguage, SystemContractCode, SystemContractsRepo,
 };
 use zksync_multivm::interface::{ExecutionResult, Halt};
-use zksync_types::system_contracts::get_system_smart_contracts_from_dir;
-use zksync_types::{block::L2BlockHasher, Address, L1BatchNumber, L2BlockNumber, U256, u256_to_h256, };
-use zksync_types::{L2ChainId, Transaction};
 use zksync_types::bytecode::BytecodeHash;
+use zksync_types::system_contracts::get_system_smart_contracts_from_dir;
+use zksync_types::{
+    block::L2BlockHasher, settlement::SettlementLayer, u256_to_h256, Address, L1BatchNumber, L2BlockNumber, SLChainId, U256,
+};
+use zksync_types::{L2ChainId, Transaction};
 
 mod hook;
 mod test_count_tracer;
@@ -41,15 +41,20 @@ fn execute_internal_bootloader_test() {
         root: env::current_dir().unwrap().join("../../"),
     };
 
-    let bytecode = repo.read_sys_contract_bytecode(artifacts_location, "bootloader_test", Some("Bootloader"), ContractLanguage::Yul);
+    let bytecode = repo.read_sys_contract_bytecode(
+        artifacts_location,
+        "bootloader_test",
+        Some("Bootloader"),
+        ContractLanguage::Yul,
+    );
     let hash = BytecodeHash::for_bytecode(&bytecode).value();
     let bootloader = SystemContractCode {
         code: bytecode,
         hash,
     };
 
-
-    let bytecode = repo.read_sys_contract_bytecode("", "DefaultAccount", None, ContractLanguage::Sol);
+    let bytecode =
+        repo.read_sys_contract_bytecode("", "DefaultAccount", None, ContractLanguage::Sol);
     let hash = BytecodeHash::for_bytecode(&bytecode).value();
     let default_aa = SystemContractCode {
         code: bytecode,
@@ -70,6 +75,7 @@ fn execute_internal_bootloader_test() {
         execution_mode: TxExecutionMode::VerifyExecute,
         default_validation_computational_gas_limit: u32::MAX,
         chain_id: zksync_types::L2ChainId::from(299),
+        // pubdata_params: Default::default(),
     };
 
     let mut l1_batch_env = L1BatchEnv {
@@ -87,18 +93,16 @@ fn execute_internal_bootloader_test() {
             max_virtual_blocks_to_create: 1,
             interop_roots: vec![],
         },
+        settlement_layer: SettlementLayer::L1(SLChainId(10)),
     };
 
     // First - get the number of tests.
     let test_count = {
-        let storage: StoragePtr<StorageView<InMemoryStorage>> =
-            StorageView::new(InMemoryStorage::with_custom_system_contracts_and_chain_id(
-                L2ChainId::from(IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID),
-                get_system_smart_contracts_from_dir(
-                    env::current_dir().unwrap().join("../../"),
-                ),
-            ))
-            .to_rc_ptr();
+        let storage = StorageView::new(InMemoryStorage::with_custom_system_contracts_and_chain_id(
+            L2ChainId::from(IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID),
+            get_system_smart_contracts_from_dir(env::current_dir().unwrap().join("../../")),
+        ))
+        .to_rc_ptr();
 
         let mut vm: Vm<_, HistoryDisabled> =
             VmFactory::new(l1_batch_env.clone(), system_env.clone(), storage.clone());
@@ -121,20 +125,18 @@ fn execute_internal_bootloader_test() {
     for test_id in 1..=test_count {
         println!("\n === Running test {}", test_id);
 
-        let storage: StoragePtr<StorageView<InMemoryStorage>> =
-            StorageView::new(InMemoryStorage::with_custom_system_contracts_and_chain_id(
-                L2ChainId::from(IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID),
-                get_system_smart_contracts_from_dir(
-                    env::current_dir().unwrap().join("../../"),
-                ),
-            ))
-            .to_rc_ptr();
+        let storage = StorageView::new(InMemoryStorage::with_custom_system_contracts_and_chain_id(
+            L2ChainId::from(IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID),
+            get_system_smart_contracts_from_dir(env::current_dir().unwrap().join("../../")),
+        ))
+        .to_rc_ptr();
 
         // We are passing id of the test in location (0) where we normally put the operator.
         // This is then picked up by the testing framework.
         l1_batch_env.fee_account = zksync_types::H160::from(u256_to_h256(U256::from(test_id)));
         let mut vm: Vm<_, HistoryDisabled> =
             Vm::new(l1_batch_env.clone(), system_env.clone(), storage.clone());
+
         let test_result = Arc::new(OnceCell::default());
         let requested_assert = Arc::new(OnceCell::default());
         let test_name = Arc::new(OnceCell::default());
@@ -176,7 +178,8 @@ fn execute_internal_bootloader_test() {
                     )),
                     ExecutionResult::Halt { reason } => {
                         if let Halt::UnexpectedVMBehavior(reason) = reason {
-                            let reason = reason.strip_prefix("Assertion error: ").unwrap_or(reason);
+                            let reason =
+                                reason.strip_prefix("Assertion error: ").unwrap_or(&reason);
                             if reason == requested_assert {
                                 Ok(())
                             } else {
