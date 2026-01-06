@@ -650,6 +650,11 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             require(!depositsPaused(), DepositsPaused());
         }
 
+        /// We only check deposits paused on L1 to keep the GW and L1 Priority queues the same.
+        if (block.chainid == L1_CHAIN_ID) {
+            require(!depositsPaused(), DepositsPaused());
+        }
+
         // Data that is needed for the operator to simulate priority queue offchain
         // solhint-disable-next-line func-named-parameters
         emit NewPriorityRequest(_transaction.nonce, _canonicalTxHash, 0, _transaction, _factoryDeps);
