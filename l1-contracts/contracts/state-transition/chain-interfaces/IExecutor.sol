@@ -134,9 +134,16 @@ interface IExecutor is IZKChainBase {
     /// (state root, block number, bloch hashes)
     /// @param numberOfLayer1Txs Number of priority operations to be processed
     /// @param priorityOperationsHash Hash of all priority operations from this batch
+    /// @param dependencyRootsRollingHash Hash of imported dependency interop roots
     /// @param l2LogsTreeRoot Root hash of tree that contains L2 -> L1 messages from this batch
     /// @param daCommitmentScheme commitment scheme used to generate pubdata commitment for this batch
     /// @param daCommitment commitment to the batch pubdata to validate DA in the l1 da validator
+    /// @param firstBlockTimestamp timestamp of the first block in the batch
+    /// @param firstBlockNumber number of the first block in the batch
+    /// @param lastBlockTimestamp timestamp of the last block in the batch
+    /// @param lastBlockNumber number of the last block in the batch
+    /// @param chainId chain id used during batch execution
+    /// @param codeSizeLimit code size limit used during batch execution
     // solhint-disable-next-line gas-struct-packing
     struct CommitBatchInfoZKsyncOS {
         uint64 batchNumber;
@@ -152,6 +159,7 @@ interface IExecutor is IZKChainBase {
         uint64 lastBlockTimestamp;
         uint64 lastBlockNumber;
         uint256 chainId;
+        uint32 codeSizeLimit;
         bytes operatorDAInput;
     }
 
