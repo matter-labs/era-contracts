@@ -61,7 +61,7 @@ library DeployCTML1OrGateway {
                 }
             } else {
                 if (config.isZKsyncOS) {
-                    return abi.encode(config.verifierFflonk, config.verifierPlonk, msg.sender);
+                    return abi.encode(config.verifierFflonk, config.verifierPlonk, config.verifierOwner);
                 } else {
                     return abi.encode(config.verifierFflonk, config.verifierPlonk);
                 }
