@@ -50,6 +50,9 @@ interface IAdmin is IZKChainBase {
     /// @notice Allow EVM emulation on chain
     function allowEvmEmulation() external returns (bytes32 canonicalTxHash);
 
+    /// @notice set contracts code size limit for the chain
+    function setCodeSizeLimit(uint32 _codeSizeLimit) external;
+
     /// @notice Perform the upgrade from the current protocol version with the corresponding upgrade data
     /// @param _protocolVersion The current protocol version from which upgrade is executed
     /// @param _cutData The diamond cut parameters that is executed in the upgrade
