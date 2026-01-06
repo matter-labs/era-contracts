@@ -3,8 +3,11 @@ pragma solidity ^0.8.24;
 
 // solhint-disable no-console, gas-custom-errors
 
-import {console2 as console} from "forge-std/Script.sol";
+import {Script, console2 as console} from "forge-std/Script.sol";
+
 import {stdToml} from "forge-std/StdToml.sol";
+import {Vm} from "forge-std/Vm.sol";
+import {stdJson} from "forge-std/StdJson.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -12,6 +15,8 @@ import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {Utils} from "../utils/Utils.sol";
+import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
+import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
@@ -116,7 +121,8 @@ struct GeneratedData {
 abstract contract DeployCTMUtils is DeployUtils {
     using stdToml for string;
 
-    string public constant CHAIN_CREATION_PARAMS_PATH = "/../configs/genesis/era/latest.toml";
+    string public constant ERA_CHAIN_CREATION_PARAMS_PATH = "/../configs/genesis/era/latest.json";
+    string public constant ZKSYNC_OS_CHAIN_CREATION_PARAMS_PATH = "/../configs/genesis/zksync-os/latest.json";
     Config public config;
     GeneratedData internal generatedData;
     CTMDeployedAddresses internal addresses;
@@ -131,8 +137,12 @@ abstract contract DeployCTMUtils is DeployUtils {
         addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
-    function chainCreationParamsPath() internal virtual returns (string memory) {
-        return string.concat(vm.projectRoot(), CHAIN_CREATION_PARAMS_PATH);
+    function chainCreationParamsPath(bool isZKsyncOs) internal virtual returns (string memory) {
+        if (isZKsyncOs) {
+            return string.concat(vm.projectRoot(), ZKSYNC_OS_CHAIN_CREATION_PARAMS_PATH);
+        } else {
+            return string.concat(vm.projectRoot(), ERA_CHAIN_CREATION_PARAMS_PATH);
+        }
     }
 
     function initializeConfig(string memory configPath) internal virtual {
@@ -164,32 +174,17 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.contracts.validatorTimelockExecutionDelay = toml.readUint(
             "$.contracts.validator_timelock_execution_delay"
         );
-        config.contracts.chainCreationParams = getChainCreationParams(chainCreationParamsPath());
+        config.contracts.chainCreationParams = getChainCreationParamsConfig(chainCreationParamsPath(config.isZKsyncOS));
 
         if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
             config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
         }
     }
 
-    function getChainCreationParams(
+    function getChainCreationParamsConfig(
         string memory _config
     ) internal virtual returns (ChainCreationParamsConfig memory chainCreationParams) {
-        string memory toml = vm.readFile(_config);
-        chainCreationParams.latestProtocolVersion = toml.readUint("$.protocol_semantic_version");
-        chainCreationParams.genesisRoot = toml.readBytes32("$.genesis_root");
-        chainCreationParams.genesisRollupLeafIndex = toml.readUint("$.genesis_rollup_leaf_index");
-        chainCreationParams.genesisBatchCommitment = toml.readBytes32("$.genesis_batch_commitment");
-
-        // These fields are redundant for zksync_os.
-        if (toml.keyExists("$.default_aa_hash")) {
-            chainCreationParams.defaultAAHash = toml.readBytes32("$.default_aa_hash");
-        }
-        if (toml.keyExists("$.bootloader_hash")) {
-            chainCreationParams.bootloaderHash = toml.readBytes32("$.bootloader_hash");
-        }
-        if (toml.keyExists("$.evm_emulator_hash")) {
-            chainCreationParams.evmEmulatorHash = toml.readBytes32("$.evm_emulator_hash");
-        }
+        return ChainCreationParamsLib.getChainCreationParams(_config, config.isZKsyncOS);
     }
 
     /// @notice Get all four facet cuts
@@ -342,6 +337,10 @@ abstract contract DeployCTMUtils is DeployUtils {
                 return type(EraVerifierFflonk).creationCode;
             } else if (compareStrings(contractName, "EraVerifierPlonk")) {
                 return type(EraVerifierPlonk).creationCode;
+            } else if (compareStrings(contractName, "ZKsyncOSVerifierFflonk")) {
+                return type(ZKsyncOSVerifierFflonk).creationCode;
+            } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
+                return type(ZKsyncOSVerifierPlonk).creationCode;
             } else if (compareStrings(contractName, "DefaultUpgrade")) {
                 return type(DefaultUpgrade).creationCode;
             } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
@@ -469,7 +468,9 @@ abstract contract DeployCTMUtils is DeployUtils {
                 eip7702Checker: addresses.eip7702Checker,
                 verifierFflonk: addresses.stateTransition.verifierFflonk,
                 verifierPlonk: addresses.stateTransition.verifierPlonk,
-                ownerAddress: config.ownerAddress
+                // For L1 deployment we need to use the deployer as the owner of the verifier,
+                // because we set the dual verifier later
+                verifierOwner: msg.sender
             });
     }
 
@@ -515,4 +516,32 @@ abstract contract DeployCTMUtils is DeployUtils {
     }
 
     function test() internal virtual {}
+}
+
+library ChainCreationParamsLib {
+    using stdJson for string;
+    address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
+    Vm internal constant vm = Vm(VM_ADDRESS);
+
+    function getChainCreationParams(
+        string memory _config,
+        bool isZKsyncOs
+    ) public returns (ChainCreationParamsConfig memory chainCreationParams) {
+        string memory json = vm.readFile(_config);
+        uint32 major = uint32(json.readUint("$.protocol_semantic_version.major"));
+        uint32 minor = uint32(json.readUint("$.protocol_semantic_version.minor"));
+        uint32 patch = uint32(json.readUint("$.protocol_semantic_version.patch"));
+        chainCreationParams.latestProtocolVersion = SemVer.packSemVer(major, minor, patch);
+        chainCreationParams.genesisRoot = json.readBytes32("$.genesis_root");
+        if (isZKsyncOs) {
+            chainCreationParams.genesisBatchCommitment = bytes32(uint256(1));
+        } else {
+            // These fields are used only for zksync era
+            chainCreationParams.genesisRollupLeafIndex = json.readUint("$.genesis_rollup_leaf_index");
+            chainCreationParams.genesisBatchCommitment = json.readBytes32("$.genesis_batch_commitment");
+            chainCreationParams.defaultAAHash = json.readBytes32("$.default_aa_hash");
+            chainCreationParams.bootloaderHash = json.readBytes32("$.bootloader_hash");
+            chainCreationParams.evmEmulatorHash = json.readBytes32("$.evm_emulator_hash");
+        }
+    }
 }

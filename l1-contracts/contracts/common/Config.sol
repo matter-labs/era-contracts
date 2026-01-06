@@ -110,8 +110,9 @@ uint256 constant L1_TX_CALLDATA_COST_NATIVE_ZKSYNC_OS = 1;
 /// @dev The intrinsic cost of the L1->l2 transaction in pubdata for ZKsync OS
 uint256 constant L1_TX_INTRINSIC_PUBDATA_ZSKYNC_OS = 88;
 
-/// @dev The native per gas ratio for upgrade transactions in ZKsync OS.
-uint256 constant UPGRADE_TX_NATIVE_PER_GAS = 10_000;
+/// @dev The native per gas ratio for 0 gas price(service/upgrade/gateway) transactions in ZKsync OS.
+/// This value is big enough to cover computational native resources usage for any operations.
+uint256 constant FREE_TX_NATIVE_PER_GAS = 10_000;
 
 /// @dev The mask which should be applied to the packed batch and L2 block timestamp in order
 /// to obtain the L2 block timestamp. Applying this mask is equivalent to calculating modulo 2**128
