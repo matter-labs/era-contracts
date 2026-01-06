@@ -252,7 +252,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         if (config.isZKsyncOS) {
             rollupDAManager.updateDAPair(
                 addresses.daAddresses.l1BlobsDAValidatorZKsyncOS,
-                L2DACommitmentScheme.BLOBS_ZKSYNC_OS,
+                getRollupL2DACommitmentScheme(),
                 true
             );
         }
