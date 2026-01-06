@@ -227,7 +227,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function allowPriorityMode() external onlyChainTypeManager onlyL1 {
+    function allowPriorityMode() external onlyChainTypeManager onlySettlementLayer onlyL1 {
         if (s.priorityModeInfo.canBeActivated) {
             revert PriorityModeAlreadyAllowed();
         }
