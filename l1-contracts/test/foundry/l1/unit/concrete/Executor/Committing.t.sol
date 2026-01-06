@@ -331,7 +331,7 @@ contract CommittingTest is ExecutorTest {
             true,
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
-            bytes32(bytes1(0x01))
+            bytes32(uint256(type(uint96).max))
         );
 
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
@@ -345,7 +345,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(defaultBlobVersionedHashes);
         vm.prank(validator);
 
-        vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, uint256(bytes32(bytes1(0x01))), uint256(2)));
+        vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, type(uint96).max, uint256(2)));
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
