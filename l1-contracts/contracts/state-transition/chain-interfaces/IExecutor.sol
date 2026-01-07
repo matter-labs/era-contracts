@@ -146,6 +146,7 @@ interface IExecutor is IZKChainBase {
     /// it's guaranteed that this commitment commits to any state that needed for execution
     /// (state root, block number, block hashes)
     /// @param numberOfLayer1Txs Number of priority operations to be processed
+    /// @param numberOfLayer2Txs Number of L2 transactions executed in the batch
     /// @param priorityOperationsHash Hash of all priority operations from this batch
     /// @param l2LogsTreeRoot Root hash of tree that contains L2 -> L1 messages from this batch
     /// @param daCommitmentScheme commitment scheme used to generate pubdata commitment for this batch
@@ -155,6 +156,7 @@ interface IExecutor is IZKChainBase {
         uint64 batchNumber;
         bytes32 newStateCommitment;
         uint256 numberOfLayer1Txs;
+        uint256 numberOfLayer2Txs;
         bytes32 priorityOperationsHash;
         bytes32 dependencyRootsRollingHash;
         bytes32 l2LogsTreeRoot;

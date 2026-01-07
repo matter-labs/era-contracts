@@ -176,6 +176,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             _operatorDAInput: _newBatch.operatorDAInput,
             _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
         });
+
+        // When priority mode is activated, the batch must contain only priority transactions
+        if (s.priorityModeInfo.activated && _newBatch.numberOfLayer2Txs != 0) {
+            revert InvalidL2TxCountInPriorityMode(_newBatch.numberOfLayer2Txs);
+        }
+
         // Theoretically, we can just ignore it, all the DA validators, except `RollupL1DAValidator`, always return a 0 array,
         // and `RollupL1DAValidator` will fail if we try to submit blobs with ZKsync OS, so it also returns zeroes here.
         // However, we are double-checking that the L1 DA validator doesn't rely on "EraVM like" blobs verification, just in case.
@@ -224,6 +230,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 uint256(_newBatch.daCommitmentScheme),
                 _newBatch.daCommitment,
                 _newBatch.numberOfLayer1Txs,
+                _newBatch.numberOfLayer2Txs,
                 _newBatch.priorityOperationsHash,
                 _newBatch.l2LogsTreeRoot,
                 _expectedSystemContractUpgradeTxHash,
