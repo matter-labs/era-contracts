@@ -14,6 +14,12 @@ import {InvalidChainId} from "../common/L1ContractErrors.sol";
 /// @author Matter Labs
 /// @notice The l2 component of the genesis upgrade.
 contract L2GenesisUpgrade is IL2GenesisUpgrade {
+    event GenesisUpgradeStarted(bool isZKsyncOS, uint256 chainId, address ctmDeployer);
+    event ChainIdValidated(uint256 chainId);
+    event SetChainIdStarted(uint256 chainId);
+    event SetChainIdCompleted(uint256 chainId);
+    event CallingPerformForceDeployedContractsInit();
+
     /// @notice The function that is delegateCalled from the complex upgrader.
     /// @dev It is used to set the chainId and to deploy the force deployments.
     /// @param _chainId the chain id
@@ -28,16 +34,23 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
         bytes calldata _fixedForceDeploymentsData,
         bytes calldata _additionalForceDeploymentsData
     ) external {
+        emit GenesisUpgradeStarted(_isZKsyncOS, _chainId, _ctmDeployer);
+
         if (_chainId == 0) {
             revert InvalidChainId();
         }
 
+        emit ChainIdValidated(_chainId);
+
         // On ZKsyncOS, the chain Id is a part of implicit block properties
         // and so does not need to set inside the genesis upgrade.
         if (!_isZKsyncOS) {
+            emit SetChainIdStarted(_chainId);
             ISystemContext(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR).setChainId(_chainId);
+            emit SetChainIdCompleted(_chainId);
         }
 
+        emit CallingPerformForceDeployedContractsInit();
         // solhint-disable-next-line func-named-parameters
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
             _isZKsyncOS,

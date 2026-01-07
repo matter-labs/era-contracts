@@ -21,11 +21,10 @@ contract ZKOSContractDeployer is IZKOSContractDeployer {
         address _addr,
         bytes32 _bytecodeHash,
         uint32 _bytecodeLength,
-        bytes32 _observableBytecodeHash,
-        uint32 _observableBytecodeLength
+        bytes32 _observableBytecodeHash
     ) external override onlyComplexUpgrader {
         (bool ok, ) = SET_BYTECODE_ON_ADDRESS_HOOK.call(
-            abi.encode(_addr, _bytecodeHash, _bytecodeLength, _observableBytecodeHash, _observableBytecodeLength)
+            abi.encode(_addr, _bytecodeHash, _bytecodeLength, _observableBytecodeHash)
         );
 
         if (!ok) {
