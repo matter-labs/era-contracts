@@ -2062,9 +2062,9 @@ object "Bootloader" {
 
                 let gasLimit := getGasLimit(innerTxDataOffset)
                 let txInternalCost := safeMul(gasPrice, gasLimit, "poa")
-                let to_mint := safeSub(getReserved0(innerTxDataOffset), txInternalCost, "ol")
-                if to_mint {
-                    mintEther(from, to_mint, true)
+                let toMint := safeSub(getReserved0(innerTxDataOffset), txInternalCost, "ol")
+                if toMint {
+                    mintEther(from, toMint, true)
                 }
 
                 success := executeL1Tx(innerTxDataOffset, from)
