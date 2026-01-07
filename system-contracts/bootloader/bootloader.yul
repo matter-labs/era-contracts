@@ -1186,13 +1186,25 @@ object "Bootloader" {
                 // Paying the fee to the operator
                 mintEther(BOOTLOADER_FORMAL_ADDR(), payToOperator, false)
 
-                if and(iszero(isPriorityOp), iszero(success)) {
-                    // Upgrade transactions must always succeed
-                    assertionError("Upgrade tx failed")
-                }
+                let toRefundRecipient
+                switch success
+                case 0 {
+                    if iszero(isPriorityOp) {
+                        // Upgrade transactions must always succeed
+                        assertionError("Upgrade tx failed")
+                    }
 
-                // Mint everything that the user has deposited to the refund recipient
-                let toRefundRecipient := safeSub(getReserved0(innerTxDataOffset), payToOperator, "vji")
+                    // If the transaction reverts, then initial minting to the user has been reverted
+                    // as well, so we can simply mint everything that the user has deposited to
+                    // the refund recipient
+                    toRefundRecipient := safeSub(getReserved0(innerTxDataOffset), payToOperator, "vji")
+                default {
+                    // If the transaction succeeds, then it is assumed that initial mint was made. However, the remaining
+                    // ETH deposited will be given to the refund recipient.
+
+                    let txInternalCost := safeMul(gasPrice, gasLimit, "poa")
+                    toRefundRecipient := safeSub(txInternalCost payToOperator, "ysl")
+                }
 
                 if gt(toRefundRecipient, 0) {
                     let refundRecipient := getReserved1(innerTxDataOffset)
@@ -2048,6 +2060,12 @@ object "Bootloader" {
 
                 debugLog("execution itself", 0)
 
+                let gasLimit := getGasLimit(innerTxDataOffset)
+                let txInternalCost := safeMul(gasPrice, gasLimit, "poa")
+                let to_mint := safeSub(getReserved0(innerTxDataOffset), txInternalCost, "ol")
+                if to_mint {
+                    mintEther(from, to_mint, true)
+                }
 
                 success := executeL1Tx(innerTxDataOffset, from)
 
