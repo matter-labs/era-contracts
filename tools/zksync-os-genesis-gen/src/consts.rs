@@ -37,20 +37,20 @@ pub const L2_CHAIN_ASSET_HANDLER_ADDR: Address = Address(FixedBytes::<20>(hex_li
     "000000000000000000000000000000000001000a"
 )));
 
-pub const L2_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
-    "000000000000000000000000000000000001000e"
-)));
-
 pub const L2_INTEROP_CENTER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
-    "0000000000000000000000000000000000010010"
-)));
-
-pub const L2_INTEROP_HANDLER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "000000000000000000000000000000000001000d"
 )));
 
-pub const GW_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+pub const L2_INTEROP_HANDLER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+    "000000000000000000000000000000000001000e"
+)));
+
+pub const L2_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "000000000000000000000000000000000001000f"
+)));
+
+pub const GW_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+    "0000000000000000000000000000000000010010"
 )));
 
 // keccak256("L2_COMPLEX_UPGRADER_IMPL_ADDR") - 1.
