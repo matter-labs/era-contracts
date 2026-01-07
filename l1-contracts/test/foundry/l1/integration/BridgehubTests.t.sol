@@ -3,10 +3,12 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
+import {console2 as console} from "forge-std/console2.sol";
 
-import {IL1Bridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
@@ -17,12 +19,13 @@ import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
+
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
 
     bytes32 constant NEW_PRIORITY_REQUEST_HASH =
@@ -51,6 +54,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
     address public currentChainAddress;
     address public currentTokenAddress = ETH_TOKEN_ADDRESS;
     TestnetERC20Token currentToken;
+    SimpleExecutor simpleExecutor;
 
     // Amounts deposited by each user, mapped by user address and token address
     mapping(address user => mapping(address token => uint256 deposited)) public depositsUsers;
@@ -666,7 +670,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         return addressesToExclude;
     }
 
-    function prepare() public {
+    function prepare() public virtual {
         _generateUserAddresses();
 
         _deployL1Contracts();
@@ -674,12 +678,8 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         _registerNewTokens(tokens);
 
         _deployEra();
-        _deployZKChain(ETH_TOKEN_ADDRESS);
-        _deployZKChain(ETH_TOKEN_ADDRESS);
+        // _deployZKChain(ETH_TOKEN_ADDRESS);
         _deployZKChain(tokens[0]);
-        _deployZKChain(tokens[0]);
-        _deployZKChain(tokens[1]);
-        _deployZKChain(tokens[1]);
 
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
@@ -692,55 +692,3 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
     // add this to be excluded from coverage report
     function test() internal override {}
 }
-
-contract BoundedBridgeHubInvariantTests is BridgeHubInvariantTests {
-    function depositEthSuccess(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 l2Value) public {
-        uint64 MAX = 2 ** 64 - 1;
-        uint256 l2Value = bound(l2Value, 0.1 ether, MAX);
-
-        emit log_string("DEPOSIT ETH");
-        super.depositEthToBridgeSuccess(userIndexSeed, chainIndexSeed, l2Value);
-    }
-
-    function depositERC20Success(
-        uint256 userIndexSeed,
-        uint256 chainIndexSeed,
-        uint256 tokenIndexSeed,
-        uint256 l2Value
-    ) public {
-        uint64 MAX = 2 ** 64 - 1;
-        uint256 l2Value = bound(l2Value, 0.1 ether, MAX);
-
-        emit log_string("DEPOSIT ERC20");
-        super.depositERC20ToBridgeSuccess(userIndexSeed, chainIndexSeed, tokenIndexSeed, l2Value);
-    }
-
-    function withdrawERC20Success(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 amountToWithdraw) public {
-        uint64 MAX = (2 ** 32 - 1) + 0.1 ether;
-        uint256 amountToWithdraw = bound(amountToWithdraw, 0.1 ether, MAX);
-
-        emit log_string("WITHDRAW ERC20");
-        super.withdrawSuccess(userIndexSeed, chainIndexSeed, amountToWithdraw);
-    }
-
-    // add this to be excluded from coverage report
-    function testBoundedBridgeHubInvariant() internal {}
-}
-
-// contract InvariantTesterZKChains is Test {
-//     BoundedBridgeHubInvariantTests tests;
-
-//     function setUp() public {
-//         tests = new BoundedBridgeHubInvariantTests();
-//         tests.prepare();
-//     }
-
-//     // Check whether the sum of ETH deposits from tests, updated on each deposit and withdrawal,
-//     // equals the balance of L1Shared bridge.
-//     function test_ETHbalanceStaysEqual() public {
-//         require(1 == 1);
-//     }
-
-//     // add this to be excluded from coverage report
-//     function test() internal {}
-// }

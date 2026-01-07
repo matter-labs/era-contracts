@@ -3,13 +3,11 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
-import {MessageRootNotRegistered, OnlyBridgehub} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
-import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
-import {L2MessageVerification} from "contracts/bridgehub/L2MessageVerification.sol";
+
+import {L2MessageVerification} from "contracts/interop/L2MessageVerification.sol";
 import {L2Log, L2Message} from "contracts/common/Messaging.sol";
-// import {IL2MessageRootStorage} from "contracts/common/interfaces/IL2MessageRootStorage.sol";
+// import {IL2InteropRootStorage} from "contracts/common/interfaces/IL2InteropRootStorage.sol";
 import {L2_INTEROP_ROOT_STORAGE} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.

@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {StdStorage, Test, stdStorage, stdToml} from "forge-std/Test.sol";
+import {Test, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L2Utils} from "./L2Utils.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/Utils.sol";
-import {ADDRESS_ONE} from "deploy-scripts/Utils.sol";
+import {ADDRESS_ONE} from "deploy-scripts/utils/Utils.sol";
 
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -37,18 +37,20 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         L2Utils.initSystemContracts(_args);
     }
 
-    // note this is duplicate code, but the inheritance is already complex
+    /// @notice this is duplicate code, but the inheritance is already complex
+    /// here we have to deploy contracts manually with new Contract(), because that can be handled by the compiler.
     function deployL2Contracts(uint256 _l1ChainId) public virtual override {
         string memory root = vm.projectRoot();
         string memory inputPath = string.concat(
             root,
-            "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml"
+            "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm.toml"
+        );
+        string memory permanentValuesInputPath = string.concat(
+            root,
+            "/test/foundry/l1/integration/deploy-scripts/script-config/permanent-values.toml"
         );
         initializeConfig(inputPath);
         addresses.transparentProxyAdmin = address(0x1);
-        addresses.bridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
-        addresses.bridges.l1AssetRouterProxy = L2_ASSET_ROUTER_ADDR;
-        addresses.vaults.l1NativeTokenVaultProxy = L2_NATIVE_TOKEN_VAULT_ADDR;
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         instantiateCreate2Factory();
@@ -66,35 +68,35 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         );
         addresses.stateTransition.executorFacet = address(new ExecutorFacet(config.l1ChainId));
         addresses.stateTransition.adminFacet = address(
-            new AdminFacet(config.l1ChainId, RollupDAManager(addresses.daAddresses.rollupDAManager))
+            new AdminFacet(config.l1ChainId, RollupDAManager(addresses.daAddresses.rollupDAManager), false)
         );
-        addresses.stateTransition.mailboxFacet = address(new MailboxFacet(config.eraChainId, config.l1ChainId));
+        addresses.stateTransition.mailboxFacet = address(
+            new MailboxFacet(
+                config.eraChainId,
+                config.l1ChainId,
+                L2_CHAIN_ASSET_HANDLER_ADDR,
+                IEIP7702Checker(address(0)),
+                false
+            )
+        );
         addresses.stateTransition.gettersFacet = address(new GettersFacet());
         addresses.stateTransition.diamondInit = address(new DiamondInit(false));
         // Deploy ChainTypeManager implementation
         if (config.isZKsyncOS) {
             addresses.stateTransition.chainTypeManagerImplementation = address(
-                new ZKsyncOSChainTypeManager(addresses.bridgehub.bridgehubProxy)
+                new ZKsyncOSChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
             );
         } else {
             addresses.stateTransition.chainTypeManagerImplementation = address(
-                new EraChainTypeManager(addresses.bridgehub.bridgehubProxy)
+                new EraChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
             );
         }
 
         // Deploy TransparentUpgradeableProxy for ChainTypeManager
-        bytes memory initCalldata;
-        if (config.isZKsyncOS) {
-            initCalldata = abi.encodeCall(
-                IChainTypeManager.initialize,
-                getChainTypeManagerInitializeData(addresses.stateTransition)
-            );
-        } else {
-            initCalldata = abi.encodeCall(
-                IChainTypeManager.initialize,
-                getChainTypeManagerInitializeData(addresses.stateTransition)
-            );
-        }
+        bytes memory initCalldata = abi.encodeCall(
+            IChainTypeManager.initialize,
+            getChainTypeManagerInitializeData(addresses.stateTransition)
+        );
 
         addresses.stateTransition.chainTypeManagerProxy = address(
             new TransparentUpgradeableProxy(
@@ -115,28 +117,4 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
 
     // add this to be excluded from coverage report
     function test() internal virtual override {}
-
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        revert("Not implemented");
-    }
-
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (bytes memory) {
-        return ("Not implemented initialize calldata");
-    }
-
-    function deployTuppWithContract(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (address implementation, address proxy) {
-        revert("Not implemented tupp");
-    }
-
-    // function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
-    // }
 }

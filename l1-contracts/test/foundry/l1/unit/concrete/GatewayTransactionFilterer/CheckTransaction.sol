@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {GatewayTransactionFiltererTest} from "./_GatewayTransactionFilterer_Shared.t.sol";
 
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {InvalidSelector} from "contracts/common/L1ContractErrors.sol";
@@ -81,7 +81,7 @@ contract CheckTransactionTest is GatewayTransactionFiltererTest {
     function test_TransactionFailsWithInvalidSelectorEvenIfTheSenderIsAR() public {
         bytes memory txCalladata = abi.encodeCall(
             AssetRouterBase.setAssetHandlerAddressThisChain,
-            (bytes32("0x12345"), address(0x01234567890123456789))
+            (bytes32("0x12345"), makeAddr("testAddress"))
         );
         vm.prank(owner);
         vm.expectRevert(

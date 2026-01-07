@@ -41,6 +41,8 @@ interface ISystemContext {
 
     function baseFee() external view returns (uint256);
 
+    function currentSettlementLayerChainId() external view returns (uint256);
+
     function txNumberInBlock() external view returns (uint16);
 
     function getBlockHashEVM(uint256 _block) external view returns (bytes32);

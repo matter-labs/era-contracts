@@ -4,8 +4,12 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 
 import {FullMerkleTest as FullMerkleTestContract} from "contracts/dev-contracts/test/FullMerkleTest.sol";
+import {FullMerkleMemory} from "contracts/common/libraries/FullMerkleMemory.sol";
+import {console2 as console} from "forge-std/console2.sol";
 
 contract FullMerkleTest is Test {
+    using FullMerkleMemory for FullMerkleMemory.FullTree;
+
     // add this to be excluded from coverage report
     function test() internal {}
 
@@ -19,5 +23,12 @@ contract FullMerkleTest is Test {
     // ### Helper functions ###
     function keccak(bytes32 left, bytes32 right) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(left, right));
+    }
+
+    function _setupMemoryTree(uint256 _maxLeafNumber) internal view returns (FullMerkleMemory.FullTree memory) {
+        FullMerkleMemory.FullTree memory memoryTree;
+        memoryTree.createTree(_maxLeafNumber);
+        memoryTree.setup(zeroHash);
+        return memoryTree;
     }
 }

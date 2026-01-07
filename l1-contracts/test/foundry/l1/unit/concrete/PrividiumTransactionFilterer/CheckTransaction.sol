@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {PrividiumTransactionFiltererTest} from "./_PrividiumTransactionFilterer_Shared.t.sol";
 
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {InvalidSelector} from "contracts/common/L1ContractErrors.sol";

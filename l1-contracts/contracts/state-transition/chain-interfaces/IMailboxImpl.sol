@@ -116,14 +116,24 @@ interface IMailboxImpl is IZKChainBase {
         bytes calldata _l2Calldata
     ) external returns (bytes32 canonicalTxHash);
 
+    /// @notice Pauses deposits on Gateway, needed as migration is only allowed with this timestamp.
+    function pauseDepositsOnGateway(uint256 _timestamp) external;
+
     /// @dev On L1 we have to forward to the Gateway's mailbox which sends to the Bridgehub on the Gateway.
+    /// @dev Note that this function is callable by any chain, including potentially malicious ones, so all inputs
+    /// need to be validated (or ensured that their validation will happen on L2).
     /// @param _chainId the chainId of the chain.
     /// @param _canonicalTxHash the canonical transaction hash.
     /// @param _expirationTimestamp the expiration timestamp.
-    function requestL2TransactionToGatewayMailbox(
+    /// @param _baseTokenAmount the base token amount that is sent with the transaction.
+    /// @param _getBalanceChange whether a second token is passed with the transaction,
+    /// the amount of which will be fetched from the L1 asset tracker. If false it is not fetched for gas savings.
+    function requestL2TransactionToGatewayMailboxWithBalanceChange(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
+        uint64 _expirationTimestamp,
+        uint256 _baseTokenAmount,
+        bool _getBalanceChange
     ) external returns (bytes32 canonicalTxHash);
 
     /// @notice Estimates the cost in Ether of requesting execution of an L2 transaction from L1.
@@ -152,6 +162,10 @@ interface IMailboxImpl is IZKChainBase {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) external view returns (bool);
+
+    /// @notice Returns whether deposits are paused on the chain.
+    /// @return Whether deposits are paused on the chain.
+    function depositsPaused() external view returns (bool);
 
     /// @notice New priority request event. Emitted when a request is placed into the priority queue.
     /// @param txId Serial number of the priority operation.

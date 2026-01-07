@@ -8,7 +8,7 @@ import {RelayedSLDAValidator} from "contracts/state-transition/data-availability
 import {L1DAValidatorOutput, PubdataSource} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {L2_BRIDGEHUB_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2ToL1MessengerEra} from "contracts/common/l2-helpers/IL2ToL1MessengerEra.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {InvalidPubdataSource, L1DAValidatorInvalidSender, PubdataInputTooSmall} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract RelayedSLDAValidatorTest is Test {
