@@ -47,4 +47,34 @@ library GetDiamondCutData {
         }
         revert("No recorded logs for NewUpgradeCutData");
     }
+
+    function getDiamondCutAndForceDeployment(
+        address ctm
+    ) external returns (bytes memory diamondCutData, bytes memory forceDeploymentsData) {
+        ChainTypeManagerBase chainTypeManager = ChainTypeManagerBase(ctm);
+        uint256 protocolVersion = chainTypeManager.protocolVersion();
+        uint256 blockWithData = chainTypeManager.newChainCreationParamsBlock(protocolVersion);
+        bytes32[] memory topics = new bytes32[](1);
+        topics[0] = IChainTypeManager.NewChainCreationParams.selector;
+        Vm.EthGetLogs[] memory logs = vm.eth_getLogs(blockWithData, blockWithData, ctm, topics);
+        require(logs.length > 0, "No logs found for NewChainCreationParams");
+        // Assuming the first log is the one we want
+        bytes memory data = logs[0].data;
+        // Decode the event data as a tuple of all event parameters
+        // Event: NewChainCreationParams(address, bytes32, uint64, bytes32, Diamond.DiamondCutData, bytes32, bytes, bytes32)
+        (
+            address genesisUpgrade,
+            bytes32 genesisBatchHash,
+            uint64 genesisIndexRepeatedStorageChanges,
+            bytes32 genesisBatchCommitment,
+            Diamond.DiamondCutData memory newInitialCut,
+            bytes32 newInitialCutHash,
+            bytes memory forceDeployments,
+            bytes32 forceDeploymentHash
+        ) = abi.decode(data, (address, bytes32, uint64, bytes32, Diamond.DiamondCutData, bytes32, bytes, bytes32));
+
+        diamondCutData = abi.encode(newInitialCut);
+        forceDeploymentsData = forceDeployments;
+    }
+
 }

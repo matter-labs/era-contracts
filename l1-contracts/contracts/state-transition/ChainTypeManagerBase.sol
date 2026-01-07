@@ -81,6 +81,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev It's used for easier tracking the upgrade cutData off-chain.
     mapping(uint256 protocolVersion => uint256) public upgradeCutDataBlock;
 
+    /// @dev The block number when newChainCreationParams was saved for some protocolVersion.
+    /// @dev It's used for easier tracking the upgrade cutData off-chain.
+    mapping(uint256 protocolVersion => uint256) public newChainCreationParamsBlock;
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     /// @dev Note, that while the contract does not use `nonReentrant` modifier, we still keep the `reentrancyGuardInitializer`
@@ -205,6 +209,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         initialCutHash = newInitialCutHash;
         bytes32 forceDeploymentHash = keccak256(abi.encode(_chainCreationParams.forceDeploymentsData));
         initialForceDeploymentHash = forceDeploymentHash;
+        newChainCreationParamsBlock[protocolVersion] = block.number;
 
         emit NewChainCreationParams({
             genesisUpgrade: _chainCreationParams.genesisUpgrade,
