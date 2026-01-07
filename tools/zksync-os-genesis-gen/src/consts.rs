@@ -101,7 +101,7 @@ pub const INITIAL_CONTRACTS: [(Address, &str); 20] = [
     (L2_INTEROP_CENTER_ADDR, "InteropCenter"),
     (L2_INTEROP_HANDLER_ADDR, "InteropHandler"),
     (L2_INTEROP_ROOT_STORAGE, "L2InteropRootStorage"),
-    (L2_MESSAGE_VERIFICATION, "L2MessageVerification")
+    (L2_MESSAGE_VERIFICATION, "L2MessageVerification"),
     // System contracts (0x8000 range)
     (L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, "ZKOSContractDeployer"),
     (L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "L1Messenger"),
