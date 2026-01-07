@@ -11,7 +11,7 @@ pragma solidity 0.8.28;
 library ZKSyncOSBytecodeInfo {
     /// @notice Encodes the ZKSync OS bytecode info.
     /// @param _bytecodeBlakeHash The Blake2b hash of the bytecode.
-    /// @param _bytecodeLength The length of the bytecode.
+    /// @param _bytecodeLength The length of the bytecode (used for both bytecode_length and observable_bytecode_length).
     /// @param _observableBytecodeHash The observable hash of the bytecode (Keccak256).
     /// @return The encoded bytecode info.
     function encodeZKSyncOSBytecodeInfo(
@@ -26,7 +26,7 @@ library ZKSyncOSBytecodeInfo {
     /// @param _bytecodeInfo The encoded bytecode info.
     /// @return bytecodeBlakeHash The Blake2b hash of the bytecode.
     /// @return bytecodeLength The length of the bytecode.
-    /// @return observableBytecodeHash The observable hash of the bytecode (Keccak256
+    /// @return observableBytecodeHash The observable hash of the bytecode (Keccak256).
     function decodeZKSyncOSBytecodeInfo(
         bytes memory _bytecodeInfo
     ) internal pure returns (bytes32 bytecodeBlakeHash, uint256 bytecodeLength, bytes32 observableBytecodeHash) {
