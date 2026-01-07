@@ -42,7 +42,13 @@ import {ZKSyncOSBytecodeInfo} from "../common/libraries/ZKSyncOSBytecodeInfo.sol
 library L2GenesisForceDeploymentsHelper {
     event ForceDeployEraStarted(address indexed targetAddress, bytes32 bytecodeHash);
     event ForceDeployEraCompleted(address indexed targetAddress);
-    event ZKsyncOSBytecodeDetailsSet(address indexed targetAddress, bytes32 bytecodeHash, uint32 bytecodeLength, bytes32 observableBytecodeHash, uint32 observableBytecodeLength);
+    event ZKsyncOSBytecodeDetailsSet(
+        address indexed targetAddress,
+        bytes32 bytecodeHash,
+        uint32 bytecodeLength,
+        bytes32 observableBytecodeHash,
+        uint32 observableBytecodeLength
+    );
     event ZKsyncOSForceDeployStarted(address indexed targetAddress);
     event ZKsyncOSForceDeployCompleted(address indexed targetAddress);
     event UpdateZKsyncOSContractStarted(address indexed targetAddress);
@@ -87,8 +93,8 @@ library L2GenesisForceDeploymentsHelper {
         emit ZKsyncOSForceDeployStarted(_newAddress);
 
         // Decode the bytecode info using the library
-        (bytes32 bytecodeHash, uint256 bytecodeLength256, bytes32 observableBytecodeHash) =
-            ZKSyncOSBytecodeInfo.decodeZKSyncOSBytecodeInfo(_bytecodeInfo);
+        (bytes32 bytecodeHash, uint256 bytecodeLength256, bytes32 observableBytecodeHash) = ZKSyncOSBytecodeInfo
+            .decodeZKSyncOSBytecodeInfo(_bytecodeInfo);
 
         // Convert to uint32 for the contract deployer interface
         uint32 bytecodeLength = uint32(bytecodeLength256);
@@ -97,7 +103,13 @@ library L2GenesisForceDeploymentsHelper {
             IZKOSContractDeployer.setBytecodeDetailsEVM,
             (_newAddress, bytecodeHash, bytecodeLength, observableBytecodeHash)
         );
-        emit ZKsyncOSBytecodeDetailsSet(_newAddress, bytecodeHash, bytecodeLength, observableBytecodeHash, bytecodeLength);
+        emit ZKsyncOSBytecodeDetailsSet({
+            targetAddress: _newAddress,
+            bytecodeHash: bytecodeHash,
+            bytecodeLength: bytecodeLength,
+            observableBytecodeHash: observableBytecodeHash,
+            observableBytecodeLength: bytecodeLength
+        });
 
         // Note, that we dont use interface, but raw call to avoid Solidity checking for empty bytecode
         (bool success, ) = L2_DEPLOYER_SYSTEM_CONTRACT_ADDR.call(data);
@@ -476,15 +488,15 @@ library L2GenesisForceDeploymentsHelper {
         // It is expected that either through the force deployments above
         // or upon initialization, both the L2 deployment of BridgeHub, AssetRouter, and MessageRoot are deployed.
         // However, there is still some follow-up finalization that needs to be done.
-        
+
         emit BridgehubSetAddressesStarted();
-        L2Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses(
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses({
             _assetRouter: L2_ASSET_ROUTER_ADDR,
             _l1CtmDeployer: ICTMDeploymentTracker(_ctmDeployer),
             _messageRoot: IMessageRoot(L2_MESSAGE_ROOT_ADDR),
             _chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
             _chainRegistrationSender: fixedForceDeploymentsData.aliasedChainRegistrationSender
-        );
+        });
 
         L2AssetTracker(L2_ASSET_TRACKER_ADDR).setAddresses(
             fixedForceDeploymentsData.l1ChainId,
@@ -499,7 +511,6 @@ library L2GenesisForceDeploymentsHelper {
 
         InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
         emit PerformForceDeployedContractsInitCompleted();
-
     }
 
     /// @notice Constructs the initialization calldata for the L2WrappedBaseToken.

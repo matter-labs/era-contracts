@@ -157,7 +157,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
-        if (toml.keyExists("$.is_zk_sync_os")) {
+        if (vm.keyExistsToml(toml, "$.is_zk_sync_os")) {
             config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
         }
         bytes32 create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");

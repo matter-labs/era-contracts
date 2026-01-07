@@ -49,7 +49,7 @@ contract L1Messenger is IL2ToL1MessengerZKSyncOS {
     }
 
     // --- Burner entrypoint: only callable by self ---
-    fallback() external {
+    fallback() external payable {
         // This fallback is used *only* for self-call burning
         require(msg.sender == address(this), NotSelfCall());
         assembly {
