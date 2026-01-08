@@ -43,7 +43,11 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         string memory root = vm.projectRoot();
         string memory inputPath = string.concat(
             root,
-            "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml"
+            "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm.toml"
+        );
+        string memory permanentValuesInputPath = string.concat(
+            root,
+            "/test/foundry/l1/integration/deploy-scripts/script-config/permanent-values.toml"
         );
         string memory permanentValuesInputPath = string.concat(
             root,

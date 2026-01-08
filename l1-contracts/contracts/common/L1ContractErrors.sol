@@ -125,6 +125,8 @@ error FacetExists(bytes4 selector, address);
 error GasPerPubdataMismatch();
 // 0x6d4a7df8
 error GenesisBatchCommitmentZero();
+// 0x5ca97564
+error GenesisBatchCommitmentIncorrect();
 // 0x7940c83f
 error GenesisBatchHashZero();
 // 0xb4fc6835
@@ -424,8 +426,6 @@ error WrongMagicValue(uint256 expectedMagicValue, uint256 providedMagicValue);
 error ZeroAddress();
 // 0xc84885d4
 error ZeroChainId();
-// 0xdb60e600
-error ZeroGasPriceL1TxZKsyncOS();
 // 0x601b6882
 error ZKChainLimitReached();
 // 0x646ac57e

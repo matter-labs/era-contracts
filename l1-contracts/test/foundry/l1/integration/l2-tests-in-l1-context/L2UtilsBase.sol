@@ -10,8 +10,10 @@ import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol"
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
-import {GW_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2_INTEROP_ACCOUNT_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "../l2-tests-abstract/Utils.sol";
 
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
@@ -30,6 +32,7 @@ import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/
 
 import {InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
 import {InteropHandler} from "../../../../../contracts/interop/InteropHandler.sol";
+import {DummyL2L1Messenger} from "../../../../../contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 
 import {DummyL2StandardTriggerAccount} from "../../../../../contracts/dev-contracts/test/DummyL2StandardTriggerAccount.sol";
 import {DummyL2BaseTokenSystemContract} from "../../../../../contracts/dev-contracts/test/DummyBaseTokenSystemContract.sol";
@@ -121,6 +124,25 @@ library L2UtilsBase {
             );
         }
         {
+            address interopHandler = address(new InteropHandler());
+            vm.etch(L2_INTEROP_HANDLER_ADDR, interopHandler.code);
+            /// storing the reentrancy guard as the constructor is not called.
+            vm.store(
+                L2_INTEROP_HANDLER_ADDR,
+                bytes32(0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4),
+                bytes32(uint256(1))
+            );
+            address l2AssetTrackerAddress = address(new L2AssetTracker());
+            vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            L2AssetTracker(L2_ASSET_TRACKER_ADDR).setAddresses(_args.l1ChainId, bytes32(0));
+
+            address gwAssetTrackerAddress = address(new GWAssetTracker());
+            vm.etch(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAddress.code);
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            GWAssetTracker(GW_ASSET_TRACKER_ADDR).setAddresses(_args.l1ChainId);
+        }
+        {
             address l2StandardTriggerAccount = address(new DummyL2StandardTriggerAccount());
             vm.etch(L2_STANDARD_TRIGGER_ACCOUNT_ADDR, l2StandardTriggerAccount.code);
             address l2InteropAccount = address(new DummyL2InteropAccount());
@@ -132,6 +154,8 @@ library L2UtilsBase {
             vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, l2DummyBaseTokenSystemContract.code);
         }
 
+        // DummyL2L1Messenger dummyL2L1Messenger = new DummyL2L1Messenger();
+        // vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(dummyL2L1Messenger).code);
         {
             address assetRouter = address(new L2AssetRouter());
             vm.etch(L2_ASSET_ROUTER_ADDR, assetRouter.code);
@@ -147,8 +171,13 @@ library L2UtilsBase {
         }
 
         {
-            // Initialize reentrancy guard for AssetRouter
-            _initializeReentrancyGuard(L2_ASSET_ROUTER_ADDR);
+            // Initializing reentrancy guard
+            // stdstore.target(address(L2_ASSET_ROUTER_ADDR)).sig("l1AssetRouter()").checked_write(_args.l1AssetRouter);
+            vm.store(
+                L2_ASSET_ROUTER_ADDR,
+                bytes32(0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4),
+                bytes32(uint256(1))
+            );
         }
 
         {

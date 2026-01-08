@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {ChainTypeManagerBase} from "./ChainTypeManagerBase.sol";
 import {Diamond} from "./libraries/Diamond.sol";
 import {ChainCreationParams} from "./IChainTypeManager.sol";
-import {GenesisIndexStorageZero, MigrationsNotPaused} from "../common/L1ContractErrors.sol";
+import {GenesisIndexStorageZero, MigrationsNotPaused, GenesisBatchCommitmentZero, GenesisBatchHashZero, GenesisUpgradeZero} from "../common/L1ContractErrors.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {IChainAssetHandler} from "../core/chain-asset-handler/IChainAssetHandler.sol";
 
@@ -48,5 +48,22 @@ contract EraChainTypeManager is ChainTypeManagerBase {
         }
 
         _setNewVersionUpgrade(_cutData, _oldProtocolVersion, _oldProtocolVersionDeadline, _newProtocolVersion);
+    }
+
+    /// @notice Validates chain creation parameters common to all chain types
+    /// @param _chainCreationParams The chain creation parameters to validate
+    function _validateChainCreationParams(
+        ChainCreationParams calldata _chainCreationParams
+    ) internal pure virtual override {
+        if (_chainCreationParams.genesisUpgrade == address(0)) {
+            revert GenesisUpgradeZero();
+        }
+        if (_chainCreationParams.genesisBatchHash == bytes32(0)) {
+            revert GenesisBatchHashZero();
+        }
+
+        if (_chainCreationParams.genesisBatchCommitment == bytes32(0)) {
+            revert GenesisBatchCommitmentZero();
+        }
     }
 }

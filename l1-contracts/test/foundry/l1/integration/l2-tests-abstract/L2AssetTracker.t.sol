@@ -121,6 +121,9 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             if (!success) {
                 console.log("Call failed for index", i);
                 console.logBytes(returnData);
+                assembly {
+                    revert(add(data, 0x20), mload(data))
+                }
             }
 
             require(success, string.concat("Failed to call GWAssetTracker ", vm.toString(i)));
