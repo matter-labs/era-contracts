@@ -193,7 +193,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         // TODO can we discover it?. Try to get it from the chain
         bool isZKsyncOS;
-        if (permanentValuesToml.keyExists("$.is_zk_sync_os")) {
+        if (vm.keyExistsToml(permanentValuesToml, "$.is_zk_sync_os")) {
             isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
         }
 
@@ -215,7 +215,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         string memory toml = vm.readFile(newConfigPath);
 
         address governance;
-        if (toml.keyExists("$.governance")) {
+        if (vm.keyExistsToml(toml, "$.governance")) {
             governance = toml.readAddress("$.governance");
         } else {
             governance = address(0);
