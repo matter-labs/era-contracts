@@ -93,6 +93,6 @@ In the current system though having such logic would be dangerous and would allo
 
 The most important caveat of this malicious upgrade is that it may change implementation of the `Keccak256` precompile to return any values that the operator needs.
 
-- When the`priorityOperationsRollingHash` will be updated, instead of the “correct” rolling hash of the priority transactions, the one which would appear with the correct topmost priority operation is returned. The operator can’t amend the behaviour of `numberOfPriorityTransactions`, but it won’t help much, since the the `priorityOperationsRollingHash` will match on L1 on the execution step.
+- When the`priorityOperationsRollingHash` will be updated, instead of the “correct” rolling hash of the priority transactions, the one which would appear with the correct topmost priority operation is returned. The operator can’t amend the behaviour of `numberOfPriorityTransactions`, but it won’t help much, since the `priorityOperationsRollingHash` will match on L1 on the execution step.
 
 That’s why the concept of the upgrade transaction is needed: this is the only transaction that can initiate transactions out of the kernel space and thus change bytecodes of system contracts. That’s why it must be the first one and that’s why bootloader [emits](../../../system-contracts/bootloader/bootloader.yul#L603) its hash via a system L2→L1 log before actually processing it.
