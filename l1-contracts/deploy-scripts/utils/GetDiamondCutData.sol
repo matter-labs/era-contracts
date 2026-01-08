@@ -76,5 +76,4 @@ library GetDiamondCutData {
         diamondCutData = abi.encode(newInitialCut);
         forceDeploymentsData = forceDeployments;
     }
-
 }
