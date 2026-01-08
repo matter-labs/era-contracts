@@ -114,13 +114,13 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             console.log("About to call processLogsAndMessages for index", i);
             vm.prank(L2_BRIDGEHUB.getZKChain(testData[i].chainId));
 
-            (bool success, bytes memory returnData) = GW_ASSET_TRACKER_ADDR.call(
+            (bool success, bytes memory data) = GW_ASSET_TRACKER_ADDR.call(
                 abi.encodeCall(GW_ASSET_TRACKER.processLogsAndMessages, testData[i])
             );
 
             if (!success) {
                 console.log("Call failed for index", i);
-                console.logBytes(returnData);
+                console.logBytes(data);
                 assembly {
                     revert(add(data, 0x20), mload(data))
                 }
