@@ -172,6 +172,13 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setTransactionFilterer(address _transactionFilterer) external onlyAdmin onlyL1 {
+        if (s.priorityModeInfo.canBeActivated) {
+            revert NotCompatibleWithPriorityMode();
+        }
+        _setTransactionFilterer(_transactionFilterer);
+    }
+
+    function _setTransactionFilterer(address _transactionFilterer) internal {
         address oldTransactionFilterer = s.transactionFilterer;
         s.transactionFilterer = _transactionFilterer;
         emit NewTransactionFilterer(oldTransactionFilterer, _transactionFilterer);
@@ -231,6 +238,8 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if (s.priorityModeInfo.canBeActivated) {
             revert PriorityModeAlreadyAllowed();
         }
+        // Remove the transaction filterer because it is not compatible with Priority Mode.
+        _setTransactionFilterer(address(0));
         s.priorityModeInfo.canBeActivated = true;
         emit PriorityModeAllowed();
     }
