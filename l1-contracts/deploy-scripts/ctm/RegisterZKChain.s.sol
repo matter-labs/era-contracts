@@ -95,8 +95,9 @@ contract RegisterZKChainScript is Script {
 
     function run(address ctm) public {
         console.log("Deploying ZKChain");
-
-        initializeConfig(ctm);
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/script-config/register-zk-chain.toml");
+        initializeConfig(path, ctm);
         loadChainCreationData(ctm);
         // TODO: some chains may not want to have a legacy shared bridge
         runInner("/script-out/output-register-zk-chain.toml");
@@ -145,10 +146,8 @@ contract RegisterZKChainScript is Script {
         saveOutput(outputPath);
     }
 
-    function initializeConfig(address chainTypeManagerProxy) internal {
+    function initializeConfig(string memory path, address chainTypeManagerProxy) internal {
         // Grab config from output of l1 deployment
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/register-zk-chain.toml");
         string memory toml = vm.readFile(path);
 
         config.deployerAddress = msg.sender;
@@ -189,7 +188,10 @@ contract RegisterZKChainScript is Script {
             config.validatorSenderOperatorExecute = address(0);
         }
 
-        config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
+        if (vm.keyExistsToml(toml, "$.chain.initialize_legacy_bridge")) {
+            config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
+        }
+
         if (vm.keyExistsToml(toml, "$.chain.l1_erc20_bridge")) {
             config.l1Erc20Bridge = toml.readAddress("$.chain.l1_erc20_bridge");
         }
@@ -197,7 +199,6 @@ contract RegisterZKChainScript is Script {
             config.l1SharedBridgeProxy = toml.readAddress("$.chain.l1_shared_bridge_proxy");
         }
 
-        config.governance = toml.readAddress("$.governance");
         config.create2FactoryAddress = toml.readAddress("$.contracts.create2_factory_addr");
         config.create2Salt = toml.readBytes32("$.contracts.create2_factory_salt");
         if (vm.keyExistsToml(toml, "$.chain.allow_evm_emulator")) {
@@ -225,7 +226,8 @@ contract RegisterZKChainScript is Script {
         );
         config.forceDeploymentsData = toml.readBytes("$.contracts_config.force_deployments_data");
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
-        initializeConfig(chainTypeManagerProxy);
+        path = string.concat(root, vm.envString("ZK_CHAIN_CONFIG"));
+        initializeConfig(path, chainTypeManagerProxy);
     }
 
     function getOwnerAddress() public view returns (address) {
