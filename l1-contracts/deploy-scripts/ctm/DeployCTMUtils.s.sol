@@ -131,7 +131,11 @@ abstract contract DeployCTMUtils is DeployUtils {
         }
     }
 
-    function initializeConfig(string memory configPath) internal virtual {
+    function initializeConfig(
+        string memory configPath,
+        string memory permanentValuesPath,
+        address bridgehub
+    ) internal virtual {
         string memory toml = vm.readFile(configPath);
 
         config.l1ChainId = block.chainid;
@@ -142,11 +146,6 @@ abstract contract DeployCTMUtils is DeployUtils {
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
-
-        // Get eraChainId from AssetRouter via AddressIntrospector
-        IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddress);
-        address assetRouter = address(bridgehub.assetRouter());
-        config.eraChainId = AddressIntrospector.getEraChainId(assetRouter);
 
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
         if (toml.keyExists("$.is_zk_sync_os")) {
