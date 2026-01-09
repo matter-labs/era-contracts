@@ -1194,16 +1194,17 @@ object "Bootloader" {
                         assertionError("Upgrade tx failed")
                     }
 
-                    // If the transaction reverts, then initial minting to the user has been reverted
-                    // as well, so we can simply mint everything that the user has deposited to
-                    // the refund recipient
+                    // If the transaction reverts, the initial mint to the sender is reverted as well.
+                    // Refund the deposited amount minus the operator payment to the refund recipient.
                     toRefundRecipient := safeSub(getReserved0(innerTxDataOffset), payToOperator, "vji")
+                }
                 default {
-                    // If the transaction succeeds, then it is assumed that initial mint was made. However, the remaining
-                    // ETH deposited will be given to the refund recipient.
-
+                    // If the transaction succeeds, the initial mint to the sender is assumed to have happened.
+                    // We mint back to the sender the part of the deposited amount not spent on execution gas:
+                    //   refund = reserved0 - (gasLimit * gasPrice).
+                    // The operator payment is handled separately.
                     let txInternalCost := safeMul(gasPrice, gasLimit, "poa")
-                    toRefundRecipient := safeSub(txInternalCost payToOperator, "ysl")
+                    toRefundRecipient := safeSub(getReserved0(innerTxDataOffset), txInternalCost, "ysl")
                 }
 
                 if gt(toRefundRecipient, 0) {
