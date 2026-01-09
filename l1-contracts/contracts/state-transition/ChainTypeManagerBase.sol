@@ -16,7 +16,7 @@ import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE} from "../common/Config.sol";
 import {AdminZero, InitialForceDeploymentMismatch, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
-import {ChainAlreadyLive, GenesisBatchCommitmentZero, GenesisBatchHashZero, GenesisUpgradeZero, HashMismatch, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {ChainAlreadyLive, HashMismatch, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 
@@ -185,17 +185,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
 
     /// @notice Validates chain creation parameters common to all chain types
     /// @param _chainCreationParams The chain creation parameters to validate
-    function _validateChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal pure {
-        if (_chainCreationParams.genesisUpgrade == address(0)) {
-            revert GenesisUpgradeZero();
-        }
-        if (_chainCreationParams.genesisBatchHash == bytes32(0)) {
-            revert GenesisBatchHashZero();
-        }
-        if (_chainCreationParams.genesisBatchCommitment == bytes32(0)) {
-            revert GenesisBatchCommitmentZero();
-        }
-    }
+    function _validateChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal pure virtual;
 
     /// @notice Sets chain creation parameters after validation
     /// @param _chainCreationParams The chain creation parameters

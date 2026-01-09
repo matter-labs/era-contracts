@@ -6,7 +6,6 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "../utils/Utils.sol";
-import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
@@ -15,9 +14,8 @@ import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {IDeployL2Contracts} from "contracts/script-interfaces/IDeployL2Contracts.sol";
 
-contract DeployL2Script is Script, IDeployL2Contracts {
+contract DeployL2Script is Script {
     using stdToml for string;
 
     Config internal config;

@@ -40,6 +40,7 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 
@@ -61,7 +62,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IDeployCTM} from "contracts/script-interfaces/IDeployCTM.sol";
 
 // TODO: pass this value from zkstack_cli
-uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 5;
+uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 6;
 
 contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     using stdToml for string;
@@ -439,6 +440,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts", contracts);
+        vm.serializeBool("root", "is_zk_sync_os", config.isZKsyncOS);
         string memory toml = vm.serializeString("root", "contracts_config", contractsConfig);
         vm.writeToml(toml, outputPath);
     }

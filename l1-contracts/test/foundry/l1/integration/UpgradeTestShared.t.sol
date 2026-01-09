@@ -161,7 +161,16 @@ contract UpgradeIntegrationTestBase is Test {
             "$.deployed_addresses.state_transition.bytecodes_supplier_addr"
         );
         address l1Bridgehub = outputDeployL1Toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
-        address rollupDAManager = outputDeployCTMToml.readAddress("$.deployed_addresses.l1_rollup_da_manager");
+        bool isZKsyncOs = outputDeployCTMToml.readBool("$.is_zk_sync_os");
+
+        address rollupDAManager;
+        if (isZKsyncOs) {
+            rollupDAManager = outputDeployCTMToml.readAddress(
+                "$.deployed_addresses.blobs_zksync_os_l1_da_validator_addr"
+            );
+        } else {
+            rollupDAManager = outputDeployCTMToml.readAddress("$.deployed_addresses.l1_rollup_da_manager");
+        }
         uint256 eraChainId = outputDeployL1Toml.readUint("$.era_chain_id");
 
         // Serialize permanent_contracts section

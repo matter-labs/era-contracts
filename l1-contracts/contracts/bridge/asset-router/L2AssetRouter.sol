@@ -18,7 +18,7 @@ import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
 import {InteropCallStarter} from "../../common/Messaging.sol";
-import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, ExecuteMessageFailed, InvalidSelector, PayloadTooShort, TokenNotLegacy, Unauthorized} from "../../common/L1ContractErrors.sol";
@@ -110,9 +110,15 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _;
     }
 
-    /// @notice Checks that the message sender is the bridgehub.
+    /// @notice Checks that the message sender is the interop center.
     modifier onlyL2InteropCenter() {
         require(msg.sender == L2_INTEROP_CENTER_ADDR, Unauthorized(msg.sender));
+        _;
+    }
+
+    /// @notice Checks that the message sender is the interop handler.
+    modifier onlyL2InteropHandler() {
+        require(msg.sender == L2_INTEROP_HANDLER_ADDR, Unauthorized(msg.sender));
         _;
     }
 
@@ -202,7 +208,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         bytes32 /* receiveId */, // Unique identifier
         bytes calldata sender, // ERC-7930 address
         bytes calldata payload
-    ) external payable returns (bytes4) {
+    ) external payable onlyL2InteropHandler returns (bytes4) {
         // This function serves as the L2AssetRouter's entry point for processing cross-chain bridge operations
         // initiated through the InteropCenter system. It implements critical security validations:
         // - L1->L2 calls: Currently Interop can only be initiated on L2, so this case shouldn't be covered.
@@ -230,7 +236,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
             InvalidSelector(bytes4(payload[0:4]))
         );
 
-        (bool success, ) = address(this).call(payload);
+        (bool success, ) = address(this).call{value: msg.value}(payload);
         require(success, ExecuteMessageFailed());
         return IERC7786Recipient.receiveMessage.selector;
     }

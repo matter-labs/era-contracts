@@ -91,6 +91,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     function migrateTokenBalanceFromNTVV31(uint256 _chainId, bytes32 _assetId) external {
         IL1NativeTokenVault l1NTV = IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT));
         uint256 originChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
+        require(originChainId != 0, InvalidChainId());
         // We do not migrate the chainBalance for the originChain directly, but indirectly by subtracting from MAX_TOKEN_BALANCE.
         // Its important to call this for all chains in the ecosystem so that the sum is accurate.
         require(_chainId != originChainId, InvalidChainId());
@@ -398,7 +399,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @notice Verifies that a message was properly included in the L2->L1 message system.
     /// @param _finalizeWithdrawalParams The parameters containing the message and its inclusion proof.
     function _proveMessageInclusion(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) internal view {
-        require(_finalizeWithdrawalParams.l2Sender == L2_ASSET_TRACKER_ADDR, InvalidSender());
+        require(
+            _finalizeWithdrawalParams.l2Sender == L2_ASSET_TRACKER_ADDR ||
+                _finalizeWithdrawalParams.l2Sender == GW_ASSET_TRACKER_ADDR,
+            InvalidSender()
+        );
         bool success = MESSAGE_ROOT.proveL1DepositParamsInclusion(_finalizeWithdrawalParams);
         if (!success) {
             revert InvalidProof();

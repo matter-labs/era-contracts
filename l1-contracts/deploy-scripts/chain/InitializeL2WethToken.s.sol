@@ -8,7 +8,6 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Utils} from "../utils/Utils.sol";
-import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {IL1Bridgehub, L2TransactionRequestDirect} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 contract InitializeL2WethTokenScript is Script {
