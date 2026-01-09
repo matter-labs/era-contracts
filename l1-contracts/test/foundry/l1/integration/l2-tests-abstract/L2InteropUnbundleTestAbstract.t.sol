@@ -12,7 +12,7 @@ import {IMessageVerification} from "contracts/common/interfaces/IMessageVerifica
 import {InteropBundle, MessageInclusionProof, CallStatus} from "contracts/common/Messaging.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
-import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
+import {InteropLibrary} from "contracts/interop/InteropLibrary.sol";
 
 abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
     function test_unbundleBundleViaReceiveMessage() public {

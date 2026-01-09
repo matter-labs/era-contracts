@@ -11,7 +11,7 @@ import {L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER, L2_INTEROP_HANDLER_ADDR} fro
 import {InteropBundle, MessageInclusionProof} from "contracts/common/Messaging.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
-import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
+import {InteropLibrary} from "contracts/interop/InteropLibrary.sol";
 
 abstract contract L2InteropExecuteBundleTestAbstract is L2InteropTestUtils {
     function test_executeBundleViaReceiveMessage() public {

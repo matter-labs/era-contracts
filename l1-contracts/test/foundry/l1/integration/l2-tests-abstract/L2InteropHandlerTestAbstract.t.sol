@@ -29,7 +29,7 @@ import {IMessageVerification} from "contracts/common/interfaces/IMessageVerifica
 
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
-import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
+import {InteropLibrary} from "contracts/interop/InteropLibrary.sol";
 
 abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer {
     function test_requestL2TransactionDirectWithCalldata() public {

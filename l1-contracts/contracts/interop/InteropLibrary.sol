@@ -4,21 +4,19 @@ pragma solidity ^0.8.24;
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_ASSET_ROUTER, L2_BRIDGEHUB, L2_INTEROP_CENTER_ADDR, L2_INTEROP_CENTER, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
-// import {IInteropCenter} from "contracts/interop/InteropCenter.sol";
-import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {AmountMustBeGreaterThanZero, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
-import {ArgumentsLengthNotIdentical} from "./utils/ZkSyncScriptErrors.sol";
+import {ArgumentsLengthNotIdentical} from "./InteropErrors.sol";
 
 library InteropLibrary {
     /*//////////////////////////////////////////////////////////////
                                BUILDERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Build the “second bridge” calldata. Check DataEncoding library for details.
+    /// @notice Build the "second bridge" calldata. Check DataEncoding library for details.
     function buildSecondBridgeCalldata(
         bytes32 l2TokenAssetId,
         uint256 amount,

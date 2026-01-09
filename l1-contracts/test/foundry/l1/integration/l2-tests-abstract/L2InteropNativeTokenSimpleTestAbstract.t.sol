@@ -11,7 +11,7 @@ import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
-import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
+import {InteropLibrary} from "contracts/interop/InteropLibrary.sol";
 
 abstract contract L2InteropNativeTokenSimpleTestAbstract is L2InteropTestUtils {
     function test_requestNativeTokenTransferViaLibrary_SameBaseToken() public {

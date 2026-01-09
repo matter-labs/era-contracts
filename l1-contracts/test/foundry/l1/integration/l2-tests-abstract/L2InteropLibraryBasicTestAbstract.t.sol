@@ -8,7 +8,7 @@ import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
-import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
+import {InteropLibrary} from "contracts/interop/InteropLibrary.sol";
 
 abstract contract L2InteropLibraryBasicTestAbstract is L2InteropTestUtils {
     function test_requestTokenTransferInteropViaLibrary() public {

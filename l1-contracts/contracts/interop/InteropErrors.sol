@@ -39,3 +39,5 @@ error WrongCallStatusLength(uint256 bundleCallsLength, uint256 providedCallStatu
 error WrongDestinationChainId(bytes32 bundleHash, uint256 expected, uint256 actual);
 // 0x534ab1b2
 error WrongSourceChainId(bytes32 bundleHash, uint256 expected, uint256 actual);
+// 0xa5cea466
+error ArgumentsLengthNotIdentical();

@@ -20,7 +20,7 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
-import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
+import {InteropLibrary} from "contracts/interop/InteropLibrary.sol";
 
 abstract contract L2InteropNativeTokenDifferentBaseTestAbstract is L2InteropTestUtils {
     function test_requestNativeTokenTransferViaLibrary_DifferentBaseToken() public {
