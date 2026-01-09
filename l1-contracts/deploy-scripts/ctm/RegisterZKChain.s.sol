@@ -199,8 +199,14 @@ contract RegisterZKChainScript is Script {
             config.l1SharedBridgeProxy = toml.readAddress("$.chain.l1_shared_bridge_proxy");
         }
 
-        config.create2FactoryAddress = toml.readAddress("$.contracts.create2_factory_addr");
-        config.create2Salt = toml.readBytes32("$.contracts.create2_factory_salt");
+        if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
+            config.create2FactoryAddress = toml.readAddress("$.contracts.create2_factory_addr");
+        }
+
+        if (vm.keyExistsToml(toml, "$.contracts.create2_factory_salt")) {
+            config.create2Salt = toml.readBytes32("$.contracts.create2_factory_salt");
+        }
+
         if (vm.keyExistsToml(toml, "$.chain.allow_evm_emulator")) {
             config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
         }
@@ -226,6 +232,8 @@ contract RegisterZKChainScript is Script {
         );
         config.forceDeploymentsData = toml.readBytes("$.contracts_config.force_deployments_data");
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
+        config.create2FactoryAddress = toml.readAddress("$.contracts.create2_factory_addr");
+        config.create2Salt = toml.readBytes32("$.contracts.create2_factory_salt");
         path = string.concat(root, vm.envString("ZK_CHAIN_CONFIG"));
         initializeConfig(path, chainTypeManagerProxy);
     }
