@@ -189,7 +189,7 @@ contract RegisterZKChainScript is Script {
         }
 
         if (vm.keyExistsToml(toml, "$.chain.initialize_legacy_bridge")) {
-            config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
+            config.initializeLegacyBridge = toml.readBool("$.chain.initialize_legacy_bridge");
         }
 
         if (vm.keyExistsToml(toml, "$.chain.l1_erc20_bridge")) {
