@@ -961,6 +961,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
         uint256 firstUnprocessedTx = s.priorityTree.getFirstUnprocessedPriorityTx();
         uint256 unprocessedTxRequestedAt = s.priorityOpsRequestTimestamp[firstUnprocessedTx];
+        // A zero timestamp means we don't have a recorded "requested at" time for this priority tx.
+        // This can happen when:
+        //  - the priority queue is empty, or
+        //  - immediately after the chain upgraded to the `PriorityMode` protocol version.
+        //
+        // In the upgrade case, priority transactions may already exist in the contract state,
+        // but `priorityOpsRequestTimestamp` has not been populated for "old" priority transactions.
         if (unprocessedTxRequestedAt == 0) {
             revert PriorityOpsRequestTimestampMissing(firstUnprocessedTx);
         }

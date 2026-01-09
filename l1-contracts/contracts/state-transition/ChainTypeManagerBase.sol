@@ -411,8 +411,8 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     }
 
     /// @notice Allow Priority Mode to be activated on the specified chain.
-    function allowPriorityMode(uint256 _chainId) external onlyOwner {
-        IZKChain(getZKChain(_chainId)).allowPriorityMode();
+    function permanentlyAllowPriorityMode(uint256 _chainId) external onlyOwner {
+        IZKChain(getZKChain(_chainId)).permanentlyAllowPriorityMode();
     }
 
     /// @dev setPorterAvailability for the specified chain

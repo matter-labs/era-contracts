@@ -52,7 +52,7 @@ interface IAdmin is IZKChainBase {
     function allowEvmEmulation() external returns (bytes32 canonicalTxHash);
 
     /// @notice Allow Priority Mode to be activated on the chain (does not activate it).
-    function allowPriorityMode() external;
+    function permanentlyAllowPriorityMode() external;
 
     /// @notice Perform the upgrade from the current protocol version with the corresponding upgrade data
     /// @param _protocolVersion The current protocol version from which upgrade is executed
