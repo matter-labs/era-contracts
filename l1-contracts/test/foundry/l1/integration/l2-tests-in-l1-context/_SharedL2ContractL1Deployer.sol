@@ -55,7 +55,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         initializeConfig(inputPath, permanentValuesInputPath, L2_BRIDGEHUB_ADDR);
         coreAddresses.bridgehub.proxies.bridgehub = L2_BRIDGEHUB_ADDR;
         coreAddresses.bridges.proxies.l1AssetRouter = L2_ASSET_ROUTER_ADDR;
-        coreAddresses.bridges.proxies.l1NativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;   
+        coreAddresses.bridges.proxies.l1NativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         if (!_skip) {
