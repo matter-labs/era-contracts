@@ -284,3 +284,6 @@ uint64 constant DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
 /// @dev The mask that should be applied to the packed log data containing both the number of L2 and L1 transactions
 /// processed in the batch. Applying this mask is equivalent to calculating modulo 2**128.
 uint256 constant PACKED_NUMBER_OF_L1_TRANSACTIONS_LOG_MASK = 0xffffffffffffffffffffffffffffffff;
+
+/// @dev Bit offset for extracting the upper 128 bits (L2 tx count) from the packed log value.
+uint256 constant PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS = 128;
