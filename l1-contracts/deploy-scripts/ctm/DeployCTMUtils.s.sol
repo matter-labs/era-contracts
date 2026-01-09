@@ -110,11 +110,14 @@ abstract contract DeployCTMUtils is DeployUtils {
     string public constant ERA_CHAIN_CREATION_PARAMS_PATH = "/../configs/genesis/era/latest.json";
     string public constant ZKSYNC_OS_CHAIN_CREATION_PARAMS_PATH = "/../configs/genesis/zksync-os/latest.json";
     Config public config;
-    GeneratedData internal generatedData;
+    // Note: This variable is initialized by concrete implementations before use
+    GeneratedData internal generatedData; //slither-disable-line uninitialized-state
     CTMDeployedAddresses internal ctmAddresses;
-    // Addresses discovered from already deployed core contracts (Bridgehub, AssetRouter, etc.)
-    CoreDeployedAddresses internal coreAddresses;
+    // Note: Addresses discovered from already deployed core contracts (Bridgehub, AssetRouter, etc.)
+    // This variable is initialized by concrete implementations before use
+    CoreDeployedAddresses internal coreAddresses; //slither-disable-line uninitialized-state
 
+    //slither-disable-next-line reentrancy-benign
     function deployStateTransitionDiamondFacets() internal {
         ctmAddresses.stateTransition.facets.executorFacet = deploySimpleContract("ExecutorFacet", false);
         ctmAddresses.stateTransition.facets.adminFacet = deploySimpleContract("AdminFacet", false);

@@ -53,8 +53,10 @@ contract DeployL1CoreUtils is DeployUtils {
     using stdToml for string;
 
     Config public config;
-    CoreDeployedAddresses internal coreAddresses;
+    // Note: This variable is populated during deployment by concrete implementations
+    CoreDeployedAddresses internal coreAddresses; //slither-disable-line uninitialized-state
 
+    //slither-disable-next-line reentrancy-benign
     function initializeConfig(string memory configPath) public virtual {
         string memory toml = vm.readFile(configPath);
 

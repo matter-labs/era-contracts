@@ -91,8 +91,8 @@ library AddressIntrospector {
         for (uint256 i = 0; i < zkChains.length; i++) {
             IZKChain zkChain = IZKChain(zkChains[i]);
             address chainCTM;
-            try zkChain.getChainTypeManager() {
-                chainCTM = zkChain.getChainTypeManager();
+            try zkChain.getChainTypeManager() returns (address result) {
+                chainCTM = result;
             } catch {
                 continue;
             }
@@ -288,12 +288,12 @@ library AddressIntrospector {
         for (uint256 i = 0; i < zkChains.length; i++) {
             IZKChain zkChain = IZKChain(zkChains[i]);
             address chainCTM;
-            try zkChain.getChainTypeManager() {
-                chainCTM = zkChain.getChainTypeManager();
+            try zkChain.getChainTypeManager() returns (address result) {
+                chainCTM = result;
             } catch {
                 continue;
             }
-            if (zkChain.getChainTypeManager() != address(_ctm)) {
+            if (chainCTM != address(_ctm)) {
                 continue;
             }
             uint256 zkChainProtocolVersion = zkChain.getProtocolVersion();
