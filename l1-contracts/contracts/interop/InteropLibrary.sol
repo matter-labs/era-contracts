@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_ROUTER, L2_BRIDGEHUB, L2_INTEROP_CENTER_ADDR, L2_INTEROP_CENTER, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_INTEROP_HANDLER} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
-import {InteropCallStarter} from "contracts/common/Messaging.sol";
-import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
-import {AmountMustBeGreaterThanZero, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
+import {IL2NativeTokenVault} from "../bridge/ntv/IL2NativeTokenVault.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_ROUTER, L2_BRIDGEHUB, L2_INTEROP_CENTER_ADDR, L2_INTEROP_CENTER, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_INTEROP_HANDLER} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {IERC7786Attributes} from "./IERC7786Attributes.sol";
+import {InteropCallStarter} from "../common/Messaging.sol";
+import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
+import {AmountMustBeGreaterThanZero, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {ArgumentsLengthNotIdentical} from "./InteropErrors.sol";
-import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
+import {IInteropHandler} from "./IInteropHandler.sol";
 
 library InteropLibrary {
     /*//////////////////////////////////////////////////////////////
