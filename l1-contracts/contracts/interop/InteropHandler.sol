@@ -10,9 +10,10 @@ import {BUNDLE_IDENTIFIER, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, BundleS
 import {IERC7786Recipient} from "./IERC7786Recipient.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
-import {BundleAlreadyProcessed, BundleVerifiedAlready, CallAlreadyExecuted, CallNotExecutable, CanNotUnbundle, ExecutingNotAllowed, MessageNotIncluded, UnauthorizedMessageSender, UnbundlingNotAllowed, WrongCallStatusLength, WrongDestinationChainId, WrongSourceChainId, InvalidInteropBundleVersion, InvalidInteropCallVersion} from "./InteropErrors.sol";
+import {BundleAlreadyProcessed, BundleVerifiedAlready, CallAlreadyExecuted, CallNotExecutable, CanNotUnbundle, ExecutingNotAllowed, MessageNotIncluded, UnauthorizedMessageSender, UnbundlingNotAllowed, WrongCallStatusLength, WrongDestinationChainId, WrongSourceChainId, InvalidInteropBundleVersion, InvalidInteropCallVersion, ShadowAccountDeploymentFailed} from "./InteropErrors.sol";
 import {InvalidSelector, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
+import {ShadowAccount} from "./ShadowAccount.sol";
 
 /// @title InteropHandler
 /// @author Matter Labs
@@ -295,13 +296,26 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             if (interopCall.value > 0) {
                 L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(this), interopCall.value);
             }
-            // slither-disable-next-line arbitrary-send-eth
-            bytes4 selector = IERC7786Recipient(interopCall.to).receiveMessage{value: interopCall.value}({
-                receiveId: keccak256(abi.encodePacked(_bundleHash, i)),
-                sender: InteroperableAddress.formatEvmV1(_sourceChainId, interopCall.from),
-                payload: interopCall.data
-            }); // attributes are not supported yet
-            require(selector == IERC7786Recipient.receiveMessage.selector, InvalidSelector(selector));
+
+            if (interopCall.shadowAccount) {
+                // Execute via shadow account - deploy if needed and call the target
+                _executeViaShadowAccount(
+                    _sourceChainId,
+                    interopCall.from,
+                    interopCall.to,
+                    interopCall.value,
+                    interopCall.data
+                );
+            } else {
+                // Normal execution via receiveMessage
+                // slither-disable-next-line arbitrary-send-eth
+                bytes4 selector = IERC7786Recipient(interopCall.to).receiveMessage{value: interopCall.value}({
+                    receiveId: keccak256(abi.encodePacked(_bundleHash, i)),
+                    sender: InteroperableAddress.formatEvmV1(_sourceChainId, interopCall.from),
+                    payload: interopCall.data
+                }); // attributes are not supported yet
+                require(selector == IERC7786Recipient.receiveMessage.selector, InvalidSelector(selector));
+            }
         }
     }
 
@@ -438,5 +452,96 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         );
 
         this.unbundleBundle(sourceChainId, bundle, providedCallStatus);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        Shadow Account Functions
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Internal function to execute via shadow account
+    /// @param _ownerChainId The chain ID of the shadow account owner
+    /// @param _ownerAddress The address of the shadow account owner on their source chain
+    /// @param _to The target address to call
+    /// @param _value The amount of native token to send
+    /// @param _data The calldata to pass to the target
+    function _executeViaShadowAccount(
+        uint256 _ownerChainId,
+        address _ownerAddress,
+        address _to,
+        uint256 _value,
+        bytes memory _data
+    ) internal {
+        // Get or deploy the shadow account
+        address shadowAccountAddr = _getOrDeployShadowAccount(_ownerChainId, _ownerAddress);
+
+        // Execute the call via the shadow account
+        ShadowAccount(payable(shadowAccountAddr)).executeFromIH{value: _value}(_to, _value, _data);
+    }
+
+    /// @notice Gets or deploys a shadow account for the given owner
+    /// @param _ownerChainId The chain ID of the owner
+    /// @param _ownerAddress The EVM address of the owner
+    /// @return shadowAccountAddr The address of the shadow account
+    function _getOrDeployShadowAccount(
+        uint256 _ownerChainId,
+        address _ownerAddress
+    ) internal returns (address shadowAccountAddr) {
+        // Compute the expected address using full bytecode (creation code + constructor args)
+        shadowAccountAddr = _computeShadowAccountAddress(_ownerChainId, _ownerAddress);
+
+        // Check if already deployed
+        if (shadowAccountAddr.code.length > 0) {
+            return shadowAccountAddr;
+        }
+
+        // Deploy using CREATE2 with full bytecode (creation code + constructor args)
+        bytes memory fullOwnerAddress = InteroperableAddress.formatEvmV1(_ownerChainId, _ownerAddress);
+        bytes memory bytecode = abi.encodePacked(type(ShadowAccount).creationCode, abi.encode(fullOwnerAddress));
+
+        assembly {
+            shadowAccountAddr := create2(0, add(bytecode, 0x20), mload(bytecode), 0)
+        }
+
+        ShadowAccount account = new ShadowAccount{salt: bytes32(0)}(fullOwnerAddress);
+
+        require(shadowAccountAddr != address(0), ShadowAccountDeploymentFailed());
+
+        emit ShadowAccountDeployed(shadowAccountAddr, _ownerChainId, _ownerAddress);
+    }
+
+    /// @notice Computes the deterministic address of a shadow account for a given owner
+    /// @param _ownerChainId The chain ID of the owner
+    /// @param _ownerAddress The EVM address of the owner on the source chain
+    /// @return The address where the shadow account is/will be deployed
+    function getShadowAccountAddress(uint256 _ownerChainId, address _ownerAddress) external view returns (address) {
+        return _computeShadowAccountAddress(_ownerChainId, _ownerAddress);
+    }
+
+    /// @notice Computes the deterministic address of a shadow account for a given owner on this chain
+    /// @param _ownerAddress The EVM address of the owner (assumes block.chainid as the owner's chain)
+    /// @return The address where the shadow account is/will be deployed
+    function getShadowAccountAddress(address _ownerAddress) external view returns (address) {
+        return _computeShadowAccountAddress(block.chainid, _ownerAddress);
+    }
+
+    /// @notice Internal function to compute the expected shadow account address
+    /// @dev Uses full bytecode (creation code + constructor args) for address computation
+    /// @param _ownerChainId The chain ID of the owner
+    /// @param _ownerAddress The EVM address of the owner
+    /// @return The computed address
+    function _computeShadowAccountAddress(
+        uint256 _ownerChainId,
+        address _ownerAddress
+    ) internal view returns (address) {
+        bytes memory fullOwnerAddress = InteroperableAddress.formatEvmV1(_ownerChainId, _ownerAddress);
+        bytes memory bytecode = abi.encodePacked(type(ShadowAccount).creationCode, abi.encode(fullOwnerAddress));
+        bytes32 bytecodeHash = keccak256(bytecode);
+
+        return address(uint160(uint256(keccak256(abi.encodePacked(
+            bytes1(0xff),
+            address(this),
+            bytes32(0x0),
+            bytecodeHash
+        )))));
     }
 }

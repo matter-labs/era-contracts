@@ -41,3 +41,5 @@ error WrongDestinationChainId(bytes32 bundleHash, uint256 expected, uint256 actu
 error WrongSourceChainId(bytes32 bundleHash, uint256 expected, uint256 actual);
 // 0xa5cea466
 error ArgumentsLengthNotIdentical();
+// Shadow account errors
+error ShadowAccountDeploymentFailed();

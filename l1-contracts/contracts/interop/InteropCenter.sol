@@ -390,7 +390,7 @@ contract InteropCenter is
             (, address actualCallRecipient) = InteroperableAddress.parseEvmV1(actualCallStarter.to);
             interopCall = InteropCall({
                 version: INTEROP_CALL_VERSION,
-                shadowAccount: false,
+                shadowAccount: _callStarter.callAttributes.shadowAccount,
                 to: actualCallRecipient,
                 data: actualCallStarter.data,
                 value: _callStarter.callAttributes.interopCallValue,
@@ -399,7 +399,7 @@ contract InteropCenter is
         } else {
             interopCall = InteropCall({
                 version: INTEROP_CALL_VERSION,
-                shadowAccount: false,
+                shadowAccount: _callStarter.callAttributes.shadowAccount,
                 to: recipientAddress,
                 data: _callStarter.data,
                 value: _callStarter.callAttributes.interopCallValue,
@@ -450,10 +450,11 @@ contract InteropCenter is
         bytes[] calldata _attributes,
         AttributeParsingRestrictions _restriction
     ) public pure returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) {
-        // Default value is direct call.
+        // Default values
         callAttributes.indirectCall = false;
+        callAttributes.shadowAccount = false;
 
-        bytes4[4] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
+        bytes4[5] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
         // We can only pass each attribute once.
         bool[] memory attributeUsed = new bool[](ATTRIBUTE_SELECTORS.length);
 
@@ -499,6 +500,15 @@ contract InteropCenter is
                 );
                 attributeUsed[3] = true;
                 bundleAttributes.unbundlerAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
+            } else if (selector == IERC7786Attributes.shadowAccount.selector) {
+                require(!attributeUsed[4], AttributeAlreadySet(selector));
+                require(
+                    _restriction == AttributeParsingRestrictions.OnlyCallAttributes ||
+                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
+                    AttributeViolatesRestriction(selector, uint256(_restriction))
+                );
+                attributeUsed[4] = true;
+                callAttributes.shadowAccount = true;
             } else {
                 revert IERC7786GatewaySource.UnsupportedAttribute(selector);
             }
@@ -509,7 +519,7 @@ contract InteropCenter is
     /// @param _attributeSelector The attribute selector to check.
     /// @return True if the attribute selector is supported, false otherwise.
     function supportsAttribute(bytes4 _attributeSelector) external pure returns (bool) {
-        bytes4[4] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
+        bytes4[5] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
         uint256 attributeSelectorsLength = ATTRIBUTE_SELECTORS.length;
         for (uint256 i = 0; i < attributeSelectorsLength; ++i) {
             if (_attributeSelector == ATTRIBUTE_SELECTORS[i]) {
@@ -521,12 +531,13 @@ contract InteropCenter is
 
     /// @notice Returns the attribute selectors supported by the InteropCenter.
     /// @return The attribute selectors supported by the InteropCenter.
-    function _getERC7786AttributeSelectors() internal pure returns (bytes4[4] memory) {
+    function _getERC7786AttributeSelectors() internal pure returns (bytes4[5] memory) {
         return [
             IERC7786Attributes.interopCallValue.selector,
             IERC7786Attributes.indirectCall.selector,
             IERC7786Attributes.executionAddress.selector,
-            IERC7786Attributes.unbundlerAddress.selector
+            IERC7786Attributes.unbundlerAddress.selector,
+            IERC7786Attributes.shadowAccount.selector
         ];
     }
 

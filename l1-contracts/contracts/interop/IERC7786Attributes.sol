@@ -16,4 +16,7 @@ interface IERC7786Attributes {
 
     // Attribute assumes that _executionAddress is an ERC-7930 address.
     function unbundlerAddress(bytes calldata _unbundlerAddress) external pure;
+
+    // Attribute indicating the call should be executed via the sender's shadow account
+    function shadowAccount() external pure;
 }

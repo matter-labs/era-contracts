@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_ROUTER, L2_BRIDGEHUB, L2_INTEROP_CENTER_ADDR, L2_INTEROP_CENTER, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_ROUTER, L2_BRIDGEHUB, L2_INTEROP_CENTER_ADDR, L2_INTEROP_CENTER, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_INTEROP_HANDLER} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
@@ -10,6 +10,7 @@ import {AmountMustBeGreaterThanZero, ZeroAddress} from "contracts/common/L1Contr
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
 import {ArgumentsLengthNotIdentical} from "./InteropErrors.sol";
+import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
 
 library InteropLibrary {
     /*//////////////////////////////////////////////////////////////
@@ -319,5 +320,90 @@ library InteropLibrary {
             result[idx] = b[i];
             idx++;
         }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        SHADOW ACCOUNT HELPERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Get the shadow account address for a given owner on a specific chain
+    /// @param _ownerChainId The chain ID of the owner
+    /// @param _ownerAddress The EVM address of the owner on the source chain
+    /// @return The address where the shadow account is/will be deployed on this chain
+    function getShadowAccountAddress(uint256 _ownerChainId, address _ownerAddress) internal view returns (address) {
+        return L2_INTEROP_HANDLER.getShadowAccountAddress(_ownerChainId, _ownerAddress);
+    }
+
+    /// @notice Get the shadow account address for a given owner (assumes block.chainid as owner's chain)
+    /// @param _ownerAddress The EVM address of the owner
+    /// @return The address where the shadow account is/will be deployed on this chain
+    function getShadowAccountAddress(address _ownerAddress) internal view returns (address) {
+        return L2_INTEROP_HANDLER.getShadowAccountAddress(_ownerAddress);
+    }
+
+    /// @notice Build a call with the shadowAccount attribute set to true
+    /// @dev This call will be executed via the sender's shadow account on the destination chain
+    /// @param target The target contract address on the destination chain
+    /// @param data The calldata to send
+    /// @return call The InteropCallStarter with shadow account attribute
+    function buildShadowAccountCall(
+        address target,
+        bytes memory data
+    ) internal pure returns (InteropCallStarter memory call) {
+        bytes[] memory callAttributes = new bytes[](1);
+        callAttributes[0] = abi.encodeCall(IERC7786Attributes.shadowAccount, ());
+
+        call = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(target),
+            data: data,
+            callAttributes: callAttributes
+        });
+    }
+
+    /// @notice Build and send a single call via shadow account
+    /// @param destination The destination chain ID
+    /// @param target The target contract address on the destination chain
+    /// @param data The calldata to send
+    /// @param executionAddress The address allowed to execute the bundle (use address(0) for permissionless)
+    /// @param unbundlerAddress The address allowed to unbundle the bundle (use address(0) for sender)
+    /// @return bundleHash Hash of the sent bundle containing a single call
+    function sendShadowAccountCall(
+        uint256 destination,
+        address target,
+        bytes memory data,
+        address executionAddress,
+        address unbundlerAddress
+    ) internal returns (bytes32 bundleHash) {
+        if (target == address(0)) {
+            revert ZeroAddress();
+        }
+
+        InteropCallStarter[] memory calls = new InteropCallStarter[](1);
+        calls[0] = buildShadowAccountCall(target, data);
+
+        bytes[] memory bundleAttrs = buildBundleAttributes(executionAddress, unbundlerAddress);
+
+        return L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(destination), calls, bundleAttrs);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        GENERIC BUNDLE SENDER
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Send a bundle of interop calls
+    /// @param destination The destination chain ID
+    /// @param calls Array of InteropCallStarter structs describing each call
+    /// @param executionAddress The address allowed to execute the bundle (use address(0) for permissionless)
+    /// @param unbundlerAddress The address allowed to unbundle the bundle (use address(0) for sender)
+    /// @return bundleHash Hash of the sent bundle
+    function sendBundle(
+        uint256 destination,
+        InteropCallStarter[] memory calls,
+        address executionAddress,
+        address unbundlerAddress
+    ) internal returns (bytes32 bundleHash) {
+        bytes[] memory bundleAttrs = buildBundleAttributes(executionAddress, unbundlerAddress);
+
+        return L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(destination), calls, bundleAttrs);
     }
 }
