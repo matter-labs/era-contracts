@@ -59,12 +59,12 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     INativeTokenVaultBase public nativeTokenVault;
 
     /// @dev Address of legacy bridge.
-    IL1ERC20BridgeLegacy public legacyBridge;
+    IL1ERC20BridgeLegacy public legacyBridge;//TODO deprecate, eventually
 
     /// @notice Legacy function to get the L2 shared bridge address for a chain.
     /// @dev In case the chain has been deployed after the gateway release,
     /// the returned value is 0.
-    function l2BridgeAddress(uint256 _chainId) external view override returns (address) {
+    function l2BridgeAddress(uint256 _chainId) external view override returns (address) {//TODO deprecate, eventually
         return L1_NULLIFIER.l2BridgeAddress(_chainId);
     }
 
@@ -77,8 +77,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
-    modifier onlyBridgehubOrEra(uint256 _chainId) {
-        //@check deprecate?
+    modifier onlyBridgehubOrEra(uint256 _chainId) { //TODO deprecate, eventually
         if (
             msg.sender != address(BRIDGE_HUB) && (_chainId != ERA_CHAIN_ID || msg.sender != address(ERA_DIAMOND_PROXY))
         ) {
@@ -88,7 +87,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Checks that the message sender is the legacy bridge.
-    modifier onlyLegacyBridge() {
+    modifier onlyLegacyBridge() { //TODO deprecate, eventually
         if (msg.sender != address(legacyBridge)) {
             revert Unauthorized(msg.sender);
         }
@@ -157,7 +156,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @notice Sets the L1ERC20Bridge contract address.
     /// @dev Should be called only once by the owner.
     /// @param _legacyBridge The address of the legacy bridge.
-    function setL1Erc20Bridge(IL1ERC20BridgeLegacy _legacyBridge) external override onlyOwner {
+    function setL1Erc20Bridge(IL1ERC20BridgeLegacy _legacyBridge) external override onlyOwner {//TODO deprecate, eventually
         if (address(legacyBridge) != address(0)) {
             revert AddressAlreadySet(address(legacyBridge));
         }
@@ -167,7 +166,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         legacyBridge = _legacyBridge;
     }
 
-    /// @notice Used to set the assed deployment tracker address for given asset data.
+    /// @notice Used to set the asset deployment tracker address for given asset data.
     /// @param _assetRegistrationData The asset data which may include the asset address and any additional required data or encodings.
     /// @param _assetDeploymentTracker The whitelisted address of asset deployment tracker for provided asset.
     function setAssetDeploymentTracker(
@@ -453,7 +452,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         // Do the transfer if allowance to Shared bridge is bigger than amount
         // And if there is not enough allowance for the NTV
         bool weCanTransfer = false;
-        if (l1Token.allowance(address(legacyBridge), address(this)) >= _amount) {
+        if (l1Token.allowance(address(legacyBridge), address(this)) >= _amount) {//TODO deprecate, eventually
             _originalCaller = address(legacyBridge);
             weCanTransfer = true;
         } else if (

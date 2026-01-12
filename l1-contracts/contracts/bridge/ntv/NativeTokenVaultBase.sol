@@ -226,19 +226,10 @@ abstract contract NativeTokenVaultBase is
         if (storedAssetId != bytes32(0)) {
             revert AssetIdAlreadyRegistered();
         }
-
+       
         // This token has not been registered within this NTV yet. Usually this means that the
         // token is native to the chain and the user would prefer to get it registered as such.
-        // However, there are exceptions (e.g. bridged legacy ERC20 tokens on L2) when the
-        // assetId has not been stored yet. We will ask the implementor to double check that the token
-        // is not legacy.
-
-        // We try to register it as legacy token. If it fails, we know
-        // it is a native one and so register it as a native token.
-        bytes32 newAssetId = _registerTokenIfBridgedLegacy(tokenAddress);
-        if (newAssetId == bytes32(0)) {
-            newAssetId = _registerToken(tokenAddress);
-        }
+        bytes32 newAssetId = _registerToken(tokenAddress);
 
         if (newAssetId != _expectedAssetId) {
             revert AssetIdMismatch(_expectedAssetId, newAssetId);
@@ -268,7 +259,7 @@ abstract contract NativeTokenVaultBase is
         }
     }
 
-    function _registerTokenIfBridgedLegacy(address _token) internal virtual returns (bytes32);
+    function _registerTokenIfBridgedLegacy(address _token) internal virtual returns (bytes32); //TODO deprecate, eventually
 
     function _bridgeBurnBridgedToken(
         uint256 _chainId,

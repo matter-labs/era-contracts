@@ -121,7 +121,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         uint256 _l1ChainId,
         uint256 _eraChainId,
         IL1AssetRouter _l1AssetRouter,
-        IL2SharedBridgeLegacy _legacySharedBridge, //@check deprecate?
+        IL2SharedBridgeLegacy _legacySharedBridge, //@TODO deprecate, eventually
         bytes32 _baseTokenAssetId,
         address _aliasedOwner
     ) public reentrancyGuardInitializer onlyUpgrader {

@@ -91,6 +91,8 @@ error DeployingBridgedTokenForNativeToken();
 error DepositDoesNotExist();
 // 0xad2fa98e
 error DepositExists();
+//0xc2d7f813
+error DeprecatedFunction();
 // 0x0e7ee319
 error DiamondAlreadyFrozen();
 // 0xa7151b9a

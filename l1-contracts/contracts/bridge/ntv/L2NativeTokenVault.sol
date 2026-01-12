@@ -20,7 +20,7 @@ import {IContractDeployer, L2ContractHelper} from "../../common/l2-helpers/L2Con
 import {SystemContractsCaller} from "../../common/l2-helpers/SystemContractsCaller.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {AddressMismatch, AssetIdAlreadyRegistered, AssetIdNotSupported, DeployFailed, EmptyAddress, EmptyBytes32, InvalidCaller, NoLegacySharedBridge, TokenIsLegacy, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
+import {AddressMismatch, AssetIdAlreadyRegistered, AssetIdNotSupported, DeployFailed, EmptyAddress, EmptyBytes32, InvalidCaller, NoLegacySharedBridge, TokenIsLegacy, TokenNotLegacy, DeprecatedFunction} from "../../common/L1ContractErrors.sol";
 
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 
@@ -50,7 +50,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// @dev The address of the L2 legacy shared bridge
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    IL2SharedBridgeLegacy public L2_LEGACY_SHARED_BRIDGE;
+    IL2SharedBridgeLegacy public L2_LEGACY_SHARED_BRIDGE; //TODO deprecate, eventually
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
@@ -94,7 +94,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         uint256 _l1ChainId,
         address _aliasedOwner,
         bytes32 _l2TokenProxyBytecodeHash,
-        address _legacySharedBridge,
+        address _legacySharedBridge, //TODO deprecate, eventually
         address _bridgedTokenBeacon,
         address _wethToken,
         bytes32 _baseTokenAssetId
@@ -129,14 +129,14 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     function updateL2(
         uint256 _l1ChainId,
         bytes32 _l2TokenProxyBytecodeHash,
-        address _legacySharedBridge,
+        address _legacySharedBridge, //TODO remove after SDK changes
         address _wethToken,
         bytes32 _baseTokenAssetId
     ) public onlyUpgrader {
         WETH_TOKEN = _wethToken;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         L1_CHAIN_ID = _l1ChainId;
-        L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
+        //L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge); //TODO deprecate
 
         if (_l2TokenProxyBytecodeHash == bytes32(0)) {
             revert EmptyBytes32();
@@ -145,51 +145,13 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         L2_TOKEN_PROXY_BYTECODE_HASH = _l2TokenProxyBytecodeHash;
     }
 
-    function _registerTokenIfBridgedLegacy(address _tokenAddress) internal override returns (bytes32) {
-        // In zkEVM immutables are stored in a storage of a system contract,
-        // so it makes sense to cache them for efficiency.
-        IL2SharedBridgeLegacy legacyBridge = L2_LEGACY_SHARED_BRIDGE;
-        if (address(legacyBridge) == address(0)) {
-            // No legacy bridge, the token must be native
-            return bytes32(0);
-        }
-
-        address l1TokenAddress = legacyBridge.l1TokenAddress(_tokenAddress);
-        if (l1TokenAddress == address(0)) {
-            // The token is not legacy
-            return bytes32(0);
-        }
-
-        return _registerLegacyTokenAssetId(_tokenAddress, l1TokenAddress);
-    }
-
     /// @notice Sets the legacy token asset ID for the given L2 token address.
-    function setLegacyTokenAssetId(address _l2TokenAddress) public override {
-        // some legacy tokens were bridged without setting the originChainId on testnets
-        bytes32 assetId = assetId[_l2TokenAddress];
-        if (assetId != bytes32(0) && originChainId[assetId] != 0) {
-            revert AssetIdAlreadyRegistered();
-        }
-        if (address(L2_LEGACY_SHARED_BRIDGE) == address(0)) {
-            revert NoLegacySharedBridge();
-        }
-        address l1TokenAddress = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_l2TokenAddress);
-        if (l1TokenAddress == address(0)) {
-            revert TokenNotLegacy();
-        }
-
-        _registerLegacyTokenAssetId(_l2TokenAddress, l1TokenAddress);
+    function setLegacyTokenAssetId(address _l2TokenAddress) public override { //TODO remove after SDK changes
+        revert DeprecatedFunction();
     }
 
-    function _registerLegacyTokenAssetId(
-        address _l2TokenAddress,
-        address _l1TokenAddress
-    ) internal returns (bytes32 newAssetId) {
-        newAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1TokenAddress);
-        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).setLegacyTokenAssetHandler(newAssetId);
-        tokenAddress[newAssetId] = _l2TokenAddress;
-        assetId[_l2TokenAddress] = newAssetId;
-        originChainId[newAssetId] = L1_CHAIN_ID;
+    function _registerTokenIfBridgedLegacy(address _token) internal override returns (bytes32) { //TODO remove, eventually
+        revert DeprecatedFunction(); 
     }
 
     /// @notice Ensures that the token is deployed.
@@ -205,11 +167,11 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         uint256 tokenOriginChainId;
         (expectedToken, tokenOriginChainId) = _calculateExpectedTokenAddress(_originToken, _erc20Data);
         address l1LegacyToken;
-        if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
+        if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {  
             l1LegacyToken = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(expectedToken);
         }
-
-        if (l1LegacyToken != address(0)) {
+        
+        if (l1LegacyToken != address(0)) {  
             _ensureAndSaveTokenDeployedInnerLegacyToken({
                 _assetId: _assetId,
                 _originToken: _originToken,
@@ -228,7 +190,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     }
 
     /// @notice Ensures that the token is deployed inner for legacy tokens.
-    function _ensureAndSaveTokenDeployedInnerLegacyToken(
+    function _ensureAndSaveTokenDeployedInnerLegacyToken( //@check 
         bytes32 _assetId,
         address _originToken,
         address _expectedToken,
@@ -346,10 +308,10 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     }
 
     function _registerToken(address _nativeToken) internal override returns (bytes32) {
-        if (
+        if (  
             address(L2_LEGACY_SHARED_BRIDGE) != address(0) &&
             L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_nativeToken) != address(0)
-        ) {
+        ) {//TODO deprecate, eventually
             // Legacy tokens should be registered via `setLegacyTokenAssetId`.
             revert TokenIsLegacy();
         }
@@ -363,7 +325,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// @notice Calculates L2 wrapped token address corresponding to L1 token counterpart.
     /// @param _l1Token The address of token on L1.
     /// @return expectedToken The address of token on L2.
-    function l2TokenAddress(address _l1Token) public view returns (address expectedToken) {
+    function l2TokenAddress(address _l1Token) public view returns (address expectedToken) {//TODO deprecate, eventually
         bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
         expectedToken = tokenAddress[expectedAssetId];
     }

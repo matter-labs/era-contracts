@@ -25,7 +25,6 @@ import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {L2WrappedBaseToken} from "contracts/bridge/L2WrappedBaseToken.sol";
-//import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol"; //@check 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -73,7 +72,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
 
     bytes internal exampleChainCommitment;
 
-    address internal sharedBridgeLegacy; //@rev rm?
+    address internal sharedBridgeLegacy;
 
     IChainTypeManager internal chainTypeManager;
 
@@ -92,22 +91,13 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
 
         sharedBridgeLegacy = makeAddr("L2SharedBridgeLegacy");
 
-//        sharedBridgeLegacy = deployL2SharedBridgeLegacy( //@check 
-//            L1_CHAIN_ID,
-//            ERA_CHAIN_ID,
-//            ownerWallet,
-//            l1AssetRouter,
-//            beaconProxyBytecodeHash
-//        );
-
         L2WrappedBaseToken weth = deployL2Weth();
-
         initSystemContracts(
             SystemContractsArgs({
                 l1ChainId: L1_CHAIN_ID,
                 eraChainId: ERA_CHAIN_ID,
                 l1AssetRouter: l1AssetRouter,
-                legacySharedBridge: sharedBridgeLegacy,  //@check 
+                legacySharedBridge: sharedBridgeLegacy,  //@TODO deprecate, eventually
                 l2TokenBeacon: address(beacon),
                 l2TokenProxyBytecodeHash: beaconProxyBytecodeHash,
                 aliasedOwner: ownerWallet,
@@ -117,7 +107,6 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
             })
         );
         deployL2Contracts(L1_CHAIN_ID);
-
         vm.prank(aliasedL1AssetRouter);
         l2AssetRouter.setAssetHandlerAddress(L1_CHAIN_ID, ctmAssetId, L2_CHAIN_ASSET_HANDLER_ADDR);
         vm.prank(ownerWallet);
@@ -206,32 +195,6 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
 
         return abi.encode(encodedName, encodedSymbol, encodedDecimals);
     }
-
-//    function deployL2SharedBridgeLegacy( //@check 
-//        uint256 _l1ChainId,
-//        uint256 _eraChainId,
-//        address _aliasedOwner,
-//        address _l1SharedBridge,
-//        bytes32 _l2TokenProxyBytecodeHash
-//    ) internal returns (address) {
-//        bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
-//
-//        L2SharedBridgeLegacy bridge = new L2SharedBridgeLegacy();
-//        console.log("bridge", address(bridge));
-//        address proxyAdmin = makeAddr("proxyAdmin");
-//        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-//            address(bridge),
-//            proxyAdmin,
-//            abi.encodeWithSelector(
-//                L2SharedBridgeLegacy.initialize.selector,
-//                _l1SharedBridge,
-//                _l2TokenProxyBytecodeHash,
-//                _aliasedOwner
-//            )
-//        );
-//        console.log("proxy", address(proxy));
-//        return address(proxy);
-//    }
 
     function deployL2Weth() internal returns (L2WrappedBaseToken) {
         L2WrappedBaseToken wethImpl = new L2WrappedBaseToken();
