@@ -10,28 +10,26 @@ struct RegisterZKChainConfig {
     uint256 bridgehubCreateNewChainSalt;
     address validatorSenderOperatorEth;
     address validatorSenderOperatorBlobsEth;
+    // optional - if not set, then equal to 0
     address validatorSenderOperatorProve;
+    // optional - if not set, then equal to 0
     address validatorSenderOperatorExecute;
     address baseToken;
     bytes32 baseTokenAssetId;
     uint128 baseTokenGasPriceMultiplierNominator;
     uint128 baseTokenGasPriceMultiplierDenominator;
-    address bridgehub;
-    address sharedBridgeProxy;
-    address nativeTokenVault;
-    address chainTypeManagerProxy;
-    address validatorTimelock;
-    bytes diamondCutData;
-    bytes forceDeployments;
     address governanceSecurityCouncilAddress;
     uint256 governanceMinDelay;
-    address l1Nullifier;
-    address l1Erc20Bridge;
     bool initializeLegacyBridge;
     address governance;
     address create2FactoryAddress;
     bytes32 create2Salt;
     bool allowEvmEmulator;
+    // optional - if not set, then equal to 0
+    address l1Erc20Bridge;
+    address l1SharedBridgeProxy;
+    bytes diamondCutData;
+    bytes forceDeploymentsData;
 }
 
 /// @title IRegisterZKChain
