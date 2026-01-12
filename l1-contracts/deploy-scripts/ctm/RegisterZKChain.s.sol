@@ -45,8 +45,6 @@ import {IRegisterZKChain, RegisterZKChainConfig} from "contracts/script-interfac
 import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
 
 contract RegisterZKChainScript is Script, IRegisterZKChain {
-
-
     using stdToml for string;
 
     bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewZKChain(uint256,address)");
@@ -75,7 +73,6 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         // TODO: some chains may not want to have a legacy shared bridge
         runInner("/script-out/output-register-zk-chain.toml");
     }
-
 
     function loadChainCreationData(address _ctmAddress) internal {
         (config.diamondCutData, config.forceDeploymentsData) = GetDiamondCutData.getDiamondCutAndForceDeployment(
@@ -178,7 +175,6 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(getPermanentValuesPath());
         config.create2FactoryAddress = create2FactoryAddr;
         config.create2Salt = create2FactorySalt;
-
 
         if (vm.keyExistsToml(toml, "$.chain.allow_evm_emulator")) {
             config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
