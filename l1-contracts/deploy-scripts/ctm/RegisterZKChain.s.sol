@@ -83,13 +83,13 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         );
     }
 
-    function runForTest(address _bridgehub, address _chainTypeManagerProxy, uint256 _chainChainId) public {
+    function runForTest(address _chainTypeManagerProxy, uint256 _chainChainId) public {
         console.log("Deploying ZKChain");
 
         // Timestamp needs to be late enough for `pauseDepositsBeforeInitiatingMigration` time checks
         vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET + 1);
 
-        initializeConfigTest(_bridgehub, _chainTypeManagerProxy, _chainChainId);
+        initializeConfigTest(_chainTypeManagerProxy, _chainChainId);
         runInner(vm.envString("ZK_CHAIN_OUT"));
     }
 

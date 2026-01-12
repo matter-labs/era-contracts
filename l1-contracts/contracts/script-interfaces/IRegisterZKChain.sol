@@ -36,16 +36,14 @@ struct RegisterZKChainConfig {
 /// @notice Interface for the RegisterZKChain deployment script
 interface IRegisterZKChain {
     /// @notice Runs the ZK chain registration with production configuration
-    /// @param _bridgehub Address of the bridgehub contract
-    /// @param _chainTypeManagerProxy Address of the chain type manager proxy
+    /// @param _chainTypeManagerProxy Address of the chain type manager proxy (bridgehub is derived from this)
     /// @param _chainChainId Chain ID for the new ZK chain
-    function run(address _bridgehub, address _chainTypeManagerProxy, uint256 _chainChainId) external;
+    function run(address _chainTypeManagerProxy, uint256 _chainChainId) external;
 
     /// @notice Runs the ZK chain registration for testing purposes
-    /// @param _bridgehub Address of the bridgehub contract
-    /// @param _chainTypeManagerProxy Address of the chain type manager proxy
+    /// @param _chainTypeManagerProxy Address of the chain type manager proxy (bridgehub is derived from this)
     /// @param _chainChainId Chain ID for the new ZK chain
-    function runForTest(address _bridgehub, address _chainTypeManagerProxy, uint256 _chainChainId) external;
+    function runForTest(address _chainTypeManagerProxy, uint256 _chainChainId) external;
 
     /// @notice Returns the registration configuration
     /// @return The RegisterZKChainConfig struct containing registration parameters
