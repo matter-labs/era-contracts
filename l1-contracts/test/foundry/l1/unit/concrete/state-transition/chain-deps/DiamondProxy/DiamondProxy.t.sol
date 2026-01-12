@@ -113,13 +113,13 @@ contract DiamondProxyTest is UtilsCallMockerTest {
 
         // Call with 1-3 bytes should trigger "Ut" error (incomplete selector)
         vm.expectRevert(bytes("Ut"));
-        address(diamondProxy).call(hex"aa");  // 1 byte
+        address(diamondProxy).call(hex"aa"); // 1 byte
 
         vm.expectRevert(bytes("Ut"));
-        address(diamondProxy).call(hex"aabb");  // 2 bytes
+        address(diamondProxy).call(hex"aabb"); // 2 bytes
 
         vm.expectRevert(bytes("Ut"));
-        address(diamondProxy).call(hex"aabbcc");  // 3 bytes
+        address(diamondProxy).call(hex"aabbcc"); // 3 bytes
     }
 
     function test_revertWhen_proxyHasNoFacetForSelector() public {
