@@ -167,8 +167,6 @@ contract L1AssetRouterTest is Test {
         l1Nullifier.setL1NativeTokenVault(nativeTokenVault);
         vm.prank(owner);
         l1Nullifier.setL1Erc20Bridge(IL1ERC20BridgeLegacy(l1ERC20BridgeAddress));
-        vm.prank(owner);
-        sharedBridge.setL1Erc20Bridge(IL1ERC20BridgeLegacy(l1ERC20BridgeAddress));
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
         vm.prank(owner);
         sharedBridge.setNativeTokenVault(INativeTokenVaultBase(address(nativeTokenVault)));

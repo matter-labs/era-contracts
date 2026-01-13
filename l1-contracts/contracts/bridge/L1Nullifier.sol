@@ -217,7 +217,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @notice Sets the L1ERC20Bridge contract address.
     /// @dev Should be called only once by the owner.
     /// @param _legacyBridge The address of the legacy bridge.
-    function setL1Erc20Bridge(IL1ERC20BridgeLegacy _legacyBridge) external onlyOwner {
+    function setL1Erc20Bridge(IL1ERC20BridgeLegacy _legacyBridge) external onlyOwner { //TODO deprecate, eventually
         if (address(legacyBridge) != address(0)) {
             revert AddressAlreadySet(address(legacyBridge));
         }

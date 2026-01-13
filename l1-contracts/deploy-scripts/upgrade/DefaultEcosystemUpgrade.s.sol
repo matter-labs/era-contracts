@@ -674,9 +674,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         addresses.bridges.l1NullifierProxy = address(
             L1AssetRouter(addresses.bridges.l1AssetRouterProxy).L1_NULLIFIER()
         );
-        addresses.bridges.erc20BridgeProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
-        );
 
         addresses.bridgehub.ctmDeploymentTrackerProxy = address(
             L1Bridgehub(addresses.bridgehub.bridgehubProxy).l1CtmDeployer()
@@ -688,9 +685,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             L1Bridgehub(addresses.bridgehub.bridgehubProxy).chainAssetHandler()
         );
 
-        addresses.bridges.erc20BridgeProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
-        );
         newConfig.oldValidatorTimelock = IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy)
             .validatorTimelock();
         addresses.stateTransition.serverNotifierProxy = IChainTypeManager(
@@ -733,7 +727,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         string[] memory additionalForceDeployments = getAdditionalDependenciesNames();
 
         bytes[] memory additionalDependencies = new bytes[](7 + additionalForceDeployments.length); // Deps after Gateway upgrade
-        additionalDependencies[0] = ""; //@rev rm? check impact of index changes 
+        additionalDependencies[0] = ""; //TODO rm? check impact of index changes 
         additionalDependencies[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
         additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
         additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");

@@ -149,9 +149,6 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
 
         addresses.bridgehub.messageRootProxy = address(L1Bridgehub(addresses.bridgehub.bridgehubProxy).messageRoot());
 
-        addresses.bridges.erc20BridgeProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
-        );
         // It is used as the ecosystem admin inside the `DeployL1` contract
         addresses.chainAdmin = L1Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
     }

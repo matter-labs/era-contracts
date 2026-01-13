@@ -60,8 +60,8 @@ struct BridgehubDeployedAddresses {
 
 // solhint-disable-next-line gas-struct-packing
 struct BridgesDeployedAddresses {
-    address erc20BridgeImplementation;
-    address erc20BridgeProxy;
+    address erc20BridgeImplementation; //TODO deprecate, eventually
+    address erc20BridgeProxy; //TODO deprecate, eventually
     address l1AssetRouterImplementation;
     address l1AssetRouterProxy;
     address l1NullifierImplementation;

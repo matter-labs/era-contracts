@@ -118,7 +118,6 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         address l1CtmDeployer = address(bridgehubProxy.l1CtmDeployer());
         address chainAssetHandler = address(bridgehubProxy.chainAssetHandler());
         address nativeTokenVault = address(assetRouter.nativeTokenVault());
-        address erc20Bridge = address(assetRouter.legacyBridge());
         address l1Nullifier = address(assetRouter.L1_NULLIFIER());
 
         addresses.bridgehub.bridgehubProxy = bridgehub;
@@ -131,8 +130,6 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         addresses.bridgehub.chainAssetHandlerImplementation = Utils.getImplementation(chainAssetHandler);
 
         // Bridges
-        addresses.bridges.erc20BridgeProxy = erc20Bridge;
-        addresses.bridges.erc20BridgeImplementation = Utils.getImplementation(erc20Bridge);
         addresses.bridges.l1NullifierProxy = l1Nullifier;
         addresses.bridges.l1NullifierImplementation = Utils.getImplementation(l1Nullifier);
         addresses.bridges.l1AssetRouterProxy = address(assetRouter);
@@ -380,8 +377,8 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             addresses.stateTransition.diamondProxy
         );
 
-        vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", addresses.bridges.erc20BridgeImplementation);
-        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", addresses.bridges.erc20BridgeProxy);
+        //vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", addresses.bridges.erc20BridgeImplementation);
+        //vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", addresses.bridges.erc20BridgeProxy);
         vm.serializeAddress("bridges", "l1_nullifier_implementation_addr", addresses.bridges.l1NullifierImplementation);
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", addresses.bridges.l1NullifierProxy);
         vm.serializeAddress(
