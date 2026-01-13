@@ -112,7 +112,14 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             }
 
             console.log("About to call processLogsAndMessages for index", i);
-            vm.prank(L2_BRIDGEHUB.getZKChain(testData[i].chainId));
+
+            // Get the ZKChain address for this chain - this will be the caller and the settlement fee payer
+            address zkChainAddr = L2_BRIDGEHUB.getZKChain(testData[i].chainId);
+
+            // Update settlementFeePayer to be the ZKChain address (which has tokens and approval)
+            testData[i].settlementFeePayer = zkChainAddr;
+
+            vm.prank(zkChainAddr);
 
             (bool success, bytes memory data) = GW_ASSET_TRACKER_ADDR.call(
                 abi.encodeCall(GW_ASSET_TRACKER.processLogsAndMessages, testData[i])

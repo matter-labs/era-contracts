@@ -140,8 +140,8 @@ library L2UtilsBase {
 
             address gwAssetTrackerAddress = address(new GWAssetTracker());
             vm.etch(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAddress.code);
-            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            GWAssetTracker(GW_ASSET_TRACKER_ADDR).setAddresses(_args.l1ChainId);
+            // Note: GWAssetTracker.setAddresses is called later, after NTV is deployed,
+            // because it fetches wrappedZKToken from NTV.WETH_TOKEN()
         }
         {
             address l2StandardTriggerAccount = address(new DummyL2StandardTriggerAccount());
