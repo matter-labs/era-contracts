@@ -212,6 +212,8 @@ struct CallAttributes {
 ///                      GWAssetTracker to spend wrapped ZK tokens.
 ///                    Note on ZK-as-base-token chains: On chains where ZK is the base token, useFixedFee=true still requires wrapped ZK tokens
 ///                    (paid via ERC20 transfer), while useFixedFee=false accepts native ZK via msg.value. This is intentional behavior.
+///                    IMPORTANT: useFixedFee=true requires ZK token to be bridged to the source chain. If ZK token is not yet available
+///                    in the chain's NativeTokenVault, the transaction will revert with ZKTokenNotAvailable().
 struct BundleAttributes {
     bytes executionAddress;
     bytes unbundlerAddress;

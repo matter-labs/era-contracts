@@ -112,6 +112,8 @@ contract InteropCenter is
 
     /// @notice Resolves ZK token address from asset ID with caching.
     /// @dev Uses native token vault to resolve asset ID to token address.
+    /// @dev Reverts with ZKTokenNotAvailable() if ZK token hasn't been bridged to this chain yet.
+    ///      This means useFixedFee=true is only available after ZK token is bridged to the source chain.
     /// @return The ZK token contract interface.
     function _getZKToken() internal returns (IERC20) {
         // Return cached token if available
