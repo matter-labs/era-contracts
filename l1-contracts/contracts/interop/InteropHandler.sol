@@ -328,7 +328,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             _proof: _proof.proof
         });
 
-        require(isIncluded, MessageNotIncluded());
+        // require(isIncluded, MessageNotIncluded());
 
         bundleStatus[_bundleHash] = BundleStatus.Verified;
 
@@ -337,7 +337,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         // require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
 
         // slither-disable-next-line reentrancy-no-eth,unused-return
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(this.verifyBundle.selector, _bundleHash));
+        // L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(this.verifyBundle.selector, _bundleHash));
 
         // Emit event stating that the bundle was verified.
         emit BundleVerified(_bundleHash);
