@@ -29,12 +29,14 @@ fs_permissions = [
     { access = "read", path = "../l1-contracts/broadcast/" },
     { access = "read", path = "../da-contracts/" },
     { access = "read", path = "../system-contracts/zkout/" },
+    { access = "read", path = "home/user/era-contracts/system-contracts/zkout/" },
     { access = "read", path = "./script-config" },
     { access = "read", path = "./upgrade-envs/" },
     { access = "read", path = "./out" },
     { access = "read", path = "zkout" },
     { access = "read", path = "./deploy-scripts/evm-predeploys/evm-predeploy-datas" },
     { access = "read", path = "../configs/genesis/" },
+    { access = "read", path = "../configs/" },
 ]
 ignored_error_codes = ["missing-receive-ether", "code-size"]
 ignored_warnings_from = ["test", "contracts/dev-contracts"]
