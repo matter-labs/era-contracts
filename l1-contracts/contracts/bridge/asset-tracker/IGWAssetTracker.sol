@@ -13,6 +13,20 @@ interface IGWAssetTracker {
     /// @param newFee New fee amount.
     event GatewaySettlementFeeUpdated(uint256 indexed oldFee, uint256 indexed newFee);
 
+    /// @notice Returns the current gateway settlement fee per interop call.
+    function gatewaySettlementFee() external view returns (uint256);
+
+    /// @notice Returns the wrapped ZK token used for fee payments.
+    function wrappedZKToken() external view returns (address);
+
+    /// @notice Sets the gateway settlement fee per interop call.
+    /// @param _fee New fee amount in wrapped ZK token wei.
+    function setGatewaySettlementFee(uint256 _fee) external;
+
+    /// @notice Withdraws accumulated gateway fees to a recipient.
+    /// @param _recipient Address to receive the fees.
+    function withdrawGatewayFees(address _recipient) external;
+
     function setAddresses(uint256 _l1ChainId) external;
 
     function handleChainBalanceIncreaseOnGateway(
