@@ -185,7 +185,9 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
                 l2SharedBridgeLegacyImpl: address(0),
                 l2BridgedStandardERC20Impl: address(0),
                 aliasedChainRegistrationSender: address(1),
-                dangerousTestOnlyForcedBeacon: address(0)
+                dangerousTestOnlyForcedBeacon: address(0),
+                zkTokenOriginChainId: 324,
+                zkTokenAddress: address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E)
             })
         );
 

@@ -433,7 +433,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
                 discoveredBridgehub.chainRegistrationSenderProxy
             ),
             // upgradeAddresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
-            dangerousTestOnlyForcedBeacon: address(0)
+            dangerousTestOnlyForcedBeacon: address(0),
+            // TODO: Load zkTokenOriginChainId and zkTokenAddress from config for production deployments.
+            zkTokenOriginChainId: 0,
+            zkTokenAddress: address(0)
         });
     }
 

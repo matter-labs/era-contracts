@@ -488,7 +488,10 @@ contract DeployCTMScript is Script, DeployCTMUtils {
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
                 discoveredBridgehub.chainRegistrationSenderProxy
             ),
-            dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon
+            dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon,
+            // TODO: Load zkTokenOriginChainId and zkTokenAddress from config for production deployments.
+            zkTokenOriginChainId: 0,
+            zkTokenAddress: address(0)
         });
     }
 

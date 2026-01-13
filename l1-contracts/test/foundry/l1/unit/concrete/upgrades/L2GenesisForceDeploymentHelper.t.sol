@@ -247,6 +247,9 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
             data.beaconDeployerInfo = "";
         }
 
+        data.zkTokenOriginChainId = 324;
+        data.zkTokenAddress = address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E);
+
         return data;
     }
 
@@ -268,6 +271,8 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         data.interopHandlerBytecodeInfo = abi.encode(keccak256("interopHandler"));
         data.assetTrackerBytecodeInfo = abi.encode(keccak256("assetTracker"));
         data.beaconDeployerInfo = abi.encode(keccak256("beaconDeployer"));
+        data.zkTokenOriginChainId = 324;
+        data.zkTokenAddress = address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E);
 
         return data;
     }

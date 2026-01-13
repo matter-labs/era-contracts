@@ -56,6 +56,10 @@ struct FixedForceDeploymentsData {
     // MUST be equal to 0 in production.
     // It will be the job of the governance to ensure that this value is set correctly.
     address dangerousTestOnlyForcedBeacon;
+    // The origin chain ID of the ZK token (chain where ZK token was first deployed).
+    uint256 zkTokenOriginChainId;
+    // The address of the ZK token on its origin chain.
+    address zkTokenAddress;
 }
 
 /// @author Matter Labs
