@@ -90,7 +90,12 @@ interface IInteropCenter {
     /// @notice Unpauses the contract.
     function unpause() external;
 
-    function initL2(uint256 _l1ChainId, address _owner, uint256 _zkTokenOriginChainId, address _zkTokenAddress) external;
+    function initL2(
+        uint256 _l1ChainId,
+        address _owner,
+        uint256 _zkTokenOriginChainId,
+        address _zkTokenAddress
+    ) external;
 
     /// Mailbox forwarder
 

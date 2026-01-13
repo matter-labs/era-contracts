@@ -625,7 +625,9 @@ contract InteropCenter is
     /// @notice Checks if the attribute selector is supported by the InteropCenter.
     /// @param _attributeSelector The attribute selector to check.
     /// @return True if the attribute selector is supported, false otherwise.
-    function supportsAttribute(bytes4 _attributeSelector) external pure override(IERC7786GatewaySource, IInteropCenter) returns (bool) {
+    function supportsAttribute(
+        bytes4 _attributeSelector
+    ) external pure override(IERC7786GatewaySource, IInteropCenter) returns (bool) {
         bytes4[5] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
         uint256 attributeSelectorsLength = ATTRIBUTE_SELECTORS.length;
         for (uint256 i = 0; i < attributeSelectorsLength; ++i) {
