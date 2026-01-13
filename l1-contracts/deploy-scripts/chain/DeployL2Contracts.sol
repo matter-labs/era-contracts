@@ -14,6 +14,8 @@ import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Call} from "contracts/governance/Common.sol";
+import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
+import {BridgehubAddresses} from "../utils/Types.sol";
 
 contract DeployL2Script is Script {
     using stdToml for string;
