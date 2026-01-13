@@ -43,20 +43,6 @@ contract InteropCenter is
 {
     using SafeERC20 for IERC20;
 
-    /// @notice Emitted when the interop protocol fee is updated.
-    /// @param oldFee Previous fee amount.
-    /// @param newFee New fee amount.
-    event InteropFeeUpdated(uint256 indexed oldFee, uint256 indexed newFee);
-
-    /// @notice Emitted when protocol fees are accumulated for withdrawal.
-    /// @param amount Amount of fees accumulated.
-    event ProtocolFeesAccumulated(uint256 amount);
-
-    /// @notice Emitted when protocol fees are withdrawn.
-    /// @param to Address that received the fees.
-    /// @param amount Amount of fees withdrawn.
-    event ProtocolFeesWithdrawn(address indexed to, uint256 amount);
-
     /// @notice The chain ID of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
     uint256 public L1_CHAIN_ID;
@@ -550,7 +536,7 @@ contract InteropCenter is
     function parseAttributes(
         bytes[] calldata _attributes,
         AttributeParsingRestrictions _restriction
-    ) public returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) {
+    ) public pure returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) {
         // Default value is direct call.
         callAttributes.indirectCall = false;
 
@@ -631,7 +617,7 @@ contract InteropCenter is
     /// @notice Checks if the attribute selector is supported by the InteropCenter.
     /// @param _attributeSelector The attribute selector to check.
     /// @return True if the attribute selector is supported, false otherwise.
-    function supportsAttribute(bytes4 _attributeSelector) external pure returns (bool) {
+    function supportsAttribute(bytes4 _attributeSelector) external pure override(IERC7786GatewaySource, IInteropCenter) returns (bool) {
         bytes4[5] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
         uint256 attributeSelectorsLength = ATTRIBUTE_SELECTORS.length;
         for (uint256 i = 0; i < attributeSelectorsLength; ++i) {

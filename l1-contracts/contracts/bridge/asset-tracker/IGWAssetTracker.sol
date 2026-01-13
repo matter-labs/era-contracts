@@ -2,6 +2,8 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {BalanceChange, ConfirmBalanceMigrationData} from "../../common/Messaging.sol";
 
@@ -17,7 +19,7 @@ interface IGWAssetTracker {
     function gatewaySettlementFee() external view returns (uint256);
 
     /// @notice Returns the wrapped ZK token used for fee payments.
-    function wrappedZKToken() external view returns (address);
+    function wrappedZKToken() external view returns (IERC20);
 
     /// @notice Sets the gateway settlement fee per interop call.
     /// @param _fee New fee amount in wrapped ZK token wei.
