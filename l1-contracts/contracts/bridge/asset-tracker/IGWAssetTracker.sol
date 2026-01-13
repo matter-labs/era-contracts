@@ -7,6 +7,16 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {BalanceChange, ConfirmBalanceMigrationData} from "../../common/Messaging.sol";
 
+/// @title IGWAssetTracker
+/// @notice Interface for the Gateway Asset Tracker, which handles asset tracking and settlement fee collection.
+///
+/// @dev IMPORTANT - Approval Warning:
+///      Only approve this contract to spend your wrapped ZK tokens if you are responsible for paying settlement fees.
+///
+///      Approved tokens can be spent by the chain's validator during batch execution via the
+///      settlementFeePayer parameter in executeBatchesSharedBridge(). The validator is a trusted
+///      role for each chain, but cross-chain attacks are not possible (chain A's validator cannot
+///      execute chain B's batches).
 interface IGWAssetTracker {
     /// @notice Emitted when the gateway settlement fee is updated.
     ///         This is the fee that operator must pay for each interop call.

@@ -122,7 +122,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// @notice Withdraws collected gateway fees to specified recipient
     /// @dev Only callable by owner. Withdraws Wrapped ZK tokens collected as settlement fees.
     /// @param _recipient Address to receive the collected fees
-    // vg todo. Only withdrawable by governance now. TBD who has control over this.
+    // vg todo. Only withdrawable by governance now. TBD by BD who has control over this.
     function withdrawGatewayFees(address _recipient) external onlyOwner {
         if (_recipient == address(0)) {
             revert InvalidFeeRecipient();
@@ -322,6 +322,20 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         );
 
         // Collect ZK settlement fees from the designated fee payer using Wrapped ZK token.
+        //
+        // Fee Collection Trust Model:
+        // - Only the chain's authorized validator can call executeBatchesSharedBridge (enforced by onlyChain)
+        // - The validator is trusted to specify a valid settlementFeePayer address
+        // - There is no on-chain registry of "authorized fee payers" because:
+        //   1. Operators may use any funding mechanism (EOA, multisig, treasury contract)
+        //   2. The validator role already implies trust from the chain operator
+        //   3. Adding a registry would introduce unnecessary complexity
+        //
+        // Failure Behavior:
+        // - If fee collection fails (insufficient balance or approval), batch execution reverts entirely
+        // - This ensures fees are always paid atomically with settlement
+        // - Operators must maintain sufficient balance and approval to avoid blocking their own chain
+        //
         if (chargeableInteropCount > 0 && gatewaySettlementFee > 0) {
             uint256 totalFee = gatewaySettlementFee * chargeableInteropCount;
 

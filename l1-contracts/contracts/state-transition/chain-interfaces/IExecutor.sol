@@ -40,14 +40,32 @@ struct LogProcessingOutput {
 /// @dev Maximal value that SystemLogKey variable can have.
 uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max);
 
-/// @notice The struct passed to the assetTracker.
+/// @notice The struct passed to the assetTracker for processing L2 logs and collecting settlement fees.
 /// @param logs The L2 logs from the batch.
 /// @param messages The L2 messages corresponding to the logs.
 /// @param chainId The chain ID of the settling chain.
 /// @param batchNumber The batch number being processed.
 /// @param chainBatchRoot The batch root hash for verification.
 /// @param messageRoot The message root hash for verification.
-/// @param settlementFeePayer Address that pays gateway settlement fees. Must have approved GWAssetTracker to spend wrapped ZK tokens.
+/// @param settlementFeePayer Address that pays gateway settlement fees for interop calls in this batch.
+///
+/// @dev Settlement Fee Payer Requirements:
+///      1. Must have sufficient wrapped ZK token balance to cover: gatewaySettlementFee * chargeableInteropCount
+///      2. Must have pre-approved GWAssetTracker to spend wrapped ZK tokens
+///      If either condition is not met, batch execution will revert.
+///
+/// @dev Trust Model:
+///      - The validator (caller of executeBatchesSharedBridge) specifies this address
+///      - The validator is a trusted role, authorized via EXECUTOR_ROLE for this specific chain
+///      - There is no on-chain registry of "authorized fee payers" because:
+///         1. Operators may use any funding mechanism (EOA, multisig, treasury contract)
+///         2. The validator role already implies trust from the chain operator
+///         3. Adding a registry would introduce unnecessary complexity
+///
+/// @dev Failure Behavior:
+///      - If fee collection fails (insufficient balance or approval), batch execution reverts entirely
+///      - This ensures fees are always paid atomically with settlement
+///      - Operators must maintain sufficient balance and approval to avoid blocking their own chain
 struct ProcessLogsInput {
     L2Log[] logs;
     bytes[] messages;
