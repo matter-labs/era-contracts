@@ -406,7 +406,9 @@ contract InteropCenter is
         // If using fixed fees, collect ZK tokens per-call
         if (_bundleAttributes.useFixedFee) {
             uint256 totalZKFee = ZK_INTEROP_FEE * callStartersLength;
-            _getZKToken().safeTransferFrom(msg.sender, owner(), totalZKFee);
+            address feeRecipient = owner();
+            _getZKToken().safeTransferFrom(msg.sender, feeRecipient, totalZKFee);
+            emit FixedZKFeesCollected(msg.sender, feeRecipient, totalZKFee);
         }
 
         // Ensure that tokens required for bundle execution were received.

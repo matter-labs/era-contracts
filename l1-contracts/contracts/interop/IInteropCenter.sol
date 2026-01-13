@@ -21,6 +21,12 @@ interface IInteropCenter {
     /// @notice Emitted when protocol fees are withdrawn.
     event ProtocolFeesWithdrawn(address indexed to, uint256 amount);
 
+    /// @notice Emitted when fixed ZK fees are collected from a user.
+    /// @param payer Address that paid the fees.
+    /// @param recipient Address that received the fees.
+    /// @param amount Total amount of ZK tokens collected.
+    event FixedZKFeesCollected(address indexed payer, address indexed recipient, uint256 amount);
+
     /// @notice Restrictions for parsing attributes.
     /// @param OnlyInteropCallValue: Only attribute for interop call value is allowed.
     /// @param OnlyCallAttributes: Only call attributes are allowed.
