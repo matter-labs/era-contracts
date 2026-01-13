@@ -303,7 +303,7 @@ contract ValidatorTimelockTest is Test {
             storedBatches,
             Utils.emptyData()
         );
-        validator.executeBatchesSharedBridge(zkSync, executeBatchFrom, executeBatchTo, executeData);
+        validator.executeBatchesSharedBridge(zkSync, executeBatchFrom, executeBatchTo, executeData, address(0));
     }
 
     function test_RevertWhen_setExecutionDelayNotOwner() public {
@@ -386,7 +386,7 @@ contract ValidatorTimelockTest is Test {
             storedBatches,
             Utils.emptyData()
         );
-        validator.executeBatchesSharedBridge(zkSync, executeBatchFrom, executeBatchTo, executeData);
+        validator.executeBatchesSharedBridge(zkSync, executeBatchFrom, executeBatchTo, executeData, address(0));
     }
 
     function test_RevertWhen_executeBatchesSharedBridgeTooEarly() public {
@@ -425,6 +425,6 @@ contract ValidatorTimelockTest is Test {
             storedBatches,
             Utils.emptyData()
         );
-        validator.executeBatchesSharedBridge(zkSync, executeBatchFrom, executeBatchTo, executeData);
+        validator.executeBatchesSharedBridge(zkSync, executeBatchFrom, executeBatchTo, executeData, address(0));
     }
 }

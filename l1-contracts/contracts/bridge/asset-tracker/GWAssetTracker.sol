@@ -321,14 +321,13 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             chainBatchRootHash
         );
 
-        // Collect ZK settlement fees from chain operator using Wrapped ZK token.
+        // Collect ZK settlement fees from the designated fee payer using Wrapped ZK token.
         if (chargeableInteropCount > 0 && gatewaySettlementFee > 0) {
             uint256 totalFee = gatewaySettlementFee * chargeableInteropCount;
 
-            // Transfer Wrapped ZK tokens from the chain operator (msg.sender) to this contract
-            wrappedZKToken.safeTransferFrom(msg.sender, address(this), totalFee);
-
-            // Settlement fees are now held by this contract (Gateway treasury)
+            // Transfer Wrapped ZK tokens from the settlement fee payer to this contract.
+            // The fee payer must have pre-approved this contract to spend wrapped ZK tokens.
+            wrappedZKToken.safeTransferFrom(_processLogsInputs.settlementFeePayer, address(this), totalFee);
         }
     }
 

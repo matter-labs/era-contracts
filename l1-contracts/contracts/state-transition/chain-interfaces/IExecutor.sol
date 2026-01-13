@@ -41,6 +41,13 @@ struct LogProcessingOutput {
 uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max);
 
 /// @notice The struct passed to the assetTracker.
+/// @param logs The L2 logs from the batch.
+/// @param messages The L2 messages corresponding to the logs.
+/// @param chainId The chain ID of the settling chain.
+/// @param batchNumber The batch number being processed.
+/// @param chainBatchRoot The batch root hash for verification.
+/// @param messageRoot The message root hash for verification.
+/// @param settlementFeePayer Address that pays gateway settlement fees. Must have approved GWAssetTracker to spend wrapped ZK tokens.
 struct ProcessLogsInput {
     L2Log[] logs;
     bytes[] messages;
@@ -48,6 +55,7 @@ struct ProcessLogsInput {
     uint256 batchNumber;
     bytes32 chainBatchRoot;
     bytes32 messageRoot;
+    address settlementFeePayer;
 }
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch)
@@ -225,11 +233,13 @@ interface IExecutor is IZKChainBase {
     /// @param _processFrom The batch number from which the execution starts.
     /// @param _processTo The batch number at which the execution ends.
     /// @param _executeData The encoded data of the new batches to be executed.
+    /// @param _settlementFeePayer Address that pays gateway settlement fees. Must have approved GWAssetTracker to spend wrapped ZK tokens.
     function executeBatchesSharedBridge(
         address _chainAddress,
         uint256 _processFrom,
         uint256 _processTo,
-        bytes calldata _executeData
+        bytes calldata _executeData,
+        address _settlementFeePayer
     ) external;
 
     /// @notice Reverts unexecuted batches
