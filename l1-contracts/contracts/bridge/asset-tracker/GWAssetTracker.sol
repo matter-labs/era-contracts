@@ -327,6 +327,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
             // Transfer Wrapped ZK tokens from the settlement fee payer to this contract.
             // The fee payer must have pre-approved this contract to spend wrapped ZK tokens.
+            // slither-disable-next-line arbitrary-send-erc20
             wrappedZKToken.safeTransferFrom(_processLogsInputs.settlementFeePayer, address(this), totalFee);
         }
     }
