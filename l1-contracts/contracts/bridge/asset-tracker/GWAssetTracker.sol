@@ -771,7 +771,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
 
         // Must be an interop bundle message (starts with BUNDLE_IDENTIFIER)
-        if (_message.length <= 0 || _message[0] != BUNDLE_IDENTIFIER) {
+        if (_message.length == 0 || _message[0] != BUNDLE_IDENTIFIER) {
             return 0;
         }
 
