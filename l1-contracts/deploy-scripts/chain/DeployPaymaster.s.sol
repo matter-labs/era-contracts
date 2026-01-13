@@ -6,6 +6,10 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "../utils/Utils.sol";
+import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
+import {BridgehubAddresses} from "../utils/Types.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IDeployPaymaster} from "contracts/script-interfaces/IDeployPaymaster.sol";
 
 contract DeployPaymaster is Script, IDeployPaymaster {
     using stdToml for string;
@@ -27,7 +31,7 @@ contract DeployPaymaster is Script, IDeployPaymaster {
         BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
             IL1Bridgehub(bridgehubAddress)
         );
-        config.l1SharedBridgeProxy = bhAddresses.assetRouter;
+        config.l1SharedBridgeProxy = bhAddresses.proxies.chainAssetHandler;
     }
 
     function saveOutput() internal {
