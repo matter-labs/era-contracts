@@ -1,13 +1,41 @@
 # General guidelines
 
-## Solidity Code Rules
+## ⚠️ CRITICAL SOLIDITY CODE RULES ⚠️
 
-**CRITICAL: Never use try-catch or staticCall in Solidity code**
-- Do NOT use `try`/`catch` blocks for error handling
-- Do NOT use low-level `staticcall`, `call`, or `delegatecall`
-- If a function might not exist or could revert, refactor the code to avoid calling it
-- Use proper interface checks, conditional logic, or restructure the code instead
-- If the function was introduced in a new version, query the protocol version from the ChainTypeManager or the Diamond proxy
+### NEVER USE try-catch OR staticcall
+
+**THIS IS AN ABSOLUTE RULE - NO EXCEPTIONS**
+
+❌ **FORBIDDEN PATTERNS:**
+```solidity
+// NEVER DO THIS:
+try contract.someFunction() returns (address result) {
+    // ...
+} catch {
+    return address(0);
+}
+
+// NEVER DO THIS:
+(bool ok, bytes memory data) = target.staticcall(abi.encodeWithSignature("someFunction()"));
+if (ok) {
+    return abi.decode(data, (address));
+}
+
+// NEVER DO THIS:
+address result = _tryAddress(target, "someFunction()");
+```
+
+✅ **CORRECT APPROACH:**
+- If a function reverts, it means the contract is not properly initialized or the script is being called at the wrong time
+- Do NOT try to "handle" or "catch" reverts - fix the root cause instead
+- If you think you need try-catch or staticcall, you are solving the wrong problem
+- Query protocol version, check initialization state, or restructure when the script runs
+
+**WHY THIS RULE EXISTS:**
+- try-catch and staticcall hide real errors instead of fixing them
+- These patterns make debugging extremely difficult
+- They mask initialization issues and timing problems
+- The codebase should fail fast and clearly, not silently return defaults
 
 ## Debugging Strategies
 
