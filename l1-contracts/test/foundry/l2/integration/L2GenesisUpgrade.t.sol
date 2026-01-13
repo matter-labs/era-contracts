@@ -19,6 +19,7 @@ import {SystemContractsArgs} from "./L2Utils.sol";
 import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
 import {Create2FactoryUtils} from "deploy-scripts/utils/deploy/Create2FactoryUtils.s.sol";
 import {TokenMetadata, TokenBridgingData} from "contracts/common/Messaging.sol";
+import {L2GenesisUpgradeTestHelper, BytecodeInfo} from "./L2GenesisUpgradeTestHelper.sol";
 
 contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2ContractL2Deployer {
     using stdStorage for StdStorage;
@@ -97,107 +98,20 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
         );
         vm.etch(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, systemContractProxyAdminCode);
 
-        additionalForceDeploymentsData = abi.encode(
-            ZKChainSpecificForceDeploymentsData({
-                baseTokenBridgingData: TokenBridgingData({
-                    assetId: bytes32(0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70),
-                    originChainId: 1,
-                    originToken: address(1)
-                }),
-                l2LegacySharedBridge: address(0),
-                predeployedL2WethAddress: address(1),
-                baseTokenL1Address: address(1),
-                baseTokenMetadata: TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18})
-            })
-        );
+        additionalForceDeploymentsData = L2GenesisUpgradeTestHelper.getAdditionalForceDeploymentsData();
+        BytecodeInfo memory bytecodeInfo = L2GenesisUpgradeTestHelper.getBytecodeInfo();
+        fixedForceDeploymentsData = L2GenesisUpgradeTestHelper.getFixedForceDeploymentsData(CHAIN_ID, bytecodeInfo);
 
-        bytes memory messageRootBytecode = Utils.readZKFoundryBytecodeL1("L2MessageRoot.sol", "L2MessageRoot");
-        bytes memory messageRootBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(messageRootBytecode));
-
-        bytes memory l2NativeTokenVaultBytecode = Utils.readZKFoundryBytecodeL1(
-            "L2NativeTokenVault.sol",
-            "L2NativeTokenVault"
-        );
-        bytes memory l2NtvBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(l2NativeTokenVaultBytecode));
-
-        bytes memory l2AssetRouterBytecodeInfo = abi.encode(
-            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("L2AssetRouter.sol", "L2AssetRouter"))
-        );
-
-        bytes memory bridgehubBytecodeInfo = abi.encode(
-            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("L2Bridgehub.sol", "L2Bridgehub"))
-        );
-
-        bytes memory chainAssetHandlerBytecodeInfo = abi.encode(
-            L2ContractHelper.hashL2Bytecode(
-                Utils.readZKFoundryBytecodeL1("L2ChainAssetHandler.sol", "L2ChainAssetHandler")
-            )
-        );
-
-        bytes memory beaconDeployerBytecodeInfo = abi.encode(
-            L2ContractHelper.hashL2Bytecode(
-                Utils.readZKFoundryBytecodeL1("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer")
-            )
-        );
-
-        bytes memory interopCenterBytecodeInfo = abi.encode(
-            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("InteropCenter.sol", "InteropCenter"))
-        );
-
-        bytes memory interopHandlerBytecodeInfo = abi.encode(
-            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("InteropHandler.sol", "InteropHandler"))
-        );
-
-        bytes memory assetTrackerBytecodeInfo = abi.encode(
-            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("L2AssetTracker.sol", "L2AssetTracker"))
-        );
-
-        fixedForceDeploymentsData = abi.encode(
-            FixedForceDeploymentsData({
-                l1ChainId: 1,
-                gatewayChainId: 1,
-                eraChainId: CHAIN_ID,
-                l1AssetRouter: address(1),
-                l2TokenProxyBytecodeHash: bytes32(0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70),
-                aliasedL1Governance: address(1),
-                maxNumberOfZKChains: 100,
-                bridgehubBytecodeInfo: bridgehubBytecodeInfo,
-                l2AssetRouterBytecodeInfo: l2AssetRouterBytecodeInfo,
-                l2NtvBytecodeInfo: l2NtvBytecodeInfo,
-                messageRootBytecodeInfo: messageRootBytecodeInfo,
-                chainAssetHandlerBytecodeInfo: chainAssetHandlerBytecodeInfo,
-                interopCenterBytecodeInfo: interopCenterBytecodeInfo,
-                interopHandlerBytecodeInfo: interopHandlerBytecodeInfo,
-                assetTrackerBytecodeInfo: assetTrackerBytecodeInfo,
-                beaconDeployerInfo: beaconDeployerBytecodeInfo,
-                // For genesis upgrade these values will always be zero
-                l2SharedBridgeLegacyImpl: address(0),
-                l2BridgedStandardERC20Impl: address(0),
-                aliasedChainRegistrationSender: address(1),
-                dangerousTestOnlyForcedBeacon: address(0)
-            })
-        );
-
-        vm.mockCall(
+        L2GenesisUpgradeTestHelper.setupMockCalls(
+            vm,
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(ISystemContext.setChainId.selector),
-            ""
-        );
-        vm.mockCall(L2_BRIDGEHUB_ADDR, abi.encodeWithSelector(L2Bridgehub.initL2.selector), "");
-        vm.mockCall(L2_ASSET_ROUTER_ADDR, abi.encodeWithSelector(L2AssetRouter.initL2.selector), "");
-        vm.mockCall(L2_CHAIN_ASSET_HANDLER_ADDR, abi.encodeWithSelector(L2ChainAssetHandler.initL2.selector), "");
-        vm.mockCall(L2_INTEROP_CENTER_ADDR, abi.encodeWithSelector(bytes4(keccak256("initL2(uint256,address)"))), "");
-        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            L2_ASSET_ROUTER_ADDR,
+            L2_CHAIN_ASSET_HANDLER_ADDR,
+            L2_INTEROP_CENTER_ADDR,
             L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(bytes4(keccak256("getMarker(bytes32)"))),
-            abi.encode(1)
-        );
-
-        // Mock SystemContractProxyAdmin.owner() to return the complex upgrader address
-        vm.mockCall(
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
-            abi.encodeWithSignature("owner()"),
-            abi.encode(L2_COMPLEX_UPGRADER_ADDR)
+            L2_COMPLEX_UPGRADER_ADDR
         );
     }
 
