@@ -16,8 +16,9 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {BridgehubAddresses} from "../utils/Types.sol";
+import {IDeployL2Contracts} from "contracts/script-interfaces/IDeployL2Contracts.sol";
 
-contract DeployL2Script is Script {
+contract DeployL2Script is Script, IDeployL2Contracts {
     using stdToml for string;
 
     Config internal config;
@@ -181,9 +182,9 @@ contract DeployL2Script is Script {
         BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
             IL1Bridgehub(bridgehubAddress)
         );
-        config.l1SharedBridgeProxy = bhAddresses.assetRouter;
-        config.proxies.erc20Bridge = AddressIntrospector.getLegacyBridgeAddress(bhAddresses.assetRouter);
-        config.eraChainId = AddressIntrospector.getEraChainId(bhAddresses.assetRouter);
+        config.l1SharedBridgeProxy = bhAddresses.proxies.chainAssetHandler;
+        config.erc20BridgeProxy = AddressIntrospector.getLegacyBridgeAddress(bhAddresses.proxies.chainAssetHandler);
+        config.eraChainId = AddressIntrospector.getEraChainId(bhAddresses.proxies.chainAssetHandler);
     }
 
     function saveOutput() internal {
