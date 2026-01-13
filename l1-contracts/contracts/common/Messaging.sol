@@ -207,8 +207,9 @@ struct CallAttributes {
 ///                    - Fixed fee in ZK (ZK_INTEROP_FEE constant in InteropCenter). User pays this fee directly in ZK tokens via ERC20 transfer.
 ///                      No gateway settlement fees are charged for this interop operation.
 ///                    - Dynamic fee in base token of source chain where the interop is initiated. This value is fully under control of chain operator via interopProtocolFee in InteropCenter.
-///                      In this case, gateway settlement fees (gatewaySettlementFee per call, set by governance in GWAssetTracker) are charged from the ZKChain contract
-///                      when the chain settles on Gateway via processLogsAndMessages().
+///                      In this case, gateway settlement fees (gatewaySettlementFee per call, set by governance in GWAssetTracker) are charged from the settlementFeePayer address
+///                      (specified in executeBatchesSharedBridge) when the chain settles on Gateway via processLogsAndMessages(). The settlementFeePayer must have pre-approved
+///                      GWAssetTracker to spend wrapped ZK tokens.
 struct BundleAttributes {
     bytes executionAddress;
     bytes unbundlerAddress;
