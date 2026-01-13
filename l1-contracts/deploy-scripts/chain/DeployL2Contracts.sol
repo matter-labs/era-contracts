@@ -182,7 +182,7 @@ contract DeployL2Script is Script, IDeployL2Contracts {
         BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
             IL1Bridgehub(bridgehubAddress)
         );
-        
+
         address assetRouter = address(IL1Bridgehub(bridgehubAddress).assetRouter());
         config.l1SharedBridgeProxy = assetRouter;
         config.erc20BridgeProxy = AddressIntrospector.getLegacyBridgeAddress(assetRouter);

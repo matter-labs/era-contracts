@@ -286,8 +286,16 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             "chain_type_manager_implementation_addr",
             output.gatewayStateTransition.implementations.chainTypeManager
         );
-        vm.serializeAddress("gateway_state_transition", "verifier_addr", output.gatewayStateTransition.verifiers.verifier);
-        vm.serializeAddress("gateway_state_transition", "admin_facet_addr", output.gatewayStateTransition.facets.adminFacet);
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "verifier_addr",
+            output.gatewayStateTransition.verifiers.verifier
+        );
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "admin_facet_addr",
+            output.gatewayStateTransition.facets.adminFacet
+        );
         vm.serializeAddress(
             "gateway_state_transition",
             "mailbox_facet_addr",
@@ -303,7 +311,11 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             "getters_facet_addr",
             output.gatewayStateTransition.facets.gettersFacet
         );
-        vm.serializeAddress("gateway_state_transition", "diamond_init_addr", output.gatewayStateTransition.facets.diamondInit);
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "diamond_init_addr",
+            output.gatewayStateTransition.facets.diamondInit
+        );
         vm.serializeAddress(
             "gateway_state_transition",
             "genesis_upgrade_addr",
