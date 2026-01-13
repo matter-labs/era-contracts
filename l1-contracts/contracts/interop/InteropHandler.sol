@@ -498,15 +498,11 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         bytes memory fullOwnerAddress = InteroperableAddress.formatEvmV1(_ownerChainId, _ownerAddress);
         bytes memory bytecode = abi.encodePacked(type(ShadowAccount).creationCode, abi.encode(fullOwnerAddress));
 
-        assembly {
-            shadowAccountAddr := create2(0, add(bytecode, 0x20), mload(bytecode), 0)
-        }
-
         ShadowAccount account = new ShadowAccount{salt: bytes32(0)}(fullOwnerAddress);
 
-        require(shadowAccountAddr != address(0), ShadowAccountDeploymentFailed());
+        require(address(account) != address(0), ShadowAccountDeploymentFailed());
 
-        emit ShadowAccountDeployed(shadowAccountAddr, _ownerChainId, _ownerAddress);
+        emit ShadowAccountDeployed(address(account), _ownerChainId, _ownerAddress);
     }
 
     /// @notice Computes the deterministic address of a shadow account for a given owner
