@@ -27,6 +27,11 @@ interface IInteropCenter {
     /// @param amount Total amount of ZK tokens collected.
     event FixedZKFeesCollected(address indexed payer, address indexed recipient, uint256 amount);
 
+    /// @notice Emitted when the protocol fee recipient is updated.
+    /// @param oldRecipient Previous fee recipient address.
+    /// @param newRecipient New fee recipient address.
+    event ProtocolFeeRecipientUpdated(address indexed oldRecipient, address indexed newRecipient);
+
     /// @notice Restrictions for parsing attributes.
     /// @param OnlyInteropCallValue: Only attribute for interop call value is allowed.
     /// @param OnlyCallAttributes: Only call attributes are allowed.
@@ -54,6 +59,9 @@ interface IInteropCenter {
     /// @notice Returns the accumulated protocol fees awaiting withdrawal.
     function accumulatedProtocolFees() external view returns (uint256);
 
+    /// @notice Returns the address that receives protocol fees.
+    function protocolFeeRecipient() external view returns (address);
+
     /// @notice Returns the number of bundles sent by a sender.
     function interopBundleNonce(address sender) external view returns (uint256);
 
@@ -64,9 +72,12 @@ interface IInteropCenter {
     /// @param _fee New fee amount in base token wei.
     function setInteropFee(uint256 _fee) external;
 
-    /// @notice Allows the owner to withdraw accumulated protocol fees to a specified address.
-    /// @param _to Address to send the accumulated fees to.
-    function withdrawProtocolFees(address _to) external;
+    /// @notice Allows the owner to withdraw accumulated protocol fees to the protocol fee recipient.
+    function withdrawProtocolFees() external;
+
+    /// @notice Sets the address that receives protocol fees.
+    /// @param _recipient New fee recipient address.
+    function setProtocolFeeRecipient(address _recipient) external;
 
     /// @notice Checks if the attribute selector is supported by the InteropCenter.
     /// @param _attributeSelector The attribute selector to check.
