@@ -8,8 +8,6 @@ import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecuto
 import {BalanceChange, ConfirmBalanceMigrationData} from "../../common/Messaging.sol";
 
 /// @title IGWAssetTracker
-/// @notice Interface for the Gateway Asset Tracker, which handles asset tracking and settlement fee collection.
-///
 /// @dev IMPORTANT - Approval Warning:
 ///      Only approve this contract to spend your wrapped ZK tokens if you are responsible for paying settlement fees.
 ///
