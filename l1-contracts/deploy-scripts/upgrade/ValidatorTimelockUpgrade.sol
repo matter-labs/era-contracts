@@ -68,6 +68,7 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
             bytes memory data = abi.encodeCall(MultisigCommitter.addSharedValidator, (validators[i]));
             calls = Utils.mergeCalls(calls, prepareChainAdminCall(validatorTimelock, data));
         }
+        printAndSaveCalls(calls, "add_shared_validators", defaultOutput);
     }
 
     function removeSharedValidators(address[] memory validators, address ctm) public {
