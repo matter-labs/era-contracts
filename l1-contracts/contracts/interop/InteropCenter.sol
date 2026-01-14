@@ -412,9 +412,6 @@ contract InteropCenter is
         }
 
         // If using fixed fees, collect ZK tokens per-call
-        // TODO: Decide on fixed fee flow - currently transfers directly to protocolFeeRecipient,
-        // while dynamic base token fees are accumulated in contract and withdrawn later.
-        // Ideally feed them to GW somehow. So that they are able to be withdrawn together with settlement fees.
         if (_bundleAttributes.useFixedFee) {
             uint256 totalZKFee = ZK_INTEROP_FEE * callStartersLength;
             address feeRecipient = protocolFeeRecipient;
