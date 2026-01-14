@@ -271,10 +271,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 require(log.isService, InvalidServiceLog());
 
                 if (log.key == bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
-                    _handleInteropCenterMessage(_processLogsInputs.chainId, message);
-
-                    // Count the number of calls that should incur gateway settlement fees
-                    chargeableInteropCount += _countChargeableInteropCalls(log, message, _processLogsInputs.chainId);
+                    // Handle interop message and get count of chargeable calls for settlement fees
+                    chargeableInteropCount += _handleInteropCenterMessage(_processLogsInputs.chainId, message);
                 } else if (log.key == bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR)))) {
                     _handleInteropHandlerReceiveMessage(_processLogsInputs.chainId, message, baseTokenAssetId);
                 } else if (log.key == bytes32(uint256(uint160(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)))) {
@@ -402,10 +400,17 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
     }
 
-    function _handleInteropCenterMessage(uint256 _chainId, bytes calldata _message) internal {
+    /// @notice Handles an interop center message and returns the number of chargeable calls for settlement fees.
+    /// @param _chainId The source chain ID.
+    /// @param _message The message data from InteropCenter.
+    /// @return chargeableCallCount Number of calls that should incur gateway settlement fees (0 if useFixedFee=true or not a bundle).
+    function _handleInteropCenterMessage(
+        uint256 _chainId,
+        bytes calldata _message
+    ) internal returns (uint256 chargeableCallCount) {
         if (_message[0] != BUNDLE_IDENTIFIER) {
             // This should not be possible in V31. In V31 this will be a trigger.
-            return;
+            return 0;
         }
 
         InteropBundle memory interopBundle = abi.decode(_message[1:], (InteropBundle));
@@ -438,6 +443,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes32 destinationChainBaseTokenAssetId = _bridgehub().baseTokenAssetId(interopBundle.destinationChainId);
         _decreaseChainBalance(_chainId, destinationChainBaseTokenAssetId, totalBaseTokenAmount);
         interopBalanceChange[interopBundle.destinationChainId][bundleHash].baseTokenAmount = totalBaseTokenAmount;
+
+        // Return chargeable call count for settlement fee calculation.
+        return interopBundle.calls.length;
     }
 
     function _processInteropCall(
@@ -766,57 +774,5 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
         return L2_CHAIN_ASSET_HANDLER.migrationNumber(_chainId);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        Gateway Settlement Fee Collection
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Counts the number of chargeable interop calls in a message.
-    /// @param _log The L2Log to check.
-    /// @param _message The corresponding message data.
-    /// @param _chainId The chain ID for validation.
-    /// @return callCount Number of calls that should incur gateway settlement fees (0 if not chargeable).
-    function _countChargeableInteropCalls(
-        L2Log memory _log,
-        bytes calldata _message,
-        uint256 _chainId
-    ) internal pure returns (uint256 callCount) {
-        // Must be from L2ToL1Messenger (where system contracts send messages)
-        if (_log.sender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
-            return 0;
-        }
-
-        // The log.key must indicate this message originated from InteropCenter
-        if (_log.key != bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
-            return 0;
-        }
-
-        // Must be an interop bundle message (starts with BUNDLE_IDENTIFIER)
-        if (_message.length == 0 || _message[0] != BUNDLE_IDENTIFIER) {
-            return 0;
-        }
-
-        // Decode the bundle to check fee payment status
-        bytes memory bundleData = _message[1:];
-        InteropBundle memory bundle = abi.decode(bundleData, (InteropBundle));
-
-        // Validate this bundle is from the correct source chain
-        if (bundle.sourceChainId != _chainId) {
-            return 0;
-        }
-
-        // If bundle has no calls, return 0
-        if (bundle.calls.length == 0) {
-            return 0;
-        }
-
-        // Check if bundle uses fixed fees - if so, no gateway settlement fees apply
-        if (bundle.bundleAttributes.useFixedFee) {
-            return 0; // No settlement fees for fixed fee calls
-        }
-
-        // Return the number of calls in the bundle for per-call fee calculation
-        return bundle.calls.length;
     }
 }
