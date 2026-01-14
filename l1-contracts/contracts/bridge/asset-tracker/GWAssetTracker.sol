@@ -29,6 +29,8 @@ import {IInteropHandler} from "../../interop/IInteropHandler.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
+/// @dev IMPORTANT - Approval Warning:
+///      Only approve this contract to spend your wrapped ZK tokens if you are responsible for paying settlement fees.
 contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     using FullMerkleMemory for FullMerkleMemory.FullTree;
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
