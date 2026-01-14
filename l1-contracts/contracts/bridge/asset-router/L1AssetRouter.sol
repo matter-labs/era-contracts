@@ -58,6 +58,9 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @dev Address of native token vault.
     INativeTokenVaultBase public nativeTokenVault;
 
+    /// @dev Address of legacy bridge.
+    IL1ERC20BridgeLegacy public __DEPRECATED_legacyBridge;
+
     /// @notice Legacy function to get the L2 shared bridge address for a chain.
     /// @dev In case the chain has been deployed after the gateway release,
     /// the returned value is 0.

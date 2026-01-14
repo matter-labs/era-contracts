@@ -186,10 +186,10 @@ library L2GenesisForceDeploymentsHelper {
 
         // For new chains, there is no legacy shared bridge, but the already existing ones,
         // we should be able to query it.
-        address l2LegacySharedBridge = _isGenesisUpgrade //TODO deprecate, eventually
+        address l2LegacySharedBridge = _isGenesisUpgrade 
             ? address(0)
             : address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
-
+        
         conductContractUpgrade(
             expectedUpgradeType,
             fixedForceDeploymentsData.l2AssetRouterBytecodeInfo,

@@ -66,7 +66,7 @@ interface IL1Nullifier {
 
     function BRIDGE_HUB() external view returns (IL1Bridgehub);
 
-    function legacyBridge() external view returns (IL1ERC20BridgeLegacy);
+    function legacyBridge() external view returns (IL1ERC20BridgeLegacy); //TODO deprecate, eventually
 
     function depositHappened(uint256 _chainId, bytes32 _l2TxHash) external view returns (bytes32);
 

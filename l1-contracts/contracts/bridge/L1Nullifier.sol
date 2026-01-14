@@ -126,7 +126,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     }
 
     /// @notice Checks that the message sender is the legacy bridge.
-    modifier onlyLegacyBridge() {
+    modifier onlyLegacyBridge() { //TODO deprecate, eventually
         if (msg.sender != address(legacyBridge)) {
             revert Unauthorized(msg.sender);
         }
@@ -230,7 +230,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @notice Sets the nativeTokenVault contract address.
     /// @dev Should be called only once by the owner.
     /// @param _l1NativeTokenVault The address of the native token vault.
-    function setL1NativeTokenVault(IL1NativeTokenVault _l1NativeTokenVault) external onlyOwner {
+    function setL1NativeTokenVault(IL1NativeTokenVault _l1NativeTokenVault) external onlyOwner { 
         if (address(l1NativeTokenVault) != address(0)) {
             revert NativeTokenVaultAlreadySet();
         }
@@ -243,7 +243,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @notice Sets the L1 asset router contract address.
     /// @dev Should be called only once by the owner.
     /// @param _l1AssetRouter The address of the asset router.
-    function setL1AssetRouter(address _l1AssetRouter) external onlyOwner {
+    function setL1AssetRouter(address _l1AssetRouter) external onlyOwner { //TODO deprecate, eventually
         if (address(l1AssetRouter) != address(0)) {
             revert AddressAlreadySet(address(l1AssetRouter));
         }

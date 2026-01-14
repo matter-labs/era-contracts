@@ -19,7 +19,7 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
+import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, TokenNotLegacy, DeprecatedFunction} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -50,7 +50,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     /// @dev The address of the L2 legacy shared bridge.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    IL2SharedBridgeLegacy public L2_LEGACY_SHARED_BRIDGE; //TODO deprecate, eventually
+    IL2SharedBridgeLegacy public L2_LEGACY_SHARED_BRIDGE;  //DEPRECATED 
 
     /// @dev The asset id of the base token.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
@@ -87,10 +87,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Checks that the message sender is the legacy L2 bridge.
-    modifier onlyLegacyBridge() { //TODO deprecate, eventually
-        if (msg.sender != address(L2_LEGACY_SHARED_BRIDGE)) {
-            revert InvalidCaller(msg.sender);
-        }
+    modifier onlyLegacyBridge() { //TODO remove after SDK changes
+        revert DeprecatedFunction();
         _;
     }
 
@@ -121,7 +119,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         uint256 _l1ChainId,
         uint256 _eraChainId,
         IL1AssetRouter _l1AssetRouter,
-        IL2SharedBridgeLegacy _legacySharedBridge, //@TODO deprecate, eventually
+        IL2SharedBridgeLegacy _legacySharedBridge, //TODO remove after SDK changes
         bytes32 _baseTokenAssetId,
         address _aliasedOwner
     ) public reentrancyGuardInitializer onlyUpgrader {
@@ -145,10 +143,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         uint256 _l1ChainId,
         uint256 _eraChainId,
         IL1AssetRouter _l1AssetRouter,
-        IL2SharedBridgeLegacy _legacySharedBridge, //TODO deprecate, eventually
+        IL2SharedBridgeLegacy _legacySharedBridge, //TODO remove after SDK changes
         bytes32 _baseTokenAssetId
     ) public onlyUpgrader {
-        L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
         if (address(_l1AssetRouter) == address(0)) {
             revert EmptyAddress();
         }
@@ -242,22 +239,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         });
 
         bytes memory message;
-        if (_alwaysNewMessageFormat || address(L2_LEGACY_SHARED_BRIDGE) == address(0)) {
-            message = _getAssetRouterWithdrawMessage(_assetId, l1bridgeMintData);
-            // slither-disable-next-line unused-return
-            txHash = L2ContractHelper.sendMessageToL1(message);
-        } else { //TODO deprecate, eventually
-            address l1Token = IBridgedStandardToken(
-                IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).tokenAddress(_assetId)
-            ).originToken();
-            if (l1Token == address(0)) {
-                revert AssetIdNotSupported(_assetId);
-            }
-            // slither-disable-next-line unused-return
-            (uint256 amount, address l1Receiver, ) = DataEncoding.decodeBridgeBurnData(_assetData);
-            message = _getSharedBridgeWithdrawMessage(l1Receiver, l1Token, amount);
-            txHash = IL2SharedBridgeLegacy(L2_LEGACY_SHARED_BRIDGE).sendMessageToL1(message);
-        }
+        message = _getAssetRouterWithdrawMessage(_assetId, l1bridgeMintData);
+        // slither-disable-next-line unused-return
+        txHash = L2ContractHelper.sendMessageToL1(message);
 
         emit WithdrawalInitiatedAssetRouter(L1_CHAIN_ID, _sender, _assetId, _assetData);
     }
@@ -316,14 +300,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external onlyLegacyBridge { //TODO deprecate, eventually
-        _translateLegacyFinalizeDeposit({
-            _l1Sender: _l1Sender,
-            _l2Receiver: _l2Receiver,
-            _l1Token: _l1Token,
-            _amount: _amount,
-            _data: _data
-        });
+    ) external onlyLegacyBridge { //TODO remove after SDK changes
+        revert DeprecatedFunction();
     }
 
     function _translateLegacyFinalizeDeposit(
@@ -363,8 +341,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         address _l2Token,
         uint256 _amount,
         address _sender
-    ) external onlyLegacyBridge nonReentrant { //TODO deprecate, eventually
-        _withdrawLegacy(_l1Receiver, _l2Token, _amount, _sender);
+    ) external onlyLegacyBridge nonReentrant { //TODO remove after SDK changes
+        revert DeprecatedFunction();
     }
 
     function _withdrawLegacy(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) internal {

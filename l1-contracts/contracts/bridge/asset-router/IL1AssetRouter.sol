@@ -41,7 +41,7 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
 
     function setNativeTokenVault(INativeTokenVaultBase _nativeTokenVault) external;
 
-    function setL1Erc20Bridge(IL1ERC20BridgeLegacy _legacyBridge) external;  //TODO remove after SDK changes
+    function setL1Erc20Bridge(IL1ERC20BridgeLegacy _legacyBridge) external;  //TODO deprecate, eventually
 
     /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on L2.
     /// @param _chainId The ZK chain id to which the deposit was initiated.
