@@ -59,6 +59,10 @@ contract InteropCenter is
     uint256 public interopProtocolFee;
 
     /// @notice Fixed fee amount in ZK tokens per interop call (when useFixedFee=true).
+    /// @dev This is intentionally set to be the more expensive option compared to dynamic base token fees.
+    ///      The fixed ZK fee provides Stage 1 protection - it allows users to pay fees independent of chain
+    ///      operator settings, ensuring interop works even if the operator sets arbitrary dynamic fees.
+    /// TODO: Decide on the exact value for fixed fee.
     uint256 public constant ZK_INTEROP_FEE = 1e18;
 
     /// @notice ZK token asset ID for resolving token address via native token vault.
