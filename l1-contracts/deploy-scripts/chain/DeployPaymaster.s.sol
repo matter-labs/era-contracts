@@ -6,8 +6,6 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "../utils/Utils.sol";
-import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
-import {BridgehubAddresses} from "../utils/Types.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IDeployPaymaster} from "contracts/script-interfaces/IDeployPaymaster.sol";
 
@@ -27,11 +25,8 @@ contract DeployPaymaster is Script, IDeployPaymaster {
         config.bridgehubAddress = bridgehubAddress;
         config.chainId = chainId;
 
-        // Use AddressIntrospector to get addresses from deployed contracts
-        BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
-            IL1Bridgehub(bridgehubAddress)
-        );
-        config.l1SharedBridgeProxy = bhAddresses.proxies.chainAssetHandler;
+        // Get the assetRouter address directly from bridgehub for deposit approvals
+        config.l1SharedBridgeProxy = address(IL1Bridgehub(bridgehubAddress).assetRouter());
     }
 
     function saveOutput() internal {
