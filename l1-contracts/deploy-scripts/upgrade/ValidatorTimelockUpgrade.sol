@@ -12,6 +12,8 @@ import {Call} from "contracts/governance/Common.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Utils} from "deploy-scripts/Utils.sol";
 import {Call} from "contracts/governance/Common.sol";
+import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
     using stdToml for string;
@@ -29,9 +31,10 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
         console.logAddress(msg.sender);
         address validatorTimelock = chainTypeManager.validatorTimelockPostV29();
         address bridgehub = chainTypeManager.BRIDGE_HUB();
+        address owner = IOwnable(validatorTimelock).owner();
         address proxyAdmin = Utils.getProxyAdminAddress(validatorTimelock);
 
-        address implementation = deployImplementation(proxyAdmin, bridgehub);
+        address implementation = deployImplementation(owner, bridgehub);
         calls = prepareUpgradeValidatorTimelockCall(validatorTimelock, implementation, proxyAdmin);
     }
 
@@ -63,7 +66,7 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
         Call[] memory calls = new Call[](0);
         for (uint256 i = 0; i < validators.length; i++) {
             bytes memory data = abi.encodeCall(MultisigCommitter.addSharedValidator, (validators[i]));
-            calls = Utils.mergeCalls(calls, prepareCallWithoutUpgrade(validatorTimelock, data));
+            calls = Utils.mergeCalls(calls, prepareChainAdminCall(validatorTimelock, data));
         }
     }
 
@@ -73,7 +76,7 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
         Call[] memory calls = new Call[](0);
         for (uint256 i = 0; i < validators.length; i++) {
             bytes memory data = abi.encodeCall(MultisigCommitter.removeSharedValidator, (validators[i]));
-            calls = Utils.mergeCalls(calls, prepareCallWithoutUpgrade(validatorTimelock, data));
+            calls = Utils.mergeCalls(calls, prepareChainAdminCall(validatorTimelock, data));
         }
         printAndSaveCalls(calls, "remove_shared_validators", defaultOutput);
     }
@@ -81,21 +84,21 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
     function useSharedSigningSet(address ctm, uint256 chainId) public {
         (address validatorTimelock, address chain) = getValidatorAndChainAddress(ctm, chainId);
         bytes memory data = abi.encodeCall(MultisigCommitter.useSharedSigningSet, (chain));
-        Call[] memory calls = prepareCallWithoutUpgrade(validatorTimelock, data);
+        Call[] memory calls = prepareChainAdminCall(validatorTimelock, data);
         printAndSaveCalls(calls, "use_shared_signing_set", defaultOutput);
     }
 
     function useCustomSigningSet(address ctm, uint256 chainId) public {
         (address validatorTimelock, address chain) = getValidatorAndChainAddress(ctm, chainId);
         bytes memory data = abi.encodeCall(MultisigCommitter.useCustomSigningSet, (chain));
-        Call[] memory calls = prepareCallWithoutUpgrade(validatorTimelock, data);
+        Call[] memory calls = prepareChainAdminCall(validatorTimelock, data);
         printAndSaveCalls(calls, "use_custom_signing_set", defaultOutput);
     }
 
     function setCustomSigningThreshold(address ctm, uint256 chainId, uint64 newThreshold) public {
         (address validatorTimelock, address chain) = getValidatorAndChainAddress(ctm, chainId);
         bytes memory data = abi.encodeCall(MultisigCommitter.setCustomSigningThreshold, (chain, newThreshold));
-        Call[] memory calls = prepareCallWithoutUpgrade(validatorTimelock, data);
+        Call[] memory calls = prepareChainAdminCall(validatorTimelock, data);
         printAndSaveCalls(calls, "set_custom_signing_threshold", defaultOutput);
     }
 
@@ -106,11 +109,9 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
         return (validatorTimelock, chain);
     }
 
-    function prepareCallWithoutUpgrade(address proxyAddress, bytes memory data) internal returns (Call[] memory calls) {
-        address proxyAdmin = Utils.getProxyAdminAddress(proxyAddress);
-        ITransparentUpgradeableProxy proxy = ITransparentUpgradeableProxy(payable(proxyAddress));
-        address implementation = Utils.getImplementation(proxyAddress);
-        calls = prepareGovernanceCallWithUpgrade(proxyAddress, data, implementation);
+    function prepareChainAdminCall(address proxyAddress, bytes memory data) internal returns (Call[] memory calls) {
+        calls = new Call[](1);
+        calls[0] = Call({target: proxyAddress, data: data, value: 0});
     }
 
     function prepareGovernanceCallWithUpgrade(
