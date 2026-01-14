@@ -203,6 +203,8 @@ struct CallAttributes {
 /// @param executionAddress ERC-7930 Address allowed to execute the bundle on the destination chain. If the byte array is empty then execution is permissionless.
 /// @param unbundlerAddress ERC-7930 Address allowed to unbundle the bundle on the destination chain. Note, that it is required to be nonempty, unlike `executionAddress`.
 /// @param useFixedFee If true, user pays fixed ZK fees instead of base token fees controlled by chain operator.
+///                    This is a bundle-level attribute - all calls within a bundle share the same fee mode.
+///                    Users are free to choose which fee mode to use when creating their bundle.
 ///                    In more details, any user of interop functionality is able to choose between two fee options:
 ///                    - Fixed fee in ZK (ZK_INTEROP_FEE constant in InteropCenter). User pays this fee directly in ZK tokens via ERC20 transfer.
 ///                      No gateway settlement fees are charged for this interop operation.
