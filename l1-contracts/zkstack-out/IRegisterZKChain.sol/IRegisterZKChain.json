@@ -152,11 +152,6 @@
     "name": "run",
     "inputs": [
       {
-        "name": "_bridgehub",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "_chainTypeManagerProxy",
         "type": "address",
         "internalType": "address"
