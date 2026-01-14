@@ -4,14 +4,14 @@ pragma solidity 0.8.28;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS, ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, MAX_NEW_FACTORY_DEPS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {TransactionFiltererTrue} from "contracts/dev-contracts/test/DummyTransactionFiltererTrue.sol";
 import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransactionFiltererFalse.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
-import {OnlyEraSupported, TooManyFactoryDeps, MsgValueTooLow, GasPerPubdataMismatch} from "contracts/common/L1ContractErrors.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {GasPerPubdataMismatch, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps} from "contracts/common/L1ContractErrors.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 contract MailboxRequestL2TransactionTest is MailboxTest {
     address tempAddress;
@@ -25,7 +25,7 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
 
         l1SharedBridge = new DummySharedBridge(keccak256("dummyDepositHash"));
         baseTokenBridgeAddress = address(l1SharedBridge);
-        vm.mockCall(bridgehub, abi.encodeCall(Bridgehub.sharedBridge, ()), abi.encode(baseTokenBridgeAddress));
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.assetRouter, ()), abi.encode(baseTokenBridgeAddress));
 
         tempAddress = makeAddr("temp");
         tempBytesArr = new bytes[](0);

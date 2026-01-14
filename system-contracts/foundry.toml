@@ -14,3 +14,17 @@ remappings = [
 zksolc = "1.5.11"
 enable_eravm_extensions = true
 suppressed_errors = ["sendtransfer"]
+
+[profile.test]
+src = 'test/foundry'
+test = 'test/foundry'
+out = "out-tests"
+libs = ["lib"]
+cache_path = "cache-forge-tests"
+evm_version = "cancun"
+solc_version = "0.8.28"
+
+[profile.test.zksync]
+zksolc = "1.5.11"
+enable_eravm_extensions = true
+suppressed_errors = ["sendtransfer"]

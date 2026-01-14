@@ -6,7 +6,7 @@ import {IZKChainBase} from "../chain-interfaces/IZKChainBase.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
-import {ZKChainCommitment} from "../../common/Config.sol";
+import {ZKChainCommitment, L2DACommitmentScheme} from "../../common/Config.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
@@ -75,13 +75,16 @@ interface IAdmin is IZKChainBase {
         bytes[] calldata _factoryDeps
     ) external;
 
-    /// @notice Set the L1 DA validator address as well as the L2 DA validator address.
-    /// @dev While in principle it is possible that updating only one of the addresses is needed,
+    /// @notice Returns address of the RollupDAManager of the ZK Chain.
+    function getRollupDAManager() external view returns (address);
+
+    /// @notice Set the L1 DA validator address as well as the L2 DA commitment scheme.
+    /// @dev While in principle it is possible that updating only one of the values is needed,
     /// usually these should work in pair and L1 validator typically expects a specific input from the L2 Validator.
     /// That's why we change those together to prevent admins of chains from shooting themselves in the foot.
     /// @param _l1DAValidator The address of the L1 DA validator
-    /// @param _l2DAValidator The address of the L2 DA validator
-    function setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) external;
+    /// @param _l2DACommitmentScheme The scheme of the L2 DA commitment
+    function setDAValidatorPair(address _l1DAValidator, L2DACommitmentScheme _l2DACommitmentScheme) external;
 
     /// @notice Makes the chain as permanent rollup.
     /// @dev This is a security feature needed for chains that should be
@@ -138,8 +141,11 @@ interface IAdmin is IZKChainBase {
     /// @notice The EVM emulator has been enabled
     event EnableEvmEmulator();
 
-    /// @notice New pair of DA validators set
-    event NewL2DAValidator(address indexed oldL2DAValidator, address indexed newL2DAValidator);
+    /// @notice New L2 DA commitment scheme set
+    event NewL2DACommitmentScheme(
+        L2DACommitmentScheme indexed oldL2DACommitmentScheme,
+        L2DACommitmentScheme indexed newL2DACommitmentScheme
+    );
     event NewL1DAValidator(address indexed oldL1DAValidator, address indexed newL1DAValidator);
 
     event BridgeMint(address indexed _account, uint256 _amount);

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
 import {PubdataPricingMode} from "../state-transition/chain-deps/ZKChainStorage.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
@@ -29,7 +29,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
     address public l2Deployer;
 
     /// @notice Address of ZKsync Bridgehub.
-    IBridgehub public bridgehub;
+    IL1Bridgehub public bridgehub;
 
     /// @notice Mapping of proposed chains by author and chain ID.
     /// @notice Stores chain proposals made by users, where each address can propose a chain with a unique chain ID.
@@ -110,7 +110,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
     /// @param _l2Deployer Address of the L2 deployer.
     /// @param _owner Address of the contract owner.
     function initialize(address _bridgehub, address _l2Deployer, address _owner) external initializer {
-        bridgehub = IBridgehub(_bridgehub);
+        bridgehub = IL1Bridgehub(_bridgehub);
         l2Deployer = _l2Deployer;
         _transferOwnership(_owner);
     }
@@ -196,7 +196,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
         address diamondProxy = IChainTypeManager(ctm).getZKChain(_chainId);
         address pendingChainAdmin = IGetters(diamondProxy).getPendingAdmin();
         address chainAdmin = IGetters(diamondProxy).getAdmin();
-        address l2BridgeAddress = IL1SharedBridgeLegacy(bridgehub.sharedBridge()).l2BridgeAddress(_chainId);
+        address l2BridgeAddress = IL1SharedBridgeLegacy(bridgehub.assetRouter()).l2BridgeAddress(_chainId);
         if (l2BridgeAddress == address(0)) {
             revert BridgeIsNotRegistered();
         }
