@@ -29,7 +29,6 @@ fs_permissions = [
     { access = "read", path = "../l1-contracts/broadcast/" },
     { access = "read", path = "../da-contracts/" },
     { access = "read", path = "../system-contracts/zkout/" },
-    { access = "read", path = "home/user/era-contracts/system-contracts/zkout/" },
     { access = "read", path = "./script-config" },
     { access = "read", path = "./upgrade-envs/" },
     { access = "read", path = "./out" },
