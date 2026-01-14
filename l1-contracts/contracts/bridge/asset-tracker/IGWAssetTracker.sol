@@ -25,6 +25,18 @@ interface IGWAssetTracker {
     /// @param newFee New fee amount.
     event GatewaySettlementFeeUpdated(uint256 indexed oldFee, uint256 indexed newFee);
 
+    /// @notice Emitted when gateway settlement fees are collected during batch execution.
+    /// @param chainId The chain ID that is settling.
+    /// @param feePayer Address that paid the settlement fees.
+    /// @param amount Total amount of wrapped ZK tokens collected.
+    /// @param interopCallCount Number of interop calls that incurred fees.
+    event GatewaySettlementFeesCollected(
+        uint256 indexed chainId,
+        address indexed feePayer,
+        uint256 amount,
+        uint256 interopCallCount
+    );
+
     /// @notice Returns the current gateway settlement fee per interop call.
     function gatewaySettlementFee() external view returns (uint256);
 
