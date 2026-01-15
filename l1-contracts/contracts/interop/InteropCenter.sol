@@ -14,7 +14,7 @@ import {IInteropCenter} from "./IInteropCenter.sol";
 
 import {GW_ASSET_TRACKER, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
-import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BUNDLE_IDENTIFIER, BalanceChange, BundleAttributes, CallAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal} from "../common/Messaging.sol";
 import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
@@ -91,6 +91,12 @@ contract InteropCenter is
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert Unauthorized(msg.sender);
         }
+        _;
+    }
+
+    /// @dev Only allows calls from the service transaction sender (L1 Admin.sol via requestL2ServiceTransaction).
+    modifier onlyServiceTransactionSender() {
+        require(msg.sender == SERVICE_TRANSACTION_SENDER, Unauthorized(msg.sender));
         _;
     }
 
@@ -667,7 +673,8 @@ contract InteropCenter is
     /// @notice Sets the base token fee per interop call (used when useFixedFee=false).
     /// @dev Can be set to 0 to disable base token fees for users.
     /// @param _fee New fee amount in base token wei.
-    function setInteropFee(uint256 _fee) external onlyOwner {
+    /// @dev Only callable via L1 Admin.sol service transaction (chain admin calls Admin.setInteropFee on L1).
+    function setInteropFee(uint256 _fee) external onlyServiceTransactionSender {
         uint256 oldFee = interopProtocolFee;
         interopProtocolFee = _fee;
         emit InteropFeeUpdated(oldFee, _fee);
