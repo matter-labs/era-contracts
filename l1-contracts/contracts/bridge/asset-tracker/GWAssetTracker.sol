@@ -321,35 +321,43 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             chainBatchRootHash
         );
 
-        // Collect ZK settlement fees from the designated fee payer using Wrapped ZK token.
-        //
-        // Fee Collection Trust Model:
-        // - Only the chain's authorized validator can call executeBatchesSharedBridge (enforced by onlyChain)
-        // - The validator is trusted to specify a valid settlementFeePayer address
-        // - There is no on-chain registry of "authorized fee payers" because:
-        //   1. Operators may use any funding mechanism (EOA, multisig, treasury contract)
-        //   2. The validator role already implies trust from the chain operator
-        //   3. Adding a registry would introduce unnecessary complexity
-        //
-        // Failure Behavior:
-        // - If fee collection fails (insufficient balance or approval), batch execution reverts entirely
-        // - This ensures fees are always paid atomically with settlement
-        // - Operators must maintain sufficient balance and approval to avoid blocking their own chain
-        //
-        if (chargeableInteropCount > 0 && gatewaySettlementFee > 0) {
-            uint256 totalFee = gatewaySettlementFee * chargeableInteropCount;
+        _collectInteropSettlementFee(
+            _processLogsInputs.chainId,
+            _processLogsInputs.settlementFeePayer,
+            chargeableInteropCount
+        );
+    }
+
+    /// @notice Collects interop settlement fees from the designated fee payer using Wrapped ZK token.
+    /// @dev Fee Collection Trust Model:
+    /// - Only the chain's authorized validator can call executeBatchesSharedBridge (enforced by onlyChain)
+    /// - The validator is trusted to specify a valid settlementFeePayer address
+    /// - There is no on-chain registry of "authorized fee payers" because:
+    ///   1. Operators may use any funding mechanism (EOA, multisig, treasury contract)
+    ///   2. The validator role already implies trust from the chain operator
+    ///   3. Adding a registry would introduce unnecessary complexity
+    ///
+    /// Failure Behavior:
+    /// - If fee collection fails (insufficient balance or approval), batch execution reverts entirely
+    /// - This ensures fees are always paid atomically with settlement
+    /// - Operators must maintain sufficient balance and approval to avoid blocking their own chain
+    /// @param _chainId The chain ID for which fees are being collected
+    /// @param _settlementFeePayer The address paying the settlement fees
+    /// @param _chargeableInteropCount The number of chargeable interop messages
+    function _collectInteropSettlementFee(
+        uint256 _chainId,
+        address _settlementFeePayer,
+        uint256 _chargeableInteropCount
+    ) internal {
+        if (_chargeableInteropCount > 0 && gatewaySettlementFee > 0) {
+            uint256 totalFee = gatewaySettlementFee * _chargeableInteropCount;
 
             // Transfer Wrapped ZK tokens from the settlement fee payer to this contract.
             // The fee payer must have pre-approved this contract to spend wrapped ZK tokens.
             // slither-disable-next-line arbitrary-send-erc20
-            wrappedZKToken.safeTransferFrom(_processLogsInputs.settlementFeePayer, address(this), totalFee);
+            wrappedZKToken.safeTransferFrom(_settlementFeePayer, address(this), totalFee);
 
-            emit GatewaySettlementFeesCollected(
-                _processLogsInputs.chainId,
-                _processLogsInputs.settlementFeePayer,
-                totalFee,
-                chargeableInteropCount
-            );
+            emit GatewaySettlementFeesCollected(_chainId, _settlementFeePayer, totalFee, _chargeableInteropCount);
         }
     }
 
