@@ -138,13 +138,12 @@ contract InteropCenter is
     function initL2(
         uint256 _l1ChainId,
         address _owner,
-        uint256 _zkTokenOriginChainId,
-        address _zkTokenAddress
+        bytes32 _zkTokenAssetId
     ) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
         L1_CHAIN_ID = _l1ChainId;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
-        ZK_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(_zkTokenOriginChainId, _zkTokenAddress);
+        ZK_TOKEN_ASSET_ID = _zkTokenAssetId;
 
         _transferOwnership(_owner);
         protocolFeeRecipient = _owner; // Default to owner, can be changed via setProtocolFeeRecipient

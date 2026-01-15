@@ -136,8 +136,7 @@ library L2Utils {
         InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
             _args.l1ChainId,
             _args.aliasedOwner,
-            324,
-            address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E)
+            DataEncoding.encodeNTVAssetId(324, address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E))
         );
     }
 

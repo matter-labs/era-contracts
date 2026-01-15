@@ -32,7 +32,8 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {DeployCTMUtils, CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
-import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {L2CanonicalTransaction, TokenBridgingData} from "contracts/common/Messaging.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 import {BytecodePublisher} from "../../utils/bytecode/BytecodePublisher.s.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
@@ -434,9 +435,12 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             ),
             // upgradeAddresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
             dangerousTestOnlyForcedBeacon: address(0),
-            // TODO: Load zkTokenOriginChainId and zkTokenAddress from config for production deployments.
-            zkTokenOriginChainId: 0,
-            zkTokenAddress: address(0)
+            // TODO: Load zkTokenBridgingData from config for production deployments.
+            zkTokenBridgingData: TokenBridgingData({
+                assetId: DataEncoding.encodeNTVAssetId(0, address(0)),
+                originChainId: 0,
+                originToken: address(0)
+            })
         });
     }
 

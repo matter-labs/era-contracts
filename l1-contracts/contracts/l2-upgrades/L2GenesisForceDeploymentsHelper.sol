@@ -469,8 +469,7 @@ library L2GenesisForceDeploymentsHelper {
             InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.aliasedL1Governance,
-                fixedForceDeploymentsData.zkTokenOriginChainId,
-                fixedForceDeploymentsData.zkTokenAddress
+                fixedForceDeploymentsData.zkTokenBridgingData.assetId
             );
         }
         if (!(_isZKsyncOS && _isGenesisUpgrade)) {

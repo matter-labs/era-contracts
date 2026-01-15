@@ -13,6 +13,8 @@ import {Utils} from "deploy-scripts/utils/Utils.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_GENESIS_UPGRADE_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {TokenBridgingData} from "contracts/common/Messaging.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {L2WrappedBaseToken} from "contracts/bridge/L2WrappedBaseToken.sol";
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
@@ -186,8 +188,11 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
                 l2BridgedStandardERC20Impl: address(0),
                 aliasedChainRegistrationSender: address(1),
                 dangerousTestOnlyForcedBeacon: address(0),
-                zkTokenOriginChainId: 324,
-                zkTokenAddress: address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E)
+                zkTokenBridgingData: TokenBridgingData({
+                    assetId: DataEncoding.encodeNTVAssetId(324, address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E)),
+                    originChainId: 324,
+                    originToken: address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E)
+                })
             })
         );
 

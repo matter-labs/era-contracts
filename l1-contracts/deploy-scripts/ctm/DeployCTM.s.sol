@@ -58,6 +58,8 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {Config, CTMDeployedAddresses, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {TokenBridgingData} from "contracts/common/Messaging.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 // TODO: pass this value from zkstack_cli
@@ -489,9 +491,12 @@ contract DeployCTMScript is Script, DeployCTMUtils {
                 discoveredBridgehub.chainRegistrationSenderProxy
             ),
             dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon,
-            // TODO: Load zkTokenOriginChainId and zkTokenAddress from config for production deployments.
-            zkTokenOriginChainId: 0,
-            zkTokenAddress: address(0)
+            // TODO: Load zkTokenBridgingData from config for production deployments.
+            zkTokenBridgingData: TokenBridgingData({
+                assetId: DataEncoding.encodeNTVAssetId(0, address(0)),
+                originChainId: 0,
+                originToken: address(0)
+            })
         });
     }
 
