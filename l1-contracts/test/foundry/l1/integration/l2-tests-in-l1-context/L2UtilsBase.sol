@@ -263,6 +263,10 @@ library L2UtilsBase {
                 // Approve GWAssetTracker to spend tokens on behalf of the chain operator
                 vm.prank(chainOperator);
                 wrappedZKToken.approve(GW_ASSET_TRACKER_ADDR, type(uint256).max);
+
+                // Agree to pay settlement fees for this chain
+                vm.prank(chainOperator);
+                GWAssetTracker(GW_ASSET_TRACKER_ADDR).agreeToPaySettlementFees(chainIds[i]);
             }
         }
     }
