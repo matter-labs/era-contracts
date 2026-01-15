@@ -16,7 +16,7 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed, InvalidInteropBalanceChange, InvalidFeeRecipient} from "./AssetTrackerErrors.sol";
+import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed, InvalidInteropBalanceChange, InvalidFeeRecipient, SettlementFeePayerNotAgreed} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
@@ -29,8 +29,12 @@ import {IInteropHandler} from "../../interop/IInteropHandler.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-/// @dev IMPORTANT - Approval Warning:
-///      Only approve this contract to spend your wrapped ZK tokens if you are responsible for paying settlement fees.
+/// @dev IMPORTANT - Settlement Fee Payer Setup:
+///      To pay settlement fees for a chain, you must:
+///      1. Call `agreeToPaySettlementFees(chainId)` to opt-in for that specific chain
+///      2. Approve this contract to spend your wrapped ZK tokens
+///      The agreement mechanism prevents front-running attacks where malicious operators
+///      could make you pay for other chains' settlements.
 contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     using FullMerkleMemory for FullMerkleMemory.FullTree;
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
@@ -80,6 +84,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// @dev Since ZK is the base token on Gateway, we use the wrapped version for transfers.
     /// @dev This is fetched from L2NativeTokenVault.WETH_TOKEN on initialization.
     IERC20 public wrappedZKToken;
+
+    /// @notice Tracks whether a fee payer has agreed to pay settlement fees for a specific chain.
+    /// @dev This prevents front-running attacks where a malicious operator could make another chain's
+    /// fee payer pay for their settlement by specifying their address as settlementFeePayer.
+    mapping(address payer => mapping(uint256 chainId => bool)) public settlementFeePayerAgreement;
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -133,6 +142,21 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         if (balance > 0) {
             wrappedZKToken.safeTransfer(_recipient, balance);
         }
+    }
+
+    /// @notice Opt-in to pay settlement fees for a specific chain.
+    /// @dev The fee payer must also approve wrapped ZK tokens for this contract.
+    /// @param _chainId Chain ID to agree to pay fees for.
+    function agreeToPaySettlementFees(uint256 _chainId) external {
+        settlementFeePayerAgreement[msg.sender][_chainId] = true;
+        emit SettlementFeePayerAgreementUpdated(msg.sender, _chainId, true);
+    }
+
+    /// @notice Revoke agreement to pay settlement fees for a specific chain.
+    /// @param _chainId Chain ID to revoke agreement for.
+    function revokeSettlementFeePayerAgreement(uint256 _chainId) external {
+        settlementFeePayerAgreement[msg.sender][_chainId] = false;
+        emit SettlementFeePayerAgreementUpdated(msg.sender, _chainId, false);
     }
 
     /// @notice Sets legacy shared bridge addresses for chains that used the old bridging system.
@@ -329,18 +353,16 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     }
 
     /// @notice Collects interop settlement fees from the designated fee payer using Wrapped ZK token.
-    /// @dev Fee Collection Trust Model:
-    /// - Only the chain's authorized validator can call executeBatchesSharedBridge (enforced by onlyChain)
-    /// - The validator is trusted to specify a valid settlementFeePayer address
-    /// - There is no on-chain registry of "authorized fee payers" because:
-    ///   1. Operators may use any funding mechanism (EOA, multisig, treasury contract)
-    ///   2. The validator role already implies trust from the chain operator
-    ///   3. Adding a registry would introduce unnecessary complexity
+    /// @dev Fee Collection Security Model:
+    /// - Fee payers must explicitly opt-in via `agreeToPaySettlementFees(chainId)` before they can be charged
+    /// - This prevents front-running attacks where a malicious operator could specify another chain's
+    ///   fee payer address to make them pay for unrelated settlements
+    /// - Fee payers must also approve wrapped ZK tokens for this contract
     ///
     /// Failure Behavior:
-    /// - If fee collection fails (insufficient balance or approval), batch execution reverts entirely
+    /// - If fee collection fails (payer not agreed, insufficient balance, or no approval), batch execution reverts
     /// - This ensures fees are always paid atomically with settlement
-    /// - Operators must maintain sufficient balance and approval to avoid blocking their own chain
+    /// - Operators must ensure their fee payer has agreed and maintains sufficient balance/approval
     /// @param _chainId The chain ID for which fees are being collected
     /// @param _settlementFeePayer The address paying the settlement fees
     /// @param _chargeableInteropCount The number of chargeable interop messages
@@ -350,6 +372,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         uint256 _chargeableInteropCount
     ) internal {
         if (_chargeableInteropCount > 0 && gatewaySettlementFee > 0) {
+            if (!settlementFeePayerAgreement[_settlementFeePayer][_chainId]) {
+                revert SettlementFeePayerNotAgreed(_settlementFeePayer, _chainId);
+            }
+
             uint256 totalFee = gatewaySettlementFee * _chargeableInteropCount;
 
             // Transfer Wrapped ZK tokens from the settlement fee payer to this contract.

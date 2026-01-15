@@ -55,6 +55,8 @@ error OnlyGatewaySettlementLayer();
 error OnlyWhitelistedSettlementLayer(address, address);
 // 0x174996d5
 error RegisterNewTokenNotAllowed();
+// 0xaad86dcd
+error SettlementFeePayerNotAgreed(address payer, uint256 chainId);
 // 0x90ed63bb
 error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
 // 0x03a5ba47

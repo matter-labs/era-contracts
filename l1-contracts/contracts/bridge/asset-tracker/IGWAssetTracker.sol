@@ -28,6 +28,12 @@ interface IGWAssetTracker {
         uint256 interopCallCount
     );
 
+    /// @notice Emitted when a fee payer's agreement to pay settlement fees is updated.
+    /// @param payer Address of the fee payer.
+    /// @param chainId Chain ID the agreement applies to.
+    /// @param agreed Whether the payer agreed (true) or revoked (false).
+    event SettlementFeePayerAgreementUpdated(address indexed payer, uint256 indexed chainId, bool agreed);
+
     /// @notice Returns the current gateway settlement fee per interop call.
     function gatewaySettlementFee() external view returns (uint256);
 
@@ -41,6 +47,20 @@ interface IGWAssetTracker {
     /// @notice Withdraws accumulated gateway fees to a recipient.
     /// @param _recipient Address to receive the fees.
     function withdrawGatewayFees(address _recipient) external;
+
+    /// @notice Returns whether a fee payer has agreed to pay settlement fees for a chain.
+    /// @param _payer Address of the fee payer.
+    /// @param _chainId Chain ID to check.
+    function settlementFeePayerAgreement(address _payer, uint256 _chainId) external view returns (bool);
+
+    /// @notice Opt-in to pay settlement fees for a specific chain.
+    /// @dev The fee payer must also approve wrapped ZK tokens for this contract.
+    /// @param _chainId Chain ID to agree to pay fees for.
+    function agreeToPaySettlementFees(uint256 _chainId) external;
+
+    /// @notice Revoke agreement to pay settlement fees for a specific chain.
+    /// @param _chainId Chain ID to revoke agreement for.
+    function revokeSettlementFeePayerAgreement(uint256 _chainId) external;
 
     function setAddresses(uint256 _l1ChainId) external;
 
