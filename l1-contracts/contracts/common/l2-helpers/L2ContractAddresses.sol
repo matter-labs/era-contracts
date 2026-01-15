@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IL2ToL1Messenger} from "./IL2ToL1Messenger.sol";
+import {IL2ToL1MessengerEra} from "./IL2ToL1MessengerEra.sol";
 import {IL2InteropRootStorage} from "../interfaces/IL2InteropRootStorage.sol";
 import {IMessageVerification} from "../interfaces/IMessageVerification.sol";
 import {IBaseToken} from "./IBaseToken.sol";
@@ -18,11 +18,28 @@ import {IGWAssetTracker} from "../../bridge/asset-tracker/IGWAssetTracker.sol";
 import {ISystemContext} from "../interfaces/ISystemContext.sol";
 import {IMessageRoot} from "../../core/message-root/IMessageRoot.sol";
 
+/// @dev the offset for the system hooks for ZKsync OS
+uint160 constant SYSTEM_HOOKS_OFFSET = 0x7000;
+
 /// @dev the offset for the system contracts
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
 
 /// @dev The offset from which the built-in, but user space contracts are located.
 uint160 constant BUILT_IN_CONTRACTS_OFFSET = 0x10000; // 2^16
+
+////////////////////////////////////////////////////////////
+// zksync os system hooks
+////////////////////////////////////////////////////////////
+
+/// @dev The address of the L2ToL1Messenger system hook
+address constant L1_MESSENGER_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x01);
+
+/// @dev The address of the system hook responsible for setting bytecode on address. Can only be called from L2_COMPLEX_UPGRADER address
+address constant SET_BYTECODE_ON_ADDRESS_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x02);
+
+////////////////////////////////////////////////////////////
+// System contracts
+////////////////////////////////////////////////////////////
 
 /// @dev The maximum address of the built-in contracts.
 uint160 constant MAX_BUILT_IN_CONTRACT_ADDR = BUILT_IN_CONTRACTS_OFFSET + 0x1ffff;
@@ -50,7 +67,7 @@ address constant L2_FORCE_DEPLOYER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x07
 /// @dev The address of the L2ToL1Messenger system contract
 address constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x08);
 /// @dev The address of the special smart contract that can send arbitrary length message as an L2 log
-IL2ToL1Messenger constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT = IL2ToL1Messenger(
+IL2ToL1MessengerEra constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT = IL2ToL1MessengerEra(
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 );
 
@@ -73,6 +90,10 @@ address constant L2_COMPRESSOR_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x0e);
 
 /// @dev The address used to execute complex upgragedes, also used for the genesis upgrade
 address constant L2_COMPLEX_UPGRADER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x0f);
+
+////////////////////////////////////////////////////////////
+// Built-in contracts
+////////////////////////////////////////////////////////////
 
 /// @dev The address of the create2 factory contract
 address constant L2_CREATE2_FACTORY_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x00);
@@ -128,18 +149,18 @@ address constant L2_NTV_BEACON_DEPLOYER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET
 /// @dev the address of the L2 system contract proxy admin
 address constant L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0c);
 
+/// @dev the address of the L2 interop center
+address constant L2_INTEROP_CENTER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0d);
+IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(L2_INTEROP_CENTER_ADDR);
+
 /// @dev the address of the L2 interop handler
-address constant L2_INTEROP_HANDLER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0d);
+address constant L2_INTEROP_HANDLER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0e);
 IInteropHandler constant L2_INTEROP_HANDLER = IInteropHandler(L2_INTEROP_HANDLER_ADDR);
 
 /// @dev the address of the L2 asset tracker
-address constant L2_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0e);
+address constant L2_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0f);
 IL2AssetTracker constant L2_ASSET_TRACKER = IL2AssetTracker(L2_ASSET_TRACKER_ADDR);
 
 /// @dev the address of the GW asset tracker
-address constant GW_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0f);
+address constant GW_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x10);
 IGWAssetTracker constant GW_ASSET_TRACKER = IGWAssetTracker(GW_ASSET_TRACKER_ADDR);
-
-/// @dev the address of the L2 interop center
-address constant L2_INTEROP_CENTER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x10);
-IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(L2_INTEROP_CENTER_ADDR);
