@@ -84,7 +84,7 @@ const L2_INTEROP_ROOT_STORAGE: Address = Address(FixedBytes::<20>(hex_literal::h
 const L2_MESSAGE_VERIFICATION: Address = Address(FixedBytes::<20>(hex_literal::hex!("0000000000000000000000000000000000010009")));
 
 // FIXME: consider reducing the size of the genesis by deploying those inside L2GensisUpgrade
-pub const INITIAL_CONTRACTS: [(Address, &str); 21] = [
+pub const INITIAL_CONTRACTS: [(Address, &str); 20] = [
     (L2_COMPLEX_UPGRADER_ADDR, "SystemContractProxy"),
     (L2_GENESIS_UPGRADE, "L2GenesisUpgrade"),
     (L2_WRAPPED_BASE_TOKEN, "L2WrappedBaseToken"),
