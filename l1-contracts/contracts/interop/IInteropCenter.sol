@@ -15,22 +15,16 @@ interface IInteropCenter {
     /// @notice Emitted when the interop protocol fee is updated.
     event InteropFeeUpdated(uint256 indexed oldFee, uint256 indexed newFee);
 
-    /// @notice Emitted when protocol fees are accumulated for withdrawal.
-    event ProtocolFeesAccumulated(uint256 amount);
-
-    /// @notice Emitted when protocol fees are withdrawn.
-    event ProtocolFeesWithdrawn(address indexed to, uint256 amount);
+    /// @notice Emitted when protocol fees (base token) are collected and sent to the recipient
+    /// @param recipient Address that received the fees (always block.coinbase in current release).
+    /// @param amount Total amount of base token collected.
+    event ProtocolFeesCollected(address indexed recipient, uint256 amount);
 
     /// @notice Emitted when fixed ZK fees are collected from a user.
     /// @param payer Address that paid the fees.
-    /// @param recipient Address that received the fees.
+    /// @param recipient Address that received the fees (always block.coinbase in current release).
     /// @param amount Total amount of ZK tokens collected.
     event FixedZKFeesCollected(address indexed payer, address indexed recipient, uint256 amount);
-
-    /// @notice Emitted when the protocol fee recipient is updated.
-    /// @param oldRecipient Previous fee recipient address.
-    /// @param newRecipient New fee recipient address.
-    event ProtocolFeeRecipientUpdated(address indexed oldRecipient, address indexed newRecipient);
 
     /// @notice Restrictions for parsing attributes.
     /// @param OnlyInteropCallValue: Only attribute for interop call value is allowed.
@@ -56,12 +50,6 @@ interface IInteropCenter {
     /// @notice Returns the ZK token asset ID.
     function ZK_TOKEN_ASSET_ID() external view returns (bytes32);
 
-    /// @notice Returns the accumulated protocol fees awaiting withdrawal.
-    function accumulatedProtocolFees() external view returns (uint256);
-
-    /// @notice Returns the address that receives protocol fees.
-    function protocolFeeRecipient() external view returns (address);
-
     /// @notice Returns the number of bundles sent by a sender.
     function interopBundleNonce(address sender) external view returns (uint256);
 
@@ -71,13 +59,6 @@ interface IInteropCenter {
     /// @notice Sets the base token fee per interop call (used when useFixedFee=false).
     /// @param _fee New fee amount in base token wei.
     function setInteropFee(uint256 _fee) external;
-
-    /// @notice Allows the owner to withdraw accumulated protocol fees to the protocol fee recipient.
-    function withdrawProtocolFees() external;
-
-    /// @notice Sets the address that receives protocol fees.
-    /// @param _recipient New fee recipient address.
-    function setProtocolFeeRecipient(address _recipient) external;
 
     /// @notice Checks if the attribute selector is supported by the InteropCenter.
     /// @param _attributeSelector The attribute selector to check.

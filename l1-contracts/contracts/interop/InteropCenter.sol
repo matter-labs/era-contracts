@@ -19,7 +19,7 @@ import {BUNDLE_IDENTIFIER, BalanceChange, BundleAttributes, CallAttributes, INTE
 import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
-import {AttributeAlreadySet, AttributeViolatesRestriction, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty, UseFixedFeeRequired, InvalidRecipientAddress, FeeWithdrawalFailed, ZKTokenNotAvailable} from "./InteropErrors.sol";
+import {AttributeAlreadySet, AttributeViolatesRestriction, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty, UseFixedFeeRequired, FeeWithdrawalFailed, ZKTokenNotAvailable} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
@@ -70,13 +70,6 @@ contract InteropCenter is
 
     /// @notice Cached ZK token contract address (resolved from asset ID).
     IERC20 private zkToken;
-
-    /// @notice Accumulated protocol fees awaiting withdrawal.
-    uint256 public accumulatedProtocolFees;
-
-    /// @notice Address that receives protocol fees (both fixed ZK fees and withdrawn base token fees).
-    /// @dev Set by governance, can be operator, treasury, or any designated recipient.
-    address public protocolFeeRecipient;
 
     modifier onlyL1() {
         require(L1_CHAIN_ID == block.chainid, NotL1(L1_CHAIN_ID, block.chainid));
@@ -145,7 +138,6 @@ contract InteropCenter is
         ZK_TOKEN_ASSET_ID = _zkTokenAssetId;
 
         _transferOwnership(_owner);
-        protocolFeeRecipient = _owner; // Default to owner, can be changed via setProtocolFeeRecipient
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -363,10 +355,11 @@ contract InteropCenter is
                 );
             }
         }
-        // Accumulate protocol fee for withdrawal by operator (owner)
+        // Send protocol fee directly to block.coinbase
         if (protocolFee > 0) {
-            accumulatedProtocolFees += protocolFee;
-            emit ProtocolFeesAccumulated(protocolFee);
+            (bool success, ) = block.coinbase.call{value: protocolFee}("");
+            require(success, FeeWithdrawalFailed());
+            emit ProtocolFeesCollected(block.coinbase, protocolFee);
         }
     }
 
@@ -413,12 +406,11 @@ contract InteropCenter is
             }
         }
 
-        // If using fixed fees, collect ZK tokens per-call
+        // If using fixed fees, collect ZK tokens per-call and send to block.coinbase
         if (_bundleAttributes.useFixedFee) {
             uint256 totalZKFee = ZK_INTEROP_FEE * callStartersLength;
-            address feeRecipient = protocolFeeRecipient;
-            _getZKToken().safeTransferFrom(msg.sender, feeRecipient, totalZKFee);
-            emit FixedZKFeesCollected(msg.sender, feeRecipient, totalZKFee);
+            _getZKToken().safeTransferFrom(msg.sender, block.coinbase, totalZKFee);
+            emit FixedZKFeesCollected(msg.sender, block.coinbase, totalZKFee);
         }
 
         // Ensure that tokens required for bundle execution were received.
@@ -679,30 +671,5 @@ contract InteropCenter is
         uint256 oldFee = interopProtocolFee;
         interopProtocolFee = _fee;
         emit InteropFeeUpdated(oldFee, _fee);
-    }
-
-    /// @notice Allows the owner to withdraw accumulated protocol fees to the protocol fee recipient.
-    /// @dev Uses pull-over-push pattern to prevent reverts from blocking interop operations.
-    function withdrawProtocolFees() external onlyOwner {
-        address recipient = protocolFeeRecipient;
-        require(recipient != address(0), InvalidRecipientAddress());
-        uint256 amount = accumulatedProtocolFees;
-
-        accumulatedProtocolFees = 0;
-
-        (bool success, ) = recipient.call{value: amount}("");
-        require(success, FeeWithdrawalFailed());
-
-        emit ProtocolFeesWithdrawn(recipient, amount);
-    }
-
-    /// @notice Sets the address that receives protocol fees.
-    /// @dev Only callable by owner. Can be set to operator, treasury, or any designated recipient.
-    /// @param _recipient New fee recipient address.
-    function setProtocolFeeRecipient(address _recipient) external onlyOwner {
-        require(_recipient != address(0), InvalidRecipientAddress());
-        address oldRecipient = protocolFeeRecipient;
-        protocolFeeRecipient = _recipient;
-        emit ProtocolFeeRecipientUpdated(oldRecipient, _recipient);
     }
 }
