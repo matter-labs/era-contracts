@@ -35,8 +35,8 @@ import {DeployCTMScript} from "../ctm/DeployCTM.s.sol";
 import {StateTransitionDeployedAddresses} from "../utils/Types.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 
-import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
-import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
+import {GatewayCTMDeployerHelper, PhaseCreate2Calldata, PhaseDeployerAddresses, DirectDeployedAddresses, DirectCreate2Calldata} from "./GatewayCTMDeployerHelper.sol";
+import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
@@ -127,9 +127,14 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     }
 
     function deployGatewayCTM() internal {
-        (DeployedContracts memory expectedGatewayContracts, bytes memory create2Calldata, ) = GatewayCTMDeployerHelper
-            .calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
+        (
+            DeployedContracts memory expectedGatewayContracts,
+            PhaseCreate2Calldata memory phaseCalldata,
+            ,
+            DirectCreate2Calldata memory directCalldata
+        ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
 
+        // Deploy all factory dependencies
         bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps();
 
         for (uint i = 0; i < deps.length; i++) {
@@ -148,8 +153,65 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             });
         }
 
+        // Deploy Phase 1: DA contracts (RollupDAManager, ValidiumL1DAValidator, RelayedSLDAValidator)
         Utils.runL1L2Transaction({
-            l2Calldata: create2Calldata,
+            l2Calldata: phaseCalldata.daCalldata,
+            l2GasLimit: 72_000_000,
+            l2Value: 0,
+            factoryDeps: new bytes[](0),
+            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            chainId: gatewayChainId,
+            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
+            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            refundRecipient: msg.sender
+        });
+
+        // Deploy Phase 2: ProxyAdmin
+        Utils.runL1L2Transaction({
+            l2Calldata: phaseCalldata.proxyAdminCalldata,
+            l2GasLimit: 72_000_000,
+            l2Value: 0,
+            factoryDeps: new bytes[](0),
+            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            chainId: gatewayChainId,
+            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
+            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            refundRecipient: msg.sender
+        });
+
+        // Deploy Phase 3: ValidatorTimelock (implementation + proxy)
+        Utils.runL1L2Transaction({
+            l2Calldata: phaseCalldata.validatorTimelockCalldata,
+            l2GasLimit: 72_000_000,
+            l2Value: 0,
+            factoryDeps: new bytes[](0),
+            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            chainId: gatewayChainId,
+            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
+            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            refundRecipient: msg.sender
+        });
+
+        // Deploy Phase 4: Verifiers (Era or ZKsyncOS verifiers based on config)
+        Utils.runL1L2Transaction({
+            l2Calldata: phaseCalldata.verifiersCalldata,
+            l2GasLimit: 72_000_000,
+            l2Value: 0,
+            factoryDeps: new bytes[](0),
+            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            chainId: gatewayChainId,
+            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
+            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            refundRecipient: msg.sender
+        });
+
+        // Deploy direct contracts (AdminFacet, MailboxFacet, ExecutorFacet, GettersFacet,
+        // DiamondInit, L1GenesisUpgrade, Multicall3)
+        _deployDirectContracts(directCalldata);
+
+        // Deploy Phase 5: CTM and ServerNotifier (Era or ZKsyncOS CTM based on config)
+        Utils.runL1L2Transaction({
+            l2Calldata: phaseCalldata.ctmCalldata,
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),
@@ -161,6 +223,99 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         });
 
         _saveExpectedGatewayContractsToOutput(expectedGatewayContracts);
+    }
+
+    function _deployDirectContracts(DirectCreate2Calldata memory directCalldata) internal {
+        // Deploy AdminFacet
+        Utils.runL1L2Transaction({
+            l2Calldata: directCalldata.adminFacetCalldata,
+            l2GasLimit: 72_000_000,
+            l2Value: 0,
+            factoryDeps: new bytes[](0),
+            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            chainId: gatewayChainId,
+            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
+            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            refundRecipient: msg.sender
+        });
+
+        // Deploy MailboxFacet
+        Utils.runL1L2Transaction({
+            l2Calldata: directCalldata.mailboxFacetCalldata,
+            l2GasLimit: 72_000_000,
+            l2Value: 0,
+            factoryDeps: new bytes[](0),
+            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            chainId: gatewayChainId,
+            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
+            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            refundRecipient: msg.sender
+        });
+
+        // Deploy ExecutorFacet
+        Utils.runL1L2Transaction({
+            l2Calldata: directCalldata.executorFacetCalldata,
+            l2GasLimit: 72_000_000,
+            l2Value: 0,
+            factoryDeps: new bytes[](0),
+            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            chainId: gatewayChainId,
+            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
+            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            refundRecipient: msg.sender
+        });
+
+        // Deploy GettersFacet
+        Utils.runL1L2Transaction({
+            l2Calldata: directCalldata.gettersFacetCalldata,
+            l2GasLimit: 72_000_000,
+            l2Value: 0,
+            factoryDeps: new bytes[](0),
+            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            chainId: gatewayChainId,
+            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
+            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            refundRecipient: msg.sender
+        });
+
+        // Deploy DiamondInit
+        Utils.runL1L2Transaction({
+            l2Calldata: directCalldata.diamondInitCalldata,
+            l2GasLimit: 72_000_000,
+            l2Value: 0,
+            factoryDeps: new bytes[](0),
+            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            chainId: gatewayChainId,
+            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
+            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            refundRecipient: msg.sender
+        });
+
+        // Deploy L1GenesisUpgrade
+        Utils.runL1L2Transaction({
+            l2Calldata: directCalldata.genesisUpgradeCalldata,
+            l2GasLimit: 72_000_000,
+            l2Value: 0,
+            factoryDeps: new bytes[](0),
+            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            chainId: gatewayChainId,
+            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
+            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            refundRecipient: msg.sender
+        });
+
+        // Deploy Multicall3
+        Utils.runL1L2Transaction({
+            l2Calldata: directCalldata.multicall3Calldata,
+            l2GasLimit: 72_000_000,
+            l2Value: 0,
+            factoryDeps: new bytes[](0),
+            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            chainId: gatewayChainId,
+            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
+            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            refundRecipient: msg.sender
+        });
     }
 
     function _saveExpectedGatewayContractsToOutput(DeployedContracts memory expectedGatewayContracts) internal {

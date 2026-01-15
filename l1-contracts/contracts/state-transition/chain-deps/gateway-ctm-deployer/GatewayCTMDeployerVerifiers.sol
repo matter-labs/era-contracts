@@ -1,0 +1,57 @@
+// SPDX-License-Identifier: MIT
+
+pragma solidity 0.8.28;
+
+import {EraVerifierFflonk} from "../../verifiers/EraVerifierFflonk.sol";
+import {EraVerifierPlonk} from "../../verifiers/EraVerifierPlonk.sol";
+import {EraDualVerifier} from "../../verifiers/EraDualVerifier.sol";
+import {EraTestnetVerifier} from "../../verifiers/EraTestnetVerifier.sol";
+
+import {IVerifier} from "../../chain-interfaces/IVerifier.sol";
+import {IVerifierV2} from "../../chain-interfaces/IVerifierV2.sol";
+
+import {GatewayVerifiersDeployerConfig, GatewayVerifiersDeployerResult} from "./GatewayCTMDeployer.sol";
+
+/// @title GatewayCTMDeployerVerifiers
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
+/// @notice Phase 4 of Gateway CTM deployment: deploys Era verifier contracts.
+/// @dev Deploys: EraVerifierFflonk, EraVerifierPlonk, and Era DualVerifier/TestnetVerifier.
+/// For ZKsyncOS verifiers, use GatewayCTMDeployerVerifiersZKsyncOS instead.
+/// This contract is expected to be deployed via the built-in L2 `Create2Factory`.
+contract GatewayCTMDeployerVerifiers {
+    GatewayVerifiersDeployerResult internal deployedResult;
+
+    /// @notice Returns the deployed contracts from this phase.
+    /// @return result The struct with information about the deployed contracts.
+    function getResult() external view returns (GatewayVerifiersDeployerResult memory result) {
+        result = deployedResult;
+    }
+
+    constructor(GatewayVerifiersDeployerConfig memory _config) {
+        require(!_config.isZKsyncOS, "Use GatewayCTMDeployerVerifiersZKsyncOS for ZKsyncOS");
+        bytes32 salt = _config.salt;
+
+        GatewayVerifiersDeployerResult memory result;
+
+        // Deploy Era verifiers
+        result.verifierFflonk = address(new EraVerifierFflonk{salt: salt}());
+        result.verifierPlonk = address(new EraVerifierPlonk{salt: salt}());
+
+        // Deploy main verifier
+        if (_config.testnetVerifier) {
+            result.verifier = address(
+                new EraTestnetVerifier{salt: salt}(
+                    IVerifierV2(result.verifierFflonk),
+                    IVerifier(result.verifierPlonk)
+                )
+            );
+        } else {
+            result.verifier = address(
+                new EraDualVerifier{salt: salt}(IVerifierV2(result.verifierFflonk), IVerifier(result.verifierPlonk))
+            );
+        }
+
+        deployedResult = result;
+    }
+}
