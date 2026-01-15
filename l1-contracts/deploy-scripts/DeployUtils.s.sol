@@ -466,6 +466,8 @@ abstract contract DeployUtils is Create2FactoryUtils {
             return abi.encode(config.isZKsyncOS);
         } else if (compareStrings(contractName, "L1ZKsyncOSV30Upgrade")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "L1ZKsyncOSV30_1Upgrade")) {
+            return abi.encode();
         } else {
             revert(string.concat("Contract ", contractName, " creation calldata not set"));
         }

@@ -500,7 +500,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
 
         ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(stateTransition);
-
+        require(stateTransition.defaultUpgrade != address(0), "Diamond proxy init address can't be zero");
         upgradeCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: stateTransition.defaultUpgrade,
@@ -1371,7 +1371,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
     }
 
     // Since we redeploy the Rollup DA manager, the admin needs to accept ownership.
-    function acceptDAValidatorOwnershipCalls() public returns (Call[] memory calls) {
+    function acceptDAValidatorOwnershipCalls() public virtual returns (Call[] memory calls) {
         calls = new Call[](1);
         calls[0] = Call({
             target: addresses.daAddresses.rollupDAManager,
@@ -1999,7 +1999,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
     /// @notice Get new facet cuts that were added in the upgrade
     function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal override returns (Diamond.FacetCut[] memory facetCuts) {
+    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
         // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.
         // If we start to use different selectors for Gateway, we should change this.
         facetCuts = new Diamond.FacetCut[](4);
