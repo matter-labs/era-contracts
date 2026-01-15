@@ -37,3 +37,10 @@ l1-contracts/test/foundry/integration/deploy-scripts/script-out/*
 l1-contracts/test/foundry/l1/integration/upgrade-envs/script-out/*.toml
 l1-contracts/zkout/*
 .lycheecache
+
+# Foundry binary
+foundry-zksync/
+l1-contracts/foundry-zksync/
+
+# Lock files
+l1-contracts/test/foundry/l1/integration/deploy-scripts/script-config/.lock
