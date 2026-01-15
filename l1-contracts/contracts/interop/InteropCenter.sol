@@ -104,7 +104,7 @@ contract InteropCenter is
     /// @notice Returns ZK token address if available, zero address otherwise.
     /// @dev View function to check ZK token availability without modifying state.
     /// @return The ZK token address or zero address if not available.
-    function getZKTokenAddress() external view returns (address) {
+    function getZKTokenAddress() public view returns (address) {
         // Check cached token first
         if (address(zkToken) != address(0)) {
             return address(zkToken);
@@ -125,8 +125,7 @@ contract InteropCenter is
             return zkToken;
         }
 
-        // Resolve token address from asset ID
-        address tokenAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(ZK_TOKEN_ASSET_ID);
+        address tokenAddress = getZKTokenAddress();
         require(tokenAddress != address(0), ZKTokenNotAvailable());
 
         // Cache the resolved token
