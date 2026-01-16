@@ -70,7 +70,7 @@ function generateReport(parsed: ParsedLcov, outputPath: string): void {
   // Filter to only include contracts (not tests or mocks)
   const relevantFiles = fileInfos.filter(
     (f) =>
-      f.path.includes("/contracts/") &&
+      (f.path.includes("/contracts/") || f.path.startsWith("contracts/")) &&
       !f.path.includes("/test/") &&
       !f.path.includes("/dev-contracts/") &&
       !f.path.includes("Mock") &&
