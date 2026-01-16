@@ -128,4 +128,41 @@ contract MakePermanentRollupTest is AdminTest {
         vm.expectRevert(AlreadyPermanentRollup.selector);
         adminFacet.makePermanentRollup();
     }
+
+    function test_RevertWhen_SetDAValidatorPairOnPermanentRollupWithInvalidPair() public {
+        address admin = utilsFacet.util_getAdmin();
+
+        // First set a valid DA pair and make it permanent
+        vm.prank(admin);
+        adminFacet.setDAValidatorPair(l1DAValidator, L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256);
+
+        vm.prank(admin);
+        adminFacet.makePermanentRollup();
+
+        // Now try to set an invalid DA pair (different validator not in the allowed list)
+        address invalidValidator = makeAddr("invalidValidator");
+
+        vm.prank(admin);
+        vm.expectRevert(InvalidDAForPermanentRollup.selector);
+        adminFacet.setDAValidatorPair(invalidValidator, L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256);
+    }
+
+    function test_SetDAValidatorPairOnPermanentRollupWithValidPair() public {
+        address admin = utilsFacet.util_getAdmin();
+
+        // First set a valid DA pair and make it permanent
+        vm.prank(admin);
+        adminFacet.setDAValidatorPair(l1DAValidator, L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256);
+
+        vm.prank(admin);
+        adminFacet.makePermanentRollup();
+
+        // Add another valid DA pair to the manager
+        address anotherValidator = makeAddr("anotherValidator");
+        rollupDAManager.updateDAPair(anotherValidator, L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256, true);
+
+        // Setting to another allowed pair should succeed
+        vm.prank(admin);
+        adminFacet.setDAValidatorPair(anotherValidator, L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256);
+    }
 }
