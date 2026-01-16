@@ -2,12 +2,12 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-// 0x86bb51b8
-error AddressHasNoCode(address);
 // 0xefce78c7
 error CallerMustBeBootloader();
 // 0xbe4bf9e4
 error CallerMustBeEvmContract();
+// 0x95ae848f
+error CallerMustBeInteropCenterOrNTV();
 // 0x9eedbd2b
 error CallerMustBeSystemContract();
 // 0xee455381
@@ -74,10 +74,12 @@ error IndexSizeError();
 error InsufficientFunds(uint256 required, uint256 actual);
 // 0xae962d4e
 error InvalidCall();
-// 0x7a47c9a2
-error InvalidChainId();
 // 0x6a84bc39
 error InvalidCodeHash(CodeHashReason);
+// 0x9e3eb73e
+error InvalidCompressionMetadata();
+// 0xc74537a1
+error InvalidDACommitmentScheme(uint256);
 // 0xb4fa3fb3
 error InvalidInput();
 // 0x8c13f15d
@@ -108,6 +110,12 @@ error L2BlockNumberZero();
 error LegacyBridgeNotProxy();
 // 0x43e266b0
 error MalformedBytecode(BytecodeError);
+// 0x9bb54c35
+error MerkleIndexOutOfBounds();
+// 0x8e23ac1a
+error MerklePathEmpty();
+// 0x1c500385
+error MerklePathOutOfBounds();
 // 0xe90aded4
 error NonceAlreadyUsed(address account, uint256 nonce);
 // 0xbac091ee
@@ -152,6 +160,8 @@ error SystemCallFlagRequired();
 error ThirdCallShouldHaveSameGasCostAsSecondCall(uint256 thirdCallCost, uint256 secondCallCost);
 // 0x09c63320
 error TimestampsShouldBeIncremental(uint128 newTimestamp, uint128 previousBatchTimestamp);
+// 0xa0b522e3
+error TooManyL2ToL1Logs();
 // 0xf0b4e88f
 error TooMuchGas();
 // 0xe0456dfe
@@ -172,6 +182,8 @@ error UnsupportedTxType(uint256);
 error UpgradeTransactionMustBeFirst();
 // 0x626ade30
 error ValueMismatch(uint256 expected, uint256 actual);
+// Note: enum should be encoded as uint8 to calculate selector!
+// skip-errors-lint 0x7f7b0cf7
 
 enum CodeHashReason {
     NotContractOnConstructor,
@@ -195,7 +207,9 @@ enum PubdataField {
     InputMsgsHash,
     InputBytecodeHash,
     Offset,
-    Length
+    Length,
+    StateDiffCompressionVersion,
+    ExtraData
 }
 
 enum BytecodeError {

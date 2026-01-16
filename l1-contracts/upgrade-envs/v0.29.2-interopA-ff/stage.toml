@@ -1,0 +1,65 @@
+era_chain_id = 270
+testnet_verifier = true
+governance_upgrade_timer_initial_delay = 1200
+owner_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
+
+# This should always be false for non-loadtest environments.
+support_l2_legacy_shared_bridge_test = false
+
+old_protocol_version = 0x1d00000000
+
+priority_txs_l2_gas_limit = 2000000
+max_expected_l1_gas_price = 50000000000
+
+[contracts]
+governance_min_delay = 0
+
+max_number_of_chains = 100
+create2_factory_salt = "0x83de3677ffea74c9815331db7f4c737a32c161db4cae7d47504a336c4c5bcfb7"
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+validator_timelock_execution_delay = 0
+genesis_root = "0x934d46a331e4c617767cade322bc4d262899c0dc5568d2019d4e11301c0cc032"
+genesis_rollup_leaf_index = 84
+genesis_batch_commitment = "0x4df2f475a7b24cf76a9bafca7b39a081028537c6f01993ceb5cf394eda16cca1"
+recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+priority_tx_max_gas_limit = 72000000
+diamond_init_pubdata_pricing_mode = 0
+diamond_init_batch_overhead_l1_gas = 1000000
+diamond_init_max_pubdata_per_batch = 120000
+diamond_init_max_l2_gas_per_batch = 80000000
+diamond_init_priority_tx_max_pubdata = 99000
+diamond_init_minimal_l2_gas_price = 250000000
+bootloader_hash = "0x01000911c4db4fe62c98e180cfa7e9b3a22fb15f505905d4bf36192f481551e6"
+default_aa_hash = "0x010005f73e7c299ed73db937843643bdc276cbc2cc8596287e1e0cf3afc60252"
+evm_emulator_hash = "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63"
+bridgehub_proxy_address = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
+rollup_da_manager = "0xeb7c0daaddfb52afa05400b489e7497b271d6122"
+
+governance_security_council_address = "0xed04b1ac422251851a3EC953Ff4395e5c2443647"
+latest_protocol_version = 0x1d00000002
+l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
+protocol_upgrade_handler_proxy_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
+
+[tokens]
+token_weth_address = "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"
+
+[gateway]
+chain_id = 123
+
+[state_transition]
+diamond_init_addr = "0x721035F2420fEc7EF12229ceF4A55DC0C7CB19EA"
+executor_facet_addr = "0xDdFB1d1403fA94c7bA810e4Abf790fC73b5A3B9D"
+genesis_upgrade_addr = "0x65dAd0914338b7b99bB70CD2c62A3BC7BcC26a81"
+getters_facet_addr = "0xb4bBbbA20Ebc8d4E0aCcD7EBBA04AD887ACCf783"
+
+[gateway.gateway_state_transition]
+chain_type_manager_proxy_addr = "0x7f5401a0a0340f6a68fe3162e7bb3a57e262d18e"
+chain_type_manager_proxy_admin = "0x0f7bef9694575a0e149dad6808d69f678746608b"
+rollup_da_manager = "0x064ac968CCad1948fceE025fD59c20b153c88072"
+rollup_sl_da_validator = "0x719A5aE8dF7468C7E1C22278eD3fD472e9904604"
+diamond_init_addr = "0x793cbd3E57A5B0Bf5dc1CaEDc2390C738A45c9a1"
+executor_facet_addr = "0x1099487f403574BF163A60A1bE5e9a2D025964Bb"
+genesis_upgrade_addr = "0xE7b5f9f47A0Bb9Dd3C11bfD30fE251D50D04A2D6"
+getters_facet_addr = "0x00e4C7066107B6E5E81320793BCee38D2f85CC03"

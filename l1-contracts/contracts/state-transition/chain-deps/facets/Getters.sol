@@ -9,11 +9,12 @@ import {PubdataPricingMode} from "../ZKChainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
-import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
+import {L2DACommitmentScheme} from "../../../common/Config.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -26,6 +27,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZKChainBase
+    // solhint-disable-next-line const-name-snakecase
     string public constant override getName = "GettersFacet";
 
     /*//////////////////////////////////////////////////////////////
@@ -64,7 +66,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getBaseToken() external view returns (address) {
-        return IBridgehub(s.bridgehub).baseToken(s.chainId);
+        return IL1Bridgehub(s.bridgehub).baseToken(s.chainId);
     }
 
     /// @inheritdoc IGetters
@@ -237,8 +239,9 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
         return s.settlementLayer;
     }
 
-    function getDAValidatorPair() external view returns (address, address) {
-        return (s.l1DAValidator, s.l2DAValidator);
+    /// @inheritdoc IGetters
+    function getDAValidatorPair() external view returns (address, L2DACommitmentScheme) {
+        return (s.l1DAValidator, s.l2DACommitmentScheme);
     }
 
     /*//////////////////////////////////////////////////////////////

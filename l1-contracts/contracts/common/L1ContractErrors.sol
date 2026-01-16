@@ -11,6 +11,8 @@ error AddressAlreadySet(address addr);
 error AddressHasNoCode(address);
 // 0x1f73225f
 error AddressMismatch(address expected, address supplied);
+// 0x42573d7a
+error AddressNotZero();
 // 0x2a5989a0
 error AlreadyPermanentRollup();
 // 0x0bfcef28
@@ -29,6 +31,8 @@ error AssetIdMismatch(bytes32 expected, bytes32 supplied);
 error AssetIdNotSupported(bytes32 assetId);
 // 0x11832de8
 error AssetRouterAllowanceNotZero();
+// 0x9b821ed7
+error BadTransferDataLength();
 // 0x6ef9a972
 error BaseTokenGasPriceDenominatorNotSet();
 // 0x55ad3fd3
@@ -67,6 +71,10 @@ error ChainIdMismatch();
 error ChainIdNotRegistered(uint256 chainId);
 // 0x8f620a06
 error ChainIdTooBig();
+// 0x5e361ef9
+error ChainRequiresValidatorsSignaturesForCommit();
+// 0x8746f42f
+error ConstructorsNotSupported();
 // 0xec273439
 error CTMAlreadyRegistered();
 // 0xc630ef3c
@@ -83,8 +91,8 @@ error DenominatorIsZero();
 error DeployFailed();
 // 0x138ee1a3
 error DeployingBridgedTokenForNativeToken();
-// 0xc7c9660f
-error DepositDoesNotExist();
+// 0x42bce528
+error DepositDoesNotExist(bytes32, bytes32);
 // 0xad2fa98e
 error DepositExists();
 // 0x0e7ee319
@@ -107,12 +115,16 @@ error EmptyPrecommitData(uint256 batchNumber);
 error EmptyProofLength();
 // 0x627e0872
 error ETHDepositNotSupported();
+// 0xf4072616
+error ExecuteMessageFailed();
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
 // 0xc91cf3b1
 error GasPerPubdataMismatch();
 // 0x6d4a7df8
 error GenesisBatchCommitmentZero();
+// 0x5ca97564
+error GenesisBatchCommitmentIncorrect();
 // 0x7940c83f
 error GenesisBatchHashZero();
 // 0xb4fc6835
@@ -130,24 +142,36 @@ error IncorrectBatchBounds(
     uint256 processFromProvided,
     uint256 processToProvided
 );
+// 0xc1b4bc7b
+error IncorrectBatchChainId(uint256, uint256);
 // 0xdd381a4c
 error IncorrectBridgeHubAddress(address bridgehub);
 // 0x1929b7de
 error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
-// 0x826fb11e
-error InsufficientChainBalance();
 // 0x9bf8b9aa
 error InvalidBatchNumber(uint256 provided, uint256 expected);
+// 0xd438e1fa
+error InvalidBlockRange(uint64 batchNumber, uint64 from, uint64 to);
 // 0xcbd9d2e0
 error InvalidCaller(address);
+// 0x7a47c9a2
+error InvalidChainId();
 // 0x92daded2
 error InvalidDAForPermanentRollup();
 // 0x4fbe5dba
 error InvalidDelay();
+// 0x075aaa80
+error InvalidInteropCalldata(bytes4);
+// 0x3f98a77e
+error InvalidL2DACommitmentScheme(uint8);
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
+// 0x6eca2e4b
+error InvalidMessage();
 // 0xa1ec1876
 error InvalidMessageRoot(bytes32 expectedMessageRoot, bytes32 providedMessageRoot);
+// 0xd08a97e6
+error InvalidMockProofLength();
 // 0xde4c0b96
 error InvalidNTVBurnData();
 // 0xd8e9405c
@@ -166,6 +190,8 @@ error InvalidPubdataPricingMode();
 error InvalidSelector(bytes4 func);
 // 0xbe7193d4
 error InvalidSystemLogsLength();
+// 0x7b7a98f1
+error InvalidThreshold(uint256 max, uint256 got);
 // 0x5f1aa154
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xfb5c22e6
@@ -208,6 +234,8 @@ error MigrationPaused();
 error MigrationsNotPaused();
 // 0xfa44b527
 error MissingSystemLogs(uint256 expected, uint256 actual);
+// 0x1508fb47
+error MockVerifierNotSupported();
 // 0x4a094431
 error MsgValueMismatch(uint256 expectedMsgValue, uint256 providedMsgValue);
 // 0xb385a3da
@@ -230,20 +258,32 @@ error NoLegacySharedBridge();
 error NonEmptyCalldata();
 // 0x536ec84b
 error NonEmptyMsgValue();
+// 0x230f9d11
+error NotEnoughSigners(uint256 provided, uint256 expected);
 // 0xd018e08e
 error NonIncreasingTimestamp();
 // 0x0105f9c0
 error NonSequentialBatch();
 // 0x0ac76f01
 error NonSequentialVersion();
+// 0x0e0ff4d9
+error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32 blobOpeningCommitment);
 // 0xfa5cd00f
 error NotAllowed(address addr);
 // 0x64846fe4
 error NotARestriction(address addr);
+// 0xf306a770
+error NotAssetRouter(address _sender, address _assetRouter);
 // 0xb49df1f2
 error NotAZKChain(address addr);
+// 0x5e67e793
+error NotCurrentSettlementLayer();
 // 0xdd7e3621
 error NotInitializedReentrancyGuard();
+// 0xecb34449
+error NotL1(uint256 l1ChainId, uint256 blockChainId);
+// 0xc5441a63
+error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
 // 0xdf17e316
 error NotWhitelisted(address);
 // 0xf3ed9dfa
@@ -258,6 +298,8 @@ error OperationMustBePending();
 error OperationMustBeReady();
 // 0xb926450e
 error OriginChainIdNotFound();
+// 0x97da9c1c
+error PayloadTooShort();
 // 0x688c63e5
 error PrecommitmentMismatch(uint256 batchNumber, bytes32 expected, bytes32 found);
 // 0x9b48e060
@@ -274,6 +316,8 @@ error ProtocolIdNotGreater();
 error PubdataGreaterThanLimit(uint256 limit, uint256 length);
 // 0x63c36549
 error QueueIsEmpty();
+// 0x0a6c1a5c
+error ReconstructionMismatch(bytes32, bytes32);
 // 0xab143c06
 error Reentrancy();
 // 0x667d17de
@@ -300,8 +344,18 @@ error SettlementLayersMustSettleOnL1();
 error SharedBridgeNotSet();
 // 0x7774d2f9
 error SharedBridgeValueNotSet(SharedBridgeKey);
+// 0xa665a34d
+error SignaturesLengthMismatch(uint256 expected, uint256 actual);
+// 0xa7781cbb
+error SignersNotSorted();
+// 0x3b94fe24
+error SignerNotAuthorized(address signer);
+// 0xabdc734e
+error SignatureNotValid(address signer);
 // 0xdf3a8fdd
 error SlotOccupied();
+// 0xcc0f168b
+error SystemContractProxyInitialized();
 // 0xae43b424
 error SystemLogsSizeTooBig();
 // 0x08753982
@@ -348,6 +402,8 @@ error UnsupportedEncodingVersion();
 error UnsupportedExecuteBatchEncoding(uint8 version);
 // 0xf338f830
 error UnsupportedProofBatchEncoding(uint8 version);
+// 0x1906f346
+error UnsupportedUpgradeType();
 // 0xf093c2e5
 error UpgradeBatchNumberIsNotZero();
 // 0x47b3b145
@@ -370,6 +426,8 @@ error ZeroAddress();
 error ZeroChainId();
 // 0x601b6882
 error ZKChainLimitReached();
+// 0x646ac57e
+error ZKsyncOSNotForceDeployForExistingContract(address);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

@@ -5,8 +5,8 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "./AccessControlEnumerablePerChainAddressUpgradeable.sol";
 import {LibMap} from "./libraries/LibMap.sol";
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
-import {TimeNotReached, NotAZKChain} from "../common/L1ContractErrors.sol";
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+import {NotAZKChain, TimeNotReached} from "../common/L1ContractErrors.sol";
+import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {IValidatorTimelock} from "./IValidatorTimelock.sol";
 
 /// @author Matter Labs
@@ -29,6 +29,7 @@ contract ValidatorTimelock is
     using LibMap for LibMap.Uint32Map;
 
     /// @inheritdoc IValidatorTimelock
+    // solhint-disable-next-line const-name-snakecase
     string public constant override getName = "ValidatorTimelock";
 
     /// @inheritdoc IValidatorTimelock
@@ -62,7 +63,7 @@ contract ValidatorTimelock is
     bytes32 public constant override OPTIONAL_EXECUTOR_ADMIN_ROLE = keccak256("OPTIONAL_EXECUTOR_ADMIN_ROLE");
 
     /// @inheritdoc IValidatorTimelock
-    IBridgehub public immutable override BRIDGE_HUB;
+    IL1Bridgehub public immutable override BRIDGE_HUB;
 
     /// @dev The mapping of ZK chain address => batch number => timestamp when it was committed.
     mapping(address chainAddress => LibMap.Uint32Map batchNumberToTimestampMapping) internal committedBatchTimestamp;
@@ -70,14 +71,21 @@ contract ValidatorTimelock is
     /// @inheritdoc IValidatorTimelock
     uint32 public override executionDelay;
 
+    /// @dev Reserved storage space to allow for layout changes in future upgrades.
+    uint256[48] private __gap;
+
     constructor(address _bridgehubAddr) {
-        BRIDGE_HUB = IBridgehub(_bridgehubAddr);
+        BRIDGE_HUB = IL1Bridgehub(_bridgehubAddr);
         // Disable initialization to prevent Parity hack.
         _disableInitializers();
     }
 
     /// @inheritdoc IValidatorTimelock
-    function initialize(address _initialOwner, uint32 _initialExecutionDelay) external initializer {
+    function initialize(address _initialOwner, uint32 _initialExecutionDelay) external virtual initializer {
+        _validatorTimelockInit(_initialOwner, _initialExecutionDelay);
+    }
+
+    function _validatorTimelockInit(address _initialOwner, uint32 _initialExecutionDelay) internal onlyInitializing {
         _transferOwnership(_initialOwner);
         executionDelay = _initialExecutionDelay;
     }
@@ -199,7 +207,18 @@ contract ValidatorTimelock is
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata // _batchData (unused in this specific implementation)
-    ) external onlyRole(_chainAddress, COMMITTER_ROLE) {
+    ) public virtual onlyRole(_chainAddress, COMMITTER_ROLE) {
+        _recordBatchCommitment(_chainAddress, _processBatchFrom, _processBatchTo);
+        _propagateToZKChain(_chainAddress);
+    }
+
+    /// @dev Records the timestamp of batch commitment for the given chain address.
+    /// To be used from `commitBatchesSharedBridge`
+    function _recordBatchCommitment(
+        address _chainAddress,
+        uint256 _processBatchFrom,
+        uint256 _processBatchTo
+    ) internal {
         unchecked {
             // This contract is only a temporary solution, that hopefully will be disabled until 2106 year, so...
             // It is safe to cast.
@@ -208,7 +227,6 @@ contract ValidatorTimelock is
                 committedBatchTimestamp[_chainAddress].set(i, timestamp);
             }
         }
-        _propagateToZKChain(_chainAddress);
     }
 
     /// @inheritdoc IValidatorTimelock
@@ -288,7 +306,7 @@ contract ValidatorTimelock is
 
         // Firstly, we check that the chain is indeed a part of the ecosystem
         uint256 chainId = IZKChain(_chainAddress).getChainId();
-        if (IBridgehub(BRIDGE_HUB).getZKChain(chainId) != _chainAddress) {
+        if (IL1Bridgehub(BRIDGE_HUB).getZKChain(chainId) != _chainAddress) {
             revert NotAZKChain(_chainAddress);
         }
 

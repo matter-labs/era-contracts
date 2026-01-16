@@ -13,7 +13,7 @@ era_test_node.log*
 node_modules/
 out/
 target/
-tools/data/*.sol
+tools/verifier-gen/data/*.sol
 typechain/
 yarn-debug.log*
 yarn-error.log*
@@ -25,6 +25,7 @@ l1-contracts/out/*
 l1-contracts/zkout/*
 l1-contracts/broadcast/*
 l1-contracts/script-config/*
+l1-contracts/snapshots/*
 !l1-contracts/script-config/artifacts
 l1-contracts/script-out/*
 l1-contracts/test/foundry/l1/integration/deploy-scripts/script-out/*.toml

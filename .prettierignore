@@ -1,4 +1,4 @@
-tools/data
+tools/verifier-gen/data
 l1-contracts/lib
 l1-contracts-foundry/lib
 lib
@@ -14,3 +14,4 @@ l1-contracts/artifacts-forge
 l1-contracts/zkout
 l2-contracts/zkout
 system-contracts/zkout
+configs/*
