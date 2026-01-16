@@ -346,4 +346,59 @@ contract GWAssetTrackerTest is Test {
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), _amount);
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), _baseTokenAmount);
     }
+
+    function test_HandleChainBalanceIncreaseOnGateway_DifferentAssetAndBaseToken() public {
+        bytes32 assetId = keccak256("asset1");
+        bytes32 baseTokenId = keccak256("baseToken1");
+        bytes32 txHash = keccak256("txHash1");
+
+        BalanceChange memory balanceChange = BalanceChange({
+            version: BALANCE_CHANGE_VERSION,
+            assetId: assetId,
+            baseTokenAssetId: baseTokenId,
+            amount: 1000,
+            baseTokenAmount: 500,
+            originToken: makeAddr("originToken"),
+            tokenOriginChainId: 5
+        });
+
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        gwAssetTracker.handleChainBalanceIncreaseOnGateway(CHAIN_ID, txHash, balanceChange);
+
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, assetId), 1000);
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, baseTokenId), 500);
+    }
+
+    function test_MultipleChainBalanceIncreases() public {
+        // Test multiple deposits to the same chain for the same asset
+        for (uint256 i = 0; i < 5; i++) {
+            bytes32 txHash = keccak256(abi.encode("txHash", i));
+            BalanceChange memory balanceChange = BalanceChange({
+                version: BALANCE_CHANGE_VERSION,
+                assetId: ASSET_ID,
+                baseTokenAssetId: BASE_TOKEN_ASSET_ID,
+                amount: AMOUNT,
+                baseTokenAmount: BASE_TOKEN_AMOUNT,
+                originToken: ORIGIN_TOKEN,
+                tokenOriginChainId: ORIGIN_CHAIN_ID
+            });
+
+            vm.prank(L2_INTEROP_CENTER_ADDR);
+            gwAssetTracker.handleChainBalanceIncreaseOnGateway(CHAIN_ID, txHash, balanceChange);
+        }
+
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), AMOUNT * 5);
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), BASE_TOKEN_AMOUNT * 5);
+    }
+
+    function test_GetEmptyMessageRoot_DifferentChains() public {
+        uint256 chainId1 = 100;
+        uint256 chainId2 = 200;
+
+        bytes32 emptyRoot1 = gwAssetTracker.getEmptyMessageRoot(chainId1);
+        bytes32 emptyRoot2 = gwAssetTracker.getEmptyMessageRoot(chainId2);
+
+        // Different chain IDs should produce different roots
+        assertTrue(emptyRoot1 != emptyRoot2);
+    }
 }
