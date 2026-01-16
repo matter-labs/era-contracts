@@ -14,9 +14,10 @@ import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol
 import {BALANCE_CHANGE_VERSION, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
-import {InvalidCanonicalTxHash} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
-import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {InvalidCanonicalTxHash, RegisterNewTokenNotAllowed} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {Unauthorized, ChainIdNotRegistered} from "contracts/common/L1ContractErrors.sol";
 import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
 
@@ -271,4 +272,78 @@ contract GWAssetTrackerTest is Test {
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), 0);
     }
 
+    function test_RegisterNewToken_Reverts() public {
+        // registerNewToken should always revert on GWAssetTracker
+        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
+        vm.expectRevert(RegisterNewTokenNotAllowed.selector);
+        gwAssetTracker.registerNewToken(ASSET_ID, ORIGIN_CHAIN_ID);
+    }
+
+    function test_RequestPauseDepositsForChain_Unauthorized() public {
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
+        gwAssetTracker.requestPauseDepositsForChain(CHAIN_ID);
+    }
+
+    function test_RequestPauseDepositsForChain_ChainNotRegistered() public {
+        // Mock bridgehub to return address(0) for getZKChain
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, CHAIN_ID),
+            abi.encode(address(0))
+        );
+
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        vm.expectRevert(abi.encodeWithSelector(ChainIdNotRegistered.selector, CHAIN_ID));
+        gwAssetTracker.requestPauseDepositsForChain(CHAIN_ID);
+    }
+
+    function test_InitiateGatewayToL1MigrationOnGateway_ChainNotRegistered() public {
+        // Mock bridgehub to return address(0) for getZKChain
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, CHAIN_ID),
+            abi.encode(address(0))
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(ChainIdNotRegistered.selector, CHAIN_ID));
+        gwAssetTracker.initiateGatewayToL1MigrationOnGateway(CHAIN_ID, ASSET_ID);
+    }
+
+    function test_L1_CHAIN_ID_Getter() public view {
+        assertEq(gwAssetTracker.L1_CHAIN_ID(), L1_CHAIN_ID);
+    }
+
+    function testFuzz_SetAddresses(uint256 _l1ChainId) public {
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        gwAssetTracker.setAddresses(_l1ChainId);
+
+        assertEq(gwAssetTracker.L1_CHAIN_ID(), _l1ChainId);
+    }
+
+    function testFuzz_HandleChainBalanceIncreaseOnGateway(
+        uint256 _amount,
+        uint256 _baseTokenAmount
+    ) public {
+        // Bound to reasonable values to avoid overflow
+        _amount = bound(_amount, 0, type(uint128).max);
+        _baseTokenAmount = bound(_baseTokenAmount, 0, type(uint128).max);
+
+        bytes32 uniqueTxHash = keccak256(abi.encode(_amount, _baseTokenAmount));
+
+        BalanceChange memory balanceChange = BalanceChange({
+            version: BALANCE_CHANGE_VERSION,
+            assetId: ASSET_ID,
+            baseTokenAssetId: BASE_TOKEN_ASSET_ID,
+            amount: _amount,
+            baseTokenAmount: _baseTokenAmount,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID
+        });
+
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        gwAssetTracker.handleChainBalanceIncreaseOnGateway(CHAIN_ID, uniqueTxHash, balanceChange);
+
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), _amount);
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), _baseTokenAmount);
+    }
 }
