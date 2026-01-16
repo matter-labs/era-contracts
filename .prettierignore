@@ -15,3 +15,5 @@ l1-contracts/zkout
 l2-contracts/zkout
 system-contracts/zkout
 configs/*
+.claude
+**/.claude

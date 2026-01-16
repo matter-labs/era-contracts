@@ -10,6 +10,8 @@ import {ZKsyncOSTestnetVerifier} from "../../verifiers/ZKsyncOSTestnetVerifier.s
 import {IVerifier} from "../../chain-interfaces/IVerifier.sol";
 import {IVerifierV2} from "../../chain-interfaces/IVerifierV2.sol";
 
+import {WrongCTMDeployerVariant} from "../../../common/L1ContractErrors.sol";
+
 import {GatewayVerifiersDeployerConfig, GatewayVerifiersDeployerResult} from "./GatewayCTMDeployer.sol";
 
 /// @title GatewayCTMDeployerVerifiersZKsyncOS
@@ -29,7 +31,9 @@ contract GatewayCTMDeployerVerifiersZKsyncOS {
     }
 
     constructor(GatewayVerifiersDeployerConfig memory _config) {
-        require(_config.isZKsyncOS, "Use GatewayCTMDeployerVerifiers for Era");
+        if (!_config.isZKsyncOS) {
+            revert WrongCTMDeployerVariant();
+        }
         bytes32 salt = _config.salt;
 
         GatewayVerifiersDeployerResult memory result;

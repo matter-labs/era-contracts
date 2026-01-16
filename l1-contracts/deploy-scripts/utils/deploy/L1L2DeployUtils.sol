@@ -39,11 +39,7 @@ library L1L2DeployUtils {
         } else {
             // Era mode: use ZKsync CREATE2 factory with zkSync-specific address derivation
             bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(bytecode);
-            result.expectedAddress = Utils.getL2AddressViaCreate2Factory(
-                salt,
-                bytecodeHash,
-                constructorArgs
-            );
+            result.expectedAddress = Utils.getL2AddressViaCreate2Factory(salt, bytecodeHash, constructorArgs);
             (, result.data) = Utils.getDeploymentCalldata(salt, bytecode, constructorArgs);
             result.targetAddress = L2_CREATE2_FACTORY_ADDR;
         }

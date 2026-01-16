@@ -359,7 +359,8 @@ library GatewayCTMDeployerHelper {
         bytes memory constructorArgs
     ) internal returns (address addr, bytes memory calldata_) {
         // Default to Era mode (non-ZKsyncOS) for backwards compatibility
-        return _calculateCreate2AddressAndCalldataWithMode(_create2Salt, fileName, contractName, constructorArgs, false);
+        return
+            _calculateCreate2AddressAndCalldataWithMode(_create2Salt, fileName, contractName, constructorArgs, false);
     }
 
     function _calculateCreate2AddressAndCalldataWithMode(

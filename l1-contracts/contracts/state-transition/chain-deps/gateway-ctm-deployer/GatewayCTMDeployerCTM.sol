@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {EraChainTypeManager} from "../../EraChainTypeManager.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {WrongCTMDeployerVariant} from "../../../common/L1ContractErrors.sol";
 
 import {GatewayCTMFinalConfig} from "./GatewayCTMDeployer.sol";
 import {GatewayCTMDeployerCTMBase} from "./GatewayCTMDeployerCTMBase.sol";
@@ -18,7 +19,9 @@ import {GatewayCTMDeployerCTMBase} from "./GatewayCTMDeployerCTMBase.sol";
 /// This contract is expected to be deployed via the built-in L2 `Create2Factory`.
 contract GatewayCTMDeployerCTM is GatewayCTMDeployerCTMBase {
     constructor(GatewayCTMFinalConfig memory _config) {
-        require(!_config.isZKsyncOS, "Use GatewayCTMDeployerCTMZKsyncOS for ZKsyncOS");
+        if (_config.isZKsyncOS) {
+            revert WrongCTMDeployerVariant();
+        }
         _deployInner(_config);
     }
 

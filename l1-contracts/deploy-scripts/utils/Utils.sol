@@ -355,10 +355,7 @@ library Utils {
     /// @param salt The salt value.
     /// @param initCode The initialization code (bytecode + constructor args).
     /// @return The computed CREATE2 address.
-    function getL2AddressViaDeterministicCreate2(
-        bytes32 salt,
-        bytes memory initCode
-    ) internal view returns (address) {
+    function getL2AddressViaDeterministicCreate2(bytes32 salt, bytes memory initCode) internal view returns (address) {
         return vm.computeCreate2Address(salt, keccak256(initCode), DETERMINISTIC_CREATE2_ADDRESS);
     }
 

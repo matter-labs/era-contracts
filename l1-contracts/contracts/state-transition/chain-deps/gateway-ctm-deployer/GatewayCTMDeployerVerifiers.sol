@@ -10,6 +10,8 @@ import {EraTestnetVerifier} from "../../verifiers/EraTestnetVerifier.sol";
 import {IVerifier} from "../../chain-interfaces/IVerifier.sol";
 import {IVerifierV2} from "../../chain-interfaces/IVerifierV2.sol";
 
+import {WrongCTMDeployerVariant} from "../../../common/L1ContractErrors.sol";
+
 import {GatewayVerifiersDeployerConfig, GatewayVerifiersDeployerResult} from "./GatewayCTMDeployer.sol";
 
 /// @title GatewayCTMDeployerVerifiers
@@ -29,7 +31,9 @@ contract GatewayCTMDeployerVerifiers {
     }
 
     constructor(GatewayVerifiersDeployerConfig memory _config) {
-        require(!_config.isZKsyncOS, "Use GatewayCTMDeployerVerifiersZKsyncOS for ZKsyncOS");
+        if (_config.isZKsyncOS) {
+            revert WrongCTMDeployerVariant();
+        }
         bytes32 salt = _config.salt;
 
         GatewayVerifiersDeployerResult memory result;
@@ -41,10 +45,7 @@ contract GatewayCTMDeployerVerifiers {
         // Deploy main verifier
         if (_config.testnetVerifier) {
             result.verifier = address(
-                new EraTestnetVerifier{salt: salt}(
-                    IVerifierV2(result.verifierFflonk),
-                    IVerifier(result.verifierPlonk)
-                )
+                new EraTestnetVerifier{salt: salt}(IVerifierV2(result.verifierFflonk), IVerifier(result.verifierPlonk))
             );
         } else {
             result.verifier = address(

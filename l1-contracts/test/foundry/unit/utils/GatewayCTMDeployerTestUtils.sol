@@ -83,7 +83,9 @@ library GatewayCTMDeployerTestUtils {
         contracts.stateTransition.chainTypeManagerProxyAdmin = results.proxyAdminResult.chainTypeManagerProxyAdmin;
 
         // From ValidatorTimelock phase
-        contracts.stateTransition.validatorTimelockImplementation = results.validatorTimelockResult.validatorTimelockImplementation;
+        contracts.stateTransition.validatorTimelockImplementation = results
+            .validatorTimelockResult
+            .validatorTimelockImplementation;
         contracts.stateTransition.validatorTimelock = results.validatorTimelockResult.validatorTimelock;
 
         // From Verifiers phase
