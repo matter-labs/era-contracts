@@ -1,5 +1,4 @@
 import * as fs from "fs";
-import * as path from "path";
 
 /**
  * This script parses an lcov.info file and generates a report of untested lines.
@@ -45,12 +44,15 @@ function parseLcov(lcovContent: string): ParsedLcov {
       const lineNumber = parseInt(parts[0], 10);
       const hitCount = parseInt(parts[1], 10);
 
-      currentFile.totalLines++;
-      if (hitCount > 0) {
-        currentFile.coveredLines++;
-      } else {
+      if (hitCount === 0) {
         currentFile.untestedLines.push(lineNumber);
       }
+    } else if (line.startsWith("LF:") && currentFile) {
+      // Lines Found (total executable lines)
+      currentFile.totalLines = parseInt(line.substring(3), 10);
+    } else if (line.startsWith("LH:") && currentFile) {
+      // Lines Hit (covered lines)
+      currentFile.coveredLines = parseInt(line.substring(3), 10);
     } else if (line === "end_of_record" && currentFile) {
       // End of file record
       if (currentFile.totalLines > 0) {
@@ -67,19 +69,21 @@ function parseLcov(lcovContent: string): ParsedLcov {
 function generateReport(parsed: ParsedLcov, outputPath: string): void {
   const fileInfos = Array.from(parsed.files.values());
 
-  // Filter to only include contracts (not tests or mocks)
-  const relevantFiles = fileInfos.filter(
+  // Filter to contract files only (matching forge coverage calculation)
+  const contractFiles = fileInfos.filter(
     (f) =>
       (f.path.includes("/contracts/") || f.path.startsWith("contracts/")) &&
       !f.path.includes("/test/") &&
       !f.path.includes("/dev-contracts/") &&
       !f.path.includes("Mock") &&
-      !f.path.includes("Test") &&
-      f.untestedLines.length > 0
+      !f.path.includes("Test")
   );
 
+  // Filter to only files with untested lines for detailed reporting
+  const filesWithUntestedLines = contractFiles.filter((f) => f.untestedLines.length > 0);
+
   // Sort by number of untested lines (descending)
-  relevantFiles.sort((a, b) => b.untestedLines.length - a.untestedLines.length);
+  filesWithUntestedLines.sort((a, b) => b.untestedLines.length - a.untestedLines.length);
 
   // Generate markdown report
   const lines: string[] = [];
@@ -93,12 +97,13 @@ function generateReport(parsed: ParsedLcov, outputPath: string): void {
   lines.push("## Summary");
   lines.push("");
 
-  const totalUntested = relevantFiles.reduce((sum, f) => sum + f.untestedLines.length, 0);
-  const totalLines = relevantFiles.reduce((sum, f) => sum + f.totalLines, 0);
-  const totalCovered = relevantFiles.reduce((sum, f) => sum + f.coveredLines, 0);
+  // Calculate overall coverage from contract files (matching forge coverage behavior)
+  const totalLines = contractFiles.reduce((sum, f) => sum + f.totalLines, 0);
+  const totalCovered = contractFiles.reduce((sum, f) => sum + f.coveredLines, 0);
+  const totalUntested = filesWithUntestedLines.reduce((sum, f) => sum + f.untestedLines.length, 0);
   const overallCoverage = totalLines > 0 ? (totalCovered / totalLines) * 100 : 0;
 
-  lines.push(`- **Total files with untested code:** ${relevantFiles.length}`);
+  lines.push(`- **Total files with untested code:** ${filesWithUntestedLines.length}`);
   lines.push(`- **Total untested lines:** ${totalUntested}`);
   lines.push(`- **Total executable lines:** ${totalLines}`);
   lines.push(`- **Overall line coverage:** ${overallCoverage.toFixed(2)}%`);
@@ -110,7 +115,7 @@ function generateReport(parsed: ParsedLcov, outputPath: string): void {
   lines.push("| File | Coverage | Untested Lines | Specific Lines |");
   lines.push("|------|----------|----------------|----------------|");
 
-  for (const file of relevantFiles) {
+  for (const file of filesWithUntestedLines) {
     // Simplify path for display
     const displayPath = file.path.replace(/^.*\/contracts\//, "contracts/");
 
@@ -131,7 +136,7 @@ function generateReport(parsed: ParsedLcov, outputPath: string): void {
   lines.push("## Detailed Untested Lines by File");
   lines.push("");
 
-  for (const file of relevantFiles.slice(0, 30)) {
+  for (const file of filesWithUntestedLines.slice(0, 30)) {
     // Top 30 files
     const displayPath = file.path.replace(/^.*\/contracts\//, "contracts/");
     lines.push(`### ${displayPath}`);
@@ -143,8 +148,8 @@ function generateReport(parsed: ParsedLcov, outputPath: string): void {
     lines.push("");
   }
 
-  if (relevantFiles.length > 30) {
-    lines.push(`... and ${relevantFiles.length - 30} more files with untested code.`);
+  if (filesWithUntestedLines.length > 30) {
+    lines.push(`... and ${filesWithUntestedLines.length - 30} more files with untested code.`);
     lines.push("");
   }
 
