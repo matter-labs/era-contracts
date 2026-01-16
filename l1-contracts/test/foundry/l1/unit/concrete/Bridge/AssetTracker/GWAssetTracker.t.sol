@@ -401,4 +401,82 @@ contract GWAssetTrackerTest is Test {
         // Different chain IDs should produce different roots
         assertTrue(emptyRoot1 != emptyRoot2);
     }
+
+
+    function test_SetLegacySharedBridgeAddress_DifferentChains() public {
+        address legacyBridge1 = makeAddr("legacyBridge1");
+        address legacyBridge2 = makeAddr("legacyBridge2");
+        uint256 chainId1 = 100;
+        uint256 chainId2 = 200;
+
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        gwAssetTracker.setLegacySharedBridgeAddress(chainId1, legacyBridge1);
+
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        gwAssetTracker.setLegacySharedBridgeAddress(chainId2, legacyBridge2);
+    }
+
+    function testFuzz_SetLegacySharedBridgeAddress(uint256 _chainId, address _legacyBridge) public {
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        gwAssetTracker.setLegacySharedBridgeAddress(_chainId, _legacyBridge);
+    }
+
+    function test_HandleChainBalanceIncreaseOnGateway_SameAssetAndBaseToken() public {
+        // Test when assetId equals baseTokenAssetId
+        bytes32 sameAssetId = keccak256("sameAsset");
+        bytes32 txHash = keccak256("txHash2");
+
+        BalanceChange memory balanceChange = BalanceChange({
+            version: BALANCE_CHANGE_VERSION,
+            assetId: sameAssetId,
+            baseTokenAssetId: sameAssetId, // Same as assetId
+            amount: 1000,
+            baseTokenAmount: 500,
+            originToken: makeAddr("originToken"),
+            tokenOriginChainId: 5
+        });
+
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        gwAssetTracker.handleChainBalanceIncreaseOnGateway(CHAIN_ID, txHash, balanceChange);
+
+        // Total should be amount + baseTokenAmount since they're the same asset
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, sameAssetId), 1500);
+    }
+
+    function test_MultipleChains_DifferentBalances() public {
+        uint256 chainId1 = 100;
+        uint256 chainId2 = 200;
+        bytes32 txHash1 = keccak256("txHash100");
+        bytes32 txHash2 = keccak256("txHash200");
+
+        BalanceChange memory balanceChange1 = BalanceChange({
+            version: BALANCE_CHANGE_VERSION,
+            assetId: ASSET_ID,
+            baseTokenAssetId: BASE_TOKEN_ASSET_ID,
+            amount: 1000,
+            baseTokenAmount: 500,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID
+        });
+
+        BalanceChange memory balanceChange2 = BalanceChange({
+            version: BALANCE_CHANGE_VERSION,
+            assetId: ASSET_ID,
+            baseTokenAssetId: BASE_TOKEN_ASSET_ID,
+            amount: 2000,
+            baseTokenAmount: 1000,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID
+        });
+
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        gwAssetTracker.handleChainBalanceIncreaseOnGateway(chainId1, txHash1, balanceChange1);
+
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        gwAssetTracker.handleChainBalanceIncreaseOnGateway(chainId2, txHash2, balanceChange2);
+
+        // Verify each chain has its own balance
+        assertEq(gwAssetTracker.chainBalance(chainId1, ASSET_ID), 1000);
+        assertEq(gwAssetTracker.chainBalance(chainId2, ASSET_ID), 2000);
+    }
 }
