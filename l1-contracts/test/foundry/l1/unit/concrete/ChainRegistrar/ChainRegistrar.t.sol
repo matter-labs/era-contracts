@@ -270,4 +270,172 @@ contract ChainRegistrarTest is Test {
         vm.expectRevert(ChainRegistrar.ChainIsNotYetDeployed.selector);
         chainRegistrar.getRegisteredChainConfig(testChainId);
     }
+
+    function test_getRegisteredChainConfig_revertsIfBridgeNotRegistered() public {
+        // Set up chain as deployed
+        address ctm = makeAddr("ctm");
+        address diamondProxy = makeAddr("diamondProxy");
+        address assetRouter = makeAddr("assetRouter");
+
+        bridgehub.setChainTypeManager(testChainId, ctm);
+        bridgehub.setAssetRouter(assetRouter);
+
+        // Mock CTM to return diamondProxy
+        vm.mockCall(ctm, abi.encodeWithSignature("getZKChain(uint256)", testChainId), abi.encode(diamondProxy));
+
+        // Mock getters on diamondProxy
+        vm.mockCall(diamondProxy, abi.encodeWithSignature("getPendingAdmin()"), abi.encode(makeAddr("pendingAdmin")));
+        vm.mockCall(diamondProxy, abi.encodeWithSignature("getAdmin()"), abi.encode(makeAddr("admin")));
+
+        // Mock assetRouter.l2BridgeAddress to return address(0)
+        vm.mockCall(assetRouter, abi.encodeWithSignature("l2BridgeAddress(uint256)", testChainId), abi.encode(address(0)));
+
+        vm.expectRevert(ChainRegistrar.BridgeIsNotRegistered.selector);
+        chainRegistrar.getRegisteredChainConfig(testChainId);
+    }
+
+    function test_getRegisteredChainConfig_succeedsWhenFullyRegistered() public {
+        // Set up chain as deployed
+        address ctm = makeAddr("ctm");
+        address diamondProxy = makeAddr("diamondProxy");
+        address assetRouter = makeAddr("assetRouter");
+        address pendingAdmin = makeAddr("pendingAdmin");
+        address chainAdmin = makeAddr("chainAdmin");
+        address l2Bridge = makeAddr("l2Bridge");
+
+        bridgehub.setChainTypeManager(testChainId, ctm);
+        bridgehub.setAssetRouter(assetRouter);
+
+        // Mock CTM to return diamondProxy
+        vm.mockCall(ctm, abi.encodeWithSignature("getZKChain(uint256)", testChainId), abi.encode(diamondProxy));
+
+        // Mock getters on diamondProxy
+        vm.mockCall(diamondProxy, abi.encodeWithSignature("getPendingAdmin()"), abi.encode(pendingAdmin));
+        vm.mockCall(diamondProxy, abi.encodeWithSignature("getAdmin()"), abi.encode(chainAdmin));
+
+        // Mock assetRouter.l2BridgeAddress to return l2Bridge
+        vm.mockCall(assetRouter, abi.encodeWithSignature("l2BridgeAddress(uint256)", testChainId), abi.encode(l2Bridge));
+
+        ChainRegistrar.RegisteredChainConfig memory config = chainRegistrar.getRegisteredChainConfig(testChainId);
+
+        assertEq(config.pendingChainAdmin, pendingAdmin);
+        assertEq(config.chainAdmin, chainAdmin);
+        assertEq(config.diamondProxy, diamondProxy);
+        assertEq(config.l2BridgeAddress, l2Bridge);
+    }
+
+    // ============ Fuzz Tests ============
+
+    function testFuzz_proposeChainRegistration_withDifferentChainIds(uint256 _chainId) public {
+        vm.assume(_chainId != 0);
+
+        vm.prank(user);
+        chainRegistrar.proposeChainRegistration({
+            _chainId: _chainId,
+            _pubdataPricingMode: PubdataPricingMode.Rollup,
+            _blobOperator: makeAddr("blobOperator"),
+            _operator: makeAddr("operator"),
+            _governor: makeAddr("governor"),
+            _baseTokenAddress: ETH_TOKEN_ADDRESS,
+            _tokenMultiplierSetter: makeAddr("tokenMultiplierSetter"),
+            _gasPriceMultiplierNominator: 1,
+            _gasPriceMultiplierDenominator: 1
+        });
+
+        (uint256 chainId, , , , , ) = chainRegistrar.proposedChains(user, _chainId);
+        assertEq(chainId, _chainId);
+    }
+
+    function testFuzz_proposeChainRegistration_withDifferentGasMultipliers(
+        uint128 _nominator,
+        uint128 _denominator
+    ) public {
+        vm.assume(_denominator > 0);
+        vm.assume(_nominator > 0);
+
+        vm.prank(user);
+        chainRegistrar.proposeChainRegistration({
+            _chainId: testChainId,
+            _pubdataPricingMode: PubdataPricingMode.Rollup,
+            _blobOperator: makeAddr("blobOperator"),
+            _operator: makeAddr("operator"),
+            _governor: makeAddr("governor"),
+            _baseTokenAddress: ETH_TOKEN_ADDRESS,
+            _tokenMultiplierSetter: makeAddr("tokenMultiplierSetter"),
+            _gasPriceMultiplierNominator: _nominator,
+            _gasPriceMultiplierDenominator: _denominator
+        });
+
+        (, ChainRegistrar.BaseToken memory baseToken, , , , ) = chainRegistrar.proposedChains(user, testChainId);
+        assertEq(baseToken.gasPriceMultiplierNominator, _nominator);
+        assertEq(baseToken.gasPriceMultiplierDenominator, _denominator);
+    }
+
+    function testFuzz_changeDeployer(address _newDeployer) public {
+        vm.prank(owner);
+        chainRegistrar.changeDeployer(_newDeployer);
+        assertEq(chainRegistrar.l2Deployer(), _newDeployer);
+    }
+
+    // ============ PubdataPricingMode Tests ============
+
+    function test_proposeChainRegistration_withValidiumMode() public {
+        vm.prank(user);
+        chainRegistrar.proposeChainRegistration({
+            _chainId: testChainId,
+            _pubdataPricingMode: PubdataPricingMode.Validium,
+            _blobOperator: makeAddr("blobOperator"),
+            _operator: makeAddr("operator"),
+            _governor: makeAddr("governor"),
+            _baseTokenAddress: ETH_TOKEN_ADDRESS,
+            _tokenMultiplierSetter: makeAddr("tokenMultiplierSetter"),
+            _gasPriceMultiplierNominator: 1,
+            _gasPriceMultiplierDenominator: 1
+        });
+
+        (, , , , , PubdataPricingMode pubdataPricingMode) = chainRegistrar.proposedChains(user, testChainId);
+        assertEq(uint8(pubdataPricingMode), uint8(PubdataPricingMode.Validium));
+    }
+
+    // ============ Multiple Proposers Tests ============
+
+    function test_proposeChainRegistration_differentUsersCanProposeSameChainId() public {
+        address user1 = makeAddr("user1");
+        address user2 = makeAddr("user2");
+
+        // User1 proposes
+        vm.prank(user1);
+        chainRegistrar.proposeChainRegistration({
+            _chainId: testChainId,
+            _pubdataPricingMode: PubdataPricingMode.Rollup,
+            _blobOperator: makeAddr("blobOperator1"),
+            _operator: makeAddr("operator1"),
+            _governor: makeAddr("governor1"),
+            _baseTokenAddress: ETH_TOKEN_ADDRESS,
+            _tokenMultiplierSetter: makeAddr("tokenMultiplierSetter1"),
+            _gasPriceMultiplierNominator: 1,
+            _gasPriceMultiplierDenominator: 1
+        });
+
+        // User2 proposes same chain ID - should succeed (different proposer)
+        vm.prank(user2);
+        chainRegistrar.proposeChainRegistration({
+            _chainId: testChainId,
+            _pubdataPricingMode: PubdataPricingMode.Validium,
+            _blobOperator: makeAddr("blobOperator2"),
+            _operator: makeAddr("operator2"),
+            _governor: makeAddr("governor2"),
+            _baseTokenAddress: ETH_TOKEN_ADDRESS,
+            _tokenMultiplierSetter: makeAddr("tokenMultiplierSetter2"),
+            _gasPriceMultiplierNominator: 2,
+            _gasPriceMultiplierDenominator: 1
+        });
+
+        // Verify both proposals exist
+        (uint256 chainId1, , , , , ) = chainRegistrar.proposedChains(user1, testChainId);
+        (uint256 chainId2, , , , , ) = chainRegistrar.proposedChains(user2, testChainId);
+
+        assertEq(chainId1, testChainId);
+        assertEq(chainId2, testChainId);
+    }
 }
