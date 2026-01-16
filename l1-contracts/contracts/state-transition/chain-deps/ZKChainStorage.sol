@@ -183,4 +183,6 @@ struct ZKChainStorage {
     bool zksyncOS;
     /// @dev The scheme of L2 DA commitment. Different L1 validators may use different schemes.
     L2DACommitmentScheme l2DACommitmentScheme;
+    /// @dev The code size limit. Used ONLY for ZKsync OS, ignored for Era VM.
+    uint32 codeSizeLimit;
 }

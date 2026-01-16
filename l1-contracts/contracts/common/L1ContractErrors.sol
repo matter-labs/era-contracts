@@ -136,6 +136,8 @@ error IncorrectBatchBounds(
 );
 // 0xc1b4bc7b
 error IncorrectBatchChainId(uint256, uint256);
+// 0x55424854
+error IncorrectBatchCodeSizeLimit(uint32, uint32);
 // 0xdd381a4c
 error IncorrectBridgeHubAddress(address bridgehub);
 // 0x1929b7de
@@ -408,6 +410,10 @@ error ZeroGasPriceL1TxZKsyncOS();
 error ZKChainLimitReached();
 // 0x646ac57e
 error ZKsyncOSNotForceDeployForExistingContract(address);
+// 0xbcfe4b69
+error CodeSizeLimitTooLow(uint32 codeSizeLimit, uint32 minCodeSizeLimit);
+// 0x47386ac7
+error CodeSizeLimitTooBig(uint32 codeSizeLimit, uint32 maxCodeSizeLimit);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
