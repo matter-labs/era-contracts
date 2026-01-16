@@ -252,9 +252,9 @@ contract MerkleTest is Test {
         bytes32 b = keccak256("b");
 
         bytes32 hashAB = Merkle.efficientHash(a, b);
-        bytes32 hashBA = Merkle.efficientHash(b, a);
+        bytes32 hashReversed = Merkle.efficientHash(b, a);
 
-        assertTrue(hashAB != hashBA);
+        assertTrue(hashAB != hashReversed);
     }
 
     function testFuzz_efficientHash(bytes32 a, bytes32 b) public pure {
