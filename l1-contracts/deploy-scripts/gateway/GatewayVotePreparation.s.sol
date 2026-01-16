@@ -34,7 +34,7 @@ import {DeployCTMScript} from "../ctm/DeployCTM.s.sol";
 import {StateTransitionDeployedAddresses} from "../utils/Types.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 
-import {GatewayCTMDeployerHelper, PhaseCreate2Calldata, PhaseDeployerAddresses, DirectDeployedAddresses, DirectCreate2Calldata} from "./GatewayCTMDeployerHelper.sol";
+import {GatewayCTMDeployerHelper, DeployerCreate2Calldata, DeployerAddresses, DirectDeployedAddresses, DirectCreate2Calldata} from "./GatewayCTMDeployerHelper.sol";
 import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
@@ -128,7 +128,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     function deployGatewayCTM() internal {
         (
             DeployedContracts memory expectedGatewayContracts,
-            PhaseCreate2Calldata memory phaseCalldata,
+            DeployerCreate2Calldata memory deployerCalldata,
             ,
             DirectCreate2Calldata memory directCalldata,
             address create2FactoryAddress
@@ -153,9 +153,9 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             });
         }
 
-        // Deploy Phase 1: DA contracts (RollupDAManager, ValidiumL1DAValidator, RelayedSLDAValidator)
+        // Deploy DA contracts (RollupDAManager, ValidiumL1DAValidator, RelayedSLDAValidator)
         Utils.runL1L2Transaction({
-            l2Calldata: phaseCalldata.daCalldata,
+            l2Calldata: deployerCalldata.daCalldata,
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),
@@ -166,9 +166,9 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             refundRecipient: msg.sender
         });
 
-        // Deploy Phase 2: ProxyAdmin
+        // Deploy ProxyAdmin
         Utils.runL1L2Transaction({
-            l2Calldata: phaseCalldata.proxyAdminCalldata,
+            l2Calldata: deployerCalldata.proxyAdminCalldata,
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),
@@ -179,9 +179,9 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             refundRecipient: msg.sender
         });
 
-        // Deploy Phase 3: ValidatorTimelock (implementation + proxy)
+        // Deploy ValidatorTimelock (implementation + proxy)
         Utils.runL1L2Transaction({
-            l2Calldata: phaseCalldata.validatorTimelockCalldata,
+            l2Calldata: deployerCalldata.validatorTimelockCalldata,
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),
@@ -192,9 +192,9 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             refundRecipient: msg.sender
         });
 
-        // Deploy Phase 4: Verifiers (Era or ZKsyncOS verifiers based on config)
+        // Deploy Verifiers (Era or ZKsyncOS verifiers based on config)
         Utils.runL1L2Transaction({
-            l2Calldata: phaseCalldata.verifiersCalldata,
+            l2Calldata: deployerCalldata.verifiersCalldata,
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),
@@ -209,9 +209,9 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         // DiamondInit, L1GenesisUpgrade, Multicall3)
         _deployDirectContracts(directCalldata, create2FactoryAddress);
 
-        // Deploy Phase 5: CTM and ServerNotifier (Era or ZKsyncOS CTM based on config)
+        // Deploy CTM and ServerNotifier (Era or ZKsyncOS CTM based on config)
         Utils.runL1L2Transaction({
-            l2Calldata: phaseCalldata.ctmCalldata,
+            l2Calldata: deployerCalldata.ctmCalldata,
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),

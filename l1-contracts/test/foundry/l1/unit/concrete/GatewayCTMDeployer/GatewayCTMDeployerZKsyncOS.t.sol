@@ -11,9 +11,9 @@ import {GatewayCTMDeployerValidatorTimelock} from "contracts/state-transition/ch
 import {GatewayCTMDeployerVerifiersZKsyncOS} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerVerifiersZKsyncOS.sol";
 import {GatewayCTMDeployerCTMZKsyncOS} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerCTMZKsyncOS.sol";
 
-import {GatewayCTMDeployerHelper, PhaseCreate2Calldata, PhaseDeployerAddresses, DirectDeployedAddresses, DirectCreate2Calldata} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
+import {GatewayCTMDeployerHelper, DeployerCreate2Calldata, DeployerAddresses, DirectDeployedAddresses, DirectCreate2Calldata} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
 
-import {AllPhaseResults, DeployedContractsComparator, GatewayCTMDeployerTestUtils} from "test/foundry/unit/utils/GatewayCTMDeployerTestUtils.sol";
+import {AllDeployerResults, DeployedContractsComparator, GatewayCTMDeployerTestUtils} from "test/foundry/unit/utils/GatewayCTMDeployerTestUtils.sol";
 
 /// @notice Tester contract that deploys via the deterministic CREATE2 factory (Arachnid's)
 contract GatewayCTMDeployerTesterZKsyncOS {
@@ -28,56 +28,54 @@ contract GatewayCTMDeployerTesterZKsyncOS {
         }
     }
 
-    /// @notice Deploys Phase 1: DA contracts
-    function deployPhase1(
+    /// @notice Deploys DA contracts
+    function deployDA(
         bytes memory data
     ) external returns (GatewayDADeployerResult memory result, address deployerAddr) {
         (bool success, bytes memory returnData) = DETERMINISTIC_CREATE2_ADDRESS.call(data);
-        require(success, "Phase 1 deployment failed");
+        require(success, "DA deployment failed");
 
         deployerAddr = _bytesToAddress(returnData);
         result = GatewayCTMDeployerDA(deployerAddr).getResult();
     }
 
-    /// @notice Deploys Phase 2: ProxyAdmin
-    function deployPhase2(
+    /// @notice Deploys ProxyAdmin
+    function deployProxyAdmin(
         bytes memory data
     ) external returns (GatewayProxyAdminDeployerResult memory result, address deployerAddr) {
         (bool success, bytes memory returnData) = DETERMINISTIC_CREATE2_ADDRESS.call(data);
-        require(success, "Phase 2 deployment failed");
+        require(success, "ProxyAdmin deployment failed");
 
         deployerAddr = _bytesToAddress(returnData);
         result = GatewayCTMDeployerProxyAdmin(deployerAddr).getResult();
     }
 
-    /// @notice Deploys Phase 3: ValidatorTimelock
-    function deployPhase3(
+    /// @notice Deploys ValidatorTimelock
+    function deployValidatorTimelock(
         bytes memory data
     ) external returns (GatewayValidatorTimelockDeployerResult memory result, address deployerAddr) {
         (bool success, bytes memory returnData) = DETERMINISTIC_CREATE2_ADDRESS.call(data);
-        require(success, "Phase 3 deployment failed");
+        require(success, "ValidatorTimelock deployment failed");
 
         deployerAddr = _bytesToAddress(returnData);
         result = GatewayCTMDeployerValidatorTimelock(deployerAddr).getResult();
     }
 
-    /// @notice Deploys Phase 4: Verifiers (ZKsyncOS version)
-    function deployPhase4(
+    /// @notice Deploys Verifiers (ZKsyncOS version)
+    function deployVerifiers(
         bytes memory data
     ) external returns (GatewayVerifiersDeployerResult memory result, address deployerAddr) {
         (bool success, bytes memory returnData) = DETERMINISTIC_CREATE2_ADDRESS.call(data);
-        require(success, "Phase 4 deployment failed");
+        require(success, "Verifiers deployment failed");
 
         deployerAddr = _bytesToAddress(returnData);
         result = GatewayCTMDeployerVerifiersZKsyncOS(deployerAddr).getResult();
     }
 
-    /// @notice Deploys Phase 5: CTM and ServerNotifier (ZKsyncOS version)
-    function deployPhase5(
-        bytes memory data
-    ) external returns (GatewayCTMFinalResult memory result, address deployerAddr) {
+    /// @notice Deploys CTM and ServerNotifier (ZKsyncOS version)
+    function deployCTM(bytes memory data) external returns (GatewayCTMFinalResult memory result, address deployerAddr) {
         (bool success, bytes memory returnData) = DETERMINISTIC_CREATE2_ADDRESS.call(data);
-        require(success, "Phase 5 deployment failed");
+        require(success, "CTM deployment failed");
 
         deployerAddr = _bytesToAddress(returnData);
         result = GatewayCTMDeployerCTMZKsyncOS(deployerAddr).getResult();
@@ -145,11 +143,11 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
     /// @notice Smoke test that verifies the deployment works correctly in ZKsyncOS mode
     function testGatewayCTMDeployerZKsyncOS() external {
         // Calculate expected addresses using the helper FIRST
-        // This is needed because some deployer constructors need addresses from earlier phases
+        // This is needed because some deployer constructors need addresses from earlier deployers
         (
             DeployedContracts memory calculatedContracts,
-            PhaseCreate2Calldata memory phaseCalldata,
-            PhaseDeployerAddresses memory expectedDeployers,
+            DeployerCreate2Calldata memory deployerCalldata,
+            DeployerAddresses memory expectedDeployers,
             DirectCreate2Calldata memory directCalldata,
             address create2FactoryAddress
         ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), deployerConfig);
@@ -159,16 +157,16 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
 
         GatewayCTMDeployerTesterZKsyncOS tester = new GatewayCTMDeployerTesterZKsyncOS();
 
-        // Deploy all phases and collect results
-        AllPhaseResults memory results = _deployAllPhases(
+        // Deploy all deployers and collect results
+        AllDeployerResults memory results = _deployAllDeployers(
             tester,
-            phaseCalldata,
+            deployerCalldata,
             expectedDeployers,
             calculatedContracts,
             directCalldata
         );
 
-        // Assemble actual deployed contracts from all phases
+        // Assemble actual deployed contracts from all deployers
         DeployedContracts memory actualContracts = GatewayCTMDeployerTestUtils.assembleActualContracts(
             results,
             calculatedContracts
@@ -178,36 +176,38 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
         DeployedContractsComparator.compareDeployedContracts(calculatedContracts, actualContracts);
     }
 
-    function _deployAllPhases(
+    function _deployAllDeployers(
         GatewayCTMDeployerTesterZKsyncOS tester,
-        PhaseCreate2Calldata memory phaseCalldata,
-        PhaseDeployerAddresses memory expectedDeployers,
+        DeployerCreate2Calldata memory deployerCalldata,
+        DeployerAddresses memory expectedDeployers,
         DeployedContracts memory calculatedContracts,
         DirectCreate2Calldata memory directCalldata
-    ) internal returns (AllPhaseResults memory results) {
+    ) internal returns (AllDeployerResults memory results) {
         address deployer;
 
-        // DA phase
-        (results.daResult, deployer) = tester.deployPhase1(phaseCalldata.daCalldata);
+        // DA deployer
+        (results.daResult, deployer) = tester.deployDA(deployerCalldata.daCalldata);
         assertEq(deployer, expectedDeployers.daDeployer, "DA deployer address mismatch");
 
-        // ProxyAdmin phase
-        (results.proxyAdminResult, deployer) = tester.deployPhase2(phaseCalldata.proxyAdminCalldata);
+        // ProxyAdmin deployer
+        (results.proxyAdminResult, deployer) = tester.deployProxyAdmin(deployerCalldata.proxyAdminCalldata);
         assertEq(deployer, expectedDeployers.proxyAdminDeployer, "ProxyAdmin deployer address mismatch");
 
-        // ValidatorTimelock phase
-        (results.validatorTimelockResult, deployer) = tester.deployPhase3(phaseCalldata.validatorTimelockCalldata);
+        // ValidatorTimelock deployer
+        (results.validatorTimelockResult, deployer) = tester.deployValidatorTimelock(
+            deployerCalldata.validatorTimelockCalldata
+        );
         assertEq(deployer, expectedDeployers.validatorTimelockDeployer, "ValidatorTimelock deployer address mismatch");
 
-        // Verifiers phase (ZKsyncOS)
-        (results.verifiersResult, deployer) = tester.deployPhase4(phaseCalldata.verifiersCalldata);
+        // Verifiers deployer (ZKsyncOS)
+        (results.verifiersResult, deployer) = tester.deployVerifiers(deployerCalldata.verifiersCalldata);
         assertEq(deployer, expectedDeployers.verifiersDeployer, "Verifiers deployer address mismatch");
 
         // Deploy direct contracts (facets, etc.)
         _deployDirectContracts(tester, directCalldata, calculatedContracts);
 
-        // CTM phase (ZKsyncOS)
-        (results.ctmResult, deployer) = tester.deployPhase5(phaseCalldata.ctmCalldata);
+        // CTM deployer (ZKsyncOS)
+        (results.ctmResult, deployer) = tester.deployCTM(deployerCalldata.ctmCalldata);
         assertEq(deployer, expectedDeployers.ctmDeployer, "CTM deployer address mismatch");
 
         return results;

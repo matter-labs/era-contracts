@@ -5,20 +5,9 @@ pragma solidity 0.8.28;
 // This file contains the structs used by the Gateway CTM Deployer contracts.
 // The deployment uses a mix of deployer contracts (for contracts requiring owner initialization)
 // and direct deployments in scripts (for contracts without owner initialization).
-//
-// Deployer contracts (5 phases):
-// - Phase 1: GatewayCTMDeployerDA - deploys DA contracts (RollupDAManager needs owner transfer)
-// - Phase 2: GatewayCTMDeployerProxyAdmin - deploys ProxyAdmin (needs owner transfer)
-// - Phase 3: GatewayCTMDeployerValidatorTimelock - deploys ValidatorTimelock (needs owner initialization)
-// - Phase 4: GatewayCTMDeployerVerifiers[ZKsyncOS] - deploys verifier contracts (ZKsyncOS needs owner)
-// - Phase 5: GatewayCTMDeployerCTM[ZKsyncOS] - deploys ServerNotifier and CTM (needs owner transfer)
-//
-// Direct deployments in scripts (no owner initialization needed):
-// - AdminFacet, MailboxFacet, ExecutorFacet, GettersFacet
-// - DiamondInit, L1GenesisUpgrade, Multicall3
 
 /// @notice Configuration parameters for deploying Gateway CTM.
-/// @dev This is the full config used to derive configs for each phase.
+/// @dev This is the full config used to derive configs for each deployer.
 // solhint-disable-next-line gas-struct-packing
 struct GatewayCTMDeployerConfig {
     /// @notice Address of the aliased governance contract.
@@ -107,7 +96,7 @@ struct DAContracts {
     address validiumDAValidator;
 }
 
-/// @notice Collection of all deployed contracts by the Gateway CTM Deployer phases.
+/// @notice Collection of all deployed contracts by the Gateway CTM Deployers.
 struct DeployedContracts {
     /// @notice Address of the Multicall3 contract.
     address multicall3;
@@ -119,9 +108,9 @@ struct DeployedContracts {
     bytes diamondCutData;
 }
 
-// ============ Phase 1: DA Deployer ============
+// ============ DA Deployer ============
 
-/// @notice Configuration for Phase 1 deployer (DA contracts).
+/// @notice Configuration for DA deployer (DA contracts).
 // solhint-disable-next-line gas-struct-packing
 struct GatewayDADeployerConfig {
     /// @notice Salt used for deterministic deployments via CREATE2.
@@ -130,7 +119,7 @@ struct GatewayDADeployerConfig {
     address aliasedGovernanceAddress;
 }
 
-/// @notice Result from Phase 1 deployer.
+/// @notice Result from DA deployer.
 // solhint-disable-next-line gas-struct-packing
 struct GatewayDADeployerResult {
     /// @notice Address of the RollupDAManager contract.
@@ -141,9 +130,9 @@ struct GatewayDADeployerResult {
     address relayedSLDAValidator;
 }
 
-// ============ Phase 2: ProxyAdmin Deployer ============
+// ============ ProxyAdmin Deployer ============
 
-/// @notice Configuration for Phase 2 deployer (ProxyAdmin).
+/// @notice Configuration for ProxyAdmin deployer.
 // solhint-disable-next-line gas-struct-packing
 struct GatewayProxyAdminDeployerConfig {
     /// @notice Salt used for deterministic deployments via CREATE2.
@@ -152,27 +141,27 @@ struct GatewayProxyAdminDeployerConfig {
     address aliasedGovernanceAddress;
 }
 
-/// @notice Result from Phase 2 deployer.
+/// @notice Result from ProxyAdmin deployer.
 // solhint-disable-next-line gas-struct-packing
 struct GatewayProxyAdminDeployerResult {
     /// @notice Address of the ProxyAdmin for ChainTypeManager.
     address chainTypeManagerProxyAdmin;
 }
 
-// ============ Phase 3: ValidatorTimelock Deployer ============
+// ============ ValidatorTimelock Deployer ============
 
-/// @notice Configuration for Phase 3 deployer (ValidatorTimelock).
+/// @notice Configuration for ValidatorTimelock deployer.
 // solhint-disable-next-line gas-struct-packing
 struct GatewayValidatorTimelockDeployerConfig {
     /// @notice Salt used for deterministic deployments via CREATE2.
     bytes32 salt;
     /// @notice Address of the aliased governance contract.
     address aliasedGovernanceAddress;
-    /// @notice Address of the ProxyAdmin (from Phase 2).
+    /// @notice Address of the ProxyAdmin (from ProxyAdmin deployer).
     address chainTypeManagerProxyAdmin;
 }
 
-/// @notice Result from Phase 3 deployer.
+/// @notice Result from ValidatorTimelock deployer.
 // solhint-disable-next-line gas-struct-packing
 struct GatewayValidatorTimelockDeployerResult {
     /// @notice Address of the ValidatorTimelock implementation contract.
@@ -181,9 +170,9 @@ struct GatewayValidatorTimelockDeployerResult {
     address validatorTimelock;
 }
 
-// ============ Phase 4: Verifiers Deployer ============
+// ============ Verifiers Deployer ============
 
-/// @notice Configuration for Phase 4 deployer (all verifiers).
+/// @notice Configuration for Verifiers deployer.
 // solhint-disable-next-line gas-struct-packing
 struct GatewayVerifiersDeployerConfig {
     /// @notice Salt used for deterministic deployments via CREATE2.
@@ -196,7 +185,7 @@ struct GatewayVerifiersDeployerConfig {
     bool isZKsyncOS;
 }
 
-/// @notice Result from Phase 4 deployer.
+/// @notice Result from Verifiers deployer.
 // solhint-disable-next-line gas-struct-packing
 struct GatewayVerifiersDeployerResult {
     /// @notice Address of the VerifierFflonk contract.
@@ -207,10 +196,10 @@ struct GatewayVerifiersDeployerResult {
     address verifier;
 }
 
-// ============ Phase 5: CTM Deployer ============
+// ============ CTM Deployer ============
 
-/// @notice Configuration for Phase 5 deployer (ServerNotifier, CTM).
-/// @dev Contains addresses from previous phases.
+/// @notice Configuration for CTM deployer (ServerNotifier, CTM).
+/// @dev Contains addresses from previous deployers.
 // solhint-disable-next-line gas-struct-packing
 struct GatewayCTMFinalConfig {
     /// @notice Address of the aliased governance contract.
@@ -247,10 +236,10 @@ struct GatewayCTMFinalConfig {
     bytes forceDeploymentsData;
     /// @notice The latest protocol version.
     uint256 protocolVersion;
-    // ---- Addresses from previous phases ----
-    /// @notice Address of the ProxyAdmin (from Phase 2).
+    // ---- Addresses from previous deployers ----
+    /// @notice Address of the ProxyAdmin (from ProxyAdmin deployer).
     address chainTypeManagerProxyAdmin;
-    /// @notice Address of the ValidatorTimelock proxy (from Phase 3).
+    /// @notice Address of the ValidatorTimelock proxy (from ValidatorTimelock deployer).
     address validatorTimelock;
     /// @notice Address of the Admin facet (deployed directly).
     address adminFacet;
@@ -264,11 +253,11 @@ struct GatewayCTMFinalConfig {
     address diamondInit;
     /// @notice Address of the GenesisUpgrade contract (deployed directly).
     address genesisUpgrade;
-    /// @notice Address of the Verifier contract (from Phase 4).
+    /// @notice Address of the Verifier contract (from Verifiers deployer).
     address verifier;
 }
 
-/// @notice Result from Phase 5 deployer.
+/// @notice Result from CTM deployer.
 // solhint-disable-next-line gas-struct-packing
 struct GatewayCTMFinalResult {
     /// @notice Address of the ServerNotifier implementation contract.

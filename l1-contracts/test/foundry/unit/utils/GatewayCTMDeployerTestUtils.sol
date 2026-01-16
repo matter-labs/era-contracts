@@ -4,8 +4,8 @@ pragma solidity ^0.8.20;
 
 import {DAContracts, DeployedContracts, StateTransitionContracts, GatewayDADeployerResult, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerResult, GatewayVerifiersDeployerResult, GatewayCTMFinalResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 
-/// @notice Struct to hold all phase results for testing
-struct AllPhaseResults {
+/// @notice Struct to hold all deployer results for testing
+struct AllDeployerResults {
     GatewayDADeployerResult daResult;
     GatewayProxyAdminDeployerResult proxyAdminResult;
     GatewayValidatorTimelockDeployerResult validatorTimelockResult;
@@ -66,34 +66,34 @@ library DeployedContractsComparator {
 
 /// @notice Library with utility functions for GatewayCTMDeployer tests
 library GatewayCTMDeployerTestUtils {
-    /// @notice Assembles actual deployed contracts from phase results
-    /// @param results The results from all deployment phases
+    /// @notice Assembles actual deployed contracts from deployer results
+    /// @param results The results from all deployers
     /// @param calculatedContracts The pre-calculated contract addresses (used for direct deployments)
     /// @return contracts The assembled DeployedContracts struct
     function assembleActualContracts(
-        AllPhaseResults memory results,
+        AllDeployerResults memory results,
         DeployedContracts memory calculatedContracts
     ) internal pure returns (DeployedContracts memory contracts) {
-        // From DA phase
+        // From DA deployer
         contracts.daContracts.rollupDAManager = results.daResult.rollupDAManager;
         contracts.daContracts.validiumDAValidator = results.daResult.validiumDAValidator;
         contracts.daContracts.relayedSLDAValidator = results.daResult.relayedSLDAValidator;
 
-        // From ProxyAdmin phase
+        // From ProxyAdmin deployer
         contracts.stateTransition.chainTypeManagerProxyAdmin = results.proxyAdminResult.chainTypeManagerProxyAdmin;
 
-        // From ValidatorTimelock phase
+        // From ValidatorTimelock deployer
         contracts.stateTransition.validatorTimelockImplementation = results
             .validatorTimelockResult
             .validatorTimelockImplementation;
         contracts.stateTransition.validatorTimelock = results.validatorTimelockResult.validatorTimelock;
 
-        // From Verifiers phase
+        // From Verifiers deployer
         contracts.stateTransition.verifierFflonk = results.verifiersResult.verifierFflonk;
         contracts.stateTransition.verifierPlonk = results.verifiersResult.verifierPlonk;
         contracts.stateTransition.verifier = results.verifiersResult.verifier;
 
-        // From CTM phase
+        // From CTM deployer
         contracts.stateTransition.serverNotifierImplementation = results.ctmResult.serverNotifierImplementation;
         contracts.stateTransition.serverNotifierProxy = results.ctmResult.serverNotifierProxy;
         contracts.stateTransition.chainTypeManagerImplementation = results.ctmResult.chainTypeManagerImplementation;

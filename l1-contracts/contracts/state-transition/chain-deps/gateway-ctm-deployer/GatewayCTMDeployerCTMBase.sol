@@ -15,13 +15,13 @@ import {GatewayCTMFinalConfig, GatewayCTMFinalResult} from "./GatewayCTMDeployer
 /// @title GatewayCTMDeployerCTMBase
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Base contract for Phase 5 of Gateway CTM deployment.
+/// @notice Base contract for Gateway CTM deployer.
 /// @dev Contains shared logic for deploying ServerNotifier and CTM.
 /// Subclasses implement _deployCTMImplementation to deploy the specific CTM type.
 abstract contract GatewayCTMDeployerCTMBase {
     GatewayCTMFinalResult internal deployedResult;
 
-    /// @notice Returns the deployed contracts from this phase.
+    /// @notice Returns the deployed contracts from this deployer.
     /// @return result The struct with information about the deployed contracts.
     function getResult() external view returns (GatewayCTMFinalResult memory result) {
         result = deployedResult;

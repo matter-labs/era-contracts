@@ -17,14 +17,14 @@ import {GatewayVerifiersDeployerConfig, GatewayVerifiersDeployerResult} from "./
 /// @title GatewayCTMDeployerVerifiersZKsyncOS
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Phase 4 of Gateway CTM deployment: deploys ZKsyncOS verifier contracts.
+/// @notice Gateway CTM ZKsyncOS Verifiers deployer: deploys ZKsyncOS verifier contracts.
 /// @dev Deploys: ZKsyncOSVerifierFflonk, ZKsyncOSVerifierPlonk, and ZKsyncOS DualVerifier/TestnetVerifier.
 /// For Era verifiers, use GatewayCTMDeployerVerifiers instead.
 /// This contract is expected to be deployed via the built-in L2 `Create2Factory`.
 contract GatewayCTMDeployerVerifiersZKsyncOS {
     GatewayVerifiersDeployerResult internal deployedResult;
 
-    /// @notice Returns the deployed contracts from this phase.
+    /// @notice Returns the deployed contracts from this deployer.
     /// @return result The struct with information about the deployed contracts.
     function getResult() external view returns (GatewayVerifiersDeployerResult memory result) {
         result = deployedResult;

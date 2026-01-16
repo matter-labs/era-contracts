@@ -13,13 +13,12 @@ import {GatewayDADeployerConfig, GatewayDADeployerResult} from "./GatewayCTMDepl
 /// @title GatewayCTMDeployerDA
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Phase 1 of Gateway CTM deployment: deploys DA contracts.
+/// @notice Gateway CTM DA deployer: deploys DA contracts.
 /// @dev Deploys: RollupDAManager, ValidiumL1DAValidator, RelayedSLDAValidator.
-/// This contract is expected to be deployed via the built-in L2 `Create2Factory`.
 contract GatewayCTMDeployerDA {
     GatewayDADeployerResult internal deployedResult;
 
-    /// @notice Returns the deployed contracts from this phase.
+    /// @notice Returns the deployed contracts from this deployer.
     /// @return result The struct with information about the deployed contracts.
     function getResult() external view returns (GatewayDADeployerResult memory result) {
         result = deployedResult;

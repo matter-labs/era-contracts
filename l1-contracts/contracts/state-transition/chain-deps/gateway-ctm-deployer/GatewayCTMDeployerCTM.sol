@@ -13,10 +13,8 @@ import {GatewayCTMDeployerCTMBase} from "./GatewayCTMDeployerCTMBase.sol";
 /// @title GatewayCTMDeployerCTM
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Phase 5 of Gateway CTM deployment: deploys ServerNotifier and Era CTM, links them together.
-/// @dev Deploys: ServerNotifier (implementation + proxy), EraChainTypeManager (implementation + proxy).
+/// @notice Gateway CTM Era deployer: deploys ServerNotifier and Era CTM, links them together.
 /// For ZKsyncOS CTM, use GatewayCTMDeployerCTMZKsyncOS instead.
-/// This contract is expected to be deployed via the built-in L2 `Create2Factory`.
 contract GatewayCTMDeployerCTM is GatewayCTMDeployerCTMBase {
     constructor(GatewayCTMFinalConfig memory _config) {
         if (_config.isZKsyncOS) {
