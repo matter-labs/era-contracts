@@ -6,7 +6,12 @@ import {Test} from "forge-std/Test.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {InvalidNTVBurnData, UnsupportedEncodingVersion, BadTransferDataLength, L2WithdrawalMessageWrongLength} from "contracts/common/L1ContractErrors.sol";
+import {
+    InvalidNTVBurnData,
+    UnsupportedEncodingVersion,
+    BadTransferDataLength,
+    L2WithdrawalMessageWrongLength
+} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Unit tests for DataEncoding library
 contract DataEncodingTest is Test {
@@ -19,9 +24,8 @@ contract DataEncodingTest is Test {
 
         bytes memory encoded = DataEncoding.encodeBridgeBurnData(amount, receiver, tokenAddress);
 
-        (uint256 decodedAmount, address decodedReceiver, address decodedToken) = DataEncoding.decodeBridgeBurnData(
-            encoded
-        );
+        (uint256 decodedAmount, address decodedReceiver, address decodedToken) =
+            DataEncoding.decodeBridgeBurnData(encoded);
 
         assertEq(decodedAmount, amount);
         assertEq(decodedReceiver, receiver);
@@ -37,9 +41,8 @@ contract DataEncodingTest is Test {
 
     function testFuzz_roundtrip_bridgeBurnData(uint256 amount, address receiver, address tokenAddress) public pure {
         bytes memory encoded = DataEncoding.encodeBridgeBurnData(amount, receiver, tokenAddress);
-        (uint256 decodedAmount, address decodedReceiver, address decodedToken) = DataEncoding.decodeBridgeBurnData(
-            encoded
-        );
+        (uint256 decodedAmount, address decodedReceiver, address decodedToken) =
+            DataEncoding.decodeBridgeBurnData(encoded);
 
         assertEq(decodedAmount, amount);
         assertEq(decodedReceiver, receiver);
@@ -75,9 +78,11 @@ contract DataEncodingTest is Test {
     }
 
     // External wrapper for calldata conversion
-    function externalDecodeAssetRouterBridgehubDepositData(
-        bytes calldata _data
-    ) external pure returns (bytes32, bytes memory) {
+    function externalDecodeAssetRouterBridgehubDepositData(bytes calldata _data)
+        external
+        pure
+        returns (bytes32, bytes memory)
+    {
         return DataEncoding.decodeAssetRouterBridgehubDepositData(_data);
     }
 
@@ -90,13 +95,8 @@ contract DataEncodingTest is Test {
         uint256 amount = 5000;
         bytes memory erc20Metadata = hex"aabbcc";
 
-        bytes memory encoded = DataEncoding.encodeBridgeMintData(
-            originalCaller,
-            remoteReceiver,
-            originToken,
-            amount,
-            erc20Metadata
-        );
+        bytes memory encoded =
+            DataEncoding.encodeBridgeMintData(originalCaller, remoteReceiver, originToken, amount, erc20Metadata);
 
         (
             address decodedCaller,
@@ -121,13 +121,8 @@ contract DataEncodingTest is Test {
     ) public pure {
         bytes memory erc20Metadata = abi.encode("name", "symbol", uint8(18));
 
-        bytes memory encoded = DataEncoding.encodeBridgeMintData(
-            originalCaller,
-            remoteReceiver,
-            originToken,
-            amount,
-            erc20Metadata
-        );
+        bytes memory encoded =
+            DataEncoding.encodeBridgeMintData(originalCaller, remoteReceiver, originToken, amount, erc20Metadata);
 
         (
             address decodedCaller,
@@ -216,12 +211,8 @@ contract DataEncodingTest is Test {
 
         bytes memory encoded = DataEncoding.encodeTokenData(chainId, name, symbol, decimals);
 
-        (
-            uint256 decodedChainId,
-            bytes memory decodedName,
-            bytes memory decodedSymbol,
-            bytes memory decodedDecimals
-        ) = this.externalDecodeTokenData(encoded);
+        (uint256 decodedChainId, bytes memory decodedName, bytes memory decodedSymbol, bytes memory decodedDecimals) =
+            this.externalDecodeTokenData(encoded);
 
         assertEq(decodedChainId, chainId);
         assertEq(keccak256(decodedName), keccak256(name));
@@ -237,12 +228,8 @@ contract DataEncodingTest is Test {
         // Legacy encoding is just abi.encode of (name, symbol, decimals)
         bytes memory legacyEncoded = abi.encode(name, symbol, decimals);
 
-        (
-            uint256 decodedChainId,
-            bytes memory decodedName,
-            bytes memory decodedSymbol,
-            bytes memory decodedDecimals
-        ) = this.externalDecodeTokenData(legacyEncoded);
+        (uint256 decodedChainId, bytes memory decodedName, bytes memory decodedSymbol, bytes memory decodedDecimals) =
+            this.externalDecodeTokenData(legacyEncoded);
 
         // Legacy format doesn't include chainId, so it should be 0
         assertEq(decodedChainId, 0);
@@ -261,9 +248,11 @@ contract DataEncodingTest is Test {
     }
 
     // External wrapper for calldata conversion
-    function externalDecodeTokenData(
-        bytes calldata _data
-    ) external pure returns (uint256, bytes memory, bytes memory, bytes memory) {
+    function externalDecodeTokenData(bytes calldata _data)
+        external
+        pure
+        returns (uint256, bytes memory, bytes memory, bytes memory)
+    {
         return DataEncoding.decodeTokenData(_data);
     }
 
@@ -278,12 +267,7 @@ contract DataEncodingTest is Test {
         uint256 newSLBalance = 500000;
 
         bytes memory encoded = DataEncoding.encodeAssetTrackerData(
-            chainId,
-            assetId,
-            amount,
-            migratingChainIsMinter,
-            hasSettlingMintingChains,
-            newSLBalance
+            chainId, assetId, amount, migratingChainIsMinter, hasSettlingMintingChains, newSLBalance
         );
 
         (
@@ -304,9 +288,11 @@ contract DataEncodingTest is Test {
     }
 
     // External wrapper for calldata conversion
-    function externalDecodeAssetTrackerData(
-        bytes calldata _data
-    ) external pure returns (uint256, bytes32, uint256, bool, bool, uint256) {
+    function externalDecodeAssetTrackerData(bytes calldata _data)
+        external
+        pure
+        returns (uint256, bytes32, uint256, bool, bool, uint256)
+    {
         return DataEncoding.decodeAssetTrackerData(_data);
     }
 

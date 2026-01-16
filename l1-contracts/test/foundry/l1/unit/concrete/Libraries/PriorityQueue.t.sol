@@ -220,11 +220,11 @@ contract PriorityQueueTest is Test {
 
     // ============ Helper Functions ============
 
-    function _createOperation(
-        bytes32 txHash,
-        uint64 expiration,
-        uint192 tip
-    ) internal pure returns (PriorityOperation memory) {
+    function _createOperation(bytes32 txHash, uint64 expiration, uint192 tip)
+        internal
+        pure
+        returns (PriorityOperation memory)
+    {
         return PriorityOperation({canonicalTxHash: txHash, expirationTimestamp: expiration, layer2Tip: tip});
     }
 }
