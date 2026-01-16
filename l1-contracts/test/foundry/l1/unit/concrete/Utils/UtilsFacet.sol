@@ -198,6 +198,22 @@ contract UtilsFacet is ZKChainBase {
         return s.settlementLayer;
     }
 
+    function util_setPausedDepositsTimestamp(uint256 _timestamp) external {
+        s.pausedDepositsTimestamp = _timestamp;
+    }
+
+    function util_getPausedDepositsTimestamp() external view returns (uint256) {
+        return s.pausedDepositsTimestamp;
+    }
+
+    function util_setAssetTracker(address _assetTracker) external {
+        s.assetTracker = _assetTracker;
+    }
+
+    function util_setNativeTokenVault(address _nativeTokenVault) external {
+        s.nativeTokenVault = _nativeTokenVault;
+    }
+
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }

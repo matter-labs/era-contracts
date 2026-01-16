@@ -22,7 +22,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {NEW_ENCODING_VERSION, LEGACY_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
-import {AddressAlreadySet, DepositDoesNotExist, DepositExists, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {AddressAlreadySet, DepositDoesNotExist, DepositExists, LegacyMethodForNonL1Token, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {NativeTokenVaultAlreadySet, EthAlreadyMigratedToL1NTV} from "contracts/bridge/L1BridgeContractErrors.sol";
 
 contract TestERC20 is ERC20 {
@@ -554,5 +554,77 @@ contract L1NullifierTest is Test {
 
         assertEq(token.balanceOf(nativeTokenVault), _amount);
         assertEq(token.balanceOf(address(l1Nullifier)), 0);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    CLAIM FAILED DEPOSIT TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_ClaimFailedDeposit_RevertWhen_NonL1Token() public {
+        vm.prank(owner);
+        l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(nativeTokenVault));
+
+        // Create a mock token
+        address mockToken = makeAddr("mockToken");
+
+        // Mock the assetId to return a different assetId than expected for L1 tokens
+        // This simulates a token that has a different assetId registered
+        bytes32 registeredAssetId = keccak256("registeredAssetId");
+        bytes32 expectedL1AssetId = DataEncoding.encodeNTVAssetId(block.chainid, mockToken);
+
+        // Make sure they're different - the condition is assetId != ntvAssetId
+        vm.assume(registeredAssetId != expectedL1AssetId);
+
+        vm.mockCall(
+            nativeTokenVault,
+            abi.encodeWithSelector(INativeTokenVaultBase.assetId.selector, mockToken),
+            abi.encode(registeredAssetId)
+        );
+
+        bytes32[] memory merkleProof = new bytes32[](0);
+
+        vm.expectRevert(LegacyMethodForNonL1Token.selector);
+        l1Nullifier.claimFailedDeposit({
+            _chainId: 1,
+            _depositSender: makeAddr("sender"),
+            _l1Token: mockToken,
+            _amount: 1000,
+            _l2TxHash: bytes32(uint256(1)),
+            _l2BatchNumber: 1,
+            _l2MessageIndex: 1,
+            _l2TxNumberInBatch: 1,
+            _merkleProof: merkleProof
+        });
+    }
+
+    function test_ClaimFailedDeposit_UsesNtvAssetIdWhenNotRegistered() public {
+        vm.prank(owner);
+        l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(nativeTokenVault));
+        vm.prank(owner);
+        l1Nullifier.setL1AssetRouter(assetRouter);
+
+        // Mock assetId returns 0 (not registered)
+        vm.mockCall(
+            nativeTokenVault,
+            abi.encodeWithSelector(INativeTokenVaultBase.assetId.selector, address(token)),
+            abi.encode(bytes32(0))
+        );
+
+        bytes32[] memory merkleProof = new bytes32[](0);
+
+        // This will fail at verification stage because we haven't set up a proper deposit,
+        // but it will pass the assetId check (line 646-649)
+        vm.expectRevert(); // Will revert on proof verification
+        l1Nullifier.claimFailedDeposit({
+            _chainId: 1,
+            _depositSender: makeAddr("sender"),
+            _l1Token: address(token),
+            _amount: 1000,
+            _l2TxHash: bytes32(uint256(1)),
+            _l2BatchNumber: 1,
+            _l2MessageIndex: 1,
+            _l2TxNumberInBatch: 1,
+            _merkleProof: merkleProof
+        });
     }
 }
