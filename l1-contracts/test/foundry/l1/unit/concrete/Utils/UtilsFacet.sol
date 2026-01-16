@@ -190,6 +190,14 @@ contract UtilsFacet is ZKChainBase {
         return s.l2DACommitmentScheme;
     }
 
+    function util_setSettlementLayer(address _settlementLayer) external {
+        s.settlementLayer = _settlementLayer;
+    }
+
+    function util_getSettlementLayer() external view returns (address) {
+        return s.settlementLayer;
+    }
+
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }

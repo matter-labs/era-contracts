@@ -392,7 +392,7 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](45);
+        bytes4[] memory selectors = new bytes4[](47);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
@@ -440,6 +440,8 @@ library Utils {
         selectors[i++] = UtilsFacet.util_getBaseTokenGasPriceMultiplierDenominator.selector;
         selectors[i++] = UtilsFacet.util_getBaseTokenGasPriceMultiplierNominator.selector;
         selectors[i++] = UtilsFacet.util_getL2DACommimentScheme.selector;
+        selectors[i++] = UtilsFacet.util_setSettlementLayer.selector;
+        selectors[i++] = UtilsFacet.util_getSettlementLayer.selector;
 
         return selectors;
     }
