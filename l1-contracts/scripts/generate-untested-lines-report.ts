@@ -70,13 +70,27 @@ function generateReport(parsed: ParsedLcov, outputPath: string): void {
   const fileInfos = Array.from(parsed.files.values());
 
   // Filter to contract files only (matching forge coverage calculation)
+  // Also exclude L2-only contracts that cannot be tested with L1 tests
   const contractFiles = fileInfos.filter(
     (f) =>
       (f.path.includes("/contracts/") || f.path.startsWith("contracts/")) &&
       !f.path.includes("/test/") &&
       !f.path.includes("/dev-contracts/") &&
       !f.path.includes("Mock") &&
-      !f.path.includes("Test")
+      !f.path.includes("Test") &&
+      // Exclude L2-only contracts (cannot be tested with L1 foundry tests)
+      !f.path.includes("L2NativeTokenVault") &&
+      !f.path.includes("L2AssetRouter") &&
+      !f.path.includes("L2AssetTracker") &&
+      !f.path.includes("L2Bridgehub") &&
+      !f.path.includes("L2SharedBridgeLegacy") &&
+      !f.path.includes("L2ChainAssetHandler") &&
+      !f.path.includes("L2MessageRoot") &&
+      !f.path.includes("L2WrappedBaseToken") &&
+      !f.path.includes("InteropCenter") &&
+      !f.path.includes("InteropHandler") &&
+      !f.path.includes("/l2-upgrades/") &&
+      !f.path.includes("/l2-system/")
   );
 
   // Filter to only files with untested lines for detailed reporting
