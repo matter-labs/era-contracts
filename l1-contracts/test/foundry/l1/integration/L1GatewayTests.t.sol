@@ -34,7 +34,6 @@ import {InvalidProof, DepositDoesNotExist} from "contracts/common/L1ContractErro
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 import {GatewayUtils} from "deploy-scripts/gateway/GatewayUtils.s.sol";
 import {Utils} from "../unit/concrete/Utils/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -49,14 +48,7 @@ import {IMessageRoot, IMessageVerification} from "contracts/core/message-root/IM
 import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 import {NotMigrated} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
-contract L1GatewayTests is
-    L1ContractDeployer,
-    ZKChainDeployer,
-    TokenDeployer,
-    L2TxMocker,
-    GatewayDeployer,
-    ConfigSemaphore
-{
+contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
@@ -87,7 +79,6 @@ contract L1GatewayTests is
     function prepare() public {
         _generateUserAddresses();
 
-        takeConfigLock(); // Prevents race condition with configs
         _deployL1Contracts();
 
         _deployEraWithPausedDeposits();
@@ -108,8 +99,6 @@ contract L1GatewayTests is
         }
 
         _initializeGatewayScript();
-
-        releaseConfigLock();
 
         vm.deal(ecosystemConfig.ownerAddress, 100000000000000000000000000000000000);
         migratingChain = IZKChain(IL1Bridgehub(addresses.bridgehub).getZKChain(migratingChainId));
