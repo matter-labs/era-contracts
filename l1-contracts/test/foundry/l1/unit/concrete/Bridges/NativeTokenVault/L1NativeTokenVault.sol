@@ -141,4 +141,94 @@ contract L1NativeTokenVaultTest is Test {
     function test_ASSET_ROUTER() external {
         assertEq(address(ntv.ASSET_ROUTER()), assetRouter);
     }
+
+    function test_pause_OnlyOwner() external {
+        // Non-owner should fail
+        vm.prank(makeAddr("randomUser"));
+        vm.expectRevert("Ownable: caller is not the owner");
+        ntv.pause();
+    }
+
+    function test_pause_Success() external {
+        // Owner (address(0) in this test setup) should succeed
+        vm.prank(address(0));
+        ntv.pause();
+    }
+
+    function test_unpause_OnlyOwner() external {
+        // First pause it
+        vm.prank(address(0));
+        ntv.pause();
+
+        // Non-owner should fail
+        vm.prank(makeAddr("randomUser"));
+        vm.expectRevert("Ownable: caller is not the owner");
+        ntv.unpause();
+    }
+
+    function test_unpause_Success() external {
+        // First pause it
+        vm.prank(address(0));
+        ntv.pause();
+
+        // Owner should succeed
+        vm.prank(address(0));
+        ntv.unpause();
+    }
+
+    function test_originToken_ReturnsZeroForUnknownAsset() external view {
+        bytes32 unknownAssetId = keccak256("unknownAsset");
+        address result = ntv.originToken(unknownAssetId);
+        assertEq(result, address(0));
+    }
+
+    function test_originToken_ReturnsTokenForNativeAsset() external {
+        // First register the token
+        vm.mockCall(
+            assetRouter,
+            abi.encodeCall(
+                L1AssetRouter.setAssetHandlerAddressThisChain,
+                (bytes32(uint256(uint160(address(token)))), address(ntv))
+            ),
+            hex""
+        );
+        bytes[] memory zeros = new bytes[](2);
+        zeros[0] = abi.encode(0);
+        zeros[1] = abi.encode(0);
+        vm.mockCalls(assetTracker, abi.encodeWithSelector(AssetTrackerBase.registerNewToken.selector), zeros);
+        ntv.registerToken(address(token));
+
+        // Get the asset id
+        bytes32 tokenAssetId = ntv.assetId(address(token));
+
+        // Check origin token
+        address result = ntv.originToken(tokenAssetId);
+        assertEq(result, address(token));
+    }
+
+    function test_tokenAddress_ReturnsZeroForUnknownAsset() external view {
+        bytes32 unknownAssetId = keccak256("unknownAsset");
+        address result = ntv.tokenAddress(unknownAssetId);
+        assertEq(result, address(0));
+    }
+
+    function test_bridgedTokensCount_InitiallyZero() external view {
+        assertEq(ntv.bridgedTokensCount(), 0);
+    }
+
+    function test_calculateCreate2TokenAddress() external {
+        address someToken = makeAddr("someToken");
+        uint256 originChainId = 999;
+        address result = ntv.calculateCreate2TokenAddress(originChainId, someToken);
+        // Just verify it doesn't revert and returns a non-zero address
+        assertTrue(result != address(0));
+    }
+
+    function test_getERC20Getters() external view {
+        address someToken = address(token);
+        uint256 originChainId = block.chainid;
+        bytes memory result = ntv.getERC20Getters(someToken, originChainId);
+        // Just verify it doesn't revert and returns some data
+        assertTrue(result.length > 0);
+    }
 }
