@@ -195,4 +195,80 @@ contract GWAssetTrackerTest is Test {
 
         assertEq(dummyL2MessageRoot.getAggregatedRoot(), emptyRoot);
     }
+
+    function test_SetLegacySharedBridgeAddressForLocalTesting() public {
+        address legacyBridge = makeAddr("legacyBridge");
+
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        gwAssetTracker.setLegacySharedBridgeAddressForLocalTesting(CHAIN_ID, legacyBridge);
+    }
+
+    function test_SetLegacySharedBridgeAddressForLocalTesting_Unauthorized() public {
+        address legacyBridge = makeAddr("legacyBridge");
+
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
+        gwAssetTracker.setLegacySharedBridgeAddressForLocalTesting(CHAIN_ID, legacyBridge);
+    }
+
+    function test_ConfirmMigrationOnGateway_L1ToGateway() public {
+        // First increase chain balance to have something to work with
+        BalanceChange memory balanceChange = BalanceChange({
+            version: BALANCE_CHANGE_VERSION,
+            assetId: ASSET_ID,
+            baseTokenAssetId: BASE_TOKEN_ASSET_ID,
+            amount: AMOUNT,
+            baseTokenAmount: BASE_TOKEN_AMOUNT,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID
+        });
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        gwAssetTracker.handleChainBalanceIncreaseOnGateway(CHAIN_ID, CANONICAL_TX_HASH, balanceChange);
+
+        uint256 initialBalance = gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID);
+
+        ConfirmBalanceMigrationData memory data = ConfirmBalanceMigrationData({
+            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+            chainId: CHAIN_ID,
+            assetId: ASSET_ID,
+            amount: AMOUNT,
+            migrationNumber: MIGRATION_NUMBER,
+            isL1ToGateway: true
+        });
+
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        gwAssetTracker.confirmMigrationOnGateway(data);
+
+        // When isL1ToGateway is true, balance should increase
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), initialBalance + AMOUNT);
+    }
+
+
+    function test_GetEmptyMessageRoot_Cached() public {
+        // First call calculates and caches
+        bytes32 emptyRoot1 = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+
+        // Second call should return cached value
+        bytes32 emptyRoot2 = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+
+        assertEq(emptyRoot1, emptyRoot2);
+    }
+
+    function test_HandleChainBalanceIncreaseOnGateway_ZeroAmounts() public {
+        BalanceChange memory balanceChange = BalanceChange({
+            version: BALANCE_CHANGE_VERSION,
+            assetId: ASSET_ID,
+            baseTokenAssetId: BASE_TOKEN_ASSET_ID,
+            amount: 0,
+            baseTokenAmount: 0,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID
+        });
+
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        gwAssetTracker.handleChainBalanceIncreaseOnGateway(CHAIN_ID, CANONICAL_TX_HASH, balanceChange);
+
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), 0);
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), 0);
+    }
+
 }
