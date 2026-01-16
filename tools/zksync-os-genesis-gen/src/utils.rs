@@ -1,6 +1,6 @@
 use alloy::primitives::{Address, B256};
 
-pub fn bytecode_to_code(contract_name: &str) -> Vec<u8> {
+pub fn contract_name_to_code(contract_name: &str) -> Vec<u8> {
     let path = format!("../../l1-contracts/out/{contract_name}.sol/{contract_name}.json");
     let file_content =
         std::fs::read_to_string(&path).expect("Failed to read contract bytecode file");
