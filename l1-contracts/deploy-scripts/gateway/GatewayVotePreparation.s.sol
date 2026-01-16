@@ -12,7 +12,6 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
-import {L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "../utils/Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
@@ -131,7 +130,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             DeployedContracts memory expectedGatewayContracts,
             PhaseCreate2Calldata memory phaseCalldata,
             ,
-            DirectCreate2Calldata memory directCalldata
+            DirectCreate2Calldata memory directCalldata,
+            address create2FactoryAddress
         ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
 
         // Deploy all factory dependencies
@@ -159,7 +159,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),
-            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            dstAddress: create2FactoryAddress,
             chainId: gatewayChainId,
             bridgehubAddress: discoveredBridgehub.bridgehubProxy,
             l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
@@ -172,7 +172,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),
-            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            dstAddress: create2FactoryAddress,
             chainId: gatewayChainId,
             bridgehubAddress: discoveredBridgehub.bridgehubProxy,
             l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
@@ -185,7 +185,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),
-            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            dstAddress: create2FactoryAddress,
             chainId: gatewayChainId,
             bridgehubAddress: discoveredBridgehub.bridgehubProxy,
             l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
@@ -198,7 +198,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),
-            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            dstAddress: create2FactoryAddress,
             chainId: gatewayChainId,
             bridgehubAddress: discoveredBridgehub.bridgehubProxy,
             l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
@@ -207,7 +207,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
         // Deploy direct contracts (AdminFacet, MailboxFacet, ExecutorFacet, GettersFacet,
         // DiamondInit, L1GenesisUpgrade, Multicall3)
-        _deployDirectContracts(directCalldata);
+        _deployDirectContracts(directCalldata, create2FactoryAddress);
 
         // Deploy Phase 5: CTM and ServerNotifier (Era or ZKsyncOS CTM based on config)
         Utils.runL1L2Transaction({
@@ -215,7 +215,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),
-            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            dstAddress: create2FactoryAddress,
             chainId: gatewayChainId,
             bridgehubAddress: discoveredBridgehub.bridgehubProxy,
             l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
@@ -225,14 +225,14 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         _saveExpectedGatewayContractsToOutput(expectedGatewayContracts);
     }
 
-    function _deployDirectContracts(DirectCreate2Calldata memory directCalldata) internal {
+    function _deployDirectContracts(DirectCreate2Calldata memory directCalldata, address targetAddr) internal {
         // Deploy AdminFacet
         Utils.runL1L2Transaction({
             l2Calldata: directCalldata.adminFacetCalldata,
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),
-            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            dstAddress: targetAddr,
             chainId: gatewayChainId,
             bridgehubAddress: discoveredBridgehub.bridgehubProxy,
             l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
@@ -245,7 +245,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),
-            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            dstAddress: targetAddr,
             chainId: gatewayChainId,
             bridgehubAddress: discoveredBridgehub.bridgehubProxy,
             l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
@@ -258,7 +258,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),
-            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            dstAddress: targetAddr,
             chainId: gatewayChainId,
             bridgehubAddress: discoveredBridgehub.bridgehubProxy,
             l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
@@ -271,7 +271,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),
-            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            dstAddress: targetAddr,
             chainId: gatewayChainId,
             bridgehubAddress: discoveredBridgehub.bridgehubProxy,
             l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
@@ -284,7 +284,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),
-            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            dstAddress: targetAddr,
             chainId: gatewayChainId,
             bridgehubAddress: discoveredBridgehub.bridgehubProxy,
             l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
@@ -297,7 +297,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),
-            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            dstAddress: targetAddr,
             chainId: gatewayChainId,
             bridgehubAddress: discoveredBridgehub.bridgehubProxy,
             l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
@@ -310,7 +310,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),
-            dstAddress: L2_CREATE2_FACTORY_ADDR,
+            dstAddress: targetAddr,
             chainId: gatewayChainId,
             bridgehubAddress: discoveredBridgehub.bridgehubProxy,
             l1SharedBridgeProxy: discoveredBridgehub.assetRouter,

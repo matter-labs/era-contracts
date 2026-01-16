@@ -201,7 +201,8 @@ contract GatewayCTMDeployerTest is Test {
             DeployedContracts memory calculatedContracts,
             PhaseCreate2Calldata memory phaseCalldata,
             PhaseDeployerAddresses memory expectedDeployers,
-            // DirectCreate2Calldata not needed for this test
+            ,
+            // DirectCreate2Calldata and create2FactoryAddress not needed for this test
         ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), deployerConfig);
 
         // Publish bytecodes for all 5 phase deployers using calculated addresses
