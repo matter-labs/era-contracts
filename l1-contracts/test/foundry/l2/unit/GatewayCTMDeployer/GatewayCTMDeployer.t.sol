@@ -40,63 +40,61 @@ import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR}
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {GatewayCTMDeployerHelper, PhaseCreate2Calldata, PhaseDeployerAddresses} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
+import {GatewayCTMDeployerHelper, DeployerCreate2Calldata, DeployerAddresses} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
 
-import {AllPhaseResults, DeployedContractsComparator, GatewayCTMDeployerTestUtils} from "test/foundry/unit/utils/GatewayCTMDeployerTestUtils.sol";
+import {AllDeployerResults, DeployedContractsComparator, GatewayCTMDeployerTestUtils} from "test/foundry/unit/utils/GatewayCTMDeployerTestUtils.sol";
 
 // We need to use contract the zkfoundry consistently uses
 // zk environment only within a deployed contract
 contract GatewayCTMDeployerTester {
-    /// @notice Deploys Phase 1: DA contracts
-    function deployPhase1(
+    /// @notice Deploys DA contracts
+    function deployDA(
         bytes memory data
     ) external returns (GatewayDADeployerResult memory result, address deployerAddr) {
         (bool success, bytes memory returnData) = L2_CREATE2_FACTORY_ADDR.call(data);
-        require(success, "Phase 1 deployment failed");
+        require(success, "DA deployment failed");
 
         deployerAddr = abi.decode(returnData, (address));
         result = GatewayCTMDeployerDA(deployerAddr).getResult();
     }
 
-    /// @notice Deploys Phase 2: ProxyAdmin
-    function deployPhase2(
+    /// @notice Deploys ProxyAdmin
+    function deployProxyAdmin(
         bytes memory data
     ) external returns (GatewayProxyAdminDeployerResult memory result, address deployerAddr) {
         (bool success, bytes memory returnData) = L2_CREATE2_FACTORY_ADDR.call(data);
-        require(success, "Phase 2 deployment failed");
+        require(success, "ProxyAdmin deployment failed");
 
         deployerAddr = abi.decode(returnData, (address));
         result = GatewayCTMDeployerProxyAdmin(deployerAddr).getResult();
     }
 
-    /// @notice Deploys Phase 3: ValidatorTimelock
-    function deployPhase3(
+    /// @notice Deploys ValidatorTimelock
+    function deployValidatorTimelock(
         bytes memory data
     ) external returns (GatewayValidatorTimelockDeployerResult memory result, address deployerAddr) {
         (bool success, bytes memory returnData) = L2_CREATE2_FACTORY_ADDR.call(data);
-        require(success, "Phase 3 deployment failed");
+        require(success, "ValidatorTimelock deployment failed");
 
         deployerAddr = abi.decode(returnData, (address));
         result = GatewayCTMDeployerValidatorTimelock(deployerAddr).getResult();
     }
 
-    /// @notice Deploys Phase 4: Verifiers
-    function deployPhase4(
+    /// @notice Deploys Verifiers
+    function deployVerifiers(
         bytes memory data
     ) external returns (GatewayVerifiersDeployerResult memory result, address deployerAddr) {
         (bool success, bytes memory returnData) = L2_CREATE2_FACTORY_ADDR.call(data);
-        require(success, "Phase 4 deployment failed");
+        require(success, "Verifiers deployment failed");
 
         deployerAddr = abi.decode(returnData, (address));
         result = GatewayCTMDeployerVerifiers(deployerAddr).getResult();
     }
 
-    /// @notice Deploys Phase 5: CTM and ServerNotifier
-    function deployPhase5(
-        bytes memory data
-    ) external returns (GatewayCTMFinalResult memory result, address deployerAddr) {
+    /// @notice Deploys CTM and ServerNotifier
+    function deployCTM(bytes memory data) external returns (GatewayCTMFinalResult memory result, address deployerAddr) {
         (bool success, bytes memory returnData) = L2_CREATE2_FACTORY_ADDR.call(data);
-        require(success, "Phase 5 deployment failed");
+        require(success, "CTM deployment failed");
 
         deployerAddr = abi.decode(returnData, (address));
         result = GatewayCTMDeployerCTM(deployerAddr).getResult();
@@ -108,23 +106,23 @@ contract GatewayCTMDeployerTest is Test {
 
     // This is done merely to publish the respective bytecodes.
     function _predeployContracts() internal {
-        // Phase 1 contracts (DA)
+        // DA contracts
         new RollupDAManager();
         new ValidiumL1DAValidator();
         new RelayedSLDAValidator();
 
-        // Phase 2 contracts (ProxyAdmin)
+        // ProxyAdmin contracts
         new ProxyAdmin();
 
-        // Phase 3 contracts (ValidatorTimelock)
+        // ValidatorTimelock contracts
         new ValidatorTimelock(L2_BRIDGEHUB_ADDR);
 
-        // Phase 4 contracts (Verifiers)
+        // Verifier contracts
         new EraVerifierFflonk();
         new EraVerifierPlonk();
         new EraTestnetVerifier(EraVerifierFflonk(address(0)), EraVerifierPlonk(address(0)));
 
-        // Phase 5 contracts (CTM)
+        // CTM contracts
         new ServerNotifier();
         new ZKsyncOSChainTypeManager(address(0), address(0));
         new EraChainTypeManager(address(0), address(0));
@@ -183,29 +181,29 @@ contract GatewayCTMDeployerTest is Test {
     // It is more a smoke test that indeed the deployment works
     function testGatewayCTMDeployer() external {
         // Calculate expected addresses using the helper FIRST
-        // This is needed because some deployer constructors need addresses from earlier phases
+        // This is needed because some deployer constructors need addresses from earlier deployers
         (
             DeployedContracts memory calculatedContracts,
-            PhaseCreate2Calldata memory phaseCalldata,
-            PhaseDeployerAddresses memory expectedDeployers, // DirectCreate2Calldata and create2FactoryAddress not needed for this test
+            DeployerCreate2Calldata memory deployerCalldata,
+            DeployerAddresses memory expectedDeployers, // DirectCreate2Calldata and create2FactoryAddress not needed for this test
             ,
 
         ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), deployerConfig);
 
-        // Publish bytecodes for all 5 phase deployers using calculated addresses
-        _publishPhaseDeployerBytecodes(calculatedContracts);
+        // Publish bytecodes for all deployers using calculated addresses
+        _publishDeployerBytecodes(calculatedContracts);
 
         GatewayCTMDeployerTester tester = new GatewayCTMDeployerTester();
 
-        // Deploy all phases and collect results
-        AllPhaseResults memory results = _deployAllPhases(
+        // Deploy all deployers and collect results
+        AllDeployerResults memory results = _deployAllDeployers(
             tester,
-            phaseCalldata,
+            deployerCalldata,
             expectedDeployers,
             calculatedContracts
         );
 
-        // Assemble actual deployed contracts from all phases
+        // Assemble actual deployed contracts from all deployers
         DeployedContracts memory actualContracts = GatewayCTMDeployerTestUtils.assembleActualContracts(
             results,
             calculatedContracts
@@ -215,22 +213,22 @@ contract GatewayCTMDeployerTest is Test {
         DeployedContractsComparator.compareDeployedContracts(calculatedContracts, actualContracts);
     }
 
-    function _publishPhaseDeployerBytecodes(DeployedContracts memory calculatedContracts) internal {
-        // Phase 1: DA
+    function _publishDeployerBytecodes(DeployedContracts memory calculatedContracts) internal {
+        // DA deployer
         GatewayDADeployerConfig memory daConfig = GatewayDADeployerConfig({
             salt: deployerConfig.salt,
             aliasedGovernanceAddress: deployerConfig.aliasedGovernanceAddress
         });
         new GatewayCTMDeployerDA(daConfig);
 
-        // Phase 2: ProxyAdmin
+        // ProxyAdmin deployer
         GatewayProxyAdminDeployerConfig memory proxyAdminConfig = GatewayProxyAdminDeployerConfig({
             salt: deployerConfig.salt,
             aliasedGovernanceAddress: deployerConfig.aliasedGovernanceAddress
         });
         new GatewayCTMDeployerProxyAdmin(proxyAdminConfig);
 
-        // Phase 3: ValidatorTimelock - needs calculated ProxyAdmin address
+        // ValidatorTimelock deployer - needs calculated ProxyAdmin address
         GatewayValidatorTimelockDeployerConfig memory vtConfig = GatewayValidatorTimelockDeployerConfig({
             salt: deployerConfig.salt,
             aliasedGovernanceAddress: deployerConfig.aliasedGovernanceAddress,
@@ -238,7 +236,7 @@ contract GatewayCTMDeployerTest is Test {
         });
         new GatewayCTMDeployerValidatorTimelock(vtConfig);
 
-        // Phase 4: Verifiers
+        // Verifiers deployer
         GatewayVerifiersDeployerConfig memory verifiersConfig = GatewayVerifiersDeployerConfig({
             salt: deployerConfig.salt,
             aliasedGovernanceAddress: deployerConfig.aliasedGovernanceAddress,
@@ -248,42 +246,44 @@ contract GatewayCTMDeployerTest is Test {
         new GatewayCTMDeployerVerifiers(verifiersConfig);
     }
 
-    function _deployAllPhases(
+    function _deployAllDeployers(
         GatewayCTMDeployerTester tester,
-        PhaseCreate2Calldata memory phaseCalldata,
-        PhaseDeployerAddresses memory expectedDeployers,
+        DeployerCreate2Calldata memory deployerCalldata,
+        DeployerAddresses memory expectedDeployers,
         DeployedContracts memory calculatedContracts
-    ) internal returns (AllPhaseResults memory results) {
+    ) internal returns (AllDeployerResults memory results) {
         address deployer;
 
-        // DA phase
-        (results.daResult, deployer) = tester.deployPhase1(phaseCalldata.daCalldata);
+        // DA deployer
+        (results.daResult, deployer) = tester.deployDA(deployerCalldata.daCalldata);
         require(deployer == expectedDeployers.daDeployer, "DA deployer address mismatch");
 
-        // ProxyAdmin phase
-        (results.proxyAdminResult, deployer) = tester.deployPhase2(phaseCalldata.proxyAdminCalldata);
+        // ProxyAdmin deployer
+        (results.proxyAdminResult, deployer) = tester.deployProxyAdmin(deployerCalldata.proxyAdminCalldata);
         require(deployer == expectedDeployers.proxyAdminDeployer, "ProxyAdmin deployer address mismatch");
 
-        // ValidatorTimelock phase
-        (results.validatorTimelockResult, deployer) = tester.deployPhase3(phaseCalldata.validatorTimelockCalldata);
+        // ValidatorTimelock deployer
+        (results.validatorTimelockResult, deployer) = tester.deployValidatorTimelock(
+            deployerCalldata.validatorTimelockCalldata
+        );
         require(deployer == expectedDeployers.validatorTimelockDeployer, "ValidatorTimelock deployer address mismatch");
 
-        // Verifiers phase
-        (results.verifiersResult, deployer) = tester.deployPhase4(phaseCalldata.verifiersCalldata);
+        // Verifiers deployer
+        (results.verifiersResult, deployer) = tester.deployVerifiers(deployerCalldata.verifiersCalldata);
         require(deployer == expectedDeployers.verifiersDeployer, "Verifiers deployer address mismatch");
 
-        // Need to publish CTM phase bytecode with actual addresses
-        _publishPhase5Bytecode(results, calculatedContracts);
+        // Need to publish CTM deployer bytecode with actual addresses
+        _publishCTMDeployerBytecode(results, calculatedContracts);
 
-        // CTM phase
-        (results.ctmResult, deployer) = tester.deployPhase5(phaseCalldata.ctmCalldata);
+        // CTM deployer
+        (results.ctmResult, deployer) = tester.deployCTM(deployerCalldata.ctmCalldata);
         require(deployer == expectedDeployers.ctmDeployer, "CTM deployer address mismatch");
 
         return results;
     }
 
-    function _publishPhase5Bytecode(
-        AllPhaseResults memory results,
+    function _publishCTMDeployerBytecode(
+        AllDeployerResults memory results,
         DeployedContracts memory calculatedContracts
     ) internal {
         // Use calculated addresses for direct deployments (facets, etc.)

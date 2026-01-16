@@ -9,13 +9,12 @@ import {GatewayProxyAdminDeployerConfig, GatewayProxyAdminDeployerResult} from "
 /// @title GatewayCTMDeployerProxyAdmin
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Phase 2 of Gateway CTM deployment: deploys ProxyAdmin.
+/// @notice Gateway CTM ProxyAdmin deployer: deploys ProxyAdmin.
 /// @dev Deploys: ProxyAdmin and transfers ownership to governance.
-/// This contract is expected to be deployed via the built-in L2 `Create2Factory`.
 contract GatewayCTMDeployerProxyAdmin {
     GatewayProxyAdminDeployerResult internal deployedResult;
 
-    /// @notice Returns the deployed contracts from this phase.
+    /// @notice Returns the deployed contracts from this deployer.
     /// @return result The struct with information about the deployed contracts.
     function getResult() external view returns (GatewayProxyAdminDeployerResult memory result) {
         result = deployedResult;

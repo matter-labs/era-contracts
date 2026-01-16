@@ -33,8 +33,8 @@ struct InnerDeployConfig {
     bytes32 salt;
 }
 
-/// @notice Addresses of deployer contracts for the 5 phases
-struct PhaseDeployerAddresses {
+/// @notice Addresses of deployer contracts
+struct DeployerAddresses {
     address daDeployer;
     address proxyAdminDeployer;
     address validatorTimelockDeployer;
@@ -42,8 +42,8 @@ struct PhaseDeployerAddresses {
     address ctmDeployer;
 }
 
-/// @notice CREATE2 calldata for the 5 deployer phases
-struct PhaseCreate2Calldata {
+/// @notice CREATE2 calldata for the deployers
+struct DeployerCreate2Calldata {
     bytes daCalldata;
     bytes proxyAdminCalldata;
     bytes validatorTimelockCalldata;
@@ -75,12 +75,12 @@ struct DirectCreate2Calldata {
 
 library GatewayCTMDeployerHelper {
     /// @notice Calculates all addresses for the deployment.
-    /// @dev Uses 5 deployer phases + direct contract deployments.
-    /// @param _create2Salt Salt used for CREATE2 when deploying the phase deployers.
+    /// @dev Uses 5 deployers + direct contract deployments.
+    /// @param _create2Salt Salt used for CREATE2 when deploying the deployers.
     /// @param config The full deployment configuration.
     /// @return contracts The complete set of deployed contracts.
-    /// @return phaseCalldata The CREATE2 calldata for each phase deployer.
-    /// @return phaseDeployers The addresses of each phase deployer.
+    /// @return deployerCalldata The CREATE2 calldata for each deployer.
+    /// @return deployers The addresses of each deployer.
     /// @return directCalldata The CREATE2 calldata for direct contract deployments.
     /// @return create2FactoryAddress The CREATE2 factory address for L1->L2 deployment transactions.
     function calculateAddresses(
@@ -90,8 +90,8 @@ library GatewayCTMDeployerHelper {
         internal
         returns (
             DeployedContracts memory contracts,
-            PhaseCreate2Calldata memory phaseCalldata,
-            PhaseDeployerAddresses memory phaseDeployers,
+            DeployerCreate2Calldata memory deployerCalldata,
+            DeployerAddresses memory deployers,
             DirectCreate2Calldata memory directCalldata,
             address create2FactoryAddress
         )
@@ -101,29 +101,29 @@ library GatewayCTMDeployerHelper {
 
         // Calculate DA deployer addresses
         GatewayDADeployerResult memory daResult;
-        (phaseDeployers.daDeployer, phaseCalldata.daCalldata, daResult) = _calculateDADeployer(_create2Salt, config);
+        (deployers.daDeployer, deployerCalldata.daCalldata, daResult) = _calculateDADeployer(_create2Salt, config);
 
         // Calculate ProxyAdmin deployer addresses
         GatewayProxyAdminDeployerResult memory proxyAdminResult;
         (
-            phaseDeployers.proxyAdminDeployer,
-            phaseCalldata.proxyAdminCalldata,
+            deployers.proxyAdminDeployer,
+            deployerCalldata.proxyAdminCalldata,
             proxyAdminResult
         ) = _calculateProxyAdminDeployer(_create2Salt, config);
 
         // Calculate ValidatorTimelock deployer addresses
         GatewayValidatorTimelockDeployerResult memory validatorTimelockResult;
         (
-            phaseDeployers.validatorTimelockDeployer,
-            phaseCalldata.validatorTimelockCalldata,
+            deployers.validatorTimelockDeployer,
+            deployerCalldata.validatorTimelockCalldata,
             validatorTimelockResult
         ) = _calculateValidatorTimelockDeployer(_create2Salt, config, proxyAdminResult);
 
         // Calculate Verifiers deployer addresses
         GatewayVerifiersDeployerResult memory verifiersResult;
         (
-            phaseDeployers.verifiersDeployer,
-            phaseCalldata.verifiersCalldata,
+            deployers.verifiersDeployer,
+            deployerCalldata.verifiersCalldata,
             verifiersResult
         ) = _calculateVerifiersDeployer(_create2Salt, config);
 
@@ -133,7 +133,7 @@ library GatewayCTMDeployerHelper {
 
         // Calculate CTM deployer addresses
         GatewayCTMFinalResult memory ctmResult;
-        (phaseDeployers.ctmDeployer, phaseCalldata.ctmCalldata, ctmResult) = _calculateCTMDeployer(
+        (deployers.ctmDeployer, deployerCalldata.ctmCalldata, ctmResult) = _calculateCTMDeployer(
             _create2Salt,
             config,
             directAddresses,
@@ -933,20 +933,20 @@ library GatewayCTMDeployerHelper {
         DirectDeployedAddresses memory directAddresses,
         GatewayCTMFinalResult memory ctmResult
     ) internal pure returns (DeployedContracts memory contracts) {
-        // From DA (Phase 1)
+        // From DA deployer
         contracts.daContracts.rollupDAManager = daResult.rollupDAManager;
         contracts.daContracts.validiumDAValidator = daResult.validiumDAValidator;
         contracts.daContracts.relayedSLDAValidator = daResult.relayedSLDAValidator;
 
-        // From ProxyAdmin (Phase 2)
+        // From ProxyAdmin deployer
         contracts.stateTransition.chainTypeManagerProxyAdmin = proxyAdminResult.chainTypeManagerProxyAdmin;
 
-        // From ValidatorTimelock (Phase 3)
+        // From ValidatorTimelock deployer
         contracts.stateTransition.validatorTimelockImplementation = validatorTimelockResult
             .validatorTimelockImplementation;
         contracts.stateTransition.validatorTimelock = validatorTimelockResult.validatorTimelock;
 
-        // From Verifiers (Phase 4)
+        // From Verifiers deployer
         contracts.stateTransition.verifierFflonk = verifiersResult.verifierFflonk;
         contracts.stateTransition.verifierPlonk = verifiersResult.verifierPlonk;
         contracts.stateTransition.verifier = verifiersResult.verifier;
@@ -960,7 +960,7 @@ library GatewayCTMDeployerHelper {
         contracts.stateTransition.genesisUpgrade = directAddresses.genesisUpgrade;
         contracts.multicall3 = directAddresses.multicall3;
 
-        // From CTM (Phase 5)
+        // From CTM deployer
         contracts.stateTransition.serverNotifierImplementation = ctmResult.serverNotifierImplementation;
         contracts.stateTransition.serverNotifierProxy = ctmResult.serverNotifierProxy;
         contracts.stateTransition.chainTypeManagerImplementation = ctmResult.chainTypeManagerImplementation;
@@ -1086,7 +1086,7 @@ library GatewayCTMDeployerHelper {
     /// @notice Returns all factory dependencies for deployment.
     /// @return dependencies Array of bytecodes needed for deployment.
     function getListOfFactoryDeps() external returns (bytes[] memory dependencies) {
-        // 7 phase deployers (DA, ProxyAdmin, ValidatorTimelock, Verifiers Era/ZKsyncOS, CTM Era/ZKsyncOS)
+        // 7 deployers (DA, ProxyAdmin, ValidatorTimelock, Verifiers Era/ZKsyncOS, CTM Era/ZKsyncOS)
         // + 3 DA contracts (RollupDAManager, ValidiumL1DAValidator, RelayedSLDAValidator)
         // + 1 ProxyAdmin contract
         // + 2 ValidatorTimelock contracts (implementation + proxy)
@@ -1098,7 +1098,7 @@ library GatewayCTMDeployerHelper {
         dependencies = new bytes[](totalDependencies);
         uint256 index = 0;
 
-        // Phase deployers
+        // Deployer contracts
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("GatewayCTMDeployerDA.sol", "GatewayCTMDeployerDA");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1(
             "GatewayCTMDeployerProxyAdmin.sol",
@@ -1122,22 +1122,22 @@ library GatewayCTMDeployerHelper {
             "GatewayCTMDeployerCTMZKsyncOS"
         );
 
-        // Phase 1 contracts (DA)
+        // DA contracts
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("RollupDAManager.sol", "RollupDAManager");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ValidiumL1DAValidator.sol", "ValidiumL1DAValidator");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("RelayedSLDAValidator.sol", "RelayedSLDAValidator");
 
-        // Phase 2 contracts (ProxyAdmin)
+        // ProxyAdmin contracts
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ProxyAdmin.sol", "ProxyAdmin");
 
-        // Phase 3 contracts (ValidatorTimelock)
+        // ValidatorTimelock contracts
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ValidatorTimelock.sol", "ValidatorTimelock");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1(
             "TransparentUpgradeableProxy.sol",
             "TransparentUpgradeableProxy"
         );
 
-        // Phase 4 contracts (Verifiers)
+        // Verifier contracts
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraVerifierFflonk.sol", "EraVerifierFflonk");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraVerifierPlonk.sol", "EraVerifierPlonk");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSVerifierFflonk.sol", "ZKsyncOSVerifierFflonk");
@@ -1147,7 +1147,7 @@ library GatewayCTMDeployerHelper {
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSDualVerifier.sol", "ZKsyncOSDualVerifier");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSTestnetVerifier.sol", "ZKsyncOSTestnetVerifier");
 
-        // Phase 5 contracts (CTM)
+        // CTM contracts
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ServerNotifier.sol", "ServerNotifier");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1(
             "ZKsyncOSChainTypeManager.sol",
