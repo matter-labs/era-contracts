@@ -96,13 +96,13 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
         });
 
         ZKChainCommitment memory commitment = ZKChainCommitment({
-            totalBatchesCommitted: 0,
-            totalBatchesVerified: 0,
             totalBatchesExecuted: 0,
-            l2SystemContractsUpgradeBatchNumber: 0,
+            totalBatchesVerified: 0,
+            totalBatchesCommitted: 0,
             l2SystemContractsUpgradeTxHash: bytes32(0),
-            priorityTree: priorityTreeCommitment,
+            l2SystemContractsUpgradeBatchNumber: 0,
             batchHashes: new bytes32[](1),
+            priorityTree: priorityTreeCommitment,
             isPermanentRollup: false,
             precommitmentForTheLatestBatch: bytes32(0)
         });
@@ -131,13 +131,13 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
 
         // Create commitment where executed > verified
         ZKChainCommitment memory commitment = ZKChainCommitment({
-            totalBatchesCommitted: 10,
-            totalBatchesVerified: 5,
             totalBatchesExecuted: 8, // Greater than verified
-            l2SystemContractsUpgradeBatchNumber: 0,
+            totalBatchesVerified: 5,
+            totalBatchesCommitted: 10,
             l2SystemContractsUpgradeTxHash: bytes32(0),
-            priorityTree: priorityTreeCommitment,
+            l2SystemContractsUpgradeBatchNumber: 0,
             batchHashes: new bytes32[](1),
+            priorityTree: priorityTreeCommitment,
             isPermanentRollup: false,
             precommitmentForTheLatestBatch: bytes32(0)
         });
@@ -166,13 +166,13 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
 
         // Create commitment where verified > committed
         ZKChainCommitment memory commitment = ZKChainCommitment({
-            totalBatchesCommitted: 5,
-            totalBatchesVerified: 8, // Greater than committed
             totalBatchesExecuted: 2,
-            l2SystemContractsUpgradeBatchNumber: 0,
+            totalBatchesVerified: 8, // Greater than committed
+            totalBatchesCommitted: 5,
             l2SystemContractsUpgradeTxHash: bytes32(0),
-            priorityTree: priorityTreeCommitment,
+            l2SystemContractsUpgradeBatchNumber: 0,
             batchHashes: new bytes32[](1),
+            priorityTree: priorityTreeCommitment,
             isPermanentRollup: false,
             precommitmentForTheLatestBatch: bytes32(0)
         });
@@ -202,13 +202,13 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
         // committed=10, executed=5, so we need 10-5+1 = 6 batch hashes
         // But we provide only 2
         ZKChainCommitment memory commitment = ZKChainCommitment({
-            totalBatchesCommitted: 10,
-            totalBatchesVerified: 8,
             totalBatchesExecuted: 5,
-            l2SystemContractsUpgradeBatchNumber: 0,
+            totalBatchesVerified: 8,
+            totalBatchesCommitted: 10,
             l2SystemContractsUpgradeTxHash: bytes32(0),
-            priorityTree: priorityTreeCommitment,
+            l2SystemContractsUpgradeBatchNumber: 0,
             batchHashes: new bytes32[](2), // Wrong number
+            priorityTree: priorityTreeCommitment,
             isPermanentRollup: false,
             precommitmentForTheLatestBatch: bytes32(0)
         });
