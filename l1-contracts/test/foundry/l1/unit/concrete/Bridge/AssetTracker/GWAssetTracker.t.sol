@@ -538,12 +538,12 @@ contract GWAssetTrackerTest is Test {
             uint8(18)
         );
 
-        (uint256 tokenOriginalChainId, string memory name, string memory symbol, uint8 decimals) = gwAssetTracker.parseTokenData(metadata);
+        (uint256 tokenOriginalChainId, bytes memory name, bytes memory symbol, bytes memory decimals) = gwAssetTracker.parseTokenData(metadata);
 
         assertEq(tokenOriginalChainId, ORIGIN_CHAIN_ID);
-        assertEq(name, "TestToken");
-        assertEq(symbol, "TST");
-        assertEq(decimals, 18);
+        assertEq(string(name), "TestToken");
+        assertEq(string(symbol), "TST");
+        assertEq(uint8(bytes1(decimals)), 18);
     }
 
     function test_HandleChainBalanceIncreaseOnGateway_MultipleAssets() public {

@@ -284,7 +284,7 @@ contract L1NativeTokenVaultTest is Test {
         nativeTokenVault.registerToken(address(unknownToken));
 
         // Create bridge burn data
-        bytes memory data = DataEncoding.encodeBridgeBurnData(100, owner, bytes(""));
+        bytes memory data = DataEncoding.encodeBridgeBurnData(100, owner, address(0));
 
         // Mock the asset tracker call
         vm.mockCall(
@@ -318,7 +318,7 @@ contract L1NativeTokenVaultTest is Test {
         nativeTokenVault.setOriginChainId(bridgedAssetId, otherChainId);
 
         uint256 amount = 100;
-        bytes memory data = DataEncoding.encodeBridgeBurnData(amount, owner, bytes(""));
+        bytes memory data = DataEncoding.encodeBridgeBurnData(amount, owner, address(0));
 
         // Mock the asset tracker call
         vm.mockCall(

@@ -90,6 +90,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
         );
 
         PriorityTreeCommitment memory priorityTreeCommitment = PriorityTreeCommitment({
+            nextLeafIndex: 0,
             startIndex: 0,
             unprocessedIndex: 0,
             sides: new bytes32[](0)
@@ -124,6 +125,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
         );
 
         PriorityTreeCommitment memory priorityTreeCommitment = PriorityTreeCommitment({
+            nextLeafIndex: 0,
             startIndex: 0,
             unprocessedIndex: 0,
             sides: new bytes32[](0)
@@ -159,6 +161,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
         );
 
         PriorityTreeCommitment memory priorityTreeCommitment = PriorityTreeCommitment({
+            nextLeafIndex: 0,
             startIndex: 0,
             unprocessedIndex: 0,
             sides: new bytes32[](0)
@@ -194,6 +197,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
         );
 
         PriorityTreeCommitment memory priorityTreeCommitment = PriorityTreeCommitment({
+            nextLeafIndex: 0,
             startIndex: 0,
             unprocessedIndex: 0,
             sides: new bytes32[](0)
