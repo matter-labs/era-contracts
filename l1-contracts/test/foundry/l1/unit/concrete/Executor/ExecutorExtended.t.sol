@@ -230,11 +230,7 @@ contract ExecutorRevertBatchesTest is ExecutorTest {
     function test_CommitBatches_RevertWhen_InvalidProtocolVersion() public {
         // Mock the chainTypeManager to return false for protocolVersionIsActive
         address ctm = utilsFacet.util_getChainTypeManager();
-        vm.mockCall(
-            ctm,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector),
-            abi.encode(false)
-        );
+        vm.mockCall(ctm, abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector), abi.encode(false));
 
         IExecutor.CommitBatchInfo[] memory newBatchesData = new IExecutor.CommitBatchInfo[](1);
         newBatchesData[0] = IExecutor.CommitBatchInfo({
