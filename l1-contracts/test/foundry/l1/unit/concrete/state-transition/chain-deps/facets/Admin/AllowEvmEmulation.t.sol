@@ -6,7 +6,7 @@ import {AdminTest} from "./_Admin_Shared.t.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {NotL1} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
+import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -37,6 +37,25 @@ contract AllowEvmEmulationTest is AdminTest {
         vm.startPrank(admin);
         vm.expectRevert(abi.encodeWithSelector(NotL1.selector, fakeChainId));
         adminFacet.allowEvmEmulation();
+    }
+
+    function test_successfulCall() public {
+        address admin = utilsFacet.util_getAdmin();
+
+        // Mock the requestL2ServiceTransaction call on the same diamond (Mailbox facet)
+        bytes32 expectedCanonicalTxHash = bytes32(uint256(0xabcdef));
+        vm.mockCall(
+            address(adminFacet),
+            abi.encodeWithSelector(IMailboxImpl.requestL2ServiceTransaction.selector),
+            abi.encode(expectedCanonicalTxHash)
+        );
+
+        vm.startPrank(admin);
+        vm.expectEmit(false, false, false, false);
+        emit EnableEvmEmulator();
+        bytes32 canonicalTxHash = adminFacet.allowEvmEmulation();
+
+        assertEq(canonicalTxHash, expectedCanonicalTxHash);
     }
 
     // add this to be excluded from coverage report
