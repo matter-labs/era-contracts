@@ -12,7 +12,8 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET, CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
 contract ForwardedBridgeFunctionsTest is AdminTest {
     address chainAssetHandler;
@@ -61,6 +62,106 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
         vm.prank(chainAssetHandler);
         vm.expectRevert(abi.encodeWithSelector(NotChainAdmin.selector, notAdmin, admin));
         adminFacet.forwardedBridgeBurn(address(0), notAdmin, data);
+    }
+
+    function _setupPausedDepositsState() internal {
+        // Set pausedDepositsTimestamp to allow migration (must be in valid time window)
+        // The check is: timestamp + CHAIN_MIGRATION_TIME_WINDOW_START < block.timestamp &&
+        //               block.timestamp < timestamp + CHAIN_MIGRATION_TIME_WINDOW_END
+        // Warp to a sufficiently large timestamp to avoid underflow
+        vm.warp(CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET + 10);
+        uint256 timestamp = block.timestamp - CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET - 1;
+        utilsFacet.util_setPausedDepositsTimestamp(timestamp);
+    }
+
+    function test_forwardedBridgeBurn_RevertWhen_NotAZKChain() public {
+        _setupPausedDepositsState();
+
+        // Create a fake settlement layer that is not registered as a ZKChain
+        address fakeSettlementLayer = makeAddr("fakeSettlementLayer");
+        uint256 fakeChainId = 999;
+
+        // Mock the settlement layer to return a fake chain ID
+        vm.mockCall(
+            fakeSettlementLayer,
+            abi.encodeWithSelector(IGetters.getChainId.selector),
+            abi.encode(fakeChainId)
+        );
+
+        // Mock bridgehub to return a different address for that chain ID
+        vm.mockCall(
+            address(dummyBridgehub),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, fakeChainId),
+            abi.encode(makeAddr("differentZKChain"))
+        );
+
+        bytes memory data = abi.encode(utilsFacet.util_getProtocolVersion());
+
+        vm.prank(chainAssetHandler);
+        vm.expectRevert(abi.encodeWithSelector(NotAZKChain.selector, fakeSettlementLayer));
+        adminFacet.forwardedBridgeBurn(fakeSettlementLayer, admin, data);
+    }
+
+    function test_forwardedBridgeBurn_RevertWhen_NotEraChain() public {
+        _setupPausedDepositsState();
+
+        // Create a settlement layer that is a valid ZKChain but with different CTM
+        address settlementLayer = makeAddr("settlementLayer");
+        uint256 settlementChainId = 999;
+        address differentCtm = makeAddr("differentCtm");
+
+        // Mock the settlement layer to return a chain ID
+        vm.mockCall(
+            settlementLayer,
+            abi.encodeWithSelector(IGetters.getChainId.selector),
+            abi.encode(settlementChainId)
+        );
+
+        // Mock bridgehub to return the same address (valid ZKChain)
+        vm.mockCall(
+            address(dummyBridgehub),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, settlementChainId),
+            abi.encode(settlementLayer)
+        );
+
+        // Mock bridgehub to return a different CTM for that chain
+        vm.mockCall(
+            address(dummyBridgehub),
+            abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector, settlementChainId),
+            abi.encode(differentCtm)
+        );
+
+        bytes memory data = abi.encode(utilsFacet.util_getProtocolVersion());
+
+        vm.prank(chainAssetHandler);
+        vm.expectRevert(NotEraChain.selector);
+        adminFacet.forwardedBridgeBurn(settlementLayer, admin, data);
+    }
+
+    function test_forwardedBridgeBurn_RevertWhen_ProtocolVersionNotUpToDate() public {
+        _setupPausedDepositsState();
+
+        uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
+        uint256 differentVersion = currentProtocolVersion + 1;
+        bytes memory data = abi.encode(differentVersion);
+
+        vm.prank(chainAssetHandler);
+        vm.expectRevert(abi.encodeWithSelector(ProtocolVersionNotUpToDate.selector, currentProtocolVersion, differentVersion));
+        adminFacet.forwardedBridgeBurn(L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, admin, data);
+    }
+
+    function test_forwardedBridgeBurn_RevertWhen_NotAllBatchesExecuted() public {
+        _setupPausedDepositsState();
+
+        // Set committed != executed
+        utilsFacet.util_setTotalBatchesCommitted(10);
+        utilsFacet.util_setTotalBatchesExecuted(5);
+
+        bytes memory data = abi.encode(utilsFacet.util_getProtocolVersion());
+
+        vm.prank(chainAssetHandler);
+        vm.expectRevert(NotAllBatchesExecuted.selector);
+        adminFacet.forwardedBridgeBurn(L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, admin, data);
     }
 
     /*//////////////////////////////////////////////////////////////
