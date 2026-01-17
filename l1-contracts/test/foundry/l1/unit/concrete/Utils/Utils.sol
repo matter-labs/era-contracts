@@ -392,7 +392,7 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](57);
+        bytes4[] memory selectors = new bytes4[](59);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
