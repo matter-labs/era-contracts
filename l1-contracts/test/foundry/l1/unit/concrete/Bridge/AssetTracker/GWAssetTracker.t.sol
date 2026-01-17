@@ -26,6 +26,10 @@ contract GWAssetTrackerTestHelper is GWAssetTracker {
     function getEmptyMessageRoot(uint256 _chainId) external returns (bytes32) {
         return _getEmptyMessageRoot(_chainId);
     }
+
+    function getLegacySharedBridgeAddress(uint256 _chainId) external view returns (address) {
+        return legacySharedBridgeAddress[_chainId];
+    }
 }
 
 contract GWAssetTrackerTest is Test {
