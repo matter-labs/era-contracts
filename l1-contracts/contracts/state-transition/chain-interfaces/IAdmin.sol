@@ -48,14 +48,17 @@ interface IAdmin is IZKChainBase {
     /// @notice Set the transaction filterer
     function setTransactionFilterer(address _transactionFilterer) external;
 
+    /// @notice Sets the transaction filterer used in Priority Mode.
+    /// By default, there is no transaction filtering in Priority Mode. This is the recommended setup.
+    /// However, for some chains (e.g., Prividium or Gateway), a custom filterer may be required
+    /// for correct system operation. This function allows ZK Governance to set it.
+    function setPriorityModeTransactionFilterer(address _priorityModeTransactionFilterer) external;
+
     /// @notice Allow EVM emulation on chain
     function allowEvmEmulation() external returns (bytes32 canonicalTxHash);
 
     /// @notice Allow Priority Mode to be activated on the chain (does not activate it).
-    /// @dev Also sets a new transaction filterer. Passing the zero address disables transaction
-    /// filtering. Please note that some chains may require a custom filterer.
-    /// @param _transactionFilterer Address of the transaction filterer to use (or zero to disable filtering).
-    function permanentlyAllowPriorityMode(address _transactionFilterer) external;
+    function permanentlyAllowPriorityMode() external;
 
     /// @notice Perform the upgrade from the current protocol version with the corresponding upgrade data
     /// @param _protocolVersion The current protocol version from which upgrade is executed
@@ -124,6 +127,9 @@ interface IAdmin is IZKChainBase {
 
     /// @notice The transaction filterer has been updated
     event NewTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);
+    
+    /// @notice The address of the transaction filterer contract used when Priority Mode is activated
+    event NewPriorityModeTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);
 
     /// @notice BaseToken multiplier for L1->L2 transactions changed
     event NewBaseTokenMultiplier(

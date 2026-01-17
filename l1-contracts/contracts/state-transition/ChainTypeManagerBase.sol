@@ -410,14 +410,6 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         IZKChain(getZKChain(_chainId)).setValidator(_validator, _active);
     }
 
-    /// @notice Allow Priority Mode to be activated on the specified chain.
-    /// @dev Also sets a new transaction filterer for the chain. Passing the zero address disables transaction
-    /// filtering. Please note that some chains may require a custom filterer.
-    /// @param _transactionFilterer Address of the transaction filterer to use (or zero to disable filtering).
-    function permanentlyAllowPriorityMode(uint256 _chainId, address _transactionFilterer) external onlyOwner {
-        IZKChain(getZKChain(_chainId)).permanentlyAllowPriorityMode(_transactionFilterer);
-    }
-
     /// @dev setPorterAvailability for the specified chain
     /// @param _chainId the chainId of the chain
     /// @param _zkPorterIsAvailable whether the zkPorter mode is available

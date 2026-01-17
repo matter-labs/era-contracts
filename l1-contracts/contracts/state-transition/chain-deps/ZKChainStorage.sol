@@ -56,10 +56,13 @@ struct FeeParams {
 /// @dev Only when `canBeActivated` is true, it is possible to enter Priority Mode.
 /// @dev When `activated` is true, batch settlement is restricted to `permissionlessValidator`.
 /// @param permissionlessValidator The only address allowed to call commit/prove/execute when Priority Mode is enabled.
+/// @param transactionFilterer The transaction filterer to be used when Priority Mode is activated.
+/// Only ZK Governance can change it.
 struct PriorityModeInformation {
     bool canBeActivated;
     bool activated;
     address permissionlessValidator;
+    address transactionFilterer;
 }
 
 /// @dev storing all storage variables for ZK chain diamond facets
@@ -242,9 +245,9 @@ struct ZKChainStorage {
     /// @dev STORAGE SLOT: 64
     uint256 pausedDepositsTimestamp;
     /// @dev Information required in the Priority Mode packed in one storage slot.
-    /// @dev STORAGE SLOT: 65
+    /// @dev STORAGE SLOT: 65-66
     PriorityModeInformation priorityModeInfo;
     /// @dev Timestamp when a priority tx request was made for the specified tx index from priorityTree.
-    /// @dev STORAGE SLOT: 66
+    /// @dev STORAGE SLOT: 67
     mapping(uint256 => uint256) priorityOpsRequestTimestamp;
 }

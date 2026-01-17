@@ -234,19 +234,28 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function permanentlyAllowPriorityMode(
-        address _transactionFilterer
-    ) external onlyChainTypeManager onlySettlementLayer onlyL1 {
+    function setPriorityModeTransactionFilterer(address _priorityModeTransactionFilterer) external onlyChainTypeManager onlySettlementLayer onlyL1 {
+        if (s.priorityModeInfo.canBeActivated) {
+            _setTransactionFilterer(_priorityModeTransactionFilterer);
+        }
+        emit NewPriorityModeTransactionFilterer(s.priorityModeInfo.transactionFilterer, _priorityModeTransactionFilterer);
+        s.priorityModeInfo.transactionFilterer = _priorityModeTransactionFilterer;
+    }
+
+    /// @inheritdoc IAdmin
+    function permanentlyAllowPriorityMode() external onlyAdmin onlySettlementLayer onlyL1 {
         if (s.priorityModeInfo.canBeActivated) {
             revert PriorityModeAlreadyAllowed();
         }
         // Set a transaction filterer that is compatible with Priority Mode.
         //
-        // In the common case, ZK Governance will pass the zero address to disable filtering.
+        // In the common case, ZK Governance does not override `priorityModeInfo.transactionFilterer`,
+        // so most of the time transaction filtering will be disabled.
+        //
         // For some chains (e.g., Prividium or Gateway), a custom filterer may be required
         // for correct system operation. This lets ZK Governance choose whether to remove the
         // transaction filterer entirely or set the one best suited for the special chain needs.
-        _setTransactionFilterer(_transactionFilterer);
+        _setTransactionFilterer(s.priorityModeInfo.transactionFilterer);
         s.priorityModeInfo.canBeActivated = true;
         emit PriorityModeAllowed();
     }
