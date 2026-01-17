@@ -5,7 +5,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "../AccessControlEnumerablePerChainAddressUpgradeable.sol";
 import {LibMap} from "../libraries/LibMap.sol";
 import {IZKChain} from "../chain-interfaces/IZKChain.sol";
-import {NotAZKChain, TimeNotReached, ActivatePriorityModeNotImplelemtedInValidatorContract} from "../../common/L1ContractErrors.sol";
+import {NotAZKChain, TimeNotReached, ActivatePriorityModeNotImplementedInValidatorContract} from "../../common/L1ContractErrors.sol";
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
 import {IValidatorTimelock} from "./interfaces/IValidatorTimelock.sol";
 
@@ -274,7 +274,7 @@ contract ValidatorTimelock is
 
     /// @inheritdoc IValidatorTimelock
     function activatePriorityMode() external override {
-        revert ActivatePriorityModeNotImplelemtedInValidatorContract();
+        revert ActivatePriorityModeNotImplementedInValidatorContract();
     }
 
     /// @dev Call the zkChain diamond contract with the same calldata as this contract was called.

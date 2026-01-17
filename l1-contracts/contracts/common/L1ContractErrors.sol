@@ -435,7 +435,7 @@ error PriorityModeActivationTooEarly(uint256 earliestActivationTimestamp, uint25
 // 0x9d7bb13f
 error OnlyNormalMode();
 // 0xdda650de
-error ActivatePriorityModeNotImplelemtedInValidatorContract();
+error ActivatePriorityModeNotImplementedInValidatorContract();
 // 0x7833d1cd
 error InvalidL2TxCountInPriorityMode(uint256 l2TxCount);
 // 0xdbfcbbef
