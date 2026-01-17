@@ -7,7 +7,9 @@ import "./_Executor_Shared.t.sol";
 import {Utils} from "../Utils/Utils.sol";
 import {UtilsFacet} from "../Utils/UtilsFacet.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {BatchNumberMismatch, CanOnlyProcessOneBatch, InvalidSystemLogsLength, EmptyPrecommitData, InvalidBatchNumber, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, CantExecuteUnprovenBatches, VerifiedBatchesExceedsCommittedBatches, InvalidProof} from "contracts/common/L1ContractErrors.sol";
+import {BatchNumberMismatch, CanOnlyProcessOneBatch, InvalidSystemLogsLength, EmptyPrecommitData, InvalidBatchNumber, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, CantExecuteUnprovenBatches, VerifiedBatchesExceedsCommittedBatches, InvalidProof, InvalidProtocolVersion} from "contracts/common/L1ContractErrors.sol";
+import {InvalidBatchesDataLength} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
@@ -223,6 +225,52 @@ contract ExecutorRevertBatchesTest is ExecutorTest {
 
         // The verified batches should NOT be reset (still 2)
         assertEq(utilsFacet.util_getTotalBatchesVerified(), 2);
+    }
+
+    function test_CommitBatches_RevertWhen_InvalidProtocolVersion() public {
+        // Mock the chainTypeManager to return false for protocolVersionIsActive
+        address ctm = utilsFacet.util_getChainTypeManager();
+        vm.mockCall(
+            ctm,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector),
+            abi.encode(false)
+        );
+
+        IExecutor.CommitBatchInfo[] memory newBatchesData = new IExecutor.CommitBatchInfo[](1);
+        newBatchesData[0] = IExecutor.CommitBatchInfo({
+            batchNumber: 1,
+            timestamp: uint64(block.timestamp),
+            indexRepeatedStorageChanges: 0,
+            newStateRoot: bytes32(0),
+            numberOfLayer1Txs: 0,
+            priorityOperationsHash: keccak256(""),
+            bootloaderHeapInitialContentsHash: bytes32(0),
+            eventsQueueStateHash: bytes32(0),
+            systemLogs: new bytes(0),
+            operatorDAInput: new bytes(0)
+        });
+
+        bytes memory commitData = bytes.concat(
+            bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
+            abi.encode(
+                IExecutor.StoredBatchInfo({
+                    batchNumber: 0,
+                    batchHash: bytes32(0),
+                    indexRepeatedStorageChanges: 0,
+                    numberOfLayer1Txs: 0,
+                    priorityOperationsHash: bytes32(0),
+                    l2LogsTreeRoot: bytes32(0),
+                    dependencyRootsRollingHash: bytes32(0),
+                    timestamp: 0,
+                    commitment: bytes32(0)
+                }),
+                newBatchesData
+            )
+        );
+
+        vm.prank(validator);
+        vm.expectRevert(InvalidProtocolVersion.selector);
+        executor.commitBatchesSharedBridge(address(0), 1, 1, commitData);
     }
 
     // add this to be excluded from coverage report
