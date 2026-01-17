@@ -417,6 +417,13 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         IZKChain(getZKChain(_chainId)).setPorterAvailability(_zkPorterIsAvailable);
     }
 
+    /// @notice Deactivates Priority Mode for the specified chain.
+    /// The chain will return to normal operation with whitelisted validators.
+    /// @param _chainId the chainId of the chain
+    function deactivatePriorityMode(uint256 _chainId) external onlyOwner {
+        IZKChain(getZKChain(_chainId)).deactivatePriorityMode();
+    }
+
     /// @notice deploys a full set of chains contracts
     /// @param _chainId the chain's id
     /// @param _baseTokenAssetId the base token asset id used to pay for gas fees

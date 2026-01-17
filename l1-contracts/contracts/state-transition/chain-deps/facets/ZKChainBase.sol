@@ -7,7 +7,7 @@ import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 import {PriorityQueue} from "../../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
-import {Unauthorized, OnlyNormalMode} from "../../../common/L1ContractErrors.sol";
+import {Unauthorized, OnlyNormalMode, OnlyPriorityMode} from "../../../common/L1ContractErrors.sol";
 import {L2_INTEROP_CENTER_ADDR, GW_ASSET_TRACKER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
@@ -42,6 +42,12 @@ contract ZKChainBase is ReentrancyGuard {
     /// @notice Ensures Priority Mode is not active.
     modifier notPriorityMode() {
         require(!s.priorityModeInfo.activated, OnlyNormalMode());
+        _;
+    }
+
+    /// @notice Ensures Priority Mode is active.
+    modifier onlyPriorityMode() {
+        require(s.priorityModeInfo.activated, OnlyPriorityMode());
         _;
     }
 

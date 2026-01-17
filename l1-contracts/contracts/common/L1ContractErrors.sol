@@ -432,6 +432,8 @@ error ZKsyncOSNotForceDeployForExistingContract(address);
 error PriorityOpsRequestTimestampMissing(uint256 requestId);
 // 0x67c198fe
 error PriorityModeActivationTooEarly(uint256 earliestActivationTimestamp, uint256 currentTimestamp);
+// 0xd702c443
+error OnlyPriorityMode();
 // 0x9d7bb13f
 error OnlyNormalMode();
 // 0xdda650de

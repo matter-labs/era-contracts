@@ -261,6 +261,12 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
+    function deactivatePriorityMode() external onlyPriorityMode onlyChainTypeManager onlySettlementLayer onlyL1 {
+        s.priorityModeInfo.activated = false;
+        emit PriorityModeDeactivated();
+    }
+
+    /// @inheritdoc IAdmin
     function allowEvmEmulation() external onlyAdmin onlyL1 returns (bytes32 canonicalTxHash) {
         canonicalTxHash = IMailbox(address(this)).requestL2ServiceTransaction(
             L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,

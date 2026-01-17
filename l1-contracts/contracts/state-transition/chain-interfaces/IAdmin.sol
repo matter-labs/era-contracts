@@ -60,6 +60,9 @@ interface IAdmin is IZKChainBase {
     /// @notice Allow Priority Mode to be activated on the chain (does not activate it).
     function permanentlyAllowPriorityMode() external;
 
+    /// @notice Deactivate Priority Mode and return the chain to normal mode.
+    function deactivatePriorityMode() external;
+
     /// @notice Perform the upgrade from the current protocol version with the corresponding upgrade data
     /// @param _protocolVersion The current protocol version from which upgrade is executed
     /// @param _cutData The diamond cut parameters that is executed in the upgrade
@@ -168,6 +171,8 @@ interface IAdmin is IZKChainBase {
     event DepositsUnpaused(uint256 chainId);
 
     event PriorityModeAllowed();
+
+    event PriorityModeDeactivated();
 
     /// @notice Pauses deposits before initiating migration to the Gateway.
     function pauseDepositsBeforeInitiatingMigration() external;
