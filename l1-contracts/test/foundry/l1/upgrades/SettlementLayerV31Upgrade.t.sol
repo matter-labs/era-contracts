@@ -240,7 +240,6 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
         assertEq(upgrade.getAssetTracker(), mockAssetTracker);
     }
 
-
     function test_SuccessfulUpgrade_WhitelistedSettlementLayerWithEmptyQueue() public {
         _setupMocks();
 
@@ -252,11 +251,7 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
         );
 
         // Mock getPriorityQueueSize to return 0
-        vm.mockCall(
-            address(upgrade),
-            abi.encodeWithSelector(IGetters.getPriorityQueueSize.selector),
-            abi.encode(0)
-        );
+        vm.mockCall(address(upgrade), abi.encodeWithSelector(IGetters.getPriorityQueueSize.selector), abi.encode(0));
 
         bytes32 result = upgrade.upgrade(proposedUpgrade);
 

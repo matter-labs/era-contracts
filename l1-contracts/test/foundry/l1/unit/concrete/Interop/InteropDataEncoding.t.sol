@@ -89,10 +89,11 @@ contract InteropDataEncodingTest is Test {
         assertEq(result, expected);
     }
 
-    function testFuzz_encodeInteropBundleHash_uniqueness(uint256 chainId1, uint256 chainId2, bytes memory bundle)
-        public
-        pure
-    {
+    function testFuzz_encodeInteropBundleHash_uniqueness(
+        uint256 chainId1,
+        uint256 chainId2,
+        bytes memory bundle
+    ) public pure {
         vm.assume(chainId1 != chainId2);
 
         bytes32 result1 = InteropDataEncoding.encodeInteropBundleHash(chainId1, bundle);

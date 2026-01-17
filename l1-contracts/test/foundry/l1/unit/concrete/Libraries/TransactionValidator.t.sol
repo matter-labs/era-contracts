@@ -5,14 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {TransactionValidator} from "contracts/state-transition/libraries/TransactionValidator.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {
-    InvalidUpgradeTxn,
-    PubdataGreaterThanLimit,
-    TooMuchGas,
-    TxnBodyGasLimitNotEnoughGas,
-    UpgradeTxVerifyParam,
-    ValidateTxnNotEnoughGas
-} from "contracts/common/L1ContractErrors.sol";
+import {InvalidUpgradeTxn, PubdataGreaterThanLimit, TooMuchGas, TxnBodyGasLimitNotEnoughGas, UpgradeTxVerifyParam, ValidateTxnNotEnoughGas} from "contracts/common/L1ContractErrors.sol";
 import {TX_SLOT_OVERHEAD_L2_GAS, MEMORY_OVERHEAD_GAS} from "contracts/common/Config.sol";
 
 /// @notice Unit tests for TransactionValidator library
@@ -348,47 +341,49 @@ contract TransactionValidatorTest is Test {
         reserved[2] = 0;
         reserved[3] = 0;
 
-        return L2CanonicalTransaction({
-            txType: 254, // Protocol upgrade type
-            from: 0x8001, // Within system contract range
-            to: uint160(0xABCD), // Valid address
-            gasLimit: 1_000_000,
-            gasPerPubdataByteLimit: 800,
-            maxFeePerGas: 0,
-            maxPriorityFeePerGas: 0,
-            paymaster: 0,
-            nonce: 0,
-            value: 0,
-            reserved: reserved,
-            data: hex"",
-            signature: hex"",
-            factoryDeps: factoryDeps,
-            paymasterInput: hex"",
-            reservedDynamic: hex""
-        });
+        return
+            L2CanonicalTransaction({
+                txType: 254, // Protocol upgrade type
+                from: 0x8001, // Within system contract range
+                to: uint160(0xABCD), // Valid address
+                gasLimit: 1_000_000,
+                gasPerPubdataByteLimit: 800,
+                maxFeePerGas: 0,
+                maxPriorityFeePerGas: 0,
+                paymaster: 0,
+                nonce: 0,
+                value: 0,
+                reserved: reserved,
+                data: hex"",
+                signature: hex"",
+                factoryDeps: factoryDeps,
+                paymasterInput: hex"",
+                reservedDynamic: hex""
+            });
     }
 
     function _createBasicL2Transaction() internal pure returns (L2CanonicalTransaction memory) {
         uint256[] memory factoryDeps = new uint256[](0);
         uint256[4] memory reserved;
 
-        return L2CanonicalTransaction({
-            txType: 255,
-            from: uint256(uint160(address(0x1234))),
-            to: uint256(uint160(address(0x5678))),
-            gasLimit: 1_000_000,
-            gasPerPubdataByteLimit: 800,
-            maxFeePerGas: 1 gwei,
-            maxPriorityFeePerGas: 0,
-            paymaster: 0,
-            nonce: 0,
-            value: 0,
-            reserved: reserved,
-            data: hex"",
-            signature: hex"",
-            factoryDeps: factoryDeps,
-            paymasterInput: hex"",
-            reservedDynamic: hex""
-        });
+        return
+            L2CanonicalTransaction({
+                txType: 255,
+                from: uint256(uint160(address(0x1234))),
+                to: uint256(uint160(address(0x5678))),
+                gasLimit: 1_000_000,
+                gasPerPubdataByteLimit: 800,
+                maxFeePerGas: 1 gwei,
+                maxPriorityFeePerGas: 0,
+                paymaster: 0,
+                nonce: 0,
+                value: 0,
+                reserved: reserved,
+                data: hex"",
+                signature: hex"",
+                factoryDeps: factoryDeps,
+                paymasterInput: hex"",
+                reservedDynamic: hex""
+            });
     }
 }

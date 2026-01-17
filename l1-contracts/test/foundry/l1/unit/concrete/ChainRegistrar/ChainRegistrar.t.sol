@@ -288,7 +288,11 @@ contract ChainRegistrarTest is Test {
         vm.mockCall(diamondProxy, abi.encodeWithSignature("getAdmin()"), abi.encode(makeAddr("admin")));
 
         // Mock assetRouter.l2BridgeAddress to return address(0)
-        vm.mockCall(assetRouter, abi.encodeWithSignature("l2BridgeAddress(uint256)", testChainId), abi.encode(address(0)));
+        vm.mockCall(
+            assetRouter,
+            abi.encodeWithSignature("l2BridgeAddress(uint256)", testChainId),
+            abi.encode(address(0))
+        );
 
         vm.expectRevert(ChainRegistrar.BridgeIsNotRegistered.selector);
         chainRegistrar.getRegisteredChainConfig(testChainId);
@@ -314,7 +318,11 @@ contract ChainRegistrarTest is Test {
         vm.mockCall(diamondProxy, abi.encodeWithSignature("getAdmin()"), abi.encode(chainAdmin));
 
         // Mock assetRouter.l2BridgeAddress to return l2Bridge
-        vm.mockCall(assetRouter, abi.encodeWithSignature("l2BridgeAddress(uint256)", testChainId), abi.encode(l2Bridge));
+        vm.mockCall(
+            assetRouter,
+            abi.encodeWithSignature("l2BridgeAddress(uint256)", testChainId),
+            abi.encode(l2Bridge)
+        );
 
         ChainRegistrar.RegisteredChainConfig memory config = chainRegistrar.getRegisteredChainConfig(testChainId);
 

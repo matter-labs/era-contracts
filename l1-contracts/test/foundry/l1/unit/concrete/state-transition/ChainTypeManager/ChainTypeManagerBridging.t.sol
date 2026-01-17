@@ -50,7 +50,6 @@ contract ChainTypeManagerBridgingTest is ChainTypeManagerTest {
         chainContractAddress.forwardedBridgeBurn(chainId, abi.encode(address(0), bytes("")));
     }
 
-
     // Test forwardedBridgeMint reverts for non-asset-handler
     function test_RevertWhen_forwardedBridgeMintNotChainAssetHandler() public {
         vm.stopPrank();

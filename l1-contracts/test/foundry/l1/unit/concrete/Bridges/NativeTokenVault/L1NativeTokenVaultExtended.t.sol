@@ -154,11 +154,7 @@ contract L1NativeTokenVaultExtendedTest is Test {
             abi.encode()
         );
 
-        vm.mockCall(
-            assetTracker,
-            abi.encodeWithSelector(IAssetTrackerBase.registerNewToken.selector),
-            abi.encode()
-        );
+        vm.mockCall(assetTracker, abi.encodeWithSelector(IAssetTrackerBase.registerNewToken.selector), abi.encode());
 
         l1NTV.registerEthToken();
 
@@ -232,11 +228,7 @@ contract L1NativeTokenVaultExtendedTest is Test {
             abi.encode()
         );
 
-        vm.mockCall(
-            assetTracker,
-            abi.encodeWithSelector(IAssetTrackerBase.registerNewToken.selector),
-            abi.encode()
-        );
+        vm.mockCall(assetTracker, abi.encodeWithSelector(IAssetTrackerBase.registerNewToken.selector), abi.encode());
 
         vm.mockCall(
             assetRouter,

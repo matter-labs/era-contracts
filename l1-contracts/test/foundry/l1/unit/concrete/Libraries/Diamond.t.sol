@@ -4,17 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {
-    AddressHasNoCode,
-    DelegateCallFailed,
-    FacetExists,
-    NoFunctionsForDiamondCut,
-    NonEmptyCalldata,
-    RemoveFunctionFacetAddressNotZero,
-    RemoveFunctionFacetAddressZero,
-    ReplaceFunctionFacetAddressZero,
-    SelectorsMustAllHaveSameFreezability
-} from "contracts/common/L1ContractErrors.sol";
+import {AddressHasNoCode, DelegateCallFailed, FacetExists, NoFunctionsForDiamondCut, NonEmptyCalldata, RemoveFunctionFacetAddressNotZero, RemoveFunctionFacetAddressZero, ReplaceFunctionFacetAddressZero, SelectorsMustAllHaveSameFreezability} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Mock facet for testing
 contract MockFacet {
@@ -102,11 +92,17 @@ contract DiamondTest is Test {
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(facet1), action: Diamond.Action.Add, isFreezable: false, selectors: selectors
+            facet: address(facet1),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: selectors
         });
 
-        Diamond.DiamondCutData memory cutData =
-            Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: ""});
+        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(0),
+            initCalldata: ""
+        });
 
         Diamond.diamondCut(cutData);
 
@@ -122,11 +118,17 @@ contract DiamondTest is Test {
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(facet1), action: Diamond.Action.Add, isFreezable: false, selectors: selectors
+            facet: address(facet1),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: selectors
         });
 
-        Diamond.DiamondCutData memory cutData =
-            Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: ""});
+        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(0),
+            initCalldata: ""
+        });
 
         Diamond.diamondCut(cutData);
 
@@ -146,14 +148,23 @@ contract DiamondTest is Test {
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(facet1), action: Diamond.Action.Add, isFreezable: false, selectors: selectors1
+            facet: address(facet1),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: selectors1
         });
         facetCuts[1] = Diamond.FacetCut({
-            facet: address(facet2), action: Diamond.Action.Add, isFreezable: true, selectors: selectors2
+            facet: address(facet2),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: selectors2
         });
 
-        Diamond.DiamondCutData memory cutData =
-            Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: ""});
+        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(0),
+            initCalldata: ""
+        });
 
         Diamond.diamondCut(cutData);
 
@@ -168,11 +179,17 @@ contract DiamondTest is Test {
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(facet1), action: Diamond.Action.Add, isFreezable: false, selectors: selectors
+            facet: address(facet1),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: selectors
         });
 
-        Diamond.DiamondCutData memory cutData =
-            Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: ""});
+        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(0),
+            initCalldata: ""
+        });
 
         vm.expectRevert(NoFunctionsForDiamondCut.selector);
         Diamond.diamondCut(cutData);
@@ -183,11 +200,18 @@ contract DiamondTest is Test {
         selectors[0] = MockFacet.setValue.selector;
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        facetCuts[0] =
-            Diamond.FacetCut({facet: address(0), action: Diamond.Action.Add, isFreezable: false, selectors: selectors});
+        facetCuts[0] = Diamond.FacetCut({
+            facet: address(0),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: selectors
+        });
 
-        Diamond.DiamondCutData memory cutData =
-            Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: ""});
+        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(0),
+            initCalldata: ""
+        });
 
         vm.expectRevert(abi.encodeWithSelector(AddressHasNoCode.selector, address(0)));
         Diamond.diamondCut(cutData);
@@ -199,11 +223,17 @@ contract DiamondTest is Test {
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(facet1), action: Diamond.Action.Add, isFreezable: false, selectors: selectors
+            facet: address(facet1),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: selectors
         });
 
-        Diamond.DiamondCutData memory cutData =
-            Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: ""});
+        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(0),
+            initCalldata: ""
+        });
 
         Diamond.diamondCut(cutData);
 
@@ -221,7 +251,10 @@ contract DiamondTest is Test {
 
         Diamond.FacetCut[] memory addCuts = new Diamond.FacetCut[](1);
         addCuts[0] = Diamond.FacetCut({
-            facet: address(facet1), action: Diamond.Action.Add, isFreezable: false, selectors: selectors
+            facet: address(facet1),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: selectors
         });
 
         Diamond.diamondCut(Diamond.DiamondCutData({facetCuts: addCuts, initAddress: address(0), initCalldata: ""}));
@@ -231,7 +264,10 @@ contract DiamondTest is Test {
 
         Diamond.FacetCut[] memory replaceCuts = new Diamond.FacetCut[](1);
         replaceCuts[0] = Diamond.FacetCut({
-            facet: address(newFacet), action: Diamond.Action.Replace, isFreezable: false, selectors: selectors
+            facet: address(newFacet),
+            action: Diamond.Action.Replace,
+            isFreezable: false,
+            selectors: selectors
         });
 
         Diamond.diamondCut(Diamond.DiamondCutData({facetCuts: replaceCuts, initAddress: address(0), initCalldata: ""}));
@@ -246,11 +282,17 @@ contract DiamondTest is Test {
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(facet1), action: Diamond.Action.Replace, isFreezable: false, selectors: selectors
+            facet: address(facet1),
+            action: Diamond.Action.Replace,
+            isFreezable: false,
+            selectors: selectors
         });
 
-        Diamond.DiamondCutData memory cutData =
-            Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: ""});
+        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(0),
+            initCalldata: ""
+        });
 
         vm.expectRevert(ReplaceFunctionFacetAddressZero.selector);
         Diamond.diamondCut(cutData);
@@ -265,7 +307,10 @@ contract DiamondTest is Test {
 
         Diamond.FacetCut[] memory addCuts = new Diamond.FacetCut[](1);
         addCuts[0] = Diamond.FacetCut({
-            facet: address(facet1), action: Diamond.Action.Add, isFreezable: false, selectors: selectors
+            facet: address(facet1),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: selectors
         });
 
         Diamond.diamondCut(Diamond.DiamondCutData({facetCuts: addCuts, initAddress: address(0), initCalldata: ""}));
@@ -293,7 +338,10 @@ contract DiamondTest is Test {
 
         Diamond.FacetCut[] memory addCuts = new Diamond.FacetCut[](1);
         addCuts[0] = Diamond.FacetCut({
-            facet: address(facet1), action: Diamond.Action.Add, isFreezable: false, selectors: selectors
+            facet: address(facet1),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: selectors
         });
 
         Diamond.diamondCut(Diamond.DiamondCutData({facetCuts: addCuts, initAddress: address(0), initCalldata: ""}));
@@ -317,7 +365,10 @@ contract DiamondTest is Test {
 
         Diamond.FacetCut[] memory removeCuts = new Diamond.FacetCut[](1);
         removeCuts[0] = Diamond.FacetCut({
-            facet: address(0), action: Diamond.Action.Remove, isFreezable: false, selectors: selectors
+            facet: address(0),
+            action: Diamond.Action.Remove,
+            isFreezable: false,
+            selectors: selectors
         });
 
         vm.expectRevert(RemoveFunctionFacetAddressZero.selector);
@@ -332,7 +383,10 @@ contract DiamondTest is Test {
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(facet1), action: Diamond.Action.Add, isFreezable: false, selectors: selectors
+            facet: address(facet1),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: selectors
         });
 
         Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
@@ -354,7 +408,10 @@ contract DiamondTest is Test {
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(facet1), action: Diamond.Action.Add, isFreezable: false, selectors: selectors
+            facet: address(facet1),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: selectors
         });
 
         Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
@@ -375,7 +432,10 @@ contract DiamondTest is Test {
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(facet1), action: Diamond.Action.Add, isFreezable: true, selectors: selectors
+            facet: address(facet1),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: selectors
         });
 
         Diamond.diamondCut(Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: ""}));
@@ -391,7 +451,10 @@ contract DiamondTest is Test {
 
         Diamond.FacetCut[] memory addCuts = new Diamond.FacetCut[](1);
         addCuts[0] = Diamond.FacetCut({
-            facet: address(facet1), action: Diamond.Action.Add, isFreezable: true, selectors: selectors1
+            facet: address(facet1),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: selectors1
         });
 
         Diamond.diamondCut(Diamond.DiamondCutData({facetCuts: addCuts, initAddress: address(0), initCalldata: ""}));
@@ -426,10 +489,16 @@ contract DiamondTest is Test {
 
         Diamond.FacetCut[] memory addCuts = new Diamond.FacetCut[](2);
         addCuts[0] = Diamond.FacetCut({
-            facet: address(facet1), action: Diamond.Action.Add, isFreezable: false, selectors: selectors1
+            facet: address(facet1),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: selectors1
         });
         addCuts[1] = Diamond.FacetCut({
-            facet: address(facet2), action: Diamond.Action.Add, isFreezable: true, selectors: selectors2
+            facet: address(facet2),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: selectors2
         });
 
         Diamond.diamondCut(Diamond.DiamondCutData({facetCuts: addCuts, initAddress: address(0), initCalldata: ""}));
@@ -448,7 +517,10 @@ contract DiamondTest is Test {
 
         Diamond.FacetCut[] memory removeCuts = new Diamond.FacetCut[](1);
         removeCuts[0] = Diamond.FacetCut({
-            facet: address(0), action: Diamond.Action.Remove, isFreezable: false, selectors: removeSelectors
+            facet: address(0),
+            action: Diamond.Action.Remove,
+            isFreezable: false,
+            selectors: removeSelectors
         });
 
         Diamond.diamondCut(Diamond.DiamondCutData({facetCuts: removeCuts, initAddress: address(0), initCalldata: ""}));

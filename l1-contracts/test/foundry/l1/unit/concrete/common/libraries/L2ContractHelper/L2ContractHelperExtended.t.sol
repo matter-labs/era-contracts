@@ -186,10 +186,18 @@ contract L2ContractHelperExtendedTest is Test {
         bytes32 bytecodeHash = bytes32(0x01000001f862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925);
         bytes32 constructorInputHash = keccak256(abi.encode("test"));
 
-        address addr1 =
-            L2ContractHelper.computeCreate2Address(sender, bytes32(uint256(1)), bytecodeHash, constructorInputHash);
-        address addr2 =
-            L2ContractHelper.computeCreate2Address(sender, bytes32(uint256(2)), bytecodeHash, constructorInputHash);
+        address addr1 = L2ContractHelper.computeCreate2Address(
+            sender,
+            bytes32(uint256(1)),
+            bytecodeHash,
+            constructorInputHash
+        );
+        address addr2 = L2ContractHelper.computeCreate2Address(
+            sender,
+            bytes32(uint256(2)),
+            bytecodeHash,
+            constructorInputHash
+        );
 
         assertTrue(addr1 != addr2);
     }
@@ -284,9 +292,9 @@ contract L2ContractHelperExtendedTest is Test {
     function testFuzz_bytecodeLen(uint8 byte2, uint8 byte3) public pure {
         // Construct a bytecode hash with specific length bytes
         bytes32 bytecodeHash = bytes32(
-            (uint256(1) << 248) // version = 1
-                | (uint256(byte2) << 232) // length high byte
-                | (uint256(byte3) << 224) // length low byte
+            (uint256(1) << 248) | // version = 1
+                (uint256(byte2) << 232) | // length high byte
+                (uint256(byte3) << 224) // length low byte
         );
 
         uint256 expectedLen = uint256(byte2) * 256 + uint256(byte3);

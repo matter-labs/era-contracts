@@ -648,11 +648,7 @@ contract GWAssetTrackerExtendedTest is Test {
         );
 
         // Mock pauseDepositsOnGateway
-        vm.mockCall(
-            mockZKChain,
-            abi.encodeWithSelector(IMailboxImpl.pauseDepositsOnGateway.selector),
-            abi.encode()
-        );
+        vm.mockCall(mockZKChain, abi.encodeWithSelector(IMailboxImpl.pauseDepositsOnGateway.selector), abi.encode());
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
         gwAssetTracker.requestPauseDepositsForChain(CHAIN_ID);

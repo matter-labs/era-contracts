@@ -3,16 +3,8 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {
-    CalldataDAGateway,
-    BLOB_COMMITMENT_SIZE,
-    BLOB_SIZE_BYTES
-} from "contracts/state-transition/data-availability/CalldataDAGateway.sol";
-import {
-    InvalidPubdataHash,
-    PubdataInputTooSmall,
-    PubdataLengthTooBig
-} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {CalldataDAGateway, BLOB_COMMITMENT_SIZE, BLOB_SIZE_BYTES} from "contracts/state-transition/data-availability/CalldataDAGateway.sol";
+import {InvalidPubdataHash, PubdataInputTooSmall, PubdataLengthTooBig} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 /// @notice Concrete implementation of CalldataDAGateway for testing
 contract CalldataDAGatewayHarness is CalldataDAGateway {
@@ -24,8 +16,12 @@ contract CalldataDAGatewayHarness is CalldataDAGateway {
         bytes calldata _pubdataInput
     ) external pure returns (bytes32[] memory blobCommitments, bytes memory pubdata) {
         bytes calldata pubdataCalldata;
-        (blobCommitments, pubdataCalldata) =
-            _processCalldataDA(_blobsProvided, _fullPubdataHash, _maxBlobsSupported, _pubdataInput);
+        (blobCommitments, pubdataCalldata) = _processCalldataDA(
+            _blobsProvided,
+            _fullPubdataHash,
+            _maxBlobsSupported,
+            _pubdataInput
+        );
         pubdata = pubdataCalldata;
     }
 }
@@ -47,13 +43,12 @@ contract CalldataDAGatewayTest is Test {
 
         bytes memory pubdataInput = abi.encodePacked(pubdata, commitment);
 
-        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) =
-            gateway.processCalldataDA(
-                1, // blobsProvided
-                pubdataHash,
-                6, // maxBlobsSupported
-                pubdataInput
-            );
+        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) = gateway.processCalldataDA(
+            1, // blobsProvided
+            pubdataHash,
+            6, // maxBlobsSupported
+            pubdataInput
+        );
 
         assertEq(blobCommitments.length, 6);
         assertEq(blobCommitments[0], commitment);
@@ -68,13 +63,12 @@ contract CalldataDAGatewayTest is Test {
 
         bytes memory pubdataInput = abi.encodePacked(pubdata, commitment1, commitment2);
 
-        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) =
-            gateway.processCalldataDA(
-                2, // blobsProvided
-                pubdataHash,
-                6, // maxBlobsSupported
-                pubdataInput
-            );
+        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) = gateway.processCalldataDA(
+            2, // blobsProvided
+            pubdataHash,
+            6, // maxBlobsSupported
+            pubdataInput
+        );
 
         assertEq(blobCommitments.length, 6);
         assertEq(blobCommitments[0], commitment1);
@@ -89,8 +83,12 @@ contract CalldataDAGatewayTest is Test {
 
         bytes memory pubdataInput = abi.encodePacked(pubdata, commitment);
 
-        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) =
-            gateway.processCalldataDA(1, pubdataHash, 6, pubdataInput);
+        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) = gateway.processCalldataDA(
+            1,
+            pubdataHash,
+            6,
+            pubdataInput
+        );
 
         assertEq(blobCommitments.length, 6);
         assertEq(blobCommitments[0], commitment);
@@ -160,8 +158,12 @@ contract CalldataDAGatewayTest is Test {
 
         bytes memory pubdataInput = abi.encodePacked(pubdata, commitment);
 
-        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) =
-            gateway.processCalldataDA(1, pubdataHash, 6, pubdataInput);
+        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) = gateway.processCalldataDA(
+            1,
+            pubdataHash,
+            6,
+            pubdataInput
+        );
 
         assertEq(blobCommitments.length, 6);
         assertEq(returnedPubdata.length, BLOB_SIZE_BYTES);
@@ -173,13 +175,12 @@ contract CalldataDAGatewayTest is Test {
 
         bytes memory pubdataInput = pubdata;
 
-        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) =
-            gateway.processCalldataDA(
-                0, // 0 blobs provided
-                pubdataHash,
-                6,
-                pubdataInput
-            );
+        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) = gateway.processCalldataDA(
+            0, // 0 blobs provided
+            pubdataHash,
+            6,
+            pubdataInput
+        );
 
         assertEq(blobCommitments.length, 6);
         assertEq(returnedPubdata.length, 0);
@@ -194,7 +195,7 @@ contract CalldataDAGatewayTest is Test {
 
         bytes memory pubdataInput = abi.encodePacked(pubdata, commitment1, commitment2, commitment3);
 
-        (bytes32[] memory blobCommitments,) = gateway.processCalldataDA(3, pubdataHash, 6, pubdataInput);
+        (bytes32[] memory blobCommitments, ) = gateway.processCalldataDA(3, pubdataHash, 6, pubdataInput);
 
         assertEq(blobCommitments[0], commitment1);
         assertEq(blobCommitments[1], commitment2);
@@ -212,10 +213,10 @@ contract CalldataDAGatewayTest is Test {
 
         bytes memory pubdataInput = abi.encodePacked(pubdata, commitment);
 
-        (bytes32[] memory blobCommitments1,) = gateway.processCalldataDA(1, pubdataHash, 1, pubdataInput);
+        (bytes32[] memory blobCommitments1, ) = gateway.processCalldataDA(1, pubdataHash, 1, pubdataInput);
         assertEq(blobCommitments1.length, 1);
 
-        (bytes32[] memory blobCommitments10,) = gateway.processCalldataDA(1, pubdataHash, 10, pubdataInput);
+        (bytes32[] memory blobCommitments10, ) = gateway.processCalldataDA(1, pubdataHash, 10, pubdataInput);
         assertEq(blobCommitments10.length, 10);
     }
 
@@ -229,8 +230,12 @@ contract CalldataDAGatewayTest is Test {
 
         bytes memory pubdataInput = abi.encodePacked(pubdata, commitment);
 
-        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) =
-            gateway.processCalldataDA(1, pubdataHash, 6, pubdataInput);
+        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) = gateway.processCalldataDA(
+            1,
+            pubdataHash,
+            6,
+            pubdataInput
+        );
 
         assertEq(blobCommitments.length, 6);
         assertEq(blobCommitments[0], commitment);
@@ -254,7 +259,7 @@ contract CalldataDAGatewayTest is Test {
 
         bytes memory pubdataInput = abi.encodePacked(pubdata, commitment);
 
-        (bytes32[] memory blobCommitments,) = gateway.processCalldataDA(1, pubdataHash, 6, pubdataInput);
+        (bytes32[] memory blobCommitments, ) = gateway.processCalldataDA(1, pubdataHash, 6, pubdataInput);
 
         assertEq(blobCommitments[0], commitment);
     }

@@ -36,7 +36,10 @@ contract BridgedStandardERC20AdditionalTest is Test {
 
     function _init(BridgedStandardERC20 token) internal {
         bytes memory data = DataEncoding.encodeTokenData({
-            _chainId: 1, _name: abi.encode("TestToken"), _symbol: abi.encode("TT"), _decimals: abi.encode(uint8(18))
+            _chainId: 1,
+            _name: abi.encode("TestToken"),
+            _symbol: abi.encode("TT"),
+            _decimals: abi.encode(uint8(18))
         });
         token.bridgeInitialize(assetId, originToken, data);
     }
@@ -94,7 +97,10 @@ contract BridgedStandardERC20AdditionalTest is Test {
     function test_bridgeInitialize_revertsOnZeroOriginToken() public {
         BridgedStandardERC20 token = _deployProxy();
         bytes memory data = DataEncoding.encodeTokenData({
-            _chainId: 1, _name: abi.encode("N"), _symbol: abi.encode("S"), _decimals: abi.encode(uint8(18))
+            _chainId: 1,
+            _name: abi.encode("N"),
+            _symbol: abi.encode("S"),
+            _decimals: abi.encode(uint8(18))
         });
 
         vm.expectRevert(ZeroAddress.selector);
@@ -106,7 +112,10 @@ contract BridgedStandardERC20AdditionalTest is Test {
         _init(token);
 
         bytes memory data = DataEncoding.encodeTokenData({
-            _chainId: 1, _name: abi.encode("N"), _symbol: abi.encode("S"), _decimals: abi.encode(uint8(18))
+            _chainId: 1,
+            _name: abi.encode("N"),
+            _symbol: abi.encode("S"),
+            _decimals: abi.encode(uint8(18))
         });
 
         vm.expectRevert();

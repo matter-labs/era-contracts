@@ -28,10 +28,7 @@ contract CTMDeploymentTrackerExtendedTest is Test {
         assetRouter = makeAddr("assetRouter");
         chainAssetHandler = makeAddr("chainAssetHandler");
 
-        CTMDeploymentTracker impl = new CTMDeploymentTracker(
-            IBridgehubBase(bridgehub),
-            IAssetRouterBase(assetRouter)
-        );
+        CTMDeploymentTracker impl = new CTMDeploymentTracker(IBridgehubBase(bridgehub), IAssetRouterBase(assetRouter));
 
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(impl),
@@ -57,7 +54,10 @@ contract CTMDeploymentTrackerExtendedTest is Test {
     function test_OnlyBridgehub_RevertWhen_NotBridgehub() public {
         address notBridgehub = makeAddr("notBridgehub");
         uint256 chainId = 123;
-        bytes memory data = abi.encodePacked(CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION, abi.encode(address(0), address(0)));
+        bytes memory data = abi.encodePacked(
+            CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION,
+            abi.encode(address(0), address(0))
+        );
 
         vm.prank(notBridgehub);
         vm.expectRevert(abi.encodeWithSelector(OnlyBridgehub.selector, notBridgehub, bridgehub));
@@ -66,7 +66,10 @@ contract CTMDeploymentTrackerExtendedTest is Test {
 
     function test_BridgehubDeposit_RevertWhen_EthSent() public {
         uint256 chainId = 123;
-        bytes memory data = abi.encodePacked(CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION, abi.encode(address(0), address(0)));
+        bytes memory data = abi.encodePacked(
+            CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION,
+            abi.encode(address(0), address(0))
+        );
 
         vm.deal(bridgehub, 1 ether);
         vm.prank(bridgehub);
@@ -77,7 +80,10 @@ contract CTMDeploymentTrackerExtendedTest is Test {
     function test_BridgehubDeposit_RevertWhen_NotOwner() public {
         address notOwner = makeAddr("notOwner");
         uint256 chainId = 123;
-        bytes memory data = abi.encodePacked(CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION, abi.encode(address(0), address(0)));
+        bytes memory data = abi.encodePacked(
+            CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION,
+            abi.encode(address(0), address(0))
+        );
 
         vm.prank(bridgehub);
         vm.expectRevert(abi.encodeWithSelector(NotOwner.selector, notOwner, owner));
@@ -97,10 +103,18 @@ contract CTMDeploymentTrackerExtendedTest is Test {
         uint256 chainId = 123;
         address ctmL1Address = makeAddr("ctmL1Address");
         address ctmL2Address = makeAddr("ctmL2Address");
-        bytes memory data = abi.encodePacked(CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION, abi.encode(ctmL1Address, ctmL2Address));
+        bytes memory data = abi.encodePacked(
+            CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION,
+            abi.encode(ctmL1Address, ctmL2Address)
+        );
 
         vm.prank(bridgehub);
-        L2TransactionRequestTwoBridgesInner memory request = ctmDeploymentTracker.bridgehubDeposit(chainId, owner, 0, data);
+        L2TransactionRequestTwoBridgesInner memory request = ctmDeploymentTracker.bridgehubDeposit(
+            chainId,
+            owner,
+            0,
+            data
+        );
 
         // Verify the request
         assertTrue(request.magicValue != bytes32(0));
@@ -139,7 +153,9 @@ contract CTMDeploymentTrackerExtendedTest is Test {
         address wrongCounterpart = makeAddr("wrongCounterpart");
 
         vm.prank(assetRouter);
-        vm.expectRevert(abi.encodeWithSelector(WrongCounterPart.selector, wrongCounterpart, L2_CHAIN_ASSET_HANDLER_ADDR));
+        vm.expectRevert(
+            abi.encodeWithSelector(WrongCounterPart.selector, wrongCounterpart, L2_CHAIN_ASSET_HANDLER_ADDR)
+        );
         ctmDeploymentTracker.bridgeCheckCounterpartAddress(123, bytes32(0), owner, wrongCounterpart);
     }
 
@@ -197,11 +213,7 @@ contract CTMDeploymentTrackerExtendedTest is Test {
         );
 
         // Mock setCTMAssetAddress
-        vm.mockCall(
-            bridgehub,
-            abi.encodeWithSelector(IBridgehubBase.setCTMAssetAddress.selector),
-            abi.encode()
-        );
+        vm.mockCall(bridgehub, abi.encodeWithSelector(IBridgehubBase.setCTMAssetAddress.selector), abi.encode());
 
         vm.prank(owner);
         ctmDeploymentTracker.registerCTMAssetOnL1(ctmAddress);
@@ -243,7 +255,9 @@ contract CTMDeploymentTrackerExtendedTest is Test {
 
         // Verify it's not zero and matches expected calculation
         assertTrue(assetId != bytes32(0));
-        bytes32 expected = keccak256(abi.encode(block.chainid, address(ctmDeploymentTracker), bytes32(uint256(uint160(ctmAddress)))));
+        bytes32 expected = keccak256(
+            abi.encode(block.chainid, address(ctmDeploymentTracker), bytes32(uint256(uint160(ctmAddress))))
+        );
         assertEq(assetId, expected);
     }
 
@@ -253,15 +267,20 @@ contract CTMDeploymentTrackerExtendedTest is Test {
         assertTrue(assetId != bytes32(0));
     }
 
-    function testFuzz_BridgehubDeposit_VariousAddresses(
-        address ctmL1Address,
-        address ctmL2Address
-    ) public {
+    function testFuzz_BridgehubDeposit_VariousAddresses(address ctmL1Address, address ctmL2Address) public {
         uint256 chainId = 123;
-        bytes memory data = abi.encodePacked(CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION, abi.encode(ctmL1Address, ctmL2Address));
+        bytes memory data = abi.encodePacked(
+            CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION,
+            abi.encode(ctmL1Address, ctmL2Address)
+        );
 
         vm.prank(bridgehub);
-        L2TransactionRequestTwoBridgesInner memory request = ctmDeploymentTracker.bridgehubDeposit(chainId, owner, 0, data);
+        L2TransactionRequestTwoBridgesInner memory request = ctmDeploymentTracker.bridgehubDeposit(
+            chainId,
+            owner,
+            0,
+            data
+        );
 
         // Just verify it doesn't revert
         assertTrue(request.l2Calldata.length > 0);

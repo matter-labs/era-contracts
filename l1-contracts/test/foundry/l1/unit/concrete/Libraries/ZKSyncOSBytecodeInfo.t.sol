@@ -12,9 +12,12 @@ contract ZKSyncOSBytecodeInfoWrapper {
         uint256 _bytecodeLength,
         bytes32 _observableBytecodeHash
     ) external pure returns (bytes memory) {
-        return ZKSyncOSBytecodeInfo.encodeZKSyncOSBytecodeInfo(
-            _bytecodeBlakeHash, _bytecodeLength, _observableBytecodeHash
-        );
+        return
+            ZKSyncOSBytecodeInfo.encodeZKSyncOSBytecodeInfo(
+                _bytecodeBlakeHash,
+                _bytecodeLength,
+                _observableBytecodeHash
+            );
     }
 
     function decodeZKSyncOSBytecodeInfo(bytes memory _bytecodeInfo) external pure returns (bytes32, uint256, bytes32) {
@@ -43,8 +46,10 @@ contract ZKSyncOSBytecodeInfoTest is Test {
         assertTrue(encoded.length > 0, "Encoded data should not be empty");
 
         // Decode and verify
-        (bytes32 decodedBlake, uint256 decodedLength, bytes32 decodedKeccak) =
-            abi.decode(encoded, (bytes32, uint256, bytes32));
+        (bytes32 decodedBlake, uint256 decodedLength, bytes32 decodedKeccak) = abi.decode(
+            encoded,
+            (bytes32, uint256, bytes32)
+        );
         assertEq(decodedBlake, blakeHash);
         assertEq(decodedLength, length);
         assertEq(decodedKeccak, keccakHash);
@@ -53,8 +58,10 @@ contract ZKSyncOSBytecodeInfoTest is Test {
     function test_encodeZKSyncOSBytecodeInfo_zeroValues() public view {
         bytes memory encoded = wrapper.encodeZKSyncOSBytecodeInfo(bytes32(0), 0, bytes32(0));
 
-        (bytes32 decodedBlake, uint256 decodedLength, bytes32 decodedKeccak) =
-            abi.decode(encoded, (bytes32, uint256, bytes32));
+        (bytes32 decodedBlake, uint256 decodedLength, bytes32 decodedKeccak) = abi.decode(
+            encoded,
+            (bytes32, uint256, bytes32)
+        );
         assertEq(decodedBlake, bytes32(0));
         assertEq(decodedLength, 0);
         assertEq(decodedKeccak, bytes32(0));
@@ -66,8 +73,10 @@ contract ZKSyncOSBytecodeInfoTest is Test {
 
         bytes memory encoded = wrapper.encodeZKSyncOSBytecodeInfo(maxHash, maxLength, maxHash);
 
-        (bytes32 decodedBlake, uint256 decodedLength, bytes32 decodedKeccak) =
-            abi.decode(encoded, (bytes32, uint256, bytes32));
+        (bytes32 decodedBlake, uint256 decodedLength, bytes32 decodedKeccak) = abi.decode(
+            encoded,
+            (bytes32, uint256, bytes32)
+        );
         assertEq(decodedBlake, maxHash);
         assertEq(decodedLength, maxLength);
         assertEq(decodedKeccak, maxHash);
@@ -82,8 +91,9 @@ contract ZKSyncOSBytecodeInfoTest is Test {
 
         bytes memory encoded = abi.encode(blakeHash, length, keccakHash);
 
-        (bytes32 decodedBlake, uint256 decodedLength, bytes32 decodedKeccak) =
-            wrapper.decodeZKSyncOSBytecodeInfo(encoded);
+        (bytes32 decodedBlake, uint256 decodedLength, bytes32 decodedKeccak) = wrapper.decodeZKSyncOSBytecodeInfo(
+            encoded
+        );
 
         assertEq(decodedBlake, blakeHash);
         assertEq(decodedLength, length);
@@ -98,8 +108,9 @@ contract ZKSyncOSBytecodeInfoTest is Test {
         bytes32 keccakHash = keccak256("keccak hash test");
 
         bytes memory encoded = wrapper.encodeZKSyncOSBytecodeInfo(blakeHash, length, keccakHash);
-        (bytes32 decodedBlake, uint256 decodedLength, bytes32 decodedKeccak) =
-            wrapper.decodeZKSyncOSBytecodeInfo(encoded);
+        (bytes32 decodedBlake, uint256 decodedLength, bytes32 decodedKeccak) = wrapper.decodeZKSyncOSBytecodeInfo(
+            encoded
+        );
 
         assertEq(decodedBlake, blakeHash);
         assertEq(decodedLength, length);
@@ -108,13 +119,15 @@ contract ZKSyncOSBytecodeInfoTest is Test {
 
     // ============ Fuzz Tests ============
 
-    function testFuzz_roundtrip_encodeDecodeZKSyncOSBytecodeInfo(bytes32 blakeHash, uint256 length, bytes32 keccakHash)
-        public
-        view
-    {
+    function testFuzz_roundtrip_encodeDecodeZKSyncOSBytecodeInfo(
+        bytes32 blakeHash,
+        uint256 length,
+        bytes32 keccakHash
+    ) public view {
         bytes memory encoded = wrapper.encodeZKSyncOSBytecodeInfo(blakeHash, length, keccakHash);
-        (bytes32 decodedBlake, uint256 decodedLength, bytes32 decodedKeccak) =
-            wrapper.decodeZKSyncOSBytecodeInfo(encoded);
+        (bytes32 decodedBlake, uint256 decodedLength, bytes32 decodedKeccak) = wrapper.decodeZKSyncOSBytecodeInfo(
+            encoded
+        );
 
         assertEq(decodedBlake, blakeHash);
         assertEq(decodedLength, length);

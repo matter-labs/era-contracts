@@ -83,7 +83,7 @@ contract DynamicIncrementalMerkleMemoryTest is Test {
         bytes32 leaf1 = keccak256("leaf1");
         bytes32 leaf2 = keccak256("leaf2");
 
-        (uint256 index1,) = tree.push(leaf1);
+        (uint256 index1, ) = tree.push(leaf1);
         (uint256 index2, bytes32 newRoot) = tree.push(leaf2);
 
         assertEq(index1, 0);
@@ -359,9 +359,9 @@ contract DynamicIncrementalMerkleMemoryTest is Test {
         bytes32 leaf3 = keccak256("leaf3");
         bytes32 leaf4 = keccak256("leaf4");
 
-        (uint256 idx1,) = tree.push(leaf1);
-        (uint256 idx2,) = tree.push(leaf2);
-        (uint256 idx3,) = tree.push(leaf3);
+        (uint256 idx1, ) = tree.push(leaf1);
+        (uint256 idx2, ) = tree.push(leaf2);
+        (uint256 idx3, ) = tree.push(leaf3);
         (uint256 idx4, bytes32 finalRoot) = tree.push(leaf4);
 
         // Verify indices

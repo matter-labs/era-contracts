@@ -83,5 +83,4 @@ contract MailboxBaseTests is MailboxTest {
             l2TransactionBaseCost
         );
     }
-
 }

@@ -5,14 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {TransactionValidator} from "contracts/state-transition/libraries/TransactionValidator.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {
-    InvalidUpgradeTxn,
-    PubdataGreaterThanLimit,
-    TooMuchGas,
-    TxnBodyGasLimitNotEnoughGas,
-    UpgradeTxVerifyParam,
-    ValidateTxnNotEnoughGas
-} from "contracts/common/L1ContractErrors.sol";
+import {InvalidUpgradeTxn, PubdataGreaterThanLimit, TooMuchGas, TxnBodyGasLimitNotEnoughGas, UpgradeTxVerifyParam, ValidateTxnNotEnoughGas} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Unit tests for TransactionValidator library
 contract TransactionValidatorTest is Test {
@@ -105,11 +98,23 @@ contract TransactionValidatorTest is Test {
     }
 
     function test_getMinimalPriorityTransactionGasLimit_withFactoryDeps() public pure {
-        uint256 minGasNoDeps =
-            TransactionValidator.getMinimalPriorityTransactionGasLimit(100, 50, 0, 800, 1 gwei, false);
+        uint256 minGasNoDeps = TransactionValidator.getMinimalPriorityTransactionGasLimit(
+            100,
+            50,
+            0,
+            800,
+            1 gwei,
+            false
+        );
 
-        uint256 minGasWithDeps =
-            TransactionValidator.getMinimalPriorityTransactionGasLimit(100, 50, 5, 800, 1 gwei, false);
+        uint256 minGasWithDeps = TransactionValidator.getMinimalPriorityTransactionGasLimit(
+            100,
+            50,
+            5,
+            800,
+            1 gwei,
+            false
+        );
 
         // More factory deps should require more gas
         assertGt(minGasWithDeps, minGasNoDeps);
@@ -123,10 +128,23 @@ contract TransactionValidatorTest is Test {
     }
 
     function test_getMinimalPriorityTransactionGasLimit_largerEncodingRequiresMoreOrEqualGas() public pure {
-        uint256 minGasSmall = TransactionValidator.getMinimalPriorityTransactionGasLimit(100, 50, 0, 800, 1 gwei, false);
+        uint256 minGasSmall = TransactionValidator.getMinimalPriorityTransactionGasLimit(
+            100,
+            50,
+            0,
+            800,
+            1 gwei,
+            false
+        );
 
-        uint256 minGasLarge =
-            TransactionValidator.getMinimalPriorityTransactionGasLimit(1000, 500, 0, 800, 1 gwei, false);
+        uint256 minGasLarge = TransactionValidator.getMinimalPriorityTransactionGasLimit(
+            1000,
+            500,
+            0,
+            800,
+            1 gwei,
+            false
+        );
 
         // Larger encoding should require at least as much gas
         assertGe(minGasLarge, minGasSmall);
@@ -289,23 +307,24 @@ contract TransactionValidatorTest is Test {
         uint256[] memory factoryDeps = new uint256[](0);
         uint256[4] memory reserved;
 
-        return L2CanonicalTransaction({
-            txType: 254, // Upgrade tx type
-            from: 0x8001, // System contract address
-            to: 0x8002, // Another system contract
-            gasLimit: 1000000,
-            gasPerPubdataByteLimit: 800,
-            maxFeePerGas: 0,
-            maxPriorityFeePerGas: 0,
-            paymaster: 0,
-            nonce: 0,
-            value: 0,
-            reserved: reserved,
-            data: hex"",
-            signature: hex"",
-            factoryDeps: factoryDeps,
-            paymasterInput: hex"",
-            reservedDynamic: hex""
-        });
+        return
+            L2CanonicalTransaction({
+                txType: 254, // Upgrade tx type
+                from: 0x8001, // System contract address
+                to: 0x8002, // Another system contract
+                gasLimit: 1000000,
+                gasPerPubdataByteLimit: 800,
+                maxFeePerGas: 0,
+                maxPriorityFeePerGas: 0,
+                paymaster: 0,
+                nonce: 0,
+                value: 0,
+                reserved: reserved,
+                data: hex"",
+                signature: hex"",
+                factoryDeps: factoryDeps,
+                paymasterInput: hex"",
+                reservedDynamic: hex""
+            });
     }
 }

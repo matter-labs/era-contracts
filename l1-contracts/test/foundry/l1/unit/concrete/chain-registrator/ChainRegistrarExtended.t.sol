@@ -175,7 +175,13 @@ contract ChainRegistrarExtendedTest is Test {
         address author = makeAddr("author");
 
         // First set up the chain as deployed in CTM
-        DummyZKChain zkChain = new DummyZKChain(address(bridgeHub), 270, block.chainid, address(assetRouter), eip7702Checker);
+        DummyZKChain zkChain = new DummyZKChain(
+            address(bridgeHub),
+            270,
+            block.chainid,
+            address(assetRouter),
+            eip7702Checker
+        );
         vm.prank(admin);
         ctm.setZKChain(999, address(zkChain));
 
@@ -210,7 +216,13 @@ contract ChainRegistrarExtendedTest is Test {
         uint256 chainId = 999;
 
         // Set up chain in CTM
-        DummyZKChain zkChain = new DummyZKChain(address(bridgeHub), 270, block.chainid, address(assetRouter), eip7702Checker);
+        DummyZKChain zkChain = new DummyZKChain(
+            address(bridgeHub),
+            270,
+            block.chainid,
+            address(assetRouter),
+            eip7702Checker
+        );
         vm.prank(admin);
         ctm.setZKChain(chainId, address(zkChain));
 
@@ -285,14 +297,7 @@ contract ChainRegistrarExtendedTest is Test {
             _gasPriceMultiplierDenominator: 1
         });
 
-        (
-            uint256 proposedChainId,
-            ,
-            ,
-            ,
-            ,
-            PubdataPricingMode mode
-        ) = chainRegistrar.proposedChains(author, chainId);
+        (uint256 proposedChainId, , , , , PubdataPricingMode mode) = chainRegistrar.proposedChains(author, chainId);
 
         assertEq(proposedChainId, chainId);
         assertEq(uint8(mode), uint8(PubdataPricingMode.Rollup));
@@ -407,11 +412,7 @@ contract ChainRegistrarExtendedTest is Test {
         assertTrue(token.balanceOf(deployer) > initialBalance);
     }
 
-    function testFuzz_ProposeChainRegistration(
-        uint256 chainId,
-        uint128 nominator,
-        uint128 denominator
-    ) public {
+    function testFuzz_ProposeChainRegistration(uint256 chainId, uint128 nominator, uint128 denominator) public {
         vm.assume(chainId != 0);
         vm.assume(denominator != 0);
         vm.assume(nominator <= 1000);

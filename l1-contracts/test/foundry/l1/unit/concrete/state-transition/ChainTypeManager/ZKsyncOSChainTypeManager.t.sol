@@ -175,7 +175,9 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         vm.stopPrank();
     }
 
-    function _deployChainTypeManager(ChainCreationParams memory chainCreationParams) internal returns (ZKsyncOSChainTypeManager) {
+    function _deployChainTypeManager(
+        ChainCreationParams memory chainCreationParams
+    ) internal returns (ZKsyncOSChainTypeManager) {
         vm.startPrank(address(bridgehub));
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
@@ -359,7 +361,12 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         uint256 newProtocolVersion = 1;
 
         vm.prank(governor);
-        chainContractAddress.setNewVersionUpgrade(cutData, oldProtocolVersion, oldProtocolVersionDeadline, newProtocolVersion);
+        chainContractAddress.setNewVersionUpgrade(
+            cutData,
+            oldProtocolVersion,
+            oldProtocolVersionDeadline,
+            newProtocolVersion
+        );
 
         // Verify that the protocol version deadline was set
         assertEq(chainContractAddress.protocolVersionDeadline(oldProtocolVersion), oldProtocolVersionDeadline);
@@ -385,7 +392,12 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         address notOwner = makeAddr("notOwner");
         vm.prank(notOwner);
         vm.expectRevert("Ownable: caller is not the owner");
-        chainContractAddress.setNewVersionUpgrade(cutData, oldProtocolVersion, oldProtocolVersionDeadline, newProtocolVersion);
+        chainContractAddress.setNewVersionUpgrade(
+            cutData,
+            oldProtocolVersion,
+            oldProtocolVersionDeadline,
+            newProtocolVersion
+        );
     }
 
     // ============================================================

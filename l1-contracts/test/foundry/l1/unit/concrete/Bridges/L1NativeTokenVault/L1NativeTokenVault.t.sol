@@ -267,7 +267,7 @@ contract L1NativeTokenVaultTest is Test {
         vm.expectRevert(OnlyFailureStatusAllowed.selector);
         nativeTokenVault.bridgeConfirmTransferResult(
             chainId,
-            TxStatus.Success,  // Should revert for non-Failure status
+            TxStatus.Success, // Should revert for non-Failure status
             tokenAssetId,
             owner,
             data
@@ -300,13 +300,7 @@ contract L1NativeTokenVaultTest is Test {
 
         vm.prank(address(assetRouter));
         vm.expectRevert(OriginChainIdNotFound.selector);
-        nativeTokenVault.bridgeConfirmTransferResult(
-            chainId,
-            TxStatus.Failure,
-            unknownAssetId,
-            owner,
-            data
-        );
+        nativeTokenVault.bridgeConfirmTransferResult(chainId, TxStatus.Failure, unknownAssetId, owner, data);
     }
 
     function test_bridgeConfirmTransferResult_BridgeMintPath() public {
@@ -340,13 +334,7 @@ contract L1NativeTokenVaultTest is Test {
         );
 
         vm.prank(address(assetRouter));
-        nativeTokenVault.bridgeConfirmTransferResult(
-            chainId,
-            TxStatus.Failure,
-            bridgedAssetId,
-            owner,
-            data
-        );
+        nativeTokenVault.bridgeConfirmTransferResult(chainId, TxStatus.Failure, bridgedAssetId, owner, data);
     }
 
     /*//////////////////////////////////////////////////////////////

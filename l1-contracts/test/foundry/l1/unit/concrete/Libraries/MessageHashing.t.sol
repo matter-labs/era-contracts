@@ -5,15 +5,8 @@ import {Test} from "forge-std/Test.sol";
 
 import {MessageHashing, BATCH_LEAF_PADDING, CHAIN_ID_LEAF_PADDING} from "contracts/common/libraries/MessageHashing.sol";
 import {L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
-import {
-    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-    L2_BOOTLOADER_ADDRESS
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {
-    MerklePathEmpty,
-    HashedLogIsDefault,
-    InvalidProofLengthForFinalNode
-} from "contracts/common/L1ContractErrors.sol";
+import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {MerklePathEmpty, HashedLogIsDefault, InvalidProofLengthForFinalNode} from "contracts/common/L1ContractErrors.sol";
 import {UnsupportedProofMetadataVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, SUPPORTED_PROOF_METADATA_VERSION} from "contracts/common/Config.sol";
 
@@ -180,11 +173,9 @@ contract MessageHashingTest is Test {
     }
 
     // External wrapper for calldata conversion
-    function externalParseProofMetadata(bytes32[] calldata _proof)
-        external
-        pure
-        returns (MessageHashing.ProofMetadata memory)
-    {
+    function externalParseProofMetadata(
+        bytes32[] calldata _proof
+    ) external pure returns (MessageHashing.ProofMetadata memory) {
         return MessageHashing.parseProofMetadata(_proof);
     }
 
@@ -213,11 +204,11 @@ contract MessageHashingTest is Test {
     }
 
     // External wrapper for calldata conversion
-    function externalExtractSlice(bytes32[] calldata _proof, uint256 _left, uint256 _right)
-        external
-        pure
-        returns (bytes32[] memory)
-    {
+    function externalExtractSlice(
+        bytes32[] calldata _proof,
+        uint256 _left,
+        uint256 _right
+    ) external pure returns (bytes32[] memory) {
         return MessageHashing.extractSlice(_proof, _left, _right);
     }
 
@@ -237,11 +228,10 @@ contract MessageHashingTest is Test {
     }
 
     // External wrapper for calldata conversion
-    function externalExtractSliceUntilEnd(bytes32[] calldata _proof, uint256 _start)
-        external
-        pure
-        returns (bytes32[] memory)
-    {
+    function externalExtractSliceUntilEnd(
+        bytes32[] calldata _proof,
+        uint256 _start
+    ) external pure returns (bytes32[] memory) {
         return MessageHashing.extractSliceUntilEnd(_proof, _start);
     }
 }

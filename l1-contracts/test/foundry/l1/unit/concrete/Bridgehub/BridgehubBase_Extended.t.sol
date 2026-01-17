@@ -157,5 +157,4 @@ contract BridgehubBase_Extended_Test is Test {
         uint256 maxChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
         assertEq(maxChains, maxNumberOfChains);
     }
-
 }

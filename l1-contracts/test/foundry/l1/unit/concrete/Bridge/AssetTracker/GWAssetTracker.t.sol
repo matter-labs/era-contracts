@@ -248,7 +248,6 @@ contract GWAssetTrackerTest is Test {
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), initialBalance + AMOUNT);
     }
 
-
     function test_GetEmptyMessageRoot_Cached() public {
         // First call calculates and caches
         bytes32 emptyRoot1 = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
@@ -325,10 +324,7 @@ contract GWAssetTrackerTest is Test {
         assertEq(gwAssetTracker.L1_CHAIN_ID(), _l1ChainId);
     }
 
-    function testFuzz_HandleChainBalanceIncreaseOnGateway(
-        uint256 _amount,
-        uint256 _baseTokenAmount
-    ) public {
+    function testFuzz_HandleChainBalanceIncreaseOnGateway(uint256 _amount, uint256 _baseTokenAmount) public {
         // Bound to reasonable values to avoid overflow
         _amount = bound(_amount, 0, type(uint128).max);
         _baseTokenAmount = bound(_baseTokenAmount, 0, type(uint128).max);
@@ -406,7 +402,6 @@ contract GWAssetTrackerTest is Test {
         // Different chain IDs should produce different roots
         assertTrue(emptyRoot1 != emptyRoot2);
     }
-
 
     function test_SetLegacySharedBridgeAddress_DifferentChains() public {
         address legacyBridge1 = makeAddr("legacyBridge1");
@@ -553,7 +548,8 @@ contract GWAssetTrackerTest is Test {
             abi.encode(ORIGIN_CHAIN_ID, nameBytes, symbolBytes, decimalsBytes)
         );
 
-        (uint256 tokenOriginalChainId, bytes memory name, bytes memory symbol, bytes memory decimals) = gwAssetTracker.parseTokenData(metadata);
+        (uint256 tokenOriginalChainId, bytes memory name, bytes memory symbol, bytes memory decimals) = gwAssetTracker
+            .parseTokenData(metadata);
 
         assertEq(tokenOriginalChainId, ORIGIN_CHAIN_ID);
         assertEq(string(name), "TestToken");

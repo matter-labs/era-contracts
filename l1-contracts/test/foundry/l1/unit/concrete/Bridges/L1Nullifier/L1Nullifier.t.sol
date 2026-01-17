@@ -406,12 +406,7 @@ contract L1NullifierTest is Test {
         bytes32 assetId = keccak256("assetId");
         bytes memory transferData = abi.encode("some data");
 
-        bytes32 result = l1Nullifier.encodeTxDataHash(
-            NEW_ENCODING_VERSION,
-            originalCaller,
-            assetId,
-            transferData
-        );
+        bytes32 result = l1Nullifier.encodeTxDataHash(NEW_ENCODING_VERSION, originalCaller, assetId, transferData);
 
         // Verify it's not zero
         assertTrue(result != bytes32(0));
@@ -433,12 +428,7 @@ contract L1NullifierTest is Test {
             abi.encode(address(token))
         );
 
-        bytes32 result = l1Nullifier.encodeTxDataHash(
-            LEGACY_ENCODING_VERSION,
-            originalCaller,
-            assetId,
-            transferData
-        );
+        bytes32 result = l1Nullifier.encodeTxDataHash(LEGACY_ENCODING_VERSION, originalCaller, assetId, transferData);
 
         // Should return keccak256(abi.encode(originalCaller, tokenAddress, amount))
         bytes32 expected = keccak256(abi.encode(originalCaller, address(token), uint256(1000)));

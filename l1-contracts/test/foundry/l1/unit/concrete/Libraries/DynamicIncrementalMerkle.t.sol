@@ -51,7 +51,7 @@ contract DynamicIncrementalMerkleTest is Test {
         bytes32 leaf1 = keccak256("leaf1");
         bytes32 leaf2 = keccak256("leaf2");
 
-        (uint256 index1,) = tree.push(leaf1);
+        (uint256 index1, ) = tree.push(leaf1);
         (uint256 index2, bytes32 newRoot) = tree.push(leaf2);
 
         assertEq(index1, 0);
@@ -79,7 +79,7 @@ contract DynamicIncrementalMerkleTest is Test {
         // After three elements, tree should expand
         assertEq(tree.height(), 2);
 
-        (uint256 index4,) = tree.push(leaf4); // index=3, no expansion
+        (uint256 index4, ) = tree.push(leaf4); // index=3, no expansion
         assertEq(index4, 3);
         assertEq(tree.height(), 2);
     }
@@ -102,7 +102,7 @@ contract DynamicIncrementalMerkleTest is Test {
         tree.setup(ZERO);
 
         for (uint256 i = 0; i < numElements; i++) {
-            (uint256 index,) = tree.push(keccak256(abi.encode(i)));
+            (uint256 index, ) = tree.push(keccak256(abi.encode(i)));
             assertEq(index, i);
         }
     }
@@ -277,7 +277,7 @@ contract DynamicIncrementalMerkleTest is Test {
 
         // Push 64 elements
         for (uint256 i = 0; i < 64; i++) {
-            (uint256 index,) = tree.push(keccak256(abi.encode(i)));
+            (uint256 index, ) = tree.push(keccak256(abi.encode(i)));
             assertEq(index, i);
         }
 

@@ -7,19 +7,15 @@ import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.
 
 /// @notice Helper contract to test InteroperableAddress library with calldata functions
 contract InteroperableAddressHelper {
-    function parseV1Calldata(bytes calldata data)
-        external
-        pure
-        returns (bytes2 chainType, bytes calldata chainReference, bytes calldata addr)
-    {
+    function parseV1Calldata(
+        bytes calldata data
+    ) external pure returns (bytes2 chainType, bytes calldata chainReference, bytes calldata addr) {
         return InteroperableAddress.parseV1Calldata(data);
     }
 
-    function tryParseV1Calldata(bytes calldata data)
-        external
-        pure
-        returns (bool success, bytes2 chainType, bytes calldata chainReference, bytes calldata addr)
-    {
+    function tryParseV1Calldata(
+        bytes calldata data
+    ) external pure returns (bool success, bytes2 chainType, bytes calldata chainReference, bytes calldata addr) {
         return InteroperableAddress.tryParseV1Calldata(data);
     }
 
@@ -27,11 +23,9 @@ contract InteroperableAddressHelper {
         return InteroperableAddress.parseEvmV1Calldata(data);
     }
 
-    function tryParseEvmV1Calldata(bytes calldata data)
-        external
-        pure
-        returns (bool success, uint256 chainId, address addr)
-    {
+    function tryParseEvmV1Calldata(
+        bytes calldata data
+    ) external pure returns (bool success, uint256 chainId, address addr) {
         return InteroperableAddress.tryParseEvmV1Calldata(data);
     }
 }
@@ -167,14 +161,14 @@ contract InteroperableAddressTest is Test {
     function test_tryParseV1_invalidVersion() public pure {
         bytes memory invalidInput = hex"00020000011400001234567890123456789012345678901234567890";
 
-        (bool success,,,) = invalidInput.tryParseV1();
+        (bool success, , , ) = invalidInput.tryParseV1();
         assertFalse(success);
     }
 
     function test_tryParseV1_tooShort() public pure {
         bytes memory tooShort = hex"0001";
 
-        (bool success,,,) = tooShort.tryParseV1();
+        (bool success, , , ) = tooShort.tryParseV1();
         assertFalse(success);
     }
 
@@ -182,7 +176,7 @@ contract InteroperableAddressTest is Test {
         // Version + chainType + chainRefLen(255) but no actual data
         bytes memory invalid = hex"000100001400";
 
-        (bool success,,,) = invalid.tryParseV1();
+        (bool success, , , ) = invalid.tryParseV1();
         assertFalse(success);
     }
 
@@ -210,7 +204,7 @@ contract InteroperableAddressTest is Test {
     function test_tryParseV1Calldata_validInput() public view {
         bytes memory formatted = InteroperableAddress.formatEvmV1(uint256(1), address(0x1234));
 
-        (bool success, bytes2 chainType,,) = helper.tryParseV1Calldata(formatted);
+        (bool success, bytes2 chainType, , ) = helper.tryParseV1Calldata(formatted);
 
         assertTrue(success);
         assertEq(chainType, bytes2(0x0000));
@@ -219,14 +213,14 @@ contract InteroperableAddressTest is Test {
     function test_tryParseV1Calldata_invalidVersion() public view {
         bytes memory invalidInput = hex"00020000011400001234567890123456789012345678901234567890";
 
-        (bool success,,,) = helper.tryParseV1Calldata(invalidInput);
+        (bool success, , , ) = helper.tryParseV1Calldata(invalidInput);
         assertFalse(success);
     }
 
     function test_tryParseV1Calldata_tooShort() public view {
         bytes memory tooShort = hex"0001";
 
-        (bool success,,,) = helper.tryParseV1Calldata(tooShort);
+        (bool success, , , ) = helper.tryParseV1Calldata(tooShort);
         assertFalse(success);
     }
 
@@ -275,7 +269,7 @@ contract InteroperableAddressTest is Test {
     function test_tryParseEvmV1_nonEvmChainType() public pure {
         bytes memory nonEvm = hex"000100010114001234567890123456789012345678901234567890";
 
-        (bool success,,) = nonEvm.tryParseEvmV1();
+        (bool success, , ) = nonEvm.tryParseEvmV1();
         assertFalse(success);
     }
 
@@ -284,17 +278,17 @@ contract InteroperableAddressTest is Test {
         // Format: version(0001) + chainType(0000) + chainRefLen(01) + chainRef(01) + addrLen(0a=10) + 10 bytes addr
         bytes memory invalid = hex"0001000001010a12345678901234567890";
 
-        (bool success,,) = invalid.tryParseEvmV1();
+        (bool success, , ) = invalid.tryParseEvmV1();
         assertFalse(success);
     }
 
     function test_tryParseEvmV1_chainReferenceTooLong() public pure {
         // Chain reference > 32 bytes (version + chainType + chainRefLen=33 + 33 bytes chainRef + addrLen + 20 bytes addr)
         bytes memory invalid = hex"0001000021"
-            hex"0102030405060708091011121314151617181920212223242526272829303132330014"
-            hex"1234567890123456789012345678901234567890";
+        hex"0102030405060708091011121314151617181920212223242526272829303132330014"
+        hex"1234567890123456789012345678901234567890";
 
-        (bool success,,) = invalid.tryParseEvmV1();
+        (bool success, , ) = invalid.tryParseEvmV1();
         assertFalse(success);
     }
 
@@ -326,7 +320,7 @@ contract InteroperableAddressTest is Test {
     function test_tryParseEvmV1Calldata_invalidInput() public view {
         bytes memory invalid = hex"0002"; // wrong version
 
-        (bool success,,) = helper.tryParseEvmV1Calldata(invalid);
+        (bool success, , ) = helper.tryParseEvmV1Calldata(invalid);
         assertFalse(success);
     }
 

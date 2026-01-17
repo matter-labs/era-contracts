@@ -111,10 +111,7 @@ contract L1NativeTokenVaultTest is Test {
 
         vm.mockCall(
             assetRouter,
-            abi.encodeCall(
-                L1AssetRouter.setAssetHandlerAddressThisChain,
-                (ethAssetId, address(ntv))
-            ),
+            abi.encodeCall(L1AssetRouter.setAssetHandlerAddressThisChain, (ethAssetId, address(ntv))),
             hex""
         );
         bytes[] memory zeros = new bytes[](2);

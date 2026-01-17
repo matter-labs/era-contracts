@@ -82,11 +82,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
         uint256 fakeChainId = 999;
 
         // Mock the settlement layer to return a fake chain ID
-        vm.mockCall(
-            fakeSettlementLayer,
-            abi.encodeWithSelector(IGetters.getChainId.selector),
-            abi.encode(fakeChainId)
-        );
+        vm.mockCall(fakeSettlementLayer, abi.encodeWithSelector(IGetters.getChainId.selector), abi.encode(fakeChainId));
 
         // Mock bridgehub to return a different address for that chain ID
         vm.mockCall(
@@ -146,7 +142,9 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
         bytes memory data = abi.encode(differentVersion);
 
         vm.prank(chainAssetHandler);
-        vm.expectRevert(abi.encodeWithSelector(ProtocolVersionNotUpToDate.selector, currentProtocolVersion, differentVersion));
+        vm.expectRevert(
+            abi.encodeWithSelector(ProtocolVersionNotUpToDate.selector, currentProtocolVersion, differentVersion)
+        );
         adminFacet.forwardedBridgeBurn(L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, admin, data);
     }
 
@@ -212,7 +210,9 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
         bytes memory data = abi.encode(commitment);
 
         vm.prank(chainAssetHandler);
-        vm.expectRevert(abi.encodeWithSelector(OutdatedProtocolVersion.selector, differentVersion, currentProtocolVersion));
+        vm.expectRevert(
+            abi.encodeWithSelector(OutdatedProtocolVersion.selector, differentVersion, currentProtocolVersion)
+        );
         adminFacet.forwardedBridgeMint(data, false);
     }
 
@@ -364,7 +364,9 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
         utilsFacet.util_setSettlementLayer(makeAddr("settlementLayer"));
 
         vm.prank(chainAssetHandler);
-        vm.expectRevert(abi.encodeWithSelector(OutdatedProtocolVersion.selector, differentVersion, currentProtocolVersion));
+        vm.expectRevert(
+            abi.encodeWithSelector(OutdatedProtocolVersion.selector, differentVersion, currentProtocolVersion)
+        );
         adminFacet.forwardedBridgeConfirmTransferResult(1, TxStatus.Failure, bytes32(0), address(0), data);
     }
 

@@ -59,8 +59,11 @@ contract ZKsyncOSDualVerifierTest is Test {
         owner = makeAddr("owner");
         fflonkVerifier = new MockFflonkVerifierOS();
         plonkVerifier = new MockPlonkVerifierOS();
-        verifier =
-            new ZKsyncOSDualVerifier(IVerifierV2(address(fflonkVerifier)), IVerifier(address(plonkVerifier)), owner);
+        verifier = new ZKsyncOSDualVerifier(
+            IVerifierV2(address(fflonkVerifier)),
+            IVerifier(address(plonkVerifier)),
+            owner
+        );
     }
 
     // ============ Constructor Tests ============
@@ -317,10 +320,11 @@ contract ZKsyncOSDualVerifierTest is Test {
 
     // ============ Fuzz Tests ============
 
-    function testFuzz_computeZKsyncOSHash_deterministicResults(uint256 initialHash, uint256 input1, uint256 input2)
-        public
-        view
-    {
+    function testFuzz_computeZKsyncOSHash_deterministicResults(
+        uint256 initialHash,
+        uint256 input1,
+        uint256 input2
+    ) public view {
         uint256[] memory publicInputs = new uint256[](2);
         publicInputs[0] = input1;
         publicInputs[1] = input2;
