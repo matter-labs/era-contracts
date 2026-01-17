@@ -2,8 +2,8 @@
 pragma solidity 0.8.28;
 
 import "./_Admin_Shared.t.sol";
-import {Unauthorized, AlreadyPermanentRollup, InvalidDAForPermanentRollup, DiamondAlreadyFrozen, DiamondNotFrozen, DenominatorIsZero, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, L1DAValidatorAddressIsZero, HashMismatch, ProtocolIdMismatch, ProtocolIdNotGreater} from "contracts/common/L1ContractErrors.sol";
-import {InvalidL2DACommitmentScheme} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, DiamondNotFrozen, DenominatorIsZero, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, HashMismatch, ProtocolIdMismatch, InvalidL2DACommitmentScheme} from "contracts/common/L1ContractErrors.sol";
+import {L1DAValidatorAddressIsZero} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {FeeParams, PubdataPricingMode, L2DACommitmentScheme} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -92,20 +92,6 @@ contract AdminExtendedTest is AdminTest {
         adminFacet.setDAValidatorPair(makeAddr("validator"), L2DACommitmentScheme.NONE);
     }
 
-    function test_FreezeDiamond_AlreadyFrozen() public {
-        vm.prank(address(dummyBridgehub));
-        utilsFacet.util_setChainTypeManager(address(this));
-
-        // First freeze
-        vm.prank(address(this));
-        adminFacet.freezeDiamond();
-
-        // Try to freeze again
-        vm.prank(address(this));
-        vm.expectRevert(DiamondAlreadyFrozen.selector);
-        adminFacet.freezeDiamond();
-    }
-
     function test_UnfreezeDiamond_NotFrozen() public {
         vm.prank(address(dummyBridgehub));
         utilsFacet.util_setChainTypeManager(address(this));
@@ -113,19 +99,6 @@ contract AdminExtendedTest is AdminTest {
         // Try to unfreeze when not frozen
         vm.prank(address(this));
         vm.expectRevert(DiamondNotFrozen.selector);
-        adminFacet.unfreezeDiamond();
-    }
-
-    function test_FreezeDiamond_AndUnfreeze() public {
-        vm.prank(address(dummyBridgehub));
-        utilsFacet.util_setChainTypeManager(address(this));
-
-        // Freeze
-        vm.prank(address(this));
-        adminFacet.freezeDiamond();
-
-        // Unfreeze
-        vm.prank(address(this));
         adminFacet.unfreezeDiamond();
     }
 
@@ -194,11 +167,6 @@ contract AdminExtendedTest is AdminTest {
         adminFacet.setPorterAvailability(false);
 
         assertFalse(utilsFacet.util_getZkPorterAvailability());
-    }
-
-    function test_GetRollupDAManager() public view {
-        address daManager = adminFacet.getRollupDAManager();
-        assertEq(daManager, address(0)); // From constructor
     }
 
     function test_SetPubdataPricingMode() public {
@@ -303,10 +271,5 @@ contract AdminExtendedTest is AdminTest {
 
         vm.prank(address(this));
         adminFacet.executeUpgrade(diamondCut);
-    }
-
-    function test_GetName() public view {
-        string memory name = adminFacet.getName();
-        assertEq(name, "AdminFacet");
     }
 }

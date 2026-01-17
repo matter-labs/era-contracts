@@ -14,7 +14,9 @@ import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
+import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 
@@ -146,6 +148,18 @@ contract L1NativeTokenVaultExtendedTest is Test {
     }
 
     function test_RegisterEthToken() public {
+        vm.mockCall(
+            assetRouter,
+            abi.encodeWithSelector(AssetRouterBase.setAssetHandlerAddressThisChain.selector),
+            abi.encode()
+        );
+
+        vm.mockCall(
+            assetTracker,
+            abi.encodeWithSelector(IAssetTrackerBase.registerNewToken.selector),
+            abi.encode()
+        );
+
         l1NTV.registerEthToken();
 
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
@@ -218,6 +232,18 @@ contract L1NativeTokenVaultExtendedTest is Test {
             abi.encode()
         );
 
+        vm.mockCall(
+            assetTracker,
+            abi.encodeWithSelector(IAssetTrackerBase.registerNewToken.selector),
+            abi.encode()
+        );
+
+        vm.mockCall(
+            assetRouter,
+            abi.encodeWithSelector(AssetRouterBase.setAssetHandlerAddressThisChain.selector),
+            abi.encode()
+        );
+
         // Register the token
         vm.prank(assetRouter);
         l1NTV.ensureTokenIsRegistered(address(token));
@@ -227,7 +253,7 @@ contract L1NativeTokenVaultExtendedTest is Test {
         l1NTV.bridgeConfirmTransferResult(CHAIN_ID, TxStatus.Failure, assetId, makeAddr("sender"), data);
     }
 
-    function test_CalculateCreate2TokenAddress() public view {
+    function test_CalculateCreate2TokenAddress() public {
         uint256 originChainId = 1;
         address nonNativeToken = makeAddr("nonNativeToken");
 

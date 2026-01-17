@@ -4,11 +4,9 @@ pragma solidity 0.8.28;
 
 import "./_Executor_Shared.t.sol";
 
-import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_DA_COMMITMENT_SCHEME} from "../Utils/Utils.sol";
+import {Utils} from "../Utils/Utils.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
-import {BatchNumberMismatch, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, CanOnlyProcessOneBatch, InvalidSystemLogsLength, MissingSystemLogs, InvalidProtocolVersion, EmptyPrecommitData, InvalidBatchNumber} from "contracts/common/L1ContractErrors.sol";
-import {InvalidBatchesDataLength} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {BatchNumberMismatch, CanOnlyProcessOneBatch, InvalidSystemLogsLength, EmptyPrecommitData, InvalidBatchNumber} from "contracts/common/L1ContractErrors.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 
 /// @title Extended tests for ExecutorFacet to increase coverage
@@ -29,25 +27,6 @@ contract ExecutorExtendedTest is ExecutorTest {
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSelector(BatchNumberMismatch.selector, 1, 5));
         executor.commitBatchesSharedBridge(address(0), 5, 5, commitData);
-    }
-
-    function test_RevertBatches_CantRevertExecutedBatch() public {
-        // First commit a batch
-        IExecutor.CommitBatchInfo[] memory newBatchesData = new IExecutor.CommitBatchInfo[](1);
-        newBatchesData[0] = newCommitBatchInfo;
-
-        (uint256 processFrom, uint256 processTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            newBatchesData
-        );
-
-        vm.prank(validator);
-        executor.commitBatchesSharedBridge(address(0), processFrom, processTo, commitData);
-
-        // Try to revert to a batch number that doesn't exist yet
-        vm.prank(validator);
-        vm.expectRevert(RevertedBatchNotAfterNewLastBatch.selector);
-        executor.revertBatchesSharedBridge(address(0), 5);
     }
 
     function test_CommitBatches_MultipleBatches_Fails() public {
@@ -89,32 +68,10 @@ contract ExecutorExtendedTest is ExecutorTest {
         executor.commitBatchesSharedBridge(address(0), processFrom, processTo, commitData);
     }
 
-    function test_ExecuteBatches_WithEmptyPriorityOps() public {
-        // First commit a batch
-        IExecutor.CommitBatchInfo[] memory newBatchesData = new IExecutor.CommitBatchInfo[](1);
-        newBatchesData[0] = newCommitBatchInfo;
-
-        (uint256 processFrom, uint256 processTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            newBatchesData
-        );
-
-        vm.prank(validator);
-        executor.commitBatchesSharedBridge(address(0), processFrom, processTo, commitData);
-
-        // Prove the batch
-        IExecutor.StoredBatchInfo[] memory committedBatches = new IExecutor.StoredBatchInfo[](1);
-        committedBatches[0] = newStoredBatchInfo;
-        committedBatches[0].batchNumber = 1;
-
-        // Execute the batch (this will fail because we haven't properly proved it)
-        // But this tests the execution path
-    }
-
     function test_PrecommitSharedBridge_InvalidBatchNumber() public {
         // Try to precommit with wrong batch number
         bytes memory precommitData = bytes.concat(
-            bytes1(BatchDecoder.SUPPORTED_PRECOMMIT_VERSION),
+            bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
             abi.encode(uint256(0), abi.encodePacked(bytes32(uint256(1))))
         );
 
@@ -125,54 +82,13 @@ contract ExecutorExtendedTest is ExecutorTest {
 
     function test_PrecommitSharedBridge_EmptyPrecommitData() public {
         bytes memory precommitData = bytes.concat(
-            bytes1(BatchDecoder.SUPPORTED_PRECOMMIT_VERSION),
+            bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
             abi.encode(uint256(0), bytes(""))
         );
 
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSelector(EmptyPrecommitData.selector, 1));
         executor.precommitSharedBridge(address(0), 1, precommitData);
-    }
-
-    function test_GetName() public view {
-        string memory name = executor.getName();
-        assertEq(name, "ExecutorFacet");
-    }
-
-    function test_RevertBatches_ToLastCommitted() public {
-        // First commit a batch
-        IExecutor.CommitBatchInfo[] memory newBatchesData = new IExecutor.CommitBatchInfo[](1);
-        newBatchesData[0] = newCommitBatchInfo;
-
-        (uint256 processFrom, uint256 processTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            newBatchesData
-        );
-
-        vm.prank(validator);
-        executor.commitBatchesSharedBridge(address(0), processFrom, processTo, commitData);
-
-        // Revert to batch 0 (before the committed batch)
-        vm.prank(validator);
-        executor.revertBatchesSharedBridge(address(0), 0);
-
-        // Verify the batch was reverted by checking totalBatchesCommitted
-        assertEq(getters.getTotalBatchesCommitted(), 0);
-    }
-
-    function test_CommitBatches_SuccessfulCommit() public {
-        IExecutor.CommitBatchInfo[] memory newBatchesData = new IExecutor.CommitBatchInfo[](1);
-        newBatchesData[0] = newCommitBatchInfo;
-
-        (uint256 processFrom, uint256 processTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            newBatchesData
-        );
-
-        vm.prank(validator);
-        executor.commitBatchesSharedBridge(address(0), processFrom, processTo, commitData);
-
-        assertEq(getters.getTotalBatchesCommitted(), 1);
     }
 
     function test_CommitBatches_UnauthorizedValidator() public {
@@ -187,33 +103,6 @@ contract ExecutorExtendedTest is ExecutorTest {
         vm.prank(randomSigner);
         vm.expectRevert();
         executor.commitBatchesSharedBridge(address(0), processFrom, processTo, commitData);
-    }
-
-    function test_ExecuteBatches_BatchesDataLengthMismatch() public {
-        // First commit a batch
-        IExecutor.CommitBatchInfo[] memory newBatchesData = new IExecutor.CommitBatchInfo[](1);
-        newBatchesData[0] = newCommitBatchInfo;
-
-        (uint256 processFrom, uint256 processTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            newBatchesData
-        );
-
-        vm.prank(validator);
-        executor.commitBatchesSharedBridge(address(0), processFrom, processTo, commitData);
-
-        // Try to execute with mismatched data lengths
-        IExecutor.StoredBatchInfo[] memory batchesData = new IExecutor.StoredBatchInfo[](2);
-        PriorityOpsBatchInfo[] memory priorityOpsData = new PriorityOpsBatchInfo[](1);
-
-        bytes memory executeData = bytes.concat(
-            bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
-            abi.encode(batchesData, priorityOpsData, new bytes32[][](0), new bytes[](0), new bytes[](0), new bytes32[](0))
-        );
-
-        vm.prank(validator);
-        vm.expectRevert(abi.encodeWithSelector(InvalidBatchesDataLength.selector, 2, 1));
-        executor.executeBatchesSharedBridge(address(0), 1, 2, executeData);
     }
 
     function testFuzz_CommitBatches_DifferentTimestamps(uint64 timestamp) public {

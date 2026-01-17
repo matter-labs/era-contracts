@@ -237,7 +237,7 @@ contract CTMDeploymentTrackerExtendedTest is Test {
         ctmDeploymentTracker.setCtmAssetHandlerAddressOnL1(ctmAddress);
     }
 
-    function test_CalculateAssetId() public view {
+    function test_CalculateAssetId() public {
         address ctmAddress = makeAddr("ctmAddress");
         bytes32 assetId = ctmDeploymentTracker.calculateAssetId(ctmAddress);
 

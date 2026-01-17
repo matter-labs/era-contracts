@@ -6,6 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
@@ -37,21 +38,24 @@ contract ChainRegistrarExtendedTest is Test {
     L1MessageRoot private messageRoot;
     DummyChainTypeManagerWBH private ctm;
     address private admin;
+    address private proxyAdmin;
     address private deployer;
     ChainRegistrar private chainRegistrar;
     L1AssetRouter private assetRouter;
     bytes diamondCutData;
     bytes initCalldata;
     L1Nullifier l1NullifierImpl;
+    IEIP7702Checker private eip7702Checker;
 
     function setUp() public {
         bridgeHub = new DummyBridgehub();
         interopCenter = new InteropCenter();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        interopCenter.initL2(block.chainid, makeAddr("admin"));
+        interopCenter.initL2(block.chainid, makeAddr("interopAdmin"));
         messageRoot = new L1MessageRoot(address(bridgeHub), 1);
         ctm = new DummyChainTypeManagerWBH(address(bridgeHub));
         admin = makeAddr("admin");
+        proxyAdmin = makeAddr("proxyAdmin");
         deployer = makeAddr("deployer");
         vm.prank(admin);
 
@@ -108,10 +112,28 @@ contract ChainRegistrarExtendedTest is Test {
         address chainRegistrarImplementation = address(new ChainRegistrar());
         TransparentUpgradeableProxy chainRegistrarProxy = new TransparentUpgradeableProxy(
             chainRegistrarImplementation,
-            admin,
+            proxyAdmin,
             abi.encodeCall(ChainRegistrar.initialize, (address(bridgeHub), deployer, admin))
         );
         chainRegistrar = ChainRegistrar(address(chainRegistrarProxy));
+
+        // Deploy EIP7702Checker once for all tests to avoid CREATE2 address conflicts
+        eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
+
+        // Mock bridgehub.chainTypeManager to return address(0) by default (chain not deployed)
+        // Individual tests can override this for specific chain IDs
+        vm.mockCall(
+            address(bridgeHub),
+            abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector),
+            abi.encode(address(0))
+        );
+
+        // Mock bridgehub.assetRouter to return the asset router address
+        vm.mockCall(
+            address(bridgeHub),
+            abi.encodeWithSelector(IBridgehubBase.assetRouter.selector),
+            abi.encode(address(assetRouter))
+        );
     }
 
     function test_Initialize_SetsBridgehub() public view {
@@ -153,8 +175,7 @@ contract ChainRegistrarExtendedTest is Test {
         address author = makeAddr("author");
 
         // First set up the chain as deployed in CTM
-        IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
-        DummyZKChain zkChain = new DummyZKChain(address(bridgeHub), 270, 6, address(0), eip7702Checker);
+        DummyZKChain zkChain = new DummyZKChain(address(bridgeHub), 270, block.chainid, address(assetRouter), eip7702Checker);
         vm.prank(admin);
         ctm.setZKChain(999, address(zkChain));
 
@@ -189,16 +210,30 @@ contract ChainRegistrarExtendedTest is Test {
         uint256 chainId = 999;
 
         // Set up chain in CTM
-        IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
-        DummyZKChain zkChain = new DummyZKChain(address(bridgeHub), 270, 6, address(0), eip7702Checker);
+        DummyZKChain zkChain = new DummyZKChain(address(bridgeHub), 270, block.chainid, address(assetRouter), eip7702Checker);
         vm.prank(admin);
         ctm.setZKChain(chainId, address(zkChain));
+
+        // Also set in bridgehub since ctm.getZKChain delegates to bridgehub
+        bridgeHub.setZKChain(chainId, address(zkChain));
 
         // Mock chainTypeManager call
         vm.mockCall(
             address(bridgeHub),
             abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector, chainId),
             abi.encode(address(ctm))
+        );
+
+        // Mock the IGetters methods that chainRegistrar will call on zkChain
+        vm.mockCall(
+            address(zkChain),
+            abi.encodeWithSelector(IGetters.getPendingAdmin.selector),
+            abi.encode(makeAddr("pendingAdmin"))
+        );
+        vm.mockCall(
+            address(zkChain),
+            abi.encodeWithSelector(IGetters.getAdmin.selector),
+            abi.encode(makeAddr("chainAdmin"))
         );
 
         // Now L2 bridge address will be 0 because no governance was initialized
