@@ -38,8 +38,6 @@ uint256 constant ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE = 126;
 /// We are allowed to jump at most 100 minor versions at a time. The major version is always expected to be 0.
 uint256 constant MAX_ALLOWED_MINOR_VERSION_DELTA = 100;
 
-/// @dev The amount of time in seconds the validator has to process the priority transaction
-
 /// @dev Maximum time a priority transaction may remain unprocessed before Priority Mode (escape hatch) can be activated.
 /// Note: This is not the full user exit window. The effective exit window is`UPGRADE_NOTICE_PERIOD` - `PRIORITY_EXPIRATION`.
 uint256 constant PRIORITY_EXPIRATION = 4 days;
