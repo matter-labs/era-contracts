@@ -214,6 +214,38 @@ contract UtilsFacet is ZKChainBase {
         s.nativeTokenVault = _nativeTokenVault;
     }
 
+    function util_setTotalBatchesVerified(uint256 _totalBatchesVerified) external {
+        s.totalBatchesVerified = _totalBatchesVerified;
+    }
+
+    function util_getTotalBatchesVerified() external view returns (uint256) {
+        return s.totalBatchesVerified;
+    }
+
+    function util_getTotalBatchesExecuted() external view returns (uint256) {
+        return s.totalBatchesExecuted;
+    }
+
+    function util_getTotalBatchesCommitted() external view returns (uint256) {
+        return s.totalBatchesCommitted;
+    }
+
+    function util_setL2SystemContractsUpgradeBatchNumber(uint256 _batchNumber) external {
+        s.l2SystemContractsUpgradeBatchNumber = _batchNumber;
+    }
+
+    function util_getL2SystemContractsUpgradeBatchNumber() external view returns (uint256) {
+        return s.l2SystemContractsUpgradeBatchNumber;
+    }
+
+    function util_setL2SystemContractsUpgradeTxHash(bytes32 _txHash) external {
+        s.l2SystemContractsUpgradeTxHash = _txHash;
+    }
+
+    function util_getL2SystemContractsUpgradeTxHash() external view returns (bytes32) {
+        return s.l2SystemContractsUpgradeTxHash;
+    }
+
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }
