@@ -125,3 +125,4 @@ contract MailboxConstructorTest is Test {
         assertNotEq(address(mailbox), address(0));
     }
 }
+
