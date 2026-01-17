@@ -18,6 +18,7 @@ import {InvalidCanonicalTxHash, RegisterNewTokenNotAllowed} from "contracts/brid
 import {Unauthorized, ChainIdNotRegistered} from "contracts/common/L1ContractErrors.sol";
 import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
 
@@ -497,6 +498,13 @@ contract GWAssetTrackerTest is Test {
         uint256 initialBalance = gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID);
         assertEq(initialBalance, AMOUNT * 2);
 
+        // Mock settlementLayer for the _calculatePreviousChainMigrationNumber call
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector, CHAIN_ID),
+            abi.encode(0) // Return 0 to indicate not settled on current chain
+        );
+
         ConfirmBalanceMigrationData memory data = ConfirmBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: CHAIN_ID,
@@ -531,11 +539,14 @@ contract GWAssetTrackerTest is Test {
 
     function test_ParseTokenData() public {
         // Test the parseTokenData function
-        bytes memory metadata = abi.encode(
-            ORIGIN_CHAIN_ID,
-            "TestToken",
-            "TST",
-            uint8(18)
+        // DataEncoding.decodeTokenData expects NEW_ENCODING_VERSION prefix
+        bytes memory nameBytes = bytes("TestToken");
+        bytes memory symbolBytes = bytes("TST");
+        bytes memory decimalsBytes = abi.encode(uint8(18));
+        // Properly encode with NEW_ENCODING_VERSION (0x01) prefix
+        bytes memory metadata = bytes.concat(
+            NEW_ENCODING_VERSION,
+            abi.encode(ORIGIN_CHAIN_ID, nameBytes, symbolBytes, decimalsBytes)
         );
 
         (uint256 tokenOriginalChainId, bytes memory name, bytes memory symbol, bytes memory decimals) = gwAssetTracker.parseTokenData(metadata);
@@ -543,7 +554,8 @@ contract GWAssetTrackerTest is Test {
         assertEq(tokenOriginalChainId, ORIGIN_CHAIN_ID);
         assertEq(string(name), "TestToken");
         assertEq(string(symbol), "TST");
-        assertEq(uint8(bytes1(decimals)), 18);
+        // decimals is abi.encode(uint8(18)) which is a 32-byte padded value
+        assertEq(abi.decode(decimals, (uint8)), 18);
     }
 
     function test_HandleChainBalanceIncreaseOnGateway_MultipleAssets() public {

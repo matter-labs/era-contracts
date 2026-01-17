@@ -275,13 +275,18 @@ contract L1NativeTokenVaultTest is Test {
     }
 
     function test_bridgeConfirmTransferResult_RevertWhen_OriginChainNotFound() public {
-        // Create a token with no balance anywhere and no stored origin
-        TestnetERC20Token unknownToken = new TestnetERC20Token("Unknown", "UNK", 18);
-        bytes32 unknownAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(unknownToken));
+        // To test OriginChainIdNotFound, we need a token where:
+        // 1. tokenAddress[_assetId] is not ETH_TOKEN_ADDRESS
+        // 2. originChainId[_assetId] is 0 (not set)
+        // 3. _getOriginChainId returns 0 (no balance in NTV or Nullifier)
 
-        // Register the token and set up token address mapping
-        vm.prank(address(nativeTokenVault));
-        nativeTokenVault.registerToken(address(unknownToken));
+        // Create a custom assetId and token that is set up manually (not through registerToken)
+        TestnetERC20Token unknownToken = new TestnetERC20Token("Unknown", "UNK", 18);
+        bytes32 unknownAssetId = keccak256("unknownAssetWithNoOrigin");
+
+        // Set token address mapping but DO NOT set originChainId (so it remains 0)
+        nativeTokenVault.setTokenAddress(unknownAssetId, address(unknownToken));
+        // Don't mint any tokens to NTV or Nullifier (so _getOriginChainId returns 0)
 
         // Create bridge burn data
         bytes memory data = DataEncoding.encodeBridgeBurnData(100, owner, address(0));
