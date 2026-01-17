@@ -137,7 +137,7 @@ function generateReport(parsed: ParsedLcov, outputPath: string): void {
     const lineRanges = formatLineRanges(file.untestedLines);
 
     // Truncate line ranges if too long
-    const maxRangeLength = 50;
+    const maxRangeLength = 300;
     const truncatedRanges =
       lineRanges.length > maxRangeLength ? lineRanges.substring(0, maxRangeLength) + "..." : lineRanges;
 

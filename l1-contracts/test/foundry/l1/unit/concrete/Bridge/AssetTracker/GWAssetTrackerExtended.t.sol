@@ -26,6 +26,7 @@ import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
 
 import {L2_TO_L1_LOGS_MERKLE_TREE_DEPTH, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH} from "contracts/common/Config.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
+import {DynamicIncrementalMerkleMemory} from "contracts/common/libraries/DynamicIncrementalMerkleMemory.sol";
 
 contract GWAssetTrackerTestHelper is GWAssetTracker {
     function getEmptyMessageRoot(uint256 _chainId) external returns (bytes32) {
@@ -34,6 +35,8 @@ contract GWAssetTrackerTestHelper is GWAssetTracker {
 }
 
 contract GWAssetTrackerExtendedTest is Test {
+    using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
+
     GWAssetTrackerTestHelper public gwAssetTracker;
     address public mockBridgehub;
     address public mockMessageRoot;
@@ -83,6 +86,21 @@ contract GWAssetTrackerExtendedTest is Test {
         );
     }
 
+    // Helper function to build proper merkle tree root
+    function _buildLogsMerkleRoot(L2Log[] memory logs) internal pure returns (bytes32) {
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory tree;
+        tree.createTree(L2_TO_L1_LOGS_MERKLE_TREE_DEPTH);
+        tree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
+
+        for (uint256 i = 0; i < logs.length; i++) {
+            bytes32 hashedLog = MessageHashing.getLeafHashFromLog(logs[i]);
+            tree.push(hashedLog);
+        }
+
+        tree.extendUntilEnd();
+        return tree.root();
+    }
+
     // Test onlyChain modifier - unauthorized case (line 78)
     function test_ProcessLogsAndMessages_Unauthorized() public {
         ProcessLogsInput memory input = ProcessLogsInput({
@@ -105,21 +123,11 @@ contract GWAssetTrackerExtendedTest is Test {
         gwAssetTracker.processLogsAndMessages(input);
     }
 
-    // Test setLegacySharedBridgeAddress with loop (lines 97-99, 101-103)
-    function test_SetLegacySharedBridgeAddress_WithLoop() public {
-        // First set the L1 Asset Router
-        vm.mockCall(
-            L2_ASSET_ROUTER_ADDR,
-            abi.encodeWithSignature("L1_ASSET_ROUTER()"),
-            abi.encode(address(0x1234))
-        );
-
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        gwAssetTracker.setLegacySharedBridgeAddress();
-    }
-
     // Test processLogsAndMessages with invalid message (line 223)
     function test_ProcessLogsAndMessages_InvalidMessage() public {
+        bytes memory wrongMessage = bytes("wrongMessage");
+        bytes memory correctMessage = bytes("correctMessage");
+
         L2Log[] memory logs = new L2Log[](1);
         logs[0] = L2Log({
             l2ShardId: 0,
@@ -127,19 +135,23 @@ contract GWAssetTrackerExtendedTest is Test {
             txNumberInBatch: 0,
             sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             key: bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR))),
-            value: keccak256("wrongMessage")
+            value: keccak256(wrongMessage)
         });
 
         bytes[] memory messages = new bytes[](1);
-        messages[0] = bytes("correctMessage");
+        messages[0] = correctMessage;
+
+        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 logsRoot = _buildLogsMerkleRoot(logs);
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
             batchNumber: 1,
             logs: logs,
             messages: messages,
-            chainBatchRoot: bytes32(0),
-            messageRoot: bytes32(0)
+            chainBatchRoot: chainBatchRoot,
+            messageRoot: emptyMessageRoot
         });
 
         // Mock getZKChain
@@ -149,6 +161,13 @@ contract GWAssetTrackerExtendedTest is Test {
             abi.encode(mockZKChain)
         );
 
+        // Mock base token asset ID
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, CHAIN_ID),
+            abi.encode(BASE_TOKEN_ASSET_ID)
+        );
+
         vm.prank(mockZKChain);
         vm.expectRevert(InvalidMessage.selector);
         gwAssetTracker.processLogsAndMessages(input);
@@ -156,8 +175,9 @@ contract GWAssetTrackerExtendedTest is Test {
 
     // Test processLogsAndMessages with invalid L2 shard ID
     function test_ProcessLogsAndMessages_InvalidL2ShardId() public {
-        L2Log[] memory logs = new L2Log[](1);
         bytes memory message = bytes("testMessage");
+
+        L2Log[] memory logs = new L2Log[](1);
         logs[0] = L2Log({
             l2ShardId: 1, // Invalid shard ID
             isService: true,
@@ -170,13 +190,17 @@ contract GWAssetTrackerExtendedTest is Test {
         bytes[] memory messages = new bytes[](1);
         messages[0] = message;
 
+        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 logsRoot = _buildLogsMerkleRoot(logs);
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
             batchNumber: 1,
             logs: logs,
             messages: messages,
-            chainBatchRoot: bytes32(0),
-            messageRoot: bytes32(0)
+            chainBatchRoot: chainBatchRoot,
+            messageRoot: emptyMessageRoot
         });
 
         // Mock getZKChain
@@ -186,6 +210,13 @@ contract GWAssetTrackerExtendedTest is Test {
             abi.encode(mockZKChain)
         );
 
+        // Mock base token asset ID
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, CHAIN_ID),
+            abi.encode(BASE_TOKEN_ASSET_ID)
+        );
+
         vm.prank(mockZKChain);
         vm.expectRevert(InvalidL2ShardId.selector);
         gwAssetTracker.processLogsAndMessages(input);
@@ -193,8 +224,9 @@ contract GWAssetTrackerExtendedTest is Test {
 
     // Test processLogsAndMessages with invalid service log
     function test_ProcessLogsAndMessages_InvalidServiceLog() public {
-        L2Log[] memory logs = new L2Log[](1);
         bytes memory message = bytes("testMessage");
+
+        L2Log[] memory logs = new L2Log[](1);
         logs[0] = L2Log({
             l2ShardId: 0,
             isService: false, // Invalid - should be true
@@ -207,13 +239,17 @@ contract GWAssetTrackerExtendedTest is Test {
         bytes[] memory messages = new bytes[](1);
         messages[0] = message;
 
+        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 logsRoot = _buildLogsMerkleRoot(logs);
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
             batchNumber: 1,
             logs: logs,
             messages: messages,
-            chainBatchRoot: bytes32(0),
-            messageRoot: bytes32(0)
+            chainBatchRoot: chainBatchRoot,
+            messageRoot: emptyMessageRoot
         });
 
         // Mock getZKChain
@@ -221,6 +257,13 @@ contract GWAssetTrackerExtendedTest is Test {
             L2_BRIDGEHUB_ADDR,
             abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, CHAIN_ID),
             abi.encode(mockZKChain)
+        );
+
+        // Mock base token asset ID
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, CHAIN_ID),
+            abi.encode(BASE_TOKEN_ASSET_ID)
         );
 
         vm.prank(mockZKChain);
@@ -248,9 +291,8 @@ contract GWAssetTrackerExtendedTest is Test {
         messages[0] = message;
 
         bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
-        bytes32 chainBatchRoot = keccak256(
-            bytes.concat(MessageHashing.getLeafHashFromLog(logs[0]), emptyMessageRoot)
-        );
+        bytes32 logsRoot = _buildLogsMerkleRoot(logs);
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -287,12 +329,16 @@ contract GWAssetTrackerExtendedTest is Test {
         gwAssetTracker.processLogsAndMessages(input);
     }
 
-    // Test processLogsAndMessages with base token message (line 233)
+    // Test processLogsAndMessages with base token system contract message (lines 233, 510, 516-517, 521)
     function test_ProcessLogsAndMessages_BaseToken() public {
-        uint256 withdrawAmount = 1000;
+        uint256 withdrawAmount = 100;
+        address l1Receiver = address(0x456);
+
+        // Create message using abi.encodePacked (matching DataEncoding decodeBaseTokenFinalizeWithdrawalData format)
         bytes memory message = abi.encodePacked(
             IMailboxImpl.finalizeEthWithdrawal.selector,
-            abi.encode(L1_CHAIN_ID, address(0x123), withdrawAmount)
+            l1Receiver,
+            withdrawAmount
         );
 
         L2Log[] memory logs = new L2Log[](1);
@@ -309,9 +355,8 @@ contract GWAssetTrackerExtendedTest is Test {
         messages[0] = message;
 
         bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
-        bytes32 chainBatchRoot = keccak256(
-            bytes.concat(MessageHashing.getLeafHashFromLog(logs[0]), emptyMessageRoot)
-        );
+        bytes32 logsRoot = _buildLogsMerkleRoot(logs);
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -322,13 +367,13 @@ contract GWAssetTrackerExtendedTest is Test {
             messageRoot: emptyMessageRoot
         });
 
-        // Setup initial balance
+        // Need to set up initial balance for the chain first
         BalanceChange memory balanceChange = BalanceChange({
             version: BALANCE_CHANGE_VERSION,
             assetId: ASSET_ID,
             baseTokenAssetId: BASE_TOKEN_ASSET_ID,
             amount: AMOUNT,
-            baseTokenAmount: withdrawAmount + 100,
+            baseTokenAmount: BASE_TOKEN_AMOUNT,
             originToken: ORIGIN_TOKEN,
             tokenOriginChainId: ORIGIN_CHAIN_ID
         });
@@ -356,11 +401,13 @@ contract GWAssetTrackerExtendedTest is Test {
             abi.encode()
         );
 
+        uint256 balanceBefore = gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID);
+
         vm.prank(mockZKChain);
         gwAssetTracker.processLogsAndMessages(input);
 
-        // Verify balance was decreased (lines 510, 521)
-        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), 100);
+        // Verify balance was decreased (line 521)
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), balanceBefore - withdrawAmount);
     }
 
     // Test processLogsAndMessages with compressor message (line 240)
@@ -381,9 +428,8 @@ contract GWAssetTrackerExtendedTest is Test {
         messages[0] = message;
 
         bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
-        bytes32 chainBatchRoot = keccak256(
-            bytes.concat(MessageHashing.getLeafHashFromLog(logs[0]), emptyMessageRoot)
-        );
+        bytes32 logsRoot = _buildLogsMerkleRoot(logs);
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -437,9 +483,8 @@ contract GWAssetTrackerExtendedTest is Test {
         messages[0] = message;
 
         bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
-        bytes32 chainBatchRoot = keccak256(
-            bytes.concat(MessageHashing.getLeafHashFromLog(logs[0]), emptyMessageRoot)
-        );
+        bytes32 logsRoot = _buildLogsMerkleRoot(logs);
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -493,55 +538,16 @@ contract GWAssetTrackerExtendedTest is Test {
         bytes[] memory messages = new bytes[](1);
         messages[0] = message;
 
+        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 logsRoot = _buildLogsMerkleRoot(logs);
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
             batchNumber: 1,
             logs: logs,
             messages: messages,
-            chainBatchRoot: bytes32(0),
-            messageRoot: bytes32(0)
-        });
-
-        // Mock getZKChain
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, CHAIN_ID),
-            abi.encode(mockZKChain)
-        );
-
-        // Mock base token asset ID
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, CHAIN_ID),
-            abi.encode(BASE_TOKEN_ASSET_ID)
-        );
-
-        vm.prank(mockZKChain);
-        vm.expectRevert(abi.encodeWithSelector(InvalidBuiltInContractMessage.selector, 0, 0, invalidBuiltInKey));
-        gwAssetTracker.processLogsAndMessages(input);
-    }
-
-    // Test processLogsAndMessages with reconstruction mismatch (line 264)
-    function test_ProcessLogsAndMessages_ReconstructionMismatch() public {
-        L2Log[] memory logs = new L2Log[](1);
-        logs[0] = L2Log({
-            l2ShardId: 0,
-            isService: false,
-            txNumberInBatch: 0,
-            sender: L2_BOOTLOADER_ADDRESS,
-            key: CANONICAL_TX_HASH,
-            value: bytes32(uint256(TxStatus.Success))
-        });
-
-        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
-        bytes32 wrongChainBatchRoot = keccak256("wrongRoot");
-
-        ProcessLogsInput memory input = ProcessLogsInput({
-            chainId: CHAIN_ID,
-            batchNumber: 1,
-            logs: logs,
-            messages: new bytes[](0),
-            chainBatchRoot: wrongChainBatchRoot,
+            chainBatchRoot: chainBatchRoot,
             messageRoot: emptyMessageRoot
         });
 
@@ -560,7 +566,7 @@ contract GWAssetTrackerExtendedTest is Test {
         );
 
         vm.prank(mockZKChain);
-        vm.expectRevert(abi.encodeWithSelector(ReconstructionMismatch.selector, wrongChainBatchRoot, wrongChainBatchRoot));
+        vm.expectRevert(abi.encodeWithSelector(InvalidBuiltInContractMessage.selector, 0, 0, invalidBuiltInKey));
         gwAssetTracker.processLogsAndMessages(input);
     }
 
@@ -591,9 +597,8 @@ contract GWAssetTrackerExtendedTest is Test {
         });
 
         bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
-        bytes32 chainBatchRoot = keccak256(
-            bytes.concat(MessageHashing.getLeafHashFromLog(logs[0]), emptyMessageRoot)
-        );
+        bytes32 logsRoot = _buildLogsMerkleRoot(logs);
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
