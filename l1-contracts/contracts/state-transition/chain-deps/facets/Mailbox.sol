@@ -521,6 +521,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         // Checking that the user provided enough ether to pay for the transaction.
         _params.l2GasPrice = _deriveL2GasPrice(tx.gasprice, request.l2GasPerPubdataByteLimit);
         uint256 baseCost = _params.l2GasPrice * request.l2GasLimit;
+        // User must pay the base cost for the L1 -> L2 transaction.
+        // L2 msg.value can be anything, but if it’s too low the tx will fail.
         if (request.mintValue < baseCost) {
             revert MsgValueTooLow(baseCost, request.mintValue);
         }

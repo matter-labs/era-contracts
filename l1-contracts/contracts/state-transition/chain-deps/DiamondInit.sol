@@ -93,6 +93,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.l2DefaultAccountBytecodeHash = _initializeData.l2DefaultAccountBytecodeHash;
         s.l2EvmEmulatorBytecodeHash = _initializeData.l2EvmEmulatorBytecodeHash;
         s.priorityTxMaxGasLimit = DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT;
+        s.priorityModeInfo.permissionlessValidator = _initializeData.permissionlessValidator;
         s.feeParams = FeeParams({
             pubdataPricingMode: DEFAULT_PUBDATA_PRICING_MODE,
             batchOverheadL1Gas: DEFAULT_BATCH_OVERHEAD_L1_GAS,

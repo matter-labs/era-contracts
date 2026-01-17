@@ -81,6 +81,8 @@ struct GatewayCTMDeployerConfig {
     bytes forceDeploymentsData;
     /// @notice The latest protocol version.
     uint256 protocolVersion;
+    /// @notice permissionlessValidator The address of permissionless validator contract
+    address permissionlessValidator;
 }
 
 /// @notice Addresses of state transition related contracts.
@@ -434,7 +436,8 @@ contract GatewayCTMDeployer {
             verifier: IVerifier(_deployedContracts.stateTransition.verifier),
             l2BootloaderBytecodeHash: _config.bootloaderHash,
             l2DefaultAccountBytecodeHash: _config.defaultAccountHash,
-            l2EvmEmulatorBytecodeHash: _config.evmEmulatorHash
+            l2EvmEmulatorBytecodeHash: _config.evmEmulatorHash,
+            permissionlessValidator: _config.permissionlessValidator
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({

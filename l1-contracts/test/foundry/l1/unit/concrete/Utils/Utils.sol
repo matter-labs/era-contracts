@@ -463,19 +463,22 @@ library Utils {
                 verifier: makeVerifier(testnetVerifier),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
+                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+                permissionlessValidator: address(0x56449872498357874258787)
             });
     }
 
     function makeInitializeDataForNewChain(
-        address testnetVerifier
+        address testnetVerifier,
+        address _permissionlessValidator
     ) public pure returns (InitializeDataNewChain memory) {
         return
             InitializeDataNewChain({
                 verifier: makeVerifier(testnetVerifier),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
+                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+                permissionlessValidator: _permissionlessValidator
             });
     }
 

@@ -108,7 +108,8 @@ contract GatewayCTMDeployerTest is Test {
             genesisRollupLeafIndex: 10,
             genesisBatchCommitment: bytes32(uint256(0x456)),
             forceDeploymentsData: hex"deadbeef",
-            protocolVersion: 1
+            protocolVersion: 1,
+            permissionlessValidator: address(0)
         });
 
         // Initialize selectors with sample function selectors

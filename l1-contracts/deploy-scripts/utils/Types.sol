@@ -91,4 +91,5 @@ struct ChainCreationParamsConfig {
     bytes32 bootloaderHash;
     bytes32 defaultAAHash;
     bytes32 evmEmulatorHash;
+    address permissionlessValidator;
 }

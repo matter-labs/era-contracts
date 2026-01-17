@@ -283,7 +283,8 @@ contract ExecutorTest is UtilsCallMockerTest {
             verifier: IVerifier(testnetVerifier), // verifier
             l2BootloaderBytecodeHash: dummyHash,
             l2DefaultAccountBytecodeHash: dummyHash,
-            l2EvmEmulatorBytecodeHash: dummyHash
+            l2EvmEmulatorBytecodeHash: dummyHash,
+            permissionlessValidator: address(0x56449872498357874258787)
         });
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), baseTokenAssetId);
 
@@ -362,6 +363,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             batchNumber: 1,
             newStateCommitment: Utils.randomBytes32("newStateCommitment"),
             numberOfLayer1Txs: 0,
+            numberOfLayer2Txs: 0,
             priorityOperationsHash: keccak256(""),
             dependencyRootsRollingHash: keccak256(""),
             l2LogsTreeRoot: bytes32(""),

@@ -54,7 +54,8 @@ struct FeeParams {
 
 /// @notice Stores the current Priority Mode (escape hatch) configuration.
 /// @dev Only when `canBeActivated` is true, it is possible to enter Priority Mode.
-/// @dev When `activated` is true, privileged actions are restricted to `permissionlessValidator`.
+/// @dev When `activated` is true, batch settlement is restricted to `permissionlessValidator`.
+/// @param permissionlessValidator The only address allowed to call commit/prove/execute when Priority Mode is enabled.
 struct PriorityModeInformation {
     bool canBeActivated;
     bool activated;

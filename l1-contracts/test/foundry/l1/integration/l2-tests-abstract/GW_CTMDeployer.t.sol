@@ -39,7 +39,8 @@ abstract contract GW_CTMDeployerTest is Test {
             genesisRollupLeafIndex: 1,
             genesisBatchCommitment: keccak256("genesis-batch-commitment"),
             forceDeploymentsData: bytes(""),
-            protocolVersion: 0
+            protocolVersion: 0,
+            permissionlessValidator: address(0)
         });
         new GatewayCTMDeployer(deployerConfig);
     }

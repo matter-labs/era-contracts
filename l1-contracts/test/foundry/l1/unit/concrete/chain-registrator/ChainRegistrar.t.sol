@@ -84,7 +84,8 @@ contract ChainRegistrarTest is Test {
             verifier: IVerifier(makeAddr("verifier")),
             l2BootloaderBytecodeHash: bytes32(0),
             l2DefaultAccountBytecodeHash: bytes32(0),
-            l2EvmEmulatorBytecodeHash: bytes32(0)
+            l2EvmEmulatorBytecodeHash: bytes32(0),
+            permissionlessValidator: address(0)
         });
         initCalldata = abi.encode(initializeData);
 

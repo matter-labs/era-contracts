@@ -43,6 +43,7 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
+import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 
 contract ChainTypeManagerTest is UtilsCallMockerTest {
     using stdStorage for StdStorage;
@@ -53,6 +54,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     L1Bridgehub internal bridgehub;
     L1ChainAssetHandler internal chainAssetHandler;
     L1MessageRoot internal messageroot;
+    PermissionlessValidator internal permissionlessValidator;
     address internal rollupL1DAValidator;
     address internal diamondInit;
     address internal interopCenterAddress;
@@ -89,6 +91,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         serverNotifier = makeAddr("serverNotifier");
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
         messageroot = new L1MessageRoot(address(bridgehub), 1);
+        permissionlessValidator = new PermissionlessValidator();
         chainAssetHandler = new L1ChainAssetHandler(
             governor,
             address(bridgehub),
@@ -219,7 +222,10 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
-        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain(testnetVerifier);
+        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain(
+            testnetVerifier,
+            address(permissionlessValidator)
+        );
 
         bytes memory initCalldata = abi.encode(initializeData);
 

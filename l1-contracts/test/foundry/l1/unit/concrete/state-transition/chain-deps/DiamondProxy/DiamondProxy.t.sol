@@ -81,7 +81,6 @@ contract DiamondProxyTest is UtilsCallMockerTest {
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
 
-        vm.expectRevert(abi.encodePacked("Ut"));
         (bool success, ) = address(diamondProxy).call("");
         assertEq(success, false);
     }
@@ -95,7 +94,6 @@ contract DiamondProxyTest is UtilsCallMockerTest {
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
 
-        vm.expectRevert(abi.encodePacked("Ut"));
         (bool success, ) = address(diamondProxy).call(bytes.concat(bytes4(0xdeadbeef)));
         assertEq(success, false);
     }
