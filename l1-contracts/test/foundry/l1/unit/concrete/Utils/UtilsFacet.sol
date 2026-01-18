@@ -108,6 +108,42 @@ contract UtilsFacet is ZKChainBase {
         s.transactionFilterer = _filterer;
     }
 
+    function util_getTransactionFilterer() external view returns (address) {
+        return s.transactionFilterer;
+    }
+
+    function util_setPriorityModeCanBeActivated(bool _canBeActivated) external {
+        s.priorityModeInfo.canBeActivated = _canBeActivated;
+    }
+
+    function util_getPriorityModeCanBeActivated() external view returns (bool) {
+        return s.priorityModeInfo.canBeActivated;
+    }
+
+    function util_setPriorityModeActivated(bool _activated) external {
+        s.priorityModeInfo.activated = _activated;
+    }
+
+    function util_getPriorityModeActivated() external view returns (bool) {
+        return s.priorityModeInfo.activated;
+    }
+
+    function util_setPriorityModePermissionlessValidator(address _permissionlessValidator) external {
+        s.priorityModeInfo.permissionlessValidator = _permissionlessValidator;
+    }
+
+    function util_getPriorityModePermissionlessValidator() external view returns (address) {
+        return s.priorityModeInfo.permissionlessValidator;
+    }
+
+    function util_setPriorityModeTransactionFilterer(address _filterer) external {
+        s.priorityModeInfo.transactionFilterer = _filterer;
+    }
+
+    function util_getPriorityModeTransactionFilterer() external view returns (address) {
+        return s.priorityModeInfo.transactionFilterer;
+    }
+
     function util_setBaseTokenGasPriceMultiplierDenominator(uint128 _denominator) external {
         s.baseTokenGasPriceMultiplierDenominator = _denominator;
     }

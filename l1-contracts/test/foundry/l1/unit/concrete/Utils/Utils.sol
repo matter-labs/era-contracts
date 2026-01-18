@@ -392,7 +392,7 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](45);
+        bytes4[] memory selectors = new bytes4[](54);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
@@ -419,6 +419,15 @@ library Utils {
         selectors[i++] = UtilsFacet.util_getAdmin.selector;
         selectors[i++] = UtilsFacet.util_setValidator.selector;
         selectors[i++] = UtilsFacet.util_getValidator.selector;
+        selectors[i++] = UtilsFacet.util_getTransactionFilterer.selector;
+        selectors[i++] = UtilsFacet.util_setPriorityModeCanBeActivated.selector;
+        selectors[i++] = UtilsFacet.util_getPriorityModeCanBeActivated.selector;
+        selectors[i++] = UtilsFacet.util_setPriorityModeActivated.selector;
+        selectors[i++] = UtilsFacet.util_getPriorityModeActivated.selector;
+        selectors[i++] = UtilsFacet.util_setPriorityModePermissionlessValidator.selector;
+        selectors[i++] = UtilsFacet.util_getPriorityModePermissionlessValidator.selector;
+        selectors[i++] = UtilsFacet.util_setPriorityModeTransactionFilterer.selector;
+        selectors[i++] = UtilsFacet.util_getPriorityModeTransactionFilterer.selector;
         selectors[i++] = UtilsFacet.util_setZkPorterAvailability.selector;
         selectors[i++] = UtilsFacet.util_getZkPorterAvailability.selector;
         selectors[i++] = UtilsFacet.util_setChainTypeManager.selector;

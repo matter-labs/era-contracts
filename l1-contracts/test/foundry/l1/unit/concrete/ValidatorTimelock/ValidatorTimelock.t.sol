@@ -10,7 +10,7 @@ import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.s
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 
-import {RoleAccessDenied, TimeNotReached} from "contracts/common/L1ContractErrors.sol";
+import {ActivatePriorityModeNotImplementedInValidatorContract, RoleAccessDenied, TimeNotReached} from "contracts/common/L1ContractErrors.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
 
@@ -233,6 +233,11 @@ contract ValidatorTimelockTest is Test {
             batchesToCommit
         );
         validator.commitBatchesSharedBridge(zkSync, commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_revertWhen_activatePriorityMode() public {
+        vm.expectRevert(ActivatePriorityModeNotImplementedInValidatorContract.selector);
+        validator.activatePriorityMode();
     }
 
     function test_revertBatchesSharedBridge() public {
