@@ -306,7 +306,7 @@ library Utils {
     }
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](14);
+        bytes4[] memory selectors = new bytes4[](20);
         uint256 i = 0;
         selectors[i++] = AdminFacet.setPendingAdmin.selector;
         selectors[i++] = AdminFacet.acceptAdmin.selector;
@@ -315,6 +315,11 @@ library Utils {
         selectors[i++] = AdminFacet.setPriorityTxMaxGasLimit.selector;
         selectors[i++] = AdminFacet.changeFeeParams.selector;
         selectors[i++] = AdminFacet.setTokenMultiplier.selector;
+        selectors[i++] = AdminFacet.setPubdataPricingMode.selector;
+        selectors[i++] = AdminFacet.setTransactionFilterer.selector;
+        selectors[i++] = AdminFacet.setPriorityModeTransactionFilterer.selector;
+        selectors[i++] = AdminFacet.permanentlyAllowPriorityMode.selector;
+        selectors[i++] = AdminFacet.deactivatePriorityMode.selector;
         selectors[i++] = AdminFacet.upgradeChainFromVersion.selector;
         selectors[i++] = AdminFacet.executeUpgrade.selector;
         selectors[i++] = AdminFacet.freezeDiamond.selector;
@@ -322,6 +327,7 @@ library Utils {
         selectors[i++] = AdminFacet.genesisUpgrade.selector;
         selectors[i++] = AdminFacet.setDAValidatorPair.selector;
         selectors[i++] = AdminFacet.pauseDepositsBeforeInitiatingMigration.selector;
+        selectors[i++] = AdminFacet.unpauseDeposits.selector;
         return selectors;
     }
 

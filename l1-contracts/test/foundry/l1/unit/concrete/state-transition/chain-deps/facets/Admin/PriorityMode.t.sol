@@ -48,6 +48,22 @@ contract PriorityModeAdminTest is AdminTest {
         assertEq(utilsFacet.util_getTransactionFilterer(), filterer);
     }
 
+    function test_permanentlyAllowPriorityMode_usesPriorityModeFilterer() public {
+        address admin = utilsFacet.util_getAdmin();
+        address chainTypeManager = makeAddr("chainTypeManager");
+        utilsFacet.util_setChainTypeManager(chainTypeManager);
+
+        address filterer = makeAddr("priorityModeFilterer");
+        vm.prank(chainTypeManager);
+        adminFacet.setPriorityModeTransactionFilterer(filterer);
+
+        vm.prank(admin);
+        adminFacet.permanentlyAllowPriorityMode();
+
+        assertEq(utilsFacet.util_getPriorityModeTransactionFilterer(), filterer);
+        assertEq(utilsFacet.util_getTransactionFilterer(), filterer);
+    }
+
     function test_revertWhen_setPriorityModeTransactionFilterer_notChainTypeManager() public {
         address nonChainTypeManager = makeAddr("nonChainTypeManager");
 
