@@ -43,6 +43,7 @@ import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 
 bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
 bytes constant POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000100073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
@@ -64,6 +65,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     IExecutor.StoredBatchInfo internal newStoredBatchInfo;
     DummyEraBaseTokenBridge internal sharedBridge;
     ValidatorTimelock internal validatorTimelock;
+    PermissionlessValidator internal permissionlessValidator;
     address internal rollupL1DAValidator;
     L1MessageRoot internal messageRoot;
     DummyBridgehub dummyBridgehub;
@@ -76,7 +78,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     uint256[] internal proofInput;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](12);
+        bytes4[] memory selectors = new bytes4[](13);
         uint256 i = 0;
         selectors[i++] = admin.setPendingAdmin.selector;
         selectors[i++] = admin.acceptAdmin.selector;
@@ -90,11 +92,12 @@ contract ExecutorTest is UtilsCallMockerTest {
         selectors[i++] = admin.freezeDiamond.selector;
         selectors[i++] = admin.unfreezeDiamond.selector;
         selectors[i++] = admin.setDAValidatorPair.selector;
+        selectors[i++] = admin.permanentlyAllowPriorityMode.selector;
         return selectors;
     }
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](8);
+        bytes4[] memory selectors = new bytes4[](9);
         uint256 i = 0;
         selectors[i++] = executor.commitBatchesSharedBridge.selector;
         selectors[i++] = executor.proveBatchesSharedBridge.selector;
@@ -104,6 +107,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         selectors[i++] = executor.setPriorityTreeHistoricalRoot.selector;
         selectors[i++] = executor.appendPriorityOp.selector;
         selectors[i++] = executor.precommitSharedBridge.selector;
+        selectors[i++] = executor.activatePriorityMode.selector;
         return selectors;
     }
 
@@ -200,6 +204,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             abi.encode(allZKChainChainIDsZero)
         );
         messageRoot = new L1MessageRoot(address(dummyBridgehub), 1);
+        permissionlessValidator = new PermissionlessValidator();
 
         uint256[] memory allZKChainChainIDs = new uint256[](1);
         allZKChainChainIDs[0] = 271;
@@ -284,7 +289,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             l2BootloaderBytecodeHash: dummyHash,
             l2DefaultAccountBytecodeHash: dummyHash,
             l2EvmEmulatorBytecodeHash: dummyHash,
-            permissionlessValidator: address(0x56449872498357874258787)
+            permissionlessValidator: address(permissionlessValidator)
         });
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), baseTokenAssetId);
 

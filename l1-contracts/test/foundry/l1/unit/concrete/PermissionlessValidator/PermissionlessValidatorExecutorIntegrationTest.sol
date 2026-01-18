@@ -1,24 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 import {ExecutorTest, EMPTY_PREPUBLISHED_COMMITMENT, POINT_EVALUATION_PRECOMPILE_RESULT} from "../Executor/_Executor_Shared.t.sol";
 import {Utils, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
 import {IExecutor, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
-import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
+import {POINT_EVALUATION_PRECOMPILE_ADDR, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 
 contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
-    PermissionlessValidator internal permissionlessValidator;
     bytes32[] internal defaultBlobVersionedHashes;
     bytes internal operatorDAInput;
     bytes32 internal l2DAValidatorOutputHash;
 
     function setUp() public {
-        permissionlessValidator = new PermissionlessValidator();
-        vm.prank(getters.getChainTypeManager());
-        admin.setValidator(address(permissionlessValidator), true);
+        _activatePriorityMode();
 
         bytes1 source = 0x01;
         bytes memory defaultBlobCommitment = Utils.getDefaultBlobCommitment();
@@ -51,6 +47,31 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
 
         bytes memory precompileInput = Utils.defaultPointEvaluationPrecompileInput(defaultBlobVersionedHashes[0]);
         vm.mockCall(POINT_EVALUATION_PRECOMPILE_ADDR, precompileInput, POINT_EVALUATION_PRECOMPILE_RESULT);
+    }
+
+    function _activatePriorityMode() internal {
+        vm.prank(owner);
+        admin.permanentlyAllowPriorityMode();
+        address prioritySender = makeAddr("prioritySender");
+        uint256 l2GasLimit = 1_000_000;
+        uint256 baseCost = mailbox.l2TransactionBaseCost(
+            10_000_000,
+            l2GasLimit,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+        );
+        vm.deal(prioritySender, baseCost);
+        vm.prank(prioritySender);
+        mailbox.requestL2Transaction{value: baseCost}({
+            _contractL2: makeAddr("l2Contract"),
+            _l2Value: 0,
+            _calldata: "",
+            _l2GasLimit: l2GasLimit,
+            _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            _factoryDeps: new bytes[](0),
+            _refundRecipient: prioritySender
+        });
+        vm.warp(block.timestamp + PRIORITY_EXPIRATION + 1);
+        executor.activatePriorityMode();
     }
 
     function test_settleBatchesSharedBridge_withExecutor() public {
