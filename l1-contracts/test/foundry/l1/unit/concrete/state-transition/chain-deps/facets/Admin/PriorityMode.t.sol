@@ -64,4 +64,15 @@ contract PriorityModeAdminTest is AdminTest {
         vm.expectRevert(OnlyPriorityMode.selector);
         adminFacet.deactivatePriorityMode();
     }
+
+    function test_deactivatePriorityMode_success() public {
+        address chainTypeManager = makeAddr("chainTypeManager");
+        utilsFacet.util_setChainTypeManager(chainTypeManager);
+        utilsFacet.util_setPriorityModeActivated(true);
+
+        vm.prank(chainTypeManager);
+        adminFacet.deactivatePriorityMode();
+
+        assertFalse(utilsFacet.util_getPriorityModeActivated());
+    }
 }
