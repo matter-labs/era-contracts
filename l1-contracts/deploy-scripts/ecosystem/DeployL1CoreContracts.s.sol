@@ -35,6 +35,7 @@ import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/co
 
 import {Config, CoreDeployedAddresses, DeployL1CoreUtils} from "./DeployL1CoreUtils.s.sol";
 import {IDeployL1CoreContracts} from "contracts/script-interfaces/IDeployL1CoreContracts.sol";
+import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 
 contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1CoreContracts {
     using stdToml for string;
@@ -347,7 +348,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
 
     function createPermanentValuesIfNeeded() internal virtual {
         // Determine the permanent values path
-        string memory permanentValuesPath = getPermanentValuesPath();
+        string memory permanentValuesPath = PermanentValuesHelper.getPermanentValuesPath(vm);
         if (!vm.isFile(permanentValuesPath)) {
             savePermanentValues(hex"88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5", address(0));
         } else {
@@ -356,7 +357,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
                 savePermanentValues(hex"88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5", address(0));
             }
         }
-        (address create2FactoryAddr, ) = getPermanentValues(getPermanentValuesPath());
+        (address create2FactoryAddr, ) = PermanentValuesHelper.getPermanentValues(vm, PermanentValuesHelper.getPermanentValuesPath(vm));
         if (create2FactoryAddr.code.length == 0) {
             savePermanentValues(hex"88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5", address(0));
         }
@@ -364,7 +365,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
 
     function savePermanentValues(bytes32 create2FactorySalt, address create2FactoryAddr) internal virtual {
         // Determine the permanent values path
-        string memory permanentValuesPath = getPermanentValuesPath();
+        string memory permanentValuesPath = PermanentValuesHelper.getPermanentValuesPath(vm);
 
         // Create file if it doesn't exist
         if (!vm.isFile(permanentValuesPath)) {

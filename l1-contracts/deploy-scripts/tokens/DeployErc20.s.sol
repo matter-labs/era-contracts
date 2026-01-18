@@ -14,6 +14,7 @@ import {WETH9} from "contracts/dev-contracts/WETH9.sol";
 
 import {Utils} from "../utils/Utils.sol";
 import {MintFailed} from "../utils/ZkSyncScriptErrors.sol";
+import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 
 contract DeployErc20Script is Script {
     using stdToml for string;
@@ -60,7 +61,7 @@ contract DeployErc20Script is Script {
         string memory root = vm.projectRoot();
 
         // Read create2 factory values from permanent values file
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(getPermanentValuesPath());
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(vm);
         config.create2FactoryAddr = create2FactoryAddr;
         config.create2FactorySalt = create2FactorySalt;
 
@@ -164,21 +165,6 @@ contract DeployErc20Script is Script {
 
     function deployViaCreate2(bytes memory _bytecode) internal returns (address) {
         return Utils.deployViaCreate2(_bytecode, config.create2FactorySalt, config.create2FactoryAddr);
-    }
-
-    function getPermanentValuesPath() internal view returns (string memory) {
-        string memory root = vm.projectRoot();
-        return string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
-    }
-
-    function getPermanentValues(
-        string memory permanentValuesPath
-    ) internal view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
-        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-        create2FactorySalt = permanentValuesToml.readBytes32("$.permanent_contracts.create2_factory_salt");
-        if (vm.keyExistsToml(permanentValuesToml, "$.permanent_contracts.create2_factory_addr")) {
-            create2FactoryAddr = permanentValuesToml.readAddress("$.permanent_contracts.create2_factory_addr");
-        }
     }
 
     // add this to be excluded from coverage report

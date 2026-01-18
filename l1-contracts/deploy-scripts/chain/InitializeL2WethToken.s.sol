@@ -9,6 +9,7 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 
 import {Utils} from "../utils/Utils.sol";
 import {IL1Bridgehub, L2TransactionRequestDirect} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 
 contract InitializeL2WethTokenScript is Script {
     using stdToml for string;
@@ -45,7 +46,12 @@ contract InitializeL2WethTokenScript is Script {
         string memory root = vm.projectRoot();
 
         // Read create2 factory values from permanent values file
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(getPermanentValuesPath());
+        // Note: This script uses $.contracts prefix instead of $.permanent_contracts
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValuesWithPrefix(
+            vm,
+            PermanentValuesHelper.getPermanentValuesPath(vm),
+            "$.contracts"
+        );
         config.create2FactoryAddr = create2FactoryAddr;
         config.create2FactorySalt = create2FactorySalt;
 
@@ -123,20 +129,5 @@ contract InitializeL2WethTokenScript is Script {
             (config.l2WethTokenImplAddr, upgradeData)
         );
         return l2Calldata;
-    }
-
-    function getPermanentValuesPath() internal view returns (string memory) {
-        string memory root = vm.projectRoot();
-        return string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
-    }
-
-    function getPermanentValues(
-        string memory permanentValuesPath
-    ) internal view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
-        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-        create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
-        if (vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
-        }
     }
 }

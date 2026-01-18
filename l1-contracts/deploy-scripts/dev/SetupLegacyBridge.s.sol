@@ -5,6 +5,7 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Utils} from "./../Utils.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
+import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {DummyL1ERC20Bridge} from "contracts/dev-contracts/DummyL1ERC20Bridge.sol";
@@ -64,7 +65,7 @@ contract SetupLegacyBridge is Script, ISetupLegacyBridge {
         addresses.diamondProxy = IL1Bridgehub(bridgehub).getZKChain(chainId);
 
         // Read create2 factory parameters from permanent-values.toml
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(getPermanentValuesPath());
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(vm);
         addresses.create2FactoryAddr = create2FactoryAddr;
         config.create2FactorySalt = create2FactorySalt;
 
@@ -180,20 +181,5 @@ contract SetupLegacyBridge is Script, ISetupLegacyBridge {
 
     function deployViaCreate2(bytes memory _bytecode) internal returns (address) {
         return Utils.deployViaCreate2(_bytecode, config.create2FactorySalt, addresses.create2FactoryAddr);
-    }
-
-    function getPermanentValuesPath() internal view returns (string memory) {
-        string memory root = vm.projectRoot();
-        return string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
-    }
-
-    function getPermanentValues(
-        string memory permanentValuesPath
-    ) internal view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
-        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-        create2FactorySalt = permanentValuesToml.readBytes32("$.permanent_contracts.create2_factory_salt");
-        if (vm.keyExistsToml(permanentValuesToml, "$.permanent_contracts.create2_factory_addr")) {
-            create2FactoryAddr = permanentValuesToml.readAddress("$.permanent_contracts.create2_factory_addr");
-        }
     }
 }

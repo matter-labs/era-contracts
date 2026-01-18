@@ -22,6 +22,7 @@ import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ADDRESS_ONE, Utils} from "../utils/Utils.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
+import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
@@ -172,7 +173,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         }
 
         // Read create2 factory values from permanent values file
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(getPermanentValuesPath());
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(vm);
         config.create2FactoryAddress = create2FactoryAddr;
         config.create2Salt = create2FactorySalt;
 
@@ -558,20 +559,5 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         // We assume that the total value is 0
         governance.execute{value: 0}(operation);
         vm.stopBroadcast();
-    }
-
-    function getPermanentValuesPath() internal view returns (string memory) {
-        string memory root = vm.projectRoot();
-        return string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
-    }
-
-    function getPermanentValues(
-        string memory permanentValuesPath
-    ) internal view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
-        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-        create2FactorySalt = permanentValuesToml.readBytes32("$.permanent_contracts.create2_factory_salt");
-        if (vm.keyExistsToml(permanentValuesToml, "$.permanent_contracts.create2_factory_addr")) {
-            create2FactoryAddr = permanentValuesToml.readAddress("$.permanent_contracts.create2_factory_addr");
-        }
     }
 }
