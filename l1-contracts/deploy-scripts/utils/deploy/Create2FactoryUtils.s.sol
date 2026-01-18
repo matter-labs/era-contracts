@@ -262,7 +262,8 @@ abstract contract Create2FactoryUtils is Script {
         // Read create2 factory values from permanent values file
         string memory permanentValuesToml = vm.readFile(permanentValuesPath);
 
-        create2FactorySalt = permanentValuesToml.readBytes32("$.permanent_contracts.create2_factory_salt");
+        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.permanent_contracts.create2_factory_salt");
+        address create2FactoryAddr;
         if (vm.keyExistsToml(permanentValuesToml, "$.permanent_contracts.create2_factory_addr")) {
             create2FactoryAddr = permanentValuesToml.readAddress("$.permanent_contracts.create2_factory_addr");
         }

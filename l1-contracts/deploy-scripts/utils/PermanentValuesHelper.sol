@@ -27,7 +27,8 @@ library PermanentValuesHelper {
         string memory permanentValuesPath
     ) internal view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
         string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-        create2FactorySalt = permanentValuesToml.readBytes32("$.permanent_contracts.create2_factory_salt");
+        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.permanent_contracts.create2_factory_salt");
+        address create2FactoryAddr;
         if (vm.keyExistsToml(permanentValuesToml, "$.permanent_contracts.create2_factory_addr")) {
             create2FactoryAddr = permanentValuesToml.readAddress("$.permanent_contracts.create2_factory_addr");
         }
@@ -57,7 +58,8 @@ library PermanentValuesHelper {
         string memory saltPath = string.concat(pathPrefix, ".create2_factory_salt");
         string memory addrPath = string.concat(pathPrefix, ".create2_factory_addr");
 
-        create2FactorySalt = permanentValuesToml.readBytes32(saltPath);
+        bytes32 create2FactorySalt = permanentValuesToml.readBytes32(saltPath);
+        address create2FactoryAddr;
         if (vm.keyExistsToml(permanentValuesToml, addrPath)) {
             create2FactoryAddr = permanentValuesToml.readAddress(addrPath);
         }
