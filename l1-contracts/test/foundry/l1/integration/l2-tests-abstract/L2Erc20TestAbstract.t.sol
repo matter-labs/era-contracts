@@ -83,8 +83,12 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
     function test_withdrawTokenNoRegistration() public {
         TestnetERC20Token l2NativeToken = new TestnetERC20Token("token", "T", 18);
 
-        l2NativeToken.mint(address(this), 100);
-        l2NativeToken.approve(L2_NATIVE_TOKEN_VAULT_ADDR, 100);
+        uint256 mintAmount = 100;
+        l2NativeToken.mint(address(this), mintAmount);
+        l2NativeToken.approve(L2_NATIVE_TOKEN_VAULT_ADDR, mintAmount);
+
+        // Verify initial balance
+        assertEq(l2NativeToken.balanceOf(address(this)), mintAmount, "Initial balance should be minted amount");
 
         // Basically we want all L2->L1 transactions to pass
         vm.mockCall(
@@ -95,9 +99,15 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(l2NativeToken));
 
+        // Verify asset ID is properly constructed
+        assertTrue(assetId != bytes32(0), "Asset ID should be non-zero");
+
         IL2AssetRouter(L2_ASSET_ROUTER_ADDR).withdraw(
             assetId,
-            DataEncoding.encodeBridgeBurnData(100, address(1), address(l2NativeToken))
+            DataEncoding.encodeBridgeBurnData(mintAmount, address(1), address(l2NativeToken))
         );
+
+        // After withdrawal, tokens should be burned from the sender
+        assertEq(l2NativeToken.balanceOf(address(this)), 0, "Balance should be zero after withdrawal");
     }
 }

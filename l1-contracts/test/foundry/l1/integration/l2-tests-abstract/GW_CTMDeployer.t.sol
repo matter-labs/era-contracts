@@ -21,26 +21,42 @@ abstract contract GW_CTMDeployerTest is Test {
     // }
 
     function test_GW_CTMDeployer() public {
+        address expectedGovernance = makeAddr("aliasedGovernanceAddress");
+        bytes32 expectedSalt = keccak256("test-salt");
+        uint256 expectedEraChainId = 1;
+        uint256 expectedL1ChainId = 1;
+        bytes32 expectedBootloaderHash = keccak256("bootloader-hash");
+        bytes32 expectedDefaultAccountHash = keccak256("default-account-hash");
+        bytes32 expectedEvmEmulatorHash = keccak256("evm-emulator-hash");
+        bytes32 expectedGenesisRoot = keccak256("genesis-root");
+        bytes32 expectedGenesisBatchCommitment = keccak256("genesis-batch-commitment");
+
         GatewayCTMDeployerConfig memory deployerConfig = GatewayCTMDeployerConfig({
-            aliasedGovernanceAddress: makeAddr("aliasedGovernanceAddress"),
-            salt: keccak256("test-salt"),
-            eraChainId: 1,
-            l1ChainId: 1,
+            aliasedGovernanceAddress: expectedGovernance,
+            salt: expectedSalt,
+            eraChainId: expectedEraChainId,
+            l1ChainId: expectedL1ChainId,
             testnetVerifier: false,
             isZKsyncOS: false,
             adminSelectors: new bytes4[](0),
             executorSelectors: new bytes4[](0),
             mailboxSelectors: new bytes4[](0),
             gettersSelectors: new bytes4[](0),
-            bootloaderHash: keccak256("bootloader-hash"),
-            defaultAccountHash: keccak256("default-account-hash"),
-            evmEmulatorHash: keccak256("evm-emulator-hash"),
-            genesisRoot: keccak256("genesis-root"),
+            bootloaderHash: expectedBootloaderHash,
+            defaultAccountHash: expectedDefaultAccountHash,
+            evmEmulatorHash: expectedEvmEmulatorHash,
+            genesisRoot: expectedGenesisRoot,
             genesisRollupLeafIndex: 1,
-            genesisBatchCommitment: keccak256("genesis-batch-commitment"),
+            genesisBatchCommitment: expectedGenesisBatchCommitment,
             forceDeploymentsData: bytes(""),
             protocolVersion: 0
         });
-        new GatewayCTMDeployer(deployerConfig);
+        GatewayCTMDeployer deployer = new GatewayCTMDeployer(deployerConfig);
+
+        // Verify the deployer was created at a valid address
+        assertTrue(address(deployer) != address(0), "Deployer should be deployed at a valid address");
+
+        // Verify the deployer contract code exists
+        assertTrue(address(deployer).code.length > 0, "Deployer should have contract code");
     }
 }
