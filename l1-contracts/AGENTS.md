@@ -80,3 +80,56 @@ When debugging Solidity compilation or script failures:
    - Use forge script traces to see where execution fails
 
 - If the function was introduced in a new version, query the protocol version from the ChainTypeManager or the Diamond proxy.
+
+## Running Foundry Tests
+
+### Installing foundry-zksync
+
+The tests require `foundry-zksync` (ZKSync's fork of Foundry) to be installed. Download the specific version used in CI:
+
+```bash
+mkdir ./foundry-zksync
+curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.30/foundry_zksync_v0.0.30_linux_amd64.tar.gz
+tar zxf foundry_zksync_v0.0.30_linux_amd64.tar.gz -C ./foundry-zksync
+chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+rm foundry_zksync_v0.0.30_linux_amd64.tar.gz
+export PATH="$PWD/foundry-zksync:$PATH"
+```
+
+### Building Artifacts
+
+Before running tests, build all required artifacts from the repository root:
+
+```bash
+# Build da-contracts
+yarn da build:foundry
+
+# Build l1-contracts
+yarn l1 build:foundry
+
+# Build system-contracts
+yarn sc build:foundry
+
+# Build l2-contracts
+yarn l2 build:foundry
+```
+
+### Running Tests
+
+```bash
+# Run l1-contracts foundry tests
+cd l1-contracts
+yarn test:foundry
+
+# Run system-contracts foundry tests
+cd system-contracts
+yarn test:foundry
+```
+
+### Common Issues
+
+1. **Missing zkout files**: If tests fail with "zkout/BeaconProxy.sol/BeaconProxy.json not found", ensure you've built all artifacts with the steps above.
+
+2. **Config lock errors**: Some tests may fail with "Can't acquire config lock". This is usually a transient issue - try running the tests again.
+
+3. **L1-context vs L2-context tests**: Tests in `l2-tests-in-l1-context` run L2 logic in an L1 environment. Some L2 system contract features may not work as expected in these tests, so assertions should account for this limitation.
