@@ -92,7 +92,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
         setAddressesBasedOnBridgehub(ctmRepresentativeChainId, bridgehubProxy);
         // Get eraChainId from AssetRouter
-        eraChainId = AddressIntrospector.getEraChainId(discoveredBridgehub.assetRouter);
+        address assetRouter = address(IL1Bridgehub(bridgehubProxy).assetRouter());
+        eraChainId = AddressIntrospector.getEraChainId(assetRouter);
 
         address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
@@ -153,7 +154,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 dstAddress: address(0),
                 chainId: gatewayChainId,
                 bridgehubAddress: discoveredBridgehub.proxies.bridgehub,
-                l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+                l1SharedBridgeProxy: address(IL1Bridgehub(discoveredBridgehub.proxies.bridgehub).assetRouter()),
                 refundRecipient: msg.sender
             });
         }
@@ -166,7 +167,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             dstAddress: L2_CREATE2_FACTORY_ADDR,
             chainId: gatewayChainId,
             bridgehubAddress: discoveredBridgehub.proxies.bridgehub,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            l1SharedBridgeProxy: address(IL1Bridgehub(discoveredBridgehub.proxies.bridgehub).assetRouter()),
             refundRecipient: msg.sender
         });
 
@@ -226,7 +227,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         _initializeGatewayGovernanceConfig(
             GatewayGovernanceConfig({
                 bridgehubProxy: discoveredBridgehub.proxies.bridgehub,
-                l1AssetRouterProxy: discoveredBridgehub.assetRouter,
+                l1AssetRouterProxy: address(IL1Bridgehub(discoveredBridgehub.proxies.bridgehub).assetRouter()),
                 chainTypeManagerProxy: ctm,
                 ctmDeploymentTrackerProxy: discoveredBridgehub.proxies.ctmDeploymentTracker,
                 gatewayChainId: gatewayChainId

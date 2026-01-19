@@ -401,6 +401,11 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         }
     }
 
+    function getPermanentValuesPath() internal view virtual returns (string memory) {
+        string memory root = vm.projectRoot();
+        return string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
+    }
+
     // add this to be excluded from coverage report
     function test() internal virtual override {}
 }
