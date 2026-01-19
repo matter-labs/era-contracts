@@ -51,13 +51,6 @@ import {UpgradeUtils} from "./UpgradeUtils.sol";
 contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     using stdToml for string;
 
-    /**
-     * @dev Storage slot with the admin of the contract.
-     * This is the keccak-256 hash of "eip1967.proxy.admin" subtracted by 1, and is
-     * validated in the constructor.
-     */
-    bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
-
     // solhint-disable-next-line gas-struct-packing
     struct UpgradeDeployedAddresses {
         address upgradeTimer;
@@ -551,9 +544,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function prepareUpgradeServerNotifierCall() public virtual returns (Call[] memory calls) {
-        address serverNotifierProxyAdmin = address(
-            uint160(uint256(vm.load(ctmAddresses.stateTransition.proxies.serverNotifier, ADMIN_SLOT)))
-        );
+        address serverNotifierProxyAdmin = Utils.getProxyAdminAddress(addresses.stateTransition.serverNotifierProxy);
 
         Call memory call = Call({
             target: serverNotifierProxyAdmin,
