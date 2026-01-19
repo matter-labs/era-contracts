@@ -490,7 +490,7 @@ contract GatewayPreparation is Script {
     ) public {
         initializeConfig();
 
-        L1Nullifier l1Nullifier = L1Nullifier(config.l1NullifierProxy);
+        L1Nullifier l1Nullifier = L1Nullifier(config.proxies.l1Nullifier);
         IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehub);
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
         vm.broadcast();

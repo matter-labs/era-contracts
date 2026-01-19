@@ -62,8 +62,8 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
 
     /// @notice Deploy everything that should be deployed
     function deployNewCTMContracts() public virtual override {
-        (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
-        (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
+        (ctmAddresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
+        (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
 
         deployVerifiers();
 
@@ -71,7 +71,10 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         deployUpgradeStageValidator();
         deployGovernanceUpgradeTimer();
 
-        addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("EraChainTypeManager", false);
+        ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(
+            "EraChainTypeManager",
+            false
+        );
 
         deployStateTransitionDiamondFacets();
     }
@@ -92,7 +95,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     function getL2UpgradeTargetAndData(
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
     ) internal view virtual override returns (address, bytes memory) {
-        bytes32 ethAssetId = IL1AssetRouter(discoveredBridgehub.assetRouter).ETH_TOKEN_ASSET_ID();
+        bytes32 ethAssetId = IL1AssetRouter(address(bridgehub.assetRouter())).ETH_TOKEN_ASSET_ID();
         bytes memory v29UpgradeCalldata = abi.encodeCall(
             IL2V29Upgrade.upgrade,
             (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), ethAssetId)

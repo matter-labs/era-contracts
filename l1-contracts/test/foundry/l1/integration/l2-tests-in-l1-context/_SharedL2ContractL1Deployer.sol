@@ -52,11 +52,10 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
             root,
             "/test/foundry/l1/integration/deploy-scripts/script-config/permanent-values.toml"
         );
-        initializeConfig(inputPath);
-        discoveredBridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
-        discoveredBridgehub.assetRouter = L2_ASSET_ROUTER_ADDR;
-        discoveredBridgehub.assetRouterAddresses.nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
-        discoveredBridgehub.interopCenterProxy = L2_INTEROP_CENTER_ADDR;
+        initializeConfig(inputPath, permanentValuesInputPath, L2_BRIDGEHUB_ADDR);
+        coreAddresses.bridgehub.proxies.bridgehub = L2_BRIDGEHUB_ADDR;
+        coreAddresses.bridges.proxies.l1AssetRouter = L2_ASSET_ROUTER_ADDR;
+        coreAddresses.bridges.proxies.l1NativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         if (!_skip) {
@@ -64,18 +63,18 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         }
 
         // TODO refactor
-        addresses.transparentProxyAdmin = makeAddr("transparentProxyAdmin");
-        addresses.governance = makeAddr("governance");
-        addresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
-        addresses.stateTransition.verifier = deploySimpleContract("Verifier", true);
-        addresses.stateTransition.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
-        addresses.eip7702Checker = address(0);
+        ctmAddresses.admin.transparentProxyAdmin = makeAddr("transparentProxyAdmin");
+        ctmAddresses.admin.governance = makeAddr("governance");
+        ctmAddresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
+        ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract("Verifier", true);
+        ctmAddresses.stateTransition.proxies.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
+        ctmAddresses.admin.eip7702Checker = address(0);
         initializeGeneratedData();
         deployStateTransitionDiamondFacets();
         string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
         (
-            addresses.stateTransition.chainTypeManagerImplementation,
-            addresses.stateTransition.chainTypeManagerProxy
+            ctmAddresses.stateTransition.implementations.chainTypeManager,
+            ctmAddresses.stateTransition.proxies.chainTypeManager
         ) = deployTuppWithContract(ctmContractName, true);
     }
 

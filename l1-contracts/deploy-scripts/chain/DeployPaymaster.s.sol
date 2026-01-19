@@ -6,8 +6,10 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "../utils/Utils.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IDeployPaymaster} from "contracts/script-interfaces/IDeployPaymaster.sol";
 
-contract DeployPaymaster is Script {
+contract DeployPaymaster is Script, IDeployPaymaster {
     using stdToml for string;
     Config internal config;
 
@@ -19,13 +21,12 @@ contract DeployPaymaster is Script {
         address paymaster;
     }
 
-    function initializeConfig() internal {
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/config-deploy-paymaster.toml");
-        string memory toml = vm.readFile(path);
-        config.bridgehubAddress = toml.readAddress("$.bridgehub");
-        config.l1SharedBridgeProxy = toml.readAddress("$.l1_shared_bridge");
-        config.chainId = toml.readUint("$.chain_id");
+    function initializeConfig(address bridgehubAddress, uint256 chainId) internal {
+        config.bridgehubAddress = bridgehubAddress;
+        config.chainId = chainId;
+
+        // Get the assetRouter address directly from bridgehub for deposit approvals
+        config.l1SharedBridgeProxy = address(IL1Bridgehub(bridgehubAddress).assetRouter());
     }
 
     function saveOutput() internal {
@@ -35,8 +36,8 @@ contract DeployPaymaster is Script {
         vm.writeToml(toml, path);
     }
 
-    function run() external {
-        initializeConfig();
+    function run(address _bridgehub, uint256 _chainId) external {
+        initializeConfig(_bridgehub, _chainId);
 
         deploy();
 
