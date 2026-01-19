@@ -213,7 +213,7 @@ library AddressIntrospector {
                 l1BlobsDAValidatorZKsyncOS: address(0) // Not available from CTM directly
             }),
             admin: CTMAdminAddresses({
-                transparentProxyAdmin: Utils.getProxyAdmin(ctmAddr),
+                transparentProxyAdmin: Utils.getProxyAdminAddress(ctmAddr),
                 governance: IOwnable(ctmAddr).owner(),
                 accessControlRestrictionAddress: address(0), // Not available from CTM directly
                 eip7702Checker: address(0), // Not available from CTM directly
@@ -347,7 +347,7 @@ library AddressIntrospector {
         coreAddresses.bridges = getBridgesDeployedAddresses(assetRouter);
 
         // Populate shared admin addresses
-        coreAddresses.shared.transparentProxyAdmin = Utils.getProxyAdmin(_bridgehubProxy);
+        coreAddresses.shared.transparentProxyAdmin = Utils.getProxyAdminAddress(_bridgehubProxy);
         coreAddresses.shared.bridgehubAdmin = address(IL1Bridgehub(_bridgehubProxy).admin());
         coreAddresses.shared.governance = IOwnable(_bridgehubProxy).owner();
     }
