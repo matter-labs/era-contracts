@@ -2,10 +2,11 @@
 pragma solidity 0.8.28;
 
 import {ExecutorTest, EMPTY_PREPUBLISHED_COMMITMENT, POINT_EVALUATION_PRECOMPILE_RESULT} from "../Executor/_Executor_Shared.t.sol";
-import {Utils, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
+import {Utils, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
 import {IExecutor, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
+import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 
 contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
@@ -54,11 +55,7 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
         admin.permanentlyAllowPriorityMode();
         address prioritySender = makeAddr("prioritySender");
         uint256 l2GasLimit = 1_000_000;
-        uint256 baseCost = mailbox.l2TransactionBaseCost(
-            10_000_000,
-            l2GasLimit,
-            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-        );
+        uint256 baseCost = mailbox.l2TransactionBaseCost(10_000_000, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
         vm.deal(prioritySender, baseCost);
         vm.prank(prioritySender);
         mailbox.requestL2Transaction{value: baseCost}({
@@ -75,7 +72,23 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
     }
 
     function test_settleBatchesSharedBridge_withExecutor() public {
-        IExecutor.CommitBatchInfo memory commitInfo = _buildCommitInfo();
+        PriorityOpsBatchInfo[] memory priorityOps = Utils.generatePriorityOps(1, 1);
+        IExecutor.CommitBatchInfo memory commitInfo;
+        {
+            bytes32 rollingHash = _rollingHash(priorityOps[0].itemHashes);
+            bytes32[] memory merkleItemHashes = new bytes32[](priorityOps[0].itemHashes.length);
+            for (uint256 i = 0; i < priorityOps[0].itemHashes.length; ++i) {
+                merkleItemHashes[i] = priorityOps[0].itemHashes[i];
+            }
+            bytes32 expectedRoot = Merkle.calculateRootPaths(
+                priorityOps[0].leftPath,
+                priorityOps[0].rightPath,
+                0,
+                merkleItemHashes
+            );
+            executor.setPriorityTreeHistoricalRoot(expectedRoot);
+            commitInfo = _buildCommitInfo(rollingHash, priorityOps[0].itemHashes.length);
+        }
 
         IExecutor.CommitBatchInfo[] memory commitInfos = new IExecutor.CommitBatchInfo[](1);
         commitInfos[0] = commitInfo;
@@ -95,13 +108,6 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
             storedArray,
             proofInput
         );
-
-        PriorityOpsBatchInfo[] memory priorityOps = new PriorityOpsBatchInfo[](1);
-        priorityOps[0] = PriorityOpsBatchInfo({
-            leftPath: new bytes32[](0),
-            rightPath: new bytes32[](0),
-            itemHashes: new bytes32[](0)
-        });
 
         (uint256 executeFrom, uint256 executeTo, bytes memory executeData) = Utils.encodeExecuteBatchesDataZeroLogs(
             storedArray,
@@ -129,7 +135,10 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
         assertEq(getters.l2LogsRootHash(1), storedInfo.l2LogsTreeRoot);
     }
 
-    function _buildCommitInfo() internal returns (IExecutor.CommitBatchInfo memory) {
+    function _buildCommitInfo(
+        bytes32 priorityOpsHash,
+        uint256 numberOfLayer1Txs
+    ) internal returns (IExecutor.CommitBatchInfo memory) {
         IExecutor.CommitBatchInfo memory info = newCommitBatchInfo;
         bytes[] memory logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
         logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
@@ -138,8 +147,22 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
             uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
+        logs[uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY)] = Utils.constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
+            priorityOpsHash
+        );
+        logs[uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)] = Utils.constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
+            bytes32(numberOfLayer1Txs)
+        );
         info.systemLogs = Utils.encodePacked(logs);
         info.operatorDAInput = operatorDAInput;
+        info.priorityOperationsHash = priorityOpsHash;
+        info.numberOfLayer1Txs = numberOfLayer1Txs;
         return info;
     }
 
@@ -174,5 +197,13 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
                 timestamp: commitInfo.timestamp,
                 commitment: commitment
             });
+    }
+
+    function _rollingHash(bytes32[] memory hashes) internal pure returns (bytes32) {
+        bytes32 rollingHash = keccak256("");
+        for (uint256 i = 0; i < hashes.length; ++i) {
+            rollingHash = keccak256(bytes.concat(rollingHash, hashes[i]));
+        }
+        return rollingHash;
     }
 }

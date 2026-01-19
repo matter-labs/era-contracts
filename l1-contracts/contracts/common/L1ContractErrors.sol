@@ -438,8 +438,8 @@ error OnlyPriorityMode();
 error OnlyNormalMode();
 // 0xdda650de
 error ActivatePriorityModeNotImplementedInValidatorContract();
-// 0x7833d1cd
-error InvalidL2TxCountInPriorityMode(uint256 l2TxCount);
+// 0xd857fbc0
+error InvalidTxCountInPriorityMode(uint256 l2TxCount, uint256 l1TxCount);
 // 0xdbfcbbef
 error PriorityModeIsNotAllowed();
 // 0x7fdf8632

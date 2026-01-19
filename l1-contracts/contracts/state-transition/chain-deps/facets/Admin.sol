@@ -234,11 +234,16 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setPriorityModeTransactionFilterer(address _priorityModeTransactionFilterer) external onlyChainTypeManager onlySettlementLayer onlyL1 {
+    function setPriorityModeTransactionFilterer(
+        address _priorityModeTransactionFilterer
+    ) external onlyChainTypeManager onlySettlementLayer onlyL1 {
         if (s.priorityModeInfo.canBeActivated) {
             _setTransactionFilterer(_priorityModeTransactionFilterer);
         }
-        emit NewPriorityModeTransactionFilterer(s.priorityModeInfo.transactionFilterer, _priorityModeTransactionFilterer);
+        emit NewPriorityModeTransactionFilterer(
+            s.priorityModeInfo.transactionFilterer,
+            _priorityModeTransactionFilterer
+        );
         s.priorityModeInfo.transactionFilterer = _priorityModeTransactionFilterer;
     }
 

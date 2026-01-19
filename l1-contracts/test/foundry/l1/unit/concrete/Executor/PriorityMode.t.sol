@@ -5,7 +5,7 @@ import {Utils, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {IExecutor, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {InvalidL2TxCountInPriorityMode, OnlyNormalMode, PriorityModeActivationTooEarly, PriorityModeIsNotAllowed, PriorityOpsRequestTimestampMissing, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {InvalidTxCountInPriorityMode, OnlyNormalMode, PriorityModeActivationTooEarly, PriorityModeIsNotAllowed, PriorityOpsRequestTimestampMissing, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 
 contract PriorityModeExecutorTest is ExecutorTest {
@@ -87,7 +87,49 @@ contract PriorityModeExecutorTest is ExecutorTest {
         );
 
         vm.prank(address(permissionlessValidator));
-        vm.expectRevert(abi.encodeWithSelector(InvalidL2TxCountInPriorityMode.selector, l2TxCount));
+        vm.expectRevert(abi.encodeWithSelector(InvalidTxCountInPriorityMode.selector, l2TxCount, 0));
+        executor.commitBatchesSharedBridge(address(0), commitFrom, commitTo, commitData);
+    }
+
+    function test_revertWhen_priorityModeBatchHasNoL1Txs() public {
+        _activatePriorityMode();
+
+        IExecutor.CommitBatchInfo memory commitInfo = newCommitBatchInfo;
+
+        (bytes32 l2DAValidatorOutputHash, bytes memory operatorDAInput) = _mockDAForCommit(commitInfo.batchNumber);
+        bytes[] memory logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
+        logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+        );
+
+        uint256 l1TxCount = 0;
+        uint256 l2TxCount = 0;
+        uint256 packedTxCounts = l1TxCount | (l2TxCount << PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS);
+        logs[uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)] = Utils.constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
+            bytes32(packedTxCounts)
+        );
+
+        commitInfo.numberOfLayer1Txs = l1TxCount;
+        commitInfo.systemLogs = Utils.encodePacked(logs);
+        commitInfo.operatorDAInput = operatorDAInput;
+        commitInfo.timestamp = uint64(currentTimestamp);
+
+        IExecutor.CommitBatchInfo[] memory commitInfos = new IExecutor.CommitBatchInfo[](1);
+        commitInfos[0] = commitInfo;
+
+        (uint256 commitFrom, uint256 commitTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            genesisStoredBatchInfo,
+            commitInfos
+        );
+
+        vm.prank(address(permissionlessValidator));
+        vm.expectRevert(abi.encodeWithSelector(InvalidTxCountInPriorityMode.selector, l2TxCount, l1TxCount));
         executor.commitBatchesSharedBridge(address(0), commitFrom, commitTo, commitData);
     }
 
@@ -102,11 +144,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
     function _requestPriorityOp() internal returns (uint256 requestTimestamp) {
         address prioritySender = makeAddr("prioritySender");
         uint256 l2GasLimit = 1_000_000;
-        uint256 baseCost = mailbox.l2TransactionBaseCost(
-            10_000_000,
-            l2GasLimit,
-            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-        );
+        uint256 baseCost = mailbox.l2TransactionBaseCost(10_000_000, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
         vm.deal(prioritySender, baseCost);
         requestTimestamp = block.timestamp;
         vm.prank(prioritySender);

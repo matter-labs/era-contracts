@@ -130,7 +130,7 @@ interface IAdmin is IZKChainBase {
 
     /// @notice The transaction filterer has been updated
     event NewTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);
-    
+
     /// @notice The address of the transaction filterer contract used when Priority Mode is activated
     event NewPriorityModeTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);
 
