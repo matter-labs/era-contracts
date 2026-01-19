@@ -28,7 +28,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
-import {DefaultEcosystemUpgrade} from "../default_upgrade/DefaultEcosystemUpgrade.s.sol";
+import {DefaultCoreUpgrade} from "../default_upgrade/DefaultCoreUpgrade.s.sol";
 import {DefaultCTMUpgrade} from "../default_upgrade/DefaultCTMUpgrade.s.sol";
 
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
@@ -37,7 +37,7 @@ import {DefaultGatewayUpgrade} from "../default_upgrade/DefaultGatewayUpgrade.s.
 import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 
 /// @notice Script used for v31 upgrade flow
-contract EcosystemUpgrade_v31 is Script, DefaultEcosystemUpgrade {
+contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
     using stdToml for string;
 
     /// @notice E2e upgrade generation
