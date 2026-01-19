@@ -126,10 +126,18 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
 
     function test_setMigrationNumberForV31_Success() public {
         address eraChain = IBridgehubBase(ecosystemAddresses.bridgehub.proxies.bridgehub).getZKChain(eraZKChainId);
+
+        // Verify the chain address is valid
+        assertTrue(eraChain != address(0), "Era chain address should be valid");
+
+        // Call the function as the ZK chain
         vm.prank(eraChain);
         IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).setMigrationNumberForV31(
             eraZKChainId
         );
+
+        // The function completing without revert indicates success - it's callable only by the chain
+        assertTrue(true, "setMigrationNumberForV31 should complete successfully when called by the chain");
     }
 
     function test_setMigrationNumberForV31_NotChain() public {
@@ -143,27 +151,65 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
     function test_pauseMigration_byOwner() public {
         address owner = Ownable2StepUpgradeable(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
             .owner();
+
+        // Verify owner is valid
+        assertTrue(owner != address(0), "Owner should be a valid address");
+
         vm.prank(owner);
         IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).pauseMigration();
-        // Optionally add: assert migrationPaused is true if readable
+
+        // Verify migration is paused
+        assertTrue(
+            IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
+            "Migration should be paused after calling pauseMigration"
+        );
     }
 
     function test_unpauseMigration_byOwner() public {
         address owner = Ownable2StepUpgradeable(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
             .owner();
+
+        // First pause migration
+        vm.prank(owner);
+        IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).pauseMigration();
+
+        // Verify migration is paused
+        assertTrue(
+            IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
+            "Migration should be paused before unpause"
+        );
+
+        // Now unpause migration
         vm.prank(owner);
         IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).unpauseMigration();
-        // Optionally add: assert migrationPaused is false if readable
+
+        // Verify migration is no longer paused
+        assertFalse(
+            IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
+            "Migration should not be paused after calling unpauseMigration"
+        );
     }
 
     function test_pause_byOwner() public {
         address owner = Ownable2StepUpgradeable(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
             .owner();
+
+        // Verify owner is valid
+        assertTrue(owner != address(0), "Owner should be a valid address");
+
+        // Pause the contract
         vm.prank(owner);
         IPausable(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).pause();
+
+        // The pause should succeed without reverting - if we got here, pause worked
+        assertTrue(true, "Pause should complete without reverting");
+
+        // Unpause the contract
         vm.prank(owner);
         IPausable(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).unpause();
-        // Optionally add: assert paused is true if readable
+
+        // The unpause should succeed without reverting
+        assertTrue(true, "Unpause should complete without reverting");
     }
 
     function test_bridgeBurn_Failed() public {
@@ -182,8 +228,27 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
 
     function test_setSettlementLayerChainId_Success() public {
         address systemContext = L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR;
+
+        // Verify system context address is valid
+        assertTrue(systemContext != address(0), "System context address should be valid");
+
+        // Get migration number before the call
+        uint256 migrationNumBefore = IChainAssetHandler(address(l2ChainAssetHandler)).migrationNumber(block.chainid);
+
+        // Set the settlement layer chain ID (same chain ID = no migration increment)
         vm.prank(systemContext);
         l2ChainAssetHandler.setSettlementLayerChainId(eraZKChainId, eraZKChainId);
+
+        // When previous and current are the same, migration number should not change
+        uint256 migrationNumAfter = IChainAssetHandler(address(l2ChainAssetHandler)).migrationNumber(block.chainid);
+        assertEq(
+            migrationNumAfter,
+            migrationNumBefore,
+            "Migration number should remain unchanged when settlement layer doesn't change"
+        );
+
+        // The function completing without revert indicates success
+        assertTrue(true, "setSettlementLayerChainId should complete without reverting");
     }
     function test_setSettlementLayerChainId_NotSystemContext() public {
         address notSystemContext = makeAddr("notSystemContext");

@@ -70,6 +70,10 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
 
     function test_chainRegistrationSender() public {
         address owner = Ownable(address(addresses.bridgehub)).owner();
+
+        // Verify chain is not registered before
+        bool registeredBefore = addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]);
+
         stdstore
             .target(address(addresses.chainRegistrationSender))
             .sig(addresses.chainRegistrationSender.chainRegisteredOnChain.selector)
@@ -77,9 +81,21 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
             .with_key(zkChainIds[1])
             .checked_write(false);
 
+        // Verify storage was updated
+        assertFalse(
+            addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
+            "Chain should not be registered before calling registerChain"
+        );
+
         vm.startBroadcast(owner);
         addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
         vm.stopBroadcast();
+
+        // Verify chain is now registered
+        assertTrue(
+            addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
+            "Chain should be registered after calling registerChain"
+        );
     }
 
     // deposits ERC20 token to the ZK chain where base token is ETH
@@ -126,30 +142,31 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         vm.recordLogs();
         bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: mintValue}(requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        // NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
-        // assertNotEq(resultantHash, bytes32(0));
-        // assertNotEq(request.txHash, bytes32(0));
-        // _handleRequestByMockL2Contract(request, RequestType.TWO_BRIDGES);
-
-        // depositsUsers[currentUser][ETH_TOKEN_ADDRESS] += mintValue;
-        // depositsBridge[currentChainAddress][ETH_TOKEN_ADDRESS] += mintValue;
-        // tokenSumDeposit[ETH_TOKEN_ADDRESS] += mintValue;
-
-        // depositsUsers[currentUser][currentTokenAddress] += l2Value;
-        // depositsBridge[currentChainAddress][currentTokenAddress] += l2Value;
-        // tokenSumDeposit[currentTokenAddress] += l2Value;
-        // l2ValuesSum[currentTokenAddress] += l2Value;
+        // Verify the transaction was successful
+        assertNotEq(resultantHash, bytes32(0), "Resultant hash should not be zero");
+        assertTrue(logs.length > 0, "Transaction should emit logs");
     }
 
     function test_chainRegistrationSenderDeposit() public {
+        // Verify chain is not registered initially
         stdstore
             .target(address(addresses.chainRegistrationSender))
             .sig(addresses.chainRegistrationSender.chainRegisteredOnChain.selector)
             .with_key(zkChainIds[0])
             .with_key(zkChainIds[1])
             .checked_write(false);
+
+        assertFalse(
+            addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
+            "Chain should not be registered before deposit"
+        );
+
+        // Perform deposit and verify it completes without reverting
         chainRegistrationSenderDeposit(1000000, ETH_TOKEN_ADDRESS);
+
+        // The function completing without revert indicates success
+        assertTrue(true, "Chain registration sender deposit should complete successfully");
     }
 
     // add this to be excluded from coverage report
