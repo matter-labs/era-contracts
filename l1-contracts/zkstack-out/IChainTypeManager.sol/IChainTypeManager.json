@@ -1028,6 +1028,19 @@
     "stateMutability": "view"
   },
   {
+    "type": "function",
+    "name": "validatorTimelockPostV29",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
     "type": "event",
     "name": "GenesisUpgrade",
     "inputs": [
