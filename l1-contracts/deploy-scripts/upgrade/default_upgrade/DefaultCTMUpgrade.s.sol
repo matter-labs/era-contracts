@@ -137,9 +137,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     function initializeConfig(
         ChainCreationParamsConfig memory chainCreationParams,
-        PermanentCTMConfig memory permanentConfig,
-        // Optional
-        address governance
+        PermanentCTMConfig memory permanentConfig
     ) public {
         _initCreate2FactoryParams(permanentConfig.create2FactoryAddr, permanentConfig.create2FactorySalt);
         config.l1ChainId = block.chainid;
@@ -150,11 +148,11 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
         config.contracts.chainCreationParams = chainCreationParams;
 
-        if (governance != address(0)) {
-            config.ownerAddress = governance;
-        } else {
-            config.ownerAddress = ctmAddresses.admin.governance;
-        }
+        // if (governance != address(0)) {
+        //     config.ownerAddress = governance;
+        // } else {
+        // }
+        config.ownerAddress = ctmAddresses.admin.governance;
         newConfig.ecosystemAdminAddress = ctmAddresses.admin.governance;
         config.contracts.governanceSecurityCouncilAddress = Governance(payable(ctmAddresses.admin.governance))
             .securityCouncil();
@@ -203,19 +201,12 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
         string memory toml = vm.readFile(newConfigPath);
 
-        address governance;
-        if (toml.keyExists("$.governance")) {
-            governance = toml.readAddress("$.governance");
-        } else {
-            governance = address(0);
-        }
-
         PermanentCTMConfig memory permanentConfig = initializePermanentConfig(permanentValuesInputPath);
         ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(
             chainCreationParamsPath(permanentConfig.isZKsyncOS)
         );
 
-        initializeConfig(chainCreationParams, permanentConfig, governance);
+        initializeConfig(chainCreationParams, permanentConfig);
     }
 
     /// @notice Full default upgrade preparation flow

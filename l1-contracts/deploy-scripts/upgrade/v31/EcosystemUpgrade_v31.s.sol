@@ -46,7 +46,6 @@ contract EcosystemUpgrade_v31 is Script, DefaultEcosystemUpgrade {
         initialize(
             "/upgrade-envs/permanent-values/local.toml",
             "/upgrade-envs/v0.31.0-interopB/local.toml",
-            vm.envString("V31_UPGRADE_ECOSYSTEM_INPUT"),
             vm.envString("V31_UPGRADE_ECOSYSTEM_OUTPUT")
         );
 
@@ -58,13 +57,14 @@ contract EcosystemUpgrade_v31 is Script, DefaultEcosystemUpgrade {
     function preparePermanentValues() internal {
         string memory root = vm.projectRoot();
         string memory permanentValuesInputPath = string.concat(root, "/upgrade-envs/permanent-values/local.toml");
+        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
         string memory outputDeployL1Toml = vm.readFile(string.concat(root, "/script-out/output-deploy-l1.toml"));
         string memory outputDeployCTMToml = vm.readFile(string.concat(root, "/script-out/output-deploy-ctm.toml"));
 
-        bytes32 create2FactorySalt = outputDeployL1Toml.readBytes32("$.permanent_contracts.create2_factory_salt");
+        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.permanent_contracts.create2_factory_salt");
         address create2FactoryAddr;
-        if (vm.keyExistsToml(outputDeployL1Toml, "$.permanent_contracts.create2_factory_addr")) {
-            create2FactoryAddr = outputDeployL1Toml.readAddress("$.permanent_contracts.create2_factory_addr");
+        if (vm.keyExistsToml(permanentValuesToml, "$.permanent_contracts.create2_factory_addr")) {
+            create2FactoryAddr = permanentValuesToml.readAddress("$.permanent_contracts.create2_factory_addr");
         }
         address ctm = outputDeployCTMToml.readAddress(
             "$.deployed_addresses.state_transition.state_transition_proxy_addr"
@@ -106,8 +106,8 @@ contract EcosystemUpgrade_v31 is Script, DefaultEcosystemUpgrade {
         }
 
         // Write the final TOML
-        string memory permanentValuesToml = vm.serializeUint("root", "era_chain_id", eraChainId);
-        vm.writeToml(permanentValuesToml, permanentValuesInputPath);
+        string memory outputToml = vm.serializeUint("root", "era_chain_id", eraChainId);
+        vm.writeToml(outputToml, permanentValuesInputPath);
     }
 
     function deployNewEcosystemContractsL1() public virtual override {

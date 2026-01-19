@@ -28,7 +28,7 @@ import {UpgradeUtils} from "./UpgradeUtils.sol";
 
 /// @notice Script used for default ecosystem upgrade flow should be run as a first for the upgrade.
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
+contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     using stdToml for string;
 
     /// @notice Internal state of the upgrade script
@@ -47,20 +47,17 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
     function initialize(
         string memory permanentValuesInputPath,
         string memory upgradeInputPath,
-        string memory newConfigPath,
         string memory _outputPath
     ) public virtual {
         string memory root = vm.projectRoot();
-        newConfigPath = string.concat(root, newConfigPath);
         permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
         upgradeInputPath = string.concat(root, upgradeInputPath);
         console.log("permanentValuesInputPath", permanentValuesInputPath);
         console.log("root", root);
 
-        initializeConfig(permanentValuesInputPath, upgradeInputPath, newConfigPath);
+        initializeConfig(permanentValuesInputPath, upgradeInputPath);
         instantiateCreate2Factory();
 
-        console.log("Initialized config from %s", newConfigPath);
         upgradeConfig.outputPath = string.concat(root, _outputPath);
         upgradeConfig.initialized = true;
     }
@@ -79,7 +76,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         initialize(
             vm.envString("PERMANENT_VALUES_INPUT"),
             vm.envString("UPGRADE_INPUT"),
-            vm.envString("UPGRADE_ECOSYSTEM_INPUT"),
             vm.envString("UPGRADE_ECOSYSTEM_OUTPUT")
         );
         prepareEcosystemUpgrade();
@@ -114,12 +110,10 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
 
     function initializeConfig(
         string memory permanentValuesInputPath,
-        string memory upgradeInputPath,
-        string memory newConfigPath
+        string memory upgradeInputPath
     ) public virtual {
         string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
         string memory upgradeToml = vm.readFile(upgradeInputPath);
-        string memory toml = vm.readFile(newConfigPath);
 
         (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesInputPath);
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);

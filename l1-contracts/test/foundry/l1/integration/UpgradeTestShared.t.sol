@@ -43,7 +43,7 @@ contract UpgradeIntegrationTestBase is Test {
 
     function setupUpgrade(bool skipFactoryDepsCheck) public {
         ecosystemUpgrade = new EcosystemUpgrade_v31();
-        ecosystemUpgrade.initialize(PERMANENT_VALUES_INPUT, ECOSYSTEM_UPGRADE_INPUT, ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT);
+        ecosystemUpgrade.initialize(PERMANENT_VALUES_INPUT, ECOSYSTEM_UPGRADE_INPUT, ECOSYSTEM_OUTPUT);
         ecosystemUpgrade.deployNewEcosystemContractsL1();
         chainUpgrade = new ChainUpgrade_v31();
         ctmUpgrade = new CTMUpgrade_v31();
