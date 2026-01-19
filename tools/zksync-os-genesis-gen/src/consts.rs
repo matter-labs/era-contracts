@@ -107,7 +107,7 @@ pub const EIP1967_ADMIN_SLOT: B256 = FixedBytes::<32>(hex_literal::hex!(
     "b53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103"
 ));
 
-pub const INITIAL_CONTRACTS: [(Address, ContractSource); 19] = [
+pub const INITIAL_CONTRACTS: [(Address, ContractSource); 21] = [
     (L2_COMPLEX_UPGRADER_ADDR, ContractSource::L1ContractName("SystemContractProxy")),
     (L2_GENESIS_UPGRADE, ContractSource::L1ContractName("L2GenesisUpgrade")),
     (L2_WRAPPED_BASE_TOKEN, ContractSource::L1ContractName("L2WrappedBaseToken")),
