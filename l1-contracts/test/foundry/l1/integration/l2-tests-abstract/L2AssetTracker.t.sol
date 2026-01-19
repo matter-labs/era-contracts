@@ -344,9 +344,21 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         // Mock sendMessageToL1 to avoid revert
         vm.mockCall(address(L2_BRIDGEHUB), abi.encodeWithSignature("sendMessageToL1(bytes)"), abi.encode(bytes32(0)));
 
-        // Call the migration function - should not revert
+        // Get chain balance before migration
+        uint256 balanceBefore = L2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, assetId);
+
+        // Call the migration function
         L2_ASSET_TRACKER.initiateL1ToGatewayMigrationOnL2(assetId);
 
-        // Test passes if no revert occurred
+        // Verify the asset migration number was updated
+        uint256 assetMigrationNumberAfter = L2AssetTracker(L2_ASSET_TRACKER_ADDR).assetMigrationNumber(
+            block.chainid,
+            assetId
+        );
+        assertEq(assetMigrationNumberAfter, 2, "Asset migration number should be updated to current chain migration number");
+
+        // Verify chain balance was updated to totalSupply
+        uint256 balanceAfter = L2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, assetId);
+        assertEq(balanceAfter, totalSupply, "Chain balance should be set to totalSupply");
     }
 }

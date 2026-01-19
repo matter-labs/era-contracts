@@ -7,8 +7,9 @@ import {Vm} from "forge-std/Vm.sol";
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
+import {L2InteropTestUtils, BundleExecutionResult} from "./L2InteropTestUtils.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
+import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 abstract contract L2InteropLibraryBasicTestAbstract is L2InteropTestUtils {
     function test_requestTokenTransferInteropViaLibrary() public {
@@ -18,7 +19,16 @@ abstract contract L2InteropLibraryBasicTestAbstract is L2InteropTestUtils {
 
         InteropLibrary.sendToken(destinationChainId, l2TokenAddress, 100, address(this), UNBUNDLER_ADDRESS);
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        extractAndExecuteSingleBundle(logs, destinationChainId, EXECUTION_ADDRESS);
+
+        // Verify bundle was emitted
+        assertTrue(logs.length > 0, "Expected logs to be emitted");
+
+        BundleExecutionResult memory result = extractAndExecuteSingleBundle(logs, destinationChainId, EXECUTION_ADDRESS);
+
+        // Verify the bundle was executed successfully
+        assertBundleExecuted(result);
+        assertTrue(result.bundleHash != bytes32(0), "Bundle hash should be non-zero");
+        assertTrue(result.callCount > 0, "Bundle should contain at least one call");
     }
 
     function test_requestSendCallViaLibrary() public {
@@ -36,10 +46,34 @@ abstract contract L2InteropLibraryBasicTestAbstract is L2InteropTestUtils {
             UNBUNDLER_ADDRESS
         );
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        extractAndExecuteSingleBundle(logs, destinationChainId, EXECUTION_ADDRESS);
+
+        // Verify bundle was emitted
+        assertTrue(logs.length > 0, "Expected logs to be emitted");
+
+        BundleExecutionResult memory result = extractAndExecuteSingleBundle(logs, destinationChainId, EXECUTION_ADDRESS);
+
+        // Verify the bundle was executed successfully
+        assertBundleExecuted(result);
+        assertTrue(result.bundleHash != bytes32(0), "Bundle hash should be non-zero");
+        assertEq(result.callCount, 1, "Direct call should create exactly one call in the bundle");
     }
 
     function test_sendMessageToL1ViaLibrary() public {
+        vm.recordLogs();
         InteropLibrary.sendMessage("testing interop");
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        // Verify message was sent - look for L2ToL1Log event or similar
+        assertTrue(logs.length > 0, "Expected logs to be emitted when sending message to L1");
+
+        // Verify the InteropCenter emitted a message event
+        bool foundInteropCenterLog = false;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].emitter == L2_INTEROP_CENTER_ADDR) {
+                foundInteropCenterLog = true;
+                break;
+            }
+        }
+        assertTrue(foundInteropCenterLog, "InteropCenter should emit a log when sending message to L1");
     }
 }
