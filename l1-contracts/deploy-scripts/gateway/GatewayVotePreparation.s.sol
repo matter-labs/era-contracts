@@ -36,6 +36,7 @@ import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 
 import {GatewayCTMDeployerHelper, DeployerCreate2Calldata, DeployerAddresses, DirectDeployedAddresses, DirectCreate2Calldata} from "./GatewayCTMDeployerHelper.sol";
 import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {Verifiers, Facets} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
@@ -48,7 +49,6 @@ import {BridgehubAddresses, CTMDeployedAddresses} from "../utils/Types.sol";
 contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     using stdToml for string;
 
-    BridgehubAddresses internal discoveredBridgehub;
     CTMDeployedAddresses internal addresses;
 
     struct GatewayCTMOutput {
@@ -118,7 +118,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     }
 
     function setAddressesBasedOnBridgehub(uint256 ctmRepresentativeChainId, address bridgehubProxy) internal {
-        discoveredBridgehub = AddressIntrospector.getBridgehubAddresses(IL1Bridgehub(bridgehubProxy));
+        coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubProxy);
         config.ownerAddress = L1Bridgehub(bridgehubProxy).owner();
         if (ctmRepresentativeChainId != 0) {
             ctm = IL1Bridgehub(bridgehubProxy).chainTypeManager(ctmRepresentativeChainId);
@@ -147,6 +147,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
         // Deploy all factory dependencies
         bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps();
+        address l1AssetRouter = address(IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).assetRouter());
 
         for (uint i = 0; i < deps.length; i++) {
             bytes[] memory localDeps = new bytes[](1);
@@ -158,8 +159,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 factoryDeps: localDeps,
                 dstAddress: address(0),
                 chainId: gatewayChainId,
-                bridgehubAddress: discoveredBridgehub.proxies.bridgehub,
-                l1SharedBridgeProxy: address(IL1Bridgehub(discoveredBridgehub.proxies.bridgehub).assetRouter()),
+                bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+                l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
                 refundRecipient: msg.sender
             });
         }
@@ -172,8 +173,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: create2FactoryAddress,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -185,8 +186,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: create2FactoryAddress,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -198,8 +199,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: create2FactoryAddress,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -211,8 +212,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: create2FactoryAddress,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -228,8 +229,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: create2FactoryAddress,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.proxies.bridgehub,
-            l1SharedBridgeProxy: address(IL1Bridgehub(discoveredBridgehub.proxies.bridgehub).assetRouter()),
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -245,8 +246,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: targetAddr,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -258,8 +259,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: targetAddr,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -271,8 +272,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: targetAddr,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -284,8 +285,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: targetAddr,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -297,8 +298,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: targetAddr,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -310,8 +311,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: targetAddr,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -323,8 +324,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: targetAddr,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
     }
@@ -342,8 +343,18 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                     serverNotifier: expectedGatewayContracts.stateTransition.serverNotifierImplementation,
                     validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelockImplementation
                 }),
-                verifiers: expectedGatewayContracts.stateTransition.verifiers,
-                facets: expectedGatewayContracts.stateTransition.facets,
+                verifiers: Verifiers({
+                    verifier: expectedGatewayContracts.stateTransition.verifier,
+                    verifierFflonk: expectedGatewayContracts.stateTransition.verifierFflonk,
+                    verifierPlonk: expectedGatewayContracts.stateTransition.verifierPlonk
+                }),
+                facets: Facets({
+                    adminFacet: expectedGatewayContracts.stateTransition.adminFacet,
+                    mailboxFacet: expectedGatewayContracts.stateTransition.mailboxFacet,
+                    executorFacet: expectedGatewayContracts.stateTransition.executorFacet,
+                    gettersFacet: expectedGatewayContracts.stateTransition.gettersFacet,
+                    diamondInit: expectedGatewayContracts.stateTransition.diamondInit
+                }),
                 genesisUpgrade: expectedGatewayContracts.stateTransition.genesisUpgrade,
                 defaultUpgrade: address(0),
                 legacyValidatorTimelock: address(0),
@@ -381,10 +392,10 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         initializeConfig(configPath, permanentValuesPath, bridgehubProxy, ctmRepresentativeChainId);
         _initializeGatewayGovernanceConfig(
             GatewayGovernanceConfig({
-                bridgehubProxy: discoveredBridgehub.proxies.bridgehub,
-                l1AssetRouterProxy: address(IL1Bridgehub(discoveredBridgehub.proxies.bridgehub).assetRouter()),
+                bridgehubProxy: coreAddresses.bridgehub.proxies.bridgehub,
+                l1AssetRouterProxy: address(IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).assetRouter()),
                 chainTypeManagerProxy: ctm,
-                ctmDeploymentTrackerProxy: discoveredBridgehub.proxies.ctmDeploymentTracker,
+                ctmDeploymentTrackerProxy: coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
                 gatewayChainId: gatewayChainId
             })
         );
