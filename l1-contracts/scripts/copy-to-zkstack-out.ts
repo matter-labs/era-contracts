@@ -41,6 +41,7 @@ const REQUIRED_CONTRACTS = [
   "IL2AssetRouter.sol",
   "IAssetTrackerBase.sol",
   "IL2AssetTracker.sol",
+  "IGWAssetTracker.sol",
   "IChainAdmin.sol",
   "ISetupLegacyBridge.sol",
 ];
