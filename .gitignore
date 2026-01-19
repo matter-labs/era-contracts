@@ -43,5 +43,3 @@ l1-contracts/zkout/*
 foundry-zksync/
 l1-contracts/foundry-zksync/
 
-# Lock files
-l1-contracts/test/foundry/l1/integration/deploy-scripts/script-config/.lock
