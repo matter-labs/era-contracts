@@ -35,25 +35,25 @@ contract DeployCTMIntegrationScript is Script, DeployCTMScript {
             bytes4[] memory executorFacetSelectorsArray = abi.decode(executorFacetSelectors, (bytes4[]));
 
             facetCuts[0] = Diamond.FacetCut({
-                facet: addresses.stateTransition.adminFacet,
+                facet: ctmAddresses.stateTransition.facets.adminFacet,
                 action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: adminFacetSelectorsArray
             });
             facetCuts[1] = Diamond.FacetCut({
-                facet: addresses.stateTransition.gettersFacet,
+                facet: ctmAddresses.stateTransition.facets.gettersFacet,
                 action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: gettersFacetSelectorsArray
             });
             facetCuts[2] = Diamond.FacetCut({
-                facet: addresses.stateTransition.mailboxFacet,
+                facet: ctmAddresses.stateTransition.facets.mailboxFacet,
                 action: Diamond.Action.Add,
                 isFreezable: true,
                 selectors: mailboxFacetSelectorsArray
             });
             facetCuts[3] = Diamond.FacetCut({
-                facet: addresses.stateTransition.executorFacet,
+                facet: ctmAddresses.stateTransition.facets.executorFacet,
                 action: Diamond.Action.Add,
                 isFreezable: true,
                 selectors: executorFacetSelectorsArray

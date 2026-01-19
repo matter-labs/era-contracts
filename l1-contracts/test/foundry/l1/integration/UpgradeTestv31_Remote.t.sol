@@ -17,11 +17,13 @@ import {UpgradeIntegrationTestBase} from "./UpgradeTestShared.t.sol";
 
 contract UpgradeIntegrationTest_Remote is UpgradeIntegrationTestBase {
     function setUp() public {
-        ECOSYSTEM_INPUT = "/upgrade-envs/v0.31.0-interopB/mainnet.toml";
-        ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet.toml";
-        PERMANENT_VALUES_INPUT = "/upgrade-envs/permanent-values/mainnet.toml";
-        CHAIN_INPUT = "/upgrade-envs/v0.30.0-interopB/mainnet-gateway.toml";
-        CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet-gateway.toml";
+        ECOSYSTEM_INPUT = "/upgrade-envs/v0.31.0-interopB/shared.toml";
+        ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/local-core.toml";
+        PERMANENT_VALUES_INPUT = "/upgrade-envs/permanent-values/stage.toml";
+        CHAIN_INPUT = "/upgrade-envs/v0.31.0-interopB/stage-gateway.toml";
+        CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/stage-gateway.toml";
+
+        chainId = 123;
         setupUpgrade(false);
     }
 

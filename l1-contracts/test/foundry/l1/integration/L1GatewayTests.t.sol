@@ -118,7 +118,7 @@ contract L1GatewayTests is
         vm.deal(gatewayChain.getAdmin(), 100000000000000000000000000000000000);
 
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.messageRootProxy),
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
             abi.encodeWithSelector(IMessageRoot.getProofData.selector),
             abi.encode(
                 ProofData({
@@ -218,7 +218,7 @@ contract L1GatewayTests is
         // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId.
         vm.chainId(migratingChainId);
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.messageRootProxy),
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
             abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
             abi.encode(true)
         );
@@ -248,7 +248,7 @@ contract L1GatewayTests is
             batchNumber: 0,
             ctmData: ctmData,
             chainData: chainData,
-            migrationNumber: IChainAssetHandler(address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy))
+            migrationNumber: IChainAssetHandler(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
                 .migrationNumber(migratingChainId)
         });
         bytes memory bridgehubMintData = abi.encode(data);
@@ -345,7 +345,7 @@ contract L1GatewayTests is
         MerkleProofData memory merkleProofData = _getMerkleProofData();
 
         IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
-        address chainAssetHandler = address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy);
+        address chainAssetHandler = address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler);
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
         address zkChain = addresses.bridgehub.getZKChain(migratingChainId);
         address chainAdmin = IZKChain(zkChain).getAdmin();
@@ -441,7 +441,7 @@ contract L1GatewayTests is
         TxStatus txStatus
     ) internal {
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.messageRootProxy),
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
             abi.encodeWithSelector(
                 IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
                 chainId,
@@ -501,7 +501,7 @@ contract L1GatewayTests is
         _mockMessageInclusion(gatewayChainId, merkleProofData, txStatus);
 
         IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
-        address chainAssetHandler = address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy);
+        address chainAssetHandler = address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler);
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
         address zkChain = addresses.bridgehub.getZKChain(migratingChainId);
         address chainAdmin = IZKChain(zkChain).getAdmin();

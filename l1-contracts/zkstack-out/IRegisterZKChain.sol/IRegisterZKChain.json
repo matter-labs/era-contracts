@@ -1,0 +1,186 @@
+[
+  {
+    "type": "function",
+    "name": "getConfig",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct RegisterZKChainConfig",
+        "components": [
+          {
+            "name": "deployerAddress",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "ownerAddress",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "chainChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "validiumMode",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "bridgehubCreateNewChainSalt",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "validatorSenderOperatorEth",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "validatorSenderOperatorBlobsEth",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "validatorSenderOperatorProve",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "validatorSenderOperatorExecute",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "baseToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "baseTokenAssetId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "baseTokenGasPriceMultiplierNominator",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "baseTokenGasPriceMultiplierDenominator",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "governanceSecurityCouncilAddress",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "governanceMinDelay",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "initializeLegacyBridge",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "governance",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "create2FactoryAddress",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "create2Salt",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "allowEvmEmulator",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "l1Erc20Bridge",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "l1SharedBridgeProxy",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "diamondCutData",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "forceDeploymentsData",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getOwnerAddress",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "run",
+    "inputs": [
+      {
+        "name": "_chainTypeManagerProxy",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_chainChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "runForTest",
+    "inputs": [
+      {
+        "name": "_chainTypeManagerProxy",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_chainChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  }
+]

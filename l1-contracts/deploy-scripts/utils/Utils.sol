@@ -445,6 +445,7 @@ library Utils {
     /**
      * @dev Run the l2 l1 transaction
      */
+    //slither-disable-next-line arbitrary-send-eth
     function runL1L2Transaction(
         bytes memory l2Calldata,
         uint256 l2GasLimit,
@@ -478,13 +479,16 @@ library Utils {
         if (ADDRESS_ONE != baseTokenAddress) {
             IERC20 baseToken = IERC20(baseTokenAddress);
             vm.broadcast();
-            baseToken.approve(l1SharedBridgeProxy, requiredValueToDeploy);
+            bool success = baseToken.approve(l1SharedBridgeProxy, requiredValueToDeploy);
+            require(success, "Approval failed");
             requiredValueToDeploy = 0;
         }
 
         vm.broadcast();
         vm.recordLogs();
-        bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(l2TransactionRequestDirect);
+        bytes32 canonicalTxHash = bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(
+            l2TransactionRequestDirect
+        );
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 

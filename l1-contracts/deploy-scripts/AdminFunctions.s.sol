@@ -3,6 +3,7 @@ pragma solidity ^0.8.21;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 
+import {IAdminFunctions} from "contracts/script-interfaces/IAdminFunctions.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
@@ -32,7 +33,7 @@ import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
-contract AdminFunctions is Script {
+contract AdminFunctions is Script, IAdminFunctions {
     using stdToml for string;
 
     struct Config {

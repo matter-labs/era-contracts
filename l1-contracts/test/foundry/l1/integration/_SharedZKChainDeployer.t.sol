@@ -4,7 +4,8 @@ pragma solidity 0.8.28;
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
-import {Config as ChainConfig, RegisterZKChainScript} from "deploy-scripts/ctm/RegisterZKChain.s.sol";
+import {RegisterZKChainScript} from "deploy-scripts/ctm/RegisterZKChain.s.sol";
+import {RegisterZKChainConfig as ChainConfig} from "contracts/script-interfaces/IRegisterZKChain.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
@@ -111,7 +112,7 @@ contract ZKChainDeployer is L1ContractDeployer {
     function _deployZKChainShared(uint256 _chainId, address _baseToken) internal {
         saveZKChainConfig(_getDefaultDescription(_chainId, _baseToken, _chainId));
         zkChainIds.push(_chainId);
-        deployScript.runForTest();
+        deployScript.runForTest(address(addresses.chainTypeManager), _chainId);
         _setDAValidatorPair(_chainId);
         _processGenesisUpgrade(_chainId);
     }

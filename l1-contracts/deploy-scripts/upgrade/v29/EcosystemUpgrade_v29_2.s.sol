@@ -58,8 +58,8 @@ contract EcosystemUpgrade_v29_2 is Script, DefaultCTMUpgrade {
 
         addresses.stateTransition.defaultUpgrade = deployUsedUpgradeContract();
         upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
-        bridgehubAddresses.messageRootImplementation = deploySimpleContract("MessageRoot", false);
-        bridgehubAddresses.chainAssetHandlerImplementation = deploySimpleContract("ChainAssetHandler", false);
+        bridgehubAddresses.implementations.messageRoot = deploySimpleContract("MessageRoot", false);
+        bridgehubAddresses.implementations.chainAssetHandler = deploySimpleContract("ChainAssetHandler", false);
         addresses.stateTransition.adminFacet = deploySimpleContract("AdminFacet", false);
         addresses.stateTransition.mailboxFacet = deploySimpleContract("MailboxFacet", false);
 
@@ -123,11 +123,11 @@ contract EcosystemUpgrade_v29_2 is Script, DefaultCTMUpgrade {
 
         calls[0] = _buildCallProxyUpgrade(
             discoveredBridgehub.messageRoot,
-            bridgehubAddresses.messageRootImplementation
+            bridgehubAddresses.implementations.messageRoot
         );
         calls[1] = _buildCallProxyUpgrade(
-            discoveredBridgehub.chainAssetHandler,
-            bridgehubAddresses.chainAssetHandlerImplementation
+            discoveredBridgehub.proxies.chainAssetHandler,
+            bridgehubAddresses.implementations.chainAssetHandler
         );
     }
 

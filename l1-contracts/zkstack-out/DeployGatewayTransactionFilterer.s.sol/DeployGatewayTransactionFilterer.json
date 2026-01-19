@@ -1,0 +1,122 @@
+[
+  {
+    "type": "function",
+    "name": "IS_SCRIPT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getCreate2FactoryParams",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "create2FactoryAddr",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "create2FactorySalt",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getPermanentValues",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "create2FactoryAddr",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "create2FactorySalt",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getPermanentValues",
+    "inputs": [
+      {
+        "name": "permanentValuesPath",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "create2FactoryAddr",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "create2FactorySalt",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "run",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "chainAdmin",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "chainProxyAdmin",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "proxy",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "runWithInputFromFile",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "error",
+    "name": "AddressHasNoCode",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  }
+]

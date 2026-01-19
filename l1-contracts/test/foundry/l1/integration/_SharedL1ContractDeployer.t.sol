@@ -64,6 +64,10 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         vm.setEnv("CTM_CONFIG", "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm.toml");
         vm.setEnv("CTM_OUTPUT", "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-ctm.toml");
         vm.setEnv(
+            "PERMANENT_VALUES_INPUT",
+            "/test/foundry/l1/integration/deploy-scripts/script-config/permanent-values.toml"
+        );
+        vm.setEnv(
             "ZK_CHAIN_CONFIG",
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-era.toml"
         );
@@ -77,23 +81,26 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         );
         ecosystemAddresses = deployEcosystem();
         ctmScript = new DeployCTMIntegrationScript();
-        ctmScript.runForTest(ecosystemAddresses.bridgehub.bridgehubProxy, false);
+        ctmScript.runForTest(ecosystemAddresses.bridgehub.proxies.bridgehub, false);
         ctmAddresses = ctmScript.getAddresses();
-        registerCTM(ecosystemAddresses.bridgehub.bridgehubProxy, ctmAddresses.stateTransition.chainTypeManagerProxy);
+        registerCTM(
+            ecosystemAddresses.bridgehub.proxies.bridgehub,
+            ctmAddresses.stateTransition.proxies.chainTypeManager
+        );
 
         ecosystemConfig = ctmScript.getConfig();
 
         // Get bridgehub from the CTM script's discovered addresses
-        addresses.bridgehub = L1Bridgehub(ecosystemAddresses.bridgehub.bridgehubProxy);
-        addresses.chainTypeManager = IChainTypeManager(ctmAddresses.stateTransition.chainTypeManagerProxy);
+        addresses.bridgehub = L1Bridgehub(ecosystemAddresses.bridgehub.proxies.bridgehub);
+        addresses.chainTypeManager = IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager);
         addresses.ctmDeploymentTracker = CTMDeploymentTracker(address(addresses.bridgehub.l1CtmDeployer()));
 
-        addresses.sharedBridge = L1AssetRouter(ecosystemAddresses.bridges.l1AssetRouterProxy);
-        addresses.l1Nullifier = L1Nullifier(ecosystemAddresses.bridges.l1NullifierProxy);
+        addresses.sharedBridge = L1AssetRouter(ecosystemAddresses.bridges.proxies.l1AssetRouter);
+        addresses.l1Nullifier = L1Nullifier(ecosystemAddresses.bridges.proxies.l1Nullifier);
         addresses.l1NativeTokenVault = L1NativeTokenVault(payable(address(addresses.l1Nullifier.l1NativeTokenVault())));
 
         addresses.chainRegistrationSender = ChainRegistrationSender(
-            ecosystemAddresses.bridgehub.chainRegistrationSenderProxy
+            ecosystemAddresses.bridgehub.proxies.chainRegistrationSender
         );
         _acceptOwnershipCore();
         _acceptOwnershipCTM();
@@ -106,7 +113,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         vm.startPrank(addresses.bridgehub.pendingOwner());
         addresses.bridgehub.acceptOwnership();
         addresses.sharedBridge.acceptOwnership();
-        IOwnable(ecosystemAddresses.bridgehub.chainAssetHandlerProxy).acceptOwnership();
+        IOwnable(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).acceptOwnership();
         addresses.ctmDeploymentTracker.acceptOwnership();
         vm.stopPrank();
     }
