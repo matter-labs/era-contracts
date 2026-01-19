@@ -4,7 +4,7 @@ use crate::consts::{
     SYSTEM_PROXY_ADMIN_OWNER_SLOT,
 };
 use crate::types::{InitialGenesisInput, LeafInfo, MAX_B256_VALUE, MERKLE_TREE_DEPTH};
-use crate::utils::{address_to_b256, contract_name_to_code};
+use crate::utils::{address_to_b256, da_contract_name_to_code, l1_contract_name_to_code};
 use alloy::consensus::{Header, EMPTY_OMMER_ROOT_HASH};
 use alloy::eips::eip1559::INITIAL_BASE_FEE;
 use alloy::primitives::{Address, Bloom, B256, B64, U256};
@@ -22,7 +22,8 @@ impl InitialGenesisInput {
                 .iter()
                 .map(|(addr, source)| {
                     let code = match source {
-                        ContractSource::Name(name) => contract_name_to_code(name),
+                        ContractSource::L1ContractName(name) => l1_contract_name_to_code(name),
+                        ContractSource::DAContractName(name) => da_contract_name_to_code(name),
                         ContractSource::Bytecode(bytecode) => bytecode.to_vec(),
                     };
                     (*addr, alloy::primitives::Bytes::from(code))

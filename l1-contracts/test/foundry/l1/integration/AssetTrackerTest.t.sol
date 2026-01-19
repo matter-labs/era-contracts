@@ -96,7 +96,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         }
 
         assetTracker = IL1AssetTracker(
-            address(IL1NativeTokenVault(ecosystemAddresses.vaults.l1NativeTokenVaultProxy).l1AssetTracker())
+            address(IL1NativeTokenVault(ecosystemAddresses.bridges.proxies.l1NativeTokenVault).l1AssetTracker())
         );
         address l2AssetTrackerAddress = address(new L2AssetTracker());
         vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
@@ -194,7 +194,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         });
         vm.chainId(originalChainId);
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.messageRootProxy),
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
             abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
             abi.encode(true)
         );
@@ -232,7 +232,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.store(address(assetTracker), getTotalSupplyAcrossAllChainsLocation(assetId), bytes32(amount));
 
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
+            address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler),
             abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
             abi.encode(migrationNumber)
         );
@@ -241,9 +241,9 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
             abi.encode(migrationNumber)
         );
-        console.log("chainAssetHandler", address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy));
+        console.log("chainAssetHandler", address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler));
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
+            address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler),
             abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
             abi.encode(migrationNumber)
         );
@@ -274,7 +274,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
                 abi.encode(bytes32(0))
             );
             vm.mockCall(
-                address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
+                address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler),
                 abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
                 abi.encode(migrationNumber)
             );
@@ -320,7 +320,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         vm.chainId(originalChainId);
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.messageRootProxy),
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
             abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
             abi.encode(true)
         );
@@ -363,11 +363,11 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             bytes32(migrationNumber - 1)
         );
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
+            address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler),
             abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
             abi.encode(migrationNumber)
         );
-        console.log("chainAssetHandler", address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy));
+        console.log("chainAssetHandler", address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler));
 
         assetTracker.receiveMigrationOnL1(finalizeWithdrawalParamsGatewayToL1);
 
@@ -389,14 +389,14 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         // Set origin chain ID (different from test chain)
         vm.mockCall(
-            address(ecosystemAddresses.vaults.l1NativeTokenVaultProxy),
+            address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault),
             abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, assetId),
             abi.encode(originalChainId)
         );
 
         // Mock the migrateTokenBalanceToAssetTracker call
         vm.mockCall(
-            address(ecosystemAddresses.vaults.l1NativeTokenVaultProxy),
+            address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault),
             abi.encodeWithSelector(
                 IL1NativeTokenVault.migrateTokenBalanceToAssetTracker.selector,
                 testChainId,
@@ -432,14 +432,14 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         // Set origin chain ID to a different chain
         vm.mockCall(
-            address(ecosystemAddresses.vaults.l1NativeTokenVaultProxy),
+            address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault),
             abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, assetId),
             abi.encode(differentOriginChain)
         );
 
         // Mock token address
         vm.mockCall(
-            address(ecosystemAddresses.vaults.l1NativeTokenVaultProxy),
+            address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault),
             abi.encodeWithSelector(INativeTokenVaultBase.tokenAddress.selector, assetId),
             abi.encode(tokenAddress)
         );
@@ -506,7 +506,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         // Mock origin chain ID
         vm.mockCall(
-            address(ecosystemAddresses.vaults.l1NativeTokenVaultProxy),
+            address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault),
             abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, testAssetId),
             abi.encode(originalChainId)
         );
@@ -520,13 +520,13 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         // Mock chain migration number
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
+            address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler),
             abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector, targetChainId),
             abi.encode(migrationNumber)
         );
 
         // Call handleChainBalanceIncreaseOnL1 as NativeTokenVault to set transient balance
-        vm.prank(address(ecosystemAddresses.vaults.l1NativeTokenVaultProxy));
+        vm.prank(address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault));
         assetTracker.handleChainBalanceIncreaseOnL1(targetChainId, testAssetId, testAmount, originalChainId);
 
         // Now consume the balance change

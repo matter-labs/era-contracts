@@ -1,0 +1,6 @@
+broadcast/*
+contracts/*
+out/*
+zkout/*
+cache-forge/*
+upgrade-envs/*

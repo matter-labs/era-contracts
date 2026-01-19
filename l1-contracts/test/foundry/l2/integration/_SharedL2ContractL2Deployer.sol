@@ -49,28 +49,29 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
             root,
             "/test/foundry/l1/integration/deploy-scripts/script-config/permanent-values.toml"
         );
-        initializeConfig(inputPath);
-        addresses.transparentProxyAdmin = address(0x1);
+
+        initializeConfig(inputPath, permanentValuesInputPath, L2_BRIDGEHUB_ADDR);
+        ctmAddresses.admin.transparentProxyAdmin = address(0x1);
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         instantiateCreate2Factory();
-        addresses.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade());
-        addresses.stateTransition.verifier = address(
+        ctmAddresses.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade());
+        ctmAddresses.stateTransition.verifiers.verifier = address(
             new EraTestnetVerifier(IVerifierV2(ADDRESS_ONE), IVerifier(ADDRESS_ONE))
         );
         uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
-        addresses.stateTransition.validatorTimelock = address(
+        ctmAddresses.stateTransition.proxies.validatorTimelock = address(
             new TransparentUpgradeableProxy(
                 address(new ValidatorTimelock(L2_BRIDGEHUB_ADDR)),
-                addresses.transparentProxyAdmin,
+                ctmAddresses.admin.transparentProxyAdmin,
                 abi.encodeCall(ValidatorTimelock.initialize, (config.deployerAddress, executionDelay))
             )
         );
-        addresses.stateTransition.executorFacet = address(new ExecutorFacet(config.l1ChainId));
-        addresses.stateTransition.adminFacet = address(
-            new AdminFacet(config.l1ChainId, RollupDAManager(addresses.daAddresses.rollupDAManager), false)
+        ctmAddresses.stateTransition.facets.executorFacet = address(new ExecutorFacet(config.l1ChainId));
+        ctmAddresses.stateTransition.facets.adminFacet = address(
+            new AdminFacet(config.l1ChainId, RollupDAManager(ctmAddresses.daAddresses.rollupDAManager), false)
         );
-        addresses.stateTransition.mailboxFacet = address(
+        ctmAddresses.stateTransition.facets.mailboxFacet = address(
             new MailboxFacet(
                 config.eraChainId,
                 config.l1ChainId,
@@ -79,29 +80,29 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
                 false
             )
         );
-        addresses.stateTransition.gettersFacet = address(new GettersFacet());
-        addresses.stateTransition.diamondInit = address(new DiamondInit(false));
+        ctmAddresses.stateTransition.facets.gettersFacet = address(new GettersFacet());
+        ctmAddresses.stateTransition.facets.diamondInit = address(new DiamondInit(false));
         // Deploy ChainTypeManager implementation
         if (config.isZKsyncOS) {
-            addresses.stateTransition.chainTypeManagerImplementation = address(
-                new ZKsyncOSChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
+            ctmAddresses.stateTransition.implementations.chainTypeManager = address(
+                new ZKsyncOSChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0))
             );
         } else {
-            addresses.stateTransition.chainTypeManagerImplementation = address(
-                new EraChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
+            ctmAddresses.stateTransition.implementations.chainTypeManager = address(
+                new EraChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0))
             );
         }
 
         // Deploy TransparentUpgradeableProxy for ChainTypeManager
         bytes memory initCalldata = abi.encodeCall(
             IChainTypeManager.initialize,
-            getChainTypeManagerInitializeData(addresses.stateTransition)
+            getChainTypeManagerInitializeData(ctmAddresses.stateTransition)
         );
 
-        addresses.stateTransition.chainTypeManagerProxy = address(
+        ctmAddresses.stateTransition.proxies.chainTypeManager = address(
             new TransparentUpgradeableProxy(
-                addresses.stateTransition.chainTypeManagerImplementation,
-                addresses.transparentProxyAdmin,
+                ctmAddresses.stateTransition.implementations.chainTypeManager,
+                ctmAddresses.admin.transparentProxyAdmin,
                 initCalldata
             )
         );

@@ -15,6 +15,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ADDRESS_ONE, Utils} from "../../utils/Utils.sol";
+import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 
 /**
  * @title Prepare ZKChain Registration Calldata
@@ -100,10 +101,10 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
     EcosystemContracts internal ecosystem;
     ContractsBytecodes internal bytecodes;
 
-    function run() public {
+    function run(address _bridgehub, address _stateTransitionProxy, uint256 _chainId) public {
         console.log("Preparing ZK chain registration calldata");
 
-        initializeConfig();
+        initializeConfig(_bridgehub, _stateTransitionProxy, _chainId);
 
         checkBaseTokenAddress();
 
@@ -129,7 +130,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         scheduleTransparentCalldata(calls, initChainCall);
     }
 
-    function initializeConfig() internal {
+    function initializeConfig(address bridgehub, address stateTransitionProxy, uint256 chainId) internal {
         // Grab config from output of l1 deployment
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/prepare-registration-calldata.toml");
@@ -139,14 +140,16 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alphabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
-        config.stateTransitionProxy = toml.readAddress("$.deployed_addresses.state_transition_proxy_addr");
-        config.erc20BridgeProxy = toml.readAddress("$.deployed_addresses.erc20_bridge_proxy_addr");
+        config.stateTransitionProxy = stateTransitionProxy;
 
-        ecosystem.bridgehub = IChainTypeManager(config.stateTransitionProxy).BRIDGE_HUB();
-        ecosystem.l1SharedBridgeProxy = address(L1Bridgehub(ecosystem.bridgehub).assetRouter());
-        ecosystem.governance = L1Bridgehub(ecosystem.bridgehub).owner();
+        // Use AddressIntrospector to get addresses from deployed contracts
+        BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(IL1Bridgehub(bridgehub));
+        ecosystem.bridgehub = bridgehub;
+        ecosystem.l1SharedBridgeProxy = bhAddresses.assetRouter;
+        ecosystem.governance = bhAddresses.governance;
+        config.proxies.erc20Bridge = AddressIntrospector.getLegacyBridgeAddresses(bhAddresses.assetRouter);
 
-        config.chainId = toml.readUint("$.chain.chain_id");
+        config.chainId = chainId;
         config.eraChainId = toml.readUint("$.chain.era_chain_id");
         config.chainAdmin = toml.readAddress("$.chain.admin");
         config.diamondCutData = toml.readBytes("$.chain.diamond_cut_data");
@@ -246,7 +249,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         bytes memory proxyInitializationParams = abi.encodeWithSignature(
             "initialize(address,address,bytes32,address)",
             ecosystem.l1SharedBridgeProxy,
-            config.erc20BridgeProxy,
+            config.proxies.erc20Bridge,
             l2StandardErc20BytecodeHash,
             l2GovernanceAddress
         );
@@ -266,7 +269,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
 
         console.log("Computed L2 bridge proxy address:", proxyContractAddress);
         console.log("L1 shared bridge proxy:", ecosystem.l1SharedBridgeProxy);
-        console.log("L1 ERC20 bridge proxy:", config.erc20BridgeProxy);
+        console.log("L1 ERC20 bridge proxy:", config.proxies.erc20Bridge);
         console.log("L2 governor addr:", l2GovernanceAddress);
 
         return proxyContractAddress;

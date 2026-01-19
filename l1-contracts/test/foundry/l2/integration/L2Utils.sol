@@ -216,6 +216,9 @@ library L2Utils {
 
         prankOrBroadcast(false, L2_FORCE_DEPLOYER_ADDR);
         IContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(deployments);
+
+        // In test environment, we need to actually etch the bytecode at the target address
+        vm.etch(_address, bytecode);
     }
 
     function deployViaCreat2L2(

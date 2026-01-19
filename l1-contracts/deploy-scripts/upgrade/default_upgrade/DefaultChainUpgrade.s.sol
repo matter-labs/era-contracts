@@ -33,7 +33,7 @@ contract DefaultChainUpgrade is Script {
     address currentChainAdmin;
     ChainConfig config;
 
-    function prepareChain(string memory permanentValuesInputPath) public {
+    function prepareChain(uint256 chainId, string memory permanentValuesInputPath) public {
         string memory root = vm.projectRoot();
         permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
 
@@ -44,8 +44,8 @@ contract DefaultChainUpgrade is Script {
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
 
-        config.chainChainId = permanentValuesInputToml.readUint("$.chain.chain_id");
-        config.bridgehubProxyAddress = permanentValuesInputToml.readAddress("$.contracts.bridgehub_proxy_address");
+        config.chainChainId = chainId;
+        config.bridgehubProxyAddress = permanentValuesInputToml.readAddress("$.core_contracts.bridgehub_proxy_addr");
 
         address ctm = L1Bridgehub(config.bridgehubProxyAddress).chainTypeManager(config.chainChainId);
         setupConfigFromOnchain(ctm, config.chainChainId);

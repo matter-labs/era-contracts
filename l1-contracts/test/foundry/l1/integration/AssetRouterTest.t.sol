@@ -112,12 +112,12 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         bytes32 ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(eraZKChainId, ETH_TOKEN_ADDRESS);
 
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
+            address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler),
             abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
             abi.encode(0)
         );
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.messageRootProxy),
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
             abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
         );
@@ -126,7 +126,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         _setAssetTrackerChainBalance(506, ETH_TOKEN_ADDRESS, 1e30);
         bytes32 ethAssetId = 0x8df3463b1850eb1d8d1847743ea155aef6b16074db8ba81d897dc30554fb2085;
         stdstore
-            .target(address(ecosystemAddresses.bridgehub.assetTrackerProxy))
+            .target(address(ecosystemAddresses.bridgehub.proxies.assetTracker))
             .sig(IAssetTrackerBase.chainBalance.selector)
             .with_key(eraZKChainId)
             .with_key(ETH_TOKEN_ASSET_ID)
@@ -137,7 +137,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
 
     function depositToL1(address _tokenAddress) public {
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.messageRootProxy),
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
             abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
             abi.encode(true)
         );
@@ -147,7 +147,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             abi.encode(506)
         );
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.messageRootProxy),
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
             abi.encodeWithSelector(IMessageRoot.getProofData.selector),
             abi.encode(
                 ProofData({
@@ -163,7 +163,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             )
         );
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.messageRootProxy),
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
             abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
         );

@@ -31,21 +31,25 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 
 import {DeployCTMScript} from "../ctm/DeployCTM.s.sol";
-import {StateTransitionDeployedAddresses} from "../utils/Types.sol";
+import {StateTransitionDeployedAddresses, StateTransitionContracts} from "../utils/Types.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 
 import {GatewayCTMDeployerHelper, DeployerCreate2Calldata, DeployerAddresses, DirectDeployedAddresses, DirectCreate2Calldata} from "./GatewayCTMDeployerHelper.sol";
 import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {Verifiers, Facets} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {GatewayGovernanceUtils} from "./GatewayGovernanceUtils.s.sol";
 import {DeployCTMUtils} from "../ctm/DeployCTMUtils.s.sol";
+import {BridgehubAddresses, CTMDeployedAddresses} from "../utils/Types.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     using stdToml for string;
+
+    CTMDeployedAddresses internal addresses;
 
     struct GatewayCTMOutput {
         StateTransitionDeployedAddresses gatewayStateTransition;
@@ -71,19 +75,24 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
     GatewayCTMDeployerConfig internal gatewayCTMDeployerConfig;
 
-    function initializeConfig(string memory configPath, uint256 ctmRepresentativeChainId) internal virtual {
-        super.initializeConfig(configPath);
+    function initializeConfig(
+        string memory configPath,
+        string memory permanentValuesPath,
+        address bridgehubProxy,
+        uint256 ctmRepresentativeChainId
+    ) internal virtual {
+        super.initializeConfig(configPath, permanentValuesPath, bridgehubProxy);
         string memory toml = vm.readFile(configPath);
 
-        address bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
         refundRecipient = toml.readAddress("$.refund_recipient");
-
-        eraChainId = toml.readUint("$.era_chain_id");
 
         gatewayChainId = toml.readUint("$.gateway_chain_id");
         forceDeploymentsData = toml.readBytes(".force_deployments_data");
 
         setAddressesBasedOnBridgehub(ctmRepresentativeChainId, bridgehubProxy);
+        // Get eraChainId from AssetRouter
+        address assetRouter = address(IL1Bridgehub(bridgehubProxy).assetRouter());
+        eraChainId = AddressIntrospector.getEraChainId(assetRouter);
 
         address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
@@ -109,7 +118,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     }
 
     function setAddressesBasedOnBridgehub(uint256 ctmRepresentativeChainId, address bridgehubProxy) internal {
-        discoveredBridgehub = AddressIntrospector.getBridgehubAddresses(IL1Bridgehub(bridgehubProxy));
+        coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubProxy);
         config.ownerAddress = L1Bridgehub(bridgehubProxy).owner();
         if (ctmRepresentativeChainId != 0) {
             ctm = IL1Bridgehub(bridgehubProxy).chainTypeManager(ctmRepresentativeChainId);
@@ -121,7 +130,9 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             ctmProtocolVersion == config.contracts.chainCreationParams.latestProtocolVersion,
             "CTM protocol version mismatch"
         );
-        // It is used as the ecosystem admin inside the `DeployL1` contract
+        // Get full CTM addresses including stateTransition info
+        addresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
+        // Override chainAdmin with the bridgehub admin (ecosystem admin)
         addresses.chainAdmin = L1Bridgehub(bridgehubProxy).admin();
     }
 
@@ -136,6 +147,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
         // Deploy all factory dependencies
         bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps();
+        address l1AssetRouter = address(IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).assetRouter());
 
         for (uint i = 0; i < deps.length; i++) {
             bytes[] memory localDeps = new bytes[](1);
@@ -147,8 +159,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 factoryDeps: localDeps,
                 dstAddress: address(0),
                 chainId: gatewayChainId,
-                bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-                l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+                bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+                l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
                 refundRecipient: msg.sender
             });
         }
@@ -161,8 +173,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: create2FactoryAddress,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -174,8 +186,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: create2FactoryAddress,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -187,8 +199,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: create2FactoryAddress,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -200,8 +212,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: create2FactoryAddress,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -217,8 +229,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: create2FactoryAddress,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -234,8 +246,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: targetAddr,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -247,8 +259,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: targetAddr,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -260,8 +272,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: targetAddr,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -273,8 +285,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: targetAddr,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -286,8 +298,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: targetAddr,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -299,8 +311,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: targetAddr,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
 
@@ -312,8 +324,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             factoryDeps: new bytes[](0),
             dstAddress: targetAddr,
             chainId: gatewayChainId,
-            bridgehubAddress: discoveredBridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: discoveredBridgehub.assetRouter,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
     }
@@ -321,30 +333,35 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     function _saveExpectedGatewayContractsToOutput(DeployedContracts memory expectedGatewayContracts) internal {
         output = GatewayCTMOutput({
             gatewayStateTransition: StateTransitionDeployedAddresses({
-                chainTypeManagerProxy: expectedGatewayContracts.stateTransition.chainTypeManagerProxy,
-                chainTypeManagerProxyAdmin: expectedGatewayContracts.stateTransition.chainTypeManagerProxyAdmin,
-                chainTypeManagerImplementation: expectedGatewayContracts.stateTransition.chainTypeManagerImplementation,
-                verifier: expectedGatewayContracts.stateTransition.verifier,
-                verifierFflonk: expectedGatewayContracts.stateTransition.verifierFflonk,
-                verifierPlonk: expectedGatewayContracts.stateTransition.verifierPlonk,
-                adminFacet: expectedGatewayContracts.stateTransition.adminFacet,
-                mailboxFacet: expectedGatewayContracts.stateTransition.mailboxFacet,
-                executorFacet: expectedGatewayContracts.stateTransition.executorFacet,
-                gettersFacet: expectedGatewayContracts.stateTransition.gettersFacet,
-                diamondInit: expectedGatewayContracts.stateTransition.diamondInit,
+                proxies: StateTransitionContracts({
+                    chainTypeManager: expectedGatewayContracts.stateTransition.chainTypeManagerProxy,
+                    serverNotifier: expectedGatewayContracts.stateTransition.serverNotifierProxy,
+                    validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelock
+                }),
+                implementations: StateTransitionContracts({
+                    chainTypeManager: expectedGatewayContracts.stateTransition.chainTypeManagerImplementation,
+                    serverNotifier: expectedGatewayContracts.stateTransition.serverNotifierImplementation,
+                    validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelockImplementation
+                }),
+                verifiers: Verifiers({
+                    verifier: expectedGatewayContracts.stateTransition.verifier,
+                    verifierFflonk: expectedGatewayContracts.stateTransition.verifierFflonk,
+                    verifierPlonk: expectedGatewayContracts.stateTransition.verifierPlonk
+                }),
+                facets: Facets({
+                    adminFacet: expectedGatewayContracts.stateTransition.adminFacet,
+                    mailboxFacet: expectedGatewayContracts.stateTransition.mailboxFacet,
+                    executorFacet: expectedGatewayContracts.stateTransition.executorFacet,
+                    gettersFacet: expectedGatewayContracts.stateTransition.gettersFacet,
+                    diamondInit: expectedGatewayContracts.stateTransition.diamondInit
+                }),
                 genesisUpgrade: expectedGatewayContracts.stateTransition.genesisUpgrade,
-                validatorTimelockImplementation: expectedGatewayContracts
-                    .stateTransition
-                    .validatorTimelockImplementation,
-                validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelock,
-                serverNotifierProxy: expectedGatewayContracts.stateTransition.serverNotifierProxy,
-                serverNotifierImplementation: expectedGatewayContracts.stateTransition.serverNotifierImplementation,
-                rollupDAManager: expectedGatewayContracts.daContracts.rollupDAManager,
-                rollupSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator,
-                // No need for default upgrade on gateway
                 defaultUpgrade: address(0),
-                diamondProxy: address(0),
-                bytecodesSupplier: address(0)
+                legacyValidatorTimelock: address(0),
+                eraDiamondProxy: address(0),
+                bytecodesSupplier: address(0),
+                rollupDAManager: expectedGatewayContracts.daContracts.rollupDAManager,
+                rollupSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator
             }),
             multicall3: expectedGatewayContracts.multicall3,
             diamondCutData: expectedGatewayContracts.diamondCutData,
@@ -354,8 +371,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         });
     }
 
-    function run() public {
-        prepareForGWVoting(0);
+    function run(address bridgehubProxy, uint256 ctmRepresentativeChainId) public {
+        prepareForGWVoting(bridgehubProxy, ctmRepresentativeChainId);
     }
 
     function deployServerNotifier() internal returns (address implementation, address proxy) {
@@ -365,19 +382,20 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin, false);
     }
 
-    function prepareForGWVoting(uint256 ctmRepresentativeChainId) public {
+    function prepareForGWVoting(address bridgehubProxy, uint256 ctmRepresentativeChainId) public {
         console.log("Setting up the Gateway script");
 
         string memory root = vm.projectRoot();
         string memory configPath = string.concat(root, vm.envString("GATEWAY_VOTE_PREPARATION_INPUT"));
+        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
 
-        initializeConfig(configPath, ctmRepresentativeChainId);
+        initializeConfig(configPath, permanentValuesPath, bridgehubProxy, ctmRepresentativeChainId);
         _initializeGatewayGovernanceConfig(
             GatewayGovernanceConfig({
-                bridgehubProxy: discoveredBridgehub.bridgehubProxy,
-                l1AssetRouterProxy: discoveredBridgehub.assetRouter,
+                bridgehubProxy: coreAddresses.bridgehub.proxies.bridgehub,
+                l1AssetRouterProxy: address(IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).assetRouter()),
                 chainTypeManagerProxy: ctm,
-                ctmDeploymentTrackerProxy: discoveredBridgehub.l1CtmDeployer,
+                ctmDeploymentTrackerProxy: coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
                 gatewayChainId: gatewayChainId
             })
         );
@@ -394,7 +412,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
             ecosystemAdminCalls = new Call[](2);
             ecosystemAdminCalls[0] = Call({
-                target: addresses.stateTransition.chainTypeManagerProxy,
+                target: addresses.stateTransition.proxies.chainTypeManager,
                 value: 0,
                 data: abi.encodeCall(ChainTypeManagerBase.setServerNotifier, (serverNotifier))
             });
@@ -411,10 +429,10 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         Call[] memory governanceCalls = _prepareGatewayGovernanceCalls(
             PrepareGatewayGovernanceCalls({
                 _l1GasPrice: EXPECTED_MAX_L1_GAS_PRICE,
-                _gatewayCTMAddress: output.gatewayStateTransition.chainTypeManagerProxy,
+                _gatewayCTMAddress: output.gatewayStateTransition.proxies.chainTypeManager,
                 _gatewayRollupDAManager: output.rollupDAManager,
-                _gatewayValidatorTimelock: output.gatewayStateTransition.validatorTimelock,
-                _gatewayServerNotifier: output.gatewayStateTransition.serverNotifierProxy,
+                _gatewayValidatorTimelock: output.gatewayStateTransition.proxies.validatorTimelock,
+                _gatewayServerNotifier: output.gatewayStateTransition.proxies.serverNotifier,
                 _refundRecipient: refundRecipient,
                 _ctmRepresentativeChainId: ctmRepresentativeChainId
             })
@@ -427,31 +445,43 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         vm.serializeAddress(
             "gateway_state_transition",
             "chain_type_manager_proxy_addr",
-            output.gatewayStateTransition.chainTypeManagerProxy
+            output.gatewayStateTransition.proxies.chainTypeManager
         );
         vm.serializeAddress(
             "gateway_state_transition",
             "chain_type_manager_implementation_addr",
-            output.gatewayStateTransition.chainTypeManagerImplementation
+            output.gatewayStateTransition.implementations.chainTypeManager
         );
-        vm.serializeAddress("gateway_state_transition", "verifier_addr", output.gatewayStateTransition.verifier);
-        vm.serializeAddress("gateway_state_transition", "admin_facet_addr", output.gatewayStateTransition.adminFacet);
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "verifier_addr",
+            output.gatewayStateTransition.verifiers.verifier
+        );
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "admin_facet_addr",
+            output.gatewayStateTransition.facets.adminFacet
+        );
         vm.serializeAddress(
             "gateway_state_transition",
             "mailbox_facet_addr",
-            output.gatewayStateTransition.mailboxFacet
+            output.gatewayStateTransition.facets.mailboxFacet
         );
         vm.serializeAddress(
             "gateway_state_transition",
             "executor_facet_addr",
-            output.gatewayStateTransition.executorFacet
+            output.gatewayStateTransition.facets.executorFacet
         );
         vm.serializeAddress(
             "gateway_state_transition",
             "getters_facet_addr",
-            output.gatewayStateTransition.gettersFacet
+            output.gatewayStateTransition.facets.gettersFacet
         );
-        vm.serializeAddress("gateway_state_transition", "diamond_init_addr", output.gatewayStateTransition.diamondInit);
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "diamond_init_addr",
+            output.gatewayStateTransition.facets.diamondInit
+        );
         vm.serializeAddress(
             "gateway_state_transition",
             "genesis_upgrade_addr",
@@ -465,13 +495,13 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         vm.serializeAddress(
             "gateway_state_transition",
             "validator_timelock_addr",
-            output.gatewayStateTransition.validatorTimelock
+            output.gatewayStateTransition.proxies.validatorTimelock
         );
         vm.serializeAddress("gateway_state_transition", "rollup_da_manager_addr", output.rollupDAManager);
         string memory gatewayStateTransition = vm.serializeAddress(
             "gateway_state_transition",
             "diamond_proxy_addr",
-            output.gatewayStateTransition.diamondProxy
+            output.gatewayStateTransition.eraDiamondProxy
         );
         vm.serializeString("root", "gateway_state_transition", gatewayStateTransition);
         vm.serializeAddress("root", "multicall3_addr", output.multicall3);

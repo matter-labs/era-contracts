@@ -110,8 +110,8 @@ contract GatewayCTMDeployerTest is Test {
         new RollupDAManager();
         new ValidiumL1DAValidator();
         new RelayedSLDAValidator();
-
-        // ProxyAdmin contracts
+        new ZKsyncOSChainTypeManager(address(0), address(0), address(0));
+        new EraChainTypeManager(address(0), address(0), address(0));
         new ProxyAdmin();
 
         // ValidatorTimelock contracts
@@ -124,8 +124,8 @@ contract GatewayCTMDeployerTest is Test {
 
         // CTM contracts
         new ServerNotifier();
-        new ZKsyncOSChainTypeManager(address(0), address(0));
-        new EraChainTypeManager(address(0), address(0));
+        new ZKsyncOSChainTypeManager(address(0), address(0), address(0));
+        new EraChainTypeManager(address(0), address(0), address(0));
 
         // Direct deployment contracts (no deployer)
         new AdminFacet(1, RollupDAManager(address(0)), false);
