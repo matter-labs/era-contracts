@@ -58,7 +58,11 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
 
         // Verify token is registered after
         assertEq(l2NativeTokenVault.assetId(l2Token), expectedAssetId, "Asset ID should be set after registration");
-        assertEq(l2NativeTokenVault.tokenAddress(expectedAssetId), l2Token, "Token address should be mapped to asset ID");
+        assertEq(
+            l2NativeTokenVault.tokenAddress(expectedAssetId),
+            l2Token,
+            "Token address should be mapped to asset ID"
+        );
         assertEq(l2NativeTokenVault.originChainId(expectedAssetId), L1_CHAIN_ID, "Origin chain ID should be L1");
     }
 

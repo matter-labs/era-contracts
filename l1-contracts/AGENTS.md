@@ -133,3 +133,36 @@ yarn test:foundry
 2. **Config lock errors**: Some tests may fail with "Can't acquire config lock". This is usually a transient issue - try running the tests again.
 
 3. **L1-context vs L2-context tests**: Tests in `l2-tests-in-l1-context` run L2 logic in an L1 environment. Some L2 system contract features may not work as expected in these tests, so assertions should account for this limitation.
+
+## Before Pushing Changes
+
+**ALWAYS run linting and formatting before pushing to ensure CI passes:**
+
+### Running Linting and Formatting
+
+From the repository root:
+
+```bash
+# Fix Solidity linting issues
+yarn lint:sol --fix --noPrompt
+
+# Fix TypeScript linting issues
+yarn lint:ts --fix
+
+# Fix formatting issues
+yarn prettier:fix
+```
+
+### Pre-Push Checklist
+
+1. **Run linting fixes**: `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix`
+2. **Run foundry tests**: `cd l1-contracts && yarn test:foundry`
+3. **Verify no uncommitted changes**: `git status`
+4. **Commit and push**: Only after all checks pass
+
+### Common Linting Issues
+
+1. **Line length**: Solidity lines should not exceed the configured max length
+2. **Import ordering**: Imports may need to be reordered
+3. **Trailing whitespace**: Will be fixed by prettier
+4. **Missing or extra newlines**: Will be fixed by prettier
