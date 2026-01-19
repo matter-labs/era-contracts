@@ -10,6 +10,7 @@ import * as path from "path";
 
 const REQUIRED_CONTRACTS = [
   "L1Bridgehub.sol",
+  "MessageRootBase.sol",
   "IZKChain.sol",
   "IChainTypeManagerForZKStack.sol",
   "IValidatorTimelockForZKStack.sol",
@@ -38,7 +39,9 @@ const REQUIRED_CONTRACTS = [
   "IFinalizeUpgrade.sol",
   "IL2NativeTokenVault.sol",
   "IL2AssetRouter.sol",
+  "IAssetTrackerBase.sol",
   "IL2AssetTracker.sol",
+  "IGWAssetTracker.sol",
   "IChainAdmin.sol",
   "ISetupLegacyBridge.sol",
 ];
