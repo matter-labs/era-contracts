@@ -64,23 +64,5 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "getBridgedTokenAssetIds",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "bridgedTokenCountPlusOne",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "assetIds",
-        "type": "bytes32[]",
-        "internalType": "bytes32[]"
-      }
-    ],
-    "stateMutability": "nonpayable"
   }
 ]

@@ -15,102 +15,59 @@
             "internalType": "struct StateTransitionDeployedAddresses",
             "components": [
               {
-                "name": "proxies",
-                "type": "tuple",
-                "internalType": "struct StateTransitionContracts",
-                "components": [
-                  {
-                    "name": "chainTypeManager",
-                    "type": "address",
-                    "internalType": "address"
-                  },
-                  {
-                    "name": "serverNotifier",
-                    "type": "address",
-                    "internalType": "address"
-                  },
-                  {
-                    "name": "validatorTimelock",
-                    "type": "address",
-                    "internalType": "address"
-                  }
-                ]
+                "name": "chainTypeManagerProxy",
+                "type": "address",
+                "internalType": "address"
               },
               {
-                "name": "implementations",
-                "type": "tuple",
-                "internalType": "struct StateTransitionContracts",
-                "components": [
-                  {
-                    "name": "chainTypeManager",
-                    "type": "address",
-                    "internalType": "address"
-                  },
-                  {
-                    "name": "serverNotifier",
-                    "type": "address",
-                    "internalType": "address"
-                  },
-                  {
-                    "name": "validatorTimelock",
-                    "type": "address",
-                    "internalType": "address"
-                  }
-                ]
+                "name": "chainTypeManagerProxyAdmin",
+                "type": "address",
+                "internalType": "address"
               },
               {
-                "name": "verifiers",
-                "type": "tuple",
-                "internalType": "struct Verifiers",
-                "components": [
-                  {
-                    "name": "verifier",
-                    "type": "address",
-                    "internalType": "address"
-                  },
-                  {
-                    "name": "verifierFflonk",
-                    "type": "address",
-                    "internalType": "address"
-                  },
-                  {
-                    "name": "verifierPlonk",
-                    "type": "address",
-                    "internalType": "address"
-                  }
-                ]
+                "name": "chainTypeManagerImplementation",
+                "type": "address",
+                "internalType": "address"
               },
               {
-                "name": "facets",
-                "type": "tuple",
-                "internalType": "struct Facets",
-                "components": [
-                  {
-                    "name": "adminFacet",
-                    "type": "address",
-                    "internalType": "address"
-                  },
-                  {
-                    "name": "mailboxFacet",
-                    "type": "address",
-                    "internalType": "address"
-                  },
-                  {
-                    "name": "executorFacet",
-                    "type": "address",
-                    "internalType": "address"
-                  },
-                  {
-                    "name": "gettersFacet",
-                    "type": "address",
-                    "internalType": "address"
-                  },
-                  {
-                    "name": "diamondInit",
-                    "type": "address",
-                    "internalType": "address"
-                  }
-                ]
+                "name": "verifier",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "verifierFflonk",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "verifierPlonk",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "adminFacet",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "mailboxFacet",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "executorFacet",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "gettersFacet",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "diamondInit",
+                "type": "address",
+                "internalType": "address"
               },
               {
                 "name": "genesisUpgrade",
@@ -123,17 +80,32 @@
                 "internalType": "address"
               },
               {
-                "name": "legacyValidatorTimelock",
+                "name": "validatorTimelockImplementation",
                 "type": "address",
                 "internalType": "address"
               },
               {
-                "name": "eraDiamondProxy",
+                "name": "validatorTimelock",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "diamondProxy",
                 "type": "address",
                 "internalType": "address"
               },
               {
                 "name": "bytecodesSupplier",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "serverNotifierProxy",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "serverNotifierImplementation",
                 "type": "address",
                 "internalType": "address"
               },
@@ -187,44 +159,27 @@
             ]
           },
           {
-            "name": "admin",
-            "type": "tuple",
-            "internalType": "struct CTMAdminAddresses",
-            "components": [
-              {
-                "name": "transparentProxyAdmin",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "governance",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "accessControlRestrictionAddress",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "eip7702Checker",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "chainTypeManagerAdmin",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "chainTypeManagerOwner",
-                "type": "address",
-                "internalType": "address"
-              }
-            ]
+            "name": "transparentProxyAdmin",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "governance",
+            "type": "address",
+            "internalType": "address"
           },
           {
             "name": "chainAdmin",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "accessControlRestrictionAddress",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "eip7702Checker",
             "type": "address",
             "internalType": "address"
           }

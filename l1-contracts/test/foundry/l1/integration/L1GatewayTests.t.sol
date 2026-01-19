@@ -21,7 +21,7 @@ import {L2CanonicalTransaction, L2Message, TxStatus, ConfirmTransferResultData} 
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {IAssetRouterBase, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
 import {IGetters, IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -367,7 +367,9 @@ contract L1GatewayTests is
         _mockMessageInclusion(gatewayChainId, merkleProofData, TxStatus.Success);
 
         // Reverts if deposit was faked
-        bytes32 txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(chainAdmin, assetId, transferData)));
+        bytes32 txDataHash = keccak256(
+            bytes.concat(NEW_ENCODING_VERSION, abi.encode(chainAdmin, assetId, transferData))
+        );
         vm.expectRevert(abi.encodeWithSelector(DepositDoesNotExist.selector, bytes32(0), txDataHash));
         addresses.l1Nullifier.bridgeConfirmTransferResult(transferResultData);
     }
@@ -382,7 +384,9 @@ contract L1GatewayTests is
         uint256 amount = 1 ether;
         bytes memory transferData = abi.encode(amount, alice, ETH_TOKEN_ADDRESS);
         //bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
-        bytes32 txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(alice, ETH_TOKEN_ASSET_ID, transferData)));
+        bytes32 txDataHash = keccak256(
+            bytes.concat(NEW_ENCODING_VERSION, abi.encode(alice, ETH_TOKEN_ASSET_ID, transferData))
+        );
         _setDepositHappened(migratingChainId, merkleProofData.l2TxHash, txDataHash);
         require(
             addresses.l1Nullifier.depositHappened(migratingChainId, merkleProofData.l2TxHash) == txDataHash,
@@ -509,7 +513,9 @@ contract L1GatewayTests is
         bytes memory transferData = _getTransferData();
 
         // Set Deposit Happened
-        bytes32 txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(chainAdmin, assetId, transferData)));
+        bytes32 txDataHash = keccak256(
+            bytes.concat(NEW_ENCODING_VERSION, abi.encode(chainAdmin, assetId, transferData))
+        );
         _setDepositHappened(gatewayChainId, merkleProofData.l2TxHash, txDataHash);
 
         ConfirmTransferResultData memory transferResultData = _getConfirmTransferResultData(

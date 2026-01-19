@@ -75,6 +75,41 @@
             "internalType": "uint128"
           },
           {
+            "name": "bridgehub",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "sharedBridgeProxy",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "nativeTokenVault",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "chainTypeManagerProxy",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "validatorTimelock",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "diamondCutData",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "forceDeployments",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
             "name": "governanceSecurityCouncilAddress",
             "type": "address",
             "internalType": "address"
@@ -83,6 +118,16 @@
             "name": "governanceMinDelay",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "l1Nullifier",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "l1Erc20Bridge",
+            "type": "address",
+            "internalType": "address"
           },
           {
             "name": "initializeLegacyBridge",
@@ -108,26 +153,6 @@
             "name": "allowEvmEmulator",
             "type": "bool",
             "internalType": "bool"
-          },
-          {
-            "name": "l1Erc20Bridge",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "l1SharedBridgeProxy",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "diamondCutData",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "forceDeploymentsData",
-            "type": "bytes",
-            "internalType": "bytes"
           }
         ]
       }
@@ -152,6 +177,11 @@
     "name": "run",
     "inputs": [
       {
+        "name": "_bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "_chainTypeManagerProxy",
         "type": "address",
         "internalType": "address"
@@ -169,6 +199,11 @@
     "type": "function",
     "name": "runForTest",
     "inputs": [
+      {
+        "name": "_bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "_chainTypeManagerProxy",
         "type": "address",

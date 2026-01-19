@@ -14,24 +14,6 @@
   },
   {
     "type": "function",
-    "name": "getCreate2FactoryParams",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "create2FactoryAddr",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "create2FactorySalt",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getPermanentValues",
     "inputs": [],
     "outputs": [

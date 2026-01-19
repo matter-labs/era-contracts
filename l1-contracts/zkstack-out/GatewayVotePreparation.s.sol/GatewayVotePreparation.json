@@ -1,7 +1,7 @@
 [
   {
     "type": "function",
-    "name": "ERA_CHAIN_CREATION_PARAMS_PATH",
+    "name": "CHAIN_CREATION_PARAMS_PATH",
     "inputs": [],
     "outputs": [
       {
@@ -21,19 +21,6 @@
         "name": "",
         "type": "bool",
         "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ZKSYNC_OS_CHAIN_CREATION_PARAMS_PATH",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "string",
-        "internalType": "string"
       }
     ],
     "stateMutability": "view"
@@ -285,24 +272,6 @@
       }
     ],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "getCreate2FactoryParams",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "create2FactoryAddr",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "create2FactorySalt",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
   },
   {
     "type": "function",

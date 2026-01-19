@@ -12,6 +12,11 @@
         "name": "_chainId",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "_diamondProxy",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
