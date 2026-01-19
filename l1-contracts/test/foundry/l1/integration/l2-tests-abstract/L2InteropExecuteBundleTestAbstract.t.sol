@@ -54,7 +54,11 @@ abstract contract L2InteropExecuteBundleTestAbstract is L2InteropTestUtils {
         // Verify the wrapped bundle emission
         assertTrue(logs2.length > 0, "Expected logs to be emitted for wrapped executeBundle call");
 
-        BundleExecutionResult memory result = extractAndExecuteSingleBundle(logs2, destinationChainId, EXECUTION_ADDRESS);
+        BundleExecutionResult memory result = extractAndExecuteSingleBundle(
+            logs2,
+            destinationChainId,
+            EXECUTION_ADDRESS
+        );
 
         // Verify the wrapper bundle was executed successfully
         assertBundleExecuted(result);

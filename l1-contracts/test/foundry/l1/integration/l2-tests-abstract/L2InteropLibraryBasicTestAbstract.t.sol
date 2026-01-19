@@ -23,7 +23,11 @@ abstract contract L2InteropLibraryBasicTestAbstract is L2InteropTestUtils {
         // Verify bundle was emitted
         assertTrue(logs.length > 0, "Expected logs to be emitted");
 
-        BundleExecutionResult memory result = extractAndExecuteSingleBundle(logs, destinationChainId, EXECUTION_ADDRESS);
+        BundleExecutionResult memory result = extractAndExecuteSingleBundle(
+            logs,
+            destinationChainId,
+            EXECUTION_ADDRESS
+        );
 
         // Verify the bundle was executed successfully
         assertBundleExecuted(result);
@@ -50,7 +54,11 @@ abstract contract L2InteropLibraryBasicTestAbstract is L2InteropTestUtils {
         // Verify bundle was emitted
         assertTrue(logs.length > 0, "Expected logs to be emitted");
 
-        BundleExecutionResult memory result = extractAndExecuteSingleBundle(logs, destinationChainId, EXECUTION_ADDRESS);
+        BundleExecutionResult memory result = extractAndExecuteSingleBundle(
+            logs,
+            destinationChainId,
+            EXECUTION_ADDRESS
+        );
 
         // Verify the bundle was executed successfully
         assertBundleExecuted(result);

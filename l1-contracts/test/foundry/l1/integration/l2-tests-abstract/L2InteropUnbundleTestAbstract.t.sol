@@ -79,7 +79,11 @@ abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
         // Verify the unbundle bundle emission
         assertTrue(logs2.length > 0, "Expected logs to be emitted for unbundleBundle call");
 
-        BundleExecutionResult memory result = extractAndExecuteSingleBundle(logs2, destinationChainId, UNBUNDLER_ADDRESS);
+        BundleExecutionResult memory result = extractAndExecuteSingleBundle(
+            logs2,
+            destinationChainId,
+            UNBUNDLER_ADDRESS
+        );
 
         // Verify the wrapper bundle was executed successfully
         assertBundleExecuted(result);

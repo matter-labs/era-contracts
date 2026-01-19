@@ -136,7 +136,11 @@ abstract contract L2InteropNativeTokenDifferentBaseTestAbstract is L2InteropTest
         // Verify bundle was emitted
         assertTrue(logs.length > 0, "Expected logs to be emitted for cross-chain token transfer");
 
-        BundleExecutionResult memory result = extractAndExecuteSingleBundle(logs, destinationChainId, EXECUTION_ADDRESS);
+        BundleExecutionResult memory result = extractAndExecuteSingleBundle(
+            logs,
+            destinationChainId,
+            EXECUTION_ADDRESS
+        );
 
         // Verify the bundle was executed successfully
         assertBundleExecuted(result);

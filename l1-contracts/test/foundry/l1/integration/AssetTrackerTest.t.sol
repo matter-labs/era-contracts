@@ -260,14 +260,20 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         l2AssetTracker.confirmMigrationOnL2(confirmData);
 
         // Verify L2 confirmation updated asset migration number
-        uint256 assetMigrationNumL2 = L2AssetTracker(address(l2AssetTracker)).assetMigrationNumber(eraZKChainId, assetId);
+        uint256 assetMigrationNumL2 = L2AssetTracker(address(l2AssetTracker)).assetMigrationNumber(
+            eraZKChainId,
+            assetId
+        );
         assertEq(assetMigrationNumL2, migrationNumber, "Asset migration number should be updated on L2");
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
         gwAssetTracker.confirmMigrationOnGateway(confirmData);
 
         // Verify Gateway confirmation updated asset migration number
-        uint256 assetMigrationNumGW = GWAssetTracker(address(gwAssetTracker)).assetMigrationNumber(eraZKChainId, assetId);
+        uint256 assetMigrationNumGW = GWAssetTracker(address(gwAssetTracker)).assetMigrationNumber(
+            eraZKChainId,
+            assetId
+        );
         assertEq(assetMigrationNumGW, migrationNumber, "Asset migration number should be updated on Gateway");
     }
 
@@ -405,8 +411,15 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         gwAssetTracker.confirmMigrationOnGateway(confirmData);
 
         // Verify Gateway confirmation was processed
-        uint256 assetMigrationNumGW = GWAssetTracker(address(gwAssetTracker)).assetMigrationNumber(eraZKChainId, assetId);
-        assertEq(assetMigrationNumGW, migrationNumber, "Asset migration number should be updated on Gateway after confirmation");
+        uint256 assetMigrationNumGW = GWAssetTracker(address(gwAssetTracker)).assetMigrationNumber(
+            eraZKChainId,
+            assetId
+        );
+        assertEq(
+            assetMigrationNumGW,
+            migrationNumber,
+            "Asset migration number should be updated on Gateway after confirmation"
+        );
     }
 
     function test_migrateTokenBalanceFromNTVV31_L2Chain() public {

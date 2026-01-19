@@ -355,7 +355,11 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             block.chainid,
             assetId
         );
-        assertEq(assetMigrationNumberAfter, 2, "Asset migration number should be updated to current chain migration number");
+        assertEq(
+            assetMigrationNumberAfter,
+            2,
+            "Asset migration number should be updated to current chain migration number"
+        );
 
         // Verify chain balance was updated to totalSupply
         uint256 balanceAfter = L2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, assetId);
