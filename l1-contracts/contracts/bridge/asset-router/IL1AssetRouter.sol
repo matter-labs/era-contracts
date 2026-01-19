@@ -79,6 +79,8 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy, IL1CrossCha
 
     function L1_WETH_TOKEN() external view returns (address);
 
+    function ERA_CHAIN_ID() external view returns (uint256);
+
     function ETH_TOKEN_ASSET_ID() external view returns (bytes32);
 
     function nativeTokenVault() external view returns (INativeTokenVaultBase);

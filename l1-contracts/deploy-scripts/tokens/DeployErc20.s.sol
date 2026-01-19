@@ -14,6 +14,7 @@ import {WETH9} from "contracts/dev-contracts/WETH9.sol";
 
 import {Utils} from "../utils/Utils.sol";
 import {MintFailed} from "../utils/ZkSyncScriptErrors.sol";
+import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 
 contract DeployErc20Script is Script {
     using stdToml for string;
@@ -59,19 +60,14 @@ contract DeployErc20Script is Script {
 
         string memory root = vm.projectRoot();
 
-        // Grab config from output of l1 deployment
-        string memory path = string.concat(root, vm.envString("CTM_OUTPUT"));
-        string memory toml = vm.readFile(path);
-
-        // Config file must be parsed key by key, otherwise values returned
-        // are parsed alfabetically and not by key.
-        // https://book.getfoundry.sh/cheatcodes/parse-toml
-        config.create2FactoryAddr = vm.parseTomlAddress(toml, "$.contracts.create2_factory_addr");
-        config.create2FactorySalt = vm.parseTomlBytes32(toml, "$.contracts.create2_factory_salt");
+        // Read create2 factory values from permanent values file
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(vm);
+        config.create2FactoryAddr = create2FactoryAddr;
+        config.create2FactorySalt = create2FactorySalt;
 
         // Grab config from custom config file
-        path = string.concat(root, vm.envString("TOKENS_CONFIG"));
-        toml = vm.readFile(path);
+        string memory path = string.concat(root, vm.envString("TOKENS_CONFIG"));
+        string memory toml = vm.readFile(path);
         config.additionalAddressesForMinting = vm.parseTomlAddressArray(toml, "$.additional_addresses_for_minting");
 
         string[] memory tokens = vm.parseTomlKeys(toml, "$.tokens");

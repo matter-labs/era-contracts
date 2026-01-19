@@ -92,19 +92,19 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         bytes32 ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(eraZKChainId, ETH_TOKEN_ADDRESS);
 
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
+            address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler),
             abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
             abi.encode(0)
         );
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.messageRootProxy),
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
             abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
         );
 
         bytes32 ethAssetId = 0x8df3463b1850eb1d8d1847743ea155aef6b16074db8ba81d897dc30554fb2085;
         stdstore
-            .target(address(ecosystemAddresses.bridgehub.assetTrackerProxy))
+            .target(address(ecosystemAddresses.bridgehub.proxies.assetTracker))
             .sig(IAssetTrackerBase.chainBalance.selector)
             .with_key(eraZKChainId)
             .with_key(ETH_TOKEN_ASSET_ID)
@@ -117,45 +117,52 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
                 new L2ChainAssetHandler()
                 // L1_CHAIN_ID,
                 // address(this),
-                // ecosystemAddresses.bridgehub.bridgehubProxy,
+                // ecosystemAddresses.bridgehub.proxies.bridgehub,
                 // ecosystemAddresses.bridgehub.assetRouterProxy,
-                // ecosystemAddresses.bridgehub.messageRootProxy
+                // ecosystemAddresses.bridgehub.proxies.messageRoot
             )
         );
     }
 
     function test_setMigrationNumberForV31_Success() public {
-        address eraChain = IBridgehubBase(ecosystemAddresses.bridgehub.bridgehubProxy).getZKChain(eraZKChainId);
+        address eraChain = IBridgehubBase(ecosystemAddresses.bridgehub.proxies.bridgehub).getZKChain(eraZKChainId);
         vm.prank(eraChain);
-        IChainAssetHandler(ecosystemAddresses.bridgehub.chainAssetHandlerProxy).setMigrationNumberForV31(eraZKChainId);
+        IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).setMigrationNumberForV31(
+            eraZKChainId
+        );
     }
 
     function test_setMigrationNumberForV31_NotChain() public {
-        address eraChain = IBridgehubBase(ecosystemAddresses.bridgehub.bridgehubProxy).getZKChain(eraZKChainId);
+        address eraChain = IBridgehubBase(ecosystemAddresses.bridgehub.proxies.bridgehub).getZKChain(eraZKChainId);
         vm.expectRevert();
-        IChainAssetHandler(ecosystemAddresses.bridgehub.chainAssetHandlerProxy).setMigrationNumberForV31(eraZKChainId);
+        IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).setMigrationNumberForV31(
+            eraZKChainId
+        );
     }
 
     function test_pauseMigration_byOwner() public {
-        address owner = Ownable2StepUpgradeable(address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy)).owner();
+        address owner = Ownable2StepUpgradeable(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
+            .owner();
         vm.prank(owner);
-        IChainAssetHandler(ecosystemAddresses.bridgehub.chainAssetHandlerProxy).pauseMigration();
+        IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).pauseMigration();
         // Optionally add: assert migrationPaused is true if readable
     }
 
     function test_unpauseMigration_byOwner() public {
-        address owner = Ownable2StepUpgradeable(address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy)).owner();
+        address owner = Ownable2StepUpgradeable(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
+            .owner();
         vm.prank(owner);
-        IChainAssetHandler(ecosystemAddresses.bridgehub.chainAssetHandlerProxy).unpauseMigration();
+        IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).unpauseMigration();
         // Optionally add: assert migrationPaused is false if readable
     }
 
     function test_pause_byOwner() public {
-        address owner = Ownable2StepUpgradeable(address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy)).owner();
+        address owner = Ownable2StepUpgradeable(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
+            .owner();
         vm.prank(owner);
-        IPausable(ecosystemAddresses.bridgehub.chainAssetHandlerProxy).pause();
+        IPausable(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).pause();
         vm.prank(owner);
-        IPausable(ecosystemAddresses.bridgehub.chainAssetHandlerProxy).unpause();
+        IPausable(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).unpause();
         // Optionally add: assert paused is true if readable
     }
 
@@ -163,7 +170,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         vm.expectRevert();
         IChainAssetHandler(address(l2ChainAssetHandler)).bridgeBurn(eraZKChainId, 0, 0, address(0), "");
 
-        address owner = Ownable2StepUpgradeable(address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy)).owner();
+        address owner = Ownable2StepUpgradeable(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
+            .owner();
         vm.prank(address(0));
         IChainAssetHandler(address(l2ChainAssetHandler)).pauseMigration();
 

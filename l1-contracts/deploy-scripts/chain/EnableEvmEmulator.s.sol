@@ -3,12 +3,13 @@ pragma solidity ^0.8.21;
 
 import {Script} from "forge-std/Script.sol";
 
+import {IEnableEvmEmulator} from "contracts/script-interfaces/IEnableEvmEmulator.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Utils} from "../utils/Utils.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 
-contract EnableEvmEmulator is Script {
+contract EnableEvmEmulator is Script, IEnableEvmEmulator {
     function run() external {
         chainAllowEvmEmulation(vm.envAddress("CHAIN_ADMIN_ADDRESS"), vm.envAddress("CHAIN_DIAMOND_PROXY_ADDRESS"));
     }

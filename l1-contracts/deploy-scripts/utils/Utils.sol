@@ -445,6 +445,7 @@ library Utils {
     /**
      * @dev Run the l2 l1 transaction
      */
+    //slither-disable-next-line arbitrary-send-eth
     function runL1L2Transaction(
         bytes memory l2Calldata,
         uint256 l2GasLimit,
@@ -478,13 +479,16 @@ library Utils {
         if (ADDRESS_ONE != baseTokenAddress) {
             IERC20 baseToken = IERC20(baseTokenAddress);
             vm.broadcast();
-            baseToken.approve(l1SharedBridgeProxy, requiredValueToDeploy);
+            bool success = baseToken.approve(l1SharedBridgeProxy, requiredValueToDeploy);
+            require(success, "Approval failed");
             requiredValueToDeploy = 0;
         }
 
         vm.broadcast();
         vm.recordLogs();
-        bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(l2TransactionRequestDirect);
+        bytes32 canonicalTxHash = bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(
+            l2TransactionRequestDirect
+        );
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
@@ -1378,22 +1382,22 @@ library Utils {
         return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 
-    function getProxyAdmin(address _proxyAddr) internal view returns (address proxyAdmin) {
-        // the constant is the proxy admin storage slot
-        proxyAdmin = address(
-            uint160(
-                uint256(
-                    vm.load(_proxyAddr, bytes32(0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103))
-                )
-            )
-        );
-    }
-
-    // EIP-1967 implementation slot
     bytes32 internal constant IMPLEMENTATION_SLOT = bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1);
 
     function getImplementation(address proxy) internal view returns (address) {
         bytes32 value = vm.load(proxy, IMPLEMENTATION_SLOT); // Foundry cheatcode
+        return address(uint160(uint256(value)));
+    }
+
+    /**
+     * @dev Storage slot with the admin of the contract.
+     * This is the keccak-256 hash of "eip1967.proxy.admin" subtracted by 1, and is
+     * validated in the constructor.
+     */
+    bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+
+    function getProxyAdminAddress(address proxy) internal view returns (address) {
+        bytes32 value = vm.load(proxy, ADMIN_SLOT); // Foundry cheatcode
         return address(uint160(uint256(value)));
     }
 
