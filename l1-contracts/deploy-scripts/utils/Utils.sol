@@ -532,7 +532,7 @@ library Utils {
         uint256 chainId,
         address bridgehubAddress,
         address l1SharedBridgeProxy
-    ) public returns (bytes32 txHash) {
+    ) internal returns (bytes32 txHash) {
         runL1L2Transaction({
             l2Calldata: hex"",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -1385,7 +1385,7 @@ library Utils {
         return abi.encode(bytecodeInfo, proxyBytecodeInfo);
     }
 
-    function mergeCalls(Call[] memory a, Call[] memory b) public pure returns (Call[] memory result) {
+    function mergeCalls(Call[] memory a, Call[] memory b) internal pure returns (Call[] memory result) {
         result = new Call[](a.length + b.length);
         for (uint256 i = 0; i < a.length; i++) {
             result[i] = a[i];
@@ -1395,7 +1395,7 @@ library Utils {
         }
     }
 
-    function appendCall(Call[] memory a, Call memory b) public pure returns (Call[] memory result) {
+    function appendCall(Call[] memory a, Call memory b) internal pure returns (Call[] memory result) {
         result = new Call[](a.length + 1);
         for (uint256 i = 0; i < a.length; i++) {
             result[i] = a[i];
@@ -1403,7 +1403,7 @@ library Utils {
         result[a.length] = b;
     }
 
-    function compareStrings(string memory a, string memory b) public pure returns (bool) {
+    function compareStrings(string memory a, string memory b) internal pure returns (bool) {
         return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 
