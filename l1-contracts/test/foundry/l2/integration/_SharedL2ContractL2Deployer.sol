@@ -29,9 +29,31 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 // import {DeployCTMIntegrationScript} from "../../l1/integration/deploy-scripts/DeployCTMIntegration.s.sol";
 
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
+import {ChainCreationParamsConfig} from "deploy-scripts/utils/Types.sol";
 
 contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
     using stdToml for string;
+
+    /// @notice Override to avoid library delegatecall issues in ZKsync mode
+    /// Returns hardcoded values from the test config
+    function getChainCreationParamsConfig(
+        string memory /* _config */
+    ) internal virtual override returns (ChainCreationParamsConfig memory chainCreationParams) {
+        // Values from config-deploy-ctm.toml
+        chainCreationParams.genesisRoot = bytes32(0x1000000000000000000000000000000000000000000000000000000000000000);
+        chainCreationParams.genesisRollupLeafIndex = 1;
+        chainCreationParams.genesisBatchCommitment = bytes32(
+            0x1000000000000000000000000000000000000000000000000000000000000000
+        );
+        chainCreationParams.latestProtocolVersion = 120259084288;
+        chainCreationParams.bootloaderHash = bytes32(
+            0x0100085F9382A7928DD83BFC529121827B5F29F18B9AA10D18AA68E1BE7DDC35
+        );
+        chainCreationParams.defaultAAHash = bytes32(0x010005F767ED85C548BCE536C18ED2E1643CA8A6F27EE40826D6936AEA0C87D4);
+        chainCreationParams.evmEmulatorHash = bytes32(
+            0x01000D83E0329D9144AD041430FAFCBC2B388E5434DB8CB8A96E80157738A1DA
+        );
+    }
 
     function initSystemContracts(SystemContractsArgs memory _args) internal virtual override {
         L2Utils.initSystemContracts(_args);
@@ -49,28 +71,32 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
             root,
             "/test/foundry/l1/integration/deploy-scripts/script-config/permanent-values.toml"
         );
-        initializeConfig(inputPath);
-        addresses.transparentProxyAdmin = address(0x1);
+
+        initializeConfig(inputPath, permanentValuesInputPath, L2_BRIDGEHUB_ADDR);
+        ctmAddresses.admin.transparentProxyAdmin = address(0x1);
+        ctmAddresses.admin.governance = address(0x2); // Mock governance for tests
         config.l1ChainId = _l1ChainId;
+        // Generate mock force deployments data for L2 tests
+        _generateMockForceDeploymentsData(_l1ChainId);
         console.log("Deploying L2 contracts");
         instantiateCreate2Factory();
-        addresses.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade());
-        addresses.stateTransition.verifier = address(
+        ctmAddresses.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade());
+        ctmAddresses.stateTransition.verifiers.verifier = address(
             new EraTestnetVerifier(IVerifierV2(ADDRESS_ONE), IVerifier(ADDRESS_ONE))
         );
         uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
-        addresses.stateTransition.validatorTimelock = address(
+        ctmAddresses.stateTransition.proxies.validatorTimelock = address(
             new TransparentUpgradeableProxy(
                 address(new ValidatorTimelock(L2_BRIDGEHUB_ADDR)),
-                addresses.transparentProxyAdmin,
+                ctmAddresses.admin.transparentProxyAdmin,
                 abi.encodeCall(ValidatorTimelock.initialize, (config.deployerAddress, executionDelay))
             )
         );
-        addresses.stateTransition.executorFacet = address(new ExecutorFacet(config.l1ChainId));
-        addresses.stateTransition.adminFacet = address(
-            new AdminFacet(config.l1ChainId, RollupDAManager(addresses.daAddresses.rollupDAManager), false)
+        ctmAddresses.stateTransition.facets.executorFacet = address(new ExecutorFacet(config.l1ChainId));
+        ctmAddresses.stateTransition.facets.adminFacet = address(
+            new AdminFacet(config.l1ChainId, RollupDAManager(ctmAddresses.daAddresses.rollupDAManager), false)
         );
-        addresses.stateTransition.mailboxFacet = address(
+        ctmAddresses.stateTransition.facets.mailboxFacet = address(
             new MailboxFacet(
                 config.eraChainId,
                 config.l1ChainId,
@@ -79,29 +105,29 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
                 false
             )
         );
-        addresses.stateTransition.gettersFacet = address(new GettersFacet());
-        addresses.stateTransition.diamondInit = address(new DiamondInit(false));
+        ctmAddresses.stateTransition.facets.gettersFacet = address(new GettersFacet());
+        ctmAddresses.stateTransition.facets.diamondInit = address(new DiamondInit(false));
         // Deploy ChainTypeManager implementation
         if (config.isZKsyncOS) {
-            addresses.stateTransition.chainTypeManagerImplementation = address(
-                new ZKsyncOSChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
+            ctmAddresses.stateTransition.implementations.chainTypeManager = address(
+                new ZKsyncOSChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0))
             );
         } else {
-            addresses.stateTransition.chainTypeManagerImplementation = address(
-                new EraChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
+            ctmAddresses.stateTransition.implementations.chainTypeManager = address(
+                new EraChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0))
             );
         }
 
         // Deploy TransparentUpgradeableProxy for ChainTypeManager
         bytes memory initCalldata = abi.encodeCall(
             IChainTypeManager.initialize,
-            getChainTypeManagerInitializeData(addresses.stateTransition)
+            getChainTypeManagerInitializeData(ctmAddresses.stateTransition)
         );
 
-        addresses.stateTransition.chainTypeManagerProxy = address(
+        ctmAddresses.stateTransition.proxies.chainTypeManager = address(
             new TransparentUpgradeableProxy(
-                addresses.stateTransition.chainTypeManagerImplementation,
-                addresses.transparentProxyAdmin,
+                ctmAddresses.stateTransition.implementations.chainTypeManager,
+                ctmAddresses.admin.transparentProxyAdmin,
                 initCalldata
             )
         );
@@ -117,4 +143,12 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
 
     // add this to be excluded from coverage report
     function test() internal virtual override {}
+
+    /// @notice Generate mock force deployments data for L2 tests using a pre-encoded value
+    function _generateMockForceDeploymentsData(uint256) internal {
+        // Use pre-generated force deployments data to avoid bytecode size issues
+        // This is the same as what would be generated by _buildForceDeploymentsData
+        generatedData
+            .forceDeploymentsData = hex"00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000009000000000000000000000000000000000000000000000000000000000000007b0000000000000000000000000000000000000000000000000000000000000009000000000000000000000000000000000000000000000000000000000000000101000000000000000000000000000000000000000000000000000000000000001111000000000000000000000000000000000000000000000000000000000001100000000000000000000000000000000000000000000000000000000000000064000000000000000000000000000000000000000000000000000000000000028000000000000000000000000000000000000000000000000000000000000002c000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000340000000000000000000000000000000000000000000000000000000000000038000000000000000000000000000000000000000000000000000000000000003c000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000440000000000000000000000000000000000000000000000000000000000000048000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020010000000000000000000000000000000000000000000000000000000000000000";
+    }
 }

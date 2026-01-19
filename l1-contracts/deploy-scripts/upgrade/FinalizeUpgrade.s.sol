@@ -13,9 +13,10 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {MulticallWithGas} from "../utils/MulticallWithGas.sol";
+import {IFinalizeUpgrade} from "contracts/script-interfaces/IFinalizeUpgrade.sol";
 
 /// @notice Script intended to help us finalize the governance upgrade
-contract FinalizeUpgrade is Script {
+contract FinalizeUpgrade is Script, IFinalizeUpgrade {
     using stdToml for string;
 
     function initChains(address bridgehub, uint256[] calldata chains) external {

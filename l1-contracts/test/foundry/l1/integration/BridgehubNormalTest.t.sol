@@ -71,7 +71,7 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
 
     function test_removeChainTypeManager_correctCTM() public {
         address owner = Ownable(address(addresses.bridgehub)).owner();
-        address ctm = ctmAddresses.stateTransition.chainTypeManagerProxy;
+        address ctm = ctmAddresses.stateTransition.proxies.chainTypeManager;
         vm.prank(owner);
         addresses.bridgehub.removeChainTypeManager(ctm);
 

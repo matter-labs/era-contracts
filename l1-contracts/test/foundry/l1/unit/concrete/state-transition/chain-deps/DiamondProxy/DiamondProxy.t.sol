@@ -81,9 +81,10 @@ contract DiamondProxyTest is UtilsCallMockerTest {
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
 
-        vm.expectRevert(abi.encodePacked("Ut"));
-        (bool success, ) = address(diamondProxy).call("");
-        assertEq(success, false);
+        // Empty call (length 0) is allowed but fails because no facet for selector 0x00000000
+        // Expected error: "F" (facet not found)
+        vm.expectRevert(bytes("F"));
+        address(diamondProxy).call("");
     }
 
     function test_revertWhen_calledWithFullSelectorInMsgData() public {
@@ -95,9 +96,30 @@ contract DiamondProxyTest is UtilsCallMockerTest {
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
 
-        vm.expectRevert(abi.encodePacked("Ut"));
-        (bool success, ) = address(diamondProxy).call(bytes.concat(bytes4(0xdeadbeef)));
-        assertEq(success, false);
+        // Call with unknown 4-byte selector fails because no facet registered
+        // Expected error: "F" (facet not found)
+        vm.expectRevert(bytes("F"));
+        address(diamondProxy).call(bytes.concat(bytes4(0xdeadbeef)));
+    }
+
+    function test_revertWhen_calledWithPartialSelector() public {
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(new DiamondInit(false)),
+            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+        });
+
+        DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
+
+        // Call with 1-3 bytes should trigger "Ut" error (incomplete selector)
+        vm.expectRevert(bytes("Ut"));
+        address(diamondProxy).call(hex"aa"); // 1 byte
+
+        vm.expectRevert(bytes("Ut"));
+        address(diamondProxy).call(hex"aabb"); // 2 bytes
+
+        vm.expectRevert(bytes("Ut"));
+        address(diamondProxy).call(hex"aabbcc"); // 3 bytes
     }
 
     function test_revertWhen_proxyHasNoFacetForSelector() public {
