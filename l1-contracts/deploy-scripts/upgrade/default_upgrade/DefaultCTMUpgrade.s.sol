@@ -544,7 +544,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function prepareUpgradeServerNotifierCall() public virtual returns (Call[] memory calls) {
-        address serverNotifierProxyAdmin = Utils.getProxyAdminAddress(addresses.stateTransition.serverNotifierProxy);
+        address serverNotifierProxyAdmin = Utils.getProxyAdminAddress(ctmAddresses.stateTransition.proxies.serverNotifier);
 
         Call memory call = Call({
             target: serverNotifierProxyAdmin,
