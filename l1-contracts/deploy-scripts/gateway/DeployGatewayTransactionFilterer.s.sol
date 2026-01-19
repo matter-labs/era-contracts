@@ -78,6 +78,11 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils, IDeplo
         );
     }
 
+    function getPermanentValuesPath() internal view returns (string memory) {
+        string memory root = vm.projectRoot();
+        return string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
+    }
+
     function saveOutput(address proxy) internal {
         // Save the address of the deployed proxy into an output TOML file.
         string memory outputToml = vm.serializeAddress("root", "gateway_tx_filterer_proxy", proxy);
