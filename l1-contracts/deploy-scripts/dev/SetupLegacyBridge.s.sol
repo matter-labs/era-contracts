@@ -5,6 +5,7 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Utils} from "./../Utils.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
+import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {DummyL1ERC20Bridge} from "contracts/dev-contracts/DummyL1ERC20Bridge.sol";
@@ -45,8 +46,8 @@ contract SetupLegacyBridge is Script, ISetupLegacyBridge {
         address l1NullifierProxyImpl;
     }
 
-    function run(address _bridgehub, uint256 _chainId, address _diamondProxy) public {
-        initializeConfig(_bridgehub, _chainId, _diamondProxy);
+    function run(address _bridgehub, uint256 _chainId) public {
+        initializeConfig(_bridgehub, _chainId);
         deploySharedBridgeImplementation();
         upgradeImplementation(addresses.sharedBridgeProxy, addresses.sharedBridgeProxyImpl);
         deployDummyErc20Bridge();
@@ -56,13 +57,15 @@ contract SetupLegacyBridge is Script, ISetupLegacyBridge {
         upgradeImplementation(addresses.l1Nullifier, addresses.proxies.l1NullifierImpl);
     }
 
-    function initializeConfig(address bridgehub, uint256 chainId, address diamondProxy) internal {
+    function initializeConfig(address bridgehub, uint256 chainId) internal {
         addresses.bridgehub = bridgehub;
-        addresses.diamondProxy = diamondProxy;
         config.chainId = chainId;
 
+        // Query diamond proxy from bridgehub using chain ID
+        addresses.diamondProxy = IL1Bridgehub(bridgehub).getZKChain(chainId);
+
         // Read create2 factory parameters from permanent-values.toml
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(getPermanentValuesPath());
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(vm);
         addresses.create2FactoryAddr = create2FactoryAddr;
         config.create2FactorySalt = create2FactorySalt;
 

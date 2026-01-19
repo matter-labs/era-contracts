@@ -22,6 +22,7 @@ import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ADDRESS_ONE, Utils} from "../utils/Utils.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
+import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
@@ -172,7 +173,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         }
 
         // Read create2 factory values from permanent values file
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(getPermanentValuesPath());
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(vm);
         config.create2FactoryAddress = create2FactoryAddr;
         config.create2Salt = create2FactorySalt;
 

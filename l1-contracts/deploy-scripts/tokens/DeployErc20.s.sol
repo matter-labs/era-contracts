@@ -14,6 +14,7 @@ import {WETH9} from "contracts/dev-contracts/WETH9.sol";
 
 import {Utils} from "../utils/Utils.sol";
 import {MintFailed} from "../utils/ZkSyncScriptErrors.sol";
+import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 
 contract DeployErc20Script is Script {
     using stdToml for string;
@@ -60,7 +61,7 @@ contract DeployErc20Script is Script {
         string memory root = vm.projectRoot();
 
         // Read create2 factory values from permanent values file
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(getPermanentValuesPath());
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(vm);
         config.create2FactoryAddr = create2FactoryAddr;
         config.create2FactorySalt = create2FactorySalt;
 

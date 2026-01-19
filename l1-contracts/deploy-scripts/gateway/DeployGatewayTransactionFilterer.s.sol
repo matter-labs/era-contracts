@@ -26,11 +26,6 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils, IDeplo
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
     }
 
-    function getPermanentValuesPath() internal view returns (string memory) {
-        string memory root = vm.projectRoot();
-        return string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
-    }
-
     function run(address bridgehub, address chainAdmin, address chainProxyAdmin) public returns (address proxy) {
         // Initialize config and instantiate Create2Factory before any deployment.
         initializeConfig(bridgehub, chainAdmin, chainProxyAdmin);
