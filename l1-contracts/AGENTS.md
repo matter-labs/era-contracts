@@ -134,6 +134,16 @@ yarn test:foundry
 
 3. **L1-context vs L2-context tests**: Tests in `l2-tests-in-l1-context` run L2 logic in an L1 environment. Some L2 system contract features may not work as expected in these tests, so assertions should account for this limitation.
 
+4. **zkstack-out artifacts out of date**: If CI fails with "l1-contracts/zkstack-out is out of date", you need to regenerate the compiled artifacts. This happens when you modify interface files (e.g., adding events, functions). Run:
+
+   ```bash
+   cd l1-contracts
+   forge build
+   npx ts-node scripts/copy-to-zkstack-out.ts
+   ```
+
+   Then commit the updated JSON files in `zkstack-out/`.
+
 ## Before Pushing Changes
 
 **ALWAYS run linting and formatting before pushing to ensure CI passes:**
