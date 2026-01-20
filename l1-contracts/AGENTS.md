@@ -166,3 +166,29 @@ yarn prettier:fix
 2. **Import ordering**: Imports may need to be reordered
 3. **Trailing whitespace**: Will be fixed by prettier
 4. **Missing or extra newlines**: Will be fixed by prettier
+
+## Git Best Practices
+
+### Never Force Push
+
+**Do NOT use `--force`, `--force-with-lease`, or `git push -f`**
+
+- Always use regular `git push`
+- If you need to make additional changes, create a new commit instead of amending
+- Force pushing rewrites history and can cause issues for others working on the same branch
+
+❌ **FORBIDDEN:**
+
+```bash
+git commit --amend
+git push --force
+git push --force-with-lease
+git push -f
+```
+
+✅ **CORRECT:**
+
+```bash
+git commit -m "Fix: additional changes"
+git push
+```
