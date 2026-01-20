@@ -349,12 +349,18 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         config.ownerAddress = ctmAddresses.admin.governance;
         config.eraChainId = AddressIntrospector.getEraChainId(coreAddresses.bridges.proxies.l1AssetRouter);
 
-        discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(
-            IZKChain(bridgehub.getZKChain(config.eraChainId))
-        );
+        address eraChainAddress = bridgehub.getZKChain(config.eraChainId);
+        if (eraChainAddress != address(0)) {
+            // ERA chain exists, discover its addresses
+            discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(IZKChain(eraChainAddress));
+            ctmAddresses.daAddresses.l1RollupDAValidator = discoveredEraZkChain.l1DAValidator;
+        } else {
+            // ERA chain doesn't exist yet (fresh deployment), use up-to-date addresses
+            console.log("ERA chain not found in bridgehub, using up-to-date addresses");
+        }
+
         upToDateZkChain = AddressIntrospector.getUptoDateZkChainAddresses(ChainTypeManagerBase(ctm));
 
-        ctmAddresses.daAddresses.l1RollupDAValidator = discoveredEraZkChain.l1DAValidator;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         newConfig.oldProtocolVersion = ctmProtocolVersion;
         require(

@@ -22,8 +22,9 @@ contract DefaultEcosystemUpgrade is DefaultCoreUpgrade {
     bool internal _coreInitialized;
     bool internal _ctmInitialized;
 
-    string internal _ecosystemOutputPath;
-    string internal _ctmOutputPath;
+    string internal ecosystemOutputPath;
+    string internal coreOutputPath;
+    string internal ctmOutputPath;
 
     /// @notice Create CTM upgrade instance - can be overridden for version-specific instances
     function createCTMUpgrade() internal virtual returns (DefaultCTMUpgrade) {
@@ -34,18 +35,21 @@ contract DefaultEcosystemUpgrade is DefaultCoreUpgrade {
     function initialize(
         string memory permanentValuesInputPath,
         string memory upgradeInputPath,
-        string memory ecosystemOutputPath
+        string memory _ecosystemOutputPath
     ) public virtual override {
         string memory root = vm.projectRoot();
-        _ecosystemOutputPath = string.concat(root, ecosystemOutputPath);
+        ecosystemOutputPath = string.concat(root, _ecosystemOutputPath);
 
-        // CTM output will be in script-out based on version
-        string memory upgradeToml = vm.readFile(string.concat(root, upgradeInputPath));
-        uint256 newProtocolVersion = upgradeToml.readUint("$.contracts.new_protocol_version");
-        _ctmOutputPath = string.concat(root, "/script-out/v", vm.toString(newProtocolVersion), "-upgrade-core.toml");
+        // Get output paths (these return relative paths)
+        string memory _coreOutputPath = getCoreOutputPath(_ecosystemOutputPath);
+        string memory _ctmOutputPath = getCTMOutputPath();
 
-        // Initialize core upgrade
-        DefaultCoreUpgrade.initialize(permanentValuesInputPath, upgradeInputPath, ecosystemOutputPath);
+        // Store full paths for later use
+        coreOutputPath = string.concat(root, _coreOutputPath);
+        ctmOutputPath = string.concat(root, _ctmOutputPath);
+
+        // Initialize core upgrade with its own output path (this class extends DefaultCoreUpgrade)
+        super.initialize(permanentValuesInputPath, upgradeInputPath, _coreOutputPath);
         _coreInitialized = true;
 
         // Initialize CTM upgrade with its own output path
@@ -68,7 +72,27 @@ contract DefaultEcosystemUpgrade is DefaultCoreUpgrade {
         console.log("Step 2: Preparing CTM upgrade...");
         eraVmCtmUpgrade.prepareCTMUpgrade();
 
+        // Step 3: Save combined output including diamond cut data from CTM upgrade
+        console.log("Step 3: Saving combined output...");
+        saveCombinedOutput();
+
         console.log("Ecosystem upgrade preparation complete!");
+    }
+
+    /// @notice Save combined output including CTM diamond cut data to ecosystem output
+    function saveCombinedOutput() internal virtual {
+        // Read the CTM output to get the diamond cut data (ctmOutputPath is already full path)
+        string memory ctmOutputToml = vm.readFile(ctmOutputPath);
+        bytes memory upgradeCutData = ctmOutputToml.readBytes("$.chain_upgrade_diamond_cut");
+
+        // Write the diamond cut data to the ecosystem output
+        vm.writeToml(
+            vm.serializeBytes("root", "chain_upgrade_diamond_cut", upgradeCutData),
+            ecosystemOutputPath,
+            ".chain_upgrade_diamond_cut"
+        );
+
+        console.log("Diamond cut data saved to ecosystem output!");
     }
 
     /// @notice Combine governance calls from both core and CTM upgrades
@@ -120,7 +144,7 @@ contract DefaultEcosystemUpgrade is DefaultCoreUpgrade {
             abi.encode(stage2Calls)
         );
 
-        vm.writeToml(governanceCallsSerialized, _ecosystemOutputPath, ".governance_calls");
+        vm.writeToml(governanceCallsSerialized, ecosystemOutputPath, ".governance_calls");
 
         console.log("Combined governance calls prepared!");
         console.log("Stage 0 calls:", stage0Calls.length);
