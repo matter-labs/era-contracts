@@ -31,6 +31,15 @@ abstract contract GW_CTMDeployerTest is Test {
         bytes32 expectedGenesisRoot = keccak256("genesis-root");
         bytes32 expectedGenesisBatchCommitment = keccak256("genesis-batch-commitment");
 
+        // Verify config values are properly set
+        assertTrue(expectedGovernance != address(0), "Governance address should not be zero");
+        assertTrue(expectedSalt != bytes32(0), "Salt should not be zero");
+        assertTrue(expectedBootloaderHash != bytes32(0), "Bootloader hash should not be zero");
+        assertTrue(expectedDefaultAccountHash != bytes32(0), "Default account hash should not be zero");
+        assertTrue(expectedEvmEmulatorHash != bytes32(0), "EVM emulator hash should not be zero");
+        assertTrue(expectedGenesisRoot != bytes32(0), "Genesis root should not be zero");
+        assertTrue(expectedGenesisBatchCommitment != bytes32(0), "Genesis batch commitment should not be zero");
+
         GatewayCTMDeployerConfig memory deployerConfig = GatewayCTMDeployerConfig({
             aliasedGovernanceAddress: expectedGovernance,
             salt: expectedSalt,
@@ -51,6 +60,29 @@ abstract contract GW_CTMDeployerTest is Test {
             forceDeploymentsData: bytes(""),
             protocolVersion: 0
         });
+
+        // Verify config struct is properly constructed
+        assertEq(deployerConfig.aliasedGovernanceAddress, expectedGovernance, "Config governance should match");
+        assertEq(deployerConfig.salt, expectedSalt, "Config salt should match");
+        assertEq(deployerConfig.eraChainId, expectedEraChainId, "Config era chain ID should match");
+        assertEq(deployerConfig.l1ChainId, expectedL1ChainId, "Config L1 chain ID should match");
+        assertEq(deployerConfig.bootloaderHash, expectedBootloaderHash, "Config bootloader hash should match");
+        assertEq(
+            deployerConfig.defaultAccountHash,
+            expectedDefaultAccountHash,
+            "Config default account hash should match"
+        );
+        assertEq(deployerConfig.evmEmulatorHash, expectedEvmEmulatorHash, "Config EVM emulator hash should match");
+        assertEq(deployerConfig.genesisRoot, expectedGenesisRoot, "Config genesis root should match");
+        assertEq(
+            deployerConfig.genesisBatchCommitment,
+            expectedGenesisBatchCommitment,
+            "Config genesis batch commitment should match"
+        );
+        assertEq(deployerConfig.genesisRollupLeafIndex, 1, "Config genesis rollup leaf index should be 1");
+        assertFalse(deployerConfig.testnetVerifier, "Config testnet verifier should be false");
+        assertFalse(deployerConfig.isZKsyncOS, "Config isZKsyncOS should be false");
+
         GatewayCTMDeployer deployer = new GatewayCTMDeployer(deployerConfig);
 
         // Verify the deployer was created at a valid address

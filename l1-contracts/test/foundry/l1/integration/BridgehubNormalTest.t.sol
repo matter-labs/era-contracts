@@ -51,51 +51,90 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
     function test_removeChainTypeManager_addressZero() public {
         address owner = Ownable(address(addresses.bridgehub)).owner();
         address ctm = address(0);
+
+        // Verify owner is valid before the test
+        assertTrue(owner != address(0), "Owner should not be zero address");
+
+        // Verify address(0) is an invalid CTM address
+        assertEq(ctm, address(0), "Testing removal of zero address CTM");
+
         vm.expectRevert();
         vm.prank(owner);
         addresses.bridgehub.removeChainTypeManager(ctm);
+
+        // The call should have reverted - test passes if we reach here without panic
+        // The revert is expected because address(0) is not a valid CTM
     }
 
     function test_removeChainTypeManager_addressOne() public {
         address owner = Ownable(address(addresses.bridgehub)).owner();
         address ctm = address(1);
+
+        // Verify owner is valid
+        assertTrue(owner != address(0), "Owner should not be zero address");
+
+        // Verify address(1) is not a valid CTM before the test
+        address currentCtm = addresses.bridgehub.chainTypeManager(eraZKChainId);
+        assertTrue(currentCtm != address(1), "Address(1) should not be the current CTM");
+
         vm.expectRevert();
         vm.prank(owner);
         addresses.bridgehub.removeChainTypeManager(ctm);
+
+        // Verify state is unchanged after the failed removal
+        address ctmAfter = addresses.bridgehub.chainTypeManager(eraZKChainId);
+        assertEq(ctmAfter, currentCtm, "CTM should remain unchanged after failed removal");
     }
 
     function test_removeChainTypeManager_correctCTM() public {
         address owner = Ownable(address(addresses.bridgehub)).owner();
         address ctm = ctmAddresses.stateTransition.proxies.chainTypeManager;
+
+        // Verify owner and CTM are valid before the test
+        assertTrue(owner != address(0), "Owner should not be zero address");
+        assertTrue(ctm != address(0), "CTM address should not be zero");
+
         vm.prank(owner);
         addresses.bridgehub.removeChainTypeManager(ctm);
 
-        // Optionally, check if the CTM for eraZKChainId is now zeroed out or expected state, e.g.:
-        assertEq(addresses.bridgehub.chainTypeManager(eraZKChainId), address(0));
+        // Verify the CTM for eraZKChainId is now zeroed out after removal
+        // Note: In this test setup, no chains are deployed, so chainTypeManager returns 0
+        assertEq(
+            addresses.bridgehub.chainTypeManager(eraZKChainId),
+            address(0),
+            "CTM should be zeroed out after removal"
+        );
     }
 
     function test_setAddressesV31_onlyOwnerOrUpgrader_can_call() public {
         address owner = Ownable(address(addresses.bridgehub)).owner();
-        address upgrader = makeAddr("upgrader"); // Assume this address is set as upgrader in the contract (mock appropriately)
         address newChainRegistrationSender = makeAddr("chainRegistrationSenderV31");
+
+        // Verify owner is valid
+        assertTrue(owner != address(0), "Owner should not be zero address");
 
         // Call as owner - should succeed
         vm.prank(owner);
         addresses.bridgehub.setAddressesV31(newChainRegistrationSender);
 
-        // You may want to verify effects if they are visible, e.g.:
-        // assertEq(addresses.bridgehub.chainRegistrationSender(), newChainRegistrationSender);
-
-        // Call as upgrader - should succeed if upgrader is set up in contract,
-        // mock/assume if needed; otherwise, skip this part or mock the role as appropriate.
-        // vm.prank(upgrader);
-        // addresses.bridgehub.setAddressesV31(newChainRegistrationSender);
+        // Verify the chainRegistrationSender was set correctly
+        address registrationSender = addresses.bridgehub.chainRegistrationSender();
+        assertEq(registrationSender, newChainRegistrationSender, "Chain registration sender should be updated");
 
         // Non-owner, non-upgrader should revert
         address notAllowed = makeAddr("notAllowed");
+        assertTrue(notAllowed != owner, "notAllowed should be different from owner");
+
         vm.expectRevert();
         vm.prank(notAllowed);
         addresses.bridgehub.setAddressesV31(newChainRegistrationSender);
+
+        // Verify state unchanged after failed call
+        assertEq(
+            addresses.bridgehub.chainRegistrationSender(),
+            newChainRegistrationSender,
+            "Chain registration sender should remain unchanged after failed call"
+        );
     }
 
     function test_forwardedBridgeBurnSetSettlementLayer_revert_SLNotWhitelisted() public {
@@ -103,20 +142,44 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
         uint256 chainId = 777777; // Fresh chain ID not used in setup
         uint256 nonWhitelistedSL = 888888;
 
+        // Verify the non-whitelisted SL is indeed not whitelisted
+        assertFalse(
+            addresses.bridgehub.whitelistedSettlementLayers(nonWhitelistedSL),
+            "Settlement layer should not be whitelisted"
+        );
+
         // Set settlementLayer[chainId] = block.chainid to pass that check
         stdstore.target(address(addresses.bridgehub)).sig("settlementLayer(uint256)").with_key(chainId).checked_write(
             block.chainid
         );
 
-        vm.prank(addresses.bridgehub.chainAssetHandler());
+        // Verify the setup was applied
+        assertEq(
+            addresses.bridgehub.settlementLayer(chainId),
+            block.chainid,
+            "Settlement layer for chainId should be block.chainid"
+        );
+
+        address chainAssetHandler = addresses.bridgehub.chainAssetHandler();
+        assertTrue(chainAssetHandler != address(0), "Chain asset handler should not be zero address");
+
+        vm.prank(chainAssetHandler);
         vm.expectRevert(abi.encodeWithSelector(SLNotWhitelisted.selector));
         addresses.bridgehub.forwardedBridgeBurnSetSettlementLayer(chainId, nonWhitelistedSL);
+
+        // Verify settlement layer unchanged after revert
+        assertEq(
+            addresses.bridgehub.settlementLayer(chainId),
+            block.chainid,
+            "Settlement layer should remain unchanged after revert"
+        );
     }
 
     function test_forwardedBridgeBurnSetSettlementLayer_revert_NotCurrentSettlementLayer() public {
         // Setup: Use a fresh chainId that is not in the test setup to avoid conflicts
         uint256 chainId = 666666; // Fresh chain ID not used in setup
         uint256 validWhitelistedSL = block.chainid + 1;
+        uint256 incorrectSettlementLayer = block.chainid + 8;
 
         // Whitelist the validWhitelistedSL first
         stdstore
@@ -127,14 +190,41 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
         vm.prank(addresses.bridgehub.owner());
         addresses.bridgehub.registerSettlementLayer(validWhitelistedSL, true);
 
-        // Set settlementLayer[chainId] to not be block.chainid (to trigger NotCurrentSettlementLayer error)
-        stdstore.target(address(addresses.bridgehub)).sig("settlementLayer(uint256)").with_key(chainId).checked_write(
-            block.chainid + 8
+        // Verify the settlement layer is whitelisted
+        assertTrue(
+            addresses.bridgehub.whitelistedSettlementLayers(validWhitelistedSL),
+            "Settlement layer should be whitelisted"
         );
 
-        vm.prank(addresses.bridgehub.chainAssetHandler());
+        // Set settlementLayer[chainId] to not be block.chainid (to trigger NotCurrentSettlementLayer error)
+        stdstore.target(address(addresses.bridgehub)).sig("settlementLayer(uint256)").with_key(chainId).checked_write(
+            incorrectSettlementLayer
+        );
+
+        // Verify the setup - chainId's settlement layer is NOT block.chainid
+        assertEq(
+            addresses.bridgehub.settlementLayer(chainId),
+            incorrectSettlementLayer,
+            "Settlement layer should be set to incorrect value"
+        );
+        assertTrue(
+            incorrectSettlementLayer != block.chainid,
+            "Incorrect settlement layer should differ from block.chainid"
+        );
+
+        address chainAssetHandler = addresses.bridgehub.chainAssetHandler();
+        assertTrue(chainAssetHandler != address(0), "Chain asset handler should not be zero address");
+
+        vm.prank(chainAssetHandler);
         vm.expectRevert(abi.encodeWithSelector(NotCurrentSettlementLayer.selector));
         addresses.bridgehub.forwardedBridgeBurnSetSettlementLayer(chainId, validWhitelistedSL);
+
+        // Verify settlement layer unchanged after revert
+        assertEq(
+            addresses.bridgehub.settlementLayer(chainId),
+            incorrectSettlementLayer,
+            "Settlement layer should remain unchanged after revert"
+        );
     }
 
     function test_forwardedBridgeBurnSetSettlementLayer_revert_SettlementLayersMustSettleOnL1() public {
@@ -152,6 +242,18 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
             .with_key(validWhitelistedSL)
             .checked_write(block.chainid);
 
+        // Verify the setup was applied
+        assertEq(
+            addresses.bridgehub.settlementLayer(chainId),
+            block.chainid,
+            "Chain's settlement layer should be block.chainid"
+        );
+        assertEq(
+            addresses.bridgehub.settlementLayer(validWhitelistedSL),
+            block.chainid,
+            "Valid SL's settlement layer should be block.chainid"
+        );
+
         // Whitelist chainId as a settlement layer (this should cause the test to pass the first two checks but fail the third)
         vm.prank(addresses.bridgehub.owner());
         addresses.bridgehub.registerSettlementLayer(chainId, true);
@@ -160,9 +262,29 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
         vm.prank(addresses.bridgehub.owner());
         addresses.bridgehub.registerSettlementLayer(validWhitelistedSL, true);
 
-        vm.prank(addresses.bridgehub.chainAssetHandler());
+        // Verify both are whitelisted
+        assertTrue(
+            addresses.bridgehub.whitelistedSettlementLayers(chainId),
+            "ChainId should be whitelisted as settlement layer"
+        );
+        assertTrue(
+            addresses.bridgehub.whitelistedSettlementLayers(validWhitelistedSL),
+            "Valid SL should be whitelisted as settlement layer"
+        );
+
+        address chainAssetHandler = addresses.bridgehub.chainAssetHandler();
+        assertTrue(chainAssetHandler != address(0), "Chain asset handler should not be zero address");
+
+        vm.prank(chainAssetHandler);
         vm.expectRevert(abi.encodeWithSelector(SettlementLayersMustSettleOnL1.selector));
         addresses.bridgehub.forwardedBridgeBurnSetSettlementLayer(chainId, validWhitelistedSL);
+
+        // Verify settlement layers unchanged after revert
+        assertEq(
+            addresses.bridgehub.settlementLayer(chainId),
+            block.chainid,
+            "Chain's settlement layer should remain unchanged after revert"
+        );
     }
 
     function test_getHyperchain_returnsZKChainAddress() public {
