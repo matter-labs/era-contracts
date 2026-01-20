@@ -23,13 +23,10 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {SLNotWhitelisted} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {NotCurrentSettlementLayer, SettlementLayersMustSettleOnL1} from "contracts/common/L1ContractErrors.sol";
 
-import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
-
-contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
+contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
 
     function prepare() public {
-        takeConfigLock(); // Prevents race condition with configs
         // _generateUserAddresses();
 
         _deployL1Contracts();
@@ -38,8 +35,6 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
 
         // _deployEra();
         // _deployZKChain(ETH_TOKEN_ADDRESS);
-
-        releaseConfigLock();
 
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
@@ -71,7 +66,7 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
 
     function test_removeChainTypeManager_correctCTM() public {
         address owner = Ownable(address(addresses.bridgehub)).owner();
-        address ctm = ctmAddresses.stateTransition.chainTypeManagerProxy;
+        address ctm = ctmAddresses.stateTransition.proxies.chainTypeManager;
         vm.prank(owner);
         addresses.bridgehub.removeChainTypeManager(ctm);
 

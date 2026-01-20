@@ -72,8 +72,8 @@ contract GatewayCTMDeployerTest is Test {
         new RollupDAManager();
         new ValidiumL1DAValidator();
         new RelayedSLDAValidator();
-        new ZKsyncOSChainTypeManager(address(0), address(0));
-        new EraChainTypeManager(address(0), address(0));
+        new ZKsyncOSChainTypeManager(address(0), address(0), address(0));
+        new EraChainTypeManager(address(0), address(0), address(0));
         new ProxyAdmin();
 
         new EraVerifierFflonk();
@@ -168,12 +168,12 @@ library DeployedContractsComparator {
         StateTransitionContracts memory a,
         StateTransitionContracts memory b
     ) internal pure {
-        require(a.verifier == b.verifier, "verifier differs");
-        require(a.adminFacet == b.adminFacet, "adminFacet differs");
-        require(a.mailboxFacet == b.mailboxFacet, "mailboxFacet differs");
-        require(a.executorFacet == b.executorFacet, "executorFacet differs");
-        require(a.gettersFacet == b.gettersFacet, "gettersFacet differs");
-        require(a.diamondInit == b.diamondInit, "diamondInit differs");
+        require(a.verifiers.verifier == b.verifiers.verifier, "verifier differs");
+        require(a.facets.adminFacet == b.facets.adminFacet, "adminFacet differs");
+        require(a.facets.mailboxFacet == b.facets.mailboxFacet, "mailboxFacet differs");
+        require(a.facets.executorFacet == b.facets.executorFacet, "executorFacet differs");
+        require(a.facets.gettersFacet == b.facets.gettersFacet, "gettersFacet differs");
+        require(a.facets.diamondInit == b.facets.diamondInit, "diamondInit differs");
         require(a.genesisUpgrade == b.genesisUpgrade, "genesisUpgrade differs");
         require(a.validatorTimelock == b.validatorTimelock, "validatorTimelock differs");
         require(a.chainTypeManagerProxyAdmin == b.chainTypeManagerProxyAdmin, "chainTypeManagerProxyAdmin differs");

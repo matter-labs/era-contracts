@@ -20,16 +20,9 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/co
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
 import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
-import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 
-contract ChainRegistrationSenderTests is
-    L1ContractDeployer,
-    ZKChainDeployer,
-    TokenDeployer,
-    L2TxMocker,
-    ConfigSemaphore
-{
+contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
@@ -48,7 +41,6 @@ contract ChainRegistrationSenderTests is
     }
 
     function prepare() public {
-        takeConfigLock(); // Prevents race condition with configs
         _generateUserAddresses();
 
         _deployL1Contracts();
@@ -57,8 +49,6 @@ contract ChainRegistrationSenderTests is
 
         _deployEra();
         _deployZKChain(ETH_TOKEN_ADDRESS);
-
-        releaseConfigLock();
 
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
@@ -72,7 +62,7 @@ contract ChainRegistrationSenderTests is
         prepare();
 
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.messageRootProxy),
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
             abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
         );

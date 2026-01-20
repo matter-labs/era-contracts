@@ -21,7 +21,7 @@ import {L2CanonicalTransaction, L2Message, TxStatus, ConfirmTransferResultData} 
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {IAssetRouterBase, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
 import {IGetters, IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -34,7 +34,6 @@ import {InvalidProof, DepositDoesNotExist} from "contracts/common/L1ContractErro
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 import {GatewayUtils} from "deploy-scripts/gateway/GatewayUtils.s.sol";
 import {Utils} from "../unit/concrete/Utils/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -49,14 +48,7 @@ import {IMessageRoot, IMessageVerification} from "contracts/core/message-root/IM
 import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 import {NotMigrated} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
-contract L1GatewayTests is
-    L1ContractDeployer,
-    ZKChainDeployer,
-    TokenDeployer,
-    L2TxMocker,
-    GatewayDeployer,
-    ConfigSemaphore
-{
+contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
@@ -87,7 +79,6 @@ contract L1GatewayTests is
     function prepare() public {
         _generateUserAddresses();
 
-        takeConfigLock(); // Prevents race condition with configs
         _deployL1Contracts();
 
         _deployEraWithPausedDeposits();
@@ -109,8 +100,6 @@ contract L1GatewayTests is
 
         _initializeGatewayScript();
 
-        releaseConfigLock();
-
         vm.deal(ecosystemConfig.ownerAddress, 100000000000000000000000000000000000);
         migratingChain = IZKChain(IL1Bridgehub(addresses.bridgehub).getZKChain(migratingChainId));
         gatewayChain = IZKChain(IL1Bridgehub(addresses.bridgehub).getZKChain(gatewayChainId));
@@ -118,7 +107,7 @@ contract L1GatewayTests is
         vm.deal(gatewayChain.getAdmin(), 100000000000000000000000000000000000);
 
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.messageRootProxy),
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
             abi.encodeWithSelector(IMessageRoot.getProofData.selector),
             abi.encode(
                 ProofData({
@@ -218,7 +207,7 @@ contract L1GatewayTests is
         // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId.
         vm.chainId(migratingChainId);
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.messageRootProxy),
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
             abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
             abi.encode(true)
         );
@@ -248,7 +237,7 @@ contract L1GatewayTests is
             batchNumber: 0,
             ctmData: ctmData,
             chainData: chainData,
-            migrationNumber: IChainAssetHandler(address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy))
+            migrationNumber: IChainAssetHandler(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
                 .migrationNumber(migratingChainId)
         });
         bytes memory bridgehubMintData = abi.encode(data);
@@ -345,7 +334,7 @@ contract L1GatewayTests is
         MerkleProofData memory merkleProofData = _getMerkleProofData();
 
         IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
-        address chainAssetHandler = address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy);
+        address chainAssetHandler = address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler);
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
         address zkChain = addresses.bridgehub.getZKChain(migratingChainId);
         address chainAdmin = IZKChain(zkChain).getAdmin();
@@ -367,7 +356,9 @@ contract L1GatewayTests is
         _mockMessageInclusion(gatewayChainId, merkleProofData, TxStatus.Success);
 
         // Reverts if deposit was faked
-        bytes32 txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(chainAdmin, assetId, transferData)));
+        bytes32 txDataHash = keccak256(
+            bytes.concat(NEW_ENCODING_VERSION, abi.encode(chainAdmin, assetId, transferData))
+        );
         vm.expectRevert(abi.encodeWithSelector(DepositDoesNotExist.selector, bytes32(0), txDataHash));
         addresses.l1Nullifier.bridgeConfirmTransferResult(transferResultData);
     }
@@ -382,7 +373,9 @@ contract L1GatewayTests is
         uint256 amount = 1 ether;
         bytes memory transferData = abi.encode(amount, alice, ETH_TOKEN_ADDRESS);
         //bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
-        bytes32 txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(alice, ETH_TOKEN_ASSET_ID, transferData)));
+        bytes32 txDataHash = keccak256(
+            bytes.concat(NEW_ENCODING_VERSION, abi.encode(alice, ETH_TOKEN_ASSET_ID, transferData))
+        );
         _setDepositHappened(migratingChainId, merkleProofData.l2TxHash, txDataHash);
         require(
             addresses.l1Nullifier.depositHappened(migratingChainId, merkleProofData.l2TxHash) == txDataHash,
@@ -441,7 +434,7 @@ contract L1GatewayTests is
         TxStatus txStatus
     ) internal {
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.messageRootProxy),
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
             abi.encodeWithSelector(
                 IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
                 chainId,
@@ -501,7 +494,7 @@ contract L1GatewayTests is
         _mockMessageInclusion(gatewayChainId, merkleProofData, txStatus);
 
         IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
-        address chainAssetHandler = address(ecosystemAddresses.bridgehub.chainAssetHandlerProxy);
+        address chainAssetHandler = address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler);
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
         address zkChain = addresses.bridgehub.getZKChain(migratingChainId);
         address chainAdmin = IZKChain(zkChain).getAdmin();
@@ -509,7 +502,9 @@ contract L1GatewayTests is
         bytes memory transferData = _getTransferData();
 
         // Set Deposit Happened
-        bytes32 txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(chainAdmin, assetId, transferData)));
+        bytes32 txDataHash = keccak256(
+            bytes.concat(NEW_ENCODING_VERSION, abi.encode(chainAdmin, assetId, transferData))
+        );
         _setDepositHappened(gatewayChainId, merkleProofData.l2TxHash, txDataHash);
 
         ConfirmTransferResultData memory transferResultData = _getConfirmTransferResultData(
