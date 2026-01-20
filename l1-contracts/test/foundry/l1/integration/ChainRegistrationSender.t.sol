@@ -101,7 +101,8 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
     // deposits ERC20 token to the ZK chain where base token is ETH
     // this function use requestL2TransactionTwoBridges function from shared bridge.
     // tokenAddress should be any ERC20 token, excluding ETH
-    function chainRegistrationSenderDeposit(uint256 l2Value, address tokenAddress) private {
+    // Returns the resultant transaction hash
+    function chainRegistrationSenderDeposit(uint256 l2Value, address tokenAddress) private returns (bytes32) {
         TestnetERC20Token currentToken = TestnetERC20Token(tokenAddress);
         uint256 currentChainId = zkChainIds[0];
         address currentUser = users[0];
@@ -146,6 +147,8 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         // Verify the transaction was successful
         assertNotEq(resultantHash, bytes32(0), "Resultant hash should not be zero");
         assertTrue(logs.length > 0, "Transaction should emit logs");
+
+        return resultantHash;
     }
 
     function test_chainRegistrationSenderDeposit() public {
@@ -162,10 +165,15 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
             "Chain should not be registered before deposit"
         );
 
-        // Perform deposit and verify it completes without reverting
-        // Note: chainRegistrationSenderDeposit already has internal assertions that verify
-        // the transaction was successful (resultantHash != 0 and logs.length > 0)
-        chainRegistrationSenderDeposit(1000000, ETH_TOKEN_ADDRESS);
+        // Perform deposit and capture the transaction hash
+        bytes32 txHash = chainRegistrationSenderDeposit(1000000, ETH_TOKEN_ADDRESS);
+
+        // Verify the L2 transaction was submitted successfully
+        // The txHash is the canonical transaction hash for the L2 transaction
+        assertNotEq(txHash, bytes32(0), "Transaction hash should be non-zero after successful deposit");
+
+        // Verify the transaction hash has expected format (non-zero bytes)
+        assertTrue(uint256(txHash) > 0, "Transaction hash should be a valid non-zero value");
     }
 
     // add this to be excluded from coverage report

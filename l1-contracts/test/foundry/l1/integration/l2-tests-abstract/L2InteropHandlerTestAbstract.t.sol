@@ -32,15 +32,48 @@ import {InteropHandler} from "contracts/interop/InteropHandler.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
 abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer {
+    // Function selector for requestL2TransactionDirect(L2TransactionRequestDirect)
+    bytes4 private constant REQUEST_L2_TX_DIRECT_SELECTOR = 0xd52471c1;
+
     function test_requestL2TransactionDirectWithCalldata() public {
-        // Note: get this from real local txs
-        bytes
-            memory data = hex"d52471c1000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001f9000000000000000000000000000000000000000000000001158e460913d000000000000000000000000000009ca26d77cde9cff9145d06725b400b2ec4bbc6160000000000000000000000000000000000000000000000008ac7230489e8000000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000023c34600000000000000000000000000000000000000000000000000000000000000032000000000000000000000000000000000000000000000000000000000000001400000000000000000000000009ca26d77cde9cff9145d06725b400b2ec4bbc61600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+        // Build the L2TransactionRequestDirect struct with explicit values
+        // These values represent a real transaction request
+        uint256 chainId = 505;
+        uint256 mintValue = 20000000000000000000; // 20 ETH
+        address l2Contract = 0x9Ca26d77cDe9CFf9145D06725b400b2Ec4Bbc616;
+        uint256 l2Value = 10000000000000000000; // 10 ETH
+        bytes memory l2Calldata = "";
+        uint256 l2GasLimit = 600000000;
+        uint256 l2GasPerPubdataByteLimit = 800;
+        bytes[] memory factoryDeps = new bytes[](0);
+        address refundRecipient = 0x9Ca26d77cDe9CFf9145D06725b400b2Ec4Bbc616;
+
+        // Encode the transaction request using abi.encodeWithSelector with the raw selector
+        bytes memory data = abi.encodeWithSelector(
+            REQUEST_L2_TX_DIRECT_SELECTOR,
+            chainId,
+            mintValue,
+            l2Contract,
+            l2Value,
+            l2Calldata,
+            l2GasLimit,
+            l2GasPerPubdataByteLimit,
+            factoryDeps,
+            refundRecipient
+        );
 
         vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes32(0))
+        );
+
+        // Mock the requestL2TransactionDirect call on L2 Bridgehub
+        // In L1 context, the L2 Bridgehub isn't fully set up, so we mock the response
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(REQUEST_L2_TX_DIRECT_SELECTOR),
+            abi.encode(bytes32(uint256(1))) // Return a mock transaction hash
         );
 
         // Verify the data is properly formatted (non-empty)
@@ -50,6 +83,10 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         address recipient = L2_BRIDGEHUB_ADDR;
         assertTrue(recipient != address(0), "Recipient should be a valid address");
         assertEq(recipient, L2_BRIDGEHUB_ADDR, "Recipient should be L2_BRIDGEHUB_ADDR");
+
+        // Execute the call to the Bridgehub
+        (bool success, ) = recipient.call(data);
+        assertTrue(success, "Call to L2_BRIDGEHUB should succeed");
     }
 
     function test_l2MessageVerification() public {

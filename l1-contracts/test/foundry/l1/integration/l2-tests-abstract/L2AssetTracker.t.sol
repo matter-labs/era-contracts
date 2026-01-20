@@ -367,14 +367,27 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         // Verify initial state
         assertEq(assetMigrationNumBefore, 0, "Asset migration number should be 0 before migration");
 
-        // Call the migration function - it should complete without reverting
-        // Note: In L1 context (l2-tests-in-l1-context), some L2 system contract features like
-        // message emission and storage updates may not work as expected. The function completing
-        // without revert is the primary success indicator in this context.
+        // Record logs to capture the event
+        vm.recordLogs();
+
+        // Call the migration function
         L2_ASSET_TRACKER.initiateL1ToGatewayMigrationOnL2(assetId);
 
-        // In L1 context, storage updates inside L2 contracts may not persist.
-        // The test verifies the function executes without revert, which indicates
-        // the migration logic is correct (access control, parameter validation, etc.)
+        // Verify the L1ToGatewayMigrationInitiated event was emitted
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertTrue(logs.length > 0, "Should emit L1ToGatewayMigrationInitiated event");
+
+        // Find the L1ToGatewayMigrationInitiated event
+        bool foundEvent = false;
+        bytes32 eventSignature = keccak256("L1ToGatewayMigrationInitiated(bytes32,uint256,uint256)");
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == eventSignature) {
+                foundEvent = true;
+                // Verify the indexed assetId matches
+                assertEq(logs[i].topics[1], assetId, "Event assetId should match");
+                break;
+            }
+        }
+        assertTrue(foundEvent, "L1ToGatewayMigrationInitiated event should be emitted");
     }
 }

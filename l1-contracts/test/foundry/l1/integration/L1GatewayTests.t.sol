@@ -285,17 +285,20 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChainId);
 
-        // Verify chain is on gateway before migration back
+        // Record settlement layer before migration back
         uint256 settlementLayerBefore = addresses.bridgehub.settlementLayer(migratingChainId);
-        // Note: settlementLayer may not be updated yet until migration is confirmed
+        // Note: In test environment the settlement layer may be set to gateway after migration
 
         migrateBackChain();
 
-        // Verify chain is back on L1 (migrateBackChain has its own assertions but add more)
+        // Verify the chain exists on L1 and is accessible
         IZKChain migratingChainContract = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
         assertTrue(address(migratingChainContract) != address(0), "Migrating chain should exist after migration back");
 
-        // Verify base token asset ID is correctly set
+        // Verify the chain contract is properly deployed at a non-zero address
+        assertTrue(address(migratingChainContract).code.length > 0, "Chain contract should have deployed code");
+
+        // Verify base token asset ID is correctly set in bridgehub
         bytes32 expectedBaseTokenAssetId = eraConfig.baseTokenAssetId;
         assertEq(
             addresses.bridgehub.baseTokenAssetId(migratingChainId),
@@ -303,11 +306,20 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             "Base token asset ID should be preserved after migration back"
         );
 
+        // Verify the chain's base token asset ID matches the bridgehub
         assertEq(
             migratingChainContract.getBaseTokenAssetId(),
             expectedBaseTokenAssetId,
             "Chain's base token asset ID should match bridgehub"
         );
+
+        // Verify the chain has a valid admin
+        address admin = migratingChainContract.getAdmin();
+        assertTrue(admin != address(0), "Chain should have a valid admin after migration back");
+
+        // Verify the chain's CTM asset ID can be retrieved from bridgehub
+        bytes32 ctmAssetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
+        assertTrue(ctmAssetId != bytes32(0), "CTM asset ID should be set for the migrated chain");
     }
 
     function migrateBackChain() public {
