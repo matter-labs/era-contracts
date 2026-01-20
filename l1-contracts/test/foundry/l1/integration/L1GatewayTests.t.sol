@@ -285,10 +285,6 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChainId);
 
-        // Record settlement layer before migration back
-        uint256 settlementLayerBefore = addresses.bridgehub.settlementLayer(migratingChainId);
-        // Note: In test environment the settlement layer may be set to gateway after migration
-
         migrateBackChain();
 
         // Verify the chain exists on L1 and is accessible
