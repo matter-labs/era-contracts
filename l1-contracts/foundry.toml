@@ -35,6 +35,7 @@ fs_permissions = [
     { access = "read", path = "zkout" },
     { access = "read", path = "./deploy-scripts/evm-predeploys/evm-predeploy-datas" },
     { access = "read", path = "../configs/genesis/" },
+    { access = "read", path = "../configs/" },
 ]
 ignored_error_codes = ["missing-receive-ether", "code-size"]
 ignored_warnings_from = ["test", "contracts/dev-contracts"]
