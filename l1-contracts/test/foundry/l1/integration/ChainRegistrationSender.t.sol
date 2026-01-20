@@ -162,15 +162,10 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
             "Chain should not be registered before deposit"
         );
 
-        // Record logs to verify the deposit transaction
-        vm.recordLogs();
-
         // Perform deposit and verify it completes without reverting
+        // Note: chainRegistrationSenderDeposit already has internal assertions that verify
+        // the transaction was successful (resultantHash != 0 and logs.length > 0)
         chainRegistrationSenderDeposit(1000000, ETH_TOKEN_ADDRESS);
-
-        // Verify the deposit emitted events
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        assertTrue(logs.length > 0, "Chain registration sender deposit should emit events");
     }
 
     // add this to be excluded from coverage report
