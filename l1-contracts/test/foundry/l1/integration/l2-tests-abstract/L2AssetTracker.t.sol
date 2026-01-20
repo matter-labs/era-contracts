@@ -12,6 +12,7 @@ import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExe
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {MAX_TOKEN_BALANCE} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
+import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 
 import {L2AssetTrackerData} from "./L2AssetTrackerData.sol";
 
@@ -379,7 +380,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
 
         // Find the L1ToGatewayMigrationInitiated event
         bool foundEvent = false;
-        bytes32 eventSignature = keccak256("L1ToGatewayMigrationInitiated(bytes32,uint256,uint256)");
+        bytes32 eventSignature = IL2AssetTracker.L1ToGatewayMigrationInitiated.selector;
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics[0] == eventSignature) {
                 foundEvent = true;
