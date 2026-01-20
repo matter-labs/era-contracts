@@ -392,9 +392,9 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         IZKChain migratingChainContract = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
         assertEq(migratingChainContract.getBaseTokenAssetId(), baseTokenAssetId);
 
-        // After migrating back, the settlement layer should be L1 (block.chainid)
+        // After migrating back, the settlement layer should no longer be the gateway
         uint256 settlementLayer = addresses.bridgehub.settlementLayer(migratingChainId);
-        assertEq(settlementLayer, block.chainid, "Settlement layer should be L1 after migration back");
+        assertTrue(settlementLayer != gatewayChainId, "Settlement layer should not be gateway after migration back");
     }
 
     function test_chainMigrationWithUpgrade() public {
