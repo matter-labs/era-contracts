@@ -111,7 +111,6 @@ pub struct ChainInitArgs {
 }
 
 pub async fn run(args: ChainInitArgs, shell: &Shell) -> anyhow::Result<()> {
-    let genesis_path = paths::path_from_root("etc/genesis.yaml");
     let foundry_scripts_path_buf = paths::path_from_root("l1-contracts");
     let foundry_scripts_path = foundry_scripts_path_buf.as_path();
 
@@ -310,9 +309,8 @@ pub async fn register_chain(
     let deploy_config_path = REGISTER_CHAIN_SCRIPT_PARAMS.input(&foundry_scripts_path);
     let deploy_config = RegisterChainL1Config::new(
         chain_params,
-        ecosystem_contracts,
+        ecosystem_contracts.create2_factory_addr,
         support_l2_legacy_shared_bridge_test,
-        vm_option,
     )?;
     deploy_config.save(shell, deploy_config_path)?;
 

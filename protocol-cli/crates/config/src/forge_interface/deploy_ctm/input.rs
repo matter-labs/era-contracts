@@ -4,7 +4,6 @@ use protocol_cli_types::{L1Network, VMOption};
 
 use crate::{
     forge_interface::deploy_ecosystem::input::InitialDeploymentConfig, traits::FileConfigTrait,
-    WalletsConfig,
 };
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -35,7 +34,6 @@ impl DeployCTMConfig {
             contracts: ContractsDeployCTMConfig {
                 create2_factory_addr: initial_deployment_config.create2_factory_addr,
                 create2_factory_salt: initial_deployment_config.create2_factory_salt,
-                // TODO verify correctnesss
                 governance_security_council_address: owner_address,
                 governance_min_delay: initial_deployment_config.governance_min_delay,
                 validator_timelock_execution_delay: initial_deployment_config

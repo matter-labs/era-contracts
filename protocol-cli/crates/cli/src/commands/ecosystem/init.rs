@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use ethers::{abi::parse_abi, contract::BaseContract, types::{Address, H256}};
+use ethers::{contract::BaseContract, types::{Address, H256}};
 use lazy_static::lazy_static;
 use protocol_cli_common::{
     forge::{Forge, ForgeArgs, ForgeRunner, ForgeScriptArgs},
@@ -11,7 +11,7 @@ use protocol_cli_common::{
 use protocol_cli_config::{
     forge_interface::{
         deploy_ecosystem::{
-            input::{DeployL1Config, GenesisInput, InitialDeploymentConfig},
+            input::{DeployL1Config, InitialDeploymentConfig},
             output::DeployL1CoreContractsOutput,
         },
         deploy_ctm::{input::DeployCTMConfig, output::DeployCTMOutput},
@@ -21,44 +21,36 @@ use protocol_cli_config::{
         },
     },
     traits::{get_or_create_config, ReadConfig, SaveConfig},
-    CoreContractsConfig, GenesisConfig, WalletsConfig,
+    CoreContractsConfig, WalletsConfig,
 };
 use protocol_cli_types::{L1Network, VMOption};
 use serde::{Deserialize, Serialize};
 use xshell::Shell;
 
+use crate::abi::{IDEPLOYCTMABI_ABI, IREGISTERCTMABI_ABI};
 use crate::admin_functions::{
     accept_admin, accept_owner, AdminScriptOutput, AdminScriptOutputInner,
 };
 use crate::utils::{
     forge::{fill_forge_private_key, WalletOwner},
-    paths, runlog,
+    paths,runlog,
 };
 
 lazy_static! {
-    static ref DEPLOY_CTM_FUNCTIONS: BaseContract = BaseContract::from(
-        parse_abi(&["function runWithBridgehub(address bridgehub, bool reuseGovAndAdmin) public",])
-            .unwrap(),
-    );
+    static ref DEPLOY_CTM_FUNCTIONS: BaseContract = BaseContract::from(IDEPLOYCTMABI_ABI.clone());
 }
 
 lazy_static! {
     static ref REGISTER_CTM_FUNCTIONS: BaseContract =
-         BaseContract::from(parse_abi(&["function registerCTM(address bridgehub, address chainTypeManagerProxy, bool shouldSend) public",]).unwrap(),);
+        BaseContract::from(IREGISTERCTMABI_ABI.clone());
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct EcosystemInitArgs {
-    #[clap(long, help = "Address of the deployer")]
-    pub deployer: Option<String>,
-    #[clap(long, help = "Address of the ecosystem owner")]
-    pub owner: Option<String>,
-
     #[clap(long, help = "L1 RPC URL", default_value = "http://localhost:8545")]
     pub l1_rpc_url: String,
-    #[clap(long, help = "Salt for the deployment")]
-    pub salt: Option<String>,
-    #[clap(long, default_value_t = true)]
+
+    #[clap(long, default_value_t = false)]
     pub with_testnet_verifier: bool,
     #[clap(long, default_value_t = false)]
     pub with_legacy_bridge: bool,
@@ -67,6 +59,9 @@ pub struct EcosystemInitArgs {
     pub contracts_path: PathBuf,
     #[clap(long)]
     pub wallets_path: PathBuf,
+
+    #[clap(long, default_value_t = 270)]
+    pub era_chain_id: u64,
 
     #[clap(long, default_value_t = false)]
     pub plan: bool,
@@ -79,11 +74,9 @@ pub struct EcosystemInitArgs {
 }
 
 pub async fn run(args: EcosystemInitArgs, shell: &Shell) -> anyhow::Result<()> {
-    let genesis_path = paths::path_from_root("etc/genesis.yaml");
     let foundry_scripts_path_buf = paths::path_from_root("l1-contracts");
     let foundry_scripts_path = foundry_scripts_path_buf.as_path();
     let vm_option = VMOption::ZKSyncOsVM;
-    let salt = args.salt.unwrap_or_else(|| format!("{:#x}", H256::random()));
 
     let mut contracts: CoreContractsConfig = get_or_create_config(
         shell,
@@ -91,14 +84,9 @@ pub async fn run(args: EcosystemInitArgs, shell: &Shell) -> anyhow::Result<()> {
         CoreContractsConfig::default,
     )?;
     let wallets = WalletsConfig::read(shell, args.wallets_path.clone())?;
-    let owner = wallets.clone().governor.address;
-    let deployer = wallets.clone().deployer.unwrap().address;
-    // TODO: owner, deployer should be derived from wallets if not provided
 
     let mut runner = ForgeRunner::new(args.forge_args.runner.clone());
     let initial_deployment_config = InitialDeploymentConfig::default();
-    let genesis_config = GenesisConfig::read(shell, &genesis_path).await?;
-    let genesis_input = GenesisInput::new(&genesis_config, vm_option)?;
 
     // TODO: make this configurable
     let reuse_gov_and_admin = true;
@@ -113,13 +101,9 @@ pub async fn run(args: EcosystemInitArgs, shell: &Shell) -> anyhow::Result<()> {
         &mut runner,
         args.forge_args.script.clone(),
         args.l1_rpc_url.clone(),
-        owner,
-        deployer,
-        salt.clone(),
-        args.with_testnet_verifier,
-        args.with_legacy_bridge,
         &initial_deployment_config,
-        &genesis_input,
+        args.era_chain_id,
+        args.with_legacy_bridge,
         vm_option,
     )
     .await?;
@@ -136,13 +120,9 @@ pub async fn run(args: EcosystemInitArgs, shell: &Shell) -> anyhow::Result<()> {
         args.forge_args.script.clone(),
         args.l1_rpc_url.clone(),
         bridgehub_proxy_addr,
-        owner,
-        deployer,
-        salt,
+        &initial_deployment_config,
         args.with_testnet_verifier,
         args.with_legacy_bridge,
-        &initial_deployment_config,
-        &genesis_input,
         vm_option,
         reuse_gov_and_admin,
     )
@@ -159,6 +139,7 @@ pub async fn run(args: EcosystemInitArgs, shell: &Shell) -> anyhow::Result<()> {
 /// Initializes ecosystem core contracts:
 /// * Deploys core contracts
 /// * Accepts owner and admin roles
+#[allow(clippy::too_many_arguments)]
 async fn init_core_contracts(
     shell: &Shell,
     foundry_scripts_path: &Path,
@@ -167,13 +148,9 @@ async fn init_core_contracts(
     runner: &mut ForgeRunner,
     forge_args: ForgeScriptArgs,
     l1_rpc_url: String,
-    owner: Address,
-    deployer: Address,
-    salt: String,
-    with_testnet_verifier: bool,
-    with_legacy_bridge: bool,
     initial_deployment_config: &InitialDeploymentConfig,
-    genesis_input: &GenesisInput,
+    era_chain_id: u64,
+    support_l2_legacy_shared_bridge_test: bool,
     vm_option: VMOption,
 ) -> anyhow::Result<()> {
     logger::step("Deploying core contracts...");
@@ -181,18 +158,13 @@ async fn init_core_contracts(
         shell,
         foundry_scripts_path,
         contracts,
-        &wallets,
+        wallets,
         runner,
         &forge_args,
         l1_rpc_url.clone(),
-        owner,
-        deployer,
-        salt,
-        with_testnet_verifier,
-        with_legacy_bridge,
-        &initial_deployment_config,
-        &genesis_input,
-        vm_option,
+        initial_deployment_config,
+        era_chain_id,
+        support_l2_legacy_shared_bridge_test,
         None,
         true,
     )
@@ -251,6 +223,23 @@ async fn init_core_contracts(
     )
     .await?;
 
+    if let Some(chain_asset_handler_addr) = contracts
+        .core_ecosystem_contracts
+        .chain_asset_handler_proxy_addr
+    {
+        accept_owner(
+            shell,
+            runner,
+            foundry_scripts_path,
+            contracts.l1.governance_addr,
+            &wallets.governor,
+            chain_asset_handler_addr,
+            &forge_args,
+            l1_rpc_url,
+        )
+        .await?;
+    }
+
     Ok(())
 }
 
@@ -263,32 +252,20 @@ pub async fn deploy_core_contracts(
     runner: &mut ForgeRunner,
     forge_args: &ForgeScriptArgs,
     l1_rpc_url: String,
-    owner: Address,
-    deployer: Address,
-    salt: String,
-    with_testnet_verifier: bool,
-    with_legacy_bridge: bool,
     initial_deployment_config: &InitialDeploymentConfig,
-    genesis_input: &GenesisInput,
-    vm_option: VMOption,
+    era_chain_id: u64,
+    support_l2_legacy_shared_bridge_test: bool,
     sender: Option<String>,
     broadcast: bool,
 ) -> anyhow::Result<()> {
     let deploy_config_path: PathBuf =
         DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS.input(&foundry_scripts_path);
 
-    let era_chain_id = 270;
-    let l1_network = L1Network::Localhost;
-
     let deploy_config = DeployL1Config::new(
-        &genesis_input,
-        &initial_deployment_config,
-        owner,
+        wallets.governor.address,
+        initial_deployment_config,
         era_chain_id,
-        with_testnet_verifier,
-        l1_network,
-        with_legacy_bridge,
-        vm_option,
+        support_l2_legacy_shared_bridge_test,
     );
     deploy_config.save(shell, deploy_config_path)?;
 
@@ -330,13 +307,9 @@ async fn init_ctm(
     forge_args: ForgeScriptArgs,
     l1_rpc_url: String,
     bridgehub_proxy_addr: Address,
-    owner: Address,
-    deployer: Address,
-    salt: String,
-    with_testnet_verifier: bool,
-    with_legacy_bridge: bool,
     initial_deployment_config: &InitialDeploymentConfig,
-    genesis_input: &GenesisInput,
+    with_testnet_verifier: bool,
+    support_l2_legacy_shared_bridge_test: bool,
     vm_option: VMOption,
     reuse_gov_and_admin: bool,
 ) -> anyhow::Result<()> {
@@ -349,13 +322,9 @@ async fn init_ctm(
         &forge_args,
         l1_rpc_url.clone(),
         bridgehub_proxy_addr,
-        owner,
-        deployer,
-        salt.clone(),
-        with_testnet_verifier,
-        with_legacy_bridge,
         initial_deployment_config,
-        genesis_input,
+        with_testnet_verifier,
+        support_l2_legacy_shared_bridge_test,
         vm_option,
         reuse_gov_and_admin,
         None,
@@ -367,22 +336,12 @@ async fn init_ctm(
     register_ctm_on_existing_bh(
         shell,
         foundry_scripts_path,
-        contracts,
         wallets,
         runner,
         &forge_args,
         l1_rpc_url.clone(),
         bridgehub_proxy_addr,
         contracts.ctm(vm_option).state_transition_proxy_addr,
-        owner,
-        deployer,
-        salt.clone(),
-        with_testnet_verifier,
-        with_legacy_bridge,
-        initial_deployment_config,
-        genesis_input,
-        vm_option,
-        reuse_gov_and_admin,
         None,
         true,
     )
@@ -400,13 +359,9 @@ pub async fn deploy_new_ctm_and_accept_admin(
     forge_args: &ForgeScriptArgs,
     l1_rpc_url: String,
     bridgehub_proxy_addr: Address,
-    owner: Address,
-    deployer: Address,
-    salt: String,
-    with_testnet_verifier: bool,
-    with_legacy_bridge: bool,
     initial_deployment_config: &InitialDeploymentConfig,
-    genesis_input: &GenesisInput,
+    with_testnet_verifier: bool,
+    support_l2_legacy_shared_bridge_test: bool,
     vm_option: VMOption,
     reuse_gov_and_admin: bool,
     sender: Option<String>,
@@ -417,18 +372,14 @@ pub async fn deploy_new_ctm_and_accept_admin(
         shell,
         foundry_scripts_path,
         contracts,
-        &wallets,
+        wallets,
         runner,
         forge_args,
         l1_rpc_url.clone(),
         bridgehub_proxy_addr,
-        owner,
-        deployer,
-        salt,
-        with_testnet_verifier,
-        with_legacy_bridge,
         initial_deployment_config,
-        genesis_input,
+        with_testnet_verifier,
+        support_l2_legacy_shared_bridge_test,
         vm_option,
         reuse_gov_and_admin,
         sender,
@@ -476,28 +427,23 @@ pub async fn deploy_new_ctm(
     forge_args: &ForgeScriptArgs,
     l1_rpc_url: String,
     bridgehub_proxy_addr: Address,
-    owner: Address,
-    deployer: Address,
-    salt: String,
-    with_testnet_verifier: bool,
-    with_legacy_bridge: bool,
     initial_deployment_config: &InitialDeploymentConfig,
-    genesis_input: &GenesisInput,
+    with_testnet_verifier: bool,
+    support_l2_legacy_shared_bridge_test: bool,
     vm_option: VMOption,
     reuse_gov_and_admin: bool,
     sender: Option<String>,
     broadcast: bool,
 ) -> anyhow::Result<()> {
     let deploy_config_path: PathBuf = DEPLOY_CTM_SCRIPT_PARAMS.input(&foundry_scripts_path);
-    let era_chain_id = 270;
     let l1_network = L1Network::Localhost;
 
     let deploy_config = DeployCTMConfig::new(
-        owner,
-        &initial_deployment_config,
+        wallets.governor.address,
+        initial_deployment_config,
         with_testnet_verifier,
         l1_network,
-        with_legacy_bridge,
+        support_l2_legacy_shared_bridge_test,
         vm_option,
     );
     deploy_config.save(shell, deploy_config_path)?;
@@ -540,22 +486,12 @@ pub async fn deploy_new_ctm(
 pub async fn register_ctm_on_existing_bh(
     shell: &Shell,
     foundry_scripts_path: &Path,
-    contracts: &mut CoreContractsConfig,
     wallets: &WalletsConfig,
     runner: &mut ForgeRunner,
     forge_args: &ForgeScriptArgs,
     l1_rpc_url: String,
     bridgehub_proxy_addr: Address,
     ctm_address: Address,
-    owner: Address,
-    deployer: Address,
-    salt: String,
-    with_testnet_verifier: bool,
-    with_legacy_bridge: bool,
-    initial_deployment_config: &InitialDeploymentConfig,
-    genesis_input: &GenesisInput,
-    vm_option: VMOption,
-    reuse_gov_and_admin: bool,
     sender: Option<String>,
     broadcast: bool,
 ) -> anyhow::Result<AdminScriptOutput> {

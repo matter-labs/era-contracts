@@ -1,3 +1,5 @@
+pub const DEFAULT_ERA_CHAIN_ID: u64 = 270;
+
 /// Name of the main configuration file
 pub const CONFIG_NAME: &str = "ZkStack.yaml";
 /// Name of the wallets file
@@ -113,8 +115,6 @@ pub(crate) const L1_CONTRACTS_FOUNDRY_INSIDE_CONTRACTS: &str = "l1-contracts";
 pub(crate) const PROVING_NETWORKS_PATH: &str = "proof-manager-contracts";
 /// Path to proving networks contracts deploy script
 pub(crate) const PROVING_NETWORKS_DEPLOY_SCRIPT_PATH: &str = "scripts/deployment/deploy.sh";
-
-pub(crate) const ERA_CHAIN_ID: u32 = 270;
 
 pub(crate) const TEST_CONFIG_PATH: &str = "etc/test_config/constant/eth.json";
 pub(crate) const BASE_PATH: &str = "m/44'/60'/0'";

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use ethers::types::H256;
 use protocol_cli_types::{L2ChainId, DAValidatorType, VMOption};
 
-use crate::{traits::FileConfigTrait, CoreContractsConfig, ContractsConfig};
+use crate::{forge_interface::Create2Addresses, traits::FileConfigTrait, CoreContractsConfig};
 
 /// Chain parameters
 #[derive(Debug)]
@@ -23,47 +23,10 @@ pub struct NewChainParams {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct RegisterChainL1Config {
-    contracts_config: Contracts,
-    deployed_addresses: DeployedAddresses,
     chain: ChainL1Config,
     owner_address: Address,
-    governance: Address,
-    create2_factory_address: Address,
-    create2_salt: H256,
+    contracts: Create2Addresses,
     initialize_legacy_bridge: bool,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-struct Bridgehub {
-    bridgehub_proxy_addr: Address,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-struct Bridges {
-    shared_bridge_proxy_addr: Address,
-    l1_nullifier_proxy_addr: Address,
-    erc20_bridge_proxy_addr: Address,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-struct StateTransition {
-    chain_type_manager_proxy_addr: Address,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-struct DeployedAddresses {
-    state_transition: StateTransition,
-    bridgehub: Bridgehub,
-    bridges: Bridges,
-    validator_timelock_addr: Address,
-    native_token_vault_addr: Address,
-    server_notifier_proxy_addr: Option<Address>,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-struct Contracts {
-    diamond_cut_data: String,
-    force_deployments_data: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -86,44 +49,10 @@ impl FileConfigTrait for RegisterChainL1Config {}
 impl RegisterChainL1Config {
     pub fn new(
         chain_params: &NewChainParams,
-        contracts: &CoreContractsConfig,
+        create2_factory_addr: Address,
         initialize_legacy_bridge: bool,
-        vm_option: VMOption,
     ) -> anyhow::Result<Self> {
-        let ctm = match vm_option {
-            VMOption::EraVM => &contracts.era_ctm.clone().unwrap(),
-            VMOption::ZKSyncOsVM => &contracts.zksync_os_ctm.clone().unwrap(),
-        };        
         Ok(Self {
-            contracts_config: Contracts {
-                diamond_cut_data: ctm.diamond_cut_data.clone(),
-                force_deployments_data: ctm
-                    .force_deployments_data
-                    .clone()
-                    .expect("force_deployment_data"),
-            },
-            deployed_addresses: DeployedAddresses {
-                state_transition: StateTransition {
-                    chain_type_manager_proxy_addr: ctm.state_transition_proxy_addr,
-                },
-                bridgehub: Bridgehub {
-                    bridgehub_proxy_addr: contracts.core_ecosystem_contracts.bridgehub_proxy_addr,
-                },
-                bridges: Bridges {
-                    shared_bridge_proxy_addr: contracts.bridges.shared.l1_address,
-                    l1_nullifier_proxy_addr: contracts
-                        .bridges
-                        .l1_nullifier_addr
-                        .expect("l1_nullifier_addr"),
-                    erc20_bridge_proxy_addr: contracts.bridges.erc20.l1_address,
-                },
-                validator_timelock_addr: ctm.validator_timelock_addr,
-                native_token_vault_addr: contracts
-                    .core_ecosystem_contracts
-                    .native_token_vault_addr
-                    .expect("native_token_vault_addr"),
-                server_notifier_proxy_addr: Some(ctm.server_notifier_proxy_addr),
-            },
             chain: ChainL1Config {
                 chain_chain_id: chain_params.chain_id,
                 base_token_gas_price_multiplier_nominator: chain_params.base_token_gas_price_multiplier_numerator,
@@ -137,20 +66,13 @@ impl RegisterChainL1Config {
                 validium_mode: chain_params.da_mode == DAValidatorType::NoDA || chain_params.da_mode == DAValidatorType::Avail,
                 validator_sender_operator_eth: chain_params.commit_operator,
                 validator_sender_operator_blobs_eth: chain_params.prove_operator,                
-                // validator_sender_operator_prove: wallets_config
-                //     .prove_operator
-                //     .as_ref()
-                //     .map(|w| w.address),
-                // validator_sender_operator_execute: wallets_config
-                //     .execute_operator
-                //     .as_ref()
-                //     .map(|w| w.address),
                 allow_evm_emulator: true,
             },
             owner_address: chain_params.owner,
-            governance: contracts.l1.governance_addr,
-            create2_factory_address: contracts.create2_factory_addr,
-            create2_salt: H256::random(),
+            contracts: Create2Addresses {
+                create2_factory_addr,
+                create2_factory_salt: H256::random(),
+            },
             initialize_legacy_bridge,
         })
     }
