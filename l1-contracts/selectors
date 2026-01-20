@@ -1,5 +1,4 @@
 Listing selectors for contracts in the project...
-[2m2026-01-20T10:33:30.862350Z[0m [31mERROR[0m [2mfoundry_compilers::cache[0m[2m:[0m [3merror[0m[2m=[0mmissing field `preprocessed` at line 1 column 3250291
 AccessControlEnumerablePerChainAddressUpgradeable
 
 ╭----------+---------------------------------------------------+--------------------------------------------------------------------╮
