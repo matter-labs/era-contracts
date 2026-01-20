@@ -146,7 +146,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
 
         // Deploy all factory dependencies
-        bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps();
+        bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps(gatewayCTMDeployerConfig.isZKsyncOS);
         address l1AssetRouter = address(IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).assetRouter());
 
         for (uint i = 0; i < deps.length; i++) {

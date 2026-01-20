@@ -1086,7 +1086,12 @@ library GatewayCTMDeployerHelper {
 
     /// @notice Returns all factory dependencies for deployment.
     /// @return dependencies Array of bytecodes needed for deployment.
-    function getListOfFactoryDeps() external returns (bytes[] memory dependencies) {
+    function getListOfFactoryDeps(bool _isZKsyncOS) external returns (bytes[] memory dependencies) {
+        if (_isZKsyncOS) {
+            // There are no factory dependencies needed for ZKSync OS chains to initialize ZK Gateway.
+            return dependencies;
+        }
+
         // 7 deployers (DA, ProxyAdmin, ValidatorTimelock, Verifiers Era/ZKsyncOS, CTM Era/ZKsyncOS)
         // + 3 DA contracts (RollupDAManager, ValidiumL1DAValidator, RelayedSLDAValidator)
         // + 1 ProxyAdmin contract
