@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
 import {StdStorage, Test, stdStorage, console} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER, L2_ASSET_TRACKER_ADDR, L2_CHAIN_ASSET_HANDLER, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -372,10 +373,12 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         // Call the migration function
         L2_ASSET_TRACKER.initiateL1ToGatewayMigrationOnL2(assetId);
 
-        // The function should complete without reverting
+        // Verify logs were emitted - the function should emit a message for L1
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertTrue(logs.length > 0, "initiateL1ToGatewayMigrationOnL2 should emit at least one event");
+
         // Note: The initiateL1ToGatewayMigrationOnL2 function emits a message but may not
         // update local storage in all contexts. The actual migration number update happens
         // during the L1 confirmation flow.
-        assertTrue(true, "initiateL1ToGatewayMigrationOnL2 should complete without reverting");
     }
 }

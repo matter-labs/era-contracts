@@ -337,8 +337,8 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         assertTrue(logs.length > 0, "Direct transaction should emit logs");
 
         // Direct transactions send calldata to L2 without going through the bridge's token transfer
-        // The function completing without revert indicates success
-        assertTrue(true, "Direct deposit transaction should complete without reverting");
+        // Verify the calldata was properly encoded
+        assertTrue(secondBridgeCalldata.length > 0, "Second bridge calldata should not be empty");
     }
 
     function test_DepositToL1AndWithdraw7702() public {
