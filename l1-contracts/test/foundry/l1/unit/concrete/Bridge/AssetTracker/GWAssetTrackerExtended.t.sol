@@ -109,7 +109,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: new L2Log[](0),
             messages: new bytes[](0),
             chainBatchRoot: bytes32(0),
-            messageRoot: bytes32(0)
+            messageRoot: bytes32(0),
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain to return a different address
@@ -151,7 +152,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot
+            messageRoot: emptyMessageRoot,
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -200,7 +202,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot
+            messageRoot: emptyMessageRoot,
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -249,7 +252,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot
+            messageRoot: emptyMessageRoot,
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -300,7 +304,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot
+            messageRoot: emptyMessageRoot,
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -364,7 +369,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot
+            messageRoot: emptyMessageRoot,
+            settlementFeePayer: address(0)
         });
 
         // Need to set up initial balance for the chain first
@@ -437,7 +443,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot
+            messageRoot: emptyMessageRoot,
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -492,7 +499,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot
+            messageRoot: emptyMessageRoot,
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -548,7 +556,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot
+            messageRoot: emptyMessageRoot,
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -606,7 +615,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: new bytes[](0),
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot
+            messageRoot: emptyMessageRoot,
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain

@@ -113,7 +113,8 @@ library L2GenesisUpgradeTestHelper {
                     l2SharedBridgeLegacyImpl: address(0),
                     l2BridgedStandardERC20Impl: address(0),
                     aliasedChainRegistrationSender: address(1),
-                    dangerousTestOnlyForcedBeacon: address(0)
+                    dangerousTestOnlyForcedBeacon: address(0),
+                    zkTokenBridgingData: TokenBridgingData({assetId: bytes32(0), originChainId: 0, originToken: address(0)})
                 })
             );
     }
