@@ -1091,7 +1091,7 @@ library GatewayCTMDeployerHelper {
             // There are no factory dependencies needed for ZKSync OS chains to initialize ZK Gateway.
             return dependencies;
         }
-        
+
         // 7 deployers (DA, ProxyAdmin, ValidatorTimelock, Verifiers Era/ZKsyncOS, CTM Era/ZKsyncOS)
         // + 3 DA contracts (RollupDAManager, ValidiumL1DAValidator, RelayedSLDAValidator)
         // + 1 ProxyAdmin contract
