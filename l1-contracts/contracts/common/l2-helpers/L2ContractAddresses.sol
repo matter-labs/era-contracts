@@ -6,6 +6,7 @@ import {IL2ToL1MessengerEra} from "./IL2ToL1MessengerEra.sol";
 import {IL2InteropRootStorage} from "../interfaces/IL2InteropRootStorage.sol";
 import {IMessageVerification} from "../interfaces/IMessageVerification.sol";
 import {IBaseToken} from "./IBaseToken.sol";
+import {IBaseTokenHolder} from "./IBaseTokenHolder.sol";
 import {IL2ContractDeployer} from "../interfaces/IL2ContractDeployer.sol";
 import {IL2NativeTokenVault} from "../../bridge/ntv/IL2NativeTokenVault.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
@@ -164,3 +165,7 @@ IL2AssetTracker constant L2_ASSET_TRACKER = IL2AssetTracker(L2_ASSET_TRACKER_ADD
 /// @dev the address of the GW asset tracker
 address constant GW_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x10);
 IGWAssetTracker constant GW_ASSET_TRACKER = IGWAssetTracker(GW_ASSET_TRACKER_ADDR);
+
+/// @dev The address of the base token holder contract that holds chain's base token reserves.
+address constant L2_BASE_TOKEN_HOLDER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x11);
+IBaseTokenHolder constant L2_BASE_TOKEN_HOLDER = IBaseTokenHolder(payable(L2_BASE_TOKEN_HOLDER_ADDR));
