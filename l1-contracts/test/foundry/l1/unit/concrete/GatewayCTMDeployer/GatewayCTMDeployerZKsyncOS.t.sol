@@ -12,12 +12,13 @@ import {GatewayCTMDeployerVerifiersZKsyncOS} from "contracts/state-transition/ch
 import {GatewayCTMDeployerCTMZKsyncOS} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerCTMZKsyncOS.sol";
 
 import {GatewayCTMDeployerHelper, DeployerCreate2Calldata, DeployerAddresses, DirectDeployedAddresses, DirectCreate2Calldata} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
+import {Utils} from "deploy-scripts/utils/Utils.sol";
 
 import {AllDeployerResults, DeployedContractsComparator, GatewayCTMDeployerTestUtils} from "test/foundry/unit/utils/GatewayCTMDeployerTestUtils.sol";
 
 /// @notice Tester contract that deploys via the deterministic CREATE2 factory (Arachnid's)
 contract GatewayCTMDeployerTesterZKsyncOS {
-    address constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
+    address constant DETERMINISTIC_CREATE2_ADDRESS = Utils.DETERMINISTIC_CREATE2_ADDRESS;
 
     /// @notice Converts raw 20-byte return data to address
     /// @dev Arachnid's CREATE2 factory returns raw 20 bytes, not ABI-encoded
@@ -92,17 +93,11 @@ contract GatewayCTMDeployerTesterZKsyncOS {
 /// @notice Test for GatewayCTMDeployer in ZKsyncOS (EVM) mode
 /// @dev This test verifies that the deployment logic works correctly for standard EVM systems
 contract GatewayCTMDeployerZKsyncOSTest is Test {
-    // Deterministic CREATE2 factory RUNTIME bytecode (Arachnid's)
-    bytes constant CREATE2_FACTORY_RUNTIME_BYTECODE =
-        hex"7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
-
-    address constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
-
     GatewayCTMDeployerConfig deployerConfig;
 
     function setUp() external {
         // Deploy the deterministic CREATE2 factory at the expected address
-        vm.etch(DETERMINISTIC_CREATE2_ADDRESS, CREATE2_FACTORY_RUNTIME_BYTECODE);
+        vm.etch(Utils.DETERMINISTIC_CREATE2_ADDRESS, Utils.CREATE2_FACTORY_RUNTIME_BYTECODE);
 
         // Initialize the configuration with sample data for ZKsyncOS mode
         GatewayCTMDeployerConfig memory config = GatewayCTMDeployerConfig({
@@ -153,7 +148,7 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
         ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), deployerConfig);
 
         // Verify we're using the deterministic CREATE2 factory
-        assertEq(create2FactoryAddress, DETERMINISTIC_CREATE2_ADDRESS, "Should use deterministic CREATE2 factory");
+        assertEq(create2FactoryAddress, Utils.DETERMINISTIC_CREATE2_ADDRESS, "Should use deterministic CREATE2 factory");
 
         GatewayCTMDeployerTesterZKsyncOS tester = new GatewayCTMDeployerTesterZKsyncOS();
 
