@@ -1,7 +1,7 @@
 era_chain_id = 324
 testnet_verifier = false
-# Updated temporarily for this upgrade
-governance_upgrade_timer_initial_delay = 0
+# 5m, updated only for this upgrade.
+governance_upgrade_timer_initial_delay = 900
 owner_address = "0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3"
 
 # This should always be false for non-loadtest environments.
@@ -17,7 +17,7 @@ max_expected_l1_gas_price = 30000000000
 governance_min_delay = 0
 
 max_number_of_chains = 100
-create2_factory_salt = "0x55de3677ffea74c9815331db7f4c737a32c161db4cae7d47504a336c4c5bcfb5"
+create2_factory_salt = "0x89de3677ffea74c9815331db7f4c737a32c161db4cae7d47504a336c4c5bcfb5"
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 
 # === Unused, we read it from the old chain creation params
