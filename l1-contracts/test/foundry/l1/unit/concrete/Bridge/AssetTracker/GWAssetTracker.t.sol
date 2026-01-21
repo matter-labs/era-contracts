@@ -202,6 +202,76 @@ contract GWAssetTrackerTest is Test {
         assertEq(dummyL2MessageRoot.getAggregatedRoot(), emptyRoot);
     }
 
+    /// @notice Regression test for the bug fixed in PR #1704 (commit a6c9e5622f3d430b530472a4f0f4d1e8db8fc2a8)
+    /// @dev Bug Description:
+    ///      In GWAssetTracker::_getEmptyMessageRoot, the sharedTree was initialized with
+    ///      `sharedTree.createTree(2)` instead of `sharedTree.createTree(1)`.
+    ///      This caused the tree height to be calculated as 1 instead of 0, because
+    ///      DynamicIncrementalMerkleMemory calculates height as log2(_maxLeafNumber).
+    ///
+    ///      The fix changed `sharedTree.createTree(2)` to `sharedTree.createTree(1)`,
+    ///      ensuring the empty tree root matches what MessageRootBase constructs
+    ///      during initialization of L2MessageRoot.
+    ///
+    ///      Impact: Inconsistent message roots between GWAssetTracker and L2MessageRoot
+    ///      would cause chain settlement verification failures.
+    function test_regression_emptyMessageRootTreeHeightConsistency() public {
+        // Get empty root from GWAssetTracker
+        bytes32 gwEmptyRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+
+        // Create an L2MessageRoot and initialize it the same way it's done in production
+        vm.chainId(CHAIN_ID);
+        L2MessageRoot l2MessageRoot = new L2MessageRoot();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        l2MessageRoot.initL2(L1_CHAIN_ID, block.chainid);
+
+        // Get the aggregated root from L2MessageRoot (which uses MessageRootBase initialization)
+        bytes32 l2AggregatedRoot = l2MessageRoot.getAggregatedRoot();
+
+        // These must match - if the tree height calculation is wrong in GWAssetTracker,
+        // this assertion will fail
+        assertEq(
+            gwEmptyRoot,
+            l2AggregatedRoot,
+            "Empty message root from GWAssetTracker must match L2MessageRoot's aggregated root"
+        );
+
+        // Verify the roots are not zero (sanity check)
+        assertTrue(gwEmptyRoot != bytes32(0), "Empty root should not be zero");
+    }
+
+    /// @notice Additional regression test ensuring consistent empty roots across multiple chains
+    /// @dev Part of the regression test for PR #1704 - verifies the fix works for various chain IDs
+    function test_regression_emptyMessageRootConsistentAcrossChains() public {
+        uint256[] memory chainIds = new uint256[](3);
+        chainIds[0] = 100;
+        chainIds[1] = 200;
+        chainIds[2] = 300;
+
+        for (uint256 i = 0; i < chainIds.length; i++) {
+            uint256 chainId = chainIds[i];
+
+            // Get empty root from GWAssetTracker for this chain
+            bytes32 gwEmptyRoot = gwAssetTracker.getEmptyMessageRoot(chainId);
+
+            // Create an L2MessageRoot and initialize it for this chain
+            vm.chainId(chainId);
+            L2MessageRoot l2MessageRoot = new L2MessageRoot();
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            l2MessageRoot.initL2(L1_CHAIN_ID, block.chainid);
+
+            // Get the aggregated root from L2MessageRoot
+            bytes32 l2AggregatedRoot = l2MessageRoot.getAggregatedRoot();
+
+            // Verify consistency for each chain
+            assertEq(
+                gwEmptyRoot,
+                l2AggregatedRoot,
+                string.concat("Empty root mismatch for chain ID: ", vm.toString(chainId))
+            );
+        }
+    }
+
     function test_SetLegacySharedBridgeAddressForLocalTesting() public {
         address legacyBridge = makeAddr("legacyBridge");
 
