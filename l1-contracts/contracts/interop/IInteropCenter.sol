@@ -12,6 +12,20 @@ interface IInteropCenter {
     event NewAssetRouter(address indexed oldAssetRouter, address indexed newAssetRouter);
     event NewAssetTracker(address indexed oldAssetTracker, address indexed newAssetTracker);
 
+    /// @notice Emitted when the interop protocol fee is updated.
+    event InteropFeeUpdated(uint256 indexed oldFee, uint256 indexed newFee);
+
+    /// @notice Emitted when protocol fees (base token) are collected and sent to the recipient
+    /// @param recipient Address that received the fees (always block.coinbase in current release).
+    /// @param amount Total amount of base token collected.
+    event ProtocolFeesCollected(address indexed recipient, uint256 amount);
+
+    /// @notice Emitted when fixed ZK fees are collected from a user.
+    /// @param payer Address that paid the fees.
+    /// @param recipient Address that received the fees (always block.coinbase in current release).
+    /// @param amount Total amount of ZK tokens collected.
+    event FixedZKFeesCollected(address indexed payer, address indexed recipient, uint256 amount);
+
     /// @notice Restrictions for parsing attributes.
     /// @param OnlyInteropCallValue: Only attribute for interop call value is allowed.
     /// @param OnlyCallAttributes: Only call attributes are allowed.
@@ -24,7 +38,40 @@ interface IInteropCenter {
         CallAndBundleAttributes
     }
 
-    function initL2(uint256 _l1ChainId, address _owner) external;
+    /// @notice Returns the L1 chain ID.
+    function L1_CHAIN_ID() external view returns (uint256);
+
+    /// @notice Returns the operator-set fee in base token per interop call (when useFixedFee=false).
+    function interopProtocolFee() external view returns (uint256);
+
+    /// @notice Returns the fixed fee amount in ZK tokens per interop call (when useFixedFee=true).
+    function ZK_INTEROP_FEE() external view returns (uint256);
+
+    /// @notice Returns the ZK token asset ID.
+    function ZK_TOKEN_ASSET_ID() external view returns (bytes32);
+
+    /// @notice Returns the number of bundles sent by a sender.
+    function interopBundleNonce(address sender) external view returns (uint256);
+
+    /// @notice Returns ZK token address if available, zero address otherwise.
+    function getZKTokenAddress() external view returns (address);
+
+    /// @notice Sets the base token fee per interop call (used when useFixedFee=false).
+    /// @param _fee New fee amount in base token wei.
+    function setInteropFee(uint256 _fee) external;
+
+    /// @notice Checks if the attribute selector is supported by the InteropCenter.
+    /// @param _attributeSelector The attribute selector to check.
+    /// @return True if the attribute selector is supported, false otherwise.
+    function supportsAttribute(bytes4 _attributeSelector) external pure returns (bool);
+
+    /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
+    function pause() external;
+
+    /// @notice Unpauses the contract.
+    function unpause() external;
+
+    function initL2(uint256 _l1ChainId, address _owner, bytes32 _zkTokenAssetId) external;
 
     /// Mailbox forwarder
 

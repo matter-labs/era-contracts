@@ -21,8 +21,10 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
+import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 
 contract GWAssetTrackerTestHelper is GWAssetTracker {
+    constructor() GWAssetTracker() {}
     function getEmptyMessageRoot(uint256 _chainId) external returns (bytes32) {
         return _getEmptyMessageRoot(_chainId);
     }
@@ -67,6 +69,14 @@ contract GWAssetTrackerTest is Test {
         vm.etch(L2_MESSAGE_ROOT_ADDR, address(mockMessageRoot).code);
         vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, address(mockNativeTokenVault).code);
         vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, address(mockChainAssetHandler).code);
+
+        // Mock the WETH_TOKEN() call on NativeTokenVault
+        address mockWrappedZKToken = makeAddr("mockWrappedZKToken");
+        vm.mockCall(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            abi.encodeWithSelector(IL2NativeTokenVault.WETH_TOKEN.selector),
+            abi.encode(mockWrappedZKToken)
+        );
 
         // Set up the contract
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);

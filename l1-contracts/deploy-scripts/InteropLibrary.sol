@@ -53,7 +53,7 @@ library InteropLibrary {
         bytes memory data
     ) internal pure returns (InteropCallStarter memory, bytes[] memory) {
         bytes[] memory callAttributes = buildCallAttributes(false);
-        bytes[] memory bundleAttributes = buildBundleAttributes(executionAddress, unbundlerAddress);
+        bytes[] memory bundleAttributes = buildBundleAttributes(executionAddress, unbundlerAddress, false);
 
         return (
             InteropCallStarter({
@@ -108,21 +108,28 @@ library InteropLibrary {
     }
 
     /// @notice Bundle-level attributes.
-    function buildBundleAttributes(address unbundlerAddress) internal pure returns (bytes[] memory attrs) {
-        attrs = new bytes[](1);
+    function buildBundleAttributes(
+        address unbundlerAddress,
+        bool useFixedFee
+    ) internal pure returns (bytes[] memory attrs) {
+        attrs = new bytes[](2);
         attrs[0] = abi.encodeCall(
             IERC7786Attributes.unbundlerAddress,
             (InteroperableAddress.formatEvmV1(unbundlerAddress))
         );
+        attrs[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (useFixedFee));
     }
 
-    /// @notice Build a call-level 7786 attributes array.
+    /// @notice Build bundle attributes with execution address, unbundler address, and fee type.
     /// @param executionAddress     Optional executor (EOA/contract) on destination chain
+    /// @param unbundlerAddress     Unbundler address on destination chain
+    /// @param useFixedFee          Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
     function buildBundleAttributes(
         address executionAddress,
-        address unbundlerAddress
+        address unbundlerAddress,
+        bool useFixedFee
     ) internal pure returns (bytes[] memory) {
-        uint256 length;
+        uint256 length = 1; // Always include useFixedFee
         if (executionAddress != address(0)) ++length;
         if (unbundlerAddress != address(0)) ++length;
         bytes[] memory attributes = new bytes[](length);
@@ -139,6 +146,7 @@ library InteropLibrary {
                 (InteroperableAddress.formatEvmV1(unbundlerAddress))
             );
         }
+        attributes[attributesPointer++] = abi.encodeCall(IERC7786Attributes.useFixedFee, (useFixedFee));
         return attributes;
     }
 
@@ -158,19 +166,21 @@ library InteropLibrary {
                            ONE-SHOT SENDER
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Build and send a token transfer bundle in one go.
+    /// @notice Build and send a token transfer bundle.
     /// @param  destinationChainId  Destination chain id (e.g., 271 for zkSync Era testnet), later wrapped via InteroperableAddress.formatEvmV1.
     /// @param  l2TokenAddress      Address of token on L2
     /// @param  amount              Amount to transfer
     /// @param  recipient           Recipient on destination chain
     /// @param  unbundlerAddress     Address authorized to unbundle and execute the bundle on the  destination chain.
+    /// @param  useFixedFee         Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
     /// @return bundleHash Hash of the sent bundle
     function sendToken(
         uint256 destinationChainId,
         address l2TokenAddress,
         uint256 amount,
         address recipient,
-        address unbundlerAddress
+        address unbundlerAddress,
+        bool useFixedFee
     ) internal returns (bytes32 bundleHash) {
         if (recipient == address(0)) {
             revert ZeroAddress();
@@ -193,12 +203,12 @@ library InteropLibrary {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = buildSecondBridgeCall(secondBridgeCalldata, L2_ASSET_ROUTER_ADDR); // Using the default address as second bridge.
 
-        bytes[] memory bundleAttrs = buildBundleAttributes(unbundlerAddress);
+        bytes[] memory bundleAttrs = buildBundleAttributes(address(0), unbundlerAddress, useFixedFee);
 
         return L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(destinationChainId), calls, bundleAttrs);
     }
 
-    /// @notice Build and send a bundle of interop calls in one go.
+    /// @notice Build and send a bundle of interop calls.
     /// @dev
     /// - All arrays must be the same length; each index describes one call.
     /// - If an entry in `executionAddresses` is the zero address, the default executor will be used (see library policy).
@@ -208,13 +218,15 @@ library InteropLibrary {
     /// @param dataArray            Calldata payloads for each target (one per call).
     /// @param executionAddress     Default executor used whenever a corresponding entry in `executionAddresses` is address(0).
     /// @param unbundlerAddress     Address authorized to unbundle and execute the bundle on the  destination chain.
+    /// @param useFixedFee          Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
     /// @return bundleHash Hash of the sent bundle
     function sendDirectCallBundle(
         uint256 destination,
         address[] memory targets,
         bytes[] memory dataArray,
         address executionAddress,
-        address unbundlerAddress
+        address unbundlerAddress,
+        bool useFixedFee
     ) internal returns (bytes32 bundleHash) {
         if (targets.length != dataArray.length) {
             revert ArgumentsLengthNotIdentical();
@@ -229,7 +241,7 @@ library InteropLibrary {
             calls[i] = buildBundleCall(targets[i], dataArray[i]);
         }
 
-        bytes[] memory bundleAttrs = buildBundleAttributes(executionAddress, unbundlerAddress);
+        bytes[] memory bundleAttrs = buildBundleAttributes(executionAddress, unbundlerAddress, useFixedFee);
 
         return L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(destination), calls, bundleAttrs);
     }
@@ -267,17 +279,19 @@ library InteropLibrary {
             IERC7786GatewaySource(address(L2_INTEROP_CENTER)).sendMessage(calls[0].to, calls[0].data, mergedAttributes);
     }
 
-    /// @notice Build and send a call to receive native tokens on remote chain in one go.
+    /// @notice Build and send a call to receive native tokens on remote chain.
     /// @param  destinationChainId      The normal chain id of the destination chain
     /// @param  recipient               Address that will receive the tokens on remote chain
     /// @param  unbundlerAddress        Address authorized to unbundle and execute the bundle on the  destination chain.
     /// @param  amount                  Amount to transfer
+    /// @param  useFixedFee             Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
     /// @return bundleHash Hash of the sent bundle
     function sendNative(
         uint256 destinationChainId,
         address recipient,
         address unbundlerAddress,
-        uint256 amount
+        uint256 amount,
+        bool useFixedFee
     ) internal returns (bytes32 bundleHash) {
         if (recipient == address(0)) {
             revert ZeroAddress();
@@ -288,7 +302,7 @@ library InteropLibrary {
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = buildSendDestinationChainBaseTokenCall(destinationChainId, recipient, amount);
-        bytes[] memory bundleAttributes = buildBundleAttributes(unbundlerAddress);
+        bytes[] memory bundleAttributes = buildBundleAttributes(address(0), unbundlerAddress, useFixedFee);
 
         return
             L2_INTEROP_CENTER.sendBundle{value: amount}(

@@ -134,10 +134,12 @@ interface IValidatorTimelock is IExecutor {
     ) external;
     /// @dev Check that batches were committed at least X time ago and
     /// make a call to the zkChain diamond contract with the same calldata.
+    /// @param _settlementFeePayer Address that pays gateway settlement fees. Must have approved GWAssetTracker to spend wrapped ZK tokens.
     function executeBatchesSharedBridge(
         address _chainAddress,
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
-        bytes calldata _batchData
+        bytes calldata _batchData,
+        address _settlementFeePayer
     ) external;
 }

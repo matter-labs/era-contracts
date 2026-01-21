@@ -774,7 +774,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         address, // _chainAddress
         uint256 _processFrom,
         uint256 _processTo,
-        bytes calldata _executeData
+        bytes calldata _executeData,
+        address _settlementFeePayer
     ) external nonReentrant onlyValidator onlySettlementLayer {
         (
             StoredBatchInfo[] memory batchesData,
@@ -811,7 +812,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     chainId: s.chainId,
                     batchNumber: batchesData[i].batchNumber,
                     chainBatchRoot: batchesData[i].l2LogsTreeRoot,
-                    messageRoot: messageRoots[i]
+                    messageRoot: messageRoots[i],
+                    settlementFeePayer: _settlementFeePayer
                 });
                 GW_ASSET_TRACKER.processLogsAndMessages(processLogsInput);
             }

@@ -238,6 +238,11 @@
         "name": "_executeData",
         "type": "bytes",
         "internalType": "bytes"
+      },
+      {
+        "name": "_settlementFeePayer",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -1881,6 +1886,25 @@
       }
     ],
     "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setInteropFee",
+    "inputs": [
+      {
+        "name": "_fee",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "canonicalTxHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
     "stateMutability": "nonpayable"
   },
   {
