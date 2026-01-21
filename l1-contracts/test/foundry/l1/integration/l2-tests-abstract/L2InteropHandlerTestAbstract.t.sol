@@ -380,26 +380,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
     }
 
-    /*//////////////////////////////////////////////////////////////
-                    Regression Tests for PR #1762
-                    currentSettlementLayerChainId Access Fix
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Regression test for the bug fixed in PR #1762
-    /// @dev Bug Description:
-    ///      The _verifyBundle function in InteropHandler calls:
-    ///      L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId()
-    ///
-    ///      On L2, this getter was restricted via onlyL2AssetTrackerOrInteropCenter modifier,
-    ///      which only allowed calls from L2_ASSET_TRACKER_ADDRESS and L2_INTEROP_CENTER_ADDRESS.
-    ///      Since InteropHandler is at L2_INTEROP_HANDLER_ADDR, which was not in the allowed list,
-    ///      any call to verifyBundle would revert when checking gateway mode.
-    ///
-    ///      Fix: Remove the access control restriction from currentSettlementLayerChainId()
-    ///      since it's just a getter and doesn't modify state.
-    ///
-    /// @dev This test verifies that verifyBundle can successfully call currentSettlementLayerChainId()
-    ///      when the chain is in gateway mode (settling on a chain other than L1).
     function test_regression_verifyBundleCanAccessCurrentSettlementLayerChainId() public {
         InteropBundle memory interopBundle = getInteropBundle(1);
         bytes memory bundle = abi.encode(interopBundle);

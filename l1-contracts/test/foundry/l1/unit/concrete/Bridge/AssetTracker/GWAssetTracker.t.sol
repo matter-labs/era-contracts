@@ -33,8 +33,6 @@ contract GWAssetTrackerTestHelper is GWAssetTracker {
         return legacySharedBridgeAddress[_chainId];
     }
 
-    /// @notice Exposes internal _handleChainBalanceChangeOnGateway for testing
-    /// @dev Used for regression testing of PR #1757 (double balance increment fix)
     function handleChainBalanceChangeOnGateway(
         uint256 _sourceChainId,
         uint256 _destinationChainId,
@@ -51,7 +49,6 @@ contract GWAssetTrackerTestHelper is GWAssetTracker {
     }
 
     /// @notice Exposes internal _handleLegacySharedBridgeMessage for testing
-    /// @dev Used for regression testing of PR #1760 (legacy shared bridge message handling fix)
     function handleLegacySharedBridgeMessage(uint256 _chainId, bytes memory _message) external {
         _handleLegacySharedBridgeMessage(_chainId, _message);
     }
@@ -227,19 +224,6 @@ contract GWAssetTrackerTest is Test {
         assertEq(dummyL2MessageRoot.getAggregatedRoot(), emptyRoot);
     }
 
-    /// @notice Regression test for the bug fixed in PR #1704 (commit a6c9e5622f3d430b530472a4f0f4d1e8db8fc2a8)
-    /// @dev Bug Description:
-    ///      In GWAssetTracker::_getEmptyMessageRoot, the sharedTree was initialized with
-    ///      `sharedTree.createTree(2)` instead of `sharedTree.createTree(1)`.
-    ///      This caused the tree height to be calculated as 1 instead of 0, because
-    ///      DynamicIncrementalMerkleMemory calculates height as log2(_maxLeafNumber).
-    ///
-    ///      The fix changed `sharedTree.createTree(2)` to `sharedTree.createTree(1)`,
-    ///      ensuring the empty tree root matches what MessageRootBase constructs
-    ///      during initialization of L2MessageRoot.
-    ///
-    ///      Impact: Inconsistent message roots between GWAssetTracker and L2MessageRoot
-    ///      would cause chain settlement verification failures.
     function test_regression_emptyMessageRootTreeHeightConsistency() public {
         // Get empty root from GWAssetTracker
         bytes32 gwEmptyRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
@@ -265,8 +249,6 @@ contract GWAssetTrackerTest is Test {
         assertTrue(gwEmptyRoot != bytes32(0), "Empty root should not be zero");
     }
 
-    /// @notice Additional regression test ensuring consistent empty roots across multiple chains
-    /// @dev Part of the regression test for PR #1704 - verifies the fix works for various chain IDs
     function test_regression_emptyMessageRootConsistentAcrossChains() public {
         uint256[] memory chainIds = new uint256[](3);
         chainIds[0] = 100;
@@ -727,26 +709,6 @@ contract GWAssetTrackerTest is Test {
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), _amount);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                    Regression Tests for PR #1757
-                    Double Balance Increment Fix
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Regression test for the bug fixed in PR #1757
-    /// @dev Bug Description:
-    ///      When processing interop transactions, the recipient chain's balance was incorrectly
-    ///      incremented twice:
-    ///      1. When the InteropCenter message (from origin chain) was processed via
-    ///         _handleInteropCenterMessage -> _processInteropCall -> _handleAssetRouterMessageInner
-    ///         -> _handleChainBalanceChangeOnGateway -> _increaseAndSaveChainBalance
-    ///      2. When the InteropHandler message (from recipient chain) was processed via
-    ///         _handleInteropHandlerReceiveMessage -> _increaseAndSaveChainBalance
-    ///
-    ///      This allowed a chain to bypass double spending checks in GWAssetTracker.
-    ///
-    ///      Fix: Added _isInteropCall parameter to _handleChainBalanceChangeOnGateway.
-    ///      When _isInteropCall is true, the destination balance is NOT increased.
-    ///      The balance is only increased when the InteropHandler message is received.
     function test_regression_interopCallDoesNotIncreaseDestinationBalance() public {
         uint256 sourceChainId = 100;
         uint256 destinationChainId = 200;
@@ -971,24 +933,6 @@ contract GWAssetTrackerTest is Test {
         }
     }
 
-    /*//////////////////////////////////////////////////////////////
-                    Regression Tests for PR #1760
-                    Legacy Shared Bridge Message Handling Fix
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Regression test for the bug fixed in PR #1760
-    /// @dev Bug Description:
-    ///      When handling legacy shared bridge messages, the decodeLegacyFinalizeWithdrawalData
-    ///      function was setting erc20Metadata to `new bytes(0)` (empty bytes).
-    ///      When _handleAssetRouterMessageInner called parseTokenData on this empty metadata,
-    ///      it would fail with an out-of-bounds access error because decodeTokenData
-    ///      tries to read _tokenData[0] from empty bytes.
-    ///
-    ///      This caused any batch containing a legacy token withdraw transaction to fail
-    ///      settlement on Gateway.
-    ///
-    ///      Fix: Changed `new bytes(0)` to `DataEncoding.encodeTokenData(_l1ChainId, bytes(""), bytes(""), bytes(""))`
-    ///      which creates properly formatted (but empty content) token metadata that can be decoded.
     function test_regression_legacySharedBridgeMessageDecodingDoesNotFail() public {
         uint256 legacyChainId = 324; // Era chain ID
         address l1Token = makeAddr("l1Token");
@@ -1164,27 +1108,6 @@ contract GWAssetTrackerTest is Test {
         );
     }
 
-    /*//////////////////////////////////////////////////////////////
-                    Regression Tests for PR #1768
-                    First Deposit Migration Optimization Fix
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Regression test for the bug fixed in PR #1768
-    /// @dev Bug Description:
-    ///      In handleChainBalanceIncreaseOnGateway, the migration skip optimization check
-    ///      was evaluated AFTER incrementing chainBalance. For the first deposit:
-    ///      1. chainBalance was 0, assetMigrationNumber was 0
-    ///      2. _increaseAndSaveChainBalance was called FIRST, so chainBalance > 0
-    ///      3. _tokenCanSkipMigrationOnSettlementLayer was then called
-    ///      4. Since chainBalance > 0, the check returned false
-    ///      5. _forceSetAssetMigrationNumber was NOT called
-    ///
-    ///      Impact: The optimization to skip migration for first deposits was never triggered.
-    ///      Tokens that should have been marked as "already migrated" were left with
-    ///      assetMigrationNumber = 0, potentially causing issues with migration status checks.
-    ///
-    ///      Fix: Moved the _tokenCanSkipMigrationOnSettlementLayer check BEFORE
-    ///      _increaseAndSaveChainBalance, so the check evaluates when chainBalance is still 0.
     function test_regression_firstDepositSetsAssetMigrationNumber() public {
         // Use a fresh asset ID that has never been deposited
         bytes32 freshAssetId = keccak256("fresh-asset-for-first-deposit-test");
@@ -1193,9 +1116,21 @@ contract GWAssetTrackerTest is Test {
 
         // Verify initial state: chainBalance and assetMigrationNumber are both 0
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, freshAssetId), 0, "Initial chainBalance should be 0");
-        assertEq(gwAssetTracker.assetMigrationNumber(CHAIN_ID, freshAssetId), 0, "Initial assetMigrationNumber should be 0");
-        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, freshBaseTokenAssetId), 0, "Initial base token chainBalance should be 0");
-        assertEq(gwAssetTracker.assetMigrationNumber(CHAIN_ID, freshBaseTokenAssetId), 0, "Initial base token assetMigrationNumber should be 0");
+        assertEq(
+            gwAssetTracker.assetMigrationNumber(CHAIN_ID, freshAssetId),
+            0,
+            "Initial assetMigrationNumber should be 0"
+        );
+        assertEq(
+            gwAssetTracker.chainBalance(CHAIN_ID, freshBaseTokenAssetId),
+            0,
+            "Initial base token chainBalance should be 0"
+        );
+        assertEq(
+            gwAssetTracker.assetMigrationNumber(CHAIN_ID, freshBaseTokenAssetId),
+            0,
+            "Initial base token assetMigrationNumber should be 0"
+        );
 
         // Create balance change for first deposit
         BalanceChange memory balanceChange = BalanceChange({
@@ -1214,7 +1149,11 @@ contract GWAssetTrackerTest is Test {
 
         // Verify chain balance was increased
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, freshAssetId), AMOUNT, "Chain balance should be set");
-        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, freshBaseTokenAssetId), BASE_TOKEN_AMOUNT, "Base token balance should be set");
+        assertEq(
+            gwAssetTracker.chainBalance(CHAIN_ID, freshBaseTokenAssetId),
+            BASE_TOKEN_AMOUNT,
+            "Base token balance should be set"
+        );
 
         // THE KEY ASSERTION: assetMigrationNumber should have been set by _forceSetAssetMigrationNumber
         // Before the fix, this would be 0 (optimization missed)
@@ -1278,11 +1217,7 @@ contract GWAssetTrackerTest is Test {
         );
 
         // Balance should be accumulated
-        assertEq(
-            gwAssetTracker.chainBalance(CHAIN_ID, freshAssetId),
-            AMOUNT + AMOUNT * 2,
-            "Balance should accumulate"
-        );
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, freshAssetId), AMOUNT + AMOUNT * 2, "Balance should accumulate");
     }
 
     /// @notice Test that tokens with non-zero assetMigrationNumber do not get overwritten
@@ -1385,11 +1320,7 @@ contract GWAssetTrackerTest is Test {
         );
 
         // Chain balance should be set
-        assertEq(
-            gwAssetTracker.chainBalance(_chainId, _assetId),
-            _amount,
-            "chainBalance should match deposit amount"
-        );
+        assertEq(gwAssetTracker.chainBalance(_chainId, _assetId), _amount, "chainBalance should match deposit amount");
     }
 
     /// @notice Test that the optimization triggers for both assetId and baseTokenAssetId independently

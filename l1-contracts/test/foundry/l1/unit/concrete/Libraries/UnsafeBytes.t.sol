@@ -249,26 +249,6 @@ contract UnsafeBytesTest is Test {
         assertEq(remaining, trailer);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                    Regression Tests for PR #1761
-                    Consecutive Read Offset Fix
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Regression test for the bug fixed in PR #1761
-    /// @dev Bug Description:
-    ///      In L1MessageRoot.saveV30UpgradeChainBatchNumberOnL1, two consecutive uint256 values
-    ///      (chainId and batchNumber) were being read from a message using the same offset:
-    ///
-    ///      BUGGY CODE:
-    ///      (uint256 chainId, ) = UnsafeBytes.readUint256(_message, offset);  // discards new offset
-    ///      (uint256 batchNumber, ) = UnsafeBytes.readUint256(_message, offset);  // uses same offset!
-    ///
-    ///      This caused batchNumber to be incorrectly set to the same value as chainId.
-    ///
-    ///      FIX:
-    ///      uint256 chainId;
-    ///      (chainId, offset) = UnsafeBytes.readUint256(_message, offset);  // captures new offset
-    ///      (uint256 batchNumber, ) = UnsafeBytes.readUint256(_message, offset);  // uses updated offset
     function test_regression_consecutiveReadsRequireOffsetUpdate() public pure {
         // Encode two different uint256 values: chainId = 7, batchNumber = 123
         uint256 chainId = 7;
@@ -328,11 +308,7 @@ contract UnsafeBytesTest is Test {
         uint256 expectedChainId = 270; // ZKSync Era chain ID
         uint256 expectedBatchNumber = 50000; // Some batch number
 
-        bytes memory message = abi.encodePacked(
-            functionSelector,
-            expectedChainId,
-            expectedBatchNumber
-        );
+        bytes memory message = abi.encodePacked(functionSelector, expectedChainId, expectedBatchNumber);
 
         // Read selector and update offset
         uint256 offset = 0;
@@ -354,11 +330,7 @@ contract UnsafeBytesTest is Test {
 
         // Key assertion: The values should be different!
         // Before the fix, decodedBatchNumber would equal decodedChainId (270)
-        assertNotEq(
-            decodedChainId,
-            decodedBatchNumber,
-            "ChainId and BatchNumber should be different values"
-        );
+        assertNotEq(decodedChainId, decodedBatchNumber, "ChainId and BatchNumber should be different values");
     }
 
     /// @notice Fuzz test for consecutive uint256 reads with proper offset handling

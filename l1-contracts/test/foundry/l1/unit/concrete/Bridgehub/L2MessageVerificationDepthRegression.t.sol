@@ -13,17 +13,6 @@ import {DepthMoreThanOneForRecursiveMerkleProof} from "contracts/core/bridgehub/
 
 /// @title L2MessageVerificationDepthRegressionTest
 /// @notice Regression tests for the depth argument fix in L2MessageVerification
-/// @dev Tests that the _depth argument is correctly passed and incremented in recursive calls.
-///
-/// Bug Description (Fixed in PR #1755):
-/// The _proveL2LeafInclusionRecursive function was calling proveL2LeafInclusionShared for the
-/// recursive proof step, but this function doesn't take a depth argument, resulting in depth
-/// being always 0 across all recursion steps.
-///
-/// This meant the depth check (if _depth == 1 revert) was never triggered, potentially allowing
-/// proofs with more than one level of recursion when only one should be allowed.
-///
-/// The fix changes the recursive call to use proveL2LeafInclusionSharedRecursive which properly
 /// passes _depth + 1.
 contract L2MessageVerificationDepthRegressionTest is Test {
     L2MessageVerification l2MessageVerification;
@@ -192,13 +181,7 @@ contract L2MessageVerificationDepthRegressionTest is Test {
 
         // This should work because proveL2LogInclusionShared calls _proveL2LogInclusion
         // which calls _proveL2LeafInclusion which calls _proveL2LeafInclusionRecursive with depth=0
-        bool result = l2MessageVerification.proveL2LogInclusionShared(
-            chainId,
-            batchNumber,
-            l2ToL1LogIndex,
-            log,
-            proof
-        );
+        bool result = l2MessageVerification.proveL2LogInclusionShared(chainId, batchNumber, l2ToL1LogIndex, log, proof);
 
         assertTrue(result, "Simple proof should succeed starting at depth 0");
     }

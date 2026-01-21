@@ -18,15 +18,6 @@ import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
 /// @title L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract
 /// @notice Regression tests for the receiveMessage access control fix in L2AssetRouter
-/// @dev Tests that receiveMessage can only be called by the InteropHandler, not by arbitrary addresses.
-///
-/// Bug Description (Fixed in PR #1754):
-/// The receiveMessage function was unprotected and could be called by anyone.
-/// This would allow anyone to mint arbitrary amounts of native and bridged tokens on NativeTokenVault
-/// by crafting malicious payloads.
-///
-/// The fix adds the onlyL2InteropHandler modifier to receiveMessage, ensuring only
-/// the InteropHandler contract can call it.
 abstract contract L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract is Test, SharedL2ContractDeployer {
     address internal attacker;
 
@@ -35,10 +26,6 @@ abstract contract L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract
         attacker = makeAddr("attacker");
     }
 
-    /// @notice Test that receiveMessage reverts when called by an unauthorized address
-    /// @dev This is the main regression test for the bug fixed in PR #1754
-    ///      Before the fix: Anyone could call receiveMessage and potentially mint tokens
-    ///      After the fix: Only L2_INTEROP_HANDLER_ADDR can call receiveMessage
     function test_regression_receiveMessageRevertsForUnauthorizedCaller() public {
         // Prepare a valid-looking payload (finalizeDeposit selector + data)
         bytes memory payload = abi.encodeWithSelector(
@@ -115,10 +102,7 @@ abstract contract L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract
         } catch (bytes memory reason) {
             // Check that it's not an Unauthorized error
             bytes4 errorSelector = bytes4(reason);
-            assertTrue(
-                errorSelector != Unauthorized.selector,
-                "InteropHandler should not get Unauthorized error"
-            );
+            assertTrue(errorSelector != Unauthorized.selector, "InteropHandler should not get Unauthorized error");
         }
     }
 
@@ -144,11 +128,7 @@ abstract contract L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract
 
 /// @notice Malicious contract that attempts to call receiveMessage
 contract MaliciousInteropCaller {
-    function tryCallReceiveMessage(
-        address assetRouter,
-        bytes memory sender,
-        bytes memory payload
-    ) external {
+    function tryCallReceiveMessage(address assetRouter, bytes memory sender, bytes memory payload) external {
         IERC7786Recipient(assetRouter).receiveMessage(bytes32(0), sender, payload);
     }
 }

@@ -17,26 +17,12 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 /// @title L2InteropHandlerReentrancyRegressionL1Test
 /// @notice Concrete test for InteropHandler reentrancy regression tests in L1 context
-/// @dev This test verifies the fix for the bug where receiveMessage, executeBundle, verifyBundle,
-///      and unbundleBundle had nonReentrant modifiers that prevented legitimate nested calls.
-///
-/// Bug Description (Fixed in PR #1758):
-/// The InteropHandler contract had nonReentrant modifiers on receiveMessage, executeBundle,
-/// verifyBundle, and unbundleBundle. This prevented any bundle from calling receiveMessage
-/// on InteropHandler (which then calls executeBundle/unbundleBundle), because the reentrancy
-/// guard would already be set from the outer executeBundle call.
-///
-/// The fix removes the nonReentrant modifier from these functions, allowing bundles to properly
-/// nest and execute/verify/unbundle other bundles.
 contract L2InteropHandlerReentrancyRegressionL1Test is
     Test,
     SharedL2ContractL1Deployer,
     L2InteropHandlerReentrancyRegressionTestAbstract
 {
-    function setUp()
-        public
-        override(SharedL2ContractDeployer, L2InteropHandlerReentrancyRegressionTestAbstract)
-    {
+    function setUp() public override(SharedL2ContractDeployer, L2InteropHandlerReentrancyRegressionTestAbstract) {
         L2InteropHandlerReentrancyRegressionTestAbstract.setUp();
     }
 

@@ -59,17 +59,6 @@ contract MockL2CrossChainSender is IL2CrossChainSender {
 
 /// @title L2InteropIndirectCallValueRegressionTestAbstract
 /// @notice Regression tests for the indirect call value handling fix in InteropCenter
-/// @dev Tests that indirectCallMessageValue is correctly passed to the indirect call recipient
-///      and not incorrectly burnt together with interopCallValue.
-///
-/// Bug Description (Fixed in PR #1714):
-/// The _sendBundle function was incorrectly burning both interopCallValue AND indirectCallMessageValue.
-/// However, indirectCallMessageValue should be passed as msg.value to the initiateIndirectCall function,
-/// not burnt. This caused a double-counting issue where the same value was both burnt and sent.
-///
-/// The fix separates these values:
-/// - totalBurnedCallsValue: sum of interopCallValue (gets burnt for interop calls)
-/// - totalIndirectCallsValue: sum of indirectCallMessageValue (gets passed to indirect calls)
 abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropTestUtils {
     MockL2CrossChainSender internal mockCrossChainSender;
     address internal finalRecipient;
@@ -81,10 +70,6 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         mockCrossChainSender = new MockL2CrossChainSender(finalRecipient);
     }
 
-    /// @notice Test that indirectCallMessageValue is correctly passed to the indirect call recipient
-    /// @dev This is the main regression test for the bug fixed in PR #1714
-    ///      Before the fix: indirectCallMessageValue was burnt along with interopCallValue
-    ///      After the fix: indirectCallMessageValue is passed to initiateIndirectCall as msg.value
     function test_regression_indirectCallMessageValuePassedCorrectly() public {
         uint256 interopCallValue = 100;
         uint256 indirectCallMessageValue = 50;
@@ -382,11 +367,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         );
 
         // Verify indirect call mock received correct values
-        assertEq(
-            mockCrossChainSender.lastReceivedMsgValue(),
-            indirectMsgValue,
-            "Mock should receive indirectMsgValue"
-        );
+        assertEq(mockCrossChainSender.lastReceivedMsgValue(), indirectMsgValue, "Mock should receive indirectMsgValue");
         assertEq(
             mockCrossChainSender.lastInteropCallValue(),
             indirectInteropValue,
@@ -465,38 +446,6 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         );
     }
 
-    /*//////////////////////////////////////////////////////////////
-                    Regression Tests for PR #1764
-                    Zero Burned Value with Different Base Token
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Regression test for the bug fixed in PR #1764
-    /// @dev Bug Description:
-    ///      When sending a bundle with ONLY indirect calls (interopCallValue=0 for all) to a chain
-    ///      with a different base token, the _ensureCorrectTotalValue function would still call
-    ///      bridgehubDepositBaseToken with _totalBurnedCallsValue=0, which reverts.
-    ///
-    ///      BUGGY CODE (before fix):
-    ///      } else {
-    ///          require(msg.value == _totalIndirectCallsValue, ...);
-    ///          L2_ASSET_ROUTER.bridgehubDepositBaseToken(  // Called even when amount is 0!
-    ///              _destinationChainId,
-    ///              destinationChainBaseTokenAssetId,
-    ///              msg.sender,
-    ///              _totalBurnedCallsValue  // This is 0, causing revert
-    ///          );
-    ///      }
-    ///
-    ///      FIX:
-    ///      } else {
-    ///          require(msg.value == _totalIndirectCallsValue, ...);
-    ///          if (_totalBurnedCallsValue > 0) {  // Skip when 0
-    ///              L2_ASSET_ROUTER.bridgehubDepositBaseToken(...);
-    ///          }
-    ///      }
-    ///
-    /// @dev This test verifies bundles with only indirect calls work correctly when targeting
-    ///      chains with different base tokens.
     function test_regression_onlyIndirectCallsDifferentBaseToken() public {
         // Only indirect call, no interopCallValue (burned value = 0)
         uint256 interopCallValue = 0;
@@ -716,6 +665,10 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
 
         // Verify both calls were processed
         assertEq(mockCrossChainSender.lastInteropCallValue(), 0, "First call should have 0 interopCallValue");
-        assertEq(mockCrossChainSender2.lastInteropCallValue(), interopCallValue2, "Second call should have non-zero interopCallValue");
+        assertEq(
+            mockCrossChainSender2.lastInteropCallValue(),
+            interopCallValue2,
+            "Second call should have non-zero interopCallValue"
+        );
     }
 }

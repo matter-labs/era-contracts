@@ -18,40 +18,6 @@ import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
 /// @title L2BridgehubAliasRegressionTestAbstract
 /// @notice Regression tests for the onlyChainRegistrationSender modifier alias fix (PR #1765)
-/// @dev Tests that the modifier correctly compares msg.sender directly against chainRegistrationSender
-///
-/// Bug Description (Fixed in PR #1765):
-/// On L2, L1→L2 deposits arrive with msg.sender = applyL1ToL2Alias(L1 sender).
-/// The chainRegistrationSender address is stored as the aliased address on L2.
-///
-/// BUGGY CODE:
-///   modifier onlyChainRegistrationSender() {
-///       if (
-///           msg.sender != AddressAliasHelper.undoL1ToL2Alias(chainRegistrationSender) &&
-///           msg.sender != SERVICE_TRANSACTION_SENDER
-///       ) {
-///           revert Unauthorized(msg.sender);
-///       }
-///       _;
-///   }
-///
-/// When chainRegistrationSender is already aliased:
-/// - undoL1ToL2Alias(aliasedAddress) returns the original L1 address
-/// - But msg.sender from L1→L2 is the aliased address
-/// - So the comparison fails: aliasedAddress != originalL1Address
-///
-/// FIX:
-///   modifier onlyChainRegistrationSender() {
-///       if (
-///           /// Note on the L2 the chainRegistrationSender is aliased.
-///           msg.sender != chainRegistrationSender && msg.sender != SERVICE_TRANSACTION_SENDER
-///       ) {
-///           revert Unauthorized(msg.sender);
-///       }
-///       _;
-///   }
-///
-/// Now the comparison is direct, so aliased msg.sender == aliased chainRegistrationSender.
 abstract contract L2BridgehubAliasRegressionTestAbstract is Test, SharedL2ContractDeployer {
     // The L1 address that will be the chain registration sender
     address internal l1ChainRegistrationSender;

@@ -19,25 +19,6 @@ import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
 /// @title L2AssetRouterReceiveMessageValueForwardingRegressionTestAbstract
 /// @notice Regression tests for the receiveMessage value forwarding fix in L2AssetRouter
-/// @dev Tests that receiveMessage correctly forwards msg.value when executing the payload.
-///
-/// Bug Description (Fixed in PR #1767):
-/// The receiveMessage function was payable and could receive ETH via ERC-7786 interopCall.value.
-/// However, when executing the payload with `address(this).call(payload)`, it did NOT forward
-/// msg.value. This meant that:
-///   1. InteropHandler executes a call with interopCall.value = X ETH to the destination router
-///   2. L2AssetRouter.receiveMessage is entered with msg.value = X ETH
-///   3. The internal call `address(this).call(payload)` was made WITHOUT forwarding value
-///   4. finalizeDeposit/bridgeMint would see msg.value = 0
-///   5. The ETH would remain stranded on the L2AssetRouter instead of reaching the asset handler
-///
-/// The fix changes:
-///   (bool success, ) = address(this).call(payload);
-/// to:
-///   (bool success, ) = address(this).call{value: msg.value}(payload);
-///
-/// This ensures that any value sent with the cross-chain message is properly forwarded
-/// to the asset handler's bridgeMint function.
 abstract contract L2AssetRouterReceiveMessageValueForwardingRegressionTestAbstract is Test, SharedL2ContractDeployer {
     // Custom asset handler that tracks received msg.value
     MockValueTrackingAssetHandler internal mockAssetHandler;
@@ -63,13 +44,13 @@ abstract contract L2AssetRouterReceiveMessageValueForwardingRegressionTestAbstra
         // Register the mock asset handler for our test asset ID
         // We need to do this via the aliased L1 asset router (simulating a cross-chain setup message)
         vm.prank(aliasedL1AssetRouter);
-        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).setAssetHandlerAddress(L1_CHAIN_ID, testAssetId, address(mockAssetHandler));
+        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).setAssetHandlerAddress(
+            L1_CHAIN_ID,
+            testAssetId,
+            address(mockAssetHandler)
+        );
     }
 
-    /// @notice Test that msg.value is correctly forwarded through receiveMessage to bridgeMint
-    /// @dev This is the main regression test for the bug fixed in PR #1767
-    ///      Before the fix: msg.value would NOT be forwarded, bridgeMint sees 0
-    ///      After the fix: msg.value IS forwarded, bridgeMint receives the correct amount
     function test_regression_receiveMessageForwardsValueToBridgeMint() public {
         uint256 valueToSend = 1 ether;
 
@@ -107,31 +88,17 @@ abstract contract L2AssetRouterReceiveMessageValueForwardingRegressionTestAbstra
         );
 
         // Verify that bridgeMint received the correct msg.value
-        assertEq(
-            mockAssetHandler.lastReceivedValue(),
-            valueToSend,
-            "bridgeMint should receive the full msg.value"
-        );
+        assertEq(mockAssetHandler.lastReceivedValue(), valueToSend, "bridgeMint should receive the full msg.value");
 
         // Verify the asset router doesn't have stranded ETH
-        assertEq(
-            L2_ASSET_ROUTER_ADDR.balance,
-            0,
-            "Asset router should not have stranded ETH after forwarding"
-        );
+        assertEq(L2_ASSET_ROUTER_ADDR.balance, 0, "Asset router should not have stranded ETH after forwarding");
     }
 
     /// @notice Test that zero value calls still work correctly
     /// @dev Ensures the fix doesn't break the zero-value case
     function test_regression_receiveMessageWorksWithZeroValue() public {
         // Prepare a valid finalizeDeposit payload
-        bytes memory transferData = abi.encode(
-            address(this),
-            address(this),
-            address(0),
-            uint256(1000),
-            bytes("")
-        );
+        bytes memory transferData = abi.encode(address(this), address(this), address(0), uint256(1000), bytes(""));
 
         bytes memory payload = abi.encodeWithSelector(
             AssetRouterBase.finalizeDeposit.selector,
@@ -146,18 +113,10 @@ abstract contract L2AssetRouterReceiveMessageValueForwardingRegressionTestAbstra
 
         // InteropHandler calls receiveMessage without value
         vm.prank(L2_INTEROP_HANDLER_ADDR);
-        IERC7786Recipient(L2_ASSET_ROUTER_ADDR).receiveMessage(
-            bytes32(0),
-            sender,
-            payload
-        );
+        IERC7786Recipient(L2_ASSET_ROUTER_ADDR).receiveMessage(bytes32(0), sender, payload);
 
         // Verify bridgeMint received zero value
-        assertEq(
-            mockAssetHandler.lastReceivedValue(),
-            0,
-            "bridgeMint should receive zero when no value is sent"
-        );
+        assertEq(mockAssetHandler.lastReceivedValue(), 0, "bridgeMint should receive zero when no value is sent");
     }
 
     /// @notice Test that various ETH amounts are correctly forwarded
@@ -166,13 +125,7 @@ abstract contract L2AssetRouterReceiveMessageValueForwardingRegressionTestAbstra
         // Bound the value to reasonable range (avoid overflow issues)
         valueToSend = bound(valueToSend, 0, 100 ether);
 
-        bytes memory transferData = abi.encode(
-            address(this),
-            address(this),
-            address(0),
-            uint256(1000),
-            bytes("")
-        );
+        bytes memory transferData = abi.encode(address(this), address(this), address(0), uint256(1000), bytes(""));
 
         bytes memory payload = abi.encodeWithSelector(
             AssetRouterBase.finalizeDeposit.selector,
@@ -187,17 +140,9 @@ abstract contract L2AssetRouterReceiveMessageValueForwardingRegressionTestAbstra
         mockAssetHandler.resetRecordedValue();
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
-        IERC7786Recipient(L2_ASSET_ROUTER_ADDR).receiveMessage{value: valueToSend}(
-            bytes32(0),
-            sender,
-            payload
-        );
+        IERC7786Recipient(L2_ASSET_ROUTER_ADDR).receiveMessage{value: valueToSend}(bytes32(0), sender, payload);
 
-        assertEq(
-            mockAssetHandler.lastReceivedValue(),
-            valueToSend,
-            "bridgeMint should receive the exact value sent"
-        );
+        assertEq(mockAssetHandler.lastReceivedValue(), valueToSend, "bridgeMint should receive the exact value sent");
     }
 
     /// @notice Test that value is forwarded even when the asset handler doesn't use it
@@ -205,13 +150,7 @@ abstract contract L2AssetRouterReceiveMessageValueForwardingRegressionTestAbstra
     function test_regression_valueForwardedEvenIfHandlerIgnoresIt() public {
         uint256 valueToSend = 0.5 ether;
 
-        bytes memory transferData = abi.encode(
-            address(this),
-            address(this),
-            address(0),
-            uint256(500),
-            bytes("")
-        );
+        bytes memory transferData = abi.encode(address(this), address(this), address(0), uint256(500), bytes(""));
 
         bytes memory payload = abi.encodeWithSelector(
             AssetRouterBase.finalizeDeposit.selector,
@@ -226,11 +165,7 @@ abstract contract L2AssetRouterReceiveMessageValueForwardingRegressionTestAbstra
         mockAssetHandler.resetRecordedValue();
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
-        IERC7786Recipient(L2_ASSET_ROUTER_ADDR).receiveMessage{value: valueToSend}(
-            bytes32(0),
-            sender,
-            payload
-        );
+        IERC7786Recipient(L2_ASSET_ROUTER_ADDR).receiveMessage{value: valueToSend}(bytes32(0), sender, payload);
 
         // The mock handler received the value
         assertEq(mockAssetHandler.lastReceivedValue(), valueToSend);
@@ -257,8 +192,8 @@ contract MockValueTrackingAssetHandler is IAssetHandler {
 
     /// @notice Records the msg.value received during bridgeMint
     function bridgeMint(
-        uint256, /* _chainId */
-        bytes32, /* _assetId */
+        uint256 /* _chainId */,
+        bytes32 /* _assetId */,
         bytes calldata /* _data */
     ) external payable override {
         _lastReceivedValue = msg.value;
@@ -267,10 +202,10 @@ contract MockValueTrackingAssetHandler is IAssetHandler {
 
     /// @notice Not used in this test, but required by interface
     function bridgeBurn(
-        uint256, /* _chainId */
-        uint256, /* _msgValue */
-        bytes32, /* _assetId */
-        address, /* _originalCaller */
+        uint256 /* _chainId */,
+        uint256 /* _msgValue */,
+        bytes32 /* _assetId */,
+        address /* _originalCaller */,
         bytes calldata /* _data */
     ) external payable override returns (bytes memory) {
         return "";

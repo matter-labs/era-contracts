@@ -19,26 +19,6 @@ import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
 /// @title L2AssetRouterAttributesEncodingRegressionTestAbstract
 /// @notice Regression tests for the callAttributes encoding fix in L2AssetRouter.initiateIndirectCall
-/// @dev Tests that callAttributes are encoded using abi.encodeCall (correct) instead of abi.encode (buggy)
-///
-/// Bug Description (Fixed in PR #1714):
-/// In L2AssetRouter.initiateIndirectCall, the callAttributes were encoded incorrectly:
-///
-/// BUGGY CODE:
-///   attributes[0] = abi.encode(IERC7786Attributes.interopCallValue.selector, _value);
-///
-/// This produces: [32 bytes padded selector][32 bytes value] = 64 bytes
-/// The selector is padded to 32 bytes, so the value is at bytes [32:64].
-///
-/// FIX:
-///   attributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, _value);
-///
-/// This produces: [4 bytes selector][32 bytes value] = 36 bytes
-/// The selector is NOT padded, so the value is at bytes [4:36].
-///
-/// The bug caused InteropCenter.parseAttributes to misread the value because
-/// AttributesDecoder.decodeUint256 reads from _data[4:], expecting the standard
-/// ABI function call encoding format (4-byte selector + args).
 abstract contract L2AssetRouterAttributesEncodingRegressionTestAbstract is Test, SharedL2ContractDeployer {
     uint256 destinationChainId = 271;
 
@@ -142,10 +122,6 @@ abstract contract L2AssetRouterAttributesEncodingRegressionTestAbstract is Test,
             IInteropCenter.AttributeParsingRestrictions.OnlyInteropCallValue
         );
 
-        assertEq(
-            callAttributes.interopCallValue,
-            testValue,
-            "parseAttributes should decode any value correctly"
-        );
+        assertEq(callAttributes.interopCallValue, testValue, "parseAttributes should decode any value correctly");
     }
 }

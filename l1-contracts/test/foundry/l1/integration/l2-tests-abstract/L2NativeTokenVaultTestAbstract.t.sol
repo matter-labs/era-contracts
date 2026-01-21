@@ -156,22 +156,6 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         assertEq(l2NativeTokenVault.assetId(expectedL2TokenAddress), assetId);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                    Regression Tests for PR #1704
-                    originToken Return Value Fix
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Regression test for the bug fixed in PR #1704 (commit 68ab974)
-    /// @dev Bug Description:
-    ///      NativeTokenVaultBase.originToken(bytes32) was missing a return statement in the
-    ///      bridged-token branch. The function called `_getOriginTokenFromAddress(token)` but
-    ///      didn't return the result, causing the function to fall through and return address(0)
-    ///      for bridged assets.
-    ///
-    ///      This caused callers relying on this getter to misroute or fail when resolving
-    ///      the origin token for bridged assets.
-    ///
-    ///      Fix: Changed `_getOriginTokenFromAddress(token);` to `return _getOriginTokenFromAddress(token);`
     function test_regression_originTokenReturnsCorrectAddressForBridgedToken() external {
         L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
@@ -221,7 +205,10 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         );
 
         // Additional check: verify it's not address(0)
-        assertTrue(returnedOriginToken != address(0), "originToken should not return address(0) for valid bridged assets");
+        assertTrue(
+            returnedOriginToken != address(0),
+            "originToken should not return address(0) for valid bridged assets"
+        );
     }
 
     /// @notice Test that originToken returns address(0) for non-existent assets
@@ -318,36 +305,10 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         // After the fix: should return originToken
         address returnedOriginToken = l2NativeTokenVault.originToken(assetId);
 
-        assertEq(
-            returnedOriginToken,
-            originToken,
-            "originToken should return correct L1 token after bridge mint"
-        );
+        assertEq(returnedOriginToken, originToken, "originToken should return correct L1 token after bridge mint");
         assertTrue(returnedOriginToken != address(0), "originToken should not be zero for bridged token");
     }
 
-    /*//////////////////////////////////////////////////////////////
-                    Regression Tests for PR #1776
-                    Base Token Bridge Burn Fix
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Regression test for the bug fixed in PR #1776
-    /// @dev Bug Description:
-    ///      When a user tries to send a bundle that includes a transfer of the sending chain's
-    ///      base token, an indirect call would be triggered. The NativeTokenVault would try to
-    ///      handle it via the bridged token path (_bridgeBurnBridgedToken), which calls:
-    ///
-    ///      IBridgedStandardToken(_tokenAddress).bridgeBurn(_originalCaller, _depositAmount);
-    ///
-    ///      However, the base token (L2_BASE_TOKEN_SYSTEM_CONTRACT) does not implement the
-    ///      IBridgedStandardToken.bridgeBurn function, causing the transaction to fail.
-    ///
-    ///      Fix: In _getTokenAndBridgeToChain, check if _assetId == _baseTokenAssetId().
-    ///      If true AND _isBridgedToken, call L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue()
-    ///      instead of trying to call bridgeBurn on the token address.
-    ///
-    /// @dev This test verifies that bridgeBurn works correctly for the base token when
-    ///      it goes through the bridged token path (originChainId != block.chainid)
     function test_regression_bridgeBurnBaseTokenAsBridgedTokenCallsBurnMsgValue() external {
         L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
@@ -367,7 +328,11 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         // Verify setup - originChainId should now be L1_CHAIN_ID (10), different from block.chainid (31337)
         uint256 storedOriginChainId = l2NativeTokenVault.originChainId(baseTokenAssetIdLocal);
         assertEq(storedOriginChainId, L1_CHAIN_ID, "Base token originChainId should be L1_CHAIN_ID");
-        assertNotEq(storedOriginChainId, block.chainid, "Base token should be considered bridged (originChainId != block.chainid)");
+        assertNotEq(
+            storedOriginChainId,
+            block.chainid,
+            "Base token should be considered bridged (originChainId != block.chainid)"
+        );
 
         // Prepare bridgeBurn parameters
         uint256 destinationChainId = 12345;
@@ -391,11 +356,7 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         );
 
         // Expect the burnMsgValue call
-        vm.expectCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            depositAmount,
-            abi.encodeCall(IBaseToken.burnMsgValue, ())
-        );
+        vm.expectCall(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, depositAmount, abi.encodeCall(IBaseToken.burnMsgValue, ()));
 
         // Call bridgeBurn from the asset router (which is the only allowed caller)
         // Before the fix: This would revert because bridgeBurn would try to call
@@ -424,7 +385,10 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         bytes32 assetId = DataEncoding.encodeNTVAssetId(originChainIdLocal, originToken);
 
         // Calculate the expected L2 token address
-        address expectedL2TokenAddress = l2NativeTokenVault.calculateCreate2TokenAddress(originChainIdLocal, originToken);
+        address expectedL2TokenAddress = l2NativeTokenVault.calculateCreate2TokenAddress(
+            originChainIdLocal,
+            originToken
+        );
 
         // Set up the token in NTV storage
         stdstore
@@ -478,13 +442,7 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
 
         // Call bridgeBurn from the asset router
         vm.prank(L2_ASSET_ROUTER_ADDR);
-        IAssetHandler(address(l2NativeTokenVault)).bridgeBurn(
-            destinationChainId,
-            0,
-            assetId,
-            originalCaller,
-            data
-        );
+        IAssetHandler(address(l2NativeTokenVault)).bridgeBurn(destinationChainId, 0, assetId, originalCaller, data);
 
         // The regular bridgeBurn should have been called on the bridged token
     }
@@ -528,34 +486,6 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         );
     }
 
-    /*//////////////////////////////////////////////////////////////
-                    Regression Tests for PR #1770
-                    Legacy Token Duplicate Entry Fix
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Regression test for the bug fixed in PR #1770
-    /// @dev Bug Description:
-    ///      `_setLegacyTokenData` appended assetId to `bridgedTokens` array but did NOT set
-    ///      `tokenIndex[assetId]`. The function `addLegacyTokenToBridgedTokensList` relies on
-    ///      `tokenIndex[tokenAssetId] != 0` to detect if a token is already present.
-    ///
-    ///      Since `tokenIndex` was never set for legacy tokens, a later call to
-    ///      `addLegacyTokenToBridgedTokensList` would pass the duplicate check and add the
-    ///      same assetId again, creating duplicates and inconsistent indexing.
-    ///
-    ///      Flow:
-    ///        1. _ensureAndSaveTokenDeployedInnerLegacyToken → _setLegacyTokenData
-    ///        2. _setLegacyTokenData appends to bridgedTokens WITHOUT setting tokenIndex
-    ///        3. Later, addLegacyTokenToBridgedTokensList(token) passes duplicate check
-    ///        4. Same assetId gets appended again → DUPLICATE!
-    ///
-    ///      Fix: Changed _setLegacyTokenData to use `_addTokenToTokensList(_assetId)` which
-    ///      properly sets both `bridgedTokens[bridgedTokensCount] = _assetId` AND
-    ///      `tokenIndex[_assetId] = bridgedTokensCount`.
-    ///
-    ///      Note: There is a sentinel-0 issue where the first token gets tokenIndex=0,
-    ///      which is indistinguishable from "not set". This test accounts for that by
-    ///      first adding a dummy token to move bridgedTokensCount > 0.
     function test_regression_setLegacyTokenDataSetsTokenIndex() external {
         L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 

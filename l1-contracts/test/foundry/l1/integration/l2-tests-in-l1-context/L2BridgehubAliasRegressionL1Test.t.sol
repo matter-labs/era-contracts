@@ -19,11 +19,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 /// @notice L1 context test for L2Bridgehub onlyChainRegistrationSender alias regression (PR #1765)
 /// @dev Tests that the modifier correctly compares msg.sender directly against chainRegistrationSender
 ///      instead of applying undoL1ToL2Alias to chainRegistrationSender
-contract L2BridgehubAliasRegressionL1Test is
-    Test,
-    SharedL2ContractL1Deployer,
-    L2BridgehubAliasRegressionTestAbstract
-{
+contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer, L2BridgehubAliasRegressionTestAbstract {
     function setUp() public override(SharedL2ContractDeployer, L2BridgehubAliasRegressionTestAbstract) {
         L2BridgehubAliasRegressionTestAbstract.setUp();
     }

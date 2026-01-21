@@ -19,30 +19,6 @@ import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 
 /// @title L2InteropDestinationChainRegressionTestAbstract
 /// @notice Regression tests for the unregistered destination chain check (PR #1811)
-/// @dev Tests that sending bundles to unregistered destination chains is properly rejected
-///
-/// Bug Description (Fixed in PR #1811):
-/// In GWAssetTracker._increaseAndSaveChainBalance, there was an unconditional call to
-/// _getOrSaveChainBalance(_chainMigrationNumber - 1). For a destination chain that never
-/// settled on Gateway, migrationNumber == 0, so subtracting 1 would underflow and revert.
-///
-/// Flow that caused the issue:
-///   _handleAssetRouterMessageInner
-///   → _handleChainBalanceChangeOnGateway
-///   → _increaseAndSaveChainBalance(..., _chainMigrationNumber=0)
-///   → _getOrSaveChainBalance(prevMigrationNumber = 0 - 1) → UNDERFLOW!
-///
-/// Example scenario:
-///   - Destination chain D freshly created: L2_CHAIN_ASSET_HANDLER.migrationNumber(D) == 0
-///   - Gateway handles a deposit to D → _increaseAndSaveChainBalance(..., 0) → reverts
-///
-/// Fix:
-/// Added a check in InteropCenter._ensureCorrectTotalValue that verifies the destination
-/// chain is registered (has a non-zero baseTokenAssetId) before processing:
-///   require(destinationChainBaseTokenAssetId != bytes32(0), DestinationChainNotRegistered(_destinationChainId));
-///
-/// This prevents bundles from being sent to unregistered chains, avoiding the underflow issue
-/// downstream in GWAssetTracker.
 abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTestUtils {
     // An unregistered chain ID (no baseTokenAssetId set)
     uint256 internal constant UNREGISTERED_CHAIN_ID = 999999;
@@ -75,11 +51,7 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
 
         // Attempt to send the bundle - should revert with DestinationChainNotRegistered
         vm.expectRevert(abi.encodeWithSelector(DestinationChainNotRegistered.selector, UNREGISTERED_CHAIN_ID));
-        L2_INTEROP_CENTER.sendBundle(
-            InteroperableAddress.formatEvmV1(UNREGISTERED_CHAIN_ID),
-            calls,
-            bundleAttributes
-        );
+        L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(UNREGISTERED_CHAIN_ID), calls, bundleAttributes);
     }
 
     /// @notice Test that sending with value to an unregistered chain also reverts
@@ -173,11 +145,7 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
         );
 
         vm.expectRevert(abi.encodeWithSelector(DestinationChainNotRegistered.selector, UNREGISTERED_CHAIN_ID));
-        L2_INTEROP_CENTER.sendBundle(
-            InteroperableAddress.formatEvmV1(UNREGISTERED_CHAIN_ID),
-            calls,
-            bundleAttributes
-        );
+        L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(UNREGISTERED_CHAIN_ID), calls, bundleAttributes);
     }
 
     /// @notice Fuzz test with various unregistered chain IDs
@@ -207,10 +175,6 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
         bytes[] memory bundleAttributes = new bytes[](0);
 
         vm.expectRevert(abi.encodeWithSelector(DestinationChainNotRegistered.selector, randomChainId));
-        L2_INTEROP_CENTER.sendBundle(
-            InteroperableAddress.formatEvmV1(randomChainId),
-            calls,
-            bundleAttributes
-        );
+        L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(randomChainId), calls, bundleAttributes);
     }
 }

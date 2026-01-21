@@ -594,30 +594,6 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(bytes32(0));
     }
 
-    /*//////////////////////////////////////////////////////////////
-                    Regression Tests for PR #1769
-                    Unknown AssetId Validation Fix
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Regression test for the bug fixed in PR #1769
-    /// @dev Bug Description:
-    ///      L1AssetTracker.migrateTokenBalanceFromNTVV31 did not validate that the provided assetId
-    ///      was registered in the L1 NativeTokenVault before assigning MAX chain balance on the origin chain.
-    ///
-    ///      For unknown assets:
-    ///      1. originChainId(assetId) returns 0 (default value for unknown assets)
-    ///      2. The non-L1 path pulls a zero migrated amount
-    ///      3. _assignMaxChainBalanceIfNeeded(0, assetId) writes chainBalance[0][assetId] = MAX_TOKEN_BALANCE
-    ///         and sets maxChainBalanceAssigned[assetId] = true
-    ///
-    ///      This permanently poisons state for that assetId:
-    ///      - chainBalance[0][assetId] = MAX_TOKEN_BALANCE (wrong origin chain)
-    ///      - maxChainBalanceAssigned[assetId] = true (prevents proper registration later)
-    ///      - Later, registerNewToken skips MAX assignment on the real origin chain
-    ///      - Migration subtracts from zero and reverts
-    ///
-    ///      Fix: Added `require(originChainId != 0, InvalidChainId())` at the start of the function
-    ///      to reject unknown assets before any state changes occur.
     function test_regression_migrateTokenBalanceFromNTVV31_revertsForUnknownAsset() public {
         // Create a predictable future assetId that is NOT registered in NTV
         bytes32 unknownAssetId = keccak256("unknown-asset-never-registered");
@@ -645,8 +621,6 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         assertEq(finalChainBalance0, 0, "chainBalance[0] should not have been set to MAX_TOKEN_BALANCE");
     }
 
-    /// @notice Additional regression test verifying the full attack scenario is blocked
-    /// @dev Tests the complete attack flow described in the bug report
     function test_regression_migrateTokenBalanceFromNTVV31_preventsStatePoisoning() public {
         // Attacker picks a predictable future assetId (unknown to NTV: originChainId(assetId) == 0)
         bytes32 futureAssetId = keccak256(abi.encodePacked("future-token-", block.timestamp));
@@ -699,13 +673,19 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         );
 
         // Set initial origin chain balance
-        vm.store(address(assetTracker), getChainBalanceLocation(assetId, registeredOriginChain), bytes32(type(uint256).max));
+        vm.store(
+            address(assetTracker),
+            getChainBalanceLocation(assetId, registeredOriginChain),
+            bytes32(type(uint256).max)
+        );
 
         // This should succeed for a registered asset (originChainId != 0)
         assetTracker.migrateTokenBalanceFromNTVV31(testChainId, assetId);
 
         // Verify balance was migrated correctly
-        uint256 testChainBalance = uint256(vm.load(address(assetTracker), getChainBalanceLocation(assetId, testChainId)));
+        uint256 testChainBalance = uint256(
+            vm.load(address(assetTracker), getChainBalanceLocation(assetId, testChainId))
+        );
         assertEq(testChainBalance, migratedBalance, "Test chain should have migrated balance");
     }
 

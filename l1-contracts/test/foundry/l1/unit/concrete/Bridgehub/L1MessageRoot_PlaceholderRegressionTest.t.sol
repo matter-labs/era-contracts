@@ -10,31 +10,7 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {V31UpgradeChainBatchNumberAlreadySet} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 /// @title L1MessageRootPlaceholderRegressionTest
-/// @notice Regression tests for the V31 upgrade batch number placeholder fix (PR #1766)
-/// @dev Tests that saveV31UpgradeChainBatchNumber correctly checks against the placeholder value
-///      instead of checking against zero.
-///
-/// Bug Description (Fixed in PR #1766):
-/// The function `saveV30UpgradeChainBatchNumberOnL1` (now `saveV31UpgradeChainBatchNumber`) required
-/// `v30UpgradeChainBatchNumber[chainId] == 0` before setting the actual value.
-///
-/// However, all existing chains are initialized with a placeholder value during the upgrade:
-///   initializeL1V31Upgrade → sets v31UpgradeChainBatchNumber[chainId] = PLACEHOLDER
-///
-/// The buggy flow was:
-///   1. initializeL1V31Upgrade sets placeholder values for existing chains
-///   2. Gateway sends message with the real batch number
-///   3. saveV30UpgradeChainBatchNumberOnL1 checks `require(mapping == 0)` → REVERTS!
-///
-/// Fix:
-/// Changed the check from `== 0` to `== PLACEHOLDER_VALUE`:
-///   require(
-///       v31UpgradeChainBatchNumber[_chainId] == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
-///       V31UpgradeChainBatchNumberAlreadySet()
-///   );
-///
-/// This allows chains that were initialized with the placeholder value to have their
-/// real batch number set, while still preventing double-setting.
+/// @notice Regression tests for the V31 upgrade batch number placeholder fix
 contract L1MessageRootPlaceholderRegressionTest is Test {
     address bridgeHub;
 
@@ -123,11 +99,7 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
         L1MessageRoot messageRoot = new L1MessageRoot(bridgeHub, 1);
 
         // For a chain not in allZKChains, the mapping defaults to 0
-        assertEq(
-            messageRoot.v31UpgradeChainBatchNumber(CHAIN_ID),
-            0,
-            "New chain should have 0, not placeholder"
-        );
+        assertEq(messageRoot.v31UpgradeChainBatchNumber(CHAIN_ID), 0, "New chain should have 0, not placeholder");
 
         // Setup mocks
         address zkChain = makeAddr("zkChain");

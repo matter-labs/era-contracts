@@ -21,18 +21,6 @@ import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 
 /// @title L2InteropHandlerReentrancyRegressionTestAbstract
 /// @notice Regression tests for the reentrancy fix in InteropHandler
-/// @dev Tests that receiveMessage, executeBundle, verifyBundle, and unbundleBundle can be called
-///      in a reentrant manner (from within bundle execution) without reverting due to reentrancy guards.
-///
-/// Bug Description (Fixed in PR #1758):
-/// The InteropHandler contract had nonReentrant modifiers on receiveMessage, executeBundle,
-/// verifyBundle, and unbundleBundle functions. However, a valid use case exists where:
-/// 1. A bundle is executed
-/// 2. One of the calls in the bundle targets InteropHandler.receiveMessage
-/// 3. receiveMessage then calls executeBundle, verifyBundle, or unbundleBundle
-///
-/// With the nonReentrant modifiers, step 3 would revert because the reentrancy guard was
-/// already set from step 1. The fix removes the nonReentrant modifier from these functions.
 abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropTestUtils {
     address internal bundleExecutor;
 
@@ -58,17 +46,16 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         // but the key is it shouldn't fail due to reentrancy
         bytes memory innerPayload = abi.encodeCall(
             IInteropHandler.verifyBundle,
-            (new bytes(0), MessageInclusionProof({
-                chainId: sourceChainId,
-                l1BatchNumber: 0,
-                l2MessageIndex: 0,
-                message: L2Message({
-                    txNumberInBatch: 0,
-                    sender: L2_INTEROP_CENTER_ADDR,
-                    data: new bytes(0)
-                }),
-                proof: new bytes32[](0)
-            }))
+            (
+                new bytes(0),
+                MessageInclusionProof({
+                    chainId: sourceChainId,
+                    l1BatchNumber: 0,
+                    l2MessageIndex: 0,
+                    message: L2Message({txNumberInBatch: 0, sender: L2_INTEROP_CENTER_ADDR, data: new bytes(0)}),
+                    proof: new bytes32[](0)
+                })
+            )
         );
 
         // Create the outer bundle that calls receiveMessage on InteropHandler
@@ -119,10 +106,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             // Check that it's not a reentrancy error
             // ReentrancyGuard error would be "ReentrancyGuard: reentrant call"
             string memory revertReason = _getRevertMessage(reason);
-            assertTrue(
-                !_containsString(revertReason, "reentrant"),
-                "Should not revert due to reentrancy"
-            );
+            assertTrue(!_containsString(revertReason, "reentrant"), "Should not revert due to reentrancy");
         }
     }
 
@@ -263,19 +247,17 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             // Success - no reentrancy issue
         } catch (bytes memory reason) {
             string memory revertReason = _getRevertMessage(reason);
-            assertTrue(
-                !_containsString(revertReason, "reentrant"),
-                "verifyBundle should not revert due to reentrancy"
-            );
+            assertTrue(!_containsString(revertReason, "reentrant"), "verifyBundle should not revert due to reentrancy");
         }
     }
 
     /// @notice Helper to create bundle attributes with execution address
     function _createBundleAttributes(address executor) internal view returns (BundleAttributes memory) {
-        return BundleAttributes({
-            executionAddress: InteroperableAddress.formatEvmV1(destinationChainId, executor),
-            unbundlerAddress: InteroperableAddress.formatEvmV1(destinationChainId, executor)
-        });
+        return
+            BundleAttributes({
+                executionAddress: InteroperableAddress.formatEvmV1(destinationChainId, executor),
+                unbundlerAddress: InteroperableAddress.formatEvmV1(destinationChainId, executor)
+            });
     }
 
     /// @notice Helper to extract revert message from bytes

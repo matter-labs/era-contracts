@@ -17,12 +17,6 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 /// @title L2AssetRouterReceiveMessageValueForwardingRegressionL1Test
 /// @notice Concrete test for receiveMessage value forwarding regression tests in L1 context
-/// @dev This test verifies the fix for the bug where receiveMessage did not forward msg.value
-///      when calling finalizeDeposit, causing ETH to be stranded on the router instead of
-///      reaching the asset handler's bridgeMint function.
-///
-/// Bug: PR #1767 - receiveMessage was calling address(this).call(payload) without {value: msg.value}
-/// Fix: Changed to address(this).call{value: msg.value}(payload)
 contract L2AssetRouterReceiveMessageValueForwardingRegressionL1Test is
     Test,
     SharedL2ContractL1Deployer,
