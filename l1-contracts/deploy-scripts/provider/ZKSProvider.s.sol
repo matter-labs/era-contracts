@@ -115,8 +115,7 @@ contract ZKSProvider is Script {
         // console.log("Total batches executed", modifiedJson);
         // console.log("json2", json2);
         bytes memory res = vm.parseJson(json2, "$[0]");
-        string memory resString = abi.decode(res, (string));
-        uint256 val = vm.parseUint(resString);
+        uint256 val = abi.decode(res, (uint256));
         return val;
     }
 
