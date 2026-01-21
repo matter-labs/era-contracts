@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {IBaseToken} from "./interfaces/IBaseToken.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, L1_MESSENGER_CONTRACT, L2_ASSET_TRACKER, MSG_VALUE_SYSTEM_CONTRACT} from "./Constants.sol";
+import {BASE_TOKEN_HOLDER_ADDRESS, BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, L1_MESSENGER_CONTRACT, L2_ASSET_TRACKER, L2_INTEROP_HANDLER, MSG_VALUE_SYSTEM_CONTRACT} from "./Constants.sol";
 import {IMailboxImpl} from "./interfaces/IMailboxImpl.sol";
 import {InsufficientFunds, Unauthorized} from "./SystemContractErrors.sol";
 
@@ -17,11 +17,19 @@ import {InsufficientFunds, Unauthorized} from "./SystemContractErrors.sol";
  * to perform the balance changes while simulating the `msg.value` Ethereum behavior.
  */
 contract L2BaseToken is IBaseToken, SystemContractBase {
+    /// @notice The initial balance of the BaseTokenHolder contract (2^127 - 1).
+    /// @dev Used to derive the real circulating supply: INITIAL - currentHolderBalance = circulatingSupply
+    uint256 public constant INITIAL_BASE_TOKEN_HOLDER_BALANCE = (2 ** 127) - 1;
+
     /// @notice The balances of the users.
     mapping(address account => uint256 balance) internal balance;
 
-    /// @notice The total amount of tokens that have been minted.
-    uint256 public override totalSupply;
+    /// @notice Returns the total circulating supply of base tokens.
+    /// @dev Computed as: INITIAL_BASE_TOKEN_HOLDER_BALANCE - current holder balance
+    /// @dev This replaces the previous storage-based totalSupply that was incremented on mint.
+    function totalSupply() external view override returns (uint256) {
+        return INITIAL_BASE_TOKEN_HOLDER_BALANCE - balance[BASE_TOKEN_HOLDER_ADDRESS];
+    }
 
     /// @notice Transfer tokens from one address to another.
     /// @param _from The address to transfer the ETH from.
@@ -34,7 +42,8 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
         if (
             msg.sender != MSG_VALUE_SYSTEM_CONTRACT &&
             msg.sender != address(DEPLOYER_SYSTEM_CONTRACT) &&
-            msg.sender != BOOTLOADER_FORMAL_ADDRESS
+            msg.sender != BOOTLOADER_FORMAL_ADDRESS &&
+            msg.sender != address(L2_INTEROP_HANDLER)
         ) {
             revert Unauthorized(msg.sender);
         }
@@ -61,13 +70,16 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
         return balance[address(uint160(_account))];
     }
 
-    /// @notice Increase the total supply of tokens and balance of the receiver.
+    /// @notice Increase the balance of the receiver by transferring from BaseTokenHolder.
     /// @dev This method is only callable by the bootloader.
+    /// @dev The totalSupply is now computed from BaseTokenHolder balance, so we only update balances.
     /// @param _account The address which to mint the funds to.
     /// @param _amount The amount of ETH in wei to be minted.
     function mint(address _account, uint256 _amount) external override onlyCallFromBootloaderOrInteropHandler {
         L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(_amount);
-        totalSupply += _amount;
+        // Transfer from BaseTokenHolder to the recipient
+        // This decreases holder balance, which increases totalSupply() automatically
+        balance[BASE_TOKEN_HOLDER_ADDRESS] -= _amount;
         balance[_account] += _amount;
         emit Mint(_account, _amount);
     }
@@ -106,12 +118,13 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
         /// @dev This function is called to check if the token is withdrawable.
         L2_ASSET_TRACKER.handleInitiateBaseTokenBridgingOnL2(amount);
 
-        // Silent burning of the ether
+        // Transfer the ether back to BaseTokenHolder (effectively "burning" from circulation)
         unchecked {
             // This is safe, since this contract holds the ether balances, and if user
             // sends a `msg.value` it will be added to the contract (`this`) balance.
             balance[address(this)] -= amount;
-            totalSupply -= amount;
+            // Return to BaseTokenHolder, which decreases totalSupply() automatically
+            balance[BASE_TOKEN_HOLDER_ADDRESS] += amount;
         }
     }
 

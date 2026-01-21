@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_VERIFICATION, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_HOLDER, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_VERIFICATION, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
 import {BUNDLE_IDENTIFIER, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, BundleStatus, CallStatus, InteropBundle, InteropCall, MessageInclusionProof} from "../common/Messaging.sol";
 import {IERC7786Recipient} from "./IERC7786Recipient.sol";
@@ -293,7 +293,17 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             require(interopCall.version == INTEROP_CALL_VERSION, InvalidInteropCallVersion());
 
             if (interopCall.value > 0) {
-                L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(this), interopCall.value);
+                // Transfer base tokens from the BaseTokenHolder instead of minting.
+                // This makes the system more EVM-compatible as all tooling supports
+                // receiving value from another contract.
+                // Note: We don't call L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2 here
+                // because for L2<->L2 interop, the chainBalance tracking is not affected
+                // (the base token origin is L1, not current chain, so chainBalance isn't updated).
+                L2_BASE_TOKEN_SYSTEM_CONTRACT.transferFromTo(
+                    address(L2_BASE_TOKEN_HOLDER),
+                    address(this),
+                    interopCall.value
+                );
             }
             // slither-disable-next-line arbitrary-send-eth
             bytes4 selector = IERC7786Recipient(interopCall.to).receiveMessage{value: interopCall.value}({
