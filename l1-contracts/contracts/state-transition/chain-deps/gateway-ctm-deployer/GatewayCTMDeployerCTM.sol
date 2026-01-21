@@ -17,7 +17,7 @@ import {GatewayCTMDeployerCTMBase} from "./GatewayCTMDeployerCTMBase.sol";
 /// For ZKsyncOS CTM, use GatewayCTMDeployerCTMZKsyncOS instead.
 contract GatewayCTMDeployerCTM is GatewayCTMDeployerCTMBase {
     constructor(GatewayCTMFinalConfig memory _config) {
-        if (_config.isZKsyncOS) {
+        if (_config.baseConfig.isZKsyncOS) {
             revert WrongCTMDeployerVariant();
         }
         _deployInner(_config);

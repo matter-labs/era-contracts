@@ -188,43 +188,11 @@ struct Verifiers {
 // ============ CTM Deployer ============
 
 /// @notice Configuration for CTM deployer (ServerNotifier, CTM).
-/// @dev Contains addresses from previous deployers.
+/// @dev Contains base config and addresses from previous deployers.
 // solhint-disable-next-line gas-struct-packing
 struct GatewayCTMFinalConfig {
-    /// @notice Address of the aliased governance contract.
-    address aliasedGovernanceAddress;
-    /// @notice Salt used for deterministic deployments via CREATE2.
-    bytes32 salt;
-    /// @notice Chain ID of the Era chain.
-    uint256 eraChainId;
-    /// @notice Chain ID of the L1 chain.
-    uint256 l1ChainId;
-    /// @notice Flag indicating whether to use ZKsync OS mode.
-    bool isZKsyncOS;
-    /// @notice Array of function selectors for the Admin facet.
-    bytes4[] adminSelectors;
-    /// @notice Array of function selectors for the Executor facet.
-    bytes4[] executorSelectors;
-    /// @notice Array of function selectors for the Mailbox facet.
-    bytes4[] mailboxSelectors;
-    /// @notice Array of function selectors for the Getters facet.
-    bytes4[] gettersSelectors;
-    /// @notice Hash of the bootloader bytecode.
-    bytes32 bootloaderHash;
-    /// @notice Hash of the default account bytecode.
-    bytes32 defaultAccountHash;
-    /// @notice Hash of the EVM emulator bytecode.
-    bytes32 evmEmulatorHash;
-    /// @notice Root hash of the genesis state.
-    bytes32 genesisRoot;
-    /// @notice Leaf index in the genesis rollup.
-    uint256 genesisRollupLeafIndex;
-    /// @notice Commitment of the genesis batch.
-    bytes32 genesisBatchCommitment;
-    /// @notice Data for force deployments.
-    bytes forceDeploymentsData;
-    /// @notice The latest protocol version.
-    uint256 protocolVersion;
+    /// @notice Base configuration containing common deployment parameters.
+    GatewayCTMDeployerConfig baseConfig;
     // ---- Addresses from previous deployers ----
     /// @notice Address of the ProxyAdmin (from ProxyAdmin deployer).
     address chainTypeManagerProxyAdmin;

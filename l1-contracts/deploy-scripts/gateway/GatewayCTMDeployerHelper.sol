@@ -392,23 +392,7 @@ library GatewayCTMDeployerHelper {
         Verifiers memory verifiersResult
     ) internal returns (address deployer, bytes memory calldata_, GatewayCTMFinalResult memory result) {
         GatewayCTMFinalConfig memory ctmConfig = GatewayCTMFinalConfig({
-            aliasedGovernanceAddress: config.aliasedGovernanceAddress,
-            salt: config.salt,
-            eraChainId: config.eraChainId,
-            l1ChainId: config.l1ChainId,
-            isZKsyncOS: config.isZKsyncOS,
-            adminSelectors: config.adminSelectors,
-            executorSelectors: config.executorSelectors,
-            mailboxSelectors: config.mailboxSelectors,
-            gettersSelectors: config.gettersSelectors,
-            bootloaderHash: config.bootloaderHash,
-            defaultAccountHash: config.defaultAccountHash,
-            evmEmulatorHash: config.evmEmulatorHash,
-            genesisRoot: config.genesisRoot,
-            genesisRollupLeafIndex: config.genesisRollupLeafIndex,
-            genesisBatchCommitment: config.genesisBatchCommitment,
-            forceDeploymentsData: config.forceDeploymentsData,
-            protocolVersion: config.protocolVersion,
+            baseConfig: config,
             chainTypeManagerProxyAdmin: proxyAdminResult.chainTypeManagerProxyAdmin,
             validatorTimelock: validatorTimelockResult.validatorTimelock,
             adminFacet: directAddresses.adminFacet,
@@ -703,7 +687,8 @@ library GatewayCTMDeployerHelper {
         address deployerAddr,
         GatewayCTMFinalConfig memory config
     ) internal returns (GatewayCTMFinalResult memory result) {
-        InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
+        GatewayCTMDeployerConfig memory baseConfig = config.baseConfig;
+        InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: baseConfig.salt});
 
         // ServerNotifier
         result.serverNotifierImplementation = _deployInternalEmptyParams(
@@ -724,7 +709,7 @@ library GatewayCTMDeployerHelper {
         );
 
         // CTM Implementation
-        if (config.isZKsyncOS) {
+        if (baseConfig.isZKsyncOS) {
             result.chainTypeManagerImplementation = _deployInternalWithParams(
                 "ZKsyncOSChainTypeManager",
                 "ZKsyncOSChainTypeManager.sol",
@@ -746,32 +731,32 @@ library GatewayCTMDeployerHelper {
             facet: config.adminFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: config.adminSelectors
+            selectors: baseConfig.adminSelectors
         });
         facetCuts[1] = Diamond.FacetCut({
             facet: config.gettersFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: config.gettersSelectors
+            selectors: baseConfig.gettersSelectors
         });
         facetCuts[2] = Diamond.FacetCut({
             facet: config.mailboxFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: config.mailboxSelectors
+            selectors: baseConfig.mailboxSelectors
         });
         facetCuts[3] = Diamond.FacetCut({
             facet: config.executorFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: config.executorSelectors
+            selectors: baseConfig.executorSelectors
         });
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(config.verifier),
-            l2BootloaderBytecodeHash: config.bootloaderHash,
-            l2DefaultAccountBytecodeHash: config.defaultAccountHash,
-            l2EvmEmulatorBytecodeHash: config.evmEmulatorHash
+            l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
+            l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
+            l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
@@ -784,18 +769,18 @@ library GatewayCTMDeployerHelper {
 
         ChainCreationParams memory chainCreationParams = ChainCreationParams({
             genesisUpgrade: config.genesisUpgrade,
-            genesisBatchHash: config.genesisRoot,
-            genesisIndexRepeatedStorageChanges: uint64(config.genesisRollupLeafIndex),
-            genesisBatchCommitment: config.genesisBatchCommitment,
+            genesisBatchHash: baseConfig.genesisRoot,
+            genesisIndexRepeatedStorageChanges: uint64(baseConfig.genesisRollupLeafIndex),
+            genesisBatchCommitment: baseConfig.genesisBatchCommitment,
             diamondCut: diamondCut,
-            forceDeploymentsData: config.forceDeploymentsData
+            forceDeploymentsData: baseConfig.forceDeploymentsData
         });
 
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
-            owner: config.aliasedGovernanceAddress,
+            owner: baseConfig.aliasedGovernanceAddress,
             validatorTimelock: config.validatorTimelock,
             chainCreationParams: chainCreationParams,
-            protocolVersion: config.protocolVersion,
+            protocolVersion: baseConfig.protocolVersion,
             serverNotifier: result.serverNotifierProxy
         });
 
@@ -814,7 +799,8 @@ library GatewayCTMDeployerHelper {
         GatewayCTMFinalConfig memory config,
         bool isZKsyncOS
     ) internal returns (GatewayCTMFinalResult memory result) {
-        InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
+        GatewayCTMDeployerConfig memory baseConfig = config.baseConfig;
+        InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: baseConfig.salt});
 
         // ServerNotifier
         result.serverNotifierImplementation = _deployInternalEmptyParamsWithMode(
@@ -837,7 +823,7 @@ library GatewayCTMDeployerHelper {
         );
 
         // CTM Implementation
-        if (config.isZKsyncOS) {
+        if (baseConfig.isZKsyncOS) {
             result.chainTypeManagerImplementation = _deployInternalWithParamsWithMode(
                 "ZKsyncOSChainTypeManager",
                 "ZKsyncOSChainTypeManager.sol",
@@ -861,32 +847,32 @@ library GatewayCTMDeployerHelper {
             facet: config.adminFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: config.adminSelectors
+            selectors: baseConfig.adminSelectors
         });
         facetCuts[1] = Diamond.FacetCut({
             facet: config.gettersFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: config.gettersSelectors
+            selectors: baseConfig.gettersSelectors
         });
         facetCuts[2] = Diamond.FacetCut({
             facet: config.mailboxFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: config.mailboxSelectors
+            selectors: baseConfig.mailboxSelectors
         });
         facetCuts[3] = Diamond.FacetCut({
             facet: config.executorFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: config.executorSelectors
+            selectors: baseConfig.executorSelectors
         });
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(config.verifier),
-            l2BootloaderBytecodeHash: config.bootloaderHash,
-            l2DefaultAccountBytecodeHash: config.defaultAccountHash,
-            l2EvmEmulatorBytecodeHash: config.evmEmulatorHash
+            l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
+            l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
+            l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
@@ -899,18 +885,18 @@ library GatewayCTMDeployerHelper {
 
         ChainCreationParams memory chainCreationParams = ChainCreationParams({
             genesisUpgrade: config.genesisUpgrade,
-            genesisBatchHash: config.genesisRoot,
-            genesisIndexRepeatedStorageChanges: uint64(config.genesisRollupLeafIndex),
-            genesisBatchCommitment: config.genesisBatchCommitment,
+            genesisBatchHash: baseConfig.genesisRoot,
+            genesisIndexRepeatedStorageChanges: uint64(baseConfig.genesisRollupLeafIndex),
+            genesisBatchCommitment: baseConfig.genesisBatchCommitment,
             diamondCut: diamondCut,
-            forceDeploymentsData: config.forceDeploymentsData
+            forceDeploymentsData: baseConfig.forceDeploymentsData
         });
 
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
-            owner: config.aliasedGovernanceAddress,
+            owner: baseConfig.aliasedGovernanceAddress,
             validatorTimelock: config.validatorTimelock,
             chainCreationParams: chainCreationParams,
-            protocolVersion: config.protocolVersion,
+            protocolVersion: baseConfig.protocolVersion,
             serverNotifier: result.serverNotifierProxy
         });
 

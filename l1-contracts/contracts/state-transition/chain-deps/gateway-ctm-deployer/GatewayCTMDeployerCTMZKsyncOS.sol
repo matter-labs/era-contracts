@@ -16,7 +16,7 @@ import {GatewayCTMDeployerCTMBase} from "./GatewayCTMDeployerCTMBase.sol";
 /// @notice Gateway CTM ZKsyncOS deployer: deploys ServerNotifier and ZKsyncOS CTM, links them together.
 contract GatewayCTMDeployerCTMZKsyncOS is GatewayCTMDeployerCTMBase {
     constructor(GatewayCTMFinalConfig memory _config) {
-        if (!_config.isZKsyncOS) {
+        if (!_config.baseConfig.isZKsyncOS) {
             revert WrongCTMDeployerVariant();
         }
         _deployInner(_config);
