@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {console} from "forge-std/console.sol";
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -247,12 +248,36 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
             abi.encode(migrationNumber)
         );
+        // Capture balances before migration
+        uint256 chainBalanceBefore = L1AssetTracker(address(assetTracker)).chainBalance(eraZKChainId, assetId);
+
         IL1AssetTracker(assetTracker).receiveMigrationOnL1(finalizeWithdrawalParamsL1ToGateway);
+
+        // Verify L1 migration was processed - chain balance should be updated
+        uint256 chainBalanceAfterL1 = L1AssetTracker(address(assetTracker)).chainBalance(eraZKChainId, assetId);
+        assertTrue(chainBalanceAfterL1 != chainBalanceBefore, "Chain balance should change after L1 migration");
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
         l2AssetTracker.confirmMigrationOnL2(confirmData);
+
+        // Verify L2 confirmation was processed - check that the migration number is updated
+        // Note: The final migration number depends on the mock setup
+        uint256 assetMigrationNumL2 = L2AssetTracker(address(l2AssetTracker)).assetMigrationNumber(
+            eraZKChainId,
+            assetId
+        );
+        // The migration number is updated based on confirmData.migrationNumber
+        assertTrue(assetMigrationNumL2 > 0, "Asset migration number should be updated on L2");
+
         vm.prank(SERVICE_TRANSACTION_SENDER);
         gwAssetTracker.confirmMigrationOnGateway(confirmData);
+
+        // Verify Gateway confirmation updated asset migration number
+        uint256 assetMigrationNumGW = GWAssetTracker(address(gwAssetTracker)).assetMigrationNumber(
+            eraZKChainId,
+            assetId
+        );
+        assertEq(assetMigrationNumGW, migrationNumber, "Asset migration number should be updated on Gateway");
     }
 
     function test_migrationGatewayToL1() public {
@@ -369,7 +394,14 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         );
         console.log("chainAssetHandler", address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler));
 
+        // Capture balance before migration
+        uint256 gwChainBalanceBefore = L1AssetTracker(address(assetTracker)).chainBalance(gwChainId, assetId);
+
         assetTracker.receiveMigrationOnL1(finalizeWithdrawalParamsGatewayToL1);
+
+        // Verify L1 processed the migration from Gateway
+        uint256 gwChainBalanceAfter = L1AssetTracker(address(assetTracker)).chainBalance(gwChainId, assetId);
+        assertTrue(gwChainBalanceAfter != gwChainBalanceBefore, "Gateway chain balance should change after migration");
 
         // vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1AssetTracker));
         vm.store(address(assetTracker), chainBalanceLocation, bytes32(amount));
@@ -380,6 +412,17 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
         gwAssetTracker.confirmMigrationOnGateway(confirmData);
+
+        // Verify Gateway confirmation was processed
+        uint256 assetMigrationNumGW = GWAssetTracker(address(gwAssetTracker)).assetMigrationNumber(
+            eraZKChainId,
+            assetId
+        );
+        assertEq(
+            assetMigrationNumGW,
+            migrationNumber,
+            "Asset migration number should be updated on Gateway after confirmation"
+        );
     }
 
     function test_migrateTokenBalanceFromNTVV31_L2Chain() public {
@@ -582,15 +625,41 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encode(bytes32(uint256(1)))
         );
 
-        // Call as the chain itself
+        // Call as the chain itself and verify event is emitted
         vm.prank(zkChainAddress);
+        vm.recordLogs();
         assetTracker.requestPauseDepositsForChainOnGateway(targetChainId);
 
-        // Verify the call was made to the gateway (checking it didn't revert is sufficient)
+        // Verify the PauseDepositsForChainRequested event was emitted
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bool foundEvent = false;
+        bytes32 eventSignature = IL1AssetTracker.PauseDepositsForChainRequested.selector;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == eventSignature) {
+                assertEq(logs[i].topics[1], bytes32(targetChainId), "Chain ID should match");
+                assertEq(logs[i].topics[2], bytes32(gwChainId), "Settlement layer should match");
+                foundEvent = true;
+                break;
+            }
+        }
+        assertTrue(foundEvent, "PauseDepositsForChainRequested event should be emitted");
     }
 
-    function test_tokenMigratedThisChain() public {
-        IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(bytes32(0));
+    function test_tokenMigratedThisChain() public view {
+        // tokenMigratedThisChain returns true when assetMigrationNumber == chainMigrationNumber
+        // For a fresh chain (migration number 0), assets with migration number 0 are considered "migrated"
+        assertTrue(
+            IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(bytes32(0)),
+            "Zero asset should be considered migrated on fresh chain"
+        );
+        assertTrue(
+            IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(keccak256("random_asset")),
+            "Random asset should be considered migrated on fresh chain"
+        );
+        assertTrue(
+            IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(assetId),
+            "Configured asset should be considered migrated on fresh chain"
+        );
     }
 
     // add this to be excluded from coverage report

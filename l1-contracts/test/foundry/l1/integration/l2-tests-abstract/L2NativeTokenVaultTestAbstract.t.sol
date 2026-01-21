@@ -42,12 +42,28 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
     function test_registerLegacyToken() external {
         address l2Token = makeAddr("l2Token");
         address l1Token = makeAddr("l1Token");
+        L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+
+        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
+
+        // Verify token is not registered before
+        assertEq(l2NativeTokenVault.assetId(l2Token), bytes32(0), "Asset ID should be zero before registration");
+
         vm.mockCall(
             sharedBridgeLegacy,
             abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),
             abi.encode(l1Token)
         );
         L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setLegacyTokenAssetId(l2Token);
+
+        // Verify token is registered after
+        assertEq(l2NativeTokenVault.assetId(l2Token), expectedAssetId, "Asset ID should be set after registration");
+        assertEq(
+            l2NativeTokenVault.tokenAddress(expectedAssetId),
+            l2Token,
+            "Token address should be mapped to asset ID"
+        );
+        assertEq(l2NativeTokenVault.originChainId(expectedAssetId), L1_CHAIN_ID, "Origin chain ID should be L1");
     }
 
     function test_registerLegacyToken_IncorrectConfiguration() external {
