@@ -72,7 +72,7 @@ object "Bootloader" {
             }
 
             /// @dev Calculates the gas per pubdata based on the pubdata price provided by the operator
-            /// as well the the fixed baseFee.
+            /// as well the fixed baseFee.
             function gasPerPubdataFromBaseFee(baseFee, pubdataPrice) -> ret {
                 ret := ceilDiv(pubdataPrice, baseFee)
             }
