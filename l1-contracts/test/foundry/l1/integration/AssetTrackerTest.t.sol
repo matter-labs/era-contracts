@@ -625,39 +625,16 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encode(bytes32(uint256(1)))
         );
 
-        // Call as the chain itself
+        // Call as the chain itself - verifies the function completes without reverting
         vm.prank(zkChainAddress);
-        vm.recordLogs();
         assetTracker.requestPauseDepositsForChainOnGateway(targetChainId);
-
-        // Verify the call was made - check that logs were emitted during the operation
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        // The function makes a call to requestL2ServiceTransaction which should produce activity
-        // Verifying it completed without reverting means the mock was called
-        assertTrue(logs.length >= 0, "Function should complete (logs may or may not be emitted depending on mocks)");
-
-        // Verify target chain ID is valid
-        assertTrue(targetChainId > 0, "Target chain ID should be positive");
     }
 
     function test_tokenMigratedThisChain() public view {
-        // Test with a known asset ID
-        bytes32 testAssetId = bytes32(0);
-        bool result1 = IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(testAssetId);
-
-        // Test with a different asset ID
-        bytes32 randomAssetId = keccak256("random_asset");
-        bool result2 = IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(randomAssetId);
-
-        // Both calls should complete without reverting and return boolean values
-        // The function checks if the token's origin chain matches block.chainid
-        // Both results should be consistent booleans (either true or false)
-        assertTrue(result1 == true || result1 == false, "Result should be a valid boolean");
-        assertTrue(result2 == true || result2 == false, "Result should be a valid boolean");
-
-        // Test with the actual asset ID configured in setUp
-        bool resultConfigured = IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(assetId);
-        assertTrue(resultConfigured == true || resultConfigured == false, "Configured asset result should be valid");
+        // Test that calls complete without reverting
+        IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(bytes32(0));
+        IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(keccak256("random_asset"));
+        IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(assetId);
     }
 
     // add this to be excluded from coverage report
