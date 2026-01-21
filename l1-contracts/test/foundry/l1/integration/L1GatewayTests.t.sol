@@ -365,11 +365,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
         BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
             chainId: migratingChainId,
-            baseTokenData: BaseTokenData({
-                assetId: baseTokenAssetId,
-                originalToken: address(0),
-                originChainId: 0
-            }),
+            baseTokenData: BaseTokenData({assetId: baseTokenAssetId, originalToken: address(0), originChainId: 0}),
             batchNumber: 0,
             ctmData: ctmData,
             chainData: chainData,

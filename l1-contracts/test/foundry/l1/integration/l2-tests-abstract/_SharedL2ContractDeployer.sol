@@ -338,11 +338,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         );
         BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
             chainId: _chainId,
-            baseTokenData: BaseTokenData({
-                assetId: baseTokenAssetId,
-                originalToken: address(0),
-                originChainId: 0
-            }),
+            baseTokenData: BaseTokenData({assetId: baseTokenAssetId, originalToken: address(0), originChainId: 0}),
             batchNumber: 0,
             ctmData: ctmData,
             chainData: chainData,
