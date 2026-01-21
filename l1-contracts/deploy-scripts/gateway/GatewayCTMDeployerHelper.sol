@@ -1085,6 +1085,7 @@ library GatewayCTMDeployerHelper {
     // ============ Factory Dependencies ============
 
     /// @notice Returns all factory dependencies for deployment.
+    /// @param _isZKsyncOS Whether to include ZKsync OS-specific dependencies.
     /// @return dependencies Array of bytecodes needed for deployment.
     function getListOfFactoryDeps(bool _isZKsyncOS) external returns (bytes[] memory dependencies) {
         if (_isZKsyncOS) {
@@ -1092,19 +1093,20 @@ library GatewayCTMDeployerHelper {
             return dependencies;
         }
 
-        // 7 deployers (DA, ProxyAdmin, ValidatorTimelock, Verifiers Era/ZKsyncOS, CTM Era/ZKsyncOS)
+        // For Era mode (non-ZKsyncOS):
+        // 5 deployers (DA, ProxyAdmin, ValidatorTimelock, Verifiers Era, CTM Era)
         // + 3 DA contracts (RollupDAManager, ValidiumL1DAValidator, RelayedSLDAValidator)
         // + 1 ProxyAdmin contract
         // + 2 ValidatorTimelock contracts (implementation + proxy)
-        // + 8 Verifier contracts (4 Era + 4 ZKsyncOS)
-        // + 3 CTM contracts (ServerNotifier, EraChainTypeManager, ZKsyncOSChainTypeManager)
+        // + 4 Verifier contracts (Era only)
+        // + 2 CTM contracts (ServerNotifier, EraChainTypeManager)
         // + 8 direct contracts (AdminFacet, MailboxFacet, ExecutorFacet, GettersFacet, DiamondInit, GenesisUpgrade, Multicall3, DiamondProxy)
-        // Total: 7 + 3 + 1 + 2 + 8 + 3 + 8 = 32
-        uint256 totalDependencies = 32;
+        // Total: 5 + 3 + 1 + 2 + 4 + 2 + 8 = 25
+        uint256 totalDependencies = 25;
         dependencies = new bytes[](totalDependencies);
         uint256 index = 0;
 
-        // Deployer contracts
+        // Deployer contracts (Era only)
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("GatewayCTMDeployerDA.sol", "GatewayCTMDeployerDA");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1(
             "GatewayCTMDeployerProxyAdmin.sol",
@@ -1118,15 +1120,7 @@ library GatewayCTMDeployerHelper {
             "GatewayCTMDeployerVerifiers.sol",
             "GatewayCTMDeployerVerifiers"
         );
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1(
-            "GatewayCTMDeployerVerifiersZKsyncOS.sol",
-            "GatewayCTMDeployerVerifiersZKsyncOS"
-        );
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("GatewayCTMDeployerCTM.sol", "GatewayCTMDeployerCTM");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1(
-            "GatewayCTMDeployerCTMZKsyncOS.sol",
-            "GatewayCTMDeployerCTMZKsyncOS"
-        );
 
         // DA contracts
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("RollupDAManager.sol", "RollupDAManager");
@@ -1143,22 +1137,14 @@ library GatewayCTMDeployerHelper {
             "TransparentUpgradeableProxy"
         );
 
-        // Verifier contracts
+        // Verifier contracts (Era only)
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraVerifierFflonk.sol", "EraVerifierFflonk");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraVerifierPlonk.sol", "EraVerifierPlonk");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSVerifierFflonk.sol", "ZKsyncOSVerifierFflonk");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSVerifierPlonk.sol", "ZKsyncOSVerifierPlonk");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraTestnetVerifier.sol", "EraTestnetVerifier");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraDualVerifier.sol", "EraDualVerifier");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSDualVerifier.sol", "ZKsyncOSDualVerifier");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSTestnetVerifier.sol", "ZKsyncOSTestnetVerifier");
 
-        // CTM contracts
+        // CTM contracts (Era only)
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ServerNotifier.sol", "ServerNotifier");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1(
-            "ZKsyncOSChainTypeManager.sol",
-            "ZKsyncOSChainTypeManager"
-        );
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraChainTypeManager.sol", "EraChainTypeManager");
 
         // Direct deployment contracts
