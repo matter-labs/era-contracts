@@ -97,7 +97,11 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         vm.etch(beaconAddr, beaconBytecode);
         beacon = UpgradeableBeacon(beaconAddr);
         // Mock the implementation() call to return our erc20 impl
-        vm.mockCall(beaconAddr, abi.encodeWithSelector(UpgradeableBeacon.implementation.selector), abi.encode(erc20ImplAddr));
+        vm.mockCall(
+            beaconAddr,
+            abi.encodeWithSelector(UpgradeableBeacon.implementation.selector),
+            abi.encode(erc20ImplAddr)
+        );
 
         // Deploy BeaconProxy using vm.etch
         bytes memory beaconProxyBytecode = Utils.readFoundryBytecodeL1("BeaconProxy.sol", "BeaconProxy");
