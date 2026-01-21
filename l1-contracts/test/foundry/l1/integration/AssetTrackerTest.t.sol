@@ -37,6 +37,7 @@ import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {InvalidChainId} from "contracts/common/L1ContractErrors.sol";
 
 contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
@@ -591,6 +592,143 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
     function test_tokenMigratedThisChain() public {
         IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(bytes32(0));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    Regression Tests for PR #1769
+                    Unknown AssetId Validation Fix
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Regression test for the bug fixed in PR #1769
+    /// @dev Bug Description:
+    ///      L1AssetTracker.migrateTokenBalanceFromNTVV31 did not validate that the provided assetId
+    ///      was registered in the L1 NativeTokenVault before assigning MAX chain balance on the origin chain.
+    ///
+    ///      For unknown assets:
+    ///      1. originChainId(assetId) returns 0 (default value for unknown assets)
+    ///      2. The non-L1 path pulls a zero migrated amount
+    ///      3. _assignMaxChainBalanceIfNeeded(0, assetId) writes chainBalance[0][assetId] = MAX_TOKEN_BALANCE
+    ///         and sets maxChainBalanceAssigned[assetId] = true
+    ///
+    ///      This permanently poisons state for that assetId:
+    ///      - chainBalance[0][assetId] = MAX_TOKEN_BALANCE (wrong origin chain)
+    ///      - maxChainBalanceAssigned[assetId] = true (prevents proper registration later)
+    ///      - Later, registerNewToken skips MAX assignment on the real origin chain
+    ///      - Migration subtracts from zero and reverts
+    ///
+    ///      Fix: Added `require(originChainId != 0, InvalidChainId())` at the start of the function
+    ///      to reject unknown assets before any state changes occur.
+    function test_regression_migrateTokenBalanceFromNTVV31_revertsForUnknownAsset() public {
+        // Create a predictable future assetId that is NOT registered in NTV
+        bytes32 unknownAssetId = keccak256("unknown-asset-never-registered");
+        uint256 testChainId = 999; // Some chain that's not the origin (since _chainId != originChainId is required)
+
+        // Mock the NTV to return 0 for originChainId (simulating unknown asset)
+        vm.mockCall(
+            address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault),
+            abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, unknownAssetId),
+            abi.encode(0) // Unknown asset returns 0
+        );
+
+        // Verify initial state: chainBalance[0][unknownAssetId] should be 0
+        bytes32 chainBalanceSlot0 = getChainBalanceLocation(unknownAssetId, 0);
+        uint256 initialChainBalance0 = uint256(vm.load(address(assetTracker), chainBalanceSlot0));
+        assertEq(initialChainBalance0, 0, "Initial chainBalance[0] should be 0");
+
+        // Attempt to migrate the unknown asset - should revert with InvalidChainId
+        // Before the fix, this would succeed and poison state
+        vm.expectRevert(InvalidChainId.selector);
+        assetTracker.migrateTokenBalanceFromNTVV31(testChainId, unknownAssetId);
+
+        // Verify state was NOT poisoned (chainBalance[0][unknownAssetId] should still be 0)
+        uint256 finalChainBalance0 = uint256(vm.load(address(assetTracker), chainBalanceSlot0));
+        assertEq(finalChainBalance0, 0, "chainBalance[0] should not have been set to MAX_TOKEN_BALANCE");
+    }
+
+    /// @notice Additional regression test verifying the full attack scenario is blocked
+    /// @dev Tests the complete attack flow described in the bug report
+    function test_regression_migrateTokenBalanceFromNTVV31_preventsStatePoisoning() public {
+        // Attacker picks a predictable future assetId (unknown to NTV: originChainId(assetId) == 0)
+        bytes32 futureAssetId = keccak256(abi.encodePacked("future-token-", block.timestamp));
+        uint256 attackerChainId = 12345;
+
+        // Mock NTV to return 0 for this "future" asset
+        vm.mockCall(
+            address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault),
+            abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, futureAssetId),
+            abi.encode(0)
+        );
+
+        // Before the fix, this attack would succeed:
+        // 1. Call migrateTokenBalanceFromNTVV31(attackerChainId, futureAssetId)
+        // 2. originChainId = 0 (for unknown asset)
+        // 3. Since attackerChainId != 0, the require(_chainId != originChainId) passes
+        // 4. migrateTokenBalanceToAssetTracker returns 0 (no balance)
+        // 5. _assignMaxChainBalanceIfNeeded(0, futureAssetId) sets chainBalance[0][futureAssetId] = MAX
+        // 6. State is now poisoned - maxChainBalanceAssigned[futureAssetId] = true
+
+        // After the fix, this should revert immediately
+        vm.expectRevert(InvalidChainId.selector);
+        assetTracker.migrateTokenBalanceFromNTVV31(attackerChainId, futureAssetId);
+    }
+
+    /// @notice Test that registered assets can still be migrated correctly
+    /// @dev Ensures the fix doesn't break legitimate migration operations
+    function test_regression_migrateTokenBalanceFromNTVV31_worksForRegisteredAsset() public {
+        // Use an already registered asset
+        uint256 testChainId = eraZKChainId;
+        uint256 migratedBalance = 5000;
+
+        // Mock origin chain to be different from testChainId and non-zero
+        uint256 registeredOriginChain = originalChainId;
+        vm.mockCall(
+            address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault),
+            abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, assetId),
+            abi.encode(registeredOriginChain)
+        );
+
+        // Mock the migration to return a balance
+        vm.mockCall(
+            address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault),
+            abi.encodeWithSelector(
+                IL1NativeTokenVault.migrateTokenBalanceToAssetTracker.selector,
+                testChainId,
+                assetId
+            ),
+            abi.encode(migratedBalance)
+        );
+
+        // Set initial origin chain balance
+        vm.store(address(assetTracker), getChainBalanceLocation(assetId, registeredOriginChain), bytes32(type(uint256).max));
+
+        // This should succeed for a registered asset (originChainId != 0)
+        assetTracker.migrateTokenBalanceFromNTVV31(testChainId, assetId);
+
+        // Verify balance was migrated correctly
+        uint256 testChainBalance = uint256(vm.load(address(assetTracker), getChainBalanceLocation(assetId, testChainId)));
+        assertEq(testChainBalance, migratedBalance, "Test chain should have migrated balance");
+    }
+
+    /// @notice Fuzz test for unknown assetId rejection
+    /// @dev Ensures any random assetId that returns originChainId=0 is rejected
+    function testFuzz_regression_migrateTokenBalanceFromNTVV31_revertsForAnyUnknownAsset(
+        bytes32 randomAssetId,
+        uint256 randomChainId
+    ) public {
+        // Ensure chain ID is not 0 (would fail the != originChainId check anyway)
+        vm.assume(randomChainId != 0);
+        vm.assume(randomChainId != block.chainid); // Skip L1 chain case
+
+        // Mock NTV to return 0 for this random asset (simulating unknown)
+        vm.mockCall(
+            address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault),
+            abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, randomAssetId),
+            abi.encode(0)
+        );
+
+        // Should always revert for unknown assets
+        vm.expectRevert(InvalidChainId.selector);
+        assetTracker.migrateTokenBalanceFromNTVV31(randomChainId, randomAssetId);
     }
 
     // add this to be excluded from coverage report
