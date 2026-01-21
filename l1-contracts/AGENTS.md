@@ -144,6 +144,15 @@ yarn test:foundry
 
    Then commit the updated JSON files in `zkstack-out/`.
 
+5. **Selectors out of date**: If CI fails with selectors check, regenerate them:
+
+   ```bash
+   cd l1-contracts
+   yarn selectors --fix
+   ```
+
+   Then commit the updated `selectors` file.
+
 ## Before Pushing Changes
 
 **ALWAYS run linting and formatting before pushing to ensure CI passes:**
