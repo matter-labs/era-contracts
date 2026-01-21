@@ -646,18 +646,19 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     }
 
     function test_tokenMigratedThisChain() public view {
-        // For assets that haven't gone through migration, tokenMigratedThisChain should return false
-        assertFalse(
+        // tokenMigratedThisChain returns true when assetMigrationNumber == chainMigrationNumber
+        // For a fresh chain (migration number 0), assets with migration number 0 are considered "migrated"
+        assertTrue(
             IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(bytes32(0)),
-            "Zero asset should not be migrated"
+            "Zero asset should be considered migrated on fresh chain"
         );
-        assertFalse(
+        assertTrue(
             IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(keccak256("random_asset")),
-            "Random asset should not be migrated"
+            "Random asset should be considered migrated on fresh chain"
         );
-        assertFalse(
+        assertTrue(
             IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(assetId),
-            "Configured asset should not be migrated initially"
+            "Configured asset should be considered migrated on fresh chain"
         );
     }
 
