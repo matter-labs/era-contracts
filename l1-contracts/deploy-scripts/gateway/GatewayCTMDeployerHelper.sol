@@ -21,7 +21,7 @@ import {L1L2DeployUtils} from "../utils/deploy/L1L2DeployUtils.sol";
 
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
-import {DeployedContracts, GatewayCTMDeployerConfig, GatewayDADeployerConfig, GatewayDADeployerResult, GatewayProxyAdminDeployerConfig, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerConfig, GatewayValidatorTimelockDeployerResult, GatewayVerifiersDeployerConfig, GatewayVerifiersDeployerResult, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {DeployedContracts, GatewayCTMDeployerConfig, GatewayDADeployerConfig, GatewayDADeployerResult, GatewayProxyAdminDeployerConfig, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerConfig, GatewayValidatorTimelockDeployerResult, GatewayVerifiersDeployerConfig, Verifiers, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 
 import {DeployCTML1OrGateway, CTMCoreDeploymentConfig} from "../ctm/DeployCTML1OrGateway.sol";
 import {CTMContract} from "../ctm/DeployCTML1OrGateway.sol";
@@ -120,7 +120,7 @@ library GatewayCTMDeployerHelper {
         ) = _calculateValidatorTimelockDeployer(_create2Salt, config, proxyAdminResult);
 
         // Calculate Verifiers deployer addresses
-        GatewayVerifiersDeployerResult memory verifiersResult;
+        Verifiers memory verifiersResult;
         (
             deployers.verifiersDeployer,
             deployerCalldata.verifiersCalldata,
@@ -246,7 +246,7 @@ library GatewayCTMDeployerHelper {
     function _calculateVerifiersDeployer(
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config
-    ) internal returns (address deployer, bytes memory calldata_, GatewayVerifiersDeployerResult memory result) {
+    ) internal returns (address deployer, bytes memory calldata_, Verifiers memory result) {
         GatewayVerifiersDeployerConfig memory verifiersConfig = GatewayVerifiersDeployerConfig({
             salt: config.salt,
             aliasedGovernanceAddress: config.aliasedGovernanceAddress,
@@ -389,7 +389,7 @@ library GatewayCTMDeployerHelper {
         DirectDeployedAddresses memory directAddresses,
         GatewayProxyAdminDeployerResult memory proxyAdminResult,
         GatewayValidatorTimelockDeployerResult memory validatorTimelockResult,
-        GatewayVerifiersDeployerResult memory verifiersResult
+        Verifiers memory verifiersResult
     ) internal returns (address deployer, bytes memory calldata_, GatewayCTMFinalResult memory result) {
         GatewayCTMFinalConfig memory ctmConfig = GatewayCTMFinalConfig({
             aliasedGovernanceAddress: config.aliasedGovernanceAddress,
@@ -563,7 +563,7 @@ library GatewayCTMDeployerHelper {
     function _calculateVerifiersDeployerAddresses(
         address deployerAddr,
         GatewayVerifiersDeployerConfig memory config
-    ) internal returns (GatewayVerifiersDeployerResult memory result) {
+    ) internal returns (Verifiers memory result) {
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
 
         // Deploy base verifiers based on config
@@ -627,7 +627,7 @@ library GatewayCTMDeployerHelper {
         address deployerAddr,
         GatewayVerifiersDeployerConfig memory config,
         bool isZKsyncOS
-    ) internal returns (GatewayVerifiersDeployerResult memory result) {
+    ) internal returns (Verifiers memory result) {
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
 
         // Deploy base verifiers based on config
@@ -929,7 +929,7 @@ library GatewayCTMDeployerHelper {
         GatewayDADeployerResult memory daResult,
         GatewayProxyAdminDeployerResult memory proxyAdminResult,
         GatewayValidatorTimelockDeployerResult memory validatorTimelockResult,
-        GatewayVerifiersDeployerResult memory verifiersResult,
+        Verifiers memory verifiersResult,
         DirectDeployedAddresses memory directAddresses,
         GatewayCTMFinalResult memory ctmResult
     ) internal pure returns (DeployedContracts memory contracts) {

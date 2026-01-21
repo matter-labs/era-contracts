@@ -187,7 +187,7 @@ struct GatewayVerifiersDeployerConfig {
 
 /// @notice Result from Verifiers deployer.
 // solhint-disable-next-line gas-struct-packing
-struct GatewayVerifiersDeployerResult {
+struct Verifiers {
     /// @notice Address of the VerifierFflonk contract.
     address verifierFflonk;
     /// @notice Address of the VerifierPlonk contract.

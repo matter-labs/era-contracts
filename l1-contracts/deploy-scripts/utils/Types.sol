@@ -3,16 +3,7 @@ pragma solidity ^0.8.10;
 
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
-
-/// @notice Verifier contract addresses.
-struct Verifiers {
-    /// @notice Address of the Verifier contract.
-    address verifier;
-    /// @notice Address of the VerifierFflonk contract.
-    address verifierFflonk;
-    /// @notice Address of the VerifierPlonk contract.
-    address verifierPlonk;
-}
+import {Verifiers} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 
 /// @notice Diamond facet contract addresses.
 struct Facets {

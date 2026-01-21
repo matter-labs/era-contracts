@@ -11,7 +11,7 @@ import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExe
 
 import {L2AssetTrackerData} from "./L2AssetTrackerData.sol";
 
-import {GatewayCTMDeployerConfig, GatewayDADeployerConfig, GatewayProxyAdminDeployerConfig, GatewayValidatorTimelockDeployerConfig, GatewayVerifiersDeployerConfig, GatewayCTMFinalConfig, GatewayDADeployerResult, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerResult, GatewayVerifiersDeployerResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {GatewayCTMDeployerConfig, GatewayDADeployerConfig, GatewayProxyAdminDeployerConfig, GatewayValidatorTimelockDeployerConfig, GatewayVerifiersDeployerConfig, GatewayCTMFinalConfig, GatewayDADeployerResult, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerResult, Verifiers} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {GatewayCTMDeployerDA} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerDA.sol";
 import {GatewayCTMDeployerProxyAdmin} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerProxyAdmin.sol";
 import {GatewayCTMDeployerValidatorTimelock} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerValidatorTimelock.sol";
@@ -82,7 +82,7 @@ abstract contract GW_CTMDeployerTest is Test {
             testnetVerifier: false,
             isZKsyncOS: false
         });
-        GatewayVerifiersDeployerResult memory verifiersResult = (new GatewayCTMDeployerVerifiers(verifiersConfig))
+        Verifiers memory verifiersResult = (new GatewayCTMDeployerVerifiers(verifiersConfig))
             .getResult();
 
         // Phase 5: CTM deployer
@@ -96,7 +96,7 @@ abstract contract GW_CTMDeployerTest is Test {
         address aliasedGovernanceAddress,
         GatewayProxyAdminDeployerResult memory proxyAdminResult,
         GatewayValidatorTimelockDeployerResult memory vtResult,
-        GatewayVerifiersDeployerResult memory verifiersResult
+        Verifiers memory verifiersResult
     ) internal {
         GatewayCTMFinalConfig memory ctmConfig = GatewayCTMFinalConfig({
             aliasedGovernanceAddress: aliasedGovernanceAddress,
