@@ -464,4 +464,258 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
             "Mock should receive indirectCallMessageValue even with different base tokens"
         );
     }
+
+    /*//////////////////////////////////////////////////////////////
+                    Regression Tests for PR #1764
+                    Zero Burned Value with Different Base Token
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Regression test for the bug fixed in PR #1764
+    /// @dev Bug Description:
+    ///      When sending a bundle with ONLY indirect calls (interopCallValue=0 for all) to a chain
+    ///      with a different base token, the _ensureCorrectTotalValue function would still call
+    ///      bridgehubDepositBaseToken with _totalBurnedCallsValue=0, which reverts.
+    ///
+    ///      BUGGY CODE (before fix):
+    ///      } else {
+    ///          require(msg.value == _totalIndirectCallsValue, ...);
+    ///          L2_ASSET_ROUTER.bridgehubDepositBaseToken(  // Called even when amount is 0!
+    ///              _destinationChainId,
+    ///              destinationChainBaseTokenAssetId,
+    ///              msg.sender,
+    ///              _totalBurnedCallsValue  // This is 0, causing revert
+    ///          );
+    ///      }
+    ///
+    ///      FIX:
+    ///      } else {
+    ///          require(msg.value == _totalIndirectCallsValue, ...);
+    ///          if (_totalBurnedCallsValue > 0) {  // Skip when 0
+    ///              L2_ASSET_ROUTER.bridgehubDepositBaseToken(...);
+    ///          }
+    ///      }
+    ///
+    /// @dev This test verifies bundles with only indirect calls work correctly when targeting
+    ///      chains with different base tokens.
+    function test_regression_onlyIndirectCallsDifferentBaseToken() public {
+        // Only indirect call, no interopCallValue (burned value = 0)
+        uint256 interopCallValue = 0;
+        uint256 indirectCallMessageValue = 100;
+
+        // Set up different base token for destination chain
+        bytes32 otherBaseTokenAssetId = bytes32(uint256(uint160(makeAddr("otherBaseToken"))));
+
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeCall(IBridgehubBase.baseTokenAssetId, (destinationChainId)),
+            abi.encode(otherBaseTokenAssetId)
+        );
+
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeCall(IBridgehubBase.baseTokenAssetId, (block.chainid)),
+            abi.encode(baseTokenAssetId)
+        );
+
+        // NOTE: We do NOT mock bridgehubDepositBaseToken here
+        // Before the fix, this would cause a revert because bridgehubDepositBaseToken(0) reverts
+        // After the fix, bridgehubDepositBaseToken is not called when _totalBurnedCallsValue=0
+
+        vm.deal(address(this), indirectCallMessageValue);
+
+        // Build indirect call with interopCallValue = 0 (only indirectCallMessageValue)
+        bytes[] memory callAttributes = new bytes[](2);
+        callAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (interopCallValue));
+        callAttributes[1] = abi.encodeCall(IERC7786Attributes.indirectCall, (indirectCallMessageValue));
+
+        InteropCallStarter[] memory calls = new InteropCallStarter[](1);
+        calls[0] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(address(mockCrossChainSender)),
+            data: hex"",
+            callAttributes: callAttributes
+        });
+
+        bytes[] memory bundleAttributes = new bytes[](1);
+        bundleAttributes[0] = abi.encodeCall(
+            IERC7786Attributes.unbundlerAddress,
+            (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
+        );
+
+        // This should NOT revert after the fix
+        // msg.value = indirectCallMessageValue (only indirect value, no burned value)
+        L2_INTEROP_CENTER.sendBundle{value: indirectCallMessageValue}(
+            InteroperableAddress.formatEvmV1(destinationChainId),
+            calls,
+            bundleAttributes
+        );
+
+        // Verify the indirect call was processed correctly
+        assertEq(
+            mockCrossChainSender.lastReceivedMsgValue(),
+            indirectCallMessageValue,
+            "Mock should receive indirectCallMessageValue"
+        );
+        assertEq(mockCrossChainSender.lastInteropCallValue(), 0, "interopCallValue should be 0");
+        assertEq(mockCrossChainSender.callCount(), 1, "initiateIndirectCall should be called once");
+    }
+
+    /// @notice Test multiple indirect calls with zero interopCallValue targeting different base token chain
+    /// @dev Verifies the fix works for multiple calls in a single bundle
+    function test_regression_multipleOnlyIndirectCallsDifferentBaseToken() public {
+        MockL2CrossChainSender mockCrossChainSender2 = new MockL2CrossChainSender(finalRecipient);
+
+        uint256 indirectCallMessageValue1 = 50;
+        uint256 indirectCallMessageValue2 = 75;
+        uint256 totalIndirectValue = indirectCallMessageValue1 + indirectCallMessageValue2;
+
+        // Set up different base token for destination chain
+        bytes32 otherBaseTokenAssetId = bytes32(uint256(uint160(makeAddr("otherBaseToken"))));
+
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeCall(IBridgehubBase.baseTokenAssetId, (destinationChainId)),
+            abi.encode(otherBaseTokenAssetId)
+        );
+
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeCall(IBridgehubBase.baseTokenAssetId, (block.chainid)),
+            abi.encode(baseTokenAssetId)
+        );
+
+        vm.deal(address(this), totalIndirectValue);
+
+        // First indirect call (interopCallValue = 0)
+        bytes[] memory callAttributes1 = new bytes[](2);
+        callAttributes1[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (0));
+        callAttributes1[1] = abi.encodeCall(IERC7786Attributes.indirectCall, (indirectCallMessageValue1));
+
+        // Second indirect call (interopCallValue = 0)
+        bytes[] memory callAttributes2 = new bytes[](2);
+        callAttributes2[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (0));
+        callAttributes2[1] = abi.encodeCall(IERC7786Attributes.indirectCall, (indirectCallMessageValue2));
+
+        InteropCallStarter[] memory calls = new InteropCallStarter[](2);
+        calls[0] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(address(mockCrossChainSender)),
+            data: hex"",
+            callAttributes: callAttributes1
+        });
+        calls[1] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(address(mockCrossChainSender2)),
+            data: hex"",
+            callAttributes: callAttributes2
+        });
+
+        bytes[] memory bundleAttributes = new bytes[](1);
+        bundleAttributes[0] = abi.encodeCall(
+            IERC7786Attributes.unbundlerAddress,
+            (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
+        );
+
+        // This should NOT revert - total burned value is 0, only indirect values
+        L2_INTEROP_CENTER.sendBundle{value: totalIndirectValue}(
+            InteroperableAddress.formatEvmV1(destinationChainId),
+            calls,
+            bundleAttributes
+        );
+
+        // Verify both indirect calls were processed
+        assertEq(
+            mockCrossChainSender.lastReceivedMsgValue(),
+            indirectCallMessageValue1,
+            "First mock should receive correct value"
+        );
+        assertEq(
+            mockCrossChainSender2.lastReceivedMsgValue(),
+            indirectCallMessageValue2,
+            "Second mock should receive correct value"
+        );
+    }
+
+    /// @notice Test mixed bundle where only some calls have zero interopCallValue
+    /// @dev Ensures the fix only skips bridgehubDepositBaseToken when total burned is 0
+    function test_regression_mixedIndirectCallsOneWithZeroInteropValue() public {
+        MockL2CrossChainSender mockCrossChainSender2 = new MockL2CrossChainSender(finalRecipient);
+
+        // First call: indirect with interopCallValue = 0
+        uint256 interopCallValue1 = 0;
+        uint256 indirectCallMessageValue1 = 50;
+
+        // Second call: indirect with interopCallValue > 0
+        uint256 interopCallValue2 = 100;
+        uint256 indirectCallMessageValue2 = 25;
+
+        uint256 totalBurnedValue = interopCallValue1 + interopCallValue2; // = 100
+        uint256 totalIndirectValue = indirectCallMessageValue1 + indirectCallMessageValue2; // = 75
+
+        // Set up different base token for destination chain
+        bytes32 otherBaseTokenAssetId = bytes32(uint256(uint160(makeAddr("otherBaseToken"))));
+
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeCall(IBridgehubBase.baseTokenAssetId, (destinationChainId)),
+            abi.encode(otherBaseTokenAssetId)
+        );
+
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeCall(IBridgehubBase.baseTokenAssetId, (block.chainid)),
+            abi.encode(baseTokenAssetId)
+        );
+
+        // Mock bridgehubDepositBaseToken since totalBurnedValue > 0
+        vm.mockCall(
+            L2_ASSET_ROUTER_ADDR,
+            abi.encodeWithSignature(
+                "bridgehubDepositBaseToken(uint256,bytes32,address,uint256)",
+                destinationChainId,
+                otherBaseTokenAssetId,
+                address(this),
+                totalBurnedValue
+            ),
+            abi.encode()
+        );
+
+        vm.deal(address(this), totalIndirectValue);
+
+        // First indirect call (interopCallValue = 0)
+        bytes[] memory callAttributes1 = new bytes[](2);
+        callAttributes1[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (interopCallValue1));
+        callAttributes1[1] = abi.encodeCall(IERC7786Attributes.indirectCall, (indirectCallMessageValue1));
+
+        // Second indirect call (interopCallValue > 0)
+        bytes[] memory callAttributes2 = new bytes[](2);
+        callAttributes2[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (interopCallValue2));
+        callAttributes2[1] = abi.encodeCall(IERC7786Attributes.indirectCall, (indirectCallMessageValue2));
+
+        InteropCallStarter[] memory calls = new InteropCallStarter[](2);
+        calls[0] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(address(mockCrossChainSender)),
+            data: hex"",
+            callAttributes: callAttributes1
+        });
+        calls[1] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(address(mockCrossChainSender2)),
+            data: hex"",
+            callAttributes: callAttributes2
+        });
+
+        bytes[] memory bundleAttributes = new bytes[](1);
+        bundleAttributes[0] = abi.encodeCall(
+            IERC7786Attributes.unbundlerAddress,
+            (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
+        );
+
+        // totalBurnedValue = 100, so bridgehubDepositBaseToken SHOULD be called
+        L2_INTEROP_CENTER.sendBundle{value: totalIndirectValue}(
+            InteroperableAddress.formatEvmV1(destinationChainId),
+            calls,
+            bundleAttributes
+        );
+
+        // Verify both calls were processed
+        assertEq(mockCrossChainSender.lastInteropCallValue(), 0, "First call should have 0 interopCallValue");
+        assertEq(mockCrossChainSender2.lastInteropCallValue(), interopCallValue2, "Second call should have non-zero interopCallValue");
+    }
 }
