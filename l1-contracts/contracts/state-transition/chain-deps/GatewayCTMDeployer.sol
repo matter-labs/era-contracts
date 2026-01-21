@@ -84,6 +84,7 @@ struct GatewayCTMDeployerConfig {
 }
 
 /// @notice Verifier contract addresses.
+// solhint-disable-next-line gas-struct-packing
 struct Verifiers {
     /// @notice Address of the Verifier contract.
     address verifier;
@@ -94,6 +95,7 @@ struct Verifiers {
 }
 
 /// @notice Diamond facet contract addresses.
+// solhint-disable-next-line gas-struct-packing
 struct Facets {
     /// @notice Address of the Admin facet contract.
     address adminFacet;
