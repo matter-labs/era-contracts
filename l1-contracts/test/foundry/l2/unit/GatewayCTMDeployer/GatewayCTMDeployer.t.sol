@@ -48,9 +48,7 @@ import {AllDeployerResults, DeployedContractsComparator, GatewayCTMDeployerTestU
 // zk environment only within a deployed contract
 contract GatewayCTMDeployerTester {
     /// @notice Deploys DA contracts
-    function deployDA(
-        bytes memory data
-    ) external returns (DAContracts memory result, address deployerAddr) {
+    function deployDA(bytes memory data) external returns (DAContracts memory result, address deployerAddr) {
         (bool success, bytes memory returnData) = L2_CREATE2_FACTORY_ADDR.call(data);
         require(success, "DA deployment failed");
 
@@ -81,9 +79,7 @@ contract GatewayCTMDeployerTester {
     }
 
     /// @notice Deploys Verifiers
-    function deployVerifiers(
-        bytes memory data
-    ) external returns (Verifiers memory result, address deployerAddr) {
+    function deployVerifiers(bytes memory data) external returns (Verifiers memory result, address deployerAddr) {
         (bool success, bytes memory returnData) = L2_CREATE2_FACTORY_ADDR.call(data);
         require(success, "Verifiers deployment failed");
 

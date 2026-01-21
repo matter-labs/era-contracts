@@ -82,8 +82,7 @@ abstract contract GW_CTMDeployerTest is Test {
             testnetVerifier: false,
             isZKsyncOS: false
         });
-        Verifiers memory verifiersResult = (new GatewayCTMDeployerVerifiers(verifiersConfig))
-            .getResult();
+        Verifiers memory verifiersResult = (new GatewayCTMDeployerVerifiers(verifiersConfig)).getResult();
 
         // Phase 5: CTM deployer
         // Note: Direct deployments (AdminFacet, MailboxFacet, ExecutorFacet, GettersFacet,

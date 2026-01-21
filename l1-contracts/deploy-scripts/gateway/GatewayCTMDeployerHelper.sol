@@ -209,10 +209,7 @@ library GatewayCTMDeployerHelper {
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config,
         GatewayProxyAdminDeployerResult memory proxyAdminResult
-    )
-        internal
-        returns (address deployer, bytes memory data, GatewayValidatorTimelockDeployerResult memory result)
-    {
+    ) internal returns (address deployer, bytes memory data, GatewayValidatorTimelockDeployerResult memory result) {
         GatewayValidatorTimelockDeployerConfig memory vtConfig = GatewayValidatorTimelockDeployerConfig({
             salt: config.salt,
             aliasedGovernanceAddress: config.aliasedGovernanceAddress,

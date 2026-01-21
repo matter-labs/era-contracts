@@ -30,9 +30,7 @@ contract GatewayCTMDeployerTesterZKsyncOS {
     }
 
     /// @notice Deploys DA contracts
-    function deployDA(
-        bytes memory data
-    ) external returns (DAContracts memory result, address deployerAddr) {
+    function deployDA(bytes memory data) external returns (DAContracts memory result, address deployerAddr) {
         (bool success, bytes memory returnData) = DETERMINISTIC_CREATE2_ADDRESS.call(data);
         require(success, "DA deployment failed");
 
@@ -63,9 +61,7 @@ contract GatewayCTMDeployerTesterZKsyncOS {
     }
 
     /// @notice Deploys Verifiers (ZKsyncOS version)
-    function deployVerifiers(
-        bytes memory data
-    ) external returns (Verifiers memory result, address deployerAddr) {
+    function deployVerifiers(bytes memory data) external returns (Verifiers memory result, address deployerAddr) {
         (bool success, bytes memory returnData) = DETERMINISTIC_CREATE2_ADDRESS.call(data);
         require(success, "Verifiers deployment failed");
 
@@ -148,7 +144,11 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
         ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), deployerConfig);
 
         // Verify we're using the deterministic CREATE2 factory
-        assertEq(create2FactoryAddress, Utils.DETERMINISTIC_CREATE2_ADDRESS, "Should use deterministic CREATE2 factory");
+        assertEq(
+            create2FactoryAddress,
+            Utils.DETERMINISTIC_CREATE2_ADDRESS,
+            "Should use deterministic CREATE2 factory"
+        );
 
         GatewayCTMDeployerTesterZKsyncOS tester = new GatewayCTMDeployerTesterZKsyncOS();
 
