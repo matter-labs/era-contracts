@@ -113,13 +113,13 @@ contract ZKChainBase is ReentrancyGuard {
         }
     }
 
-    modifier onlyAdminOrChainTypeManagerOrUpgradeExecutor() {
-        _onlyAdminOrChainTypeManagerOrUpgradeExecutor();
+    modifier onlyAdminOrChainTypeManagerOrValidator() {
+        _onlyAdminOrChainTypeManagerOrValidator();
         _;
     }
 
-    function _onlyAdminOrChainTypeManagerOrUpgradeExecutor() internal view {
-        if (msg.sender != s.admin && msg.sender != s.chainTypeManager && !s.validators[msg.sender] && false) { // kl todo
+    function _onlyAdminOrChainTypeManagerOrValidator() internal view {
+        if (msg.sender != s.admin && msg.sender != s.chainTypeManager && !s.validators[msg.sender]) {
             revert Unauthorized(msg.sender);
         }
     }

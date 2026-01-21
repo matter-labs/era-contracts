@@ -231,7 +231,4 @@ struct ZKChainStorage {
     /// @dev Timestamp when deposits were paused for chain migration to/from Gateway. 0 = not paused.
     /// @dev STORAGE SLOT: 64
     uint256 pausedDepositsTimestamp;
-    /// @dev The timestamp after which the upgrade can be executed automatically
-    /// @dev STORAGE SLOT: 65
-    mapping(uint256 protocolVersion => uint256 timestamp) autoUpgradeTimestamp;
 }
