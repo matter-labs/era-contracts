@@ -492,9 +492,6 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
         if (settlementLayer[_chainId] == block.chainid) {
             revert AlreadyCurrentSL(block.chainid);
         }
-        if (block.chainid != _l1ChainId()) {
-            GW_ASSET_TRACKER.registerBaseTokenOnGateway(_baseTokenData);
-        }
 
         settlementLayer[_chainId] = block.chainid;
         chainTypeManager[_chainId] = ctm;
@@ -502,6 +499,10 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
         // To keep `assetIdIsRegistered` consistent, we'll also automatically register the base token.
         // It is assumed that if the bridging happened, the token was approved on L1 already.
         assetIdIsRegistered[_baseTokenData.assetId] = true;
+
+        if (block.chainid != _l1ChainId()) {
+            GW_ASSET_TRACKER.registerBaseTokenOnGateway(_baseTokenData);
+        }
 
         zkChain = getZKChain(_chainId);
     }
