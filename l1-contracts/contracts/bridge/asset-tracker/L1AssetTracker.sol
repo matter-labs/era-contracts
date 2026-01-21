@@ -354,6 +354,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             GW_ASSET_TRACKER_ADDR,
             abi.encodeCall(IGWAssetTracker.requestPauseDepositsForChain, (_chainId))
         );
+        emit IL1AssetTracker.PauseDepositsForChainRequested(_chainId, settlementLayer);
     }
 
     function _sendConfirmationToChains(

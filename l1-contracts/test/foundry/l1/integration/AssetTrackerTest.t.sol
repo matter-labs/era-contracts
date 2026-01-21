@@ -625,16 +625,40 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encode(bytes32(uint256(1)))
         );
 
-        // Call as the chain itself - verifies the function completes without reverting
+        // Call as the chain itself and verify event is emitted
         vm.prank(zkChainAddress);
+        vm.recordLogs();
         assetTracker.requestPauseDepositsForChainOnGateway(targetChainId);
+
+        // Verify the PauseDepositsForChainRequested event was emitted
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bool foundEvent = false;
+        bytes32 eventSignature = IL1AssetTracker.PauseDepositsForChainRequested.selector;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == eventSignature) {
+                assertEq(logs[i].topics[1], bytes32(targetChainId), "Chain ID should match");
+                assertEq(logs[i].topics[2], bytes32(gwChainId), "Settlement layer should match");
+                foundEvent = true;
+                break;
+            }
+        }
+        assertTrue(foundEvent, "PauseDepositsForChainRequested event should be emitted");
     }
 
     function test_tokenMigratedThisChain() public view {
-        // Test that calls complete without reverting
-        IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(bytes32(0));
-        IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(keccak256("random_asset"));
-        IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(assetId);
+        // For assets that haven't gone through migration, tokenMigratedThisChain should return false
+        assertFalse(
+            IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(bytes32(0)),
+            "Zero asset should not be migrated"
+        );
+        assertFalse(
+            IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(keccak256("random_asset")),
+            "Random asset should not be migrated"
+        );
+        assertFalse(
+            IAssetTrackerBase(address(assetTracker)).tokenMigratedThisChain(assetId),
+            "Configured asset should not be migrated initially"
+        );
     }
 
     // add this to be excluded from coverage report
