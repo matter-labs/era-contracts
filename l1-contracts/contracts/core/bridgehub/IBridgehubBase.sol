@@ -39,9 +39,15 @@ struct L2TransactionRequestTwoBridgesInner {
     bytes32 txDataHash;
 }
 
+struct BaseTokenData {
+    bytes32 assetId;
+    address originalToken;
+    uint256 originChainId;
+}
+
 struct BridgehubMintCTMAssetData {
     uint256 chainId;
-    bytes32 baseTokenAssetId;
+    BaseTokenData baseTokenData;
     uint256 batchNumber;
     bytes ctmData;
     bytes chainData;
@@ -181,7 +187,7 @@ interface IBridgehubBase {
     function forwardedBridgeMint(
         bytes32 _assetId,
         uint256 _chainId,
-        bytes32 _baseTokenAssetId
+        BaseTokenData calldata _baseTokenData
     ) external returns (address zkChain, address ctm);
 
     function registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) external;

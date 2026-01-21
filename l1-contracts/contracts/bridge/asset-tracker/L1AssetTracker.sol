@@ -335,6 +335,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             isL1ToGateway: data.isL1ToGateway,
             chainId: data.chainId,
             assetId: data.assetId,
+            originToken: NATIVE_TOKEN_VAULT.originToken(data.assetId),
+            tokenOriginChainId: NATIVE_TOKEN_VAULT.originChainId(data.assetId),
             migrationNumber: data.chainMigrationNumber,
             amount: data.amount
         });
