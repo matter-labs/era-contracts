@@ -19,6 +19,8 @@ import {Unauthorized, ChainIdNotRegistered} from "contracts/common/L1ContractErr
 import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
 
@@ -46,6 +48,12 @@ contract GWAssetTrackerTestHelper is GWAssetTracker {
     /// @notice Helper to set chain balance directly for testing
     function setChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount) external {
         chainBalance[_chainId][_assetId] = _amount;
+    }
+
+    /// @notice Exposes internal _handleLegacySharedBridgeMessage for testing
+    /// @dev Used for regression testing of PR #1760 (legacy shared bridge message handling fix)
+    function handleLegacySharedBridgeMessage(uint256 _chainId, bytes memory _message) external {
+        _handleLegacySharedBridgeMessage(_chainId, _message);
     }
 }
 
@@ -961,5 +969,198 @@ contract GWAssetTrackerTest is Test {
                 "Destination should increase when isInteropCall=false"
             );
         }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    Regression Tests for PR #1760
+                    Legacy Shared Bridge Message Handling Fix
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Regression test for the bug fixed in PR #1760
+    /// @dev Bug Description:
+    ///      When handling legacy shared bridge messages, the decodeLegacyFinalizeWithdrawalData
+    ///      function was setting erc20Metadata to `new bytes(0)` (empty bytes).
+    ///      When _handleAssetRouterMessageInner called parseTokenData on this empty metadata,
+    ///      it would fail with an out-of-bounds access error because decodeTokenData
+    ///      tries to read _tokenData[0] from empty bytes.
+    ///
+    ///      This caused any batch containing a legacy token withdraw transaction to fail
+    ///      settlement on Gateway.
+    ///
+    ///      Fix: Changed `new bytes(0)` to `DataEncoding.encodeTokenData(_l1ChainId, bytes(""), bytes(""), bytes(""))`
+    ///      which creates properly formatted (but empty content) token metadata that can be decoded.
+    function test_regression_legacySharedBridgeMessageDecodingDoesNotFail() public {
+        uint256 legacyChainId = 324; // Era chain ID
+        address l1Token = makeAddr("l1Token");
+        address l1Receiver = makeAddr("l1Receiver");
+        uint256 withdrawAmount = 1000;
+
+        // Set up legacy shared bridge for this chain
+        address legacyBridge = makeAddr("legacySharedBridge");
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        gwAssetTracker.setLegacySharedBridgeAddressForLocalTesting(legacyChainId, legacyBridge);
+
+        // Set up initial chain balance so the withdrawal can be processed
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
+        gwAssetTracker.setChainBalance(legacyChainId, assetId, withdrawAmount * 2);
+
+        // Construct a legacy withdrawal message
+        // Legacy format: functionSignature (4 bytes) + l1Receiver (20 bytes) + l1Token (20 bytes) + amount (32 bytes)
+        bytes memory legacyMessage = abi.encodePacked(
+            IL1ERC20Bridge.finalizeWithdrawal.selector,
+            l1Receiver,
+            l1Token,
+            withdrawAmount
+        );
+
+        uint256 balanceBefore = gwAssetTracker.chainBalance(legacyChainId, assetId);
+
+        // Before the fix, this would revert with out-of-bounds error when parseTokenData
+        // tried to access _tokenData[0] on empty bytes
+        // After the fix, it should succeed
+        gwAssetTracker.handleLegacySharedBridgeMessage(legacyChainId, legacyMessage);
+
+        // Verify balance was decreased (withdrawal processed)
+        assertEq(
+            gwAssetTracker.chainBalance(legacyChainId, assetId),
+            balanceBefore - withdrawAmount,
+            "Chain balance should decrease after legacy withdrawal"
+        );
+    }
+
+    /// @notice Test that the legacy token data is properly encoded with L1 chain ID
+    /// @dev Verifies the fix encodes the L1 chain ID in the token metadata
+    function test_regression_legacyTokenDataEncodesL1ChainId() public {
+        // Test that decodeLegacyFinalizeWithdrawalData produces properly encoded token data
+        address l1Token = makeAddr("testToken");
+        address l1Receiver = makeAddr("testReceiver");
+        uint256 amount = 500;
+
+        // Construct a legacy message
+        bytes memory legacyMessage = abi.encodePacked(
+            IL1ERC20Bridge.finalizeWithdrawal.selector,
+            l1Receiver,
+            l1Token,
+            amount
+        );
+
+        // Decode it using the library function
+        (bytes4 sig, address token, bytes memory transferData) = DataEncoding.decodeLegacyFinalizeWithdrawalData(
+            L1_CHAIN_ID,
+            legacyMessage
+        );
+
+        assertEq(sig, IL1ERC20Bridge.finalizeWithdrawal.selector, "Function signature mismatch");
+        assertEq(token, l1Token, "Token address mismatch");
+
+        // Decode the transfer data to get erc20Metadata
+        (, , , , bytes memory erc20Metadata) = DataEncoding.decodeBridgeMintData(transferData);
+
+        // Verify the metadata is not empty and can be parsed
+        assertTrue(erc20Metadata.length > 0, "erc20Metadata should not be empty");
+
+        // Parse the token data - this is what was failing before the fix
+        (uint256 originChainId, bytes memory name, bytes memory symbol, bytes memory decimals) = gwAssetTracker
+            .parseTokenData(erc20Metadata);
+
+        // The origin chain ID should be L1_CHAIN_ID (legacy tokens are L1 tokens)
+        assertEq(originChainId, L1_CHAIN_ID, "Origin chain ID should be L1 chain ID");
+
+        // Name, symbol, decimals should be empty but valid
+        assertEq(name.length, 0, "Name should be empty");
+        assertEq(symbol.length, 0, "Symbol should be empty");
+        assertEq(decimals.length, 0, "Decimals should be empty");
+    }
+
+    /// @notice Test multiple legacy withdrawals can be processed
+    /// @dev Verifies the fix works correctly for multiple transactions
+    function test_regression_multipleLegacyWithdrawalsSucceed() public {
+        uint256 legacyChainId = 324;
+        address l1Token = makeAddr("l1Token");
+        uint256 withdrawAmount = 100;
+
+        // Set up legacy shared bridge
+        address legacyBridge = makeAddr("legacySharedBridge");
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        gwAssetTracker.setLegacySharedBridgeAddressForLocalTesting(legacyChainId, legacyBridge);
+
+        // Set up initial chain balance
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
+        gwAssetTracker.setChainBalance(legacyChainId, assetId, withdrawAmount * 10);
+
+        // Process multiple withdrawals
+        for (uint256 i = 0; i < 5; i++) {
+            address receiver = makeAddr(string(abi.encodePacked("receiver", i)));
+
+            bytes memory legacyMessage = abi.encodePacked(
+                IL1ERC20Bridge.finalizeWithdrawal.selector,
+                receiver,
+                l1Token,
+                withdrawAmount
+            );
+
+            uint256 balanceBefore = gwAssetTracker.chainBalance(legacyChainId, assetId);
+
+            // This should not revert for any iteration
+            gwAssetTracker.handleLegacySharedBridgeMessage(legacyChainId, legacyMessage);
+
+            assertEq(
+                gwAssetTracker.chainBalance(legacyChainId, assetId),
+                balanceBefore - withdrawAmount,
+                "Balance should decrease for each withdrawal"
+            );
+        }
+
+        // Final balance should be initial - 5 * withdrawAmount
+        assertEq(
+            gwAssetTracker.chainBalance(legacyChainId, assetId),
+            withdrawAmount * 5, // 10 * 100 - 5 * 100 = 500
+            "Final balance should reflect all withdrawals"
+        );
+    }
+
+    /// @notice Fuzz test for legacy withdrawal message handling
+    function testFuzz_regression_legacyWithdrawalMessage(
+        address _l1Token,
+        address _l1Receiver,
+        uint256 _amount
+    ) public {
+        // Bound amount to avoid overflow
+        _amount = bound(_amount, 1, type(uint128).max);
+
+        // Skip zero addresses
+        vm.assume(_l1Token != address(0));
+        vm.assume(_l1Receiver != address(0));
+
+        uint256 legacyChainId = 324;
+
+        // Set up legacy shared bridge
+        address legacyBridge = makeAddr("legacySharedBridge");
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        gwAssetTracker.setLegacySharedBridgeAddressForLocalTesting(legacyChainId, legacyBridge);
+
+        // Set up initial chain balance
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
+        gwAssetTracker.setChainBalance(legacyChainId, assetId, _amount * 2);
+
+        // Construct legacy message
+        bytes memory legacyMessage = abi.encodePacked(
+            IL1ERC20Bridge.finalizeWithdrawal.selector,
+            _l1Receiver,
+            _l1Token,
+            _amount
+        );
+
+        uint256 balanceBefore = gwAssetTracker.chainBalance(legacyChainId, assetId);
+
+        // Should not revert
+        gwAssetTracker.handleLegacySharedBridgeMessage(legacyChainId, legacyMessage);
+
+        // Balance should decrease
+        assertEq(
+            gwAssetTracker.chainBalance(legacyChainId, assetId),
+            balanceBefore - _amount,
+            "Balance should decrease"
+        );
     }
 }
