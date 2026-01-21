@@ -35,10 +35,9 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 
-import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 
-contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
+contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
 
     bytes32 constant NEW_PRIORITY_REQUEST_HASH =
@@ -74,8 +73,6 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
     function prepare() public {
         _generateUserAddresses();
 
-        takeConfigLock(); // Prevents race condition with configs
-
         _deployL1Contracts();
         _deployTokens();
         _registerNewTokens(tokens);
@@ -84,8 +81,6 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         _deployZKChain(ETH_TOKEN_ADDRESS);
 
         simpleExecutor = new SimpleExecutor();
-
-        releaseConfigLock();
 
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));

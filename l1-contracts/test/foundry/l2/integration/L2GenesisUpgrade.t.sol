@@ -21,6 +21,8 @@ import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
 import {Create2FactoryUtils} from "deploy-scripts/utils/deploy/Create2FactoryUtils.s.sol";
 import {TokenMetadata, TokenBridgingData} from "contracts/common/Messaging.sol";
 import {L2GenesisUpgradeTestHelper, BytecodeInfo} from "./L2GenesisUpgradeTestHelper.sol";
+import {ChainCreationParamsConfig} from "deploy-scripts/utils/Types.sol";
+import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
 
 contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2ContractL2Deployer {
     using stdStorage for StdStorage;
@@ -143,5 +145,11 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
 
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
         L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(L2_GENESIS_UPGRADE_ADDR, genesisUpgradeCalldata);
+    }
+
+    function getChainCreationParamsConfig(
+        string memory _config
+    ) internal override(DeployCTMUtils, SharedL2ContractL2Deployer) returns (ChainCreationParamsConfig memory) {
+        return SharedL2ContractL2Deployer.getChainCreationParamsConfig(_config);
     }
 }

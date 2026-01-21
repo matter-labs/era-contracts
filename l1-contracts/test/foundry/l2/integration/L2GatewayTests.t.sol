@@ -30,6 +30,8 @@ import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_
 import {L2WrappedBaseToken} from "contracts/bridge/L2WrappedBaseToken.sol";
 
 import {Create2FactoryUtils} from "deploy-scripts/utils/deploy/Create2FactoryUtils.s.sol";
+import {ChainCreationParamsConfig} from "deploy-scripts/utils/Types.sol";
+import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
 
 contract L2GatewayTests is Test, L2GatewayTestAbstract, SharedL2ContractL2Deployer {
     // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
@@ -72,5 +74,11 @@ contract L2GatewayTests is Test, L2GatewayTestAbstract, SharedL2ContractL2Deploy
         returns (L2WrappedBaseToken)
     {
         return SharedL2ContractL2Deployer.deployL2Weth();
+    }
+
+    function getChainCreationParamsConfig(
+        string memory _config
+    ) internal override(DeployCTMUtils, SharedL2ContractL2Deployer) returns (ChainCreationParamsConfig memory) {
+        return SharedL2ContractL2Deployer.getChainCreationParamsConfig(_config);
     }
 }
