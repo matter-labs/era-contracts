@@ -243,7 +243,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     function upgradeChainFromVersion(
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
-    ) external onlyAdminOrChainTypeManager {
+    ) external onlyAdminOrChainTypeManagerOrUpgradeExecutor {
         bytes32 cutHashInput = keccak256(abi.encode(_diamondCut));
         bytes32 upgradeCutHash = IChainTypeManager(s.chainTypeManager).upgradeCutHash(_oldProtocolVersion);
         if (cutHashInput != upgradeCutHash) {
@@ -253,6 +253,15 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if (s.protocolVersion != _oldProtocolVersion) {
             revert ProtocolIdMismatch(s.protocolVersion, _oldProtocolVersion);
         }
+
+        // Check that the auto upgrade timestamp has passed if the sender is not admin or chainTypeManager
+        // if (msg.sender != s.admin && msg.sender != s.chainTypeManager) {
+        //     uint256 timestamp = s.autoUpgradeTimestamp[_oldProtocolVersion];
+        //     if (block.timestamp < timestamp) {
+        //         revert Unauthorized(msg.sender);
+        //     }
+        // }
+
         Diamond.diamondCut(_diamondCut);
         emit ExecuteUpgrade(_diamondCut);
         if (s.protocolVersion <= _oldProtocolVersion) {
