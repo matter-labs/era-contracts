@@ -1192,7 +1192,7 @@
     "evmDeployedBytecodeHash": "0xc27cbc0ad475471719e2592fc73d93dd27ef232f505703534e16d05cfd09e91a"
   },
   {
-    "contractName": "l1-contracts/L2VerifierFflonk",
+    "contractName": "l1-contracts/L2VerifierFflonk ",
     "zkBytecodeHash": "0x010009edd1b497b4857b964780ff0a743774adece8894777e681a7fa5310044a",
     "zkBytecodePath": "/l1-contracts/zkout/L2VerifierFflonk.sol/L2VerifierFflonk.json",
     "evmBytecodeHash": "0xbe8666ee2a4f83669571688f9bdda7f7210c7caf9d0f1782d57ed325bc6a4300",
