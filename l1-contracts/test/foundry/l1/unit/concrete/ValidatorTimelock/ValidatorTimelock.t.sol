@@ -436,7 +436,8 @@ contract ValidatorTimelockTest is Test {
             rotateCommitterRole: true,
             rotateReverterRole: false,
             rotateProverRole: false,
-            rotateExecutorRole: false
+            rotateExecutorRole: false,
+            rotateUpgraderRole: false
         });
 
         // Bob should not have any roles initially
@@ -469,7 +470,8 @@ contract ValidatorTimelockTest is Test {
             rotateCommitterRole: false,
             rotateReverterRole: true,
             rotateProverRole: true,
-            rotateExecutorRole: false
+            rotateExecutorRole: false,
+            rotateUpgraderRole: false
         });
 
         vm.prank(owner);
@@ -489,7 +491,8 @@ contract ValidatorTimelockTest is Test {
             rotateCommitterRole: false,
             rotateReverterRole: false,
             rotateProverRole: false,
-            rotateExecutorRole: true
+            rotateExecutorRole: true,
+            rotateUpgraderRole: false
         });
 
         vm.prank(owner);
@@ -531,7 +534,8 @@ contract ValidatorTimelockTest is Test {
             rotateCommitterRole: false,
             rotateReverterRole: false,
             rotateProverRole: false,
-            rotateExecutorRole: false
+            rotateExecutorRole: false,
+            rotateUpgraderRole: false
         });
 
         vm.expectRevert(abi.encodeWithSelector(NotAZKChain.selector, fakeChain));
