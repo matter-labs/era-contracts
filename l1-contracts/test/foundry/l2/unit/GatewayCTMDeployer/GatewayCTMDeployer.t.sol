@@ -291,11 +291,7 @@ contract GatewayCTMDeployerTest is Test {
             baseConfig: deployerConfig,
             chainTypeManagerProxyAdmin: results.proxyAdminResult.chainTypeManagerProxyAdmin,
             validatorTimelockProxy: results.validatorTimelockResult.validatorTimelockProxy,
-            adminFacet: calculatedContracts.stateTransition.adminFacet,
-            gettersFacet: calculatedContracts.stateTransition.gettersFacet,
-            mailboxFacet: calculatedContracts.stateTransition.mailboxFacet,
-            executorFacet: calculatedContracts.stateTransition.executorFacet,
-            diamondInit: calculatedContracts.stateTransition.diamondInit,
+            facets: calculatedContracts.stateTransition.facets,
             genesisUpgrade: calculatedContracts.stateTransition.genesisUpgrade,
             verifier: results.verifiersResult.verifier
         });

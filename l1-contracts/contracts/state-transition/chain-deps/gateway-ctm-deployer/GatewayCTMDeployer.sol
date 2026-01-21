@@ -6,6 +6,21 @@ pragma solidity 0.8.28;
 // The deployment uses a mix of deployer contracts (for contracts requiring owner initialization)
 // and direct deployments in scripts (for contracts without owner initialization).
 
+/// @notice Diamond facet contract addresses.
+// solhint-disable-next-line gas-struct-packing
+struct Facets {
+    /// @notice Address of the Admin facet contract.
+    address adminFacet;
+    /// @notice Address of the Mailbox facet contract.
+    address mailboxFacet;
+    /// @notice Address of the Executor facet contract.
+    address executorFacet;
+    /// @notice Address of the Getters facet contract.
+    address gettersFacet;
+    /// @notice Address of the DiamondInit contract.
+    address diamondInit;
+}
+
 /// @notice Configuration parameters for deploying Gateway CTM.
 /// @dev This is the full config used to derive configs for each deployer.
 // solhint-disable-next-line gas-struct-packing
@@ -61,16 +76,8 @@ struct StateTransitionContracts {
     address verifierPlonk;
     /// @notice Address of the VerifierFflonk contract.
     address verifierFflonk;
-    /// @notice Address of the Admin facet contract.
-    address adminFacet;
-    /// @notice Address of the Mailbox facet contract.
-    address mailboxFacet;
-    /// @notice Address of the Executor facet contract.
-    address executorFacet;
-    /// @notice Address of the Getters facet contract.
-    address gettersFacet;
-    /// @notice Address of the DiamondInit contract.
-    address diamondInit;
+    /// @notice Diamond facet contract addresses.
+    Facets facets;
     /// @notice Address of the GenesisUpgrade contract.
     address genesisUpgrade;
     /// @notice Address of the implementation of the ValidatorTimelock contract.
@@ -198,16 +205,8 @@ struct GatewayCTMFinalConfig {
     address chainTypeManagerProxyAdmin;
     /// @notice Address of the ValidatorTimelock proxy (from ValidatorTimelock deployer).
     address validatorTimelockProxy;
-    /// @notice Address of the Admin facet (deployed directly).
-    address adminFacet;
-    /// @notice Address of the Getters facet (deployed directly).
-    address gettersFacet;
-    /// @notice Address of the Mailbox facet (deployed directly).
-    address mailboxFacet;
-    /// @notice Address of the Executor facet (deployed directly).
-    address executorFacet;
-    /// @notice Address of the DiamondInit contract (deployed directly).
-    address diamondInit;
+    /// @notice Diamond facet contract addresses (deployed directly).
+    Facets facets;
     /// @notice Address of the GenesisUpgrade contract (deployed directly).
     address genesisUpgrade;
     /// @notice Address of the Verifier contract (from Verifiers deployer).

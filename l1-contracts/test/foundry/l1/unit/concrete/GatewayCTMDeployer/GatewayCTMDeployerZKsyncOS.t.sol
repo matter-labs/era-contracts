@@ -217,23 +217,23 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
 
         // AdminFacet
         deployed = tester.deployDirect(directCalldata.adminFacetCalldata);
-        assertEq(deployed, calculatedContracts.stateTransition.adminFacet, "AdminFacet address mismatch");
+        assertEq(deployed, calculatedContracts.stateTransition.facets.adminFacet, "AdminFacet address mismatch");
 
         // MailboxFacet
         deployed = tester.deployDirect(directCalldata.mailboxFacetCalldata);
-        assertEq(deployed, calculatedContracts.stateTransition.mailboxFacet, "MailboxFacet address mismatch");
+        assertEq(deployed, calculatedContracts.stateTransition.facets.mailboxFacet, "MailboxFacet address mismatch");
 
         // ExecutorFacet
         deployed = tester.deployDirect(directCalldata.executorFacetCalldata);
-        assertEq(deployed, calculatedContracts.stateTransition.executorFacet, "ExecutorFacet address mismatch");
+        assertEq(deployed, calculatedContracts.stateTransition.facets.executorFacet, "ExecutorFacet address mismatch");
 
         // GettersFacet
         deployed = tester.deployDirect(directCalldata.gettersFacetCalldata);
-        assertEq(deployed, calculatedContracts.stateTransition.gettersFacet, "GettersFacet address mismatch");
+        assertEq(deployed, calculatedContracts.stateTransition.facets.gettersFacet, "GettersFacet address mismatch");
 
         // DiamondInit
         deployed = tester.deployDirect(directCalldata.diamondInitCalldata);
-        assertEq(deployed, calculatedContracts.stateTransition.diamondInit, "DiamondInit address mismatch");
+        assertEq(deployed, calculatedContracts.stateTransition.facets.diamondInit, "DiamondInit address mismatch");
 
         // GenesisUpgrade
         deployed = tester.deployDirect(directCalldata.genesisUpgradeCalldata);

@@ -21,7 +21,7 @@ import {L1L2DeployUtils} from "../utils/deploy/L1L2DeployUtils.sol";
 
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
-import {DeployedContracts, DAContracts, GatewayCTMDeployerConfig, GatewayDADeployerConfig, GatewayProxyAdminDeployerConfig, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerConfig, GatewayValidatorTimelockDeployerResult, GatewayVerifiersDeployerConfig, Verifiers, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {DeployedContracts, DAContracts, Facets, GatewayCTMDeployerConfig, GatewayDADeployerConfig, GatewayProxyAdminDeployerConfig, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerConfig, GatewayValidatorTimelockDeployerResult, GatewayVerifiersDeployerConfig, Verifiers, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 
 import {DeployCTML1OrGateway, CTMCoreDeploymentConfig} from "../ctm/DeployCTML1OrGateway.sol";
 import {CTMContract} from "../ctm/DeployCTML1OrGateway.sol";
@@ -53,11 +53,7 @@ struct DeployerCreate2Calldata {
 
 /// @notice Addresses of contracts deployed directly (no deployer)
 struct DirectDeployedAddresses {
-    address adminFacet;
-    address mailboxFacet;
-    address executorFacet;
-    address gettersFacet;
-    address diamondInit;
+    Facets facets;
     address genesisUpgrade;
     address multicall3;
 }
@@ -280,7 +276,7 @@ library GatewayCTMDeployerHelper {
     ) internal returns (DirectDeployedAddresses memory addresses, DirectCreate2Calldata memory calldata_) {
         // AdminFacet
         bytes memory adminFacetArgs = abi.encode(config.l1ChainId, daResult.rollupDAManager, config.testnetVerifier);
-        (addresses.adminFacet, calldata_.adminFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+        (addresses.facets.adminFacet, calldata_.adminFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "Admin.sol",
             "AdminFacet",
@@ -296,7 +292,7 @@ library GatewayCTMDeployerHelper {
             address(0), // eip7702Checker
             config.testnetVerifier
         );
-        (addresses.mailboxFacet, calldata_.mailboxFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+        (addresses.facets.mailboxFacet, calldata_.mailboxFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "Mailbox.sol",
             "MailboxFacet",
@@ -306,7 +302,7 @@ library GatewayCTMDeployerHelper {
 
         // ExecutorFacet
         bytes memory executorFacetArgs = abi.encode(config.l1ChainId);
-        (addresses.executorFacet, calldata_.executorFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+        (addresses.facets.executorFacet, calldata_.executorFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "Executor.sol",
             "ExecutorFacet",
@@ -315,7 +311,7 @@ library GatewayCTMDeployerHelper {
         );
 
         // GettersFacet
-        (addresses.gettersFacet, calldata_.gettersFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+        (addresses.facets.gettersFacet, calldata_.gettersFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "Getters.sol",
             "GettersFacet",
@@ -325,7 +321,7 @@ library GatewayCTMDeployerHelper {
 
         // DiamondInit
         bytes memory diamondInitArgs = abi.encode(config.isZKsyncOS);
-        (addresses.diamondInit, calldata_.diamondInitCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+        (addresses.facets.diamondInit, calldata_.diamondInitCalldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "DiamondInit.sol",
             "DiamondInit",
@@ -395,11 +391,7 @@ library GatewayCTMDeployerHelper {
             baseConfig: config,
             chainTypeManagerProxyAdmin: proxyAdminResult.chainTypeManagerProxyAdmin,
             validatorTimelockProxy: validatorTimelockResult.validatorTimelockProxy,
-            adminFacet: directAddresses.adminFacet,
-            gettersFacet: directAddresses.gettersFacet,
-            mailboxFacet: directAddresses.mailboxFacet,
-            executorFacet: directAddresses.executorFacet,
-            diamondInit: directAddresses.diamondInit,
+            facets: directAddresses.facets,
             genesisUpgrade: directAddresses.genesisUpgrade,
             verifier: verifiersResult.verifier
         });
@@ -726,27 +718,28 @@ library GatewayCTMDeployerHelper {
         }
 
         // Build diamond cut data
+        Facets memory facets = config.facets;
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
-            facet: config.adminFacet,
+            facet: facets.adminFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
             selectors: baseConfig.adminSelectors
         });
         facetCuts[1] = Diamond.FacetCut({
-            facet: config.gettersFacet,
+            facet: facets.gettersFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
             selectors: baseConfig.gettersSelectors
         });
         facetCuts[2] = Diamond.FacetCut({
-            facet: config.mailboxFacet,
+            facet: facets.mailboxFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: baseConfig.mailboxSelectors
         });
         facetCuts[3] = Diamond.FacetCut({
-            facet: config.executorFacet,
+            facet: facets.executorFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: baseConfig.executorSelectors
@@ -761,7 +754,7 @@ library GatewayCTMDeployerHelper {
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: config.diamondInit,
+            initAddress: facets.diamondInit,
             initCalldata: abi.encode(initializeData)
         });
 
@@ -842,27 +835,28 @@ library GatewayCTMDeployerHelper {
         }
 
         // Build diamond cut data
+        Facets memory facets = config.facets;
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
-            facet: config.adminFacet,
+            facet: facets.adminFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
             selectors: baseConfig.adminSelectors
         });
         facetCuts[1] = Diamond.FacetCut({
-            facet: config.gettersFacet,
+            facet: facets.gettersFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
             selectors: baseConfig.gettersSelectors
         });
         facetCuts[2] = Diamond.FacetCut({
-            facet: config.mailboxFacet,
+            facet: facets.mailboxFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: baseConfig.mailboxSelectors
         });
         facetCuts[3] = Diamond.FacetCut({
-            facet: config.executorFacet,
+            facet: facets.executorFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: baseConfig.executorSelectors
@@ -877,7 +871,7 @@ library GatewayCTMDeployerHelper {
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: config.diamondInit,
+            initAddress: facets.diamondInit,
             initCalldata: abi.encode(initializeData)
         });
 
@@ -938,11 +932,7 @@ library GatewayCTMDeployerHelper {
         contracts.stateTransition.verifier = verifiersResult.verifier;
 
         // From direct deployments
-        contracts.stateTransition.adminFacet = directAddresses.adminFacet;
-        contracts.stateTransition.mailboxFacet = directAddresses.mailboxFacet;
-        contracts.stateTransition.executorFacet = directAddresses.executorFacet;
-        contracts.stateTransition.gettersFacet = directAddresses.gettersFacet;
-        contracts.stateTransition.diamondInit = directAddresses.diamondInit;
+        contracts.stateTransition.facets = directAddresses.facets;
         contracts.stateTransition.genesisUpgrade = directAddresses.genesisUpgrade;
         contracts.multicall3 = directAddresses.multicall3;
 

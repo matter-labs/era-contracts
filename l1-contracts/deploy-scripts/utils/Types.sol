@@ -3,21 +3,7 @@ pragma solidity ^0.8.10;
 
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
-import {Verifiers} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
-
-/// @notice Diamond facet contract addresses.
-struct Facets {
-    /// @notice Address of the Admin facet contract.
-    address adminFacet;
-    /// @notice Address of the Mailbox facet contract.
-    address mailboxFacet;
-    /// @notice Address of the Executor facet contract.
-    address executorFacet;
-    /// @notice Address of the Getters facet contract.
-    address gettersFacet;
-    /// @notice Address of the DiamondInit contract.
-    address diamondInit;
-}
+import {Facets, Verifiers} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 
 struct BridgehubContracts {
     address bridgehub;

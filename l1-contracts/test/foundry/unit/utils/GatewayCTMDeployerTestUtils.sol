@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-import {DAContracts, DeployedContracts, StateTransitionContracts, DAContracts, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerResult, Verifiers, GatewayCTMFinalResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {DAContracts, DeployedContracts, Facets, StateTransitionContracts, DAContracts, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerResult, Verifiers, GatewayCTMFinalResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 
 /// @notice Struct to hold all deployer results for testing
 struct AllDeployerResults {
@@ -29,11 +29,7 @@ library DeployedContractsComparator {
         require(a.verifier == b.verifier, "verifier differs");
         require(a.verifierFflonk == b.verifierFflonk, "verifierFflonk differs");
         require(a.verifierPlonk == b.verifierPlonk, "verifierPlonk differs");
-        require(a.adminFacet == b.adminFacet, "adminFacet differs");
-        require(a.mailboxFacet == b.mailboxFacet, "mailboxFacet differs");
-        require(a.executorFacet == b.executorFacet, "executorFacet differs");
-        require(a.gettersFacet == b.gettersFacet, "gettersFacet differs");
-        require(a.diamondInit == b.diamondInit, "diamondInit differs");
+        compareFacets(a.facets, b.facets);
         require(a.genesisUpgrade == b.genesisUpgrade, "genesisUpgrade differs");
         require(
             a.validatorTimelockImplementation == b.validatorTimelockImplementation,
@@ -57,6 +53,14 @@ library DeployedContractsComparator {
         require(a.rollupDAManager == b.rollupDAManager, "rollupDAManager differs");
         require(a.relayedSLDAValidator == b.relayedSLDAValidator, "relayedSLDAValidator differs");
         require(a.validiumDAValidator == b.validiumDAValidator, "validiumDAValidator differs");
+    }
+
+    function compareFacets(Facets memory a, Facets memory b) internal pure {
+        require(a.adminFacet == b.adminFacet, "adminFacet differs");
+        require(a.mailboxFacet == b.mailboxFacet, "mailboxFacet differs");
+        require(a.executorFacet == b.executorFacet, "executorFacet differs");
+        require(a.gettersFacet == b.gettersFacet, "gettersFacet differs");
+        require(a.diamondInit == b.diamondInit, "diamondInit differs");
     }
 
     function compareBytes(bytes memory a, bytes memory b, string memory fieldName) internal pure {
@@ -101,11 +105,7 @@ library GatewayCTMDeployerTestUtils {
         contracts.diamondCutData = results.ctmResult.diamondCutData;
 
         // Direct deployments - use calculated addresses since they're deployed directly in scripts
-        contracts.stateTransition.adminFacet = calculatedContracts.stateTransition.adminFacet;
-        contracts.stateTransition.mailboxFacet = calculatedContracts.stateTransition.mailboxFacet;
-        contracts.stateTransition.executorFacet = calculatedContracts.stateTransition.executorFacet;
-        contracts.stateTransition.gettersFacet = calculatedContracts.stateTransition.gettersFacet;
-        contracts.stateTransition.diamondInit = calculatedContracts.stateTransition.diamondInit;
+        contracts.stateTransition.facets = calculatedContracts.stateTransition.facets;
         contracts.stateTransition.genesisUpgrade = calculatedContracts.stateTransition.genesisUpgrade;
         contracts.multicall3 = calculatedContracts.multicall3;
     }

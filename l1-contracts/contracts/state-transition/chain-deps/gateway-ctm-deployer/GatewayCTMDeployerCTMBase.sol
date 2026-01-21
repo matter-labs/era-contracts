@@ -10,7 +10,7 @@ import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} 
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
 import {IVerifier} from "../../chain-interfaces/IVerifier.sol";
 
-import {GatewayCTMDeployerConfig, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "./GatewayCTMDeployer.sol";
+import {Facets, GatewayCTMDeployerConfig, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "./GatewayCTMDeployer.sol";
 
 /// @title GatewayCTMDeployerCTMBase
 /// @author Matter Labs
@@ -83,28 +83,29 @@ abstract contract GatewayCTMDeployerCTMBase {
         _result.chainTypeManagerImplementation = _deployCTMImplementation(_salt);
 
         GatewayCTMDeployerConfig memory baseConfig = _config.baseConfig;
+        Facets memory facets = _config.facets;
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
-            facet: _config.adminFacet,
+            facet: facets.adminFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
             selectors: baseConfig.adminSelectors
         });
         facetCuts[1] = Diamond.FacetCut({
-            facet: _config.gettersFacet,
+            facet: facets.gettersFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
             selectors: baseConfig.gettersSelectors
         });
         facetCuts[2] = Diamond.FacetCut({
-            facet: _config.mailboxFacet,
+            facet: facets.mailboxFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: baseConfig.mailboxSelectors
         });
         facetCuts[3] = Diamond.FacetCut({
-            facet: _config.executorFacet,
+            facet: facets.executorFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: baseConfig.executorSelectors
@@ -119,7 +120,7 @@ abstract contract GatewayCTMDeployerCTMBase {
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: _config.diamondInit,
+            initAddress: facets.diamondInit,
             initCalldata: abi.encode(initializeData)
         });
 

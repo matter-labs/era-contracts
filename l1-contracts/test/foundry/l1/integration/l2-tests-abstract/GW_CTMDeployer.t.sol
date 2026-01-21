@@ -11,7 +11,7 @@ import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExe
 
 import {L2AssetTrackerData} from "./L2AssetTrackerData.sol";
 
-import {GatewayCTMDeployerConfig, GatewayDADeployerConfig, GatewayProxyAdminDeployerConfig, GatewayValidatorTimelockDeployerConfig, GatewayVerifiersDeployerConfig, GatewayCTMFinalConfig, DAContracts, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerResult, Verifiers} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {Facets, GatewayCTMDeployerConfig, GatewayDADeployerConfig, GatewayProxyAdminDeployerConfig, GatewayValidatorTimelockDeployerConfig, GatewayVerifiersDeployerConfig, GatewayCTMFinalConfig, DAContracts, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerResult, Verifiers} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {GatewayCTMDeployerDA} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerDA.sol";
 import {GatewayCTMDeployerProxyAdmin} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerProxyAdmin.sol";
 import {GatewayCTMDeployerValidatorTimelock} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerValidatorTimelock.sol";
@@ -122,11 +122,13 @@ abstract contract GW_CTMDeployerTest is Test {
             chainTypeManagerProxyAdmin: proxyAdminResult.chainTypeManagerProxyAdmin,
             validatorTimelockProxy: vtResult.validatorTimelockProxy,
             // Placeholder addresses for direct deployments
-            adminFacet: address(0x1),
-            gettersFacet: address(0x2),
-            mailboxFacet: address(0x3),
-            executorFacet: address(0x4),
-            diamondInit: address(0x5),
+            facets: Facets({
+                adminFacet: address(0x1),
+                mailboxFacet: address(0x3),
+                executorFacet: address(0x4),
+                gettersFacet: address(0x2),
+                diamondInit: address(0x5)
+            }),
             genesisUpgrade: address(0x6),
             verifier: verifiersResult.verifier
         });
