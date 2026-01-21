@@ -164,11 +164,22 @@ contract VerifierOnlyUpgrade is DefaultEcosystemUpgrade {
             generateUpgradeCutData(gatewayConfig.gatewayStateTransition);
         }
 
+        // Populate newlyGeneratedData with new chain creation params for compatibility with parent's saveOutput
+        ChainCreationParams memory newL1ChainCreationParams = _getChainCreationParamsWithNewVerifier(addresses.stateTransition);
+        newlyGeneratedData.diamondCutData = abi.encode(newL1ChainCreationParams.diamondCut);
+        newlyGeneratedData.fixedForceDeploymentsData = newL1ChainCreationParams.forceDeploymentsData;
+
+        // Populate gateway data if configured
+        if (gatewayConfig.chainId != 0) {
+            ChainCreationParams memory newGwChainCreationParams = _getChainCreationParamsWithNewVerifier(gatewayConfig.gatewayStateTransition);
+            gatewayConfig.facetCutsData = abi.encode(newGwChainCreationParams.diamondCut);
+        }
+
         upgradeConfig.upgradeCutPrepared = true;
         console.log("Upgrade cut generated");
         saveOutput(upgradeConfig.outputPath);
 
-        // Save old chain creation params to output
+        // Save old chain creation params to output for verification
         _saveOldChainCreationParams();
     }
 
