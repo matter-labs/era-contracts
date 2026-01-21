@@ -154,7 +154,7 @@ library GatewayCTMDeployerHelper {
     function _calculateDADeployer(
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config
-    ) internal returns (address deployer, bytes memory calldata_, DAContracts memory result) {
+    ) internal returns (address deployer, bytes memory data, DAContracts memory result) {
         GatewayDADeployerConfig memory daConfig = GatewayDADeployerConfig({
             salt: config.salt,
             aliasedGovernanceAddress: config.aliasedGovernanceAddress
@@ -170,7 +170,7 @@ library GatewayCTMDeployerHelper {
             config.isZKsyncOS
         );
         deployer = deployResult.expectedAddress;
-        calldata_ = deployResult.data;
+        data = deployResult.data;
         result = _calculateDADeployerAddressesWithMode(deployer, daConfig, config.isZKsyncOS);
     }
 
@@ -179,7 +179,7 @@ library GatewayCTMDeployerHelper {
     function _calculateProxyAdminDeployer(
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config
-    ) internal returns (address deployer, bytes memory calldata_, GatewayProxyAdminDeployerResult memory result) {
+    ) internal returns (address deployer, bytes memory data, GatewayProxyAdminDeployerResult memory result) {
         GatewayProxyAdminDeployerConfig memory proxyAdminConfig = GatewayProxyAdminDeployerConfig({
             salt: config.salt,
             aliasedGovernanceAddress: config.aliasedGovernanceAddress
@@ -199,7 +199,7 @@ library GatewayCTMDeployerHelper {
             config.isZKsyncOS
         );
         deployer = deployResult.expectedAddress;
-        calldata_ = deployResult.data;
+        data = deployResult.data;
         result = _calculateProxyAdminDeployerAddressesWithMode(deployer, proxyAdminConfig, config.isZKsyncOS);
     }
 
@@ -211,7 +211,7 @@ library GatewayCTMDeployerHelper {
         GatewayProxyAdminDeployerResult memory proxyAdminResult
     )
         internal
-        returns (address deployer, bytes memory calldata_, GatewayValidatorTimelockDeployerResult memory result)
+        returns (address deployer, bytes memory data, GatewayValidatorTimelockDeployerResult memory result)
     {
         GatewayValidatorTimelockDeployerConfig memory vtConfig = GatewayValidatorTimelockDeployerConfig({
             salt: config.salt,
@@ -233,7 +233,7 @@ library GatewayCTMDeployerHelper {
             config.isZKsyncOS
         );
         deployer = deployResult.expectedAddress;
-        calldata_ = deployResult.data;
+        data = deployResult.data;
         result = _calculateValidatorTimelockDeployerAddressesWithMode(deployer, vtConfig, config.isZKsyncOS);
     }
 
@@ -242,7 +242,7 @@ library GatewayCTMDeployerHelper {
     function _calculateVerifiersDeployer(
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config
-    ) internal returns (address deployer, bytes memory calldata_, Verifiers memory result) {
+    ) internal returns (address deployer, bytes memory data, Verifiers memory result) {
         GatewayVerifiersDeployerConfig memory verifiersConfig = GatewayVerifiersDeployerConfig({
             salt: config.salt,
             aliasedGovernanceAddress: config.aliasedGovernanceAddress,
@@ -263,7 +263,7 @@ library GatewayCTMDeployerHelper {
             config.isZKsyncOS
         );
         deployer = deployResult.expectedAddress;
-        calldata_ = deployResult.data;
+        data = deployResult.data;
         result = _calculateVerifiersDeployerAddressesWithMode(deployer, verifiersConfig, config.isZKsyncOS);
     }
 
@@ -273,10 +273,10 @@ library GatewayCTMDeployerHelper {
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config,
         DAContracts memory daResult
-    ) internal returns (DirectDeployedAddresses memory addresses, DirectCreate2Calldata memory calldata_) {
+    ) internal returns (DirectDeployedAddresses memory addresses, DirectCreate2Calldata memory data) {
         // AdminFacet
         bytes memory adminFacetArgs = abi.encode(config.l1ChainId, daResult.rollupDAManager, config.testnetVerifier);
-        (addresses.facets.adminFacet, calldata_.adminFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+        (addresses.facets.adminFacet, data.adminFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "Admin.sol",
             "AdminFacet",
@@ -292,7 +292,7 @@ library GatewayCTMDeployerHelper {
             address(0), // eip7702Checker
             config.testnetVerifier
         );
-        (addresses.facets.mailboxFacet, calldata_.mailboxFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+        (addresses.facets.mailboxFacet, data.mailboxFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "Mailbox.sol",
             "MailboxFacet",
@@ -302,7 +302,7 @@ library GatewayCTMDeployerHelper {
 
         // ExecutorFacet
         bytes memory executorFacetArgs = abi.encode(config.l1ChainId);
-        (addresses.facets.executorFacet, calldata_.executorFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+        (addresses.facets.executorFacet, data.executorFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "Executor.sol",
             "ExecutorFacet",
@@ -311,7 +311,7 @@ library GatewayCTMDeployerHelper {
         );
 
         // GettersFacet
-        (addresses.facets.gettersFacet, calldata_.gettersFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+        (addresses.facets.gettersFacet, data.gettersFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "Getters.sol",
             "GettersFacet",
@@ -321,7 +321,7 @@ library GatewayCTMDeployerHelper {
 
         // DiamondInit
         bytes memory diamondInitArgs = abi.encode(config.isZKsyncOS);
-        (addresses.facets.diamondInit, calldata_.diamondInitCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+        (addresses.facets.diamondInit, data.diamondInitCalldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "DiamondInit.sol",
             "DiamondInit",
@@ -330,7 +330,7 @@ library GatewayCTMDeployerHelper {
         );
 
         // L1GenesisUpgrade
-        (addresses.genesisUpgrade, calldata_.genesisUpgradeCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+        (addresses.genesisUpgrade, data.genesisUpgradeCalldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "L1GenesisUpgrade.sol",
             "L1GenesisUpgrade",
@@ -339,7 +339,7 @@ library GatewayCTMDeployerHelper {
         );
 
         // Multicall3
-        (addresses.multicall3, calldata_.multicall3Calldata) = _calculateCreate2AddressAndCalldataWithMode(
+        (addresses.multicall3, data.multicall3Calldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "Multicall3.sol",
             "Multicall3",
@@ -353,7 +353,7 @@ library GatewayCTMDeployerHelper {
         string memory fileName,
         string memory contractName,
         bytes memory constructorArgs
-    ) internal returns (address addr, bytes memory calldata_) {
+    ) internal returns (address addr, bytes memory data) {
         // Default to Era mode (non-ZKsyncOS) for backwards compatibility
         return
             _calculateCreate2AddressAndCalldataWithMode(_create2Salt, fileName, contractName, constructorArgs, false);
@@ -365,7 +365,7 @@ library GatewayCTMDeployerHelper {
         string memory contractName,
         bytes memory constructorArgs,
         bool isZKsyncOS
-    ) internal returns (address addr, bytes memory calldata_) {
+    ) internal returns (address addr, bytes memory data) {
         bytes memory bytecode = _readBytecode(fileName, contractName, isZKsyncOS);
         L1L2DeployUtils.DeployResult memory result = L1L2DeployUtils.prepareDeployment(
             _create2Salt,
@@ -374,7 +374,7 @@ library GatewayCTMDeployerHelper {
             isZKsyncOS
         );
         addr = result.expectedAddress;
-        calldata_ = result.data;
+        data = result.data;
     }
 
     // ============ CTM Deployer ============
@@ -386,7 +386,7 @@ library GatewayCTMDeployerHelper {
         GatewayProxyAdminDeployerResult memory proxyAdminResult,
         GatewayValidatorTimelockDeployerResult memory validatorTimelockResult,
         Verifiers memory verifiersResult
-    ) internal returns (address deployer, bytes memory calldata_, GatewayCTMFinalResult memory result) {
+    ) internal returns (address deployer, bytes memory data, GatewayCTMFinalResult memory result) {
         GatewayCTMFinalConfig memory ctmConfig = GatewayCTMFinalConfig({
             baseConfig: config,
             chainTypeManagerProxyAdmin: proxyAdminResult.chainTypeManagerProxyAdmin,
@@ -409,7 +409,7 @@ library GatewayCTMDeployerHelper {
             config.isZKsyncOS
         );
         deployer = deployResult.expectedAddress;
-        calldata_ = deployResult.data;
+        data = deployResult.data;
         result = _calculateCTMDeployerAddressesWithMode(deployer, ctmConfig, config.isZKsyncOS);
     }
 
