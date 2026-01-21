@@ -140,6 +140,8 @@ yarn test:foundry
    cd l1-contracts
    forge build
    npx ts-node scripts/copy-to-zkstack-out.ts
+   cd ..
+   yarn prettier:fix  # Required to add trailing newlines to JSON files
    ```
 
    Then commit the updated JSON files in `zkstack-out/`.
