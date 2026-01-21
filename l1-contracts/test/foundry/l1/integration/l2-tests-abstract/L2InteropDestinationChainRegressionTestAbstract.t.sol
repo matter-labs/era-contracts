@@ -187,6 +187,8 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
         vm.assume(randomChainId != destinationChainId);
         vm.assume(randomChainId != block.chainid);
         vm.assume(randomChainId != 0);
+        // Skip L1_CHAIN_ID - sending to L1 triggers NotL2ToL2 error before DestinationChainNotRegistered
+        vm.assume(randomChainId != L1_CHAIN_ID);
 
         // Mock the bridgehub to return bytes32(0) for this random chain
         vm.mockCall(

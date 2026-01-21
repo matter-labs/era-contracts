@@ -1163,4 +1163,279 @@ contract GWAssetTrackerTest is Test {
             "Balance should decrease"
         );
     }
+
+    /*//////////////////////////////////////////////////////////////
+                    Regression Tests for PR #1768
+                    First Deposit Migration Optimization Fix
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Regression test for the bug fixed in PR #1768
+    /// @dev Bug Description:
+    ///      In handleChainBalanceIncreaseOnGateway, the migration skip optimization check
+    ///      was evaluated AFTER incrementing chainBalance. For the first deposit:
+    ///      1. chainBalance was 0, assetMigrationNumber was 0
+    ///      2. _increaseAndSaveChainBalance was called FIRST, so chainBalance > 0
+    ///      3. _tokenCanSkipMigrationOnSettlementLayer was then called
+    ///      4. Since chainBalance > 0, the check returned false
+    ///      5. _forceSetAssetMigrationNumber was NOT called
+    ///
+    ///      Impact: The optimization to skip migration for first deposits was never triggered.
+    ///      Tokens that should have been marked as "already migrated" were left with
+    ///      assetMigrationNumber = 0, potentially causing issues with migration status checks.
+    ///
+    ///      Fix: Moved the _tokenCanSkipMigrationOnSettlementLayer check BEFORE
+    ///      _increaseAndSaveChainBalance, so the check evaluates when chainBalance is still 0.
+    function test_regression_firstDepositSetsAssetMigrationNumber() public {
+        // Use a fresh asset ID that has never been deposited
+        bytes32 freshAssetId = keccak256("fresh-asset-for-first-deposit-test");
+        bytes32 freshBaseTokenAssetId = keccak256("fresh-base-token-for-first-deposit-test");
+        bytes32 freshTxHash = keccak256("fresh-tx-hash-for-first-deposit-test");
+
+        // Verify initial state: chainBalance and assetMigrationNumber are both 0
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, freshAssetId), 0, "Initial chainBalance should be 0");
+        assertEq(gwAssetTracker.assetMigrationNumber(CHAIN_ID, freshAssetId), 0, "Initial assetMigrationNumber should be 0");
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, freshBaseTokenAssetId), 0, "Initial base token chainBalance should be 0");
+        assertEq(gwAssetTracker.assetMigrationNumber(CHAIN_ID, freshBaseTokenAssetId), 0, "Initial base token assetMigrationNumber should be 0");
+
+        // Create balance change for first deposit
+        BalanceChange memory balanceChange = BalanceChange({
+            version: BALANCE_CHANGE_VERSION,
+            assetId: freshAssetId,
+            baseTokenAssetId: freshBaseTokenAssetId,
+            amount: AMOUNT,
+            baseTokenAmount: BASE_TOKEN_AMOUNT,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID
+        });
+
+        // Execute first deposit
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        gwAssetTracker.handleChainBalanceIncreaseOnGateway(CHAIN_ID, freshTxHash, balanceChange);
+
+        // Verify chain balance was increased
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, freshAssetId), AMOUNT, "Chain balance should be set");
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, freshBaseTokenAssetId), BASE_TOKEN_AMOUNT, "Base token balance should be set");
+
+        // THE KEY ASSERTION: assetMigrationNumber should have been set by _forceSetAssetMigrationNumber
+        // Before the fix, this would be 0 (optimization missed)
+        // After the fix, this should be the current chain migration number (1)
+        assertEq(
+            gwAssetTracker.assetMigrationNumber(CHAIN_ID, freshAssetId),
+            1, // Expected: current chain migration number from mock
+            "assetMigrationNumber should be set to chain migration number for first deposit"
+        );
+        assertEq(
+            gwAssetTracker.assetMigrationNumber(CHAIN_ID, freshBaseTokenAssetId),
+            1, // Expected: current chain migration number from mock
+            "Base token assetMigrationNumber should be set for first deposit"
+        );
+    }
+
+    /// @notice Test that second deposit does NOT change assetMigrationNumber
+    /// @dev Verifies the optimization only applies to first deposits (when both chainBalance and assetMigrationNumber are 0)
+    function test_regression_secondDepositDoesNotChangeAssetMigrationNumber() public {
+        bytes32 freshAssetId = keccak256("asset-for-second-deposit-test");
+        bytes32 freshBaseTokenAssetId = keccak256("base-token-for-second-deposit-test");
+
+        // First deposit
+        BalanceChange memory firstDeposit = BalanceChange({
+            version: BALANCE_CHANGE_VERSION,
+            assetId: freshAssetId,
+            baseTokenAssetId: freshBaseTokenAssetId,
+            amount: AMOUNT,
+            baseTokenAmount: BASE_TOKEN_AMOUNT,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID
+        });
+
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        gwAssetTracker.handleChainBalanceIncreaseOnGateway(CHAIN_ID, keccak256("first-tx"), firstDeposit);
+
+        // Record migration number after first deposit
+        uint256 migrationNumberAfterFirst = gwAssetTracker.assetMigrationNumber(CHAIN_ID, freshAssetId);
+        assertEq(migrationNumberAfterFirst, 1, "Migration number should be set after first deposit");
+
+        // Second deposit
+        BalanceChange memory secondDeposit = BalanceChange({
+            version: BALANCE_CHANGE_VERSION,
+            assetId: freshAssetId,
+            baseTokenAssetId: freshBaseTokenAssetId,
+            amount: AMOUNT * 2,
+            baseTokenAmount: BASE_TOKEN_AMOUNT * 2,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID
+        });
+
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        gwAssetTracker.handleChainBalanceIncreaseOnGateway(CHAIN_ID, keccak256("second-tx"), secondDeposit);
+
+        // Migration number should NOT change after second deposit
+        // (because chainBalance > 0, so _tokenCanSkipMigrationOnSettlementLayer returns false)
+        assertEq(
+            gwAssetTracker.assetMigrationNumber(CHAIN_ID, freshAssetId),
+            migrationNumberAfterFirst,
+            "Migration number should not change after second deposit"
+        );
+
+        // Balance should be accumulated
+        assertEq(
+            gwAssetTracker.chainBalance(CHAIN_ID, freshAssetId),
+            AMOUNT + AMOUNT * 2,
+            "Balance should accumulate"
+        );
+    }
+
+    /// @notice Test that tokens with non-zero assetMigrationNumber do not get overwritten
+    /// @dev Verifies that _tokenCanSkipMigrationOnSettlementLayer correctly checks assetMigrationNumber != 0
+    function test_regression_existingMigrationNumberNotOverwritten() public {
+        bytes32 freshAssetId = keccak256("asset-with-existing-migration");
+        bytes32 freshBaseTokenAssetId = keccak256("base-with-existing-migration");
+
+        // First, do a deposit to set the migration number
+        BalanceChange memory firstDeposit = BalanceChange({
+            version: BALANCE_CHANGE_VERSION,
+            assetId: freshAssetId,
+            baseTokenAssetId: freshBaseTokenAssetId,
+            amount: AMOUNT,
+            baseTokenAmount: BASE_TOKEN_AMOUNT,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID
+        });
+
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        gwAssetTracker.handleChainBalanceIncreaseOnGateway(CHAIN_ID, keccak256("setup-tx"), firstDeposit);
+
+        uint256 originalMigrationNumber = gwAssetTracker.assetMigrationNumber(CHAIN_ID, freshAssetId);
+        assertEq(originalMigrationNumber, 1, "Setup: migration number should be 1");
+
+        // Now simulate the balance being drained (e.g., through withdrawals)
+        // by directly setting it to 0
+        gwAssetTracker.setChainBalance(CHAIN_ID, freshAssetId, 0);
+        gwAssetTracker.setChainBalance(CHAIN_ID, freshBaseTokenAssetId, 0);
+
+        // Verify balance is 0 but migration number is still set
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, freshAssetId), 0, "Balance should be 0");
+        assertEq(gwAssetTracker.assetMigrationNumber(CHAIN_ID, freshAssetId), 1, "Migration number should still be 1");
+
+        // Now do another deposit - migration number should NOT be reset
+        // because _tokenCanSkipMigrationOnSettlementLayer requires BOTH conditions:
+        // assetMigrationNumber == 0 AND chainBalance == 0
+        BalanceChange memory newDeposit = BalanceChange({
+            version: BALANCE_CHANGE_VERSION,
+            assetId: freshAssetId,
+            baseTokenAssetId: freshBaseTokenAssetId,
+            amount: AMOUNT,
+            baseTokenAmount: BASE_TOKEN_AMOUNT,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID
+        });
+
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        gwAssetTracker.handleChainBalanceIncreaseOnGateway(CHAIN_ID, keccak256("new-deposit-tx"), newDeposit);
+
+        // Migration number should remain unchanged (still 1, not reset)
+        assertEq(
+            gwAssetTracker.assetMigrationNumber(CHAIN_ID, freshAssetId),
+            originalMigrationNumber,
+            "Migration number should not be overwritten when it's already set"
+        );
+    }
+
+    /// @notice Fuzz test for first deposit migration optimization
+    /// @dev Verifies the fix works for various chain IDs and asset IDs
+    function testFuzz_regression_firstDepositMigrationOptimization(
+        uint256 _chainId,
+        bytes32 _assetId,
+        bytes32 _baseTokenAssetId,
+        uint256 _amount,
+        uint256 _baseTokenAmount
+    ) public {
+        // Bound inputs
+        _chainId = bound(_chainId, 2, 1000);
+        _amount = bound(_amount, 1, type(uint128).max);
+        _baseTokenAmount = bound(_baseTokenAmount, 1, type(uint128).max);
+
+        // Ensure unique assets
+        vm.assume(_assetId != bytes32(0));
+        vm.assume(_baseTokenAssetId != bytes32(0));
+
+        // Ensure this is a fresh deposit (chainBalance and assetMigrationNumber are 0)
+        vm.assume(gwAssetTracker.chainBalance(_chainId, _assetId) == 0);
+        vm.assume(gwAssetTracker.assetMigrationNumber(_chainId, _assetId) == 0);
+
+        bytes32 uniqueTxHash = keccak256(abi.encode(_chainId, _assetId, _amount, block.timestamp));
+
+        BalanceChange memory balanceChange = BalanceChange({
+            version: BALANCE_CHANGE_VERSION,
+            assetId: _assetId,
+            baseTokenAssetId: _baseTokenAssetId,
+            amount: _amount,
+            baseTokenAmount: _baseTokenAmount,
+            originToken: makeAddr("token"),
+            tokenOriginChainId: 1
+        });
+
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        gwAssetTracker.handleChainBalanceIncreaseOnGateway(_chainId, uniqueTxHash, balanceChange);
+
+        // After first deposit, assetMigrationNumber should be set (not 0)
+        assertTrue(
+            gwAssetTracker.assetMigrationNumber(_chainId, _assetId) != 0,
+            "assetMigrationNumber should be set after first deposit"
+        );
+
+        // Chain balance should be set
+        assertEq(
+            gwAssetTracker.chainBalance(_chainId, _assetId),
+            _amount,
+            "chainBalance should match deposit amount"
+        );
+    }
+
+    /// @notice Test that the optimization triggers for both assetId and baseTokenAssetId independently
+    /// @dev Verifies each asset is checked and updated independently
+    function test_regression_firstDepositOptimizationIndependentForAssets() public {
+        bytes32 assetId1 = keccak256("independent-asset-1");
+        bytes32 assetId2 = keccak256("independent-asset-2");
+
+        // First deposit with assetId1 as main asset and assetId2 as base token
+        BalanceChange memory deposit1 = BalanceChange({
+            version: BALANCE_CHANGE_VERSION,
+            assetId: assetId1,
+            baseTokenAssetId: assetId2,
+            amount: AMOUNT,
+            baseTokenAmount: BASE_TOKEN_AMOUNT,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID
+        });
+
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        gwAssetTracker.handleChainBalanceIncreaseOnGateway(CHAIN_ID, keccak256("tx1"), deposit1);
+
+        // Both should have migration numbers set
+        assertEq(gwAssetTracker.assetMigrationNumber(CHAIN_ID, assetId1), 1, "assetId1 migration should be set");
+        assertEq(gwAssetTracker.assetMigrationNumber(CHAIN_ID, assetId2), 1, "assetId2 migration should be set");
+
+        // Now a new deposit where one asset is new and one is existing
+        bytes32 assetId3 = keccak256("independent-asset-3");
+
+        BalanceChange memory deposit2 = BalanceChange({
+            version: BALANCE_CHANGE_VERSION,
+            assetId: assetId3, // New asset
+            baseTokenAssetId: assetId2, // Existing asset (already has migration number)
+            amount: AMOUNT,
+            baseTokenAmount: BASE_TOKEN_AMOUNT,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID
+        });
+
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        gwAssetTracker.handleChainBalanceIncreaseOnGateway(CHAIN_ID, keccak256("tx2"), deposit2);
+
+        // New asset should get migration number set
+        assertEq(gwAssetTracker.assetMigrationNumber(CHAIN_ID, assetId3), 1, "assetId3 migration should be set");
+
+        // Existing asset's migration number should not change
+        assertEq(gwAssetTracker.assetMigrationNumber(CHAIN_ID, assetId2), 1, "assetId2 migration should still be 1");
+    }
 }
