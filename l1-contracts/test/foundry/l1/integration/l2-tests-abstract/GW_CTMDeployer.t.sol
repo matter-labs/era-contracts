@@ -11,7 +11,7 @@ import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExe
 
 import {L2AssetTrackerData} from "./L2AssetTrackerData.sol";
 
-import {GatewayCTMDeployerConfig, GatewayDADeployerConfig, GatewayProxyAdminDeployerConfig, GatewayValidatorTimelockDeployerConfig, GatewayVerifiersDeployerConfig, GatewayCTMFinalConfig, GatewayDADeployerResult, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerResult, Verifiers} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {GatewayCTMDeployerConfig, GatewayDADeployerConfig, GatewayProxyAdminDeployerConfig, GatewayValidatorTimelockDeployerConfig, GatewayVerifiersDeployerConfig, GatewayCTMFinalConfig, DAContracts, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerResult, Verifiers} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {GatewayCTMDeployerDA} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerDA.sol";
 import {GatewayCTMDeployerProxyAdmin} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerProxyAdmin.sol";
 import {GatewayCTMDeployerValidatorTimelock} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerValidatorTimelock.sol";
@@ -28,7 +28,7 @@ abstract contract GW_CTMDeployerTest is Test {
 
         // Deploy phases 1-3
         (
-            GatewayDADeployerResult memory daResult,
+            DAContracts memory daResult,
             GatewayProxyAdminDeployerResult memory proxyAdminResult,
             GatewayValidatorTimelockDeployerResult memory vtResult
         ) = _deployPhases1to3(aliasedGovernanceAddress);
@@ -42,7 +42,7 @@ abstract contract GW_CTMDeployerTest is Test {
     )
         internal
         returns (
-            GatewayDADeployerResult memory daResult,
+            DAContracts memory daResult,
             GatewayProxyAdminDeployerResult memory proxyAdminResult,
             GatewayValidatorTimelockDeployerResult memory vtResult
         )

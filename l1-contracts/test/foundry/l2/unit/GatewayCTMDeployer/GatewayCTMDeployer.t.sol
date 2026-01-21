@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import {DeployedContracts, GatewayCTMDeployerConfig, GatewayDADeployerConfig, GatewayDADeployerResult, GatewayProxyAdminDeployerConfig, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerConfig, GatewayValidatorTimelockDeployerResult, GatewayVerifiersDeployerConfig, Verifiers, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {DeployedContracts, GatewayCTMDeployerConfig, GatewayDADeployerConfig, DAContracts, GatewayProxyAdminDeployerConfig, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerConfig, GatewayValidatorTimelockDeployerResult, GatewayVerifiersDeployerConfig, Verifiers, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {GatewayCTMDeployerDA} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerDA.sol";
 import {GatewayCTMDeployerProxyAdmin} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerProxyAdmin.sol";
 import {GatewayCTMDeployerValidatorTimelock} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerValidatorTimelock.sol";
@@ -50,7 +50,7 @@ contract GatewayCTMDeployerTester {
     /// @notice Deploys DA contracts
     function deployDA(
         bytes memory data
-    ) external returns (GatewayDADeployerResult memory result, address deployerAddr) {
+    ) external returns (DAContracts memory result, address deployerAddr) {
         (bool success, bytes memory returnData) = L2_CREATE2_FACTORY_ADDR.call(data);
         require(success, "DA deployment failed");
 

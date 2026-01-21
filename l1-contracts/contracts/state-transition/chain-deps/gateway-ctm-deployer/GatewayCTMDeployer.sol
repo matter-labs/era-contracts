@@ -119,17 +119,6 @@ struct GatewayDADeployerConfig {
     address aliasedGovernanceAddress;
 }
 
-/// @notice Result from DA deployer.
-// solhint-disable-next-line gas-struct-packing
-struct GatewayDADeployerResult {
-    /// @notice Address of the RollupDAManager contract.
-    address rollupDAManager;
-    /// @notice Address of the ValidiumL1DAValidator contract.
-    address validiumDAValidator;
-    /// @notice Address of the RelayedSLDAValidator contract.
-    address relayedSLDAValidator;
-}
-
 // ============ ProxyAdmin Deployer ============
 
 /// @notice Configuration for ProxyAdmin deployer.

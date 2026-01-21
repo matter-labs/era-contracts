@@ -21,7 +21,7 @@ import {L1L2DeployUtils} from "../utils/deploy/L1L2DeployUtils.sol";
 
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
-import {DeployedContracts, GatewayCTMDeployerConfig, GatewayDADeployerConfig, GatewayDADeployerResult, GatewayProxyAdminDeployerConfig, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerConfig, GatewayValidatorTimelockDeployerResult, GatewayVerifiersDeployerConfig, Verifiers, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {DeployedContracts, DAContracts, GatewayCTMDeployerConfig, GatewayDADeployerConfig, GatewayProxyAdminDeployerConfig, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerConfig, GatewayValidatorTimelockDeployerResult, GatewayVerifiersDeployerConfig, Verifiers, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 
 import {DeployCTML1OrGateway, CTMCoreDeploymentConfig} from "../ctm/DeployCTML1OrGateway.sol";
 import {CTMContract} from "../ctm/DeployCTML1OrGateway.sol";
@@ -100,7 +100,7 @@ library GatewayCTMDeployerHelper {
         create2FactoryAddress = L1L2DeployUtils.getDeploymentTarget(config.isZKsyncOS);
 
         // Calculate DA deployer addresses
-        GatewayDADeployerResult memory daResult;
+        DAContracts memory daResult;
         (deployers.daDeployer, deployerCalldata.daCalldata, daResult) = _calculateDADeployer(_create2Salt, config);
 
         // Calculate ProxyAdmin deployer addresses
@@ -158,7 +158,7 @@ library GatewayCTMDeployerHelper {
     function _calculateDADeployer(
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config
-    ) internal returns (address deployer, bytes memory calldata_, GatewayDADeployerResult memory result) {
+    ) internal returns (address deployer, bytes memory calldata_, DAContracts memory result) {
         GatewayDADeployerConfig memory daConfig = GatewayDADeployerConfig({
             salt: config.salt,
             aliasedGovernanceAddress: config.aliasedGovernanceAddress
@@ -276,7 +276,7 @@ library GatewayCTMDeployerHelper {
     function _calculateDirectDeployments(
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config,
-        GatewayDADeployerResult memory daResult
+        DAContracts memory daResult
     ) internal returns (DirectDeployedAddresses memory addresses, DirectCreate2Calldata memory calldata_) {
         // AdminFacet
         bytes memory adminFacetArgs = abi.encode(config.l1ChainId, daResult.rollupDAManager, config.testnetVerifier);
@@ -442,7 +442,7 @@ library GatewayCTMDeployerHelper {
     function _calculateDADeployerAddresses(
         address deployerAddr,
         GatewayDADeployerConfig memory config
-    ) internal returns (GatewayDADeployerResult memory result) {
+    ) internal returns (DAContracts memory result) {
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
 
         result.rollupDAManager = _deployInternalEmptyParams("RollupDAManager", "RollupDAManager.sol", innerConfig);
@@ -462,7 +462,7 @@ library GatewayCTMDeployerHelper {
         address deployerAddr,
         GatewayDADeployerConfig memory config,
         bool isZKsyncOS
-    ) internal returns (GatewayDADeployerResult memory result) {
+    ) internal returns (DAContracts memory result) {
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
 
         result.rollupDAManager = _deployInternalEmptyParamsWithMode(
@@ -926,7 +926,7 @@ library GatewayCTMDeployerHelper {
     }
 
     function _assembleContracts(
-        GatewayDADeployerResult memory daResult,
+        DAContracts memory daResult,
         GatewayProxyAdminDeployerResult memory proxyAdminResult,
         GatewayValidatorTimelockDeployerResult memory validatorTimelockResult,
         Verifiers memory verifiersResult,
