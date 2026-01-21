@@ -169,6 +169,8 @@ contract GWAssetTrackerTest is Test {
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
             migrationNumber: MIGRATION_NUMBER,
             isL1ToGateway: false
@@ -236,6 +238,8 @@ contract GWAssetTrackerTest is Test {
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
             migrationNumber: MIGRATION_NUMBER,
             isL1ToGateway: true
@@ -508,6 +512,8 @@ contract GWAssetTrackerTest is Test {
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
             migrationNumber: MIGRATION_NUMBER,
             isL1ToGateway: false
@@ -525,6 +531,8 @@ contract GWAssetTrackerTest is Test {
             version: 0, // Invalid version
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
             migrationNumber: MIGRATION_NUMBER,
             isL1ToGateway: false
@@ -602,6 +610,8 @@ contract GWAssetTrackerTest is Test {
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: 0,
             migrationNumber: MIGRATION_NUMBER,
             isL1ToGateway: true
@@ -621,6 +631,8 @@ contract GWAssetTrackerTest is Test {
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: _amount,
             migrationNumber: MIGRATION_NUMBER,
             isL1ToGateway: true

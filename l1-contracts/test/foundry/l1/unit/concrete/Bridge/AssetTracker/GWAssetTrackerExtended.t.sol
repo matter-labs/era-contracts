@@ -694,6 +694,8 @@ contract GWAssetTrackerExtendedTest is Test {
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
             migrationNumber: MIGRATION_NUMBER,
             isL1ToGateway: false

@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {BaseTokenData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
@@ -284,10 +284,15 @@ contract BridgehubBase_Extended_Test is Test {
         bytes32 unknownAssetId = keccak256("unknownCTMAsset");
         uint256 chainId = 123;
         bytes32 baseTokenAssetId = keccak256("baseToken");
+        BaseTokenData memory baseTokenData = BaseTokenData({
+            assetId: baseTokenAssetId,
+            originalToken: address(0),
+            originChainId: 0
+        });
 
         vm.prank(chainAssetHandler);
         vm.expectRevert(abi.encodeWithSelector(NoCTMForAssetId.selector, unknownAssetId));
-        bridgehub.forwardedBridgeMint(unknownAssetId, chainId, baseTokenAssetId);
+        bridgehub.forwardedBridgeMint(unknownAssetId, chainId, baseTokenData);
     }
 
     // Test forwardedBridgeMint reverts when already current settlement layer (line 493)
@@ -320,15 +325,20 @@ contract BridgehubBase_Extended_Test is Test {
 
         uint256 chainId = 123;
         bytes32 baseTokenAssetId = keccak256("baseToken");
+        BaseTokenData memory baseTokendata = BaseTokenData({
+            assetId: baseTokenAssetId,
+            originalToken: address(0),
+            originChainId: 0
+        });
 
         // First call to set up the chain on this settlement layer
         vm.prank(chainAssetHandler);
-        bridgehub.forwardedBridgeMint(ctmAssetId, chainId, baseTokenAssetId);
+        bridgehub.forwardedBridgeMint(ctmAssetId, chainId, baseTokendata);
 
         // Second call should fail because it's already the current settlement layer
         vm.prank(chainAssetHandler);
         vm.expectRevert(abi.encodeWithSelector(AlreadyCurrentSL.selector, block.chainid));
-        bridgehub.forwardedBridgeMint(ctmAssetId, chainId, baseTokenAssetId);
+        bridgehub.forwardedBridgeMint(ctmAssetId, chainId, baseTokendata);
     }
 
     // Test onlyChainAssetHandler modifier revert (line 141)

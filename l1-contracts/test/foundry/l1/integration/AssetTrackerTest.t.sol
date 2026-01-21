@@ -179,6 +179,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             isL1ToGateway: true,
             chainId: eraZKChainId,
             assetId: assetId,
+            originToken: tokenAddress,
+            tokenOriginChainId: originalChainId,
             migrationNumber: migrationNumber,
             amount: amount
         });
@@ -328,6 +330,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             isL1ToGateway: false,
             chainId: eraZKChainId,
             assetId: assetId,
+            originToken: tokenAddress,
+            tokenOriginChainId: originalChainId,
             migrationNumber: migrationNumber,
             amount: amount
         });
