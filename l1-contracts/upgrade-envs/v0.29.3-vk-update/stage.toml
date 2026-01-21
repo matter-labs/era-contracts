@@ -16,7 +16,7 @@ max_expected_l1_gas_price = 50000000000
 governance_min_delay = 0
 
 max_number_of_chains = 100
-create2_factory_salt = "0x95fe3677ffea74c9815331db7f4c737a32c161db4cae7d47504a336c4c5bcfb8"
+create2_factory_salt = "0x96fe3677ffea74c9815331db7f4c737a32c161db4cae7d47504a336c4c5bcfb8"
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 
 # === Unused, we read it from the old chain creation params
