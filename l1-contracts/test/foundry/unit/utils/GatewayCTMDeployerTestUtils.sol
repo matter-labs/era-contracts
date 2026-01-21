@@ -39,7 +39,7 @@ library DeployedContractsComparator {
             a.validatorTimelockImplementation == b.validatorTimelockImplementation,
             "validatorTimelockImplementation differs"
         );
-        require(a.validatorTimelock == b.validatorTimelock, "validatorTimelock differs");
+        require(a.validatorTimelockProxy == b.validatorTimelockProxy, "validatorTimelockProxy differs");
         require(a.chainTypeManagerProxyAdmin == b.chainTypeManagerProxyAdmin, "chainTypeManagerProxyAdmin differs");
         require(
             a.serverNotifierImplementation == b.serverNotifierImplementation,
@@ -86,7 +86,7 @@ library GatewayCTMDeployerTestUtils {
         contracts.stateTransition.validatorTimelockImplementation = results
             .validatorTimelockResult
             .validatorTimelockImplementation;
-        contracts.stateTransition.validatorTimelock = results.validatorTimelockResult.validatorTimelock;
+        contracts.stateTransition.validatorTimelockProxy = results.validatorTimelockResult.validatorTimelockProxy;
 
         // From Verifiers deployer
         contracts.stateTransition.verifierFflonk = results.verifiersResult.verifierFflonk;

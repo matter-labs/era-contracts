@@ -394,7 +394,7 @@ library GatewayCTMDeployerHelper {
         GatewayCTMFinalConfig memory ctmConfig = GatewayCTMFinalConfig({
             baseConfig: config,
             chainTypeManagerProxyAdmin: proxyAdminResult.chainTypeManagerProxyAdmin,
-            validatorTimelock: validatorTimelockResult.validatorTimelock,
+            validatorTimelockProxy: validatorTimelockResult.validatorTimelockProxy,
             adminFacet: directAddresses.adminFacet,
             gettersFacet: directAddresses.gettersFacet,
             mailboxFacet: directAddresses.mailboxFacet,
@@ -504,7 +504,7 @@ library GatewayCTMDeployerHelper {
             innerConfig
         );
 
-        result.validatorTimelock = _deployInternalWithParams(
+        result.validatorTimelockProxy = _deployInternalWithParams(
             "TransparentUpgradeableProxy",
             "TransparentUpgradeableProxy.sol",
             abi.encode(
@@ -531,7 +531,7 @@ library GatewayCTMDeployerHelper {
             isZKsyncOS
         );
 
-        result.validatorTimelock = _deployInternalWithParamsWithMode(
+        result.validatorTimelockProxy = _deployInternalWithParamsWithMode(
             "TransparentUpgradeableProxy",
             "TransparentUpgradeableProxy.sol",
             abi.encode(
@@ -778,7 +778,7 @@ library GatewayCTMDeployerHelper {
 
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
             owner: baseConfig.aliasedGovernanceAddress,
-            validatorTimelock: config.validatorTimelock,
+            validatorTimelock: config.validatorTimelockProxy,
             chainCreationParams: chainCreationParams,
             protocolVersion: baseConfig.protocolVersion,
             serverNotifier: result.serverNotifierProxy
@@ -894,7 +894,7 @@ library GatewayCTMDeployerHelper {
 
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
             owner: baseConfig.aliasedGovernanceAddress,
-            validatorTimelock: config.validatorTimelock,
+            validatorTimelock: config.validatorTimelockProxy,
             chainCreationParams: chainCreationParams,
             protocolVersion: baseConfig.protocolVersion,
             serverNotifier: result.serverNotifierProxy
@@ -930,7 +930,7 @@ library GatewayCTMDeployerHelper {
         // From ValidatorTimelock deployer
         contracts.stateTransition.validatorTimelockImplementation = validatorTimelockResult
             .validatorTimelockImplementation;
-        contracts.stateTransition.validatorTimelock = validatorTimelockResult.validatorTimelock;
+        contracts.stateTransition.validatorTimelockProxy = validatorTimelockResult.validatorTimelockProxy;
 
         // From Verifiers deployer
         contracts.stateTransition.verifierFflonk = verifiersResult.verifierFflonk;

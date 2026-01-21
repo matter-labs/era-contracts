@@ -75,8 +75,8 @@ struct StateTransitionContracts {
     address genesisUpgrade;
     /// @notice Address of the implementation of the ValidatorTimelock contract.
     address validatorTimelockImplementation;
-    /// @notice Address of the ValidatorTimelock contract.
-    address validatorTimelock;
+    /// @notice Address of the ValidatorTimelock proxy contract.
+    address validatorTimelockProxy;
     /// @notice Address of the ProxyAdmin for ChainTypeManager.
     address chainTypeManagerProxyAdmin;
     /// @notice Address of the ServerNotifier proxy contract.
@@ -156,7 +156,7 @@ struct GatewayValidatorTimelockDeployerResult {
     /// @notice Address of the ValidatorTimelock implementation contract.
     address validatorTimelockImplementation;
     /// @notice Address of the ValidatorTimelock proxy contract.
-    address validatorTimelock;
+    address validatorTimelockProxy;
 }
 
 // ============ Verifiers Deployer ============
@@ -197,7 +197,7 @@ struct GatewayCTMFinalConfig {
     /// @notice Address of the ProxyAdmin (from ProxyAdmin deployer).
     address chainTypeManagerProxyAdmin;
     /// @notice Address of the ValidatorTimelock proxy (from ValidatorTimelock deployer).
-    address validatorTimelock;
+    address validatorTimelockProxy;
     /// @notice Address of the Admin facet (deployed directly).
     address adminFacet;
     /// @notice Address of the Getters facet (deployed directly).

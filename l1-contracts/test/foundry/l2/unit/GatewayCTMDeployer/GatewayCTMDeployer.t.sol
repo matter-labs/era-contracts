@@ -290,7 +290,7 @@ contract GatewayCTMDeployerTest is Test {
         GatewayCTMFinalConfig memory ctmConfig = GatewayCTMFinalConfig({
             baseConfig: deployerConfig,
             chainTypeManagerProxyAdmin: results.proxyAdminResult.chainTypeManagerProxyAdmin,
-            validatorTimelock: results.validatorTimelockResult.validatorTimelock,
+            validatorTimelockProxy: results.validatorTimelockResult.validatorTimelockProxy,
             adminFacet: calculatedContracts.stateTransition.adminFacet,
             gettersFacet: calculatedContracts.stateTransition.gettersFacet,
             mailboxFacet: calculatedContracts.stateTransition.mailboxFacet,

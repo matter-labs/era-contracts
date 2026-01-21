@@ -120,7 +120,7 @@ abstract contract GW_CTMDeployerTest is Test {
                 protocolVersion: 0
             }),
             chainTypeManagerProxyAdmin: proxyAdminResult.chainTypeManagerProxyAdmin,
-            validatorTimelock: vtResult.validatorTimelock,
+            validatorTimelockProxy: vtResult.validatorTimelockProxy,
             // Placeholder addresses for direct deployments
             adminFacet: address(0x1),
             gettersFacet: address(0x2),
