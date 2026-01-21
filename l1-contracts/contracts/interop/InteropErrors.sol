@@ -15,6 +15,8 @@ error CallAlreadyExecuted(bytes32 bundleHash, uint256 callIndex);
 error CallNotExecutable(bytes32 bundleHash, uint256 callIndex);
 // 0xf729f26d
 error CanNotUnbundle(bytes32 bundleHash);
+// 0x2d159f39
+error DestinationChainNotRegistered(uint256 destinationChainId);
 // 0xe845be4c
 error ExecutingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes executionAddress);
 // 0x62d214aa
