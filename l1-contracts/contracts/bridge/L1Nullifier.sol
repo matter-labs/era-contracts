@@ -243,7 +243,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @notice Sets the L1 asset router contract address.
     /// @dev Should be called only once by the owner.
     /// @param _l1AssetRouter The address of the asset router.
-    function setL1AssetRouter(address _l1AssetRouter) external onlyOwner { //TODO deprecate, eventually
+    function setL1AssetRouter(address _l1AssetRouter) external onlyOwner {
         if (address(l1AssetRouter) != address(0)) {
             revert AddressAlreadySet(address(l1AssetRouter));
         }
