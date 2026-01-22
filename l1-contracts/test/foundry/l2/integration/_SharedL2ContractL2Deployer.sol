@@ -94,7 +94,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         );
         ctmAddresses.stateTransition.facets.executorFacet = address(new ExecutorFacet(config.l1ChainId));
         ctmAddresses.stateTransition.facets.adminFacet = address(
-            new AdminFacet(config.l1ChainId, RollupDAManager(ctmAddresses.daAddresses.rollupDAManager), false)
+            new AdminFacet(config.l1ChainId, RollupDAManager(ctmAddresses.daAddresses.rollupDAManager), true)
         );
         ctmAddresses.stateTransition.facets.mailboxFacet = address(
             new MailboxFacet(
@@ -102,11 +102,11 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
                 config.l1ChainId,
                 L2_CHAIN_ASSET_HANDLER_ADDR,
                 IEIP7702Checker(address(0)),
-                false
+                true
             )
         );
         ctmAddresses.stateTransition.facets.gettersFacet = address(new GettersFacet());
-        ctmAddresses.stateTransition.facets.diamondInit = address(new DiamondInit(false));
+        ctmAddresses.stateTransition.facets.diamondInit = address(new DiamondInit(true));
         // Deploy ChainTypeManager implementation
         if (config.isZKsyncOS) {
             ctmAddresses.stateTransition.implementations.chainTypeManager = address(
