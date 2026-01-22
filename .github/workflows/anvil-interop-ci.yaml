@@ -152,6 +152,24 @@ jobs:
   
       - name: Check if chains started
         run: |
-          curl -X POST -H "Content-Type: application/json" \
+          echo "Checking L1 chain (port 9545)..."
+          curl -f -X POST -H "Content-Type: application/json" \
             --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
-            http://127.0.0.1:8545 || echo "L1 chain not responding"
+            http://127.0.0.1:9545 || (echo "❌ L1 chain not responding on port 9545" && exit 1)
+
+          echo "Checking L2 chain 10 (port 4050)..."
+          curl -f -X POST -H "Content-Type: application/json" \
+            --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
+            http://127.0.0.1:4050 || (echo "❌ L2 chain 10 not responding on port 4050" && exit 1)
+
+          echo "Checking L2 chain 11 (port 4051)..."
+          curl -f -X POST -H "Content-Type: application/json" \
+            --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
+            http://127.0.0.1:4051 || (echo "❌ L2 chain 11 not responding on port 4051" && exit 1)
+
+          echo "Checking L2 chain 12 (port 4052)..."
+          curl -f -X POST -H "Content-Type: application/json" \
+            --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
+            http://127.0.0.1:4052 || (echo "❌ L2 chain 12 not responding on port 4052" && exit 1)
+
+          echo "✅ All chains are responding"
