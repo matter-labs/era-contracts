@@ -8,6 +8,11 @@ test = "test/foundry"
 solc_version = "0.8.28"
 evm_version = "cancun"
 fs_permissions = [
+    { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-config/" },
+    { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-out/" },
+    { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-config/" },
+    { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-out/" },
+    { access = "read-write", path = "./script-out" },
     { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
     { access = "read", path = "../system-contracts/artifacts-zk/" },
     { access = "read", path = "../system-contracts/contracts-preprocessed/precompiles/artifacts" },
@@ -17,17 +22,12 @@ fs_permissions = [
     { access = "read", path = "../l2-contracts/artifacts-zk/" },
     { access = "read", path = "../l2-contracts/zkout/" },
     { access = "read", path = "../l1-contracts/artifacts-zk/" },
-    { access = "read-write", path = "../l1-contracts/script-out/" },
+    { access = "read", path = "../l1-contracts/script-out/" },
     { access = "read", path = "../da-contracts/" },
     { access = "read", path = "../system-contracts/zkout/" },
     { access = "read", path = "./script-config" },
-    { access = "read-write", path = "./script-out" },
     { access = "read", path = "./upgrade-envs/" },
     { access = "read", path = "./out" },
-    { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-config/" },
-    { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-out/" },
-    { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-config/" },
-    { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-out/" },
     { access = "read", path = "zkout" },
     { access = "read", path = "./deploy-scripts/evm-predeploys/evm-predeploy-datas" },
 ]
