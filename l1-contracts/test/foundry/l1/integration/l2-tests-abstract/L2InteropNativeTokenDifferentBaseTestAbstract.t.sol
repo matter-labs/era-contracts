@@ -19,7 +19,7 @@ import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 
-import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
+import {L2InteropTestUtils, BundleExecutionResult} from "./L2InteropTestUtils.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
 abstract contract L2InteropNativeTokenDifferentBaseTestAbstract is L2InteropTestUtils {
@@ -133,6 +133,18 @@ abstract contract L2InteropNativeTokenDifferentBaseTestAbstract is L2InteropTest
         // Switch back to original chain before executing bundle
         vm.chainId(originalChainId);
 
-        extractAndExecuteSingleBundle(logs, destinationChainId, EXECUTION_ADDRESS);
+        // Verify bundle was emitted
+        assertTrue(logs.length > 0, "Expected logs to be emitted for cross-chain token transfer");
+
+        BundleExecutionResult memory result = extractAndExecuteSingleBundle(
+            logs,
+            destinationChainId,
+            EXECUTION_ADDRESS
+        );
+
+        // Verify the bundle was executed successfully
+        assertBundleExecuted(result);
+        assertTrue(result.bundleHash != bytes32(0), "Bundle hash should be non-zero");
+        assertEq(result.callCount, 2, "Bundle should contain 2 calls for different base token transfer");
     }
 }
