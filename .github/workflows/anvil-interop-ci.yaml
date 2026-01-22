@@ -145,7 +145,7 @@ jobs:
       - name: Start Anvil Interop Environment
         working-directory: l1-contracts/scripts/anvil-interop
         run: |
-          timeout 300 yarn start &
+          yarn start &
           ANVIL_PID=$!
           sleep 60
           kill $ANVIL_PID || true
