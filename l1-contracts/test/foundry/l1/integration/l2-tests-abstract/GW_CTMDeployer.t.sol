@@ -3,13 +3,7 @@
 pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
-import {StdStorage, Test, stdStorage, console} from "forge-std/Test.sol";
-
-import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
-import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDR, L2_CHAIN_ASSET_HANDLER, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-
-import {L2AssetTrackerData} from "./L2AssetTrackerData.sol";
+import {Test} from "forge-std/Test.sol";
 
 import {Facets, GatewayCTMDeployerConfig, GatewayDADeployerConfig, GatewayProxyAdminDeployerConfig, GatewayValidatorTimelockDeployerConfig, GatewayVerifiersDeployerConfig, GatewayCTMFinalConfig, DAContracts, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerResult, Verifiers} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {GatewayCTMDeployerDA} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerDA.sol";
@@ -19,26 +13,41 @@ import {GatewayCTMDeployerVerifiers} from "contracts/state-transition/chain-deps
 import {GatewayCTMDeployerCTM} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerCTM.sol";
 
 abstract contract GW_CTMDeployerTest is Test {
-    using stdStorage for StdStorage;
-
-    bytes32 internal constant TEST_SALT = keccak256("test-salt");
-
     function test_GW_CTMDeployer() public {
-        address aliasedGovernanceAddress = makeAddr("aliasedGovernanceAddress");
+        GatewayCTMDeployerConfig memory deployerConfig = GatewayCTMDeployerConfig({
+            aliasedGovernanceAddress: makeAddr("aliasedGovernanceAddress"),
+            salt: keccak256("test-salt"),
+            eraChainId: 1,
+            l1ChainId: 1,
+            testnetVerifier: false,
+            isZKsyncOS: false,
+            adminSelectors: new bytes4[](0),
+            executorSelectors: new bytes4[](0),
+            mailboxSelectors: new bytes4[](0),
+            gettersSelectors: new bytes4[](0),
+            bootloaderHash: keccak256("bootloader-hash"),
+            defaultAccountHash: keccak256("default-account-hash"),
+            evmEmulatorHash: keccak256("evm-emulator-hash"),
+            genesisRoot: keccak256("genesis-root"),
+            genesisRollupLeafIndex: 1,
+            genesisBatchCommitment: keccak256("genesis-batch-commitment"),
+            forceDeploymentsData: bytes(""),
+            protocolVersion: 0
+        });
 
         // Deploy phases 1-3
         (
             DAContracts memory daResult,
             GatewayProxyAdminDeployerResult memory proxyAdminResult,
             GatewayValidatorTimelockDeployerResult memory vtResult
-        ) = _deployPhases1to3(aliasedGovernanceAddress);
+        ) = _deployPhases1to3(deployerConfig);
 
         // Deploy phases 4-5
-        _deployPhases4to5(aliasedGovernanceAddress, proxyAdminResult, vtResult);
+        _deployPhases4to5(deployerConfig, proxyAdminResult, vtResult);
     }
 
     function _deployPhases1to3(
-        address aliasedGovernanceAddress
+        GatewayCTMDeployerConfig memory deployerConfig
     )
         internal
         returns (
@@ -49,38 +58,38 @@ abstract contract GW_CTMDeployerTest is Test {
     {
         // Phase 1: DA deployer
         GatewayDADeployerConfig memory daConfig = GatewayDADeployerConfig({
-            salt: TEST_SALT,
-            aliasedGovernanceAddress: aliasedGovernanceAddress
+            salt: deployerConfig.salt,
+            aliasedGovernanceAddress: deployerConfig.aliasedGovernanceAddress
         });
         daResult = (new GatewayCTMDeployerDA(daConfig)).getResult();
 
         // Phase 2: ProxyAdmin deployer
         GatewayProxyAdminDeployerConfig memory proxyAdminConfig = GatewayProxyAdminDeployerConfig({
-            salt: TEST_SALT,
-            aliasedGovernanceAddress: aliasedGovernanceAddress
+            salt: deployerConfig.salt,
+            aliasedGovernanceAddress: deployerConfig.aliasedGovernanceAddress
         });
         proxyAdminResult = (new GatewayCTMDeployerProxyAdmin(proxyAdminConfig)).getResult();
 
         // Phase 3: ValidatorTimelock deployer
         GatewayValidatorTimelockDeployerConfig memory vtConfig = GatewayValidatorTimelockDeployerConfig({
-            salt: TEST_SALT,
-            aliasedGovernanceAddress: aliasedGovernanceAddress,
+            salt: deployerConfig.salt,
+            aliasedGovernanceAddress: deployerConfig.aliasedGovernanceAddress,
             chainTypeManagerProxyAdmin: proxyAdminResult.chainTypeManagerProxyAdmin
         });
         vtResult = (new GatewayCTMDeployerValidatorTimelock(vtConfig)).getResult();
     }
 
     function _deployPhases4to5(
-        address aliasedGovernanceAddress,
+        GatewayCTMDeployerConfig memory deployerConfig,
         GatewayProxyAdminDeployerResult memory proxyAdminResult,
         GatewayValidatorTimelockDeployerResult memory vtResult
     ) internal {
         // Phase 4: Verifiers deployer
         GatewayVerifiersDeployerConfig memory verifiersConfig = GatewayVerifiersDeployerConfig({
-            salt: TEST_SALT,
-            aliasedGovernanceAddress: aliasedGovernanceAddress,
-            testnetVerifier: false,
-            isZKsyncOS: false
+            salt: deployerConfig.salt,
+            aliasedGovernanceAddress: deployerConfig.aliasedGovernanceAddress,
+            testnetVerifier: deployerConfig.testnetVerifier,
+            isZKsyncOS: deployerConfig.isZKsyncOS
         });
         Verifiers memory verifiersResult = (new GatewayCTMDeployerVerifiers(verifiersConfig)).getResult();
 
@@ -88,36 +97,17 @@ abstract contract GW_CTMDeployerTest is Test {
         // Note: Direct deployments (AdminFacet, MailboxFacet, ExecutorFacet, GettersFacet,
         // DiamondInit, GenesisUpgrade) would be done separately in scripts.
         // For this test, we use placeholder addresses.
-        _deployPhase5(aliasedGovernanceAddress, proxyAdminResult, vtResult, verifiersResult);
+        _deployPhase5(deployerConfig, proxyAdminResult, vtResult, verifiersResult);
     }
 
     function _deployPhase5(
-        address aliasedGovernanceAddress,
+        GatewayCTMDeployerConfig memory deployerConfig,
         GatewayProxyAdminDeployerResult memory proxyAdminResult,
         GatewayValidatorTimelockDeployerResult memory vtResult,
         Verifiers memory verifiersResult
     ) internal {
         GatewayCTMFinalConfig memory ctmConfig = GatewayCTMFinalConfig({
-            baseConfig: GatewayCTMDeployerConfig({
-                aliasedGovernanceAddress: aliasedGovernanceAddress,
-                salt: TEST_SALT,
-                eraChainId: 1,
-                l1ChainId: 1,
-                testnetVerifier: false,
-                isZKsyncOS: false,
-                adminSelectors: new bytes4[](0),
-                executorSelectors: new bytes4[](0),
-                mailboxSelectors: new bytes4[](0),
-                gettersSelectors: new bytes4[](0),
-                bootloaderHash: keccak256("bootloader-hash"),
-                defaultAccountHash: keccak256("default-account-hash"),
-                evmEmulatorHash: keccak256("evm-emulator-hash"),
-                genesisRoot: keccak256("genesis-root"),
-                genesisRollupLeafIndex: 1,
-                genesisBatchCommitment: keccak256("genesis-batch-commitment"),
-                forceDeploymentsData: bytes(""),
-                protocolVersion: 0
-            }),
+            baseConfig: deployerConfig,
             chainTypeManagerProxyAdmin: proxyAdminResult.chainTypeManagerProxyAdmin,
             validatorTimelockProxy: vtResult.validatorTimelockProxy,
             // Placeholder addresses for direct deployments

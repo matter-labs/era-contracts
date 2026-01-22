@@ -4,13 +4,15 @@ pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
 import {StdStorage, Test, stdStorage, console} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
-import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER, L2_ASSET_TRACKER_ADDR, L2_CHAIN_ASSET_HANDLER, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER, L2_ASSET_TRACKER_ADDR, L2_CHAIN_ASSET_HANDLER, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {MAX_TOKEN_BALANCE} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
+import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 
 import {L2AssetTrackerData} from "./L2AssetTrackerData.sol";
 
@@ -31,6 +33,9 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
 
         ProcessLogsInput[] memory testData = L2AssetTrackerData.getData();
 
+        // Verify test data is not empty
+        assertTrue(testData.length > 0, "Test data should not be empty");
+
         // Add the required previous batch roots for batches 1-4
         // The test is trying to add batch 5, so we need batches 1-4 to exist first
         bytes32 dummyBatchRoot = keccak256("dummy_batch_root");
@@ -43,7 +48,12 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
                 .checked_write(bytes32(uint256(dummyBatchRoot) + i));
         }
 
+        uint256 successCount = 0;
+
         for (uint256 i = 0; i < testData.length; i++) {
+            // Verify each test data entry has valid chain ID
+            assertTrue(testData[i].chainId > 0, "Chain ID should be positive");
+
             // Set the current batch number to 4 so that batch 5 can be added next
             if (testData[i].batchNumber > 0) {
                 stdstore
@@ -115,9 +125,13 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
                 }
             }
 
-            require(success, string.concat("Failed to call GWAssetTracker ", vm.toString(i)));
+            assertTrue(success, string.concat("processLogsAndMessages should succeed for iteration ", vm.toString(i)));
+            successCount++;
             console.log("success", i);
         }
+
+        // Verify all iterations succeeded
+        assertEq(successCount, testData.length, "All processLogsAndMessages calls should succeed");
     }
 
     function getTxHashes(ProcessLogsInput memory input) public returns (bytes32[] memory) {
@@ -344,9 +358,36 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         // Mock sendMessageToL1 to avoid revert
         vm.mockCall(address(L2_BRIDGEHUB), abi.encodeWithSignature("sendMessageToL1(bytes)"), abi.encode(bytes32(0)));
 
-        // Call the migration function - should not revert
+        // Get asset migration number before migration
+        uint256 assetMigrationNumBefore = L2AssetTracker(L2_ASSET_TRACKER_ADDR).assetMigrationNumber(
+            block.chainid,
+            assetId
+        );
+
+        // Verify initial state
+        assertEq(assetMigrationNumBefore, 0, "Asset migration number should be 0 before migration");
+
+        // Record logs to capture the event
+        vm.recordLogs();
+
+        // Call the migration function
         L2_ASSET_TRACKER.initiateL1ToGatewayMigrationOnL2(assetId);
 
-        // Test passes if no revert occurred
+        // Verify the L1ToGatewayMigrationInitiated event was emitted
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertTrue(logs.length > 0, "Should emit L1ToGatewayMigrationInitiated event");
+
+        // Find the L1ToGatewayMigrationInitiated event
+        bool foundEvent = false;
+        bytes32 eventSignature = IL2AssetTracker.L1ToGatewayMigrationInitiated.selector;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == eventSignature) {
+                foundEvent = true;
+                // Verify the indexed assetId matches
+                assertEq(logs[i].topics[1], assetId, "Event assetId should match");
+                break;
+            }
+        }
+        assertTrue(foundEvent, "L1ToGatewayMigrationInitiated event should be emitted");
     }
 }

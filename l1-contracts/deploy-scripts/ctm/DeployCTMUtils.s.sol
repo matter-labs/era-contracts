@@ -322,7 +322,11 @@ abstract contract DeployCTMUtils is DeployUtils {
                         return type(EraTestnetVerifier).creationCode;
                     }
                 } else {
-                    return type(EraDualVerifier).creationCode;
+                    if (config.isZKsyncOS) {
+                        return type(ZKsyncOSDualVerifier).creationCode;
+                    } else {
+                        return type(EraDualVerifier).creationCode;
+                    }
                 }
             } else if (compareStrings(contractName, "EraVerifierFflonk")) {
                 return type(EraVerifierFflonk).creationCode;
