@@ -1,5 +1,8 @@
 name: Anvil Interop CI
 
+permissions:
+  contents: read
+
 on:
   pull_request:
     paths:
