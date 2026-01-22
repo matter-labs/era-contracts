@@ -23,6 +23,11 @@ jobs:
         with:
           submodules: true
 
+      - name: Install Foundry (includes Anvil)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
       - name: Install foundry-zksync
         uses: ./.github/actions/install-zksync-foundry
 
@@ -103,10 +108,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
-  
+
+      - name: Install Foundry (includes Anvil)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
       - name: Install foundry-zksync
         uses: ./.github/actions/install-zksync-foundry
-  
+
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
