@@ -69,7 +69,7 @@ pub const GW_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal:
 pub const DETERMINISTIC_CREATE2_ADDRESS: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "4e59b44847b379578588920cA78FbF26c0B4956C"
 )));
-pub const CREATE2_FACTORY_BYTECODE: &[u8] = &hex_literal::hex!(
+pub const CREATE2_FACTORY_RUNTIME_BYTECODE: &[u8] = &hex_literal::hex!(
     "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3"
 );
 
@@ -121,5 +121,5 @@ pub const INITIAL_CONTRACTS: [(Address, ContractSource); 19] = [
     (L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, ContractSource::L1ContractName("L1Messenger")),
     (L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, ContractSource::DAContractName("L2BaseToken")),
     // Deterministic Create2 factory
-    (DETERMINISTIC_CREATE2_ADDRESS, ContractSource::Bytecode(CREATE2_FACTORY_BYTECODE)),
+    (DETERMINISTIC_CREATE2_ADDRESS, ContractSource::Bytecode(CREATE2_FACTORY_RUNTIME_BYTECODE)),
 ];
