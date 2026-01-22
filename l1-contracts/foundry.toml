@@ -9,6 +9,7 @@ solc_version = "0.8.28"
 evm_version = "prague"
 fs_permissions = [
     { access = "read-write", path = "./script-out" },
+    { access = "read-write", path = "./scripts/anvil-interop/" },
     { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-config/" },
     { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-out/" },
     { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-config/" },

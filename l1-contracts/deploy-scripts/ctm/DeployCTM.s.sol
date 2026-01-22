@@ -526,16 +526,16 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function saveDiamondSelectors() public {
-        AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)), false);
+        AdminFacet adminFacet = new AdminFacet(block.chainid, RollupDAManager(address(0)), false);
         GettersFacet gettersFacet = new GettersFacet();
         MailboxFacet mailboxFacet = new MailboxFacet(
             1,
-            1,
+            block.chainid,
             coreAddresses.bridgehub.proxies.chainAssetHandler,
-            IEIP7702Checker(address(0)),
+            IEIP7702Checker(address(1)),
             false
         );
-        ExecutorFacet executorFacet = new ExecutorFacet(1);
+        ExecutorFacet executorFacet = new ExecutorFacet(block.chainid);
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);
         bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);
         bytes4[] memory mailboxFacetSelectors = Utils.getAllSelectors(address(mailboxFacet).code);

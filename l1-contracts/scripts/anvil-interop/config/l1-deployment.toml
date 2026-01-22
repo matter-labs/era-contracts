@@ -1,0 +1,15 @@
+era_chain_id = 270
+owner_address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+testnet_verifier = true
+support_l2_legacy_shared_bridge_test = false
+
+[deployed_addresses]
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+
+[contracts]
+governance_security_council_address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+governance_min_delay = 0
+max_number_of_chains = 100
+
+[tokens]
+token_weth_address = "0x0000000000000000000000000000000000000000"
