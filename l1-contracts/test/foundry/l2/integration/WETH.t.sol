@@ -10,7 +10,6 @@ import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_
 import {L2WethTestAbstract} from "../../l1/integration/l2-tests-abstract/L2WethTestAbstract.t.sol";
 
 import {SharedL2ContractL2Deployer, SystemContractsArgs} from "./_SharedL2ContractL2Deployer.sol";
-import {L2WrappedBaseToken} from "contracts/bridge/L2WrappedBaseToken.sol";
 import {Create2FactoryUtils} from "deploy-scripts/utils/deploy/Create2FactoryUtils.s.sol";
 import {ChainCreationParamsConfig} from "deploy-scripts/utils/Types.sol";
 import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
@@ -41,17 +40,5 @@ contract WethTest is Test, L2WethTestAbstract, SharedL2ContractL2Deployer {
         uint256 _l1ChainId
     ) public override(SharedL2ContractL2Deployer, SharedL2ContractDeployer) {
         super.deployL2Contracts(_l1ChainId);
-    }
-
-    function setUpInner(bool _skip) public override(SharedL2ContractDeployer, SharedL2ContractL2Deployer) {
-        SharedL2ContractL2Deployer.setUpInner(_skip);
-    }
-
-    function deployL2Weth()
-        internal
-        override(SharedL2ContractDeployer, SharedL2ContractL2Deployer)
-        returns (L2WrappedBaseToken)
-    {
-        return SharedL2ContractL2Deployer.deployL2Weth();
     }
 }

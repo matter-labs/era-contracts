@@ -308,7 +308,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         return address(proxy);
     }
 
-    function deployL2Weth() internal virtual returns (L2WrappedBaseToken) {
+    function deployL2Weth() internal returns (L2WrappedBaseToken) {
         L2WrappedBaseToken wethImpl = new L2WrappedBaseToken();
         TransparentUpgradeableProxy wethProxy = new TransparentUpgradeableProxy(address(wethImpl), ownerWallet, "");
         weth = L2WrappedBaseToken(payable(wethProxy));
