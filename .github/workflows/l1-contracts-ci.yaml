@@ -185,7 +185,7 @@ jobs:
         run: yarn l1 selectors --check
 
   test-foundry:
-    needs: [build, lint]
+    needs: [build]
     runs-on: ubuntu-latest
 
     steps:
@@ -235,7 +235,7 @@ jobs:
       #   run: forge test --match-test MeasureGas --gas-snapshot-check=true
 
   test-foundry-zksync:
-    needs: [build, lint]
+    needs: [build]
     runs-on: ubuntu-latest
 
     steps:
