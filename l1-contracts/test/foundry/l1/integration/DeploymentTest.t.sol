@@ -21,9 +21,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
-
-contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
+contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
@@ -41,7 +39,6 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
     }
 
     function prepare() public {
-        takeConfigLock(); // Prevents race condition with configs
         _generateUserAddresses();
 
         _deployL1Contracts();
@@ -50,8 +47,6 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
         _deployEra();
         _deployZKChain(ETH_TOKEN_ADDRESS);
-
-        releaseConfigLock();
 
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
@@ -126,6 +121,14 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         {
             uint256 chainId = currentZKChainId++;
             bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(chainId, ETH_TOKEN_ADDRESS);
+
+            // Verify chain is not registered before
+            assertEq(
+                addresses.bridgehub.getZKChain(chainId),
+                address(0),
+                "Chain should not be registered before deployment"
+            );
+
             address chain = _deployZkChain(
                 chainId,
                 baseTokenAssetId,
@@ -136,12 +139,26 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 address(addresses.interopCenter)
             );
 
+            // Verify chain was deployed
+            assertTrue(chain != address(0), "Chain should be deployed at a valid address");
+            assertTrue(chain.code.length > 0, "Chain should have contract code");
+
             address stmAddr = IZKChain(chain).getChainTypeManager();
+            assertTrue(stmAddr != address(0), "CTM address should not be zero");
 
             vm.startBroadcast(owner);
             addresses.bridgehub.addTokenAssetId(baseTokenAssetId);
             addresses.bridgehub.registerAlreadyDeployedZKChain(chainId, chain);
             vm.stopBroadcast();
+
+            // Verify chain is now registered
+            address bridgehubChainAddressForChain = addresses.bridgehub.getZKChain(chainId);
+            bytes32 bridgehubBaseAssetIdForChain = addresses.bridgehub.baseTokenAssetId(chainId);
+            address bhAddr = IZKChain(chain).getBridgehub();
+
+            assertEq(bridgehubChainAddressForChain, chain, "Chain address should be registered in bridgehub");
+            assertEq(bridgehubBaseAssetIdForChain, baseTokenAssetId, "Base token asset ID should be set");
+            assertEq(bhAddr, address(addresses.bridgehub), "Bridgehub address should match");
         }
     }
 

@@ -9,6 +9,7 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 
 import {Utils} from "../utils/Utils.sol";
 import {IL1Bridgehub, L2TransactionRequestDirect} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 
 contract InitializeL2WethTokenScript is Script {
     using stdToml for string;
@@ -33,27 +34,37 @@ contract InitializeL2WethTokenScript is Script {
 
     Config internal config;
 
-    function run() public {
-        initializeConfig();
+    function run(address _bridgehub) public {
+        initializeConfig(_bridgehub);
         initializeL2WethToken();
     }
 
-    function initializeConfig() internal {
+    function initializeConfig(address bridgehubProxyAddr) internal {
         config.deployerAddress = msg.sender;
 
         // Parse some config from output of l1 deployment
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, vm.envString("L1_OUTPUT"));
-        string memory toml = vm.readFile(path);
 
-        config.create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
-        config.create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
-        config.eraChainId = toml.readUint("$.era_chain_id");
-        config.bridgehubProxyAddr = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
+        // Read create2 factory values from permanent values file
+        // Note: This script uses $.contracts prefix instead of $.permanent_contracts
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValuesWithPrefix(
+            vm,
+            PermanentValuesHelper.getPermanentValuesPath(vm),
+            "$.contracts"
+        );
+        config.create2FactoryAddr = create2FactoryAddr;
+        config.create2FactorySalt = create2FactorySalt;
+
+        // Use AddressIntrospector to get addresses from deployed contracts
+        BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
+            IL1Bridgehub(bridgehubProxyAddr)
+        );
+        config.eraChainId = AddressIntrospector.getEraChainId(bhAddresses.assetRouter);
+        config.proxies.bridgehubAddr = bridgehubProxyAddr;
 
         // Parse some config from output of erc20 tokens deployment
-        path = string.concat(root, "/script-out/output-deploy-erc20.toml");
-        toml = vm.readFile(path);
+        string memory path = string.concat(root, "/script-out/output-deploy-erc20.toml");
+        string memory toml = vm.readFile(path);
 
         config.l1WethTokenAddr = toml.readAddress("$.tokens.WETH.address");
         config.l1WethTokenName = toml.readString("$.tokens.WETH.name");
@@ -73,7 +84,7 @@ contract InitializeL2WethTokenScript is Script {
     }
 
     function initializeL2WethToken() internal {
-        IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehubProxyAddr);
+        IL1Bridgehub bridgehub = IL1Bridgehub(config.proxies.bridgehubAddr);
 
         uint256 gasPrice = Utils.bytesToUint256(vm.rpc("eth_gasPrice", "[]")) * config.gasMultiplier;
         uint256 requiredValueToInitializeBridge = bridgehub.l2TransactionBaseCost(

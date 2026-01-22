@@ -127,9 +127,10 @@ library GatewayCTMDeployerHelper {
                 interopCenterProxy: L2_INTEROP_CENTER_ADDR,
                 rollupDAManager: _deployedContracts.daContracts.rollupDAManager,
                 chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
+                l1BytecodesSupplier: address(0),
                 eip7702Checker: address(0),
-                verifierFflonk: _deployedContracts.stateTransition.verifierFflonk,
-                verifierPlonk: _deployedContracts.stateTransition.verifierPlonk,
+                verifierFflonk: _deployedContracts.stateTransition.verifiers.verifierFflonk,
+                verifierPlonk: _deployedContracts.stateTransition.verifiers.verifierPlonk,
                 verifierOwner: _config.aliasedGovernanceAddress
             });
     }
@@ -172,7 +173,7 @@ library GatewayCTMDeployerHelper {
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig
     ) internal returns (DeployedContracts memory) {
-        _deployedContracts.stateTransition.mailboxFacet = _deployInternal(
+        _deployedContracts.stateTransition.facets.mailboxFacet = _deployInternal(
             "MailboxFacet",
             "Mailbox.sol",
             innerConfig,
@@ -180,7 +181,7 @@ library GatewayCTMDeployerHelper {
             _deployedContracts
         );
 
-        _deployedContracts.stateTransition.executorFacet = _deployInternal(
+        _deployedContracts.stateTransition.facets.executorFacet = _deployInternal(
             "ExecutorFacet",
             "Executor.sol",
             innerConfig,
@@ -188,14 +189,14 @@ library GatewayCTMDeployerHelper {
             _deployedContracts
         );
 
-        _deployedContracts.stateTransition.gettersFacet = _deployInternalEmptyParams(
+        _deployedContracts.stateTransition.facets.gettersFacet = _deployInternalEmptyParams(
             "GettersFacet",
             "Getters.sol",
             innerConfig
         );
 
         (_deployedContracts) = _deployRollupDAManager(_salt, _governanceAddress, _deployedContracts, innerConfig);
-        _deployedContracts.stateTransition.adminFacet = _deployInternal(
+        _deployedContracts.stateTransition.facets.adminFacet = _deployInternal(
             "AdminFacet",
             "Admin.sol",
             innerConfig,
@@ -203,7 +204,7 @@ library GatewayCTMDeployerHelper {
             _deployedContracts
         );
 
-        _deployedContracts.stateTransition.diamondInit = _deployInternal(
+        _deployedContracts.stateTransition.facets.diamondInit = _deployInternal(
             "DiamondInit",
             "DiamondInit.sol",
             innerConfig,
@@ -246,12 +247,12 @@ library GatewayCTMDeployerHelper {
             verifierPlonk = _deployInternalEmptyParams("EraVerifierPlonk", "EraVerifierPlonk.sol", innerConfig);
         }
 
-        _deployedContracts.stateTransition.verifierFflonk = verifierFflonk;
-        _deployedContracts.stateTransition.verifierPlonk = verifierPlonk;
+        _deployedContracts.stateTransition.verifiers.verifierFflonk = verifierFflonk;
+        _deployedContracts.stateTransition.verifiers.verifierPlonk = verifierPlonk;
 
         if (_testnetVerifier) {
             if (_isZKsyncOS) {
-                _deployedContracts.stateTransition.verifier = _deployInternal(
+                _deployedContracts.stateTransition.verifiers.verifier = _deployInternal(
                     "ZKsyncOSTestnetVerifier",
                     "ZKsyncOSTestnetVerifier.sol",
                     innerConfig,
@@ -259,7 +260,7 @@ library GatewayCTMDeployerHelper {
                     _deployedContracts
                 );
             } else {
-                _deployedContracts.stateTransition.verifier = _deployInternal(
+                _deployedContracts.stateTransition.verifiers.verifier = _deployInternal(
                     "EraTestnetVerifier",
                     "EraTestnetVerifier.sol",
                     innerConfig,
@@ -269,7 +270,7 @@ library GatewayCTMDeployerHelper {
             }
         } else {
             if (_isZKsyncOS) {
-                _deployedContracts.stateTransition.verifier = _deployInternal(
+                _deployedContracts.stateTransition.verifiers.verifier = _deployInternal(
                     "ZKsyncOSDualVerifier",
                     "ZKsyncOSDualVerifier.sol",
                     innerConfig,
@@ -277,7 +278,7 @@ library GatewayCTMDeployerHelper {
                     _deployedContracts
                 );
             } else {
-                _deployedContracts.stateTransition.verifier = _deployInternal(
+                _deployedContracts.stateTransition.verifiers.verifier = _deployInternal(
                     "EraDualVerifier",
                     "EraDualVerifier.sol",
                     innerConfig,
@@ -342,32 +343,32 @@ library GatewayCTMDeployerHelper {
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
-            facet: _deployedContracts.stateTransition.adminFacet,
+            facet: _deployedContracts.stateTransition.facets.adminFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
             selectors: _config.adminSelectors
         });
         facetCuts[1] = Diamond.FacetCut({
-            facet: _deployedContracts.stateTransition.gettersFacet,
+            facet: _deployedContracts.stateTransition.facets.gettersFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
             selectors: _config.gettersSelectors
         });
         facetCuts[2] = Diamond.FacetCut({
-            facet: _deployedContracts.stateTransition.mailboxFacet,
+            facet: _deployedContracts.stateTransition.facets.mailboxFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: _config.mailboxSelectors
         });
         facetCuts[3] = Diamond.FacetCut({
-            facet: _deployedContracts.stateTransition.executorFacet,
+            facet: _deployedContracts.stateTransition.facets.executorFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: _config.executorSelectors
         });
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            verifier: IVerifier(_deployedContracts.stateTransition.verifier),
+            verifier: IVerifier(_deployedContracts.stateTransition.verifiers.verifier),
             l2BootloaderBytecodeHash: _config.bootloaderHash,
             l2DefaultAccountBytecodeHash: _config.defaultAccountHash,
             l2EvmEmulatorBytecodeHash: _config.evmEmulatorHash
@@ -375,7 +376,7 @@ library GatewayCTMDeployerHelper {
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: _deployedContracts.stateTransition.diamondInit,
+            initAddress: _deployedContracts.stateTransition.facets.diamondInit,
             initCalldata: abi.encode(initializeData)
         });
 

@@ -18,6 +18,7 @@ import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerif
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {DeployCTMScript} from "../../ctm/DeployCTM.s.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 abstract contract CTMUpgradeBase is DeployCTMScript {
     function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual returns (bool);
@@ -139,9 +140,17 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         }
     }
 
+    error NotLatestProtocolVersion();
+
     /// @notice Get facet cuts that should be removed
     function getFacetCutsForDeletion(address diamond) internal view returns (Diamond.FacetCut[] memory facetCuts) {
         IZKChain.Facet[] memory facets = IZKChain(diamond).facets();
+
+        require(
+            IZKChain(diamond).getProtocolVersion() ==
+                IChainTypeManager(IZKChain(diamond).getChainTypeManager()).protocolVersion(),
+            NotLatestProtocolVersion()
+        );
 
         // Freezability does not matter when deleting, so we just put false everywhere
         facetCuts = new Diamond.FacetCut[](facets.length);
@@ -198,7 +207,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
             evmEmulatorHash: bytes32(0),
-            verifier: stateTransition.verifier,
+            verifier: stateTransition.verifiers.verifier,
             verifierParams: verifierParams,
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: new bytes(0),
@@ -242,7 +251,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             verifierParams: verifierParams,
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
-            verifier: stateTransition.verifier,
+            verifier: stateTransition.verifiers.verifier,
             upgradeTimestamp: 0,
             newProtocolVersion: chainCreationParams.latestProtocolVersion
         });

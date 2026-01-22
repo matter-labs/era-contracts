@@ -379,4 +379,40 @@ contract MessageRoot_Extended_Test is Test {
         bytes32 historicalRoot = l2MessageRoot.historicalRoot(block.number);
         assertTrue(historicalRoot != bytes32(0));
     }
+
+    function test_L1_CHAIN_ID() public view {
+        uint256 chainId = messageRoot.L1_CHAIN_ID();
+        assertEq(chainId, block.chainid);
+    }
+
+    function test_ERA_GATEWAY_CHAIN_ID() public view {
+        uint256 eraGatewayId = messageRoot.ERA_GATEWAY_CHAIN_ID();
+        assertEq(eraGatewayId, gatewayChainId);
+    }
+
+    function test_BRIDGE_HUB() public view {
+        address bridge = messageRoot.BRIDGE_HUB();
+        assertEq(bridge, bridgeHub);
+    }
+
+    function test_ChainBatchRoots() public view {
+        uint256 chainId = 999;
+        uint256 batchNumber = 1;
+        // Should return zero for unset chain batch roots
+        bytes32 root = messageRoot.chainBatchRoots(chainId, batchNumber);
+        assertEq(root, bytes32(0));
+    }
+
+    function test_GetAggregatedRoot_EmptyTree() public view {
+        // Before any chains are added (but current chain is always registered)
+        // the chainCount is 1 (the current chain)
+        bytes32 root = messageRoot.getAggregatedRoot();
+        assertTrue(root != bytes32(0));
+    }
+
+    function test_ChainIndexToId_Mapping() public view {
+        // Current chain is at index 0
+        uint256 chainAtIndex0 = messageRoot.chainIndexToId(0);
+        assertEq(chainAtIndex0, block.chainid);
+    }
 }

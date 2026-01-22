@@ -186,8 +186,8 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
         super.deployUpgradeSpecificContractsL1();
 
         //        (
-        //            bridgehubAddresses.chainAssetHandlerImplementation,
-        //            bridgehubAddresses.chainAssetHandlerProxy
+        //            bridgehubAddresses.proxies.implementations.chainAssetHandler,
+        //            bridgehubAddresses.proxies.chainAssetHandlerProxy
         //        ) = deployTuppWithContract("L1ChainAssetHandler", false);
 
         (
@@ -304,8 +304,8 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
     function prepareSetChainAssetHandlerOnBridgehubCall() public virtual returns (Call[] memory calls) {
         calls = new Call[](1);
         //        calls[0] = Call({
-        //            target: discoveredBridgehub.bridgehubProxy,
-        //            data: abi.encodeCall(IBridgehubBase.setChainAssetHandler, (bridgehubAddresses.chainAssetHandlerProxy)),
+        //            target: discoveredBridgehub.proxies.bridgehub,
+        //            data: abi.encodeCall(IBridgehubBase.setChainAssetHandler, (bridgehubAddresses.proxies.chainAssetHandlerProxy)),
         //            value: 0
         //        });
     }
@@ -315,7 +315,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
         calls = new Call[](1);
 
         //        calls[0] = Call({
-        //            target: discoveredBridgehub.l1CtmDeployer,
+        //            target: discoveredBridgehub.proxies.ctmDeploymentTracker,
         //            data: abi.encodeCall(CTMDeploymentTracker.setCtmAssetHandlerAddressOnL1, (discoveredCTM.ctmProxy)),
         //            value: 0
         //        });
@@ -361,7 +361,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
         bytes32 chainAssetId = DataEncoding.encodeAssetId(
             block.chainid,
             bytes32(uint256(uint160(discoveredCTM.ctmProxy))),
-            discoveredBridgehub.l1CtmDeployer
+            discoveredBridgehub.proxies.ctmDeploymentTracker
         );
 
         bytes memory secondBridgeData = abi.encodePacked(
@@ -375,7 +375,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
                 l1GasPrice,
                 l2GasLimit,
                 gatewayConfig.chainId,
-                discoveredBridgehub.bridgehubProxy,
+                discoveredBridgehub.proxies.bridgehub,
                 discoveredBridgehub.assetRouter,
                 discoveredBridgehub.assetRouter,
                 0,

@@ -12,7 +12,11 @@ import {GenesisBatchHashZero, GenesisBatchCommitmentIncorrect, GenesisUpgradeZer
 /// @custom:security-contact security@matterlabs.dev
 contract ZKsyncOSChainTypeManager is ChainTypeManagerBase {
     /// @dev Contract is expected to be used as proxy implementation.
-    constructor(address _bridgehub, address _interopCenter) ChainTypeManagerBase(_bridgehub, _interopCenter) {}
+    constructor(
+        address _bridgehub,
+        address _interopCenter,
+        address _l1BytecodesSupplier
+    ) ChainTypeManagerBase(_bridgehub, _interopCenter, _l1BytecodesSupplier) {}
 
     /// @notice Updates the parameters with which a new chain is created
     /// @param _chainCreationParams The new chain creation parameters

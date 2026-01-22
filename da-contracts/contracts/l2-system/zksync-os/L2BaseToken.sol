@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.28;
 
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
+import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "./L2ContractHelper.sol";
+import {IMailbox} from "./interfaces/IMailbox.sol";
 import {Burner} from "./Burner.sol";
 import {IBaseToken} from "./ZKOSContractHelper.sol";
 import {L1MessengerSendFailed} from "./errors/ZKOSContractErrors.sol";
@@ -56,7 +56,7 @@ contract L2BaseToken is IBaseToken {
 
     /// @dev Get the message to be sent to L1 to initiate a withdrawal.
     function _getL1WithdrawMessage(address _to, uint256 _amount) internal pure returns (bytes memory) {
-        return abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, _to, _amount);
+        return abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, _to, _amount);
     }
 
     /// @dev Get the message to be sent to L1 to initiate a withdrawal.
@@ -67,6 +67,6 @@ contract L2BaseToken is IBaseToken {
         bytes memory _additionalData
     ) internal pure returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, _to, _amount, _sender, _additionalData);
+        return abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, _to, _amount, _sender, _additionalData);
     }
 }

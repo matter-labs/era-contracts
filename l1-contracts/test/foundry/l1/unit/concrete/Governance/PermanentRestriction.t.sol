@@ -8,11 +8,13 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
-import {CallNotAllowed, InvalidSelector, NotAllowed, RemovingPermanentRestriction, UnallowedImplementation, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {AlreadyWhitelisted, CallNotAllowed, InvalidSelector, NotAllowed, RemovingPermanentRestriction, TooHighDeploymentNonce, UnallowedImplementation, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
 
@@ -429,5 +431,147 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             _factoryDeps: factoryDeps
         });
         vm.stopPrank();
+    }
+
+    // Additional tests for coverage
+
+    function test_allowL2Admin_TooHighDeploymentNonce() public {
+        // MAX_ALLOWED_NONCE is (1 << 48)
+        uint256 tooHighNonce = (1 << 48) + 1;
+
+        vm.expectRevert(TooHighDeploymentNonce.selector);
+        permRestriction.allowL2Admin(tooHighNonce);
+    }
+
+    function test_allowL2Admin_AlreadyWhitelisted() public {
+        // First, whitelist an admin
+        permRestriction.allowL2Admin(0);
+
+        address expectedAddress = L2ContractHelper.computeCreateAddress(L2_FACTORY_ADDR, 0);
+
+        // Try to whitelist the same admin again
+        vm.expectRevert(abi.encodeWithSelector(AlreadyWhitelisted.selector, expectedAddress));
+        permRestriction.allowL2Admin(0);
+    }
+
+    function test_validateRemoveRestriction_ShortData() public {
+        // Call with data length < 4 on msg.sender (chainAdmin)
+        Call memory call = Call({
+            target: address(chainAdmin),
+            value: 0,
+            data: hex"aabb" // Only 2 bytes, less than 4
+        });
+
+        // Should not revert - short data is allowed
+        vm.startPrank(address(chainAdmin));
+        permRestriction.validateCall(call, owner);
+        vm.stopPrank();
+    }
+
+    function test_validateRemoveRestriction_DifferentSelector() public {
+        // Call with a selector that is not removeRestriction
+        Call memory call = Call({
+            target: address(chainAdmin),
+            value: 0,
+            data: abi.encodeWithSelector(IAdmin.acceptAdmin.selector)
+        });
+
+        // Should not revert - different selector
+        vm.startPrank(address(chainAdmin));
+        permRestriction.validateCall(call, owner);
+        vm.stopPrank();
+    }
+
+    function test_validateRemoveRestriction_RemoveDifferentRestriction() public {
+        // Call removeRestriction with a different address (not this restriction)
+        address differentRestriction = makeAddr("differentRestriction");
+        Call memory call = Call({
+            target: address(chainAdmin),
+            value: 0,
+            data: abi.encodeWithSelector(IChainAdmin.removeRestriction.selector, differentRestriction)
+        });
+
+        // Should not revert - removing a different restriction is allowed
+        vm.startPrank(address(chainAdmin));
+        permRestriction.validateCall(call, owner);
+        vm.stopPrank();
+    }
+
+    function test_validateRemoveRestriction_RemoveThisRestriction() public {
+        // Call removeRestriction with this restriction's address
+        Call memory call = Call({
+            target: address(chainAdmin),
+            value: 0,
+            data: abi.encodeWithSelector(IChainAdmin.removeRestriction.selector, address(permRestriction))
+        });
+
+        vm.expectRevert(RemovingPermanentRestriction.selector);
+        vm.startPrank(address(chainAdmin));
+        permRestriction.validateCall(call, owner);
+        vm.stopPrank();
+    }
+
+    function test_tryGetNewAdminFromMigration_ShortData() public {
+        // Call with data length < 4 targeting bridgehub
+        Call memory call = Call({
+            target: address(bridgehub),
+            value: 0,
+            data: hex"aabb" // Only 2 bytes
+        });
+
+        assertInvalidMigrationCall(call);
+    }
+
+    function test_tryGetNewAdminFromMigration_EmptySecondBridgeCalldata() public {
+        // Create a call with empty secondBridgeCalldata
+        L2TransactionRequestTwoBridgesOuter memory outer = L2TransactionRequestTwoBridgesOuter({
+            chainId: chainId,
+            mintValue: 0,
+            l2Value: 0,
+            l2GasLimit: 0,
+            l2GasPerPubdataByteLimit: 0,
+            refundRecipient: address(0),
+            secondBridgeAddress: sharedBridge,
+            secondBridgeValue: 0,
+            secondBridgeCalldata: hex"" // Empty calldata
+        });
+
+        Call memory call = Call({
+            target: address(bridgehub),
+            value: 0,
+            data: abi.encodeCall(IL1Bridgehub.requestL2TransactionTwoBridges, (outer))
+        });
+
+        assertInvalidMigrationCall(call);
+    }
+
+    function test_tryGetNewAdminFromMigration_WrongAssetHandler() public {
+        address wrongHandler = makeAddr("wrongHandler");
+
+        // Mock the asset handler to return a different address than bridgehub
+        bytes32 chainAssetId = bridgehub.ctmAssetIdFromChainId(chainId);
+        vm.mockCall(
+            address(sharedBridge),
+            abi.encodeWithSelector(IAssetRouterBase.assetHandlerAddress.selector, chainAssetId),
+            abi.encode(wrongHandler) // Not bridgehub
+        );
+
+        Call memory call = _encodeMigraationCall(true, true, true, true, true, address(0));
+
+        assertInvalidMigrationCall(call);
+    }
+
+    function test_isAdminOfAChain_ChainIdMismatch() public {
+        // Create an address that returns a valid chainId but bridgehub returns different address
+        address fakeChain = makeAddr("fakeChain");
+        uint256 fakeChainId = 999999;
+
+        // Mock the chain to return a chainId using IGetters interface
+        vm.mockCall(fakeChain, abi.encodeCall(IGetters.getChainId, ()), abi.encode(fakeChainId));
+
+        // Bridgehub returns a different address for this chainId (or address(0))
+        // By default, bridgehub.getZKChain will return address(0) for unknown chainIds
+
+        assertFalse(permRestriction.isAdminOfAChain(fakeChain));
     }
 }

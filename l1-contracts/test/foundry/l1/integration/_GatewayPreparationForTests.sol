@@ -85,13 +85,11 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         vm.stopBroadcast();
 
         // The values provided here are dummy, but allow the test to be run smoothly
+        // Note: create2FactoryAddress and create2FactorySalt are read from permanent-values.toml
         address transactionFiltererProxy = deployer.run(
             _gatewayGovernanceConfig.bridgehubProxy,
             chainInfo.admin,
-            address(proxyAdmin),
-            // Unknown
-            address(0),
-            bytes32(0)
+            address(proxyAdmin)
         );
 
         AdminFunctions adminScript = new AdminFunctions();

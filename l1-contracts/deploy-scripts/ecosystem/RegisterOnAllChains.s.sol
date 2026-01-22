@@ -7,8 +7,9 @@ import {console2 as console} from "forge-std/console2.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
+import {IRegisterOnAllChains} from "contracts/script-interfaces/IRegisterOnAllChains.sol";
 
-contract RegisterOnAllChainsScript is Script {
+contract RegisterOnAllChainsScript is Script, IRegisterOnAllChains {
     function registerOnOtherChains(address _bridgehub, uint256 _chainId) public {
         IBridgehubBase bridgehub = IBridgehubBase(_bridgehub);
         uint256[] memory chainsToRegisterOn = bridgehub.getAllZKChainChainIDs();

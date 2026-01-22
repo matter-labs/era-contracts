@@ -12,6 +12,7 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
@@ -19,7 +20,7 @@ import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
-import {BridgehubDeployedAddresses, BridgesDeployedAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
+import {BridgehubAddresses, BridgesDeployedAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
@@ -30,13 +31,6 @@ import {UpgradeUtils} from "./UpgradeUtils.sol";
 contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
     using stdToml for string;
 
-    // solhint-disable-next-line gas-struct-packing
-    struct UpgradeDeployedAddresses {
-        address upgradeTimer;
-        address upgradeStageValidator;
-        address nativeTokenVaultImplementation;
-    }
-
     /// @notice Internal state of the upgrade script
     struct EcosystemUpgradeConfig {
         bool initialized;
@@ -46,12 +40,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
     struct AdditionalConfigParams {
         uint256 newProtocolVersion;
     }
-
-    UpgradeDeployedAddresses internal upgradeAddresses;
-    BridgehubDeployedAddresses internal bridgehubAddresses;
-    BridgesDeployedAddresses internal bridges;
-    AddressIntrospector.BridgehubAddresses internal discoveredBridgehub;
-    L1Bridgehub internal bridgehub;
     AdditionalConfigParams internal additionalConfig;
 
     EcosystemUpgradeConfig internal upgradeConfig;
@@ -106,10 +94,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         config.ownerAddress = owner;
     }
 
-    function getDiscoveredBridgehub() public view returns (AddressIntrospector.BridgehubAddresses memory) {
-        return discoveredBridgehub;
-    }
-
     function getNewProtocolVersion() public virtual returns (uint256) {
         return additionalConfig.newProtocolVersion;
     }
@@ -124,6 +108,10 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         return type(uint256).max;
     }
 
+    function getDiscoveredBridgehub() public view returns (BridgehubAddresses memory) {
+        return coreAddresses.bridgehub;
+    }
+
     function initializeConfig(
         string memory permanentValuesInputPath,
         string memory upgradeInputPath,
@@ -133,32 +121,31 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         string memory upgradeToml = vm.readFile(upgradeInputPath);
         string memory toml = vm.readFile(newConfigPath);
 
-        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
-        address create2FactoryAddr;
-        if (vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
-        }
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesInputPath);
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
         //        config.supportL2LegacySharedBridgeTest = permanentValuesToml.readBool("$.support_l2_legacy_shared_bridge_test");
         additionalConfig.newProtocolVersion = upgradeToml.readUint("$.contracts.new_protocol_version");
 
-        bridgehub = L1Bridgehub(permanentValuesToml.readAddress("$.contracts.bridgehub_proxy_address"));
+        coreAddresses.bridgehub.proxies.bridgehub = permanentValuesToml.readAddress(
+            "$.core_contracts.bridgehub_proxy_addr"
+        );
         setAddressesBasedOnBridgehub();
         initializeL1CoreUtilsConfig();
     }
 
     function initializeL1CoreUtilsConfig() internal virtual {
-        L1AssetRouter assetRouter = L1AssetRouter(discoveredBridgehub.assetRouter);
-        Governance governance = Governance(payable(discoveredBridgehub.governance));
+        L1AssetRouter assetRouter = L1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
+        L1Bridgehub bridgehub = L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
+        Governance governance = Governance(payable(coreAddresses.shared.governance));
         config.l1ChainId = block.chainid;
         config.deployerAddress = msg.sender;
         config.eraChainId = assetRouter.ERA_CHAIN_ID();
-        config.eraDiamondProxyAddress = address(assetRouter.ERA_DIAMOND_PROXY());
+        config.eraDiamondProxyAddress = bridgehub.getZKChain(assetRouter.ERA_CHAIN_ID());
 
         config.ownerAddress = assetRouter.owner();
 
         config.contracts.governanceSecurityCouncilAddress = governance.securityCouncil();
-        config.contracts.governanceMinDelay = governance.minDelay();
+        // config.contracts.governanceMinDelay = governance.minDelay();
 
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
 
@@ -166,60 +153,92 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
     }
 
     function setAddressesBasedOnBridgehub() internal virtual {
-        discoveredBridgehub = AddressIntrospector.getBridgehubAddresses(bridgehub);
+        coreAddresses = AddressIntrospector.getCoreDeployedAddresses(coreAddresses.bridgehub.proxies.bridgehub);
     }
 
     function saveOutput(string memory outputPath) internal virtual {
         // Serialize bridgehub addresses
-        vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", discoveredBridgehub.bridgehubProxy);
-        vm.serializeAddress("bridgehub", "bridgehub_implementation_addr", bridgehubAddresses.bridgehubImplementation);
+        vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", coreAddresses.bridgehub.proxies.bridgehub);
+        vm.serializeAddress(
+            "bridgehub",
+            "bridgehub_implementation_addr",
+            coreAddresses.bridgehub.implementations.bridgehub
+        );
         vm.serializeAddress(
             "bridgehub",
             "ctm_deployment_tracker_implementation_addr",
-            bridgehubAddresses.ctmDeploymentTrackerImplementation
+            coreAddresses.bridgehub.implementations.ctmDeploymentTracker
         );
-        vm.serializeAddress("bridgehub", "ctm_deployment_tracker_proxy_addr", discoveredBridgehub.l1CtmDeployer);
+        vm.serializeAddress(
+            "bridgehub",
+            "ctm_deployment_tracker_proxy_addr",
+            coreAddresses.bridgehub.proxies.ctmDeploymentTracker
+        );
         vm.serializeAddress(
             "bridgehub",
             "chain_asset_handler_implementation_addr",
-            bridgehubAddresses.chainAssetHandlerImplementation
+            coreAddresses.bridgehub.implementations.chainAssetHandler
         );
-        vm.serializeAddress("bridgehub", "chain_asset_handler_proxy_addr", discoveredBridgehub.chainAssetHandler);
-        vm.serializeAddress("bridgehub", "message_root_proxy_addr", discoveredBridgehub.messageRoot);
-        string memory bridgehubAddressesSerialized = vm.serializeAddress(
+        vm.serializeAddress(
+            "bridgehub",
+            "chain_asset_handler_proxy_addr",
+            coreAddresses.bridgehub.proxies.chainAssetHandler
+        );
+        vm.serializeAddress("bridgehub", "message_root_proxy_addr", coreAddresses.bridgehub.proxies.messageRoot);
+        string memory bridgehubSerialized = vm.serializeAddress(
             "bridgehub",
             "message_root_implementation_addr",
-            bridgehubAddresses.messageRootImplementation
+            coreAddresses.bridgehub.implementations.messageRoot
         );
 
         // Serialize bridges addresses
-        vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", bridges.erc20BridgeImplementation);
-        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", bridges.erc20BridgeProxy);
-        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", bridges.l1NullifierProxy);
-        vm.serializeAddress("bridges", "l1_nullifier_implementation_addr", bridges.l1NullifierImplementation);
-        vm.serializeAddress("bridges", "l1_asset_router_implementation_addr", bridges.l1AssetRouterImplementation);
-        vm.serializeAddress("bridges", "l1_asset_router_proxy_addr", bridges.l1AssetRouterProxy);
+        vm.serializeAddress(
+            "bridges",
+            "erc20_bridge_implementation_addr",
+            coreAddresses.bridges.implementations.erc20Bridge
+        );
+        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", coreAddresses.bridges.proxies.erc20Bridge);
+        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", coreAddresses.bridges.proxies.l1Nullifier);
+        vm.serializeAddress(
+            "bridges",
+            "l1_nullifier_implementation_addr",
+            coreAddresses.bridges.implementations.l1Nullifier
+        );
+        vm.serializeAddress(
+            "bridges",
+            "l1_asset_router_implementation_addr",
+            coreAddresses.bridges.implementations.l1AssetRouter
+        );
+        vm.serializeAddress("bridges", "l1_asset_router_proxy_addr", coreAddresses.bridges.proxies.l1AssetRouter);
         // TODO: legacy name
-        vm.serializeAddress("bridges", "shared_bridge_implementation_addr", bridges.l1AssetRouterImplementation);
-        vm.serializeAddress("bridges", "bridged_standard_erc20_impl", bridges.bridgedStandardERC20Implementation);
+        vm.serializeAddress(
+            "bridges",
+            "shared_bridge_implementation_addr",
+            coreAddresses.bridges.implementations.l1AssetRouter
+        );
+        vm.serializeAddress(
+            "bridges",
+            "bridged_standard_erc20_impl",
+            coreAddresses.bridges.bridgedStandardERC20Implementation
+        );
 
         string memory bridgesSerialized = vm.serializeAddress(
             "bridges",
             "bridged_token_beacon",
-            bridges.bridgedTokenBeacon
+            coreAddresses.bridges.bridgedTokenBeacon
         );
 
-        vm.serializeString("deployed_addresses", "bridgehub", bridgehubAddressesSerialized);
+        vm.serializeString("deployed_addresses", "bridgehub", bridgehubSerialized);
         vm.serializeString("deployed_addresses", "bridges", bridgesSerialized);
         vm.serializeAddress(
             "deployed_addresses",
             "native_token_vault_addr",
-            discoveredBridgehub.assetRouterAddresses.nativeTokenVault
+            coreAddresses.bridges.proxies.l1NativeTokenVault
         );
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
             "native_token_vault_implementation_addr",
-            upgradeAddresses.nativeTokenVaultImplementation
+            coreAddresses.bridges.implementations.l1NativeTokenVault
         );
 
         string memory toml = vm.serializeString("root", "upgrade_addresses", deployedAddresses);
@@ -263,11 +282,11 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
     }
 
     function prepareUnpauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
-        require(discoveredBridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
+        require(coreAddresses.bridgehub.proxies.bridgehub != address(0), "bridgehubProxyAddress is zero in newConfig");
 
         result = new Call[](1);
         result[0] = Call({
-            target: discoveredBridgehub.chainAssetHandler,
+            target: coreAddresses.bridgehub.proxies.chainAssetHandler,
             value: 0,
             data: abi.encodeCall(IChainAssetHandler.unpauseMigration, ())
         });
@@ -326,11 +345,11 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
     function provideSetNewVersionUpgradeCall() public virtual returns (Call[] memory calls) {}
 
     function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
-        require(discoveredBridgehub.chainAssetHandler != address(0), "chainAssetHandlerProxy is zero");
+        require(coreAddresses.bridgehub.proxies.chainAssetHandler != address(0), "chainAssetHandlerProxy is zero");
 
         result = new Call[](1);
         result[0] = Call({
-            target: discoveredBridgehub.chainAssetHandler,
+            target: coreAddresses.bridgehub.proxies.chainAssetHandler,
             value: 0,
             data: abi.encodeCall(IChainAssetHandler.pauseMigration, ())
         });
@@ -341,44 +360,47 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         calls = new Call[](7);
 
         calls[0] = _buildCallProxyUpgrade(
-            discoveredBridgehub.bridgehubProxy,
-            bridgehubAddresses.bridgehubImplementation
+            coreAddresses.bridgehub.proxies.bridgehub,
+            coreAddresses.bridgehub.implementations.bridgehub
         );
 
         // Note, that we do not need to run the initializer
-        // calls[1] = _buildCallProxyUpgrade(
-        //     discoveredBridgehub.assetRouterAddresses.l1Nullifier,
-        //     bridges.l1NullifierImplementation
-        // );
+        calls[1] = _buildCallProxyUpgrade(
+            coreAddresses.bridges.proxies.l1Nullifier,
+            coreAddresses.bridges.implementations.l1Nullifier
+        );
 
-        // calls[2] = _buildCallProxyUpgrade(discoveredBridgehub.assetRouter, bridges.l1AssetRouterImplementation);
+        calls[2] = _buildCallProxyUpgrade(
+            coreAddresses.bridges.proxies.l1AssetRouter,
+            coreAddresses.bridges.implementations.l1AssetRouter
+        );
 
-        // calls[3] = _buildCallProxyUpgrade(
-        //     discoveredBridgehub.assetRouterAddresses.nativeTokenVault,
-        //     upgradeAddresses.nativeTokenVaultImplementation
-        // );
+        calls[3] = _buildCallProxyUpgrade(
+            coreAddresses.bridges.proxies.l1NativeTokenVault,
+            coreAddresses.bridges.implementations.l1NativeTokenVault
+        );
 
-        // calls[4] = _buildCallProxyUpgrade(
-        //     discoveredBridgehub.messageRoot,
-        //     bridgehubAddresses.messageRootImplementation
-        // );
+        calls[4] = _buildCallProxyUpgrade(
+            coreAddresses.bridgehub.proxies.messageRoot,
+            coreAddresses.bridgehub.implementations.messageRoot
+        );
 
-        // calls[5] = _buildCallProxyUpgrade(
-        //     discoveredBridgehub.l1CtmDeployer,
-        //     bridgehubAddresses.ctmDeploymentTrackerImplementation
-        // );
+        calls[5] = _buildCallProxyUpgrade(
+            coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
+            coreAddresses.bridgehub.implementations.ctmDeploymentTracker
+        );
 
-        // calls[6] = _buildCallProxyUpgrade(bridges.erc20BridgeProxy, bridges.erc20BridgeImplementation);
+        // calls[6] = _buildCallProxyUpgrade(coreAddresses.bridges.proxies.erc20Bridge, coreAddresses.bridges.implementations.erc20Bridge);
     }
 
     function _buildCallProxyUpgrade(
         address proxyAddress,
         address newImplementationAddress
     ) internal virtual returns (Call memory call) {
-        require(discoveredBridgehub.transparentProxyAdmin != address(0), "transparentProxyAdmin not newConfigured");
+        require(coreAddresses.shared.transparentProxyAdmin != address(0), "transparentProxyAdmin not newConfigured");
 
         call = Call({
-            target: discoveredBridgehub.transparentProxyAdmin,
+            target: coreAddresses.shared.transparentProxyAdmin,
             data: abi.encodeCall(
                 ProxyAdmin.upgrade,
                 (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress)

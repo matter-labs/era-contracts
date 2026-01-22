@@ -22,7 +22,11 @@ import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ADDRESS_ONE, Utils} from "../utils/Utils.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
+import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
+import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -36,44 +40,12 @@ import {Call} from "contracts/governance/Common.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Create2AndTransfer} from "../utils/deploy/Create2AndTransfer.sol";
-import {ZkChainAddresses} from "../utils/Types.sol";
+import {ZkChainAddresses, StateTransitionDeployedAddresses, CTMDeployedAddresses, CoreDeployedAddresses} from "../utils/Types.sol";
 import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
-import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {IRegisterZKChain, RegisterZKChainConfig} from "contracts/script-interfaces/IRegisterZKChain.sol";
 import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
 
-// solhint-disable-next-line gas-struct-packing
-struct Config {
-    address deployerAddress;
-    address ownerAddress;
-    uint256 chainChainId;
-    bool validiumMode;
-    uint256 bridgehubCreateNewChainSalt;
-    address validatorSenderOperatorEth;
-    address validatorSenderOperatorBlobsEth;
-    // optional - if not set, then equal to 0
-    address validatorSenderOperatorProve;
-    // optional - if not set, then equal to 0
-    address validatorSenderOperatorExecute;
-    address baseToken;
-    bytes32 baseTokenAssetId;
-    uint128 baseTokenGasPriceMultiplierNominator;
-    uint128 baseTokenGasPriceMultiplierDenominator;
-    address governanceSecurityCouncilAddress;
-    uint256 governanceMinDelay;
-    bool initializeLegacyBridge;
-    address governance;
-    address create2FactoryAddress;
-    bytes32 create2Salt;
-    bool allowEvmEmulator;
-    // optional - if not set, then equal to 0
-    address l1Erc20Bridge;
-    address l1SharedBridgeProxy;
-    bytes diamondCutData;
-    bytes forceDeploymentsData;
-}
-
-contract RegisterZKChainScript is Script {
+contract RegisterZKChainScript is Script, IRegisterZKChain {
     using stdToml for string;
 
     bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewZKChain(uint256,address)");
@@ -87,18 +59,18 @@ contract RegisterZKChainScript is Script {
 
     LegacySharedBridgeParams internal legacySharedBridgeParams;
 
-    AddressIntrospector.CTMAddresses internal ctmAddresses;
-    AddressIntrospector.BridgehubAddresses internal bridgehubAddresses;
+    CTMDeployedAddresses internal ctmAddresses;
+    CoreDeployedAddresses internal coreAddresses;
 
-    Config internal config;
+    RegisterZKChainConfig internal config;
     ZkChainAddresses internal output;
 
-    function run(address ctm) public {
+    function run(address _chainTypeManagerProxy, uint256 _chainChainId) public {
         console.log("Deploying ZKChain");
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/register-zk-chain.toml");
-        initializeConfig(path, ctm);
-        loadChainCreationData(ctm);
+        initializeConfig(path, _chainTypeManagerProxy, _chainChainId);
+        loadChainCreationData(_chainTypeManagerProxy);
         // TODO: some chains may not want to have a legacy shared bridge
         runInner("/script-out/output-register-zk-chain.toml");
     }
@@ -109,12 +81,13 @@ contract RegisterZKChainScript is Script {
         );
     }
 
-    function runForTest() public {
+    function runForTest(address _chainTypeManagerProxy, uint256 _chainChainId) public {
         console.log("Deploying ZKChain");
 
         // Timestamp needs to be late enough for `pauseDepositsBeforeInitiatingMigration` time checks
         vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET + 1);
-        initializeConfigTest();
+
+        initializeConfigTest(_chainTypeManagerProxy, _chainChainId);
         runInner(vm.envString("ZK_CHAIN_OUT"));
     }
 
@@ -146,7 +119,7 @@ contract RegisterZKChainScript is Script {
         saveOutput(outputPath);
     }
 
-    function initializeConfig(string memory path, address chainTypeManagerProxy) internal {
+    function initializeConfig(string memory path, address chainTypeManagerProxy, uint256 chainChainId) internal {
         // Grab config from output of l1 deployment
         string memory toml = vm.readFile(path);
 
@@ -160,7 +133,7 @@ contract RegisterZKChainScript is Script {
 
         config.ownerAddress = toml.readAddress("$.owner_address");
 
-        config.chainChainId = toml.readUint("$.chain.chain_chain_id");
+        config.chainChainId = chainChainId;
         config.baseTokenGasPriceMultiplierNominator = uint128(
             toml.readUint("$.chain.base_token_gas_price_multiplier_nominator")
         );
@@ -199,13 +172,10 @@ contract RegisterZKChainScript is Script {
             config.l1SharedBridgeProxy = toml.readAddress("$.chain.l1_shared_bridge_proxy");
         }
 
-        if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
-            config.create2FactoryAddress = toml.readAddress("$.contracts.create2_factory_addr");
-        }
-
-        if (vm.keyExistsToml(toml, "$.contracts.create2_factory_salt")) {
-            config.create2Salt = toml.readBytes32("$.contracts.create2_factory_salt");
-        }
+        // Read create2 factory values from permanent values file
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(vm);
+        config.create2FactoryAddress = create2FactoryAddr;
+        config.create2Salt = create2FactorySalt;
 
         if (vm.keyExistsToml(toml, "$.chain.allow_evm_emulator")) {
             config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
@@ -216,26 +186,23 @@ contract RegisterZKChainScript is Script {
         ChainTypeManagerBase ctm = ChainTypeManagerBase(_ctmAddress);
         ctmAddresses = AddressIntrospector.getCTMAddresses(ctm);
         IL1Bridgehub bridgehub = IL1Bridgehub(ctm.BRIDGE_HUB());
-        bridgehubAddresses = AddressIntrospector.getBridgehubAddresses(bridgehub);
+        coreAddresses = AddressIntrospector.getCoreDeployedAddresses(address(bridgehub));
     }
 
-    function getConfig() public view returns (Config memory) {
+    function getConfig() public view returns (RegisterZKChainConfig memory) {
         return config;
     }
 
-    function initializeConfigTest() internal {
+    function initializeConfigTest(address chainTypeManagerProxy, uint256 chainChainId) internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, vm.envString("CTM_OUTPUT"));
         string memory toml = vm.readFile(path);
-        address chainTypeManagerProxy = toml.readAddress(
-            "$.deployed_addresses.state_transition.state_transition_proxy_addr"
-        );
         config.forceDeploymentsData = toml.readBytes("$.contracts_config.force_deployments_data");
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.create2FactoryAddress = toml.readAddress("$.contracts.create2_factory_addr");
         config.create2Salt = toml.readBytes32("$.contracts.create2_factory_salt");
         path = string.concat(root, vm.envString("ZK_CHAIN_CONFIG"));
-        initializeConfig(path, chainTypeManagerProxy);
+        initializeConfig(path, chainTypeManagerProxy, chainChainId);
     }
 
     function getOwnerAddress() public view returns (address) {
@@ -261,25 +228,25 @@ contract RegisterZKChainScript is Script {
 
     function setUpLegacySharedBridgeParams() internal {
         // Ecosystem governance is the owner of the L1Nullifier
-        address ecosystemGovernance = L1NullifierDev(bridgehubAddresses.assetRouterAddresses.l1Nullifier).owner();
+        address ecosystemGovernance = L1NullifierDev(coreAddresses.bridges.proxies.l1Nullifier).owner();
         address bridgeAddress = L2LegacySharedBridgeTestHelper.calculateL2LegacySharedBridgeProxyAddr(
             // TODO: this is not correct, we need to get the l1Erc20Bridge from the asset router
             config.l1Erc20Bridge,
-            bridgehubAddresses.assetRouterAddresses.l1Nullifier,
+            coreAddresses.bridges.proxies.l1Nullifier,
             ecosystemGovernance
         );
 
         vm.broadcast();
-        L1NullifierDev(bridgehubAddresses.assetRouterAddresses.l1Nullifier).setL2LegacySharedBridge(
+        L1NullifierDev(coreAddresses.bridges.proxies.l1Nullifier).setL2LegacySharedBridge(
             config.chainChainId,
             bridgeAddress
         );
     }
 
     function registerAssetIdOnBridgehub() internal {
-        IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddresses.bridgehubProxy);
-        ChainAdminOwnable admin = ChainAdminOwnable(payable(bridgehubAddresses.admin));
-        INativeTokenVaultBase ntv = INativeTokenVaultBase(bridgehubAddresses.assetRouterAddresses.nativeTokenVault);
+        IL1Bridgehub bridgehub = IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
+        ChainAdminOwnable admin = ChainAdminOwnable(payable(coreAddresses.shared.bridgehubAdmin));
+        INativeTokenVaultBase ntv = INativeTokenVaultBase(coreAddresses.bridges.proxies.l1NativeTokenVault);
         bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
         uint256 baseTokenOriginChain = ntv.originChainId(baseTokenAssetId);
 
@@ -292,7 +259,7 @@ contract RegisterZKChainScript is Script {
         } else {
             IChainAdminOwnable.Call[] memory calls = new IChainAdminOwnable.Call[](1);
             calls[0] = IChainAdminOwnable.Call({
-                target: bridgehubAddresses.bridgehubProxy,
+                target: coreAddresses.bridgehub.proxies.bridgehub,
                 value: 0,
                 data: abi.encodeCall(bridgehub.addTokenAssetId, (baseTokenAssetId))
             });
@@ -304,7 +271,7 @@ contract RegisterZKChainScript is Script {
     }
 
     function registerTokenOnNTV() internal {
-        INativeTokenVaultBase ntv = INativeTokenVaultBase(bridgehubAddresses.assetRouterAddresses.nativeTokenVault);
+        INativeTokenVaultBase ntv = INativeTokenVaultBase(coreAddresses.bridges.proxies.l1NativeTokenVault);
         bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
         uint256 baseTokenOriginChain = ntv.originChainId(baseTokenAssetId);
 
@@ -382,18 +349,18 @@ contract RegisterZKChainScript is Script {
     }
 
     function registerZKChain() internal {
-        IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddresses.bridgehubProxy);
-        ChainAdminOwnable admin = ChainAdminOwnable(payable(bridgehubAddresses.admin));
+        IL1Bridgehub bridgehub = IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
+        ChainAdminOwnable admin = ChainAdminOwnable(payable(coreAddresses.shared.bridgehubAdmin));
 
         IChainAdminOwnable.Call[] memory calls = new IChainAdminOwnable.Call[](1);
         calls[0] = IChainAdminOwnable.Call({
-            target: bridgehubAddresses.bridgehubProxy,
+            target: coreAddresses.bridgehub.proxies.bridgehub,
             value: 0,
             data: abi.encodeCall(
                 bridgehub.createNewChain,
                 (
                     config.chainChainId,
-                    ctmAddresses.ctmProxy,
+                    ctmAddresses.stateTransition.proxies.chainTypeManager,
                     config.baseTokenAssetId,
                     config.bridgehubCreateNewChainSalt,
                     msg.sender,
@@ -416,8 +383,8 @@ contract RegisterZKChainScript is Script {
     }
 
     function addValidators() internal {
-        ValidatorTimelock validatorTimelock = ValidatorTimelock(ctmAddresses.validatorTimelockPostV29);
-        address chainAddress = IL1Bridgehub(bridgehubAddresses.bridgehubProxy).getZKChain(config.chainChainId);
+        ValidatorTimelock validatorTimelock = ValidatorTimelock(ctmAddresses.stateTransition.proxies.validatorTimelock);
+        address chainAddress = IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).getZKChain(config.chainChainId);
 
         vm.startBroadcast(msg.sender);
 
@@ -530,7 +497,7 @@ contract RegisterZKChainScript is Script {
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             factoryDeps: emptyDeps,
             chainId: config.chainChainId,
-            bridgehubAddress: bridgehubAddresses.bridgehubProxy,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
             l1SharedBridgeProxy: config.l1SharedBridgeProxy
         });
 
@@ -539,15 +506,15 @@ contract RegisterZKChainScript is Script {
             constructorargs: L2LegacySharedBridgeTestHelper.getLegacySharedBridgeProxyConstructorParams(
                 legacyBridgeImplAddr,
                 config.l1Erc20Bridge,
-                bridgehubAddresses.assetRouterAddresses.l1Nullifier,
+                coreAddresses.bridges.proxies.l1Nullifier,
                 // Ecosystem governance is the owner of the L1Nullifier
-                L1NullifierDev(bridgehubAddresses.assetRouterAddresses.l1Nullifier).owner()
+                L1NullifierDev(coreAddresses.bridges.proxies.l1Nullifier).owner()
             ),
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             factoryDeps: emptyDeps,
             chainId: config.chainChainId,
-            bridgehubAddress: bridgehubAddresses.bridgehubProxy,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
             l1SharedBridgeProxy: config.l1SharedBridgeProxy
         });
     }

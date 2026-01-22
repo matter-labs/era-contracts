@@ -120,7 +120,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(address(bridgehub));
-        chainTypeManager = new EraChainTypeManager(address(bridgehub), interopCenterAddress);
+        chainTypeManager = new EraChainTypeManager(address(bridgehub), interopCenterAddress, address(0));
         diamondInit = address(new DiamondInit(false));
         genesisUpgradeContract = new L1GenesisUpgrade();
 

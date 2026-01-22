@@ -28,7 +28,7 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             serverNotifier: serverNotifier
         });
 
-        EraChainTypeManager ctm = new EraChainTypeManager(address(bridgehub), interopCenterAddress);
+        EraChainTypeManager ctm = new EraChainTypeManager(address(bridgehub), interopCenterAddress, address(0));
 
         vm.expectRevert(err);
         TransparentUpgradeableProxy transparentUpgradeableProxy = new TransparentUpgradeableProxy(

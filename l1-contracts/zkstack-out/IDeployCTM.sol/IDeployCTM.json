@@ -1,0 +1,425 @@
+[
+  {
+    "type": "function",
+    "name": "getAddresses",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct CTMDeployedAddresses",
+        "components": [
+          {
+            "name": "stateTransition",
+            "type": "tuple",
+            "internalType": "struct StateTransitionDeployedAddresses",
+            "components": [
+              {
+                "name": "proxies",
+                "type": "tuple",
+                "internalType": "struct StateTransitionContracts",
+                "components": [
+                  {
+                    "name": "chainTypeManager",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "serverNotifier",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "validatorTimelock",
+                    "type": "address",
+                    "internalType": "address"
+                  }
+                ]
+              },
+              {
+                "name": "implementations",
+                "type": "tuple",
+                "internalType": "struct StateTransitionContracts",
+                "components": [
+                  {
+                    "name": "chainTypeManager",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "serverNotifier",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "validatorTimelock",
+                    "type": "address",
+                    "internalType": "address"
+                  }
+                ]
+              },
+              {
+                "name": "verifiers",
+                "type": "tuple",
+                "internalType": "struct Verifiers",
+                "components": [
+                  {
+                    "name": "verifier",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "verifierFflonk",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "verifierPlonk",
+                    "type": "address",
+                    "internalType": "address"
+                  }
+                ]
+              },
+              {
+                "name": "facets",
+                "type": "tuple",
+                "internalType": "struct Facets",
+                "components": [
+                  {
+                    "name": "adminFacet",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "mailboxFacet",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "executorFacet",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "gettersFacet",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "diamondInit",
+                    "type": "address",
+                    "internalType": "address"
+                  }
+                ]
+              },
+              {
+                "name": "genesisUpgrade",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "defaultUpgrade",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "legacyValidatorTimelock",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "eraDiamondProxy",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "bytecodesSupplier",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "rollupDAManager",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "rollupSLDAValidator",
+                "type": "address",
+                "internalType": "address"
+              }
+            ]
+          },
+          {
+            "name": "daAddresses",
+            "type": "tuple",
+            "internalType": "struct DataAvailabilityDeployedAddresses",
+            "components": [
+              {
+                "name": "rollupDAManager",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "l1RollupDAValidator",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "noDAValidiumL1DAValidator",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "availBridge",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "availL1DAValidator",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "l1BlobsDAValidatorZKsyncOS",
+                "type": "address",
+                "internalType": "address"
+              }
+            ]
+          },
+          {
+            "name": "admin",
+            "type": "tuple",
+            "internalType": "struct CTMAdminAddresses",
+            "components": [
+              {
+                "name": "transparentProxyAdmin",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "governance",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "accessControlRestrictionAddress",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "eip7702Checker",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "chainTypeManagerAdmin",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "chainTypeManagerOwner",
+                "type": "address",
+                "internalType": "address"
+              }
+            ]
+          },
+          {
+            "name": "chainAdmin",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getConfig",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct Config",
+        "components": [
+          {
+            "name": "l1ChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "deployerAddress",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "eraChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "gatewayChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "ownerAddress",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "testnetVerifier",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "supportL2LegacySharedBridgeTest",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "isZKsyncOS",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "contracts",
+            "type": "tuple",
+            "internalType": "struct ContractsConfig",
+            "components": [
+              {
+                "name": "multicall3Addr",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "validatorTimelockExecutionDelay",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "governanceSecurityCouncilAddress",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "governanceMinDelay",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "diamondCutData",
+                "type": "bytes",
+                "internalType": "bytes"
+              },
+              {
+                "name": "maxNumberOfChains",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "availL1DAValidator",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "chainCreationParams",
+                "type": "tuple",
+                "internalType": "struct ChainCreationParamsConfig",
+                "components": [
+                  {
+                    "name": "genesisRoot",
+                    "type": "bytes32",
+                    "internalType": "bytes32"
+                  },
+                  {
+                    "name": "genesisRollupLeafIndex",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                  },
+                  {
+                    "name": "genesisBatchCommitment",
+                    "type": "bytes32",
+                    "internalType": "bytes32"
+                  },
+                  {
+                    "name": "latestProtocolVersion",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                  },
+                  {
+                    "name": "bootloaderHash",
+                    "type": "bytes32",
+                    "internalType": "bytes32"
+                  },
+                  {
+                    "name": "defaultAAHash",
+                    "type": "bytes32",
+                    "internalType": "bytes32"
+                  },
+                  {
+                    "name": "evmEmulatorHash",
+                    "type": "bytes32",
+                    "internalType": "bytes32"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "run",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "runForTest",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "skipL1Deployments",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "runWithBridgehub",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "reuseGovAndAdmin",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "saveDiamondSelectors",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  }
+]
