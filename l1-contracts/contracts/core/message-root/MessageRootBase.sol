@@ -342,4 +342,14 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
                 _proof: _proof
             });
     }
+
+    /// @dev Returns merkle path in `sharedTree` for a certain chain.
+    /// @param _chainId Id of the chain to get merkle path for.
+    function getMerklePathForChain(uint256 _chainId) external view returns (bytes32[] memory) {
+        if (!chainRegistered(_chainId)) {
+            revert MessageRootNotRegistered();
+        }
+        uint256 index = chainIndex[_chainId];
+        return sharedTree.merklePath(index);
+    }
 }
