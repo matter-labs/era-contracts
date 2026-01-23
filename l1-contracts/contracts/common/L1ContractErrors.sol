@@ -286,8 +286,6 @@ error NotL1(uint256 l1ChainId, uint256 blockChainId);
 error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
 // 0xdf17e316
 error NotWhitelisted(address);
-// 0xf3ed9dfa
-error OnlyEraSupported();
 // 0x6c167909
 error OnlySelfAllowed();
 // 0x1a21feed
