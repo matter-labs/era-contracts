@@ -1,205 +1,205 @@
-import { exec, spawn } from 'child_process';
-import { promisify } from 'util';
-import * as path from 'path';
-import { CoreDeployedAddresses, CTMDeployedAddresses } from './types';
-import { parseForgeScriptOutput, ensureDirectoryExists } from './utils';
+import { exec, spawn } from "child_process";
+import { promisify } from "util";
+import * as path from "path";
+import type { CoreDeployedAddresses, CTMDeployedAddresses } from "./types";
+import { parseForgeScriptOutput, ensureDirectoryExists } from "./utils";
 
 const execAsync = promisify(exec);
 
 export class ForgeDeployer {
-    private rpcUrl: string;
-    private privateKey: string;
-    private senderAddress: string;
-    private projectRoot: string;
-    private outputDir: string;
+  private rpcUrl: string;
+  private privateKey: string;
+  private senderAddress: string;
+  private projectRoot: string;
+  private outputDir: string;
 
-    constructor(rpcUrl: string, privateKey: string) {
-        this.rpcUrl = rpcUrl;
-        this.privateKey = privateKey;
-        // First Anvil account address corresponding to the default private key
-        this.senderAddress = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
-        this.projectRoot = path.resolve(__dirname, '../../..');
-        this.outputDir = path.join(__dirname, '../outputs');
-        ensureDirectoryExists(this.outputDir);
+  constructor(rpcUrl: string, privateKey: string) {
+    this.rpcUrl = rpcUrl;
+    this.privateKey = privateKey;
+    // First Anvil account address corresponding to the default private key
+    this.senderAddress = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+    this.projectRoot = path.resolve(__dirname, "../../..");
+    this.outputDir = path.join(__dirname, "../outputs");
+    ensureDirectoryExists(this.outputDir);
+  }
+
+  async deployL1Core(): Promise<CoreDeployedAddresses> {
+    console.log("📦 Deploying L1 core contracts...");
+
+    const scriptPath = "deploy-scripts/ecosystem/DeployL1CoreContracts.s.sol:DeployL1CoreContractsScript";
+    // Use path from l1-contracts root (must start with / for string.concat in script)
+    const configPath = "/scripts/anvil-interop/config/l1-deployment.toml";
+    const outputPath = "/scripts/anvil-interop/outputs/l1-core-output.toml";
+
+    const envVars = {
+      L1_CONFIG: configPath,
+      L1_OUTPUT: outputPath,
+      PERMANENT_VALUES_INPUT: "/scripts/anvil-interop/config/permanent-values.toml",
+    };
+
+    // Use runForAnvil() which skips the acceptAdmin() step
+    await this.runForgeScript(scriptPath, envVars, "runForAnvil()");
+
+    const fullOutputPath = path.join(this.projectRoot, outputPath);
+    const output = parseForgeScriptOutput(fullOutputPath);
+
+    console.log("✅ L1 core contracts deployed");
+
+    // Access nested TOML structure
+    const deployed = output.deployed_addresses || {};
+    const bridgehub = deployed.bridgehub || {};
+    const bridges = deployed.bridges || {};
+
+    return {
+      bridgehub: bridgehub.bridgehub_proxy_addr,
+      stateTransitionManager: deployed.state_transition_manager_proxy_addr,
+      validatorTimelock: deployed.validator_timelock_addr,
+      l1SharedBridge: bridges.shared_bridge_proxy_addr,
+      l1NullifierProxy: bridges.l1_nullifier_proxy_addr,
+      l1NativeTokenVault: deployed.native_token_vault_addr,
+      l1ERC20Bridge: bridges.erc20_bridge_proxy_addr,
+      governance: deployed.governance_addr,
+      transparentProxyAdmin: deployed.transparent_proxy_admin_addr,
+      blobVersionedHashRetriever: deployed.blob_versioned_hash_retriever_addr,
+    };
+  }
+
+  async deployCTM(bridgehubAddr: string): Promise<CTMDeployedAddresses> {
+    console.log("📦 Deploying ChainTypeManager...");
+
+    const scriptPath = "deploy-scripts/ctm/DeployCTM.s.sol:DeployCTMScript";
+    // Use path from l1-contracts root (must start with / for string.concat in script)
+    const configPath = "/scripts/anvil-interop/config/ctm-deployment.toml";
+    const outputPath = "/scripts/anvil-interop/outputs/ctm-output.toml";
+    const permanentValuesPath = "/scripts/anvil-interop/config/permanent-values.toml";
+
+    const envVars = {
+      CTM_CONFIG: configPath,
+      CTM_OUTPUT: outputPath,
+      PERMANENT_VALUES_INPUT: permanentValuesPath,
+    };
+
+    const sig = "runForTest(address,bool)";
+    const args = `${bridgehubAddr} false`;
+
+    await this.runForgeScript(scriptPath, envVars, sig, args);
+
+    const fullOutputPath = path.join(this.projectRoot, outputPath);
+    const output = parseForgeScriptOutput(fullOutputPath);
+
+    console.log("✅ ChainTypeManager deployed");
+
+    return {
+      chainTypeManager: output.chain_type_manager_proxy_addr || output.chain_type_manager,
+      chainAdmin: output.chain_admin_addr || output.chain_admin,
+      diamondProxy: output.diamond_proxy_addr || output.diamond_proxy,
+      adminFacet: output.admin_facet_addr || output.admin_facet,
+      gettersFacet: output.getters_facet_addr || output.getters_facet,
+      mailboxFacet: output.mailbox_facet_addr || output.mailbox_facet,
+      executorFacet: output.executor_facet_addr || output.executor_facet,
+      verifier: output.verifier_addr || output.verifier,
+      validiumL1DAValidator: output.validium_l1da_validator_addr || output.validium_l1da_validator,
+      rollupL1DAValidator: output.rollup_l1da_validator_addr || output.rollup_l1da_validator,
+    };
+  }
+
+  async registerCTM(bridgehubAddr: string, ctmAddr: string): Promise<void> {
+    console.log("📝 Registering ChainTypeManager with Bridgehub...");
+
+    const scriptPath = "deploy-scripts/ecosystem/RegisterCTM.s.sol:RegisterCTM";
+    const sig = "runForTest(address,address)";
+    const args = `${bridgehubAddr} ${ctmAddr}`;
+
+    const envVars = {
+      BRIDGEHUB_ADDR: bridgehubAddr,
+      CTM_ADDR: ctmAddr,
+    };
+
+    await this.runForgeScript(scriptPath, envVars, sig, args);
+
+    console.log("✅ ChainTypeManager registered");
+  }
+
+  private async runForgeScript(
+    scriptPath: string,
+    envVars: Record<string, string>,
+    sig?: string,
+    args?: string
+  ): Promise<string> {
+    const env = {
+      ...process.env,
+      ...envVars,
+    };
+
+    // Build command arguments array
+    const commandArgs = [
+      "script",
+      scriptPath,
+      "--rpc-url",
+      this.rpcUrl,
+      "--unlocked",
+      "--sender",
+      this.senderAddress,
+      "--broadcast",
+      "--slow", // Send transactions one at a time to avoid overwhelming Anvil
+      "--legacy",
+      "--ffi", // Enable FFI for scripts that need to call external commands
+      "--sig",
+      sig || "runForTest()",
+    ];
+
+    if (sig && args) {
+      commandArgs.push(...args.split(" "));
     }
 
-    async deployL1Core(): Promise<CoreDeployedAddresses> {
-        console.log('📦 Deploying L1 core contracts...');
+    console.log(`   Running: ${scriptPath}`);
+    console.log(`   Command: forge ${commandArgs.join(" ")}`);
+    console.log("");
 
-        const scriptPath = 'deploy-scripts/ecosystem/DeployL1CoreContracts.s.sol:DeployL1CoreContractsScript';
-        // Use path from l1-contracts root (must start with / for string.concat in script)
-        const configPath = '/scripts/anvil-interop/config/l1-deployment.toml';
-        const outputPath = '/scripts/anvil-interop/outputs/l1-core-output.toml';
+    return new Promise((resolve, reject) => {
+      const forgeProcess = spawn("forge", commandArgs, {
+        cwd: this.projectRoot,
+        env,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
 
-        const envVars = {
-            L1_CONFIG: configPath,
-            L1_OUTPUT: outputPath,
-            PERMANENT_VALUES_INPUT: '/scripts/anvil-interop/config/permanent-values.toml',
-        };
+      let stdout = "";
+      let stderr = "";
 
-        // Use runForAnvil() which skips the acceptAdmin() step
-        await this.runForgeScript(scriptPath, envVars, 'runForAnvil()');
+      // Stream stdout in real-time
+      forgeProcess.stdout.on("data", (data: Buffer) => {
+        const text = data.toString();
+        stdout += text;
+        process.stdout.write(text);
+      });
 
-        const fullOutputPath = path.join(this.projectRoot, outputPath);
-        const output = parseForgeScriptOutput(fullOutputPath);
-
-        console.log('✅ L1 core contracts deployed');
-
-        // Access nested TOML structure
-        const deployed = output.deployed_addresses || {};
-        const bridgehub = deployed.bridgehub || {};
-        const bridges = deployed.bridges || {};
-
-        return {
-            bridgehub: bridgehub.bridgehub_proxy_addr,
-            stateTransitionManager: deployed.state_transition_manager_proxy_addr,
-            validatorTimelock: deployed.validator_timelock_addr,
-            l1SharedBridge: bridges.shared_bridge_proxy_addr,
-            l1NullifierProxy: bridges.l1_nullifier_proxy_addr,
-            l1NativeTokenVault: deployed.native_token_vault_addr,
-            l1ERC20Bridge: bridges.erc20_bridge_proxy_addr,
-            governance: deployed.governance_addr,
-            transparentProxyAdmin: deployed.transparent_proxy_admin_addr,
-            blobVersionedHashRetriever: deployed.blob_versioned_hash_retriever_addr,
-        };
-    }
-
-    async deployCTM(bridgehubAddr: string): Promise<CTMDeployedAddresses> {
-        console.log('📦 Deploying ChainTypeManager...');
-
-        const scriptPath = 'deploy-scripts/ctm/DeployCTM.s.sol:DeployCTMScript';
-        // Use path from l1-contracts root (must start with / for string.concat in script)
-        const configPath = '/scripts/anvil-interop/config/ctm-deployment.toml';
-        const outputPath = '/scripts/anvil-interop/outputs/ctm-output.toml';
-        const permanentValuesPath = '/scripts/anvil-interop/config/permanent-values.toml';
-
-        const envVars = {
-            CTM_CONFIG: configPath,
-            CTM_OUTPUT: outputPath,
-            PERMANENT_VALUES_INPUT: permanentValuesPath,
-        };
-
-        const sig = `runForTest(address,bool)`;
-        const args = `${bridgehubAddr} false`;
-
-        await this.runForgeScript(scriptPath, envVars, sig, args);
-
-        const fullOutputPath = path.join(this.projectRoot, outputPath);
-        const output = parseForgeScriptOutput(fullOutputPath);
-
-        console.log('✅ ChainTypeManager deployed');
-
-        return {
-            chainTypeManager: output.chain_type_manager_proxy_addr || output.chain_type_manager,
-            chainAdmin: output.chain_admin_addr || output.chain_admin,
-            diamondProxy: output.diamond_proxy_addr || output.diamond_proxy,
-            adminFacet: output.admin_facet_addr || output.admin_facet,
-            gettersFacet: output.getters_facet_addr || output.getters_facet,
-            mailboxFacet: output.mailbox_facet_addr || output.mailbox_facet,
-            executorFacet: output.executor_facet_addr || output.executor_facet,
-            verifier: output.verifier_addr || output.verifier,
-            validiumL1DAValidator: output.validium_l1da_validator_addr || output.validium_l1da_validator,
-            rollupL1DAValidator: output.rollup_l1da_validator_addr || output.rollup_l1da_validator,
-        };
-    }
-
-    async registerCTM(bridgehubAddr: string, ctmAddr: string): Promise<void> {
-        console.log('📝 Registering ChainTypeManager with Bridgehub...');
-
-        const scriptPath = 'deploy-scripts/ecosystem/RegisterCTM.s.sol:RegisterCTM';
-        const sig = 'runForTest(address,address)';
-        const args = `${bridgehubAddr} ${ctmAddr}`;
-
-        const envVars = {
-            BRIDGEHUB_ADDR: bridgehubAddr,
-            CTM_ADDR: ctmAddr,
-        };
-
-        await this.runForgeScript(scriptPath, envVars, sig, args);
-
-        console.log('✅ ChainTypeManager registered');
-    }
-
-    private async runForgeScript(
-        scriptPath: string,
-        envVars: Record<string, string>,
-        sig?: string,
-        args?: string
-    ): Promise<string> {
-        const env = {
-            ...process.env,
-            ...envVars,
-        };
-
-        // Build command arguments array
-        const commandArgs = [
-            'script',
-            scriptPath,
-            '--rpc-url',
-            this.rpcUrl,
-            '--unlocked',
-            '--sender',
-            this.senderAddress,
-            '--broadcast',
-            '--slow', // Send transactions one at a time to avoid overwhelming Anvil
-            '--legacy',
-            '--ffi', // Enable FFI for scripts that need to call external commands
-            '--sig',
-            sig || 'runForTest()',
-        ];
-
-        if (sig && args) {
-            commandArgs.push(...args.split(' '));
+      // Stream stderr in real-time, but filter warnings
+      forgeProcess.stderr.on("data", (data: Buffer) => {
+        const text = data.toString();
+        stderr += text;
+        // Only show non-warning stderr
+        const lines = text.split("\n");
+        const nonWarningLines = lines.filter((line: string) => !line.includes("Warning"));
+        if (nonWarningLines.length > 0 && nonWarningLines.join("").trim()) {
+          process.stderr.write(nonWarningLines.join("\n") + "\n");
         }
+      });
 
-        console.log(`   Running: ${scriptPath}`);
-        console.log(`   Command: forge ${commandArgs.join(' ')}`);
-        console.log('');
+      forgeProcess.on("close", (code: number) => {
+        console.log("");
+        if (code === 0) {
+          console.log("✅ Script completed successfully");
+          resolve(stdout);
+        } else {
+          console.error(`❌ Forge script failed with exit code ${code}`);
+          reject(new Error(`Forge script exited with code ${code}`));
+        }
+      });
 
-        return new Promise((resolve, reject) => {
-            const forgeProcess = spawn('forge', commandArgs, {
-                cwd: this.projectRoot,
-                env,
-                stdio: ['ignore', 'pipe', 'pipe'],
-            });
-
-            let stdout = '';
-            let stderr = '';
-
-            // Stream stdout in real-time
-            forgeProcess.stdout.on('data', (data: Buffer) => {
-                const text = data.toString();
-                stdout += text;
-                process.stdout.write(text);
-            });
-
-            // Stream stderr in real-time, but filter warnings
-            forgeProcess.stderr.on('data', (data: Buffer) => {
-                const text = data.toString();
-                stderr += text;
-                // Only show non-warning stderr
-                const lines = text.split('\n');
-                const nonWarningLines = lines.filter((line: string) => !line.includes('Warning'));
-                if (nonWarningLines.length > 0 && nonWarningLines.join('').trim()) {
-                    process.stderr.write(nonWarningLines.join('\n') + '\n');
-                }
-            });
-
-            forgeProcess.on('close', (code: number) => {
-                console.log('');
-                if (code === 0) {
-                    console.log('✅ Script completed successfully');
-                    resolve(stdout);
-                } else {
-                    console.error(`❌ Forge script failed with exit code ${code}`);
-                    reject(new Error(`Forge script exited with code ${code}`));
-                }
-            });
-
-            forgeProcess.on('error', (error: Error) => {
-                console.error('❌ Failed to spawn forge process:', error.message);
-                reject(error);
-            });
-        });
-    }
+      forgeProcess.on("error", (error: Error) => {
+        console.error("❌ Failed to spawn forge process:", error.message);
+        reject(error);
+      });
+    });
+  }
 }

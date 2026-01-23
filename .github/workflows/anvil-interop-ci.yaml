@@ -148,31 +148,67 @@ jobs:
       - name: Start Anvil Interop Environment
         working-directory: l1-contracts/scripts/anvil-interop
         run: |
-          yarn start &
-          ANVIL_PID=$!
-          sleep 60
-          kill $ANVIL_PID || true
-  
-      - name: Check if chains started
+          echo "Starting Anvil interop environment in background..."
+          yarn start > deployment.log 2>&1 &
+          YARN_PID=$!
+          echo "Deployment started with PID: $YARN_PID"
+
+          # Wait for deployment to complete (signaled by deployment-info.json)
+          echo "Waiting for deployment to complete..."
+          TIMEOUT=600  # 10 minutes
+          ELAPSED=0
+          INTERVAL=5
+
+          while [ $ELAPSED -lt $TIMEOUT ]; do
+            if [ -f "outputs/deployment-info.json" ]; then
+              echo "✅ Deployment completed! (deployment-info.json found)"
+              break
+            fi
+
+            if ! kill -0 $YARN_PID 2>/dev/null; then
+              echo "❌ Deployment process died unexpectedly"
+              echo "Deployment log (last 100 lines):"
+              tail -100 deployment.log
+              exit 1
+            fi
+
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+            echo "  Waiting... (${ELAPSED}s / ${TIMEOUT}s)"
+          done
+
+          if [ ! -f "outputs/deployment-info.json" ]; then
+            echo "❌ Deployment timed out after ${TIMEOUT} seconds"
+            echo "Deployment log (last 100 lines):"
+            tail -100 deployment.log
+            kill $YARN_PID 2>/dev/null || true
+            pkill -9 anvil 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "Deployment info:"
+          cat outputs/deployment-info.json
+
+      - name: Run Integration Tests
+        working-directory: l1-contracts
         run: |
-          echo "Checking L1 chain (port 9545)..."
-          curl -f -X POST -H "Content-Type: application/json" \
-            --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
-            http://127.0.0.1:9545 || (echo "❌ L1 chain not responding on port 9545" && exit 1)
+          echo "Running Foundry integration tests..."
+          forge script deploy-scripts/integration-tests/InteropTest.s.sol:InteropTest \
+            --rpc-url http://127.0.0.1:9545 \
+            --ffi \
+            -vvv
 
-          echo "Checking L2 chain 10 (port 4050)..."
-          curl -f -X POST -H "Content-Type: application/json" \
-            --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
-            http://127.0.0.1:4050 || (echo "❌ L2 chain 10 not responding on port 4050" && exit 1)
+      - name: Cleanup
+        if: always()
+        working-directory: l1-contracts/scripts/anvil-interop
+        run: |
+          echo "Cleaning up Anvil processes..."
+          pkill -9 -f "yarn start" 2>/dev/null || true
+          pkill -9 -f "ts-node index.ts" 2>/dev/null || true
+          pkill -9 anvil 2>/dev/null || true
+          echo "✅ Cleanup complete"
 
-          echo "Checking L2 chain 11 (port 4051)..."
-          curl -f -X POST -H "Content-Type: application/json" \
-            --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
-            http://127.0.0.1:4051 || (echo "❌ L2 chain 11 not responding on port 4051" && exit 1)
-
-          echo "Checking L2 chain 12 (port 4052)..."
-          curl -f -X POST -H "Content-Type: application/json" \
-            --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
-            http://127.0.0.1:4052 || (echo "❌ L2 chain 12 not responding on port 4052" && exit 1)
-
-          echo "✅ All chains are responding"
+          if [ -f "deployment.log" ]; then
+            echo "Final deployment log (last 200 lines):"
+            tail -200 deployment.log
+          fi
