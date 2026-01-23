@@ -43,9 +43,7 @@ contract MailboxTest is UtilsCallMockerTest {
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(
-                new MailboxFacet(block.chainid, address(chainAssetHandler), eip7702Checker, false)
-            ),
+            facet: address(new MailboxFacet(block.chainid, address(chainAssetHandler), eip7702Checker, false)),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: Utils.getMailboxSelectors()

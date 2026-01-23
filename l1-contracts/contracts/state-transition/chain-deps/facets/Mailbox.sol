@@ -23,10 +23,8 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {L1_GAS_PER_PUBDATA_BYTE, MAX_NEW_FACTORY_DEPS, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "../../../common/Config.sol";
 import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
-import {IAssetRouterShared} from "../../../bridge/asset-router/IAssetRouterShared.sol";
 
-import {AddressNotZero, BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, NotAssetRouter, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
+import {AddressNotZero, BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {DepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 import {DepthMoreThanOneForRecursiveMerkleProof} from "../../../core/bridgehub/L1BridgehubErrors.sol";
 
@@ -82,12 +80,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         _;
     }
 
-    constructor(
-        uint256 _l1ChainId,
-        address _chainAssetHandler,
-        IEIP7702Checker _eip7702Checker,
-        bool _isTestnet
-    ) {
+    constructor(uint256 _l1ChainId, address _chainAssetHandler, IEIP7702Checker _eip7702Checker, bool _isTestnet) {
         if (address(_eip7702Checker) == address(0) && block.chainid == _l1ChainId) {
             revert ZeroAddress();
         } else if (address(_eip7702Checker) != address(0) && block.chainid != _l1ChainId) {
@@ -662,5 +655,4 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     function _writePriorityOpHash(bytes32 _canonicalTxHash, uint64 _expirationTimestamp) internal {
         s.priorityTree.push(_canonicalTxHash);
     }
-
 }
