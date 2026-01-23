@@ -123,6 +123,9 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
 
         if (_txStatus == TxStatus.Failure) {
             --migrationNumber[bridgehubBurnData.chainId];
+            // Reset migration interval since the L1 -> SL migration failed.
+            // This prevents stale migrateToSLBatchNumber from affecting settlement layer validation.
+            delete migrationInterval[bridgehubBurnData.chainId];
         }
 
         isMigrationInProgress[bridgehubBurnData.chainId] = false;

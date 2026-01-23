@@ -22,6 +22,8 @@ error DepthMoreThanOneForRecursiveMerkleProof();
 error IncorrectChainAssetId(bytes32 assetId, bytes32 assetIdFromChainId);
 // 0xf5e39c1f
 error IncorrectSender(address prevMsgSender, address chainAdmin);
+// 0x896555dc
+error InvalidSettlementLayerForBatch(uint256 chainId, uint256 batchNumber, uint256 claimedSettlementLayer);
 // 0x47d42b1b
 error IteratedMigrationsNotSupported();
 // 0xc3bd3c65
