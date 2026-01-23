@@ -1,10 +1,10 @@
 use crate::consts::{
-    ContractSource, EIP1967_ADMIN_SLOT, EIP1967_IMPLEMENTATION_SLOT, INITIAL_CONTRACTS,
-    L2_COMPLEX_UPGRADER_ADDR, L2_COMPLEX_UPGRADER_IMPL_ADDR, SYSTEM_CONTRACT_PROXY_ADMIN,
-    SYSTEM_PROXY_ADMIN_OWNER_SLOT,
+    BASE_TOKEN_HOLDER_ADDR, EIP1967_ADMIN_SLOT, EIP1967_IMPLEMENTATION_SLOT, INITIAL_CONTRACTS,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_COMPLEX_UPGRADER_IMPL_ADDR,
+    SYSTEM_CONTRACT_PROXY_ADMIN, SYSTEM_PROXY_ADMIN_OWNER_SLOT,
 };
 use crate::types::{InitialGenesisInput, LeafInfo, MAX_B256_VALUE, MERKLE_TREE_DEPTH};
-use crate::utils::{address_to_b256, da_contract_name_to_code, l1_contract_name_to_code};
+use crate::utils::{address_to_b256, bytecode_to_code};
 use alloy::consensus::{Header, EMPTY_OMMER_ROOT_HASH};
 use alloy::eips::eip1559::INITIAL_BASE_FEE;
 use alloy::primitives::{Address, Bloom, B256, B64, U256};
@@ -20,12 +20,8 @@ impl InitialGenesisInput {
         InitialGenesisInput {
             initial_contracts: INITIAL_CONTRACTS
                 .iter()
-                .map(|(addr, source)| {
-                    let code = match source {
-                        ContractSource::L1ContractName(name) => l1_contract_name_to_code(name),
-                        ContractSource::DAContractName(name) => da_contract_name_to_code(name),
-                        ContractSource::Bytecode(bytecode) => bytecode.to_vec(),
-                    };
+                .map(|(addr, name)| {
+                    let code = bytecode_to_code(name);
                     (*addr, alloy::primitives::Bytes::from(code))
                 })
                 .collect(),
@@ -236,6 +232,32 @@ pub fn build_genesis_root_hash(genesis_input: &InitialGenesisInput) -> anyhow::R
     build_initial_genesis_commitment(storage_logs, header)
 }
 
+/// Computes the storage slot for a Solidity mapping entry.
+/// For `mapping(address => uint256)` at slot `mapping_slot`, the key for `address` is:
+/// `keccak256(abi.encode(address, mapping_slot))`
+fn solidity_mapping_slot(address: Address, mapping_slot: U256) -> B256 {
+    use alloy::primitives::keccak256;
+
+    // abi.encode(address, mapping_slot) - both are padded to 32 bytes
+    let mut data = [0u8; 64];
+    // First 32 bytes: address left-padded
+    data[12..32].copy_from_slice(address.as_slice());
+    // Second 32 bytes: mapping slot
+    data[32..64].copy_from_slice(&mapping_slot.to_be_bytes::<32>());
+
+    keccak256(data)
+}
+
+/// The initial balance of the BaseTokenHolder contract (2^127 - 1).
+/// This value is used in L2BaseToken.totalSupply() calculation:
+/// totalSupply = INITIAL_BASE_TOKEN_HOLDER_BALANCE - balance[BASE_TOKEN_HOLDER_ADDRESS]
+const INITIAL_BASE_TOKEN_HOLDER_BALANCE: U256 = U256::from_limbs([
+    0xFFFFFFFFFFFFFFFF, // lower 64 bits all 1s
+    0x7FFFFFFFFFFFFFFF, // next 64 bits: 2^63 - 1 (since 2^127 - 1 = 2^64 * (2^63 - 1) + 2^64 - 1)
+    0,
+    0,
+]);
+
 fn construct_additional_storage() -> BTreeMap<Address, BTreeMap<B256, B256>> {
     let mut map: BTreeMap<Address, BTreeMap<B256, B256>> = BTreeMap::new();
 
@@ -259,6 +281,19 @@ fn construct_additional_storage() -> BTreeMap<Address, BTreeMap<B256, B256>> {
         address_to_b256(&SYSTEM_CONTRACT_PROXY_ADMIN),
     );
     map.insert(L2_COMPLEX_UPGRADER_ADDR, l2_complex_upgrader_storage);
+
+    // Initialize BaseTokenHolder's balance in L2BaseToken contract.
+    // The `balance` mapping is at slot 0 in L2BaseToken.
+    // We set balance[BASE_TOKEN_HOLDER_ADDR] = INITIAL_BASE_TOKEN_HOLDER_BALANCE (2^127 - 1)
+    let mut l2_base_token_storage = BTreeMap::new();
+    let balance_mapping_slot = U256::ZERO; // `balance` mapping is at slot 0
+    let base_token_holder_balance_slot =
+        solidity_mapping_slot(BASE_TOKEN_HOLDER_ADDR, balance_mapping_slot);
+    l2_base_token_storage.insert(
+        base_token_holder_balance_slot,
+        B256::from(INITIAL_BASE_TOKEN_HOLDER_BALANCE),
+    );
+    map.insert(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, l2_base_token_storage);
 
     map
 }

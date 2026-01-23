@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import {IBaseTokenHolder} from "./interfaces/IBaseTokenHolder.sol";
-import {IBaseToken} from "./interfaces/IBaseToken.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {BOOTLOADER_FORMAL_ADDRESS, BASE_TOKEN_SYSTEM_CONTRACT} from "./Constants.sol";
 import {Unauthorized} from "./SystemContractErrors.sol";
