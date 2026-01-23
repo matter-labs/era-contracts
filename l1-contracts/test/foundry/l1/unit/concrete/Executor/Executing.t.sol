@@ -387,7 +387,7 @@ contract ExecutingTest is ExecutorTest {
         uint256 l2Value = 10 ether;
         uint256 totalCost = baseCost + l2Value;
 
-dummyBridgehub.requestL2TransactionDirect{value: totalCost}(
+        dummyBridgehub.requestL2TransactionDirect{value: totalCost}(
             L2TransactionRequestDirect({
                 chainId: l2ChainId,
                 mintValue: totalCost,

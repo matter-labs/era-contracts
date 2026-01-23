@@ -103,7 +103,6 @@ contract GatewayCTMDeployerTest is Test {
     // This is done merely to publish the respective bytecodes.
     function _predeployContracts() internal {
         // DA contracts
-
         new RollupDAManager();
         new ValidiumL1DAValidator();
         new RelayedSLDAValidator();
