@@ -98,7 +98,6 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         );
         ctmAddresses.stateTransition.facets.mailboxFacet = address(
             new MailboxFacet(
-                config.eraChainId,
                 config.l1ChainId,
                 L2_CHAIN_ASSET_HANDLER_ADDR,
                 IEIP7702Checker(address(0)),

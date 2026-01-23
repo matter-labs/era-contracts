@@ -253,7 +253,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_finalizeWithdrawal_EthOnEth_withdrawalFailed() public {
         vm.deal(address(nativeTokenVault), 0);
-        bytes memory message = abi.encodePacked(IMailboxIMailboxLegacyImpl.finalizeEthWithdrawal.selector, alice, amount);
+        bytes memory message = abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,

@@ -181,7 +181,6 @@ contract GatewayCTMDeployer {
     constructor(GatewayCTMDeployerConfig memory _config) {
         // Caching some values
         bytes32 salt = _config.salt;
-        uint256 eraChainId = _config.eraChainId;
         uint256 l1ChainId = _config.l1ChainId;
 
         DeployedContracts memory contracts;
@@ -190,7 +189,6 @@ contract GatewayCTMDeployer {
 
         _deployFacetsAndUpgrades({
             _salt: salt,
-            _eraChainId: eraChainId,
             _l1ChainId: l1ChainId,
             _aliasedGovernanceAddress: _config.aliasedGovernanceAddress,
             _deployedContracts: contracts,
@@ -217,7 +215,6 @@ contract GatewayCTMDeployer {
 
     /// @notice Deploys facets and upgrade contracts.
     /// @param _salt Salt used for CREATE2 deployments.
-    /// @param _eraChainId Era Chain ID.
     /// @param _l1ChainId L1 Chain ID.
     /// used by permanent rollups.
     /// @param _aliasedGovernanceAddress The aliased address of the governnace.
@@ -225,7 +222,6 @@ contract GatewayCTMDeployer {
     /// in the process of the execution of this function.
     function _deployFacetsAndUpgrades(
         bytes32 _salt,
-        uint256 _eraChainId,
         uint256 _l1ChainId,
         address _aliasedGovernanceAddress,
         DeployedContracts memory _deployedContracts,
@@ -233,7 +229,6 @@ contract GatewayCTMDeployer {
     ) internal {
         _deployedContracts.stateTransition.facets.mailboxFacet = address(
             new MailboxFacet{salt: _salt}({
-                _eraChainId: _eraChainId,
                 _l1ChainId: _l1ChainId,
                 _chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
                 _eip7702Checker: IEIP7702Checker(address(0)),

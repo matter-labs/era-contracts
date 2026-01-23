@@ -66,7 +66,6 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
     address internal testnetVerifier;
     bytes internal forceDeploymentsData = hex"";
 
-    uint256 eraChainId = 9;
     uint256 internal constant MAX_NUMBER_OF_ZK_CHAINS = 10;
 
     Diamond.FacetCut[] internal facetCuts;
@@ -160,7 +159,6 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             Diamond.FacetCut({
                 facet: address(
                     new MailboxFacet(
-                        eraChainId,
                         block.chainid,
                         address(0),
                         IEIP7702Checker(makeAddr("eip7702Checker")),

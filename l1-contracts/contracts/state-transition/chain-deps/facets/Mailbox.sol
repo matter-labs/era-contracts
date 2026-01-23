@@ -83,7 +83,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     }
 
     constructor(
-        uint256 _eraChainId,
         uint256 _l1ChainId,
         address _chainAssetHandler,
         IEIP7702Checker _eip7702Checker,
@@ -94,7 +93,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         } else if (address(_eip7702Checker) != address(0) && block.chainid != _l1ChainId) {
             revert AddressNotZero();
         }
-        ERA_CHAIN_ID = _eraChainId;
         L1_CHAIN_ID = _l1ChainId;
         CHAIN_ASSET_HANDLER = _chainAssetHandler;
         EIP_7702_CHECKER = _eip7702Checker;

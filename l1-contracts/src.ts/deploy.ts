@@ -636,7 +636,7 @@ export class Deployer {
     const chainAssetHandler = getAddressFromEnv("CONTRACTS_CHAIN_ASSET_HANDLER_ADDR");
     const contractAddress = await this.deployViaCreate2(
       "MailboxFacet",
-      [eraChainId, await this.getL1ChainId(), chainAssetHandler],
+      [await this.getL1ChainId(), chainAssetHandler],
       create2Salt,
       ethTxOptions
     );

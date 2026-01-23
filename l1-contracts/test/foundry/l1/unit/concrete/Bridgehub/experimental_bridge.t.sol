@@ -123,7 +123,7 @@ contract ExperimentalBridgeTest is Test {
         weth = makeAddr("WETH");
         mockCTM = new DummyChainTypeManagerWBH(address(bridgehub));
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
-        mockChainContract = new DummyZKChain(address(bridgehub), eraChainId, block.chainid, address(0), eip7702Checker);
+        mockChainContract = new DummyZKChain(address(bridgehub), block.chainid, address(0), eip7702Checker);
 
         mockL2Contract = makeAddr("mockL2Contract");
         // mocks to use in bridges instead of using a dummy one
