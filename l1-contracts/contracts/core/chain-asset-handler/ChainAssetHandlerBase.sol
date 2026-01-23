@@ -18,6 +18,7 @@ import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../../common/Config.sol";
 import {IncorrectChainAssetId, IncorrectSender, MigrationNotToL1, MigrationNumberAlreadySet, MigrationNumberMismatch, NotSystemContext, OnlyChain, SLHasDifferentCTM, ZKChainNotRegistered, IteratedMigrationsNotSupported} from "../bridgehub/L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused, NotAssetRouter} from "../../common/L1ContractErrors.sol";
+import {MigrationInterval} from "./IChainAssetHandler.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetHandlerModifiers} from "../../bridge/interfaces/AssetHandlerModifiers.sol";
@@ -76,12 +77,26 @@ abstract contract ChainAssetHandlerBase is
     /// NOTE: this mapping may be deprecated in the future, don't rely on it!
     mapping(uint256 chainId => uint256 migrationNumber) public migrationNumber;
 
+    /// @notice The chain ID of the legacy Gateway. Used for settlement layer validation.
+    uint256 public constant LEGACY_GW_CHAIN_ID = 9075;
+
+    /// @notice The batch range where LEGACY_GW_CHAIN_ID is always allowed as settlement layer.
+    /// @dev This represents the historical period when some chains were on the legacy GW.
+    /// @dev These values will be set to the actual range before V31 deployment (GW will be shut down first).
+    /// TODO: Set actual values.
+    uint256 public constant LEGACY_GW_BATCH_FROM = 0;
+    uint256 public constant LEGACY_GW_BATCH_TO = 0;
+
+    /// @notice Tracks migration batch numbers for chains that migrated to Gateway.
+    /// @dev Used to validate that settlement layer claims match the batch number.
+    mapping(uint256 chainId => MigrationInterval) public migrationInterval;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[43] private __gap;
+    uint256[42] private __gap;
 
     /// @notice Only the asset router can call.
     modifier onlyAssetRouter() {
@@ -215,6 +230,13 @@ abstract contract ChainAssetHandlerBase is
 
         uint256 batchNumber = IMessageRoot(_messageRoot()).currentChainBatchNumber(bridgehubBurnData.chainId);
 
+        // Track migration interval for settlement layer validation.
+        // When migrating FROM L1 TO a settlement layer, record the last L1 batch number and the SL chain ID.
+        if (block.chainid == _l1ChainId() && _settlementChainId != _l1ChainId()) {
+            migrationInterval[bridgehubBurnData.chainId].migrateToSLBatchNumber = batchNumber;
+            migrationInterval[bridgehubBurnData.chainId].settlementLayerChainId = _settlementChainId;
+        }
+
         BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
             chainId: bridgehubBurnData.chainId,
             baseTokenAssetId: IBridgehubBase(_bridgehub()).baseTokenAssetId(bridgehubBurnData.chainId),
@@ -254,6 +276,13 @@ abstract contract ChainAssetHandlerBase is
         }
         migrationNumber[bridgehubMintData.chainId] = bridgehubMintData.migrationNumber;
 
+        // Track migration interval for settlement layer validation.
+        // When migrating FROM settlement layer BACK TO L1, record the last SL batch number.
+        // This happens when migrationNumber is 2 (first migration was L1->SL, second is SL->L1).
+        if (block.chainid == _l1ChainId() && bridgehubMintData.migrationNumber == 2) {
+            migrationInterval[bridgehubMintData.chainId].migrateFromSLBatchNumber = bridgehubMintData.batchNumber;
+        }
+
         (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeMint(
             _assetId,
             bridgehubMintData.chainId,
@@ -283,6 +312,58 @@ abstract contract ChainAssetHandlerBase is
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);
 
         emit MigrationFinalized(bridgehubMintData.chainId, _assetId, zkChain);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    SETTLEMENT LAYER VALIDATION
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Validates if a claimed settlement layer is valid for a given chain and batch number.
+    /// @dev Used by MessageRoot to validate that proofs claim the correct settlement layer.
+    /// @dev Special case: for batches in [LEGACY_GW_BATCH_FROM, LEGACY_GW_BATCH_TO], both L1 and LEGACY_GW are valid.
+    /// @param _chainId The ID of the chain.
+    /// @param _batchNumber The batch number to check.
+    /// @param _claimedSettlementLayer The settlement layer chain ID claimed in the proof.
+    /// @return True if the claimed settlement layer is valid for this chain and batch.
+    function isValidSettlementLayer(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        uint256 _claimedSettlementLayer
+    ) external view returns (bool) {
+        // For batches in the legacy GW range, BOTH L1 and LEGACY_GW are valid.
+        if (_batchNumber >= LEGACY_GW_BATCH_FROM && _batchNumber <= LEGACY_GW_BATCH_TO) {
+            return _claimedSettlementLayer == _l1ChainId() || _claimedSettlementLayer == LEGACY_GW_CHAIN_ID;
+        }
+
+        MigrationInterval memory interval = migrationInterval[_chainId];
+
+        // Chain has a migration interval set - use it
+        if (interval.migrateToSLBatchNumber != 0) {
+            // Chain migrated to SL but hasn't returned yet
+            if (interval.migrateFromSLBatchNumber == 0) {
+                if (_batchNumber <= interval.migrateToSLBatchNumber) {
+                    // Batches up to and including migrateToSLBatchNumber were on L1
+                    return _claimedSettlementLayer == _l1ChainId();
+                }
+                // Batches after migrateToSLBatchNumber are on the settlement layer
+                return _claimedSettlementLayer == interval.settlementLayerChainId;
+            }
+
+            // Chain migrated to SL and back to L1
+            if (_batchNumber <= interval.migrateToSLBatchNumber) {
+                // Batches up to migrateToSLBatchNumber were on L1
+                return _claimedSettlementLayer == _l1ChainId();
+            } else if (_batchNumber <= interval.migrateFromSLBatchNumber) {
+                // Batches in (migrateToSLBatchNumber, migrateFromSLBatchNumber] were on SL
+                return _claimedSettlementLayer == interval.settlementLayerChainId;
+            } else {
+                // Batches after migrateFromSLBatchNumber are back on L1
+                return _claimedSettlementLayer == _l1ChainId();
+            }
+        }
+
+        // Default: only L1 is valid
+        return _claimedSettlementLayer == _l1ChainId();
     }
 
     /*//////////////////////////////////////////////////////////////

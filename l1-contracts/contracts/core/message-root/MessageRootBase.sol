@@ -7,7 +7,8 @@ import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializabl
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 
 import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH} from "./IMessageRoot.sol";
-import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, DepthMoreThanOneForRecursiveMerkleProof, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyChain, OnlyL1} from "../bridgehub/L1BridgehubErrors.sol";
+import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, DepthMoreThanOneForRecursiveMerkleProof, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyChain, OnlyL1, InvalidSettlementLayerForBatch} from "../bridgehub/L1BridgehubErrors.sol";
+import {IChainAssetHandler} from "../chain-asset-handler/IChainAssetHandler.sol";
 
 import {GW_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
@@ -293,6 +294,19 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
             IBridgehubBase(_bridgehub()).whitelistedSettlementLayers(proofData.settlementLayerChainId),
             NotWhitelistedSettlementLayer(proofData.settlementLayerChainId)
         );
+
+        // Validate that the claimed settlement layer is correct for this chain and batch number.
+        // This prevents a malicious settlement layer from claiming batches that were not actually
+        // committed on it (e.g., GW claiming batches after chain migrated back to L1).
+        // Only validate on L1 where migration interval data is available.
+        if (block.chainid == L1_CHAIN_ID()) {
+            bool isValid = IChainAssetHandler(IBridgehubBase(_bridgehub()).chainAssetHandler()).isValidSettlementLayer(
+                _chainId,
+                _batchNumber,
+                proofData.settlementLayerChainId
+            );
+            require(isValid, InvalidSettlementLayerForBatch(_chainId, _batchNumber, proofData.settlementLayerChainId));
+        }
 
         return
             this.proveL2LeafInclusionSharedRecursive({
