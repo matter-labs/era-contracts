@@ -102,14 +102,6 @@ contract GatewayCTMDeployerTest is Test {
 
     // This is done merely to publish the respective bytecodes.
     function _predeployContracts() internal {
-        new MailboxFacet(1, L2_CHAIN_ASSET_HANDLER_ADDR, IEIP7702Checker(address(0)), false);
-        new ExecutorFacet(1);
-        new GettersFacet();
-        new AdminFacet(1, RollupDAManager(address(0)), false);
-
-        new DiamondInit(false);
-        new L1GenesisUpgrade();
-
         // DA contracts
         new RollupDAManager();
         new ValidiumL1DAValidator();
