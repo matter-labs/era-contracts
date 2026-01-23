@@ -10,7 +10,7 @@ import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} 
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
 import {IVerifier} from "../../chain-interfaces/IVerifier.sol";
 
-import {GatewayCTMFinalConfig, GatewayCTMFinalResult} from "./GatewayCTMDeployer.sol";
+import {Facets, GatewayCTMDeployerConfig, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "./GatewayCTMDeployer.sol";
 
 /// @title GatewayCTMDeployerCTMBase
 /// @author Matter Labs
@@ -30,7 +30,7 @@ abstract contract GatewayCTMDeployerCTMBase {
     /// @notice Initializes the deployer and deploys all contracts.
     /// @param _config The deployment configuration.
     function _deployInner(GatewayCTMFinalConfig memory _config) internal {
-        bytes32 salt = _config.salt;
+        bytes32 salt = _config.baseConfig.salt;
 
         GatewayCTMFinalResult memory result;
 
@@ -41,7 +41,7 @@ abstract contract GatewayCTMDeployerCTMBase {
         _deployCTM(salt, _config, result);
 
         // Link ServerNotifier to CTM and transfer ownership
-        _setChainTypeManagerInServerNotifier(_config.aliasedGovernanceAddress, result);
+        _setChainTypeManagerInServerNotifier(_config.baseConfig.aliasedGovernanceAddress, result);
 
         deployedResult = result;
     }
@@ -82,42 +82,45 @@ abstract contract GatewayCTMDeployerCTMBase {
     ) internal {
         _result.chainTypeManagerImplementation = _deployCTMImplementation(_salt);
 
+        GatewayCTMDeployerConfig memory baseConfig = _config.baseConfig;
+        Facets memory facets = _config.facets;
+
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
-            facet: _config.adminFacet,
+            facet: facets.adminFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: _config.adminSelectors
+            selectors: baseConfig.adminSelectors
         });
         facetCuts[1] = Diamond.FacetCut({
-            facet: _config.gettersFacet,
+            facet: facets.gettersFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: _config.gettersSelectors
+            selectors: baseConfig.gettersSelectors
         });
         facetCuts[2] = Diamond.FacetCut({
-            facet: _config.mailboxFacet,
+            facet: facets.mailboxFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: _config.mailboxSelectors
+            selectors: baseConfig.mailboxSelectors
         });
         facetCuts[3] = Diamond.FacetCut({
-            facet: _config.executorFacet,
+            facet: facets.executorFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: _config.executorSelectors
+            selectors: baseConfig.executorSelectors
         });
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(_config.verifier),
-            l2BootloaderBytecodeHash: _config.bootloaderHash,
-            l2DefaultAccountBytecodeHash: _config.defaultAccountHash,
-            l2EvmEmulatorBytecodeHash: _config.evmEmulatorHash
+            l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
+            l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
+            l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: _config.diamondInit,
+            initAddress: facets.diamondInit,
             initCalldata: abi.encode(initializeData)
         });
 
@@ -125,18 +128,18 @@ abstract contract GatewayCTMDeployerCTMBase {
 
         ChainCreationParams memory chainCreationParams = ChainCreationParams({
             genesisUpgrade: _config.genesisUpgrade,
-            genesisBatchHash: _config.genesisRoot,
-            genesisIndexRepeatedStorageChanges: uint64(_config.genesisRollupLeafIndex),
-            genesisBatchCommitment: _config.genesisBatchCommitment,
+            genesisBatchHash: baseConfig.genesisRoot,
+            genesisIndexRepeatedStorageChanges: uint64(baseConfig.genesisRollupLeafIndex),
+            genesisBatchCommitment: baseConfig.genesisBatchCommitment,
             diamondCut: diamondCut,
-            forceDeploymentsData: _config.forceDeploymentsData
+            forceDeploymentsData: baseConfig.forceDeploymentsData
         });
 
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
-            owner: _config.aliasedGovernanceAddress,
-            validatorTimelock: _config.validatorTimelock,
+            owner: baseConfig.aliasedGovernanceAddress,
+            validatorTimelock: _config.validatorTimelockProxy,
             chainCreationParams: chainCreationParams,
-            protocolVersion: _config.protocolVersion,
+            protocolVersion: baseConfig.protocolVersion,
             serverNotifier: _result.serverNotifierProxy
         });
 

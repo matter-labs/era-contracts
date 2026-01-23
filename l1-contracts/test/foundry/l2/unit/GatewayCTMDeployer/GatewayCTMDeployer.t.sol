@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import {DeployedContracts, GatewayCTMDeployerConfig, GatewayDADeployerConfig, GatewayDADeployerResult, GatewayProxyAdminDeployerConfig, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerConfig, GatewayValidatorTimelockDeployerResult, GatewayVerifiersDeployerConfig, GatewayVerifiersDeployerResult, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {DeployedContracts, GatewayCTMDeployerConfig, GatewayDADeployerConfig, DAContracts, GatewayProxyAdminDeployerConfig, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerConfig, GatewayValidatorTimelockDeployerResult, GatewayVerifiersDeployerConfig, Verifiers, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {GatewayCTMDeployerDA} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerDA.sol";
 import {GatewayCTMDeployerProxyAdmin} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerProxyAdmin.sol";
 import {GatewayCTMDeployerValidatorTimelock} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerValidatorTimelock.sol";
@@ -48,9 +48,7 @@ import {AllDeployerResults, DeployedContractsComparator, GatewayCTMDeployerTestU
 // zk environment only within a deployed contract
 contract GatewayCTMDeployerTester {
     /// @notice Deploys DA contracts
-    function deployDA(
-        bytes memory data
-    ) external returns (GatewayDADeployerResult memory result, address deployerAddr) {
+    function deployDA(bytes memory data) external returns (DAContracts memory result, address deployerAddr) {
         (bool success, bytes memory returnData) = L2_CREATE2_FACTORY_ADDR.call(data);
         require(success, "DA deployment failed");
 
@@ -81,9 +79,7 @@ contract GatewayCTMDeployerTester {
     }
 
     /// @notice Deploys Verifiers
-    function deployVerifiers(
-        bytes memory data
-    ) external returns (GatewayVerifiersDeployerResult memory result, address deployerAddr) {
+    function deployVerifiers(bytes memory data) external returns (Verifiers memory result, address deployerAddr) {
         (bool success, bytes memory returnData) = L2_CREATE2_FACTORY_ADDR.call(data);
         require(success, "Verifiers deployment failed");
 
@@ -288,30 +284,10 @@ contract GatewayCTMDeployerTest is Test {
     ) internal {
         // Use calculated addresses for direct deployments (facets, etc.)
         GatewayCTMFinalConfig memory ctmConfig = GatewayCTMFinalConfig({
-            aliasedGovernanceAddress: deployerConfig.aliasedGovernanceAddress,
-            salt: deployerConfig.salt,
-            eraChainId: deployerConfig.eraChainId,
-            l1ChainId: deployerConfig.l1ChainId,
-            isZKsyncOS: deployerConfig.isZKsyncOS,
-            adminSelectors: deployerConfig.adminSelectors,
-            executorSelectors: deployerConfig.executorSelectors,
-            mailboxSelectors: deployerConfig.mailboxSelectors,
-            gettersSelectors: deployerConfig.gettersSelectors,
-            bootloaderHash: deployerConfig.bootloaderHash,
-            defaultAccountHash: deployerConfig.defaultAccountHash,
-            evmEmulatorHash: deployerConfig.evmEmulatorHash,
-            genesisRoot: deployerConfig.genesisRoot,
-            genesisRollupLeafIndex: deployerConfig.genesisRollupLeafIndex,
-            genesisBatchCommitment: deployerConfig.genesisBatchCommitment,
-            forceDeploymentsData: deployerConfig.forceDeploymentsData,
-            protocolVersion: deployerConfig.protocolVersion,
+            baseConfig: deployerConfig,
             chainTypeManagerProxyAdmin: results.proxyAdminResult.chainTypeManagerProxyAdmin,
-            validatorTimelock: results.validatorTimelockResult.validatorTimelock,
-            adminFacet: calculatedContracts.stateTransition.adminFacet,
-            gettersFacet: calculatedContracts.stateTransition.gettersFacet,
-            mailboxFacet: calculatedContracts.stateTransition.mailboxFacet,
-            executorFacet: calculatedContracts.stateTransition.executorFacet,
-            diamondInit: calculatedContracts.stateTransition.diamondInit,
+            validatorTimelockProxy: results.validatorTimelockResult.validatorTimelockProxy,
+            facets: calculatedContracts.stateTransition.facets,
             genesisUpgrade: calculatedContracts.stateTransition.genesisUpgrade,
             verifier: results.verifiersResult.verifier
         });

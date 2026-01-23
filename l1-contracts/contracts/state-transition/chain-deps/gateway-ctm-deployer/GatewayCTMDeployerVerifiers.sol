@@ -12,7 +12,7 @@ import {IVerifierV2} from "../../chain-interfaces/IVerifierV2.sol";
 
 import {WrongCTMDeployerVariant} from "../../../common/L1ContractErrors.sol";
 
-import {GatewayVerifiersDeployerConfig, GatewayVerifiersDeployerResult} from "./GatewayCTMDeployer.sol";
+import {GatewayVerifiersDeployerConfig, Verifiers} from "./GatewayCTMDeployer.sol";
 
 /// @title GatewayCTMDeployerVerifiers
 /// @author Matter Labs
@@ -21,11 +21,11 @@ import {GatewayVerifiersDeployerConfig, GatewayVerifiersDeployerResult} from "./
 /// @dev Deploys: EraVerifierFflonk, EraVerifierPlonk, and Era DualVerifier/TestnetVerifier.
 /// For ZKsyncOS verifiers, use GatewayCTMDeployerVerifiersZKsyncOS instead.
 contract GatewayCTMDeployerVerifiers {
-    GatewayVerifiersDeployerResult internal deployedResult;
+    Verifiers internal deployedResult;
 
     /// @notice Returns the deployed contracts from this deployer.
     /// @return result The struct with information about the deployed contracts.
-    function getResult() external view returns (GatewayVerifiersDeployerResult memory result) {
+    function getResult() external view returns (Verifiers memory result) {
         result = deployedResult;
     }
 
@@ -35,7 +35,7 @@ contract GatewayCTMDeployerVerifiers {
         }
         bytes32 salt = _config.salt;
 
-        GatewayVerifiersDeployerResult memory result;
+        Verifiers memory result;
 
         // Deploy Era verifiers
         result.verifierFflonk = address(new EraVerifierFflonk{salt: salt}());

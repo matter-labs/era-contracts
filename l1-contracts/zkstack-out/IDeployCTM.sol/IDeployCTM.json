@@ -64,17 +64,17 @@
                 "internalType": "struct Verifiers",
                 "components": [
                   {
-                    "name": "verifier",
-                    "type": "address",
-                    "internalType": "address"
-                  },
-                  {
                     "name": "verifierFflonk",
                     "type": "address",
                     "internalType": "address"
                   },
                   {
                     "name": "verifierPlonk",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "verifier",
                     "type": "address",
                     "internalType": "address"
                   }

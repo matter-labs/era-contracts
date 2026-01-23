@@ -21,7 +21,7 @@ import {L1L2DeployUtils} from "../utils/deploy/L1L2DeployUtils.sol";
 
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
-import {DeployedContracts, GatewayCTMDeployerConfig, GatewayDADeployerConfig, GatewayDADeployerResult, GatewayProxyAdminDeployerConfig, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerConfig, GatewayValidatorTimelockDeployerResult, GatewayVerifiersDeployerConfig, GatewayVerifiersDeployerResult, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {DeployedContracts, DAContracts, Facets, GatewayCTMDeployerConfig, GatewayDADeployerConfig, GatewayProxyAdminDeployerConfig, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerConfig, GatewayValidatorTimelockDeployerResult, GatewayVerifiersDeployerConfig, Verifiers, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 
 import {DeployCTML1OrGateway, CTMCoreDeploymentConfig} from "../ctm/DeployCTML1OrGateway.sol";
 import {CTMContract} from "../ctm/DeployCTML1OrGateway.sol";
@@ -53,11 +53,7 @@ struct DeployerCreate2Calldata {
 
 /// @notice Addresses of contracts deployed directly (no deployer)
 struct DirectDeployedAddresses {
-    address adminFacet;
-    address mailboxFacet;
-    address executorFacet;
-    address gettersFacet;
-    address diamondInit;
+    Facets facets;
     address genesisUpgrade;
     address multicall3;
 }
@@ -100,7 +96,7 @@ library GatewayCTMDeployerHelper {
         create2FactoryAddress = L1L2DeployUtils.getDeploymentTarget(config.isZKsyncOS);
 
         // Calculate DA deployer addresses
-        GatewayDADeployerResult memory daResult;
+        DAContracts memory daResult;
         (deployers.daDeployer, deployerCalldata.daCalldata, daResult) = _calculateDADeployer(_create2Salt, config);
 
         // Calculate ProxyAdmin deployer addresses
@@ -120,7 +116,7 @@ library GatewayCTMDeployerHelper {
         ) = _calculateValidatorTimelockDeployer(_create2Salt, config, proxyAdminResult);
 
         // Calculate Verifiers deployer addresses
-        GatewayVerifiersDeployerResult memory verifiersResult;
+        Verifiers memory verifiersResult;
         (
             deployers.verifiersDeployer,
             deployerCalldata.verifiersCalldata,
@@ -158,7 +154,7 @@ library GatewayCTMDeployerHelper {
     function _calculateDADeployer(
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config
-    ) internal returns (address deployer, bytes memory calldata_, GatewayDADeployerResult memory result) {
+    ) internal returns (address deployer, bytes memory data, DAContracts memory result) {
         GatewayDADeployerConfig memory daConfig = GatewayDADeployerConfig({
             salt: config.salt,
             aliasedGovernanceAddress: config.aliasedGovernanceAddress
@@ -174,7 +170,7 @@ library GatewayCTMDeployerHelper {
             config.isZKsyncOS
         );
         deployer = deployResult.expectedAddress;
-        calldata_ = deployResult.data;
+        data = deployResult.data;
         result = _calculateDADeployerAddressesWithMode(deployer, daConfig, config.isZKsyncOS);
     }
 
@@ -183,7 +179,7 @@ library GatewayCTMDeployerHelper {
     function _calculateProxyAdminDeployer(
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config
-    ) internal returns (address deployer, bytes memory calldata_, GatewayProxyAdminDeployerResult memory result) {
+    ) internal returns (address deployer, bytes memory data, GatewayProxyAdminDeployerResult memory result) {
         GatewayProxyAdminDeployerConfig memory proxyAdminConfig = GatewayProxyAdminDeployerConfig({
             salt: config.salt,
             aliasedGovernanceAddress: config.aliasedGovernanceAddress
@@ -203,7 +199,7 @@ library GatewayCTMDeployerHelper {
             config.isZKsyncOS
         );
         deployer = deployResult.expectedAddress;
-        calldata_ = deployResult.data;
+        data = deployResult.data;
         result = _calculateProxyAdminDeployerAddressesWithMode(deployer, proxyAdminConfig, config.isZKsyncOS);
     }
 
@@ -213,10 +209,7 @@ library GatewayCTMDeployerHelper {
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config,
         GatewayProxyAdminDeployerResult memory proxyAdminResult
-    )
-        internal
-        returns (address deployer, bytes memory calldata_, GatewayValidatorTimelockDeployerResult memory result)
-    {
+    ) internal returns (address deployer, bytes memory data, GatewayValidatorTimelockDeployerResult memory result) {
         GatewayValidatorTimelockDeployerConfig memory vtConfig = GatewayValidatorTimelockDeployerConfig({
             salt: config.salt,
             aliasedGovernanceAddress: config.aliasedGovernanceAddress,
@@ -237,7 +230,7 @@ library GatewayCTMDeployerHelper {
             config.isZKsyncOS
         );
         deployer = deployResult.expectedAddress;
-        calldata_ = deployResult.data;
+        data = deployResult.data;
         result = _calculateValidatorTimelockDeployerAddressesWithMode(deployer, vtConfig, config.isZKsyncOS);
     }
 
@@ -246,7 +239,7 @@ library GatewayCTMDeployerHelper {
     function _calculateVerifiersDeployer(
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config
-    ) internal returns (address deployer, bytes memory calldata_, GatewayVerifiersDeployerResult memory result) {
+    ) internal returns (address deployer, bytes memory data, Verifiers memory result) {
         GatewayVerifiersDeployerConfig memory verifiersConfig = GatewayVerifiersDeployerConfig({
             salt: config.salt,
             aliasedGovernanceAddress: config.aliasedGovernanceAddress,
@@ -267,7 +260,7 @@ library GatewayCTMDeployerHelper {
             config.isZKsyncOS
         );
         deployer = deployResult.expectedAddress;
-        calldata_ = deployResult.data;
+        data = deployResult.data;
         result = _calculateVerifiersDeployerAddressesWithMode(deployer, verifiersConfig, config.isZKsyncOS);
     }
 
@@ -276,11 +269,11 @@ library GatewayCTMDeployerHelper {
     function _calculateDirectDeployments(
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config,
-        GatewayDADeployerResult memory daResult
-    ) internal returns (DirectDeployedAddresses memory addresses, DirectCreate2Calldata memory calldata_) {
+        DAContracts memory daResult
+    ) internal returns (DirectDeployedAddresses memory addresses, DirectCreate2Calldata memory data) {
         // AdminFacet
         bytes memory adminFacetArgs = abi.encode(config.l1ChainId, daResult.rollupDAManager, config.testnetVerifier);
-        (addresses.adminFacet, calldata_.adminFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+        (addresses.facets.adminFacet, data.adminFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "Admin.sol",
             "AdminFacet",
@@ -296,7 +289,7 @@ library GatewayCTMDeployerHelper {
             address(0), // eip7702Checker
             config.testnetVerifier
         );
-        (addresses.mailboxFacet, calldata_.mailboxFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+        (addresses.facets.mailboxFacet, data.mailboxFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "Mailbox.sol",
             "MailboxFacet",
@@ -306,7 +299,7 @@ library GatewayCTMDeployerHelper {
 
         // ExecutorFacet
         bytes memory executorFacetArgs = abi.encode(config.l1ChainId);
-        (addresses.executorFacet, calldata_.executorFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+        (addresses.facets.executorFacet, data.executorFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "Executor.sol",
             "ExecutorFacet",
@@ -315,7 +308,7 @@ library GatewayCTMDeployerHelper {
         );
 
         // GettersFacet
-        (addresses.gettersFacet, calldata_.gettersFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+        (addresses.facets.gettersFacet, data.gettersFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "Getters.sol",
             "GettersFacet",
@@ -325,7 +318,7 @@ library GatewayCTMDeployerHelper {
 
         // DiamondInit
         bytes memory diamondInitArgs = abi.encode(config.isZKsyncOS);
-        (addresses.diamondInit, calldata_.diamondInitCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+        (addresses.facets.diamondInit, data.diamondInitCalldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "DiamondInit.sol",
             "DiamondInit",
@@ -334,7 +327,7 @@ library GatewayCTMDeployerHelper {
         );
 
         // L1GenesisUpgrade
-        (addresses.genesisUpgrade, calldata_.genesisUpgradeCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+        (addresses.genesisUpgrade, data.genesisUpgradeCalldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "L1GenesisUpgrade.sol",
             "L1GenesisUpgrade",
@@ -343,7 +336,7 @@ library GatewayCTMDeployerHelper {
         );
 
         // Multicall3
-        (addresses.multicall3, calldata_.multicall3Calldata) = _calculateCreate2AddressAndCalldataWithMode(
+        (addresses.multicall3, data.multicall3Calldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "Multicall3.sol",
             "Multicall3",
@@ -357,7 +350,7 @@ library GatewayCTMDeployerHelper {
         string memory fileName,
         string memory contractName,
         bytes memory constructorArgs
-    ) internal returns (address addr, bytes memory calldata_) {
+    ) internal returns (address addr, bytes memory data) {
         // Default to Era mode (non-ZKsyncOS) for backwards compatibility
         return
             _calculateCreate2AddressAndCalldataWithMode(_create2Salt, fileName, contractName, constructorArgs, false);
@@ -369,7 +362,7 @@ library GatewayCTMDeployerHelper {
         string memory contractName,
         bytes memory constructorArgs,
         bool isZKsyncOS
-    ) internal returns (address addr, bytes memory calldata_) {
+    ) internal returns (address addr, bytes memory data) {
         bytes memory bytecode = _readBytecode(fileName, contractName, isZKsyncOS);
         L1L2DeployUtils.DeployResult memory result = L1L2DeployUtils.prepareDeployment(
             _create2Salt,
@@ -378,7 +371,7 @@ library GatewayCTMDeployerHelper {
             isZKsyncOS
         );
         addr = result.expectedAddress;
-        calldata_ = result.data;
+        data = result.data;
     }
 
     // ============ CTM Deployer ============
@@ -389,33 +382,13 @@ library GatewayCTMDeployerHelper {
         DirectDeployedAddresses memory directAddresses,
         GatewayProxyAdminDeployerResult memory proxyAdminResult,
         GatewayValidatorTimelockDeployerResult memory validatorTimelockResult,
-        GatewayVerifiersDeployerResult memory verifiersResult
-    ) internal returns (address deployer, bytes memory calldata_, GatewayCTMFinalResult memory result) {
+        Verifiers memory verifiersResult
+    ) internal returns (address deployer, bytes memory data, GatewayCTMFinalResult memory result) {
         GatewayCTMFinalConfig memory ctmConfig = GatewayCTMFinalConfig({
-            aliasedGovernanceAddress: config.aliasedGovernanceAddress,
-            salt: config.salt,
-            eraChainId: config.eraChainId,
-            l1ChainId: config.l1ChainId,
-            isZKsyncOS: config.isZKsyncOS,
-            adminSelectors: config.adminSelectors,
-            executorSelectors: config.executorSelectors,
-            mailboxSelectors: config.mailboxSelectors,
-            gettersSelectors: config.gettersSelectors,
-            bootloaderHash: config.bootloaderHash,
-            defaultAccountHash: config.defaultAccountHash,
-            evmEmulatorHash: config.evmEmulatorHash,
-            genesisRoot: config.genesisRoot,
-            genesisRollupLeafIndex: config.genesisRollupLeafIndex,
-            genesisBatchCommitment: config.genesisBatchCommitment,
-            forceDeploymentsData: config.forceDeploymentsData,
-            protocolVersion: config.protocolVersion,
+            baseConfig: config,
             chainTypeManagerProxyAdmin: proxyAdminResult.chainTypeManagerProxyAdmin,
-            validatorTimelock: validatorTimelockResult.validatorTimelock,
-            adminFacet: directAddresses.adminFacet,
-            gettersFacet: directAddresses.gettersFacet,
-            mailboxFacet: directAddresses.mailboxFacet,
-            executorFacet: directAddresses.executorFacet,
-            diamondInit: directAddresses.diamondInit,
+            validatorTimelockProxy: validatorTimelockResult.validatorTimelockProxy,
+            facets: directAddresses.facets,
             genesisUpgrade: directAddresses.genesisUpgrade,
             verifier: verifiersResult.verifier
         });
@@ -433,7 +406,7 @@ library GatewayCTMDeployerHelper {
             config.isZKsyncOS
         );
         deployer = deployResult.expectedAddress;
-        calldata_ = deployResult.data;
+        data = deployResult.data;
         result = _calculateCTMDeployerAddressesWithMode(deployer, ctmConfig, config.isZKsyncOS);
     }
 
@@ -442,7 +415,7 @@ library GatewayCTMDeployerHelper {
     function _calculateDADeployerAddresses(
         address deployerAddr,
         GatewayDADeployerConfig memory config
-    ) internal returns (GatewayDADeployerResult memory result) {
+    ) internal returns (DAContracts memory result) {
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
 
         result.rollupDAManager = _deployInternalEmptyParams("RollupDAManager", "RollupDAManager.sol", innerConfig);
@@ -462,7 +435,7 @@ library GatewayCTMDeployerHelper {
         address deployerAddr,
         GatewayDADeployerConfig memory config,
         bool isZKsyncOS
-    ) internal returns (GatewayDADeployerResult memory result) {
+    ) internal returns (DAContracts memory result) {
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
 
         result.rollupDAManager = _deployInternalEmptyParamsWithMode(
@@ -520,7 +493,7 @@ library GatewayCTMDeployerHelper {
             innerConfig
         );
 
-        result.validatorTimelock = _deployInternalWithParams(
+        result.validatorTimelockProxy = _deployInternalWithParams(
             "TransparentUpgradeableProxy",
             "TransparentUpgradeableProxy.sol",
             abi.encode(
@@ -547,7 +520,7 @@ library GatewayCTMDeployerHelper {
             isZKsyncOS
         );
 
-        result.validatorTimelock = _deployInternalWithParamsWithMode(
+        result.validatorTimelockProxy = _deployInternalWithParamsWithMode(
             "TransparentUpgradeableProxy",
             "TransparentUpgradeableProxy.sol",
             abi.encode(
@@ -563,7 +536,7 @@ library GatewayCTMDeployerHelper {
     function _calculateVerifiersDeployerAddresses(
         address deployerAddr,
         GatewayVerifiersDeployerConfig memory config
-    ) internal returns (GatewayVerifiersDeployerResult memory result) {
+    ) internal returns (Verifiers memory result) {
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
 
         // Deploy base verifiers based on config
@@ -627,7 +600,7 @@ library GatewayCTMDeployerHelper {
         address deployerAddr,
         GatewayVerifiersDeployerConfig memory config,
         bool isZKsyncOS
-    ) internal returns (GatewayVerifiersDeployerResult memory result) {
+    ) internal returns (Verifiers memory result) {
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
 
         // Deploy base verifiers based on config
@@ -703,7 +676,8 @@ library GatewayCTMDeployerHelper {
         address deployerAddr,
         GatewayCTMFinalConfig memory config
     ) internal returns (GatewayCTMFinalResult memory result) {
-        InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
+        GatewayCTMDeployerConfig memory baseConfig = config.baseConfig;
+        InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: baseConfig.salt});
 
         // ServerNotifier
         result.serverNotifierImplementation = _deployInternalEmptyParams(
@@ -724,7 +698,7 @@ library GatewayCTMDeployerHelper {
         );
 
         // CTM Implementation
-        if (config.isZKsyncOS) {
+        if (baseConfig.isZKsyncOS) {
             result.chainTypeManagerImplementation = _deployInternalWithParams(
                 "ZKsyncOSChainTypeManager",
                 "ZKsyncOSChainTypeManager.sol",
@@ -741,42 +715,43 @@ library GatewayCTMDeployerHelper {
         }
 
         // Build diamond cut data
+        Facets memory facets = config.facets;
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
-            facet: config.adminFacet,
+            facet: facets.adminFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: config.adminSelectors
+            selectors: baseConfig.adminSelectors
         });
         facetCuts[1] = Diamond.FacetCut({
-            facet: config.gettersFacet,
+            facet: facets.gettersFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: config.gettersSelectors
+            selectors: baseConfig.gettersSelectors
         });
         facetCuts[2] = Diamond.FacetCut({
-            facet: config.mailboxFacet,
+            facet: facets.mailboxFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: config.mailboxSelectors
+            selectors: baseConfig.mailboxSelectors
         });
         facetCuts[3] = Diamond.FacetCut({
-            facet: config.executorFacet,
+            facet: facets.executorFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: config.executorSelectors
+            selectors: baseConfig.executorSelectors
         });
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(config.verifier),
-            l2BootloaderBytecodeHash: config.bootloaderHash,
-            l2DefaultAccountBytecodeHash: config.defaultAccountHash,
-            l2EvmEmulatorBytecodeHash: config.evmEmulatorHash
+            l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
+            l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
+            l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: config.diamondInit,
+            initAddress: facets.diamondInit,
             initCalldata: abi.encode(initializeData)
         });
 
@@ -784,18 +759,18 @@ library GatewayCTMDeployerHelper {
 
         ChainCreationParams memory chainCreationParams = ChainCreationParams({
             genesisUpgrade: config.genesisUpgrade,
-            genesisBatchHash: config.genesisRoot,
-            genesisIndexRepeatedStorageChanges: uint64(config.genesisRollupLeafIndex),
-            genesisBatchCommitment: config.genesisBatchCommitment,
+            genesisBatchHash: baseConfig.genesisRoot,
+            genesisIndexRepeatedStorageChanges: uint64(baseConfig.genesisRollupLeafIndex),
+            genesisBatchCommitment: baseConfig.genesisBatchCommitment,
             diamondCut: diamondCut,
-            forceDeploymentsData: config.forceDeploymentsData
+            forceDeploymentsData: baseConfig.forceDeploymentsData
         });
 
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
-            owner: config.aliasedGovernanceAddress,
-            validatorTimelock: config.validatorTimelock,
+            owner: baseConfig.aliasedGovernanceAddress,
+            validatorTimelock: config.validatorTimelockProxy,
             chainCreationParams: chainCreationParams,
-            protocolVersion: config.protocolVersion,
+            protocolVersion: baseConfig.protocolVersion,
             serverNotifier: result.serverNotifierProxy
         });
 
@@ -814,7 +789,8 @@ library GatewayCTMDeployerHelper {
         GatewayCTMFinalConfig memory config,
         bool isZKsyncOS
     ) internal returns (GatewayCTMFinalResult memory result) {
-        InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
+        GatewayCTMDeployerConfig memory baseConfig = config.baseConfig;
+        InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: baseConfig.salt});
 
         // ServerNotifier
         result.serverNotifierImplementation = _deployInternalEmptyParamsWithMode(
@@ -837,7 +813,7 @@ library GatewayCTMDeployerHelper {
         );
 
         // CTM Implementation
-        if (config.isZKsyncOS) {
+        if (baseConfig.isZKsyncOS) {
             result.chainTypeManagerImplementation = _deployInternalWithParamsWithMode(
                 "ZKsyncOSChainTypeManager",
                 "ZKsyncOSChainTypeManager.sol",
@@ -856,42 +832,43 @@ library GatewayCTMDeployerHelper {
         }
 
         // Build diamond cut data
+        Facets memory facets = config.facets;
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
-            facet: config.adminFacet,
+            facet: facets.adminFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: config.adminSelectors
+            selectors: baseConfig.adminSelectors
         });
         facetCuts[1] = Diamond.FacetCut({
-            facet: config.gettersFacet,
+            facet: facets.gettersFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: config.gettersSelectors
+            selectors: baseConfig.gettersSelectors
         });
         facetCuts[2] = Diamond.FacetCut({
-            facet: config.mailboxFacet,
+            facet: facets.mailboxFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: config.mailboxSelectors
+            selectors: baseConfig.mailboxSelectors
         });
         facetCuts[3] = Diamond.FacetCut({
-            facet: config.executorFacet,
+            facet: facets.executorFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: config.executorSelectors
+            selectors: baseConfig.executorSelectors
         });
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(config.verifier),
-            l2BootloaderBytecodeHash: config.bootloaderHash,
-            l2DefaultAccountBytecodeHash: config.defaultAccountHash,
-            l2EvmEmulatorBytecodeHash: config.evmEmulatorHash
+            l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
+            l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
+            l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: config.diamondInit,
+            initAddress: facets.diamondInit,
             initCalldata: abi.encode(initializeData)
         });
 
@@ -899,18 +876,18 @@ library GatewayCTMDeployerHelper {
 
         ChainCreationParams memory chainCreationParams = ChainCreationParams({
             genesisUpgrade: config.genesisUpgrade,
-            genesisBatchHash: config.genesisRoot,
-            genesisIndexRepeatedStorageChanges: uint64(config.genesisRollupLeafIndex),
-            genesisBatchCommitment: config.genesisBatchCommitment,
+            genesisBatchHash: baseConfig.genesisRoot,
+            genesisIndexRepeatedStorageChanges: uint64(baseConfig.genesisRollupLeafIndex),
+            genesisBatchCommitment: baseConfig.genesisBatchCommitment,
             diamondCut: diamondCut,
-            forceDeploymentsData: config.forceDeploymentsData
+            forceDeploymentsData: baseConfig.forceDeploymentsData
         });
 
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
-            owner: config.aliasedGovernanceAddress,
-            validatorTimelock: config.validatorTimelock,
+            owner: baseConfig.aliasedGovernanceAddress,
+            validatorTimelock: config.validatorTimelockProxy,
             chainCreationParams: chainCreationParams,
-            protocolVersion: config.protocolVersion,
+            protocolVersion: baseConfig.protocolVersion,
             serverNotifier: result.serverNotifierProxy
         });
 
@@ -926,10 +903,10 @@ library GatewayCTMDeployerHelper {
     }
 
     function _assembleContracts(
-        GatewayDADeployerResult memory daResult,
+        DAContracts memory daResult,
         GatewayProxyAdminDeployerResult memory proxyAdminResult,
         GatewayValidatorTimelockDeployerResult memory validatorTimelockResult,
-        GatewayVerifiersDeployerResult memory verifiersResult,
+        Verifiers memory verifiersResult,
         DirectDeployedAddresses memory directAddresses,
         GatewayCTMFinalResult memory ctmResult
     ) internal pure returns (DeployedContracts memory contracts) {
@@ -944,7 +921,7 @@ library GatewayCTMDeployerHelper {
         // From ValidatorTimelock deployer
         contracts.stateTransition.validatorTimelockImplementation = validatorTimelockResult
             .validatorTimelockImplementation;
-        contracts.stateTransition.validatorTimelock = validatorTimelockResult.validatorTimelock;
+        contracts.stateTransition.validatorTimelockProxy = validatorTimelockResult.validatorTimelockProxy;
 
         // From Verifiers deployer
         contracts.stateTransition.verifierFflonk = verifiersResult.verifierFflonk;
@@ -952,11 +929,7 @@ library GatewayCTMDeployerHelper {
         contracts.stateTransition.verifier = verifiersResult.verifier;
 
         // From direct deployments
-        contracts.stateTransition.adminFacet = directAddresses.adminFacet;
-        contracts.stateTransition.mailboxFacet = directAddresses.mailboxFacet;
-        contracts.stateTransition.executorFacet = directAddresses.executorFacet;
-        contracts.stateTransition.gettersFacet = directAddresses.gettersFacet;
-        contracts.stateTransition.diamondInit = directAddresses.diamondInit;
+        contracts.stateTransition.facets = directAddresses.facets;
         contracts.stateTransition.genesisUpgrade = directAddresses.genesisUpgrade;
         contracts.multicall3 = directAddresses.multicall3;
 
@@ -1085,6 +1058,7 @@ library GatewayCTMDeployerHelper {
     // ============ Factory Dependencies ============
 
     /// @notice Returns all factory dependencies for deployment.
+    /// @param _isZKsyncOS Whether to include ZKsync OS-specific dependencies.
     /// @return dependencies Array of bytecodes needed for deployment.
     function getListOfFactoryDeps(bool _isZKsyncOS) external returns (bytes[] memory dependencies) {
         if (_isZKsyncOS) {
@@ -1092,19 +1066,20 @@ library GatewayCTMDeployerHelper {
             return dependencies;
         }
 
-        // 7 deployers (DA, ProxyAdmin, ValidatorTimelock, Verifiers Era/ZKsyncOS, CTM Era/ZKsyncOS)
+        // For Era mode (non-ZKsyncOS):
+        // 5 deployers (DA, ProxyAdmin, ValidatorTimelock, Verifiers Era, CTM Era)
         // + 3 DA contracts (RollupDAManager, ValidiumL1DAValidator, RelayedSLDAValidator)
         // + 1 ProxyAdmin contract
         // + 2 ValidatorTimelock contracts (implementation + proxy)
-        // + 8 Verifier contracts (4 Era + 4 ZKsyncOS)
-        // + 3 CTM contracts (ServerNotifier, EraChainTypeManager, ZKsyncOSChainTypeManager)
+        // + 4 Verifier contracts (Era only)
+        // + 2 CTM contracts (ServerNotifier, EraChainTypeManager)
         // + 8 direct contracts (AdminFacet, MailboxFacet, ExecutorFacet, GettersFacet, DiamondInit, GenesisUpgrade, Multicall3, DiamondProxy)
-        // Total: 7 + 3 + 1 + 2 + 8 + 3 + 8 = 32
-        uint256 totalDependencies = 32;
+        // Total: 5 + 3 + 1 + 2 + 4 + 2 + 8 = 25
+        uint256 totalDependencies = 25;
         dependencies = new bytes[](totalDependencies);
         uint256 index = 0;
 
-        // Deployer contracts
+        // Deployer contracts (Era only)
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("GatewayCTMDeployerDA.sol", "GatewayCTMDeployerDA");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1(
             "GatewayCTMDeployerProxyAdmin.sol",
@@ -1118,15 +1093,7 @@ library GatewayCTMDeployerHelper {
             "GatewayCTMDeployerVerifiers.sol",
             "GatewayCTMDeployerVerifiers"
         );
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1(
-            "GatewayCTMDeployerVerifiersZKsyncOS.sol",
-            "GatewayCTMDeployerVerifiersZKsyncOS"
-        );
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("GatewayCTMDeployerCTM.sol", "GatewayCTMDeployerCTM");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1(
-            "GatewayCTMDeployerCTMZKsyncOS.sol",
-            "GatewayCTMDeployerCTMZKsyncOS"
-        );
 
         // DA contracts
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("RollupDAManager.sol", "RollupDAManager");
@@ -1143,22 +1110,14 @@ library GatewayCTMDeployerHelper {
             "TransparentUpgradeableProxy"
         );
 
-        // Verifier contracts
+        // Verifier contracts (Era only)
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraVerifierFflonk.sol", "EraVerifierFflonk");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraVerifierPlonk.sol", "EraVerifierPlonk");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSVerifierFflonk.sol", "ZKsyncOSVerifierFflonk");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSVerifierPlonk.sol", "ZKsyncOSVerifierPlonk");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraTestnetVerifier.sol", "EraTestnetVerifier");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraDualVerifier.sol", "EraDualVerifier");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSDualVerifier.sol", "ZKsyncOSDualVerifier");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSTestnetVerifier.sol", "ZKsyncOSTestnetVerifier");
 
-        // CTM contracts
+        // CTM contracts (Era only)
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ServerNotifier.sol", "ServerNotifier");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1(
-            "ZKsyncOSChainTypeManager.sol",
-            "ZKsyncOSChainTypeManager"
-        );
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraChainTypeManager.sol", "EraChainTypeManager");
 
         // Direct deployment contracts

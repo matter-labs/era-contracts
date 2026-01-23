@@ -30,18 +30,17 @@ library L1L2DeployUtils {
         bytes memory constructorArgs,
         bool isZKsyncOS
     ) internal view returns (DeployResult memory result) {
+        result.targetAddress = getDeploymentTarget(isZKsyncOS);
         if (isZKsyncOS) {
             bytes memory initCode = abi.encodePacked(bytecode, constructorArgs);
             // ZKsyncOS mode: use deterministic CREATE2 factory with standard EVM address derivation
             result.expectedAddress = Utils.getL2AddressViaDeterministicCreate2(salt, initCode);
             result.data = Utils.getDeterministicCreate2FactoryCalldata(salt, initCode);
-            result.targetAddress = Utils.DETERMINISTIC_CREATE2_ADDRESS;
         } else {
             // Era mode: use ZKsync CREATE2 factory with zkSync-specific address derivation
             bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(bytecode);
             result.expectedAddress = Utils.getL2AddressViaCreate2Factory(salt, bytecodeHash, constructorArgs);
             (, result.data) = Utils.getDeploymentCalldata(salt, bytecode, constructorArgs);
-            result.targetAddress = L2_CREATE2_FACTORY_ADDR;
         }
     }
 

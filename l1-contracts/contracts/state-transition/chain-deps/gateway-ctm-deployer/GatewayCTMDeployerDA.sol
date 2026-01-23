@@ -8,7 +8,7 @@ import {ValidiumL1DAValidator} from "../../data-availability/ValidiumL1DAValidat
 
 import {ROLLUP_L2_DA_COMMITMENT_SCHEME} from "../../../common/Config.sol";
 
-import {GatewayDADeployerConfig, GatewayDADeployerResult} from "./GatewayCTMDeployer.sol";
+import {GatewayDADeployerConfig, DAContracts} from "./GatewayCTMDeployer.sol";
 
 /// @title GatewayCTMDeployerDA
 /// @author Matter Labs
@@ -16,18 +16,18 @@ import {GatewayDADeployerConfig, GatewayDADeployerResult} from "./GatewayCTMDepl
 /// @notice Gateway CTM DA deployer: deploys DA contracts.
 /// @dev Deploys: RollupDAManager, ValidiumL1DAValidator, RelayedSLDAValidator.
 contract GatewayCTMDeployerDA {
-    GatewayDADeployerResult internal deployedResult;
+    DAContracts internal deployedResult;
 
     /// @notice Returns the deployed contracts from this deployer.
     /// @return result The struct with information about the deployed contracts.
-    function getResult() external view returns (GatewayDADeployerResult memory result) {
+    function getResult() external view returns (DAContracts memory result) {
         result = deployedResult;
     }
 
     constructor(GatewayDADeployerConfig memory _config) {
         bytes32 salt = _config.salt;
 
-        GatewayDADeployerResult memory result;
+        DAContracts memory result;
 
         // Deploy DA contracts
         RollupDAManager rollupDAManager = new RollupDAManager{salt: salt}();

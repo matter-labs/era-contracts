@@ -33,7 +33,7 @@ contract GatewayCTMDeployerValidatorTimelock {
         result.validatorTimelockImplementation = address(new ValidatorTimelock{salt: salt}(L2_BRIDGEHUB_ADDR));
 
         // Deploy ValidatorTimelock proxy
-        result.validatorTimelock = address(
+        result.validatorTimelockProxy = address(
             new TransparentUpgradeableProxy{salt: salt}(
                 result.validatorTimelockImplementation,
                 _config.chainTypeManagerProxyAdmin,

@@ -120,6 +120,10 @@ library Utils {
     bytes internal constant CREATE2_FACTORY_BYTECODE =
         hex"604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
 
+    // Runtime bytecode of the Crea§te2Factory contract.
+    bytes internal constant CREATE2_FACTORY_RUNTIME_BYTECODE =
+        hex"7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
+
     // Deterministic Create2Factory address (deployed via Arachnid's deterministic-deployment-proxy)
     // https://github.com/Arachnid/deterministic-deployment-proxy
     address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
