@@ -62,6 +62,20 @@ contract AdminFunctions is Script {
         });
     }
 
+    // This function should be called by governance to accept ownership of chainAssetHandler
+    function governanceAcceptOwnerAggregated(address governor, address bridgehub) public {
+        address chainAssetHandler = IBridgehub(bridgehub).chainAssetHandler();
+        Ownable2Step chainAssetHandlerContract = Ownable2Step(chainAssetHandler);
+        Utils.executeUpgrade({
+            _governor: governor,
+            _salt: bytes32(0),
+            _target: chainAssetHandler,
+            _data: abi.encodeCall(chainAssetHandlerContract.acceptOwnership, ()),
+            _value: 0,
+            _delay: 0
+        });
+    }
+
     // This function should be called by the owner to accept the admin role
     function governanceAcceptAdmin(address governor, address target) public {
         IZKChain adminContract = IZKChain(target);
