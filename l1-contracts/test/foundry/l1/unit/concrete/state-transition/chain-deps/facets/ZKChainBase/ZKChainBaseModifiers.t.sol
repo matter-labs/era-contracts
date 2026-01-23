@@ -78,7 +78,16 @@ contract ZKChainBaseModifiersTest is UtilsCallMockerTest {
         });
         facetCuts[3] = Diamond.FacetCut({
             facet: address(
+<<<<<<< HEAD
                 new MailboxFacet(block.chainid, address(0), IEIP7702Checker(makeAddr("eip7702Checker")), false)
+=======
+                new MailboxFacet(
+                    block.chainid,
+                    address(0),
+                    IEIP7702Checker(makeAddr("eip7702Checker")),
+                    false
+                )
+>>>>>>> ae5a78d1e (Mailbox constructor changes, rm eraChainID)
             ),
             action: Diamond.Action.Add,
             isFreezable: false,

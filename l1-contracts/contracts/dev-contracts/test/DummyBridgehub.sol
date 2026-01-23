@@ -69,6 +69,10 @@ contract DummyBridgehub {
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
     ) external payable returns (bytes32 canonicalTxHash) {
+<<<<<<< HEAD
         
+=======
+        bytes32 canonicalTxHash;
+>>>>>>> ae5a78d1e (Mailbox constructor changes, rm eraChainID)
     }
 }
