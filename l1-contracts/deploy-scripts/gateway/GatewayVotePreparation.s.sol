@@ -234,18 +234,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                     serverNotifier: expectedGatewayContracts.stateTransition.serverNotifierImplementation,
                     validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelockImplementation
                 }),
-                verifiers: Verifiers({
-                    verifier: expectedGatewayContracts.stateTransition.verifier,
-                    verifierFflonk: expectedGatewayContracts.stateTransition.verifierFflonk,
-                    verifierPlonk: expectedGatewayContracts.stateTransition.verifierPlonk
-                }),
-                facets: Facets({
-                    adminFacet: expectedGatewayContracts.stateTransition.adminFacet,
-                    mailboxFacet: expectedGatewayContracts.stateTransition.mailboxFacet,
-                    executorFacet: expectedGatewayContracts.stateTransition.executorFacet,
-                    gettersFacet: expectedGatewayContracts.stateTransition.gettersFacet,
-                    diamondInit: expectedGatewayContracts.stateTransition.diamondInit
-                }),
+                verifiers: expectedGatewayContracts.stateTransition.verifiers,
+                facets: expectedGatewayContracts.stateTransition.facets,
                 genesisUpgrade: expectedGatewayContracts.stateTransition.genesisUpgrade,
                 defaultUpgrade: address(0),
                 legacyValidatorTimelock: address(0),
