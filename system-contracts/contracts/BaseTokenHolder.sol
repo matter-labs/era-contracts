@@ -22,8 +22,8 @@ import {Unauthorized} from "./SystemContractErrors.sol";
  *
  * ## Balance Invariant
  *
- * The total sum of balances across all contracts on the chain equals 2^256 - 1.
- * This holder's balance = 2^256 - 1 - <total deposited to chain>.
+ * The total sum of balances across all contracts on the chain equals 2^127 - 1.
+ * This holder's balance = 2^127 - 1 - <total deposited to chain>.
  *
  * ## Initial Balance
  *

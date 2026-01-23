@@ -294,11 +294,6 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
             if (interopCall.value > 0) {
                 // Transfer base tokens from the BaseTokenHolder instead of minting.
-                // This makes the system more EVM-compatible as all tooling supports
-                // receiving value from another contract.
-                // Note: We don't call L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2 here
-                // because for L2<->L2 interop, the chainBalance tracking is not affected
-                // (the base token origin is L1, not current chain, so chainBalance isn't updated).
                 L2_BASE_TOKEN_SYSTEM_CONTRACT.transferFromTo(
                     address(L2_BASE_TOKEN_HOLDER),
                     address(this),
