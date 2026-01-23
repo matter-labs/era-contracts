@@ -1216,7 +1216,6 @@ contract ZKsyncOSVerifierPlonk is IVerifier {
                     fReconstructed := stateOpening0AtZ
                     let eta := mload(STATE_ETA_SLOT)
                     let currentEta := eta
-
                     fReconstructed := addmod(fReconstructed, mulmod(currentEta, stateOpening1AtZ, R_MOD), R_MOD)
                     currentEta := mulmod(currentEta, eta, R_MOD)
                     fReconstructed := addmod(fReconstructed, mulmod(currentEta, stateOpening2AtZ, R_MOD), R_MOD)
@@ -1299,7 +1298,6 @@ contract ZKsyncOSVerifierPlonk is IVerifier {
                 {
                     let zInDomainSize := mload(STATE_Z_IN_DOMAIN_SIZE)
                     let currentZ := zInDomainSize
-
                     mstore(QUERIES_AT_Z_0_X_SLOT, mload(PROOF_QUOTIENT_POLY_PARTS_0_X_SLOT))
                     mstore(QUERIES_AT_Z_0_Y_SLOT, mload(PROOF_QUOTIENT_POLY_PARTS_0_Y_SLOT))
 
@@ -1361,7 +1359,6 @@ contract ZKsyncOSVerifierPlonk is IVerifier {
 
                     let eta := mload(STATE_ETA_SLOT)
                     let currentEta := eta
-
                     pointMulAndAddIntoDest(VK_LOOKUP_TABLE_1_X_SLOT, currentEta, QUERIES_T_POLY_AGGREGATED_X_SLOT)
                     currentEta := mulmod(currentEta, eta, R_MOD)
 
@@ -1401,7 +1398,6 @@ contract ZKsyncOSVerifierPlonk is IVerifier {
                 let aggregationChallenge := 1
                 let firstDCoeff
                 let firstTCoeff
-
                 mstore(AGGREGATED_AT_Z_X_SLOT, mload(QUERIES_AT_Z_0_X_SLOT))
                 mstore(AGGREGATED_AT_Z_Y_SLOT, mload(QUERIES_AT_Z_0_Y_SLOT))
                 let aggregatedOpeningAtZ := mload(PROOF_QUOTIENT_POLY_OPENING_AT_Z_SLOT)

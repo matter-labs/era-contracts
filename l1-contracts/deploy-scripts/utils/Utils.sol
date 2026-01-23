@@ -11,12 +11,19 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {IAccessControlDefaultAdminRules} from "@openzeppelin/contracts-v4/access/IAccessControlDefaultAdminRules.sol";
 
-import {IL1Bridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {
+    IL1Bridgehub,
+    L2TransactionRequestDirect,
+    L2TransactionRequestTwoBridgesOuter
+} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {L2_CREATE2_FACTORY_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_CREATE2_FACTORY_ADDR,
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {EIP712Utils} from "./EIP712Utils.sol";
@@ -422,7 +429,7 @@ library Utils {
                 params.l2GasLimit,
                 REQUIRED_L2_GAS_PRICE_PER_PUBDATA
             ) *
-            2 +
+                2 +
             params.l2Value;
 
         l2TransactionRequestDirect = L2TransactionRequestDirect({
@@ -455,8 +462,7 @@ library Utils {
         IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddress);
 
         requiredValueToDeploy =
-            bridgehub.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
-            2;
+            bridgehub.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) * 2;
 
         l2TransactionRequest = L2TransactionRequestTwoBridgesOuter({
             chainId: chainId,

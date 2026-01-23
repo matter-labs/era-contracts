@@ -808,7 +808,6 @@ contract EraVerifierFflonk is IVerifierV2 {
             ) {
                 let omega_h
                 let c
-
                 // setup round
                 // r
 
@@ -1366,7 +1365,6 @@ contract EraVerifierFflonk is IVerifierV2 {
                 // C0
                 let ps_aggregated_commitment_g1_x := VK_C0_G1_X
                 let ps_aggregated_commitment_g1_y := VK_C0_G1_Y
-
                 // ((alpha^{2}*Z_{T\S2}(y))/Z_{T\S0}(y))
                 let aggregated_r_at_y := mulmod(
                     mload(add(PS_SET_DIFFERENCES_AT_Y, mul(2, 0x20))),

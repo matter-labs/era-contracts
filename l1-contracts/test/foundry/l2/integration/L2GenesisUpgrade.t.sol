@@ -5,9 +5,28 @@ pragma solidity 0.8.28;
 import {Test, StdStorage, stdStorage} from "forge-std/Test.sol";
 import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
 import {L2GenesisUpgrade} from "contracts/l2-upgrades/L2GenesisUpgrade.sol";
-import {IL2GenesisUpgrade, FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {
+    IL2GenesisUpgrade,
+    FixedForceDeploymentsData,
+    ZKChainSpecificForceDeploymentsData
+} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
-import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_GENESIS_UPGRADE_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_FORCE_DEPLOYER_ADDR,
+    L2_INTEROP_HANDLER_ADDR,
+    L2_GENESIS_UPGRADE_ADDR,
+    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
+    L2_MESSAGE_ROOT_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_ASSET_ROUTER_ADDR,
+    L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
+    L2_NTV_BEACON_DEPLOYER_ADDR,
+    L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_INTEROP_CENTER_ADDR,
+    L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";

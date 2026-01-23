@@ -8,14 +8,30 @@ import {ConfirmBalanceMigrationData, TokenBalanceMigrationData} from "../../comm
 import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {InvalidProof, ZeroAddress, InvalidChainId, Unauthorized} from "../../common/L1ContractErrors.sol";
-import {IMessageRoot, V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../core/message-root/IMessageRoot.sol";
+import {
+    IMessageRoot,
+    V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY
+} from "../../core/message-root/IMessageRoot.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidVersion, L1TotalSupplyAlreadyMigrated, InvalidAssetMigrationNumber, InvalidSettlementLayer} from "./AssetTrackerErrors.sol";
+import {
+    InvalidChainMigrationNumber,
+    InvalidFunctionSignature,
+    InvalidMigrationNumber,
+    InvalidSender,
+    InvalidWithdrawalChainId,
+    NotMigratedChain,
+    OnlyWhitelistedSettlementLayer,
+    TransientBalanceChangeAlreadySet,
+    InvalidVersion,
+    L1TotalSupplyAlreadyMigrated,
+    InvalidAssetMigrationNumber,
+    InvalidSettlementLayer
+} from "./AssetTrackerErrors.sol";
 import {V31UpgradeChainBatchNumberNotSet} from "../../core/bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";

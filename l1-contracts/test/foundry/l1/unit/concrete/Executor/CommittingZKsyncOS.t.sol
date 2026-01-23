@@ -10,7 +10,11 @@ import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.s
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {MismatchL2DACommitmentScheme} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
-import {InvalidPubdataHash, InvalidBlobsPublished, BlobNotPublished} from "../../../da-contracts-imports/DAContractsErrors.sol";
+import {
+    InvalidPubdataHash,
+    InvalidBlobsPublished,
+    BlobNotPublished
+} from "../../../da-contracts-imports/DAContractsErrors.sol";
 import {BlobsL1DAValidatorZKsyncOS} from "../../../da-contracts-imports/BlobsL1DAValidatorZKsyncOS.sol";
 
 contract CommittingTest is ExecutorTest {

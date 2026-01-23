@@ -92,7 +92,6 @@ chain — one of stage, testnet, or mainnet (default: stage)
 - Executes forge verify-contract from the correct project root
 
 - If verification fails, retries with:
-
   - the original contract name (in case of fallback)
 
   - TransparentUpgradeableProxy (useful for proxy deployments)

@@ -2,7 +2,15 @@
 
 pragma solidity 0.8.28;
 
-import {InvalidL2DAOutputHash, InvalidNumberOfBlobs, InvalidPubdataHash, OnlyOneBlobWithCalldataAllowed, OperatorDAInputTooSmall, PubdataInputTooSmall, PubdataLengthTooBig} from "../L1StateTransitionErrors.sol";
+import {
+    InvalidL2DAOutputHash,
+    InvalidNumberOfBlobs,
+    InvalidPubdataHash,
+    OnlyOneBlobWithCalldataAllowed,
+    OperatorDAInputTooSmall,
+    PubdataInputTooSmall,
+    PubdataLengthTooBig
+} from "../L1StateTransitionErrors.sol";
 
 /// @dev Total number of bytes in a blob. Blob = 4096 field elements * 31 bytes per field element
 /// @dev EIP-4844 defines it as 131_072 but we use 4096 * 31 within our circuits to always fit within a field element

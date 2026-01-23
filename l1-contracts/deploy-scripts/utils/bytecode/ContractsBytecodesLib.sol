@@ -51,7 +51,8 @@ library ContractsBytecodesLib {
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCode.
         string[47] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
-            "AccessControlRestriction", /// ??
+            "AccessControlRestriction",
+            /// ??
             "L2AssetTracker",
             "BeaconProxy",
             "BridgedStandardERC20",

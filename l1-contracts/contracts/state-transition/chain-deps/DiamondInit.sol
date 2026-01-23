@@ -4,12 +4,26 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {ZKChainBase} from "./facets/ZKChainBase.sol";
-import {DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_BATCH_OVERHEAD_L1_GAS, DEFAULT_MAX_PUBDATA_PER_BATCH, DEFAULT_MAX_L2_GAS_PER_BATCH, DEFAULT_PRIORITY_TX_MAX_PUBDATA, DEFAULT_MINIMAL_L2_GAS_PRICE, DEFAULT_PUBDATA_PRICING_MODE, DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT} from "../../common/Config.sol";
+import {
+    DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH,
+    L2_TO_L1_LOG_SERIALIZE_SIZE,
+    DEFAULT_BATCH_OVERHEAD_L1_GAS,
+    DEFAULT_MAX_PUBDATA_PER_BATCH,
+    DEFAULT_MAX_L2_GAS_PER_BATCH,
+    DEFAULT_PRIORITY_TX_MAX_PUBDATA,
+    DEFAULT_MINIMAL_L2_GAS_PRICE,
+    DEFAULT_PUBDATA_PRICING_MODE,
+    DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT
+} from "../../common/Config.sol";
 import {IDiamondInit, InitializeData} from "../chain-interfaces/IDiamondInit.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
 import {EmptyAssetId, EmptyBytes32, ZeroAddress} from "../../common/L1ContractErrors.sol";
-import {L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ASSET_TRACKER_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR
+} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";

@@ -10,10 +10,18 @@ import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
 import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {
+    MessageRootNotRegistered,
+    OnlyBridgehubOrChainAssetHandler
+} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
-import {GW_ASSET_TRACKER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    GW_ASSET_TRACKER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(

@@ -64,7 +64,6 @@ Here is a quick guide on how this transaction is routed through the bridgehub.
 1. The bridgehub retrieves the `baseTokenAssetId` of the chain with the corresponding `chainId` and calls `L1AssetRouter.bridgehubDepositBaseToken` method. The `L1AssetRouter` will then use standard token depositing mechanism to burn/escrow the respective amount of the `baseTokenAssetId`. You can read more about it in [the asset router doc](../asset_router/overview.md). This step ensures that the baseToken will be backed 1-1 on L1.
 
 2. After that, it just routes the corresponding call to the ZKChain with the corresponding `chainId` . It is now the responsibility of the ZKChain to validate that the transaction is correct and can be accepted by it. This validation includes, but not limited to:
-
    - The fact that the user paid enough funds for the transaction (basically `request.l2GasLimit * derivedL2GasPrice(...) + request.l2Value >= request.mintValue`.
    - The fact the transaction is always executable (the `request.l2GasLimit` is not high enough).
    - etc.

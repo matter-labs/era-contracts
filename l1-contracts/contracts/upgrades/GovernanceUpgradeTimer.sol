@@ -2,7 +2,14 @@
 pragma solidity ^0.8.18;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {CallerNotTimerAdmin, DeadlineNotYetPassed, NewDeadlineExceedsMaxDeadline, NewDeadlineNotGreaterThanCurrent, TimerAlreadyStarted, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {
+    CallerNotTimerAdmin,
+    DeadlineNotYetPassed,
+    NewDeadlineExceedsMaxDeadline,
+    NewDeadlineNotGreaterThanCurrent,
+    TimerAlreadyStarted,
+    ZeroAddress
+} from "../common/L1ContractErrors.sol";
 
 /// @title Governance Upgrade Timer
 /// @author Matter Labs

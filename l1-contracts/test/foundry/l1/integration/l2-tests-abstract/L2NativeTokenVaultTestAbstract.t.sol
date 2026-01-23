@@ -20,7 +20,11 @@ import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandar
 // import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 // import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 
 // import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -30,12 +34,20 @@ import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
-import {BridgeMintNotImplemented, TokenIsLegacy, TokenNotLegacy, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {
+    BridgeMintNotImplemented,
+    TokenIsLegacy,
+    TokenNotLegacy,
+    Unauthorized
+} from "contracts/common/L1ContractErrors.sol";
 import {TokenAlreadyInBridgedTokensList} from "contracts/bridge/L1BridgeContractErrors.sol";
 
 import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
 
 abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeployer {

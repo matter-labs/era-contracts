@@ -13,7 +13,11 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {DestinationChainNotRegistered} from "contracts/interop/InteropErrors.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_INTEROP_CENTER
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 

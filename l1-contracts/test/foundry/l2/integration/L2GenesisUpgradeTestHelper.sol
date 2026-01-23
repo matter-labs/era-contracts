@@ -4,7 +4,10 @@ pragma solidity 0.8.28;
 
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {
+    FixedForceDeploymentsData,
+    ZKChainSpecificForceDeploymentsData
+} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {TokenMetadata, TokenBridgingData} from "contracts/common/Messaging.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";

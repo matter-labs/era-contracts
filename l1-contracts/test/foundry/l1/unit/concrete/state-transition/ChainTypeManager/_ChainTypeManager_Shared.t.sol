@@ -24,7 +24,11 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
-import {IChainTypeManager, ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
+import {
+    IChainTypeManager,
+    ChainCreationParams,
+    ChainTypeManagerInitializeData
+} from "contracts/state-transition/IChainTypeManager.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";

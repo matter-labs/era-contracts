@@ -11,7 +11,11 @@ import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {IL2GenesisUpgrade} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL1GenesisUpgrade} from "./IL1GenesisUpgrade.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
-import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_GENESIS_UPGRADE_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_FORCE_DEPLOYER_ADDR,
+    L2_GENESIS_UPGRADE_ADDR
+} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {PRIORITY_TX_MAX_GAS_LIMIT, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 

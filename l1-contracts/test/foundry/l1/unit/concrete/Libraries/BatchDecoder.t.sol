@@ -7,7 +7,13 @@ import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.so
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {InteropRoot, L2Log} from "contracts/common/Messaging.sol";
-import {EmptyData, IncorrectBatchBounds, UnsupportedCommitBatchEncoding, UnsupportedExecuteBatchEncoding, UnsupportedProofBatchEncoding} from "contracts/common/L1ContractErrors.sol";
+import {
+    EmptyData,
+    IncorrectBatchBounds,
+    UnsupportedCommitBatchEncoding,
+    UnsupportedExecuteBatchEncoding,
+    UnsupportedProofBatchEncoding
+} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Unit tests for BatchDecoder library
 contract BatchDecoderTest is Test {

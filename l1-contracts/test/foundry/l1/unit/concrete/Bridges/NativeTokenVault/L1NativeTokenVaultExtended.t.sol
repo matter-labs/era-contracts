@@ -25,8 +25,18 @@ import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2Contract
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 
-import {NoFundsTransferred, OriginChainIdNotFound, Unauthorized, WithdrawFailed, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {ClaimFailedDepositFailed, WrongCounterpart, OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {
+    NoFundsTransferred,
+    OriginChainIdNotFound,
+    Unauthorized,
+    WithdrawFailed,
+    ZeroAddress
+} from "contracts/common/L1ContractErrors.sol";
+import {
+    ClaimFailedDepositFailed,
+    WrongCounterpart,
+    OnlyFailureStatusAllowed
+} from "contracts/bridge/L1BridgeContractErrors.sol";
 
 contract MockERC20 is ERC20 {
     constructor() ERC20("MockToken", "MTK") {

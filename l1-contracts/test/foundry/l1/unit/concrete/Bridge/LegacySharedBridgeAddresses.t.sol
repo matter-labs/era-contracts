@@ -3,7 +3,10 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {LegacySharedBridgeAddresses, SharedBridgeOnChainId} from "contracts/bridge/asset-tracker/LegacySharedBridgeAddresses.sol";
+import {
+    LegacySharedBridgeAddresses,
+    SharedBridgeOnChainId
+} from "contracts/bridge/asset-tracker/LegacySharedBridgeAddresses.sol";
 import {InvalidL1AssetRouter} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 
 /// @notice Wrapper contract to expose library functions

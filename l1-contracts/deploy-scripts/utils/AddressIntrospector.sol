@@ -19,10 +19,31 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {Utils} from "../utils/Utils.sol";
-import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_BRIDGEHUB_ADDR,
+    L2_ASSET_ROUTER_ADDR,
+    L2_MESSAGE_ROOT_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_ASSET_TRACKER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {CoreDeployedAddresses, BridgehubAddresses, BridgehubContracts, ZkChainAddresses, L2ERC20BridgeAddresses, StateTransitionDeployedAddresses, StateTransitionContracts, Verifiers, Facets, BridgesDeployedAddresses, BridgeContracts, CTMDeployedAddresses, CTMAdminAddresses, DataAvailabilityDeployedAddresses} from "./Types.sol";
+import {
+    CoreDeployedAddresses,
+    BridgehubAddresses,
+    BridgehubContracts,
+    ZkChainAddresses,
+    L2ERC20BridgeAddresses,
+    StateTransitionDeployedAddresses,
+    StateTransitionContracts,
+    Verifiers,
+    Facets,
+    BridgesDeployedAddresses,
+    BridgeContracts,
+    CTMDeployedAddresses,
+    CTMAdminAddresses,
+    DataAvailabilityDeployedAddresses
+} from "./Types.sol";
 
 library AddressIntrospector {
     function getBridgehubAddresses(IL1Bridgehub _bridgehub) public view returns (BridgehubAddresses memory info) {

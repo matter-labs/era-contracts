@@ -10,7 +10,12 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
-import {IBridgehubBase, BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {
+    IBridgehubBase,
+    BridgehubBurnCTMAssetData,
+    BridgehubMintCTMAssetData,
+    L2TransactionRequestDirect
+} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";

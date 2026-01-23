@@ -4,7 +4,17 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {AddressHasNoCode, DelegateCallFailed, FacetExists, NoFunctionsForDiamondCut, NonEmptyCalldata, RemoveFunctionFacetAddressNotZero, RemoveFunctionFacetAddressZero, ReplaceFunctionFacetAddressZero, SelectorsMustAllHaveSameFreezability} from "contracts/common/L1ContractErrors.sol";
+import {
+    AddressHasNoCode,
+    DelegateCallFailed,
+    FacetExists,
+    NoFunctionsForDiamondCut,
+    NonEmptyCalldata,
+    RemoveFunctionFacetAddressNotZero,
+    RemoveFunctionFacetAddressZero,
+    ReplaceFunctionFacetAddressZero,
+    SelectorsMustAllHaveSameFreezability
+} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Mock facet for testing
 contract MockFacet {

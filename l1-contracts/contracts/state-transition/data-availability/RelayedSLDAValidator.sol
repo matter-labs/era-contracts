@@ -7,7 +7,11 @@ import {CalldataDAGateway} from "./CalldataDAGateway.sol";
 
 import {IL2Bridgehub} from "../../core/bridgehub/IL2Bridgehub.sol";
 import {L2_BRIDGEHUB_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {BlobHashBlobCommitmentMismatchValue, InvalidPubdataSource, L1DAValidatorInvalidSender} from "../L1StateTransitionErrors.sol";
+import {
+    BlobHashBlobCommitmentMismatchValue,
+    InvalidPubdataSource,
+    L1DAValidatorInvalidSender
+} from "../L1StateTransitionErrors.sol";
 
 /// @dev The version that is used for the `RelayedSLDAValidator` calldata.
 /// This is needed to ensure easier future-compatible encoding.

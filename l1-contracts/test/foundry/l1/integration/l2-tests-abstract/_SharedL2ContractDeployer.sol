@@ -16,7 +16,19 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
 import {IL2NativeTokenVault} from "../../../../../contracts/bridge/ntv/IL2NativeTokenVault.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_ROUTER, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    L2_ASSET_ROUTER,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+    L2_INTEROP_CENTER_ADDR,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
@@ -28,7 +40,11 @@ import {IL2AssetRouter} from "../../../../../contracts/bridge/asset-router/IL2As
 import {IL1Nullifier} from "../../../../../contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "../../../../../contracts/bridge/asset-router/IL1AssetRouter.sol";
 
-import {BridgehubL2TransactionRequest, L2Message, MessageInclusionProof} from "../../../../../contracts/common/Messaging.sol";
+import {
+    BridgehubL2TransactionRequest,
+    L2Message,
+    MessageInclusionProof
+} from "../../../../../contracts/common/Messaging.sol";
 import {IInteropCenter, InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
 import {L2WrappedBaseToken} from "../../../../../contracts/bridge/L2WrappedBaseToken.sol";
 import {L2SharedBridgeLegacy} from "../../../../../contracts/bridge/L2SharedBridgeLegacy.sol";
