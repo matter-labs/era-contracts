@@ -448,7 +448,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         uint256[] memory factoryDeps = new uint256[](allDeps.length);
         require(factoryDeps.length <= 64, "Too many deps");
 
-        BytecodePublisher.publishBytecodesInBatches(
+        BytecodePublisher.publishEraBytecodesInBatches(
             BytecodesSupplier(ctmAddresses.stateTransition.bytecodesSupplier),
             allDeps
         );

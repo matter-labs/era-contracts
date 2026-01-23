@@ -47,8 +47,10 @@ error BridgeHubAlreadyRegistered();
 error BridgeMintNotImplemented();
 // 0xaa5f6180
 error BurningNativeWETHNotSupported();
-// 0xccdd18d2
-error BytecodeAlreadyPublished(bytes32 bytecodeHash);
+// 0x07f566d8
+error EraBytecodeAlreadyPublished(bytes32 bytecodeHash);
+// 0x9440d156
+error EVMBytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0x25d8333c
 error CallerNotTimerAdmin();
 // 0x3331e9c0

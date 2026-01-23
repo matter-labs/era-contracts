@@ -149,7 +149,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         deployDAValidators();
         deployIfNeededMulticall3();
 
-        ctmAddresses.stateTransition.bytecodesSupplier = deploySimpleContract("BytecodesSupplier", false);
+        (, ctmAddresses.stateTransition.bytecodesSupplier) = deployTuppWithContract("BytecodesSupplier", false);
 
         deployVerifiers();
 

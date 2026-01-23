@@ -502,6 +502,8 @@ abstract contract DeployCTMUtils is DeployUtils {
                     ValidatorTimelock.initialize,
                     (config.deployerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
                 );
+        } else if (compareStrings(contractName, "BytecodesSupplier")) {
+            return abi.encodeCall(BytecodesSupplier.initialize, ());
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }
