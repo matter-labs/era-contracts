@@ -1160,7 +1160,7 @@
     "evmDeployedBytecodeLength": 22361
   },
   {
-    "contractName": "l1-contracts/GatewayCTMDeployerCTM ",
+    "contractName": "l1-contracts/GatewayCTMDeployerCTM",
     "zkBytecodeHash": "0x010002179ea384ba91a8709eac4563c6fa1171dd0889810c9b59188c80faa550",
     "zkBytecodePath": "/l1-contracts/zkout/GatewayCTMDeployerCTM.sol/GatewayCTMDeployerCTM.json",
     "evmBytecodeHash": "0x59cf82d49b1f44962438d50b6bf7bc1b46731f6252a683e4380044ef66057c8d",
