@@ -175,6 +175,25 @@
   },
   {
     "type": "function",
+    "name": "chainTree",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "_nextLeafIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "currentChainBatchNumber",
     "inputs": [
       {

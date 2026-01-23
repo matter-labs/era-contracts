@@ -52,7 +52,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     FullMerkle.FullTree public sharedTree;
 
     /// @dev The incremental merkle tree storing the chain message roots.
-    mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) internal chainTree;
+    mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) public chainTree;
 
     /// @notice The mapping from block number to the global message root.
     /// @dev Each block might have multiple txs that change the historical root. You can safely use the final root in the block,
