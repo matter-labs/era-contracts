@@ -23,7 +23,6 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {L1_GAS_PER_PUBDATA_BYTE, MAX_NEW_FACTORY_DEPS, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "../../../common/Config.sol";
 import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
-
 import {AddressNotZero, BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {DepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 import {DepthMoreThanOneForRecursiveMerkleProof} from "../../../core/bridgehub/L1BridgehubErrors.sol";
