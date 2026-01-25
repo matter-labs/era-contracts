@@ -51,9 +51,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     /// @dev Deployed utility contract to check that account is EIP7702 one
     IEIP7702Checker internal immutable EIP_7702_CHECKER;
 
-    /// @dev Era's chainID
-    uint256 internal immutable ERA_CHAIN_ID;
-
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
     uint256 internal immutable L1_CHAIN_ID;

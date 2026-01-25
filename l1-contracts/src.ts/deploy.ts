@@ -634,9 +634,14 @@ export class Deployer {
   public async deployMailboxFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
     const chainAssetHandler = getAddressFromEnv("CONTRACTS_CHAIN_ASSET_HANDLER_ADDR");
+    const eip7702Checker = getAddressFromEnv("CONTRACTS_EIP7702_CHECKER_ADDR");
+    let isTestnet = true;
+    if (process.env.CHAIN_ETH_NETWORK === "mainnet") {
+      isTestnet = false;
+    }
     const contractAddress = await this.deployViaCreate2(
       "MailboxFacet",
-      [await this.getL1ChainId(), chainAssetHandler],
+      [await this.getL1ChainId(), chainAssetHandler, eip7702Checker, isTestnet],
       create2Salt,
       ethTxOptions
     );
