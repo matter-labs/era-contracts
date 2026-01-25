@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 [
   {
     "contractName": "system-contracts/AccountCodeStorage",
@@ -5810,3 +5811,5 @@
     "evmDeployedBytecodeLength": null
   }
 ]
+=======
+>>>>>>> c54858d26 (Rm inmut var)
