@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {IBaseToken} from "./interfaces/IBaseToken.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {BASE_TOKEN_HOLDER_ADDRESS, BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, L1_MESSENGER_CONTRACT, L2_ASSET_TRACKER, L2_INTEROP_HANDLER, MSG_VALUE_SYSTEM_CONTRACT} from "./Constants.sol";
+import {BASE_TOKEN_HOLDER_ADDRESS, BOOTLOADER_FORMAL_ADDRESS, COMPLEX_UPGRADER_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, L1_MESSENGER_CONTRACT, L2_ASSET_TRACKER, L2_INTEROP_HANDLER, MSG_VALUE_SYSTEM_CONTRACT} from "./Constants.sol";
 import {IMailboxImpl} from "./interfaces/IMailboxImpl.sol";
 import {InsufficientFunds, Unauthorized} from "./SystemContractErrors.sol";
 
@@ -146,5 +146,20 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
     ) internal pure returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
         return abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, _to, _amount, _sender, _additionalData);
+    }
+
+    /// @notice Initializes the BaseTokenHolder's balance during the V31 upgrade.
+    /// @dev This function sets the initial balance of BASE_TOKEN_HOLDER to INITIAL_BASE_TOKEN_HOLDER_BALANCE (2^127 - 1).
+    /// @dev Can only be called by the ComplexUpgrader contract.
+    /// @dev This function is idempotent - calling it when the balance is already set has no effect.
+    function initializeBaseTokenHolderBalance() external {
+        if (msg.sender != address(COMPLEX_UPGRADER_CONTRACT)) {
+            revert Unauthorized(msg.sender);
+        }
+
+        // Only initialize if not already set (idempotent)
+        if (balance[BASE_TOKEN_HOLDER_ADDRESS] == 0) {
+            balance[BASE_TOKEN_HOLDER_ADDRESS] = INITIAL_BASE_TOKEN_HOLDER_BALANCE;
+        }
     }
 }
