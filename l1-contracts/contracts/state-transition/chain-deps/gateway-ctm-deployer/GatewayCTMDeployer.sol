@@ -70,12 +70,8 @@ struct StateTransitionContracts {
     address chainTypeManagerProxy;
     /// @notice Address of the ChainTypeManager implementation contract.
     address chainTypeManagerImplementation;
-    /// @notice Address of the Verifier contract.
-    address verifier;
-    /// @notice Address of the VerifierPlonk contract.
-    address verifierPlonk;
-    /// @notice Address of the VerifierFflonk contract.
-    address verifierFflonk;
+    /// @notice Verifier contracts (Verifier, VerifierPlonk, VerifierFflonk).
+    Verifiers verifiers;
     /// @notice Diamond facet contract addresses.
     Facets facets;
     /// @notice Address of the GenesisUpgrade contract.

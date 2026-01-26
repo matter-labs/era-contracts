@@ -924,9 +924,7 @@ library GatewayCTMDeployerHelper {
         contracts.stateTransition.validatorTimelockProxy = validatorTimelockResult.validatorTimelockProxy;
 
         // From Verifiers deployer
-        contracts.stateTransition.verifierFflonk = verifiersResult.verifierFflonk;
-        contracts.stateTransition.verifierPlonk = verifiersResult.verifierPlonk;
-        contracts.stateTransition.verifier = verifiersResult.verifier;
+        contracts.stateTransition.verifiers = verifiersResult;
 
         // From direct deployments
         contracts.stateTransition.facets = directAddresses.facets;
@@ -958,8 +956,8 @@ library GatewayCTMDeployerHelper {
                 chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
                 l1BytecodesSupplier: address(0),
                 eip7702Checker: address(0),
-                verifierFflonk: _deployedContracts.stateTransition.verifierFflonk,
-                verifierPlonk: _deployedContracts.stateTransition.verifierPlonk,
+                verifierFflonk: _deployedContracts.stateTransition.verifiers.verifierFflonk,
+                verifierPlonk: _deployedContracts.stateTransition.verifiers.verifierPlonk,
                 verifierOwner: _config.aliasedGovernanceAddress
             });
     }

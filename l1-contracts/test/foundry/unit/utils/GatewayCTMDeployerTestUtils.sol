@@ -26,9 +26,9 @@ library DeployedContractsComparator {
         StateTransitionContracts memory a,
         StateTransitionContracts memory b
     ) internal pure {
-        require(a.verifier == b.verifier, "verifier differs");
-        require(a.verifierFflonk == b.verifierFflonk, "verifierFflonk differs");
-        require(a.verifierPlonk == b.verifierPlonk, "verifierPlonk differs");
+        require(a.verifiers.verifier == b.verifiers.verifier, "verifier differs");
+        require(a.verifiers.verifierFflonk == b.verifiers.verifierFflonk, "verifierFflonk differs");
+        require(a.verifiers.verifierPlonk == b.verifiers.verifierPlonk, "verifierPlonk differs");
         compareFacets(a.facets, b.facets);
         require(a.genesisUpgrade == b.genesisUpgrade, "genesisUpgrade differs");
         require(
@@ -93,9 +93,7 @@ library GatewayCTMDeployerTestUtils {
         contracts.stateTransition.validatorTimelockProxy = results.validatorTimelockResult.validatorTimelockProxy;
 
         // From Verifiers deployer
-        contracts.stateTransition.verifierFflonk = results.verifiersResult.verifierFflonk;
-        contracts.stateTransition.verifierPlonk = results.verifiersResult.verifierPlonk;
-        contracts.stateTransition.verifier = results.verifiersResult.verifier;
+        contracts.stateTransition.verifiers = results.verifiersResult;
 
         // From CTM deployer
         contracts.stateTransition.serverNotifierImplementation = results.ctmResult.serverNotifierImplementation;
