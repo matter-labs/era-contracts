@@ -348,6 +348,15 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
             abi.encode(addresses.chainTypeManager.protocolVersion())
         );
+        BaseTokenData memory baseTokenData = BaseTokenData({
+            assetId: baseTokenAssetId,
+            originalToken: makeAddr("baseTokenOrigin"),
+            originChainId: currentChainId
+        });
+        vm.expectCall(
+            GW_ASSET_TRACKER_ADDR,
+            abi.encodeCall(IGWAssetTracker.registerBaseTokenOnGateway, (baseTokenData))
+        );
         vm.mockCall(
             GW_ASSET_TRACKER_ADDR,
             abi.encodeWithSelector(IGWAssetTracker.registerBaseTokenOnGateway.selector),
@@ -365,7 +374,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
         BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
             chainId: migratingChainId,
-            baseTokenData: BaseTokenData({assetId: baseTokenAssetId, originalToken: address(0), originChainId: 0}),
+            baseTokenData: baseTokenData,
             batchNumber: 0,
             ctmData: ctmData,
             chainData: chainData,

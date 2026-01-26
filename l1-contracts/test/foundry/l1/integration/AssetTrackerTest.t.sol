@@ -29,7 +29,7 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IL2AssetTracker, L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {IL1AssetTracker, L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
-import {GWAssetTracker, IGWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
+import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 import {IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
 
 import {IAssetTrackerDataEncoding} from "contracts/bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
@@ -39,6 +39,16 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {InvalidChainId} from "contracts/common/L1ContractErrors.sol";
+
+contract GWAssetTrackerTestHelper is GWAssetTracker {
+    function getOriginToken(bytes32 _assetId) external view returns (address) {
+        return originToken[_assetId];
+    }
+
+    function getTokenOriginChainId(bytes32 _assetId) external view returns (uint256) {
+        return tokenOriginChainId[_assetId];
+    }
+}
 
 contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
@@ -50,7 +60,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     IBridgehubBase l2Bridgehub;
     IL1AssetTracker assetTracker;
     IL2AssetTracker l2AssetTracker;
-    IGWAssetTracker gwAssetTracker;
+    GWAssetTrackerTestHelper gwAssetTracker;
     address l1AssetTracker = address(0);
 
     address tokenAddress;
@@ -103,9 +113,9 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         address l2AssetTrackerAddress = address(new L2AssetTracker());
         vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
         l2AssetTracker = IL2AssetTracker(L2_ASSET_TRACKER_ADDR);
-        address gwAssetTrackerAddress = address(new GWAssetTracker());
+        address gwAssetTrackerAddress = address(new GWAssetTrackerTestHelper());
         vm.etch(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAddress.code);
-        gwAssetTracker = IGWAssetTracker(GW_ASSET_TRACKER_ADDR);
+        gwAssetTracker = GWAssetTrackerTestHelper(GW_ASSET_TRACKER_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2AssetTracker.setAddresses(block.chainid, bytes32(0));
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
@@ -281,6 +291,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             assetId
         );
         assertEq(assetMigrationNumGW, migrationNumber, "Asset migration number should be updated on Gateway");
+        assertEq(gwAssetTracker.getOriginToken(assetId), tokenAddress);
+        assertEq(gwAssetTracker.getTokenOriginChainId(assetId), originalChainId);
     }
 
     function test_migrationGatewayToL1() public {
@@ -428,6 +440,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             migrationNumber,
             "Asset migration number should be updated on Gateway after confirmation"
         );
+        assertEq(gwAssetTracker.getOriginToken(assetId), tokenAddress);
+        assertEq(gwAssetTracker.getTokenOriginChainId(assetId), originalChainId);
     }
 
     function test_migrateTokenBalanceFromNTVV31_L2Chain() public {

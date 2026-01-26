@@ -29,6 +29,14 @@ contract GWAssetTrackerTestHelper is GWAssetTracker {
         return _getEmptyMessageRoot(_chainId);
     }
 
+    function getOriginToken(bytes32 _assetId) external view returns (address) {
+        return originToken[_assetId];
+    }
+
+    function getTokenOriginChainId(bytes32 _assetId) external view returns (uint256) {
+        return tokenOriginChainId[_assetId];
+    }
+
     function getLegacySharedBridgeAddress(uint256 _chainId) external view returns (address) {
         return legacySharedBridgeAddress[_chainId];
     }
@@ -132,8 +140,8 @@ contract GWAssetTrackerTest is Test {
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), AMOUNT);
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), BASE_TOKEN_AMOUNT);
 
-        // Check that token was registered (these are internal mappings, so we can't test them directly)
-        // The token registration happens in the _registerToken function
+        assertEq(gwAssetTracker.getOriginToken(ASSET_ID), ORIGIN_TOKEN);
+        assertEq(gwAssetTracker.getTokenOriginChainId(ASSET_ID), ORIGIN_CHAIN_ID);
     }
 
     function test_HandleChainBalanceIncreaseOnGateway_Unauthorized() public {
@@ -699,6 +707,8 @@ contract GWAssetTrackerTest is Test {
 
         // Balance should remain 0
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), 0);
+        assertEq(gwAssetTracker.getOriginToken(ASSET_ID), ORIGIN_TOKEN);
+        assertEq(gwAssetTracker.getTokenOriginChainId(ASSET_ID), ORIGIN_CHAIN_ID);
     }
 
     function testFuzz_ConfirmMigrationOnGateway_L1ToGateway(uint256 _amount) public {
@@ -1332,7 +1342,8 @@ contract GWAssetTrackerTest is Test {
         );
 
         // Chain balance should be set
-        assertEq(gwAssetTracker.chainBalance(_chainId, _assetId), _amount, "chainBalance should match deposit amount");
+        uint256 expectedAmount = _assetId == _baseTokenAssetId ? _amount + _baseTokenAmount : _amount;
+        assertEq(gwAssetTracker.chainBalance(_chainId, _assetId), expectedAmount, "chainBalance should match deposit amount");
     }
 
     /// @notice Test that the optimization triggers for both assetId and baseTokenAssetId independently

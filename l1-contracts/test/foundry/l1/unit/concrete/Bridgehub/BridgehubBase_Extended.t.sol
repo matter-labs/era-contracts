@@ -9,6 +9,12 @@ import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymen
 import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
 import {CTMNotRegistered, CTMAlreadyRegistered, ZeroAddress, ChainIdNotRegistered, AssetIdAlreadyRegistered, AssetHandlerNotRegistered, Unauthorized, NoCTMForAssetId} from "contracts/common/L1ContractErrors.sol";
 import {NotChainAssetHandler, AlreadyCurrentSL} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {GW_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IGWAssetTracker} from "contracts/bridge/asset-tracker/IGWAssetTracker.sol";
+
+contract DummyGWAssetTracker {
+    function registerBaseTokenOnGateway(BaseTokenData calldata) external {}
+}
 
 contract BridgehubBase_Extended_Test is Test {
     L1Bridgehub bridgehub;
@@ -327,11 +333,13 @@ contract BridgehubBase_Extended_Test is Test {
         bytes32 baseTokenAssetId = keccak256("baseToken");
         BaseTokenData memory baseTokendata = BaseTokenData({
             assetId: baseTokenAssetId,
-            originalToken: address(0),
-            originChainId: 0
+            originalToken: makeAddr("originToken"),
+            originChainId: 987
         });
 
         // First call to set up the chain on this settlement layer
+        DummyGWAssetTracker dummyTracker = new DummyGWAssetTracker();
+        vm.etch(GW_ASSET_TRACKER_ADDR, address(dummyTracker).code);
         vm.prank(chainAssetHandler);
         bridgehub.forwardedBridgeMint(ctmAssetId, chainId, baseTokendata);
 

@@ -32,6 +32,14 @@ contract GWAssetTrackerTestHelper is GWAssetTracker {
     function getEmptyMessageRoot(uint256 _chainId) external returns (bytes32) {
         return _getEmptyMessageRoot(_chainId);
     }
+
+    function getOriginToken(bytes32 _assetId) external view returns (address) {
+        return originToken[_assetId];
+    }
+
+    function getTokenOriginChainId(bytes32 _assetId) external view returns (uint256) {
+        return tokenOriginChainId[_assetId];
+    }
 }
 
 contract GWAssetTrackerExtendedTest is Test {
@@ -708,5 +716,8 @@ contract GWAssetTrackerExtendedTest is Test {
 
         // Verify balance was decreased (lines 624, 630-631)
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), balanceBefore - AMOUNT);
+        // Verify token data
+        assertEq(gwAssetTracker.getOriginToken(ASSET_ID), ORIGIN_TOKEN);
+        assertEq(gwAssetTracker.getTokenOriginChainId(ASSET_ID), ORIGIN_CHAIN_ID);
     }
 }
