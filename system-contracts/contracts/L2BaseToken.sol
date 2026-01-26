@@ -20,6 +20,12 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
     /// @notice The balances of the users.
     mapping(address account => uint256 balance) internal balance;
 
+    /// @notice Deprecated: The old storage variable for total supply.
+    /// @dev This variable is kept to preserve storage layout. It is only read during the V31 upgrade
+    /// @dev to initialize the BaseTokenHolder balance correctly. After V31, totalSupply is computed
+    /// @dev dynamically from the BaseTokenHolder's balance.
+    uint256 internal __DEPRECATED_totalSupply;
+
     /// @notice Returns the total circulating supply of base tokens.
     /// @dev Computed as: INITIAL_BASE_TOKEN_HOLDER_BALANCE - current holder balance
     /// @dev This replaces the previous storage-based totalSupply that was incremented on mint.
@@ -146,7 +152,9 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
     }
 
     /// @notice Initializes the BaseTokenHolder's balance during the V31 upgrade.
-    /// @dev This function sets the initial balance of BASE_TOKEN_HOLDER to INITIAL_BASE_TOKEN_HOLDER_BALANCE (2^127 - 1).
+    /// @dev Reads the old totalSupply from __DEPRECATED_totalSupply and sets the holder balance
+    /// @dev such that the new computed totalSupply() equals the old value.
+    /// @dev Formula: balance[holder] = INITIAL_BASE_TOKEN_HOLDER_BALANCE - __DEPRECATED_totalSupply
     /// @dev Can only be called by the ComplexUpgrader contract.
     /// @dev This function is idempotent - calling it when the balance is already set has no effect.
     function initializeBaseTokenHolderBalance() external {
@@ -156,7 +164,9 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
 
         // Only initialize if not already set (idempotent)
         if (balance[BASE_TOKEN_HOLDER_ADDRESS] == 0) {
-            balance[BASE_TOKEN_HOLDER_ADDRESS] = INITIAL_BASE_TOKEN_HOLDER_BALANCE;
+            // Read the old totalSupply and compute the holder balance so that
+            // totalSupply() = INITIAL_BASE_TOKEN_HOLDER_BALANCE - balance[holder] = __DEPRECATED_totalSupply
+            balance[BASE_TOKEN_HOLDER_ADDRESS] = INITIAL_BASE_TOKEN_HOLDER_BALANCE - __DEPRECATED_totalSupply;
         }
     }
 }

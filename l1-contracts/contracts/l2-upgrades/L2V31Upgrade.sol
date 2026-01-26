@@ -16,14 +16,17 @@ contract L2V31Upgrade {
     /// @dev Intended to be delegate‑called by the `ComplexUpgrader` contract.
     /// @param _baseTokenOriginChainId The chainId of the origin chain of the base token.
     /// @param _baseTokenOriginAddress The address of the base token on the origin chain.
+    /// @param _isZkSyncOS Whether this chain is running zkSync OS (true) or Era VM (false).
     // solhint-disable-next-line no-unused-vars
-    function upgrade(uint256 _baseTokenOriginChainId, address _baseTokenOriginAddress) external {
+    function upgrade(uint256 _baseTokenOriginChainId, address _baseTokenOriginAddress, bool _isZkSyncOS) external {
         // TODO: set baseTokenOriginChainId and baseTokenOriginAddress in some location.
         // TODO: add all setAddresses, initL2 and updateL2s from genesis upgrade.
 
         // Initialize the BaseTokenHolder balance in L2BaseToken.
-        // This sets balance[BASE_TOKEN_HOLDER_ADDRESS] = 2^127 - 1, which is required
-        // for the new transfer-based approach to work correctly.
-        L2_BASE_TOKEN_SYSTEM_CONTRACT.initializeBaseTokenHolderBalance();
+        // This is only needed on zkSync OS chains where the BaseTokenHolder approach is used.
+        // Era VM chains use a different mechanism and don't need this initialization.
+        if (_isZkSyncOS) {
+            L2_BASE_TOKEN_SYSTEM_CONTRACT.initializeBaseTokenHolderBalance();
+        }
     }
 }

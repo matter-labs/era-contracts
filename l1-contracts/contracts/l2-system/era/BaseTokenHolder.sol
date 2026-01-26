@@ -2,16 +2,15 @@
 
 pragma solidity 0.8.28;
 
-import {IBaseTokenHolder} from "./interfaces/IBaseTokenHolder.sol";
-import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_HANDLER} from "./Constants.sol";
-import {Unauthorized} from "./SystemContractErrors.sol";
+import {IBaseTokenHolder} from "../../common/l2-helpers/IBaseTokenHolder.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_HANDLER} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {Unauthorized} from "../../common/L1ContractErrors.sol";
 
 /**
  * @title BaseTokenHolder
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice A system contract that holds the base token reserves for the chain.
+ * @notice A contract that holds the base token reserves for the chain.
  * @dev This contract replaces the mint/burn approach with a transfer-based approach for better EVM compatibility.
  *
  * ## Design Rationale
@@ -34,13 +33,13 @@ import {Unauthorized} from "./SystemContractErrors.sol";
  *
  * - Overflow: Before any user receives base tokens, this contract loses the same amount.
  *   Thus, no balance can overflow.
- * - Underflow: The chain operator must ensure the base token's total supply is below 2^128.
+ * - Underflow: The chain operator must ensure the base token's total supply is below 2^127.
  *   This is true for all known tokens including meme coins.
  */
-contract BaseTokenHolder is IBaseTokenHolder, SystemContractBase {
+contract BaseTokenHolder is IBaseTokenHolder {
     /// @notice Modifier that restricts access to the bootloader or InteropHandler.
     modifier onlyAuthorizedCaller() {
-        if (msg.sender != BOOTLOADER_FORMAL_ADDRESS && msg.sender != address(L2_INTEROP_HANDLER)) {
+        if (msg.sender != L2_BOOTLOADER_ADDRESS && msg.sender != address(L2_INTEROP_HANDLER)) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -58,27 +57,14 @@ contract BaseTokenHolder is IBaseTokenHolder, SystemContractBase {
 
         // Transfer base tokens from this holder to the recipient
         // This uses the L2BaseToken's transferFromTo which handles balance updates
-        BASE_TOKEN_SYSTEM_CONTRACT.transferFromTo(address(this), _to, _amount);
-
-        emit BaseTokenGiven(_to, _amount);
+        L2_BASE_TOKEN_SYSTEM_CONTRACT.transferFromTo(address(this), _to, _amount);
     }
 
-    /// @notice Receives base tokens back into the holder.
-    /// @dev This replaces the burn operation. Tokens are transferred back to this contract.
-    /// @dev The msg.value is automatically added to this contract's balance by the system.
-    function receive_() external payable override {
-        // The base tokens are already transferred to this contract via msg.value
-        // We just need to emit the event for tracking
-        if (msg.value > 0) {
-            emit BaseTokenReceived(msg.sender, msg.value);
-        }
-    }
-
-    /// @notice Fallback to accept base token transfers.
-    /// @dev This allows the contract to receive base tokens directly.
+    /// @notice Fallback to accept base token transfers from InteropHandler only.
+    /// @dev Restricts token reception to prevent accidental transfers.
     receive() external payable {
-        if (msg.value > 0) {
-            emit BaseTokenReceived(msg.sender, msg.value);
+        if (msg.sender != address(L2_INTEROP_HANDLER)) {
+            revert Unauthorized(msg.sender);
         }
     }
 }
