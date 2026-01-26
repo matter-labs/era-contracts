@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 # We need full history to fetch PR branch
-          persist-credentials: false # IMPORTANT: don't keep GITHUB_TOKEN creds for git as we'll use `RELEASE_TOKEN` instead
+          token: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Get PR branch info
         id: pr
@@ -72,18 +72,15 @@ jobs:
 
           yarn calculate-hashes:fix
 
-      - name: Commit and push changes (with RELEASE_TOKEN)
-        env:
-          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      - name: Commit and push changes
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "zksync[bot]"
+          git config user.email "zksync[bot]@users.noreply.github.com"
 
           git add AllContractsHashes.json
+          # Check if there are any changes to commit
           git diff --cached --quiet && { echo "No hash changes to commit"; exit 0; }
+          # Push changes otherwise
           git commit -m "chore: Updated hashes from CI"
-
-          # Push the changes using the RELEASE_TOKEN for authentication
-          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $(printf "x-access-token:%s" "$RELEASE_TOKEN" | base64 -w0)" \
-          push "https://github.com/${{ steps.pr.outputs.head_repo }}.git" "HEAD:${{ steps.pr.outputs.head_ref }}"
+          git push origin HEAD
