@@ -38,15 +38,9 @@ import {Unauthorized} from "./SystemContractErrors.sol";
  *   This is true for all known tokens including meme coins.
  */
 contract BaseTokenHolder is IBaseTokenHolder, SystemContractBase {
-    /// @notice Modifier that restricts access to bootloader or InteropHandler.
+    /// @notice Modifier that restricts access to the bootloader only.
     modifier onlyAuthorizedCaller() {
-        // Note: We use the same authorization as L2BaseToken.mint
-        // This includes bootloader and InteropHandler
         if (msg.sender != BOOTLOADER_FORMAL_ADDRESS) {
-            // Check if it's the InteropHandler by using the same pattern as SystemContractBase
-            // The InteropHandler check is handled by onlyCallFromBootloaderOrInteropHandler in L2BaseToken
-            // For BaseTokenHolder, we allow calls from bootloader only initially
-            // InteropHandler will call L2BaseToken which will call this contract via transferFromTo
             revert Unauthorized(msg.sender);
         }
         _;

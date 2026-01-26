@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {IBaseToken} from "./interfaces/IBaseToken.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {BASE_TOKEN_HOLDER_ADDRESS, BOOTLOADER_FORMAL_ADDRESS, COMPLEX_UPGRADER_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, L1_MESSENGER_CONTRACT, L2_ASSET_TRACKER, L2_INTEROP_HANDLER, MSG_VALUE_SYSTEM_CONTRACT} from "./Constants.sol";
+import {BASE_TOKEN_HOLDER_ADDRESS, BOOTLOADER_FORMAL_ADDRESS, COMPLEX_UPGRADER_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, INITIAL_BASE_TOKEN_HOLDER_BALANCE, L1_MESSENGER_CONTRACT, L2_ASSET_TRACKER, L2_INTEROP_HANDLER, MSG_VALUE_SYSTEM_CONTRACT} from "./Constants.sol";
 import {IMailboxImpl} from "./interfaces/IMailboxImpl.sol";
 import {InsufficientFunds, Unauthorized} from "./SystemContractErrors.sol";
 
@@ -17,10 +17,6 @@ import {InsufficientFunds, Unauthorized} from "./SystemContractErrors.sol";
  * to perform the balance changes while simulating the `msg.value` Ethereum behavior.
  */
 contract L2BaseToken is IBaseToken, SystemContractBase {
-    /// @notice The initial balance of the BaseTokenHolder contract (2^127 - 1).
-    /// @dev Used to derive the real circulating supply: INITIAL - currentHolderBalance = circulatingSupply
-    uint256 public constant INITIAL_BASE_TOKEN_HOLDER_BALANCE = (2 ** 127) - 1;
-
     /// @notice The balances of the users.
     mapping(address account => uint256 balance) internal balance;
 
