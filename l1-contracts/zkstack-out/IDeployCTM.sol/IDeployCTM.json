@@ -33,6 +33,11 @@
                     "name": "validatorTimelock",
                     "type": "address",
                     "internalType": "address"
+                  },
+                  {
+                    "name": "bytecodesSupplier",
+                    "type": "address",
+                    "internalType": "address"
                   }
                 ]
               },
@@ -53,6 +58,11 @@
                   },
                   {
                     "name": "validatorTimelock",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "bytecodesSupplier",
                     "type": "address",
                     "internalType": "address"
                   }
@@ -129,11 +139,6 @@
               },
               {
                 "name": "eraDiamondProxy",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "bytecodesSupplier",
                 "type": "address",
                 "internalType": "address"
               },
