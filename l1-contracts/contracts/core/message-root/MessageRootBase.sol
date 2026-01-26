@@ -76,6 +76,10 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// @dev We only update the chainTree on GW as of V31.
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
+    /// @notice The total number of published interop roots.
+    /// @dev Used inside the `NewInteropRoot` event, used for indexing purposes by the node.
+    uint256 public totalPublishedInteropRoots;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
@@ -203,7 +207,11 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
         bytes32[] memory _sides = new bytes32[](1);
         _sides[0] = _root;
-        emit NewInteropRoot(block.chainid, block.number, 0, _sides);
+
+        uint256 currentCount = totalPublishedInteropRoots;
+        ++totalPublishedInteropRoots;
+
+        emit NewInteropRoot(block.chainid, block.number, currentCount, _sides);
     }
 
     /// @notice Gets the aggregated root of all chains.

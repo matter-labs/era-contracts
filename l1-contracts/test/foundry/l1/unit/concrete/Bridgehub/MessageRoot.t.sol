@@ -155,12 +155,18 @@ contract MessageRootTest is Test {
         vm.prank(L2_BRIDGEHUB_ADDR);
         l2MessageRoot.addNewChain(alphaChainId, 0);
 
+        // Verify totalPublishedInteropRoots is 0 before adding batch root
+        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 0, "totalPublishedInteropRoots should be 0 before");
+
         vm.prank(alphaChainSender);
         vm.expectEmit(true, false, false, false);
         emit IMessageRoot.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
         vm.expectEmit(true, false, false, false);
         emit IMessageRoot.NewChainRoot(alphaChainId, bytes32(0), bytes32(0));
         l2MessageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
+
+        // Verify totalPublishedInteropRoots incremented after addChainBatchRoot
+        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 1, "totalPublishedInteropRoots should be 1 after");
     }
 
     function test_updateFullTree() public {
@@ -193,9 +199,29 @@ contract MessageRootTest is Test {
         vm.prank(L2_BRIDGEHUB_ADDR);
         l2MessageRoot.addNewChain(alphaChainId, 0);
         vm.chainId(gatewayChainId);
+
+        // Verify totalPublishedInteropRoots before adding batch root
+        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 0, "totalPublishedInteropRoots should be 0 before");
+
         vm.prank(GW_ASSET_TRACKER_ADDR);
         l2MessageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
+
+        // Verify totalPublishedInteropRoots after adding batch root (L2MessageRoot.addChainBatchRoot calls _emitRoot)
+        assertEq(
+            l2MessageRoot.totalPublishedInteropRoots(),
+            1,
+            "totalPublishedInteropRoots should be 1 after addChainBatchRoot"
+        );
+
         l2MessageRoot.updateFullTree();
+
+        // Verify totalPublishedInteropRoots after updateFullTree
+        assertEq(
+            l2MessageRoot.totalPublishedInteropRoots(),
+            2,
+            "totalPublishedInteropRoots should be 2 after updateFullTree"
+        );
+
         assertEq(l2MessageRoot.getAggregatedRoot(), 0x0ef1ac67d77f177a33449c47a8f05f0283300a81adca6f063c92c774beed140c);
     }
 
