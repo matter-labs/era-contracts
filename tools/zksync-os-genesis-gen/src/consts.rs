@@ -64,13 +64,6 @@ pub const GW_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal:
     "0000000000000000000000000000000000010010"
 )));
 
-pub const L2_INTEROP_ROOT_STORAGE: Address = Address(FixedBytes::<20>(hex_literal::hex!(
-    "0000000000000000000000000000000000010008"
-)));
-pub const L2_MESSAGE_VERIFICATION: Address = Address(FixedBytes::<20>(hex_literal::hex!(
-    "0000000000000000000000000000000000010009"
-)));
-
 // Deterministic Create2 factory
 // https://github.com/Arachnid/deterministic-deployment-proxy
 pub const DETERMINISTIC_CREATE2_ADDRESS: Address = Address(FixedBytes::<20>(hex_literal::hex!(
@@ -107,6 +100,10 @@ pub const EIP1967_ADMIN_SLOT: B256 = FixedBytes::<32>(hex_literal::hex!(
     "b53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103"
 ));
 
+const L2_INTEROP_ROOT_STORAGE: Address = Address(FixedBytes::<20>(hex_literal::hex!("0000000000000000000000000000000000010008")));
+const L2_MESSAGE_VERIFICATION: Address = Address(FixedBytes::<20>(hex_literal::hex!("0000000000000000000000000000000000010009")));
+
+// FIXME: consider reducing the size of the genesis by deploying those inside L2GensisUpgrade
 pub const INITIAL_CONTRACTS: [(Address, ContractSource); 21] = [
     (L2_COMPLEX_UPGRADER_ADDR, ContractSource::L1ContractName("SystemContractProxy")),
     (L2_GENESIS_UPGRADE, ContractSource::L1ContractName("L2GenesisUpgrade")),
