@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 # We need full history to fetch PR branch
-          persist-credentials: false  # IMPORTANT: don't keep GITHUB_TOKEN creds for git as we'll use `RELEASE_TOKEN` instead
+          persist-credentials: false # IMPORTANT: don't keep GITHUB_TOKEN creds for git as we'll use `RELEASE_TOKEN` instead
 
       - name: Get PR branch info
         id: pr
@@ -39,7 +39,6 @@ jobs:
             if (pr.data.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
               core.setFailed(`PR head repo is ${pr.data.head.repo.full_name}, expected ${context.repo.owner}/${context.repo.repo}`);
             }
-
 
       - name: Checkout PR branch
         run: |
