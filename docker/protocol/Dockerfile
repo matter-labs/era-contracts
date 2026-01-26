@@ -14,9 +14,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl git bash coreutils openssl jq xz-utils gnupg && \
     rm -rf /var/lib/apt/lists/*
 
-# Node 18.20.8 + Yarn 1.22.19
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
- && apt-get update && apt-get install -y --no-install-recommends nodejs=18.20.8-* \
+# Node 20 + Yarn 1.22.19
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+ && apt-get update && apt-get install -y --no-install-recommends nodejs \
  && npm i -g yarn@1.22.19 \
  && npm cache clean --force \
  && rm -rf /var/lib/apt/lists/*
