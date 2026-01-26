@@ -86,7 +86,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[37] private __gap;
+    uint256[36] private __gap;
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
@@ -210,7 +210,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         _sides[0] = _root;
 
         uint256 currentCount = totalPublishedInteropRoots;
-        ++totalPublishedInteropRoots;
+        totalPublishedInteropRoots = currentCount + 1;
 
         emit NewInteropRoot(block.chainid, block.number, currentCount, _sides);
     }

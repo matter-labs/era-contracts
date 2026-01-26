@@ -449,6 +449,12 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function publishBytecodes() public virtual {
+        if (config.isZKsyncOS) {
+            // TODO: for now, we do not provide any factory deps for zksync os
+            return;
+        }
+
+
         bytes[] memory allDeps = getFullListOfFactoryDependencies();
         uint256[] memory factoryDeps = new uint256[](allDeps.length);
         require(factoryDeps.length <= 64, "Too many deps");
