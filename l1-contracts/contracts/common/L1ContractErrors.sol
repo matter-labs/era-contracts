@@ -47,8 +47,6 @@ error BridgeHubAlreadyRegistered();
 error BridgeMintNotImplemented();
 // 0xaa5f6180
 error BurningNativeWETHNotSupported();
-// 0xccdd18d2
-error BytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0x25d8333c
 error CallerNotTimerAdmin();
 // 0x3331e9c0
@@ -113,8 +111,12 @@ error EmptyDeposit();
 error EmptyPrecommitData(uint256 batchNumber);
 // 0x456f8f7a
 error EmptyProofLength();
+// 0x876e8b23
+error EraBytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0x627e0872
 error ETHDepositNotSupported();
+// 0x61733a89
+error EVMBytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0xf4072616
 error ExecuteMessageFailed();
 // 0xac4a3f98
