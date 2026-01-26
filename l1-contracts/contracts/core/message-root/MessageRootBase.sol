@@ -78,6 +78,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
 
     /// @notice The total number of published interop roots.
     /// @dev Used inside the `NewInteropRoot` event, used for indexing purposes by the node.
+    /// @dev Note that it counts roots starting from V31 ONLY.
     uint256 public totalPublishedInteropRoots;
 
     /**
