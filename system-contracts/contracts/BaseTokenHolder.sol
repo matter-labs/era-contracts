@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {IBaseTokenHolder} from "./interfaces/IBaseTokenHolder.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, BASE_TOKEN_SYSTEM_CONTRACT} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_HANDLER} from "./Constants.sol";
 import {Unauthorized} from "./SystemContractErrors.sol";
 
 /**
@@ -38,9 +38,9 @@ import {Unauthorized} from "./SystemContractErrors.sol";
  *   This is true for all known tokens including meme coins.
  */
 contract BaseTokenHolder is IBaseTokenHolder, SystemContractBase {
-    /// @notice Modifier that restricts access to the bootloader only.
+    /// @notice Modifier that restricts access to the bootloader or InteropHandler.
     modifier onlyAuthorizedCaller() {
-        if (msg.sender != BOOTLOADER_FORMAL_ADDRESS) {
+        if (msg.sender != BOOTLOADER_FORMAL_ADDRESS && msg.sender != address(L2_INTEROP_HANDLER)) {
             revert Unauthorized(msg.sender);
         }
         _;

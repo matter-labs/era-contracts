@@ -39,7 +39,8 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
             msg.sender != MSG_VALUE_SYSTEM_CONTRACT &&
             msg.sender != address(DEPLOYER_SYSTEM_CONTRACT) &&
             msg.sender != BOOTLOADER_FORMAL_ADDRESS &&
-            msg.sender != address(L2_INTEROP_HANDLER)
+            msg.sender != address(L2_INTEROP_HANDLER) &&
+            msg.sender != BASE_TOKEN_HOLDER_ADDRESS
         ) {
             revert Unauthorized(msg.sender);
         }
