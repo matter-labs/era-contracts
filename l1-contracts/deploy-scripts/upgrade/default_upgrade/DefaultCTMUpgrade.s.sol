@@ -144,7 +144,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         _initCreate2FactoryParams(permanentConfig.create2FactoryAddr, permanentConfig.create2FactorySalt);
         config.l1ChainId = block.chainid;
         newConfig.ctm = permanentConfig.ctmProxy;
-        ctmAddresses.stateTransition.bytecodesSupplier = permanentConfig.bytecodesSupplier;
+        ctmAddresses.stateTransition.proxies.bytecodesSupplier = permanentConfig.bytecodesSupplier;
         ctmAddresses.stateTransition.rollupDAManager = permanentConfig.rollupDAManager;
         setAddressesBasedOnCTM();
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
@@ -454,13 +454,12 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             return;
         }
 
-
         bytes[] memory allDeps = getFullListOfFactoryDependencies();
         uint256[] memory factoryDeps = new uint256[](allDeps.length);
         require(factoryDeps.length <= 64, "Too many deps");
 
         BytecodePublisher.publishEraBytecodesInBatches(
-            BytecodesSupplier(ctmAddresses.stateTransition.bytecodesSupplier),
+            BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier),
             allDeps
         );
 
@@ -903,7 +902,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         vm.serializeAddress(
             "state_transition",
             "bytecodes_supplier_addr",
-            ctmAddresses.stateTransition.bytecodesSupplier
+            ctmAddresses.stateTransition.proxies.bytecodesSupplier
         );
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
