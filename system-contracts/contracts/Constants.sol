@@ -150,6 +150,9 @@ IGWAssetTracker constant GW_ASSET_TRACKER = IGWAssetTracker(address(GW_ASSET_TRA
 address constant BASE_TOKEN_HOLDER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x11);
 IBaseTokenHolder constant BASE_TOKEN_HOLDER = IBaseTokenHolder(payable(BASE_TOKEN_HOLDER_ADDRESS));
 
+/// @dev The initial balance of the BaseTokenHolder contract (2^127 - 1).
+/// @dev Used to derive the real circulating supply: INITIAL - currentHolderBalance = circulatingSupply
+uint256 constant INITIAL_BASE_TOKEN_HOLDER_BALANCE = (2 ** 127) - 1;
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.
