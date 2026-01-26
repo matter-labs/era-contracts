@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {Merkle} from "./Merkle.sol";
-import {MerkleWrongIndex, MerkleWrongLength} from "../L1ContractErrors.sol";
+import {MerkleWrongIndex, MerkleWrongLength, MerkleNothingToProve} from "../L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

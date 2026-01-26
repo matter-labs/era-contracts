@@ -886,6 +886,11 @@
   },
   {
     "type": "error",
+    "name": "MerkleNothingToProve",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "MerklePathEmpty",
     "inputs": []
   },
