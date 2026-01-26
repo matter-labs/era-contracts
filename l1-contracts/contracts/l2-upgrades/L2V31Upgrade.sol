@@ -14,12 +14,7 @@ bytes32 constant PROXY_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8
 contract L2V31Upgrade {
     /// @notice Executes the one‑time migration/patch.
     /// @dev Intended to be delegate‑called by the `ComplexUpgrader` contract.
-    /// @param _baseTokenOriginChainId The chainId of the origin chain of the base token.
-    /// @param _baseTokenOriginAddress The address of the base token on the origin chain.
-    function upgrade(uint256 _baseTokenOriginChainId, address _baseTokenOriginAddress) external {
-        // kl todo set baseTokenOriginChainId and baseTokenOriginAddress in some location.
-        // kl todo add all setAddresses, initL2 and updateL2s from genesis upgrade.
-
+    function upgrade() external {
         // Initialize the BaseTokenHolder balance in L2BaseToken.
         // This sets balance[BASE_TOKEN_HOLDER_ADDRESS] = 2^127 - 1, which is required
         // for the new transfer-based approach to work correctly.
