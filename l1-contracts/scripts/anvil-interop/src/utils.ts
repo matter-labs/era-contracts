@@ -1,4 +1,5 @@
-import { JsonRpcProvider } from "ethers";
+import { JsonRpcProvider, keccak256, toUtf8Bytes, AbiCoder } from "ethers";
+import type { TransactionReceipt } from "ethers";
 import { parse as parseToml } from "@iarna/toml";
 import * as fs from "fs";
 import * as path from "path";
@@ -31,7 +32,7 @@ export function loadTomlConfig<T>(filePath: string): T {
   return parseToml(content) as T;
 }
 
-export function saveTomlConfig(filePath: string, data: any): void {
+export function saveTomlConfig(filePath: string, data: Record<string, unknown>): void {
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -39,13 +40,13 @@ export function saveTomlConfig(filePath: string, data: any): void {
 
   const lines: string[] = [];
 
-  function writeSection(obj: any, prefix = ""): void {
+  function writeSection(obj: Record<string, unknown>, prefix = ""): void {
     for (const [key, value] of Object.entries(obj)) {
       const fullKey = prefix ? `${prefix}.${key}` : key;
 
       if (value && typeof value === "object" && !Array.isArray(value)) {
         lines.push(`\n[${fullKey}]`);
-        writeSection(value, fullKey);
+        writeSection(value as Record<string, unknown>, fullKey);
       } else if (typeof value === "string") {
         lines.push(`${key} = "${value}"`);
       } else if (typeof value === "boolean") {
@@ -62,7 +63,7 @@ export function saveTomlConfig(filePath: string, data: any): void {
   fs.writeFileSync(filePath, lines.join("\n"));
 }
 
-export function parseForgeScriptOutput(outputPath: string): any {
+export function parseForgeScriptOutput(outputPath: string): Record<string, unknown> {
   if (!fs.existsSync(outputPath)) {
     throw new Error(`Output file not found: ${outputPath}`);
   }
@@ -78,17 +79,15 @@ export function ensureDirectoryExists(dirPath: string): void {
 }
 
 export function keccak256Hash(data: string): string {
-  const { keccak256, toUtf8Bytes } = require("ethers");
   return keccak256(toUtf8Bytes(data));
 }
 
-export function encodeSystemLogs(logs: any[]): string {
+export function encodeSystemLogs(logs: Array<{ data?: string }>): string {
   if (logs.length === 0) {
     return "0x";
   }
 
-  const { AbiCoder } = require("ethers");
-  const abiCoder = new AbiCoder();
+  const abiCoder = AbiCoder.defaultAbiCoder();
   return abiCoder.encode(["bytes[]"], [logs.map((log) => log.data || "0x")]);
 }
 
@@ -111,7 +110,7 @@ export async function waitForTransactionReceipt(
   provider: JsonRpcProvider,
   txHash: string,
   maxAttempts = 60
-): Promise<any> {
+): Promise<TransactionReceipt | null> {
   for (let i = 0; i < maxAttempts; i++) {
     try {
       const receipt = await provider.getTransactionReceipt(txHash);

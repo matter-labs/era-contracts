@@ -6,14 +6,14 @@ permissions:
 on:
   pull_request:
     paths:
-      - 'l1-contracts/scripts/anvil-interop/**'
-      - '.github/workflows/anvil-interop-ci.yaml'
+      - "l1-contracts/scripts/anvil-interop/**"
+      - ".github/workflows/anvil-interop-ci.yaml"
   push:
     branches:
       - main
     paths:
-      - 'l1-contracts/scripts/anvil-interop/**'
-      - '.github/workflows/anvil-interop-ci.yaml'
+      - "l1-contracts/scripts/anvil-interop/**"
+      - ".github/workflows/anvil-interop-ci.yaml"
 
 jobs:
   test-anvil-interop:
@@ -105,7 +105,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs: test-anvil-interop
-  
+
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
@@ -125,26 +125,26 @@ jobs:
         with:
           node-version: 18.20.8
           cache: yarn
-  
+
       - name: Install dependencies
         run: yarn
-  
+
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
-  
+
       - name: Build l1-contracts artifacts
         run: yarn l1 build:foundry
-  
+
       - name: Build system-contract artifacts
         run: yarn sc build:foundry
-  
+
       - name: Build l2-contracts artifacts
         run: yarn l2 build:foundry
-  
+
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/scripts/anvil-interop
         run: yarn install
-  
+
       - name: Start Anvil Interop Environment
         working-directory: l1-contracts/scripts/anvil-interop
         run: |

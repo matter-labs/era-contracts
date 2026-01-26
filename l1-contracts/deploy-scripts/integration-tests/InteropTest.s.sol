@@ -26,10 +26,7 @@ contract InteropTest is Script {
 
         // Read addresses from deployment-info.json
         string memory root = vm.projectRoot();
-        string memory deploymentInfoPath = string.concat(
-            root,
-            "/scripts/anvil-interop/outputs/deployment-info.json"
-        );
+        string memory deploymentInfoPath = string.concat(root, "/scripts/anvil-interop/outputs/deployment-info.json");
 
         string memory json = vm.readFile(deploymentInfoPath);
         address bridgehubAddr = vm.parseJsonAddress(json, ".bridgehub");

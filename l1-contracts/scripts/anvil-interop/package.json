@@ -8,7 +8,17 @@
     "dev": "bash verify-config.sh && ts-node index.ts",
     "build": "tsc",
     "clean": "rm -rf dist outputs",
-    "cleanup": "bash cleanup.sh"
+    "cleanup": "bash cleanup.sh",
+    "step1": "ts-node step1-start-chains.ts",
+    "step2": "ts-node step2-deploy-l1.ts",
+    "step3": "ts-node step3-register-chains.ts",
+    "step4": "ts-node step4-initialize-l2.ts",
+    "step5": "ts-node step5-setup-gateway.ts",
+    "step6": "ts-node step6-start-settler.ts",
+    "step:all": "yarn step1 && yarn step2 && yarn step3 && yarn step4 && yarn step5",
+    "test:interop": "ts-node test-interop.ts",
+    "send:interop": "ts-node send-interop-tx.ts",
+    "send:l2-to-l2": "ts-node send-l2-to-l2.ts"
   },
   "keywords": [
     "anvil",

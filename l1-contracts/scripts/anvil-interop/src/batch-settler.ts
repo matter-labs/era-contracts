@@ -1,5 +1,5 @@
 import type { JsonRpcProvider } from "ethers";
-import { Contract, Wallet, keccak256, toUtf8Bytes } from "ethers";
+import { Contract, Wallet, keccak256, toUtf8Bytes, AbiCoder } from "ethers";
 import type { BatchState, L2Transaction, CommitBatchInfo, StoredBatchInfo, ProofInput, ChainAddresses } from "./types";
 import { sleep } from "./utils";
 
@@ -294,8 +294,7 @@ export class BatchSettler {
       return "0x";
     }
 
-    const { AbiCoder } = require("ethers");
-    const abiCoder = new AbiCoder();
+    const abiCoder = AbiCoder.defaultAbiCoder();
 
     const logs = txs.map((tx) => tx.hash);
 

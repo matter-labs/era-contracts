@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from "child_process";
+import { spawn } from "child_process";
 import { JsonRpcProvider } from "ethers";
 import type { AnvilChain } from "./types";
 import { waitForChainReady, formatChainInfo } from "./utils";

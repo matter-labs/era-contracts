@@ -63,7 +63,7 @@ export class GatewaySetup {
 
     const output = parseForgeScriptOutput(outputPath);
 
-    const gatewayCTMAddr = output.gateway_ctm_addr || output.gateway_chain_type_manager;
+    const gatewayCTMAddr = (output.gateway_ctm_addr || output.gateway_chain_type_manager) as string;
 
     console.log(`   Gateway CTM deployed at: ${gatewayCTMAddr}`);
 
@@ -127,15 +127,16 @@ export class GatewaySetup {
       }
 
       return stdout;
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as { message?: string; stdout?: string; stderr?: string };
       console.error("❌ Forge script failed:");
       console.error("   Command:", command);
-      console.error("   Error:", error.message);
-      if (error.stdout) {
-        console.error("   Stdout:", error.stdout);
+      console.error("   Error:", err.message);
+      if (err.stdout) {
+        console.error("   Stdout:", err.stdout);
       }
-      if (error.stderr) {
-        console.error("   Stderr:", error.stderr);
+      if (err.stderr) {
+        console.error("   Stderr:", err.stderr);
       }
       throw error;
     }

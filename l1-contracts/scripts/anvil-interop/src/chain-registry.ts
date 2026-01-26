@@ -1,7 +1,7 @@
 import { exec } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
-import { JsonRpcProvider, Contract, Wallet } from "ethers";
+import { JsonRpcProvider, Contract, Wallet, AbiCoder } from "ethers";
 import type { ChainConfig, ChainAddresses, CoreDeployedAddresses, CTMDeployedAddresses } from "./types";
 import { parseForgeScriptOutput, ensureDirectoryExists, saveTomlConfig } from "./utils";
 
@@ -41,15 +41,25 @@ export class ChainRegistry {
     const outputPath = path.join(this.outputDir, `chain-${config.chainId}-output.toml`);
 
     const scriptPath = "deploy-scripts/ctm/RegisterZKChain.s.sol:RegisterZKChainScript";
+    const sig = "runForTest(address,uint256)";
+    const args = `${this.ctmAddresses.chainTypeManager} ${config.chainId}`;
+
+    // Paths relative to project root (must start with /)
+    const ctmOutputRelPath = "/scripts/anvil-interop/outputs/ctm-output.toml";
+    const chainConfigRelPath = configPath.replace(this.projectRoot, "");
+    const chainOutputRelPath = outputPath.replace(this.projectRoot, "");
 
     const envVars = {
       CHAIN_CONFIG: configPath,
       CHAIN_OUTPUT: outputPath,
       BRIDGEHUB_ADDR: this.l1Addresses.bridgehub,
       CTM_ADDR: this.ctmAddresses.chainTypeManager,
+      CTM_OUTPUT: ctmOutputRelPath,
+      ZK_CHAIN_CONFIG: chainConfigRelPath,
+      ZK_CHAIN_OUT: chainOutputRelPath,
     };
 
-    await this.runForgeScript(scriptPath, envVars);
+    await this.runForgeScript(scriptPath, envVars, sig, args);
 
     const output = parseForgeScriptOutput(outputPath);
 
@@ -57,11 +67,12 @@ export class ChainRegistry {
 
     return {
       chainId: config.chainId,
-      diamondProxy: output.diamond_proxy_addr || output.diamond_proxy,
+      diamondProxy: (output.diamond_proxy_addr || output.diamond_proxy) as string,
     };
   }
 
-  async initializeL2SystemContracts(chainId: number, chainProxy: string): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async initializeL2SystemContracts(chainId: number, _chainProxy: string): Promise<void> {
     console.log(`🔧 Initializing L2 system contracts for chain ${chainId}...`);
 
     const bridgehubAbi = [
@@ -92,17 +103,22 @@ export class ChainRegistry {
   private async generateChainConfig(config: ChainConfig): Promise<string> {
     const configPath = path.join(__dirname, `../config/chain-${config.chainId}.toml`);
 
+    const ownerAddress = await this.wallet.getAddress();
+
     const chainConfig = {
+      owner_address: ownerAddress,
       chain: {
-        chain_id: config.chainId,
+        chain_chain_id: config.chainId,
         base_token_addr: config.baseToken,
+        bridgehub_create_new_chain_salt: config.chainId * 1000000,
         validium_mode: config.validiumMode,
-        chain_type_manager_addr: this.ctmAddresses.chainTypeManager,
-      },
-      contracts: {
-        bridgehub_proxy_addr: this.l1Addresses.bridgehub,
-        state_transition_proxy_addr: this.ctmAddresses.chainTypeManager,
-        transparent_proxy_admin_addr: this.l1Addresses.transparentProxyAdmin,
+        base_token_gas_price_multiplier_nominator: 1,
+        base_token_gas_price_multiplier_denominator: 1,
+        governance_security_council_address: "0x0000000000000000000000000000000000000000",
+        governance_min_delay: 0,
+        validator_sender_operator_eth: ownerAddress,
+        validator_sender_operator_blobs_eth: ownerAddress,
+        allow_evm_emulator: false,
       },
     };
 
@@ -112,8 +128,7 @@ export class ChainRegistry {
   }
 
   private encodeL2SystemContractsInit(): string {
-    const { AbiCoder } = require("ethers");
-    const abiCoder = new AbiCoder();
+    const abiCoder = AbiCoder.defaultAbiCoder();
 
     return abiCoder.encode(
       ["address", "address", "address"],
@@ -125,13 +140,25 @@ export class ChainRegistry {
     );
   }
 
-  private async runForgeScript(scriptPath: string, envVars: Record<string, string>): Promise<string> {
+  private async runForgeScript(
+    scriptPath: string,
+    envVars: Record<string, string>,
+    sig?: string,
+    args?: string
+  ): Promise<string> {
     const env = {
       ...process.env,
       ...envVars,
     };
 
-    const command = `forge script ${scriptPath} --rpc-url ${this.l1RpcUrl} --private-key ${this.privateKey} --broadcast --legacy`;
+    let command = `forge script ${scriptPath} --rpc-url ${this.l1RpcUrl} --private-key ${this.privateKey} --broadcast --legacy`;
+
+    if (sig) {
+      command += ` --sig "${sig}"`;
+      if (args) {
+        command += ` ${args}`;
+      }
+    }
 
     console.log(`   Running: ${scriptPath}`);
 
@@ -147,15 +174,16 @@ export class ChainRegistry {
       }
 
       return stdout;
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as { message?: string; stdout?: string; stderr?: string };
       console.error("❌ Forge script failed:");
       console.error("   Command:", command);
-      console.error("   Error:", error.message);
-      if (error.stdout) {
-        console.error("   Stdout:", error.stdout);
+      console.error("   Error:", err.message);
+      if (err.stdout) {
+        console.error("   Stdout:", err.stdout);
       }
-      if (error.stderr) {
-        console.error("   Stderr:", error.stderr);
+      if (err.stderr) {
+        console.error("   Stderr:", err.stderr);
       }
       throw error;
     }
