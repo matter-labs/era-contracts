@@ -46,12 +46,7 @@ jobs:
           cache: yarn
 
       - name: Install foundry-zksync
-        run: |
-          mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
-          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+        uses: ./.github/actions/install-zksync-foundry
 
       - name: Install dependencies
         run: yarn
