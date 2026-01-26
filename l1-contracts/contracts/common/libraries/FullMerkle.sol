@@ -148,6 +148,9 @@ library FullMerkle {
      * @param _index The index of the leaf to calculate proof for.
      */
     function merklePath(FullTree storage self, uint256 _index) internal view returns (bytes32[] memory) {
+        if (self._leafNumber == 0) {
+            revert MerkleNothingToProve();
+        }
         uint256 maxNodeNumber = self._leafNumber - 1;
         if (_index > maxNodeNumber) {
             revert MerkleWrongIndex(_index, maxNodeNumber);
