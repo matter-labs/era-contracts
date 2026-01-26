@@ -173,6 +173,9 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
         IOwnable(address(sharedBridge)).transferOwnership(addresses.governance);
 
+        // Transfer L1Nullifier ownership to governance
+        IOwnable(addresses.bridges.l1NullifierProxy).transferOwnership(addresses.governance);
+
         ICTMDeploymentTracker ctmDeploymentTracker = ICTMDeploymentTracker(
             addresses.bridgehub.ctmDeploymentTrackerProxy
         );
