@@ -109,6 +109,7 @@ contract GatewayCTMDeployerTest is Test {
 
         new DiamondInit(false);
         new L1GenesisUpgrade();
+
         // DA contracts
         new RollupDAManager();
         new ValidiumL1DAValidator();
@@ -132,7 +133,11 @@ contract GatewayCTMDeployerTest is Test {
 
         // Direct deployment contracts (no deployer)
         new AdminFacet(1, RollupDAManager(address(0)), false);
+<<<<<<< HEAD
         new MailboxFacet(1, L2_CHAIN_ASSET_HANDLER_ADDR, IEIP7702Checker(address(0)), false);
+=======
+        new MailboxFacet(1, 1, L2_CHAIN_ASSET_HANDLER_ADDR, IEIP7702Checker(address(0)), false);
+>>>>>>> b9f26d282 (feat: Splitting GatewayCTMDeployer (#1964))
         new ExecutorFacet(1);
         new GettersFacet();
         new DiamondInit(false);
