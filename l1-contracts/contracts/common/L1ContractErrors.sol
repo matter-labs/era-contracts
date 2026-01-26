@@ -123,10 +123,10 @@ error ExecuteMessageFailed();
 error FacetExists(bytes4 selector, address);
 // 0xc91cf3b1
 error GasPerPubdataMismatch();
-// 0x6d4a7df8
-error GenesisBatchCommitmentZero();
 // 0x5ca97564
 error GenesisBatchCommitmentIncorrect();
+// 0x6d4a7df8
+error GenesisBatchCommitmentZero();
 // 0x7940c83f
 error GenesisBatchHashZero();
 // 0xb4fc6835
@@ -260,8 +260,6 @@ error NoLegacySharedBridge();
 error NonEmptyCalldata();
 // 0x536ec84b
 error NonEmptyMsgValue();
-// 0x230f9d11
-error NotEnoughSigners(uint256 provided, uint256 expected);
 // 0xd018e08e
 error NonIncreasingTimestamp();
 // 0x0105f9c0
@@ -280,6 +278,8 @@ error NotAssetRouter(address _sender, address _assetRouter);
 error NotAZKChain(address addr);
 // 0x5e67e793
 error NotCurrentSettlementLayer();
+// 0x230f9d11
+error NotEnoughSigners(uint256 provided, uint256 expected);
 // 0xdd7e3621
 error NotInitializedReentrancyGuard();
 // 0xecb34449
@@ -346,14 +346,14 @@ error SettlementLayersMustSettleOnL1();
 error SharedBridgeNotSet();
 // 0x7774d2f9
 error SharedBridgeValueNotSet(SharedBridgeKey);
-// 0xa665a34d
-error SignaturesLengthMismatch(uint256 expected, uint256 actual);
-// 0xa7781cbb
-error SignersNotSorted();
-// 0x3b94fe24
-error SignerNotAuthorized(address signer);
 // 0xabdc734e
 error SignatureNotValid(address signer);
+// 0xa665a34d
+error SignaturesLengthMismatch(uint256 expected, uint256 actual);
+// 0x3b94fe24
+error SignerNotAuthorized(address signer);
+// 0xa7781cbb
+error SignersNotSorted();
 // 0xdf3a8fdd
 error SlotOccupied();
 // 0xcc0f168b
@@ -420,6 +420,8 @@ error WithdrawalAlreadyFinalized();
 error WithdrawFailed();
 // 0xf20c5c2a
 error WrappedBaseTokenAlreadyRegistered();
+// 0xf1ff6cf6
+error WrongCTMDeployerVariant();
 // 0x15e8e429
 error WrongMagicValue(uint256 expectedMagicValue, uint256 providedMagicValue);
 // 0xd92e233d
