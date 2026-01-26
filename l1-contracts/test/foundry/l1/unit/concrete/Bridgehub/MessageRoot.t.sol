@@ -289,4 +289,29 @@ contract MessageRootTest is Test {
         // Chain root is computed - the test verifies the function can be called without reverting
         // The actual root value depends on the merkle tree implementation
     }
+
+    function test_getMerklePathForChain() public {
+        uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
+        uint256 betaChainId = uint256(uint160(makeAddr("betaChainId")));
+
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(alphaChainId, 0);
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(betaChainId, 0);
+
+        bytes32 hash0 = MessageHashing.chainIdLeafHash(0x00, block.chainid);
+        bytes32 hash1 = MessageHashing.chainIdLeafHash(0x00, alphaChainId);
+        bytes32 hash2 = MessageHashing.chainIdLeafHash(0x00, betaChainId);
+
+        bytes32[] memory pathFor1 = messageRoot.getMerklePathForChain(alphaChainId);
+        bytes32[] memory expectedPath = new bytes32[](2);
+        expectedPath[0] = hash0;
+        expectedPath[1] = keccak256(abi.encodePacked(hash2, SHARED_ROOT_TREE_EMPTY_HASH));
+        assertEq(pathFor1, expectedPath, "Incorrect path for alpha chain");
+
+        bytes32[] memory pathFor2 = messageRoot.getMerklePathForChain(betaChainId);
+        expectedPath[0] = SHARED_ROOT_TREE_EMPTY_HASH;
+        expectedPath[1] = keccak256(abi.encodePacked(hash0, hash1));
+        assertEq(pathFor2, expectedPath, "Incorrect path for beta chain");
+    }
 }
