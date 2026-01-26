@@ -381,6 +381,11 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function getFullListOfFactoryDependencies() internal virtual returns (bytes[] memory factoryDeps) {
+        if (config.isZKsyncOS) {
+            // TODO: for now, we do not provide any factory deps for zksync os
+            return factoryDeps;
+        }
+
         bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
 
         string[] memory additionalForceDeployments = getAdditionalDependenciesNames();
