@@ -2,7 +2,15 @@
 
 pragma solidity 0.8.28;
 
-import {AlreadyWhitelisted, CallNotAllowed, NotAllowed, RemovingPermanentRestriction, TooHighDeploymentNonce, UnallowedImplementation, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {
+    AlreadyWhitelisted,
+    CallNotAllowed,
+    NotAllowed,
+    RemovingPermanentRestriction,
+    TooHighDeploymentNonce,
+    UnallowedImplementation,
+    ZeroAddress
+} from "../common/L1ContractErrors.sol";
 
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {BridgehubBurnCTMAssetData, L2TransactionRequestTwoBridgesOuter} from "../core/bridgehub/IBridgehubBase.sol";

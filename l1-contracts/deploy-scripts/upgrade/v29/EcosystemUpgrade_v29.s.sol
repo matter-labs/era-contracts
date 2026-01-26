@@ -38,7 +38,11 @@ import {ContractsBytecodesLib} from "../../utils/bytecode/ContractsBytecodesLib.
 
 import {Call} from "contracts/governance/Common.sol";
 
-import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_VERSION_SPECIFIC_UPGRADER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
 import {DefaultCTMUpgrade} from "../default_upgrade/DefaultCTMUpgrade.s.sol";

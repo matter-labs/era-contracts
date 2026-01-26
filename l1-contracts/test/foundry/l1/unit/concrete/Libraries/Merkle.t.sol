@@ -4,7 +4,14 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
-import {MerkleIndexOrHeightMismatch, MerkleIndexOutOfBounds, MerkleNothingToProve, MerklePathEmpty, MerklePathLengthMismatch, MerklePathOutOfBounds} from "contracts/common/L1ContractErrors.sol";
+import {
+    MerkleIndexOrHeightMismatch,
+    MerkleIndexOutOfBounds,
+    MerkleNothingToProve,
+    MerklePathEmpty,
+    MerklePathLengthMismatch,
+    MerklePathOutOfBounds
+} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Unit tests for Merkle library
 contract MerkleTest is Test {

@@ -19,7 +19,11 @@ import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.so
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {IAssetRouterBase, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {
+    IAssetRouterBase,
+    SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION,
+    NEW_ENCODING_VERSION
+} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
 import {IL2AssetRouter, L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";

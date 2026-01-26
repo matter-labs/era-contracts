@@ -10,7 +10,13 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Utils} from "../../utils/Utils.sol";
-import {StateTransitionDeployedAddresses, ChainCreationParamsConfig, StateTransitionDeployedAddresses, StateTransitionDeployedAddresses, ZkChainAddresses} from "../../utils/Types.sol";
+import {
+    StateTransitionDeployedAddresses,
+    ChainCreationParamsConfig,
+    StateTransitionDeployedAddresses,
+    StateTransitionDeployedAddresses,
+    ZkChainAddresses
+} from "../../utils/Types.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";

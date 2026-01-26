@@ -8,7 +8,11 @@ import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/Enumerable
 import {ETH_TOKEN_ADDRESS, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
 import {IL1Bridgehub} from "./IL1Bridgehub.sol";
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehubBase.sol";
+import {
+    L2TransactionRequestDirect,
+    L2TransactionRequestTwoBridgesOuter,
+    L2TransactionRequestTwoBridgesInner
+} from "./IBridgehubBase.sol";
 import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
@@ -19,7 +23,14 @@ import {IMessageRoot} from "../message-root/IMessageRoot.sol";
 import {BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 import {SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
 import {SettlementLayersMustSettleOnL1} from "../../common/L1ContractErrors.sol";
-import {ChainIdAlreadyExists, ChainIdMismatch, IncorrectBridgeHubAddress, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {
+    ChainIdAlreadyExists,
+    ChainIdMismatch,
+    IncorrectBridgeHubAddress,
+    MsgValueMismatch,
+    WrongMagicValue,
+    ZeroAddress
+} from "../../common/L1ContractErrors.sol";
 import {IL1CrossChainSender} from "../../bridge/interfaces/IL1CrossChainSender.sol";
 
 /// @author Matter Labs

@@ -40,7 +40,12 @@ import {Call} from "contracts/governance/Common.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Create2AndTransfer} from "../utils/deploy/Create2AndTransfer.sol";
-import {ZkChainAddresses, StateTransitionDeployedAddresses, CTMDeployedAddresses, CoreDeployedAddresses} from "../utils/Types.sol";
+import {
+    ZkChainAddresses,
+    StateTransitionDeployedAddresses,
+    CTMDeployedAddresses,
+    CoreDeployedAddresses
+} from "../utils/Types.sol";
 import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 import {IRegisterZKChain, RegisterZKChainConfig} from "contracts/script-interfaces/IRegisterZKChain.sol";
 import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";

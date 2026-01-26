@@ -4,7 +4,11 @@ pragma solidity 0.8.28;
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
-import {IChainTypeManager, ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
+import {
+    IChainTypeManager,
+    ChainCreationParams,
+    ChainTypeManagerInitializeData
+} from "contracts/state-transition/IChainTypeManager.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract initializingCTMOwnerZeroTest is ChainTypeManagerTest {

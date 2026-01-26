@@ -6,7 +6,10 @@ import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {L2CanonicalTransaction, L2Log, L2Message, MessageInclusionProof} from "contracts/common/Messaging.sol";
 import "forge-std/Test.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE} from "contracts/common/Config.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_BOOTLOADER_ADDRESS,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {BatchNotExecuted, HashedLogIsDefault} from "contracts/common/L1ContractErrors.sol";
 

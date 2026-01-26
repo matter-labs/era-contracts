@@ -7,7 +7,13 @@ import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "contracts/core/message-root/IMessageRoot.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {TotalBatchesExecutedZero, TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber, V31UpgradeChainBatchNumberAlreadySet, CurrentBatchNumberAlreadySet, OnlyOnSettlementLayer} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {
+    TotalBatchesExecutedZero,
+    TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber,
+    V31UpgradeChainBatchNumberAlreadySet,
+    CurrentBatchNumberAlreadySet,
+    OnlyOnSettlementLayer
+} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 contract L1MessageRootV31UpgradeTest is Test {
     address bridgeHub;

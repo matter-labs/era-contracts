@@ -8,20 +8,42 @@ import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChain
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_BRIDGEHUB_ADDR,
+    L2_INTEROP_CENTER_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {
+    ChainCreationParams,
+    ChainTypeManagerInitializeData,
+    IChainTypeManager
+} from "contracts/state-transition/IChainTypeManager.sol";
 
 import {Utils} from "../utils/Utils.sol";
 import {L1L2DeployUtils} from "../utils/deploy/L1L2DeployUtils.sol";
 
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
-import {DeployedContracts, DAContracts, Facets, GatewayCTMDeployerConfig, GatewayDADeployerConfig, GatewayProxyAdminDeployerConfig, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerConfig, GatewayValidatorTimelockDeployerResult, GatewayVerifiersDeployerConfig, Verifiers, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {
+    DeployedContracts,
+    DAContracts,
+    Facets,
+    GatewayCTMDeployerConfig,
+    GatewayDADeployerConfig,
+    GatewayProxyAdminDeployerConfig,
+    GatewayProxyAdminDeployerResult,
+    GatewayValidatorTimelockDeployerConfig,
+    GatewayValidatorTimelockDeployerResult,
+    GatewayVerifiersDeployerConfig,
+    Verifiers,
+    GatewayCTMFinalConfig,
+    GatewayCTMFinalResult
+} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 
 import {DeployCTML1OrGateway, CTMCoreDeploymentConfig} from "../ctm/DeployCTML1OrGateway.sol";
 import {CTMContract} from "../ctm/DeployCTML1OrGateway.sol";

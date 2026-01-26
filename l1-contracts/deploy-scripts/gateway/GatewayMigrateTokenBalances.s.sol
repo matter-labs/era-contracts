@@ -19,7 +19,12 @@ import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
-import {GW_ASSET_TRACKER, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    GW_ASSET_TRACKER,
+    L2_ASSET_ROUTER,
+    L2_ASSET_TRACKER_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ZKSProvider} from "../provider/ZKSProvider.s.sol";
 
 import {Utils} from "../utils/Utils.sol";

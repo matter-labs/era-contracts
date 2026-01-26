@@ -13,7 +13,16 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";

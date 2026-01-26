@@ -18,7 +18,21 @@ import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 import {ConfirmBalanceMigrationData, L2Message, TokenBalanceMigrationData} from "contracts/common/Messaging.sol";
-import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    GW_ASSET_TRACKER,
+    GW_ASSET_TRACKER_ADDR,
+    L2_ASSET_ROUTER_ADDR,
+    L2_ASSET_ROUTER,
+    L2_ASSET_TRACKER_ADDR,
+    L2_BRIDGEHUB,
+    L2_BRIDGEHUB_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_NATIVE_TOKEN_VAULT,
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";

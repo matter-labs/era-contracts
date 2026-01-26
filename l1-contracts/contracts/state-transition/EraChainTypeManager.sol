@@ -5,7 +5,13 @@ pragma solidity 0.8.28;
 import {ChainTypeManagerBase} from "./ChainTypeManagerBase.sol";
 import {Diamond} from "./libraries/Diamond.sol";
 import {ChainCreationParams} from "./IChainTypeManager.sol";
-import {GenesisIndexStorageZero, MigrationsNotPaused, GenesisBatchCommitmentZero, GenesisBatchHashZero, GenesisUpgradeZero} from "../common/L1ContractErrors.sol";
+import {
+    GenesisIndexStorageZero,
+    MigrationsNotPaused,
+    GenesisBatchCommitmentZero,
+    GenesisBatchHashZero,
+    GenesisUpgradeZero
+} from "../common/L1ContractErrors.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {IChainAssetHandler} from "../core/chain-asset-handler/IChainAssetHandler.sol";
 

@@ -4,7 +4,10 @@ pragma solidity 0.8.28;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
 import {ZKChainCommitment} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {
+    ExecutedIsNotConsistentWithVerified,
+    VerifiedIsNotConsistentWithCommitted
+} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract PrepareChainCommitmentTest is AdminTest {
     function test_prepareChainCommitment_RevertWhen_ExecutedExceedsVerified() public {

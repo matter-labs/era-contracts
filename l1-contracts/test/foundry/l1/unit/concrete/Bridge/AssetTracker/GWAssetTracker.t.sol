@@ -7,14 +7,27 @@ import {console2 as console} from "forge-std/console2.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 
 import {BalanceChange, ConfirmBalanceMigrationData} from "contracts/common/Messaging.sol";
-import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_BRIDGEHUB_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_INTEROP_CENTER_ADDR,
+    L2_MESSAGE_ROOT_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
-import {BALANCE_CHANGE_VERSION, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {
+    BALANCE_CHANGE_VERSION,
+    TOKEN_BALANCE_MIGRATION_DATA_VERSION
+} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
-import {InvalidCanonicalTxHash, RegisterNewTokenNotAllowed} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {
+    InvalidCanonicalTxHash,
+    RegisterNewTokenNotAllowed
+} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {Unauthorized, ChainIdNotRegistered} from "contracts/common/L1ContractErrors.sol";
 import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";

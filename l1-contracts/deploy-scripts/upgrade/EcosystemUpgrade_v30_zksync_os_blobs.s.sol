@@ -20,7 +20,11 @@ import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
-import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {
+    ChainCreationParams,
+    ChainTypeManagerInitializeData,
+    IChainTypeManager
+} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
@@ -51,7 +55,13 @@ import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+    L2_FORCE_DEPLOYER_ADDR,
+    L2_VERSION_SPECIFIC_UPGRADER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {TransitionaryOwner} from "contracts/governance/TransitionaryOwner.sol";
 import {SystemContractsProcessing} from "./SystemContractsProcessing.s.sol";

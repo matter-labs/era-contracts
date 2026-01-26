@@ -21,10 +21,19 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
-import {IChainTypeManager, ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
+import {
+    IChainTypeManager,
+    ChainCreationParams,
+    ChainTypeManagerInitializeData
+} from "contracts/state-transition/IChainTypeManager.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {ZeroAddress, GenesisBatchHashZero, GenesisBatchCommitmentIncorrect, GenesisUpgradeZero} from "contracts/common/L1ContractErrors.sol";
+import {
+    ZeroAddress,
+    GenesisBatchHashZero,
+    GenesisBatchCommitmentIncorrect,
+    GenesisUpgradeZero
+} from "contracts/common/L1ContractErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";

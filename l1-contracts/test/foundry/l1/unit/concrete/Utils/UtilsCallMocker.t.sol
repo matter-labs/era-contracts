@@ -12,7 +12,11 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_ASSET_TRACKER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 // solhint-enable max-line-length
 

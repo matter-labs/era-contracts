@@ -22,7 +22,14 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {NEW_ENCODING_VERSION, LEGACY_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
-import {AddressAlreadySet, DepositDoesNotExist, DepositExists, LegacyMethodForNonL1Token, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {
+    AddressAlreadySet,
+    DepositDoesNotExist,
+    DepositExists,
+    LegacyMethodForNonL1Token,
+    Unauthorized,
+    ZeroAddress
+} from "contracts/common/L1ContractErrors.sol";
 import {NativeTokenVaultAlreadySet, EthAlreadyMigratedToL1NTV} from "contracts/bridge/L1BridgeContractErrors.sol";
 
 contract TestERC20 is ERC20 {

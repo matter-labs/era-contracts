@@ -10,7 +10,14 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {DummyRestriction} from "contracts/dev-contracts/DummyRestriction.sol";
-import {AccessToFallbackDenied, AccessToFunctionDenied, NoCallsProvided, NotARestriction, RestrictionWasAlreadyPresent, RestrictionWasNotPresent} from "contracts/common/L1ContractErrors.sol";
+import {
+    AccessToFallbackDenied,
+    AccessToFunctionDenied,
+    NoCallsProvided,
+    NotARestriction,
+    RestrictionWasAlreadyPresent,
+    RestrictionWasNotPresent
+} from "contracts/common/L1ContractErrors.sol";
 
 contract ChainAdminTest is Test {
     ChainAdmin internal chainAdmin;

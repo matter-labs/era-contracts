@@ -4,7 +4,20 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import {DeployedContracts, GatewayCTMDeployerConfig, GatewayDADeployerConfig, DAContracts, GatewayProxyAdminDeployerConfig, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerConfig, GatewayValidatorTimelockDeployerResult, GatewayVerifiersDeployerConfig, Verifiers, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {
+    DeployedContracts,
+    GatewayCTMDeployerConfig,
+    GatewayDADeployerConfig,
+    DAContracts,
+    GatewayProxyAdminDeployerConfig,
+    GatewayProxyAdminDeployerResult,
+    GatewayValidatorTimelockDeployerConfig,
+    GatewayValidatorTimelockDeployerResult,
+    GatewayVerifiersDeployerConfig,
+    Verifiers,
+    GatewayCTMFinalConfig,
+    GatewayCTMFinalResult
+} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {GatewayCTMDeployerDA} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerDA.sol";
 import {GatewayCTMDeployerProxyAdmin} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerProxyAdmin.sol";
 import {GatewayCTMDeployerValidatorTimelock} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerValidatorTimelock.sol";
@@ -35,14 +48,26 @@ import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_BRIDGEHUB_ADDR,
+    L2_CREATE2_FACTORY_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {GatewayCTMDeployerHelper, DeployerCreate2Calldata, DeployerAddresses} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
+import {
+    GatewayCTMDeployerHelper,
+    DeployerCreate2Calldata,
+    DeployerAddresses
+} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
 
-import {AllDeployerResults, DeployedContractsComparator, GatewayCTMDeployerTestUtils} from "test/foundry/unit/utils/GatewayCTMDeployerTestUtils.sol";
+import {
+    AllDeployerResults,
+    DeployedContractsComparator,
+    GatewayCTMDeployerTestUtils
+} from "test/foundry/unit/utils/GatewayCTMDeployerTestUtils.sol";
 
 // We need to use contract the zkfoundry consistently uses
 // zk environment only within a deployed contract

@@ -4,8 +4,15 @@ pragma solidity 0.8.28;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {DepositsAlreadyPaused, NotL1, TotalPriorityTxsIsZero} from "contracts/state-transition/L1StateTransitionErrors.sol";
-import {PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
+import {
+    DepositsAlreadyPaused,
+    NotL1,
+    TotalPriorityTxsIsZero
+} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {
+    PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET,
+    PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET
+} from "contracts/common/Config.sol";
 import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
 
 contract PauseDepositsTest is AdminTest {

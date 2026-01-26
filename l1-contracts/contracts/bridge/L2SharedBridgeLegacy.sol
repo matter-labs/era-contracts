@@ -7,7 +7,11 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 
 import {BridgedStandardERC20} from "./BridgedStandardERC20.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR
+} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {SystemContractsCaller} from "../common/l2-helpers/SystemContractsCaller.sol";
 import {IContractDeployer, L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
@@ -16,7 +20,13 @@ import {IL2AssetRouter} from "./asset-router/IL2AssetRouter.sol";
 import {IL2NativeTokenVault} from "./ntv/IL2NativeTokenVault.sol";
 
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
-import {AmountMustBeGreaterThanZero, DeployFailed, EmptyBytes32, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {
+    AmountMustBeGreaterThanZero,
+    DeployFailed,
+    EmptyBytes32,
+    Unauthorized,
+    ZeroAddress
+} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

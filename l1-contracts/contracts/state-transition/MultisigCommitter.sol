@@ -4,7 +4,15 @@ pragma solidity 0.8.28;
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable-v4/utils/cryptography/EIP712Upgradeable.sol";
 import {SignatureCheckerUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/utils/cryptography/SignatureCheckerUpgradeable.sol";
 import {EnumerableSetUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/utils/structs/EnumerableSetUpgradeable.sol";
-import {SignersNotSorted, SignerNotAuthorized, SignatureNotValid, ChainRequiresValidatorsSignaturesForCommit, SignaturesLengthMismatch, NotEnoughSigners, InvalidThreshold} from "../common/L1ContractErrors.sol";
+import {
+    SignersNotSorted,
+    SignerNotAuthorized,
+    SignatureNotValid,
+    ChainRequiresValidatorsSignaturesForCommit,
+    SignaturesLengthMismatch,
+    NotEnoughSigners,
+    InvalidThreshold
+} from "../common/L1ContractErrors.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {ValidatorTimelock} from "./ValidatorTimelock.sol";
 import {IValidatorTimelock} from "./IValidatorTimelock.sol";

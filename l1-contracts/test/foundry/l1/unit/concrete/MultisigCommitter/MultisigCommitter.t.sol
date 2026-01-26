@@ -12,7 +12,15 @@ import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.s
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {Unauthorized, TimeNotReached, RoleAccessDenied, ChainRequiresValidatorsSignaturesForCommit, NotEnoughSigners, SignerNotAuthorized, SignersNotSorted} from "contracts/common/L1ContractErrors.sol";
+import {
+    Unauthorized,
+    TimeNotReached,
+    RoleAccessDenied,
+    ChainRequiresValidatorsSignaturesForCommit,
+    NotEnoughSigners,
+    SignerNotAuthorized,
+    SignersNotSorted
+} from "contracts/common/L1ContractErrors.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
 

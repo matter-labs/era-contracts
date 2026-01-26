@@ -11,7 +11,12 @@ import {Unauthorized} from "../../../common/L1ContractErrors.sol";
 import {L2_INTEROP_CENTER_ADDR, GW_ASSET_TRACKER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
-import {PRIORITY_OPERATION_L2_TX_TYPE, SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "../../../common/Config.sol";
+import {
+    PRIORITY_OPERATION_L2_TX_TYPE,
+    SYSTEM_UPGRADE_L2_TX_TYPE,
+    ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE,
+    ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
+} from "../../../common/Config.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs

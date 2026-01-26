@@ -8,7 +8,10 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+    L2_FORCE_DEPLOYER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";

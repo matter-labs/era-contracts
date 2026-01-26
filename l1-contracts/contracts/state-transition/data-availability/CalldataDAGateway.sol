@@ -32,9 +32,9 @@ abstract contract CalldataDAGateway is CalldataDA {
             revert InvalidPubdataHash(_fullPubdataHash, keccak256(_pubdata));
         }
 
-        bytes calldata providedCommitments = _pubdataInput[_pubdataInput.length -
-            _blobsProvided *
-            BLOB_COMMITMENT_SIZE:];
+        bytes calldata providedCommitments = _pubdataInput[
+            _pubdataInput.length - _blobsProvided * BLOB_COMMITMENT_SIZE:
+        ];
 
         _cloneCalldata(blobCommitments, providedCommitments, _blobsProvided);
     }
