@@ -5,13 +5,24 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 
 import {
-    DAContracts,
     DeployedContracts,
-    GatewayCTMDeployer,
     GatewayCTMDeployerConfig,
-    StateTransitionContracts
-} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
-import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+    GatewayDADeployerConfig,
+    DAContracts,
+    GatewayProxyAdminDeployerConfig,
+    GatewayProxyAdminDeployerResult,
+    GatewayValidatorTimelockDeployerConfig,
+    GatewayValidatorTimelockDeployerResult,
+    GatewayVerifiersDeployerConfig,
+    Verifiers,
+    GatewayCTMFinalConfig,
+    GatewayCTMFinalResult
+} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {GatewayCTMDeployerDA} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerDA.sol";
+import {GatewayCTMDeployerProxyAdmin} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerProxyAdmin.sol";
+import {GatewayCTMDeployerValidatorTimelock} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerValidatorTimelock.sol";
+import {GatewayCTMDeployerVerifiers} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerVerifiers.sol";
+import {GatewayCTMDeployerCTM} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerCTM.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
@@ -46,9 +57,17 @@ import {
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {GatewayCTMDeployerHelper, DeployerCreate2Calldata, DeployerAddresses} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
+import {
+    GatewayCTMDeployerHelper,
+    DeployerCreate2Calldata,
+    DeployerAddresses
+} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
 
-import {AllDeployerResults, DeployedContractsComparator, GatewayCTMDeployerTestUtils} from "test/foundry/unit/utils/GatewayCTMDeployerTestUtils.sol";
+import {
+    AllDeployerResults,
+    DeployedContractsComparator,
+    GatewayCTMDeployerTestUtils
+} from "test/foundry/unit/utils/GatewayCTMDeployerTestUtils.sol";
 
 // We need to use contract the zkfoundry consistently uses
 // zk environment only within a deployed contract

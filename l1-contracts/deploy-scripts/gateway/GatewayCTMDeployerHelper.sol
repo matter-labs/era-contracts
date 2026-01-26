@@ -31,8 +31,19 @@ import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol
 
 import {
     DeployedContracts,
-    GatewayCTMDeployerConfig
-} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
+    DAContracts,
+    Facets,
+    GatewayCTMDeployerConfig,
+    GatewayDADeployerConfig,
+    GatewayProxyAdminDeployerConfig,
+    GatewayProxyAdminDeployerResult,
+    GatewayValidatorTimelockDeployerConfig,
+    GatewayValidatorTimelockDeployerResult,
+    GatewayVerifiersDeployerConfig,
+    Verifiers,
+    GatewayCTMFinalConfig,
+    GatewayCTMFinalResult
+} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 
 import {DeployCTML1OrGateway, CTMCoreDeploymentConfig} from "../ctm/DeployCTML1OrGateway.sol";
 import {CTMContract} from "../ctm/DeployCTML1OrGateway.sol";

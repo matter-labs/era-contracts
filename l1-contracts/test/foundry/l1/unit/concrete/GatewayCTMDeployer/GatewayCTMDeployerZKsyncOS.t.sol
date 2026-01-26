@@ -4,17 +4,35 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import {DeployedContracts, GatewayCTMDeployerConfig, DAContracts, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerResult, Verifiers, GatewayCTMFinalResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {
+    DeployedContracts,
+    GatewayCTMDeployerConfig,
+    DAContracts,
+    GatewayProxyAdminDeployerResult,
+    GatewayValidatorTimelockDeployerResult,
+    Verifiers,
+    GatewayCTMFinalResult
+} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {GatewayCTMDeployerDA} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerDA.sol";
 import {GatewayCTMDeployerProxyAdmin} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerProxyAdmin.sol";
 import {GatewayCTMDeployerValidatorTimelock} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerValidatorTimelock.sol";
 import {GatewayCTMDeployerVerifiersZKsyncOS} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerVerifiersZKsyncOS.sol";
 import {GatewayCTMDeployerCTMZKsyncOS} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerCTMZKsyncOS.sol";
 
-import {GatewayCTMDeployerHelper, DeployerCreate2Calldata, DeployerAddresses, DirectDeployedAddresses, DirectCreate2Calldata} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
+import {
+    GatewayCTMDeployerHelper,
+    DeployerCreate2Calldata,
+    DeployerAddresses,
+    DirectDeployedAddresses,
+    DirectCreate2Calldata
+} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 
-import {AllDeployerResults, DeployedContractsComparator, GatewayCTMDeployerTestUtils} from "test/foundry/unit/utils/GatewayCTMDeployerTestUtils.sol";
+import {
+    AllDeployerResults,
+    DeployedContractsComparator,
+    GatewayCTMDeployerTestUtils
+} from "test/foundry/unit/utils/GatewayCTMDeployerTestUtils.sol";
 
 /// @notice Tester contract that deploys via the deterministic CREATE2 factory (Arachnid's)
 contract GatewayCTMDeployerTesterZKsyncOS {
