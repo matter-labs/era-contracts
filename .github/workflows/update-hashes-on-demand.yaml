@@ -8,7 +8,7 @@ on:
         required: true
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: read
 
 jobs:
@@ -19,7 +19,8 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # we need full history to fetch PR branch
+          fetch-depth: 0 # We need full history to fetch PR branch
+          persist-credentials: false  # IMPORTANT: don't keep GITHUB_TOKEN creds for git as we'll use `RELEASE_TOKEN` instead
 
       - name: Get PR branch info
         id: pr
@@ -33,6 +34,12 @@ jobs:
             });
             core.setOutput("head_ref", pr.data.head.ref);
             core.setOutput("head_repo", pr.data.head.repo.full_name);
+
+            // We only want to allow updating PRs from this repo, not from forks
+            if (pr.data.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              core.setFailed(`PR head repo is ${pr.data.head.repo.full_name}, expected ${context.repo.owner}/${context.repo.repo}`);
+            }
+
 
       - name: Checkout PR branch
         run: |
@@ -53,6 +60,7 @@ jobs:
 
       - name: Run command
         run: |
+          set -euo pipefail
           echo "Updating PR #${{ github.event.inputs.pr_number }} on branch ${{ steps.pr.outputs.head_ref }}"
           git submodule update --init --recursive
 
@@ -65,12 +73,18 @@ jobs:
 
           yarn calculate-hashes:fix
 
-      - name: Commit and push changes
+      - name: Commit and push changes (with RELEASE_TOKEN)
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          git config --global user.name "github-actions[bot]"
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+          git add AllContractsHashes.json
+          git diff --cached --quiet && { echo "No hash changes to commit"; exit 0; }
+          git commit -m "chore: Updated hashes from CI"
 
-          git add AllContractsHashes.json || echo "No changes to add"
-          git commit -m "chore: Updated hashes from CI" || echo "No changes to commit"
-          git push origin HEAD
+          # Push the changes using the RELEASE_TOKEN for authentication
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $(printf "x-access-token:%s" "$RELEASE_TOKEN" | base64 -w0)" \
+          push "https://github.com/${{ steps.pr.outputs.head_repo }}.git" "HEAD:${{ steps.pr.outputs.head_ref }}"
