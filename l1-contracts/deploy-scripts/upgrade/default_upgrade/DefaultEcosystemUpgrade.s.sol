@@ -10,14 +10,16 @@ import {Call} from "contracts/governance/Common.sol";
 import {DefaultCoreUpgrade} from "./DefaultCoreUpgrade.s.sol";
 import {DefaultCTMUpgrade} from "./DefaultCTMUpgrade.s.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
+import {BridgehubAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 
 /// @notice Unified script that runs both ecosystem core upgrade and CTM upgrade
 /// @dev This script combines DefaultCoreUpgrade and DefaultCTMUpgrade, running them in sequence
 ///      and merging their governance calls.
-contract DefaultEcosystemUpgrade is DefaultCoreUpgrade {
+contract DefaultEcosystemUpgrade is Script {
     using stdToml for string;
 
-    DefaultCTMUpgrade internal eraVmCtmUpgrade;
+    DefaultCoreUpgrade internal coreUpgrade;
+    DefaultCTMUpgrade internal ctmUpgrade;
 
     bool internal _coreInitialized;
     bool internal _ctmInitialized;
@@ -26,9 +28,37 @@ contract DefaultEcosystemUpgrade is DefaultCoreUpgrade {
     string internal coreOutputPath;
     string internal ctmOutputPath;
 
+    /// @notice Create core upgrade instance - can be overridden for version-specific instances
+    function createCoreUpgrade() internal virtual returns (DefaultCoreUpgrade) {
+        return new DefaultCoreUpgrade();
+    }
+
     /// @notice Create CTM upgrade instance - can be overridden for version-specific instances
     function createCTMUpgrade() internal virtual returns (DefaultCTMUpgrade) {
         return new DefaultCTMUpgrade();
+    }
+
+    /// @notice Get core output path - can be overridden for version-specific paths
+    /// @dev Returns relative path (without project root), as it will be concatenated in initialize()
+    function getCoreOutputPath(string memory _ecosystemOutputPath) internal virtual returns (string memory) {
+        // Default: use environment variable if set, otherwise derive from ecosystem path
+        try vm.envString("UPGRADE_CORE_OUTPUT") returns (string memory coreOutputEnv) {
+            return coreOutputEnv;
+        } catch {
+            // Fallback: same as ecosystem output (passed as parameter, already relative)
+            return _ecosystemOutputPath;
+        }
+    }
+
+    /// @notice Get CTM output path - can be overridden for version-specific paths
+    /// @dev Returns relative path (without project root), as it will be concatenated in initialize()
+    function getCTMOutputPath() internal virtual returns (string memory) {
+        // Default: use environment variable if set, otherwise extract from ecosystem output path
+        try vm.envString("UPGRADE_CTM_OUTPUT") returns (string memory ctmOutputEnv) {
+            return ctmOutputEnv;
+        } catch {
+            revert("UPGRADE_CTM_OUTPUT environment variable is not set");
+        }
     }
 
     /// @notice Initialize both core and CTM upgrades
@@ -36,7 +66,7 @@ contract DefaultEcosystemUpgrade is DefaultCoreUpgrade {
         string memory permanentValuesInputPath,
         string memory upgradeInputPath,
         string memory _ecosystemOutputPath
-    ) public virtual override {
+    ) public virtual {
         string memory root = vm.projectRoot();
         ecosystemOutputPath = string.concat(root, _ecosystemOutputPath);
 
@@ -48,29 +78,63 @@ contract DefaultEcosystemUpgrade is DefaultCoreUpgrade {
         coreOutputPath = string.concat(root, _coreOutputPath);
         ctmOutputPath = string.concat(root, _ctmOutputPath);
 
-        // Initialize core upgrade with its own output path (this class extends DefaultCoreUpgrade)
-        super.initialize(permanentValuesInputPath, upgradeInputPath, _coreOutputPath);
+        // Initialize core upgrade with its own output path
+        coreUpgrade = createCoreUpgrade();
+        coreUpgrade.initialize(permanentValuesInputPath, upgradeInputPath, _coreOutputPath);
         _coreInitialized = true;
 
         // Initialize CTM upgrade with its own output path
-        eraVmCtmUpgrade = createCTMUpgrade();
-        eraVmCtmUpgrade.initialize(permanentValuesInputPath, upgradeInputPath, _ctmOutputPath);
+        ctmUpgrade = createCTMUpgrade();
+        ctmUpgrade.initialize(permanentValuesInputPath, upgradeInputPath, _ctmOutputPath);
         _ctmInitialized = true;
+
+        // Allow subclasses to override protocol version for local testing
+        overrideProtocolVersionForLocalTesting(upgradeInputPath);
+    }
+
+    /// @notice Override this in test environments to set protocol version from config instead of genesis
+    /// @dev By default, does nothing - CTM reads protocol version from genesis config
+    function overrideProtocolVersionForLocalTesting(string memory upgradeInputPath) internal virtual {
+        // Default: no override, use genesis protocol version
+    }
+
+    /// @notice Deploy new ecosystem contracts (delegates to core upgrade)
+    function deployNewEcosystemContractsL1() public virtual {
+        require(_coreInitialized, "Core upgrade not initialized");
+        coreUpgrade.deployNewEcosystemContractsL1();
+    }
+
+    /// @notice Get owner address (delegates to core upgrade)
+    function getOwnerAddress() public virtual returns (address) {
+        require(_coreInitialized, "Core upgrade not initialized");
+        return coreUpgrade.getOwnerAddress();
+    }
+
+    /// @notice Get discovered bridgehub (delegates to core upgrade)
+    function getDiscoveredBridgehub() public virtual returns (BridgehubAddresses memory) {
+        require(_coreInitialized, "Core upgrade not initialized");
+        return coreUpgrade.getDiscoveredBridgehub();
+    }
+
+    /// @notice Get CTM upgrade instance (for test access)
+    function getCTMUpgrade() public virtual returns (DefaultCTMUpgrade) {
+        require(_ctmInitialized, "CTM upgrade not initialized");
+        return ctmUpgrade;
     }
 
     /// @notice Run full ecosystem upgrade (core + CTM)
-    function prepareEcosystemUpgrade() public override {
+    function prepareEcosystemUpgrade() public virtual {
         require(_coreInitialized && _ctmInitialized, "Not initialized");
 
         console.log("Starting unified ecosystem upgrade...");
 
         // Step 1: Deploy new ecosystem contracts (core)
         console.log("Step 1: Deploying new ecosystem contracts...");
-        DefaultCoreUpgrade.prepareEcosystemUpgrade();
+        coreUpgrade.prepareEcosystemUpgrade();
 
         // Step 2: Prepare CTM upgrade (includes generating upgrade cut data)
         console.log("Step 2: Preparing CTM upgrade...");
-        eraVmCtmUpgrade.prepareCTMUpgrade();
+        ctmUpgrade.prepareCTMUpgrade();
 
         // Step 3: Save combined output including diamond cut data from CTM upgrade
         console.log("Step 3: Saving combined output...");
@@ -85,12 +149,10 @@ contract DefaultEcosystemUpgrade is DefaultCoreUpgrade {
         string memory ctmOutputToml = vm.readFile(ctmOutputPath);
         bytes memory upgradeCutData = ctmOutputToml.readBytes("$.chain_upgrade_diamond_cut");
 
-        // Write the diamond cut data to the ecosystem output
-        vm.writeToml(
-            vm.serializeBytes("root", "chain_upgrade_diamond_cut", upgradeCutData),
-            ecosystemOutputPath,
-            ".chain_upgrade_diamond_cut"
-        );
+        // Write the diamond cut data to the ecosystem output (create initial file with just diamond cut)
+        // Note: Governance calls will be appended later
+        string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", upgradeCutData);
+        vm.writeToml(toml, ecosystemOutputPath);
 
         console.log("Diamond cut data saved to ecosystem output!");
     }
@@ -98,7 +160,7 @@ contract DefaultEcosystemUpgrade is DefaultCoreUpgrade {
     /// @notice Combine governance calls from both core and CTM upgrades
     function prepareDefaultGovernanceCalls()
         public
-        override
+        virtual
         returns (Call[] memory stage0Calls, Call[] memory stage1Calls, Call[] memory stage2Calls)
     {
         console.log("Preparing combined governance calls...");
@@ -108,14 +170,14 @@ contract DefaultEcosystemUpgrade is DefaultCoreUpgrade {
             Call[] memory coreStage0,
             Call[] memory coreStage1,
             Call[] memory coreStage2
-        ) = DefaultCoreUpgrade.prepareDefaultGovernanceCalls();
+        ) = coreUpgrade.prepareDefaultGovernanceCalls();
 
         // Get governance calls from CTM upgrade
         (
             Call[] memory ctmStage0,
             Call[] memory ctmStage1,
             Call[] memory ctmStage2
-        ) = eraVmCtmUpgrade.prepareDefaultGovernanceCalls();
+        ) = ctmUpgrade.prepareDefaultGovernanceCalls();
 
         // Merge stage 0 calls
         Call[][] memory stage0Array = new Call[][](2);
@@ -153,7 +215,7 @@ contract DefaultEcosystemUpgrade is DefaultCoreUpgrade {
     }
 
     /// @notice E2e upgrade generation
-    function run() public virtual override {
+    function run() public virtual {
         initialize(
             vm.envString("PERMANENT_VALUES_INPUT"),
             vm.envString("UPGRADE_INPUT"),

@@ -11,6 +11,11 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
@@ -18,6 +23,10 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
+import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
+import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
+import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 
@@ -35,6 +44,7 @@ import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
 import {DefaultGatewayUpgrade} from "../default_upgrade/DefaultGatewayUpgrade.s.sol";
 import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
+import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 
 /// @notice Script used for v31 upgrade flow
 contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
@@ -42,7 +52,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
-        preparePermanentValues();
+        // preparePermanentValues();
         initialize(
             "/upgrade-envs/permanent-values/local.toml",
             "/upgrade-envs/v0.31.0-interopB/local.toml",
@@ -54,7 +64,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
     }
 
     /// todo create in deploy scripts instead of here.
-    function preparePermanentValues() internal {
+    function preparePermanentValues() public {
         string memory root = vm.projectRoot();
         string memory permanentValuesInputPath = string.concat(root, "/upgrade-envs/permanent-values/local.toml");
         string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
@@ -130,6 +140,37 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
             false
         );
         // deploySimpleContract("L1ChainTypeManager", false);
+
+        // Configure AssetTracker connections after deployment
+        updateContractConnections();
+    }
+
+    /// @notice Configure contract connections after deployment
+    /// @dev AssetTracker is new in v31, we initialize it here with deployer as owner, then transfer ownership
+    function updateContractConnections() internal {
+        console.log("Configuring AssetTracker connections...");
+
+        address assetTrackerProxy = coreAddresses.bridgehub.proxies.assetTracker;
+        require(assetTrackerProxy != address(0), "AssetTracker proxy not deployed");
+
+        console.log("AssetTracker proxy:", assetTrackerProxy);
+        console.log("Current AssetTracker owner:", Ownable2StepUpgradeable(assetTrackerProxy).owner());
+        console.log("Deployer (msg.sender):", msg.sender);
+
+        // Initialize AssetTracker with ChainAssetHandler reference
+        // This sets: chainAssetHandler = IChainAssetHandler(BRIDGE_HUB.chainAssetHandler())
+        // At this point, deployer is the owner (set in initialize() during proxy deployment)
+        console.log("Calling setAddresses() on AssetTracker...");
+        vm.broadcast();
+        IL1AssetTracker(assetTrackerProxy).setAddresses();
+        console.log("AssetTracker.setAddresses() completed");
+
+        // Transfer ownership to the proper owner (governance)
+        address properOwner = getOwnerAddress();
+        console.log("Transferring AssetTracker ownership from deployer to governance:", properOwner);
+        vm.broadcast();
+        Ownable2StepUpgradeable(assetTrackerProxy).transferOwnership(properOwner);
+        console.log("AssetTracker ownership transfer initiated (pending acceptance by governance)");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -151,7 +192,23 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
     }
 
     function deployUsedUpgradeContract() internal returns (address) {
-        return deploySimpleContract("L1V31Upgrade", false);
+        return deploySimpleContract("SettlementLayerV31Upgrade", false);
+    }
+
+    /// @notice Override to properly set deployerAddress in upgrade context
+    /// @dev In upgrade scripts, msg.sender is the script address, not the broadcast address
+    ///      We need to use tx.origin which is the actual transaction sender (private key holder)
+    function initializeL1CoreUtilsConfig() internal override {
+        super.initializeL1CoreUtilsConfig();
+
+        // In Forge scripts with vm.broadcast(), msg.sender is the script address,
+        // but tx.origin is the address of the private key being used for broadcasts.
+        // We need to use tx.origin as the deployer address.
+        config.deployerAddress = tx.origin;
+        console.log("Overriding deployerAddress in upgrade context:");
+        console.log("  msg.sender (script):", msg.sender);
+        console.log("  tx.origin (actual deployer):", tx.origin);
+        console.log("  config.deployerAddress:", config.deployerAddress);
     }
 
     function getInitializeCalldata(
@@ -160,7 +217,53 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
     ) internal virtual override returns (bytes memory) {
         if (compareStrings(contractName, "L1MessageRoot")) {
             return abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ());
+        } else if (compareStrings(contractName, "L1AssetTracker")) {
+            // Initialize AssetTracker with config.deployerAddress which is now properly set
+            // to tx.origin (the address of the private key being used for broadcasts)
+            console.log("Initializing L1AssetTracker with deployer as owner:", config.deployerAddress);
+            return abi.encodeCall(L1AssetTracker.initialize, (config.deployerAddress));
         }
         return super.getInitializeCalldata(contractName, isZkBytecode);
+    }
+
+    /// @notice Override to add version-specific governance calls for stage 1
+    /// @dev Stage 1 runs after proxy upgrades
+    /// @dev Accepts AssetTracker ownership and sets it in NativeTokenVault
+    function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
+        console.log("Preparing v31-specific stage1 governance calls...");
+
+        // Get NativeTokenVault from AssetRouter
+        IL1AssetRouter assetRouter = IL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
+        address ntvProxy = address(assetRouter.nativeTokenVault());
+        address assetTrackerProxy = coreAddresses.bridgehub.proxies.assetTracker;
+
+        require(ntvProxy != address(0), "NTV proxy address not found");
+        require(assetTrackerProxy != address(0), "AssetTracker proxy address not found");
+
+        console.log("Accepting AssetTracker ownership and setting in NativeTokenVault");
+        console.log("NTV address:", ntvProxy);
+        console.log("AssetTracker address:", assetTrackerProxy);
+
+        // Note: AssetTracker.setAddresses() was already called during deployment
+        // in updateContractConnections(), and ownership was transferred to governance.
+        // Now governance needs to accept the ownership transfer.
+
+        calls = new Call[](2);
+
+        // First, accept ownership of AssetTracker (completes the two-step transfer)
+        calls[0] = Call({
+            target: assetTrackerProxy,
+            value: 0,
+            data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
+        });
+
+        // Then, set AssetTracker reference in NTV
+        calls[1] = Call({
+            target: ntvProxy,
+            value: 0,
+            data: abi.encodeCall(L1NativeTokenVault.setAssetTracker, (assetTrackerProxy))
+        });
+
+        return calls;
     }
 }

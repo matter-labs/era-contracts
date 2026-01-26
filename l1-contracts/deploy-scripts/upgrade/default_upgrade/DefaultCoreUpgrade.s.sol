@@ -66,6 +66,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     function prepareEcosystemUpgrade() public virtual {
         deployNewEcosystemContractsL1();
         console.log("Ecosystem contracts are deployed!");
+        saveOutput(upgradeConfig.outputPath);
+        console.log("Core upgrade output saved!");
     }
 
     /// @notice Deploy everything that should be deployed
@@ -147,7 +149,16 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     }
 
     function setAddressesBasedOnBridgehub() internal virtual {
-        coreAddresses = AddressIntrospector.getCoreDeployedAddresses(coreAddresses.bridgehub.proxies.bridgehub);
+        address bridgehubProxy = coreAddresses.bridgehub.proxies.bridgehub;
+
+        // Determine which introspection method to use based on protocol version
+        bool useV29Introspection = AddressIntrospector.shouldUseV29Introspection(bridgehubProxy);
+
+        if (useV29Introspection) {
+            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV29(bridgehubProxy);
+        } else {
+            coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubProxy);
+        }
     }
 
     function saveOutput(string memory outputPath) internal virtual {
@@ -374,9 +385,11 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridges.implementations.l1NativeTokenVault
         );
 
-        calls[4] = _buildCallProxyUpgrade(
+        // L1MessageRoot: Use upgradeAndCall to call initializeL1V31Upgrade
+        calls[4] = _buildCallProxyUpgradeAndCall(
             coreAddresses.bridgehub.proxies.messageRoot,
-            coreAddresses.bridgehub.implementations.messageRoot
+            coreAddresses.bridgehub.implementations.messageRoot,
+            "L1MessageRoot"
         );
 
         calls[5] = _buildCallProxyUpgrade(
@@ -384,7 +397,12 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridgehub.implementations.ctmDeploymentTracker
         );
 
-        // calls[6] = _buildCallProxyUpgrade(coreAddresses.bridges.proxies.erc20Bridge, coreAddresses.bridges.implementations.erc20Bridge);
+        calls[6] = _buildCallProxyUpgrade(
+            coreAddresses.bridgehub.proxies.chainAssetHandler,
+            coreAddresses.bridgehub.implementations.chainAssetHandler
+        );
+
+        // calls[7] = _buildCallProxyUpgrade(coreAddresses.bridges.proxies.erc20Bridge, coreAddresses.bridges.implementations.erc20Bridge);
     }
 
     function _buildCallProxyUpgrade(
@@ -398,6 +416,25 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             data: abi.encodeCall(
                 ProxyAdmin.upgrade,
                 (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress)
+            ),
+            value: 0
+        });
+    }
+
+    function _buildCallProxyUpgradeAndCall(
+        address proxyAddress,
+        address newImplementationAddress,
+        string memory contractName
+    ) internal virtual returns (Call memory call) {
+        require(coreAddresses.shared.transparentProxyAdmin != address(0), "transparentProxyAdmin not newConfigured");
+
+        bytes memory initializeCalldata = getInitializeCalldata(contractName, false);
+
+        call = Call({
+            target: coreAddresses.shared.transparentProxyAdmin,
+            data: abi.encodeCall(
+                ProxyAdmin.upgradeAndCall,
+                (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress, initializeCalldata)
             ),
             value: 0
         });

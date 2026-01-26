@@ -72,6 +72,7 @@ import {DeployCTML1OrGateway, CTMCoreDeploymentConfig, CTMContract} from "./Depl
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
 import {CTMDeployedAddresses, BridgesDeployedAddresses} from "../utils/Types.sol";
+import {SettlementLayerV31Upgrade} from "contracts/upgrades/SettlementLayerV31Upgrade.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -356,6 +357,8 @@ abstract contract DeployCTMUtils is DeployUtils {
                 return type(DiamondInit).creationCode;
             } else if (compareStrings(contractName, "ServerNotifier")) {
                 return type(ServerNotifier).creationCode;
+            } else if (compareStrings(contractName, "SettlementLayerV31Upgrade")) {
+                return type(SettlementLayerV31Upgrade).creationCode;
             }
         } else {
             if (compareStrings(contractName, "Verifier")) {
@@ -402,6 +405,8 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "SettlementLayerV31Upgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Governance")) {
             return

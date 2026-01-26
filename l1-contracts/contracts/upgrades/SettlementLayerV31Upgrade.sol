@@ -29,9 +29,11 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
         IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
+        address assetRouter = address(bridgehub.assetRouter()); 
+        address nativeTokenVaultAddr = address(IL1AssetRouter(assetRouter).nativeTokenVault());
 
         /// We write to storage to avoid reentrancy.
-        s.nativeTokenVault = address(IL1AssetRouter(address(bridgehub.assetRouter())).nativeTokenVault());
+        s.nativeTokenVault = nativeTokenVaultAddr;
 
         // Note that this call will revert if the native token vault has not been upgraded, i.e.
         // if a chain settling on Gateway tries to upgrade before ZK Gateway has done the upgrade.
@@ -42,7 +44,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
 
         bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(s.chainId);
         INativeTokenVaultBase nativeTokenVault = INativeTokenVaultBase(
-            IL1AssetRouter(address(bridgehub.assetRouter())).nativeTokenVault()
+            nativeTokenVaultAddr
         );
 
         uint256 baseTokenOriginChainId = nativeTokenVault.originChainId(baseTokenAssetId);
@@ -64,11 +66,14 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         // The lines below ensure that chains can only upgrade once the ZK Gateway itself is upgraded,
         // i.e. its minor protocol version is at least 30. Note, we use The tuple of (major, minor, patch)
         // to denote protocol version.
+        // Only perform this check if a gateway chain is deployed
         uint256 gwChainId = messageRoot.ERA_GATEWAY_CHAIN_ID();
         address gwChain = bridgehub.getZKChain(gwChainId);
-        // slither-disable-next-line unused-return
-        (, uint256 gwMinor, ) = IGetters(gwChain).getSemverProtocolVersion();
-        require(gwMinor >= 30, GWNotV31(gwChainId));
+        if (gwChain != address(0)) {
+            // slither-disable-next-line unused-return
+            (, uint256 gwMinor, ) = IGetters(gwChain).getSemverProtocolVersion();
+            require(gwMinor >= 30, GWNotV31(gwChainId));
+        }
 
         chainAssetHandler.setMigrationNumberForV31(s.chainId);
 
