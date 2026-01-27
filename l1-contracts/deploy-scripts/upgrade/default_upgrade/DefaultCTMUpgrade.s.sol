@@ -145,7 +145,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         // Pass bytecodesSupplier to introspection - will overwrite incorrect V29 value
         setAddressesBasedOnCTM(permanentConfig.bytecodesSupplier);
-        ctmAddresses.stateTransition.rollupDAManager = permanentConfig.rollupDAManager;
+        // We will not need this in V31, and it will not be part of permanentConfig with V31 onwards.
+        // ctmAddresses.stateTransition.rollupDAManager = permanentConfig.rollupDAManager;
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
         config.contracts.chainCreationParams = chainCreationParams;
 

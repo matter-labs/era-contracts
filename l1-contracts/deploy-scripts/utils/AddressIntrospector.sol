@@ -509,12 +509,14 @@ library AddressIntrospector {
                 proxies: StateTransitionContracts({
                     chainTypeManager: _ctmAddr,
                     serverNotifier: ctm.serverNotifierAddress(),
-                    validatorTimelock: validatorTimelock
+                    validatorTimelock: validatorTimelock,
+                    bytecodesSupplier: address(0) // Not available from CTM directly
                 }),
                 implementations: StateTransitionContracts({
                     chainTypeManager: Utils.getImplementation(_ctmAddr),
                     serverNotifier: address(0), // Not available from CTM directly
-                    validatorTimelock: address(0) // Not available from CTM directly
+                    validatorTimelock: address(0), // Not available from CTM directly
+                    bytecodesSupplier: address(0) // Not available from CTM directly
                 }),
                 verifiers: Verifiers({
                     verifier: verifier,
@@ -526,7 +528,6 @@ library AddressIntrospector {
                 defaultUpgrade: address(0), // Not available from CTM directly
                 legacyValidatorTimelock: validatorTimelock,
                 eraDiamondProxy: address(0), // Not available from CTM directly
-                bytecodesSupplier: address(0), // L1_BYTECODES_SUPPLIER doesn't exist in v29
                 rollupDAManager: address(0), // Not available from CTM directly
                 rollupSLDAValidator: address(0) // Not available from CTM directly
             }),
