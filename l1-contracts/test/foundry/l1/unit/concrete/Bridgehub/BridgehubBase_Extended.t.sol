@@ -3,17 +3,18 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
-import {BaseTokenData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
 import {CTMNotRegistered, CTMAlreadyRegistered, ZeroAddress, ChainIdNotRegistered, AssetIdAlreadyRegistered, AssetHandlerNotRegistered, Unauthorized, NoCTMForAssetId} from "contracts/common/L1ContractErrors.sol";
 import {NotChainAssetHandler, AlreadyCurrentSL} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {TokenBridgingData} from "contracts/common/Messaging.sol";
 import {GW_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IGWAssetTracker} from "contracts/bridge/asset-tracker/IGWAssetTracker.sol";
 
 contract DummyGWAssetTracker {
-    function registerBaseTokenOnGateway(BaseTokenData calldata) external {}
+    function registerBaseTokenOnGateway(TokenBridgingData calldata) external {}
 }
 
 contract BridgehubBase_Extended_Test is Test {
@@ -290,15 +291,15 @@ contract BridgehubBase_Extended_Test is Test {
         bytes32 unknownAssetId = keccak256("unknownCTMAsset");
         uint256 chainId = 123;
         bytes32 baseTokenAssetId = keccak256("baseToken");
-        BaseTokenData memory baseTokenData = BaseTokenData({
+        TokenBridgingData memory baseTokenBridgingData = TokenBridgingData({
             assetId: baseTokenAssetId,
-            originalToken: address(0),
+            originToken: address(0),
             originChainId: 0
         });
 
         vm.prank(chainAssetHandler);
         vm.expectRevert(abi.encodeWithSelector(NoCTMForAssetId.selector, unknownAssetId));
-        bridgehub.forwardedBridgeMint(unknownAssetId, chainId, baseTokenData);
+        bridgehub.forwardedBridgeMint(unknownAssetId, chainId, baseTokenBridgingData);
     }
 
     // Test forwardedBridgeMint reverts when already current settlement layer (line 493)
@@ -331,9 +332,9 @@ contract BridgehubBase_Extended_Test is Test {
 
         uint256 chainId = 123;
         bytes32 baseTokenAssetId = keccak256("baseToken");
-        BaseTokenData memory baseTokendata = BaseTokenData({
+        TokenBridgingData memory baseTokenBridgingData = TokenBridgingData({
             assetId: baseTokenAssetId,
-            originalToken: makeAddr("originToken"),
+            originToken: makeAddr("originToken"),
             originChainId: 987
         });
 
@@ -341,12 +342,12 @@ contract BridgehubBase_Extended_Test is Test {
         DummyGWAssetTracker dummyTracker = new DummyGWAssetTracker();
         vm.etch(GW_ASSET_TRACKER_ADDR, address(dummyTracker).code);
         vm.prank(chainAssetHandler);
-        bridgehub.forwardedBridgeMint(ctmAssetId, chainId, baseTokendata);
+        bridgehub.forwardedBridgeMint(ctmAssetId, chainId, baseTokenBridgingData);
 
         // Second call should fail because it's already the current settlement layer
         vm.prank(chainAssetHandler);
         vm.expectRevert(abi.encodeWithSelector(AlreadyCurrentSL.selector, block.chainid));
-        bridgehub.forwardedBridgeMint(ctmAssetId, chainId, baseTokendata);
+        bridgehub.forwardedBridgeMint(ctmAssetId, chainId, baseTokenBridgingData);
     }
 
     // Test onlyChainAssetHandler modifier revert (line 141)

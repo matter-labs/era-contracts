@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {L2Log, L2Message, TxStatus} from "../../common/Messaging.sol";
+import {L2Log, L2Message, TxStatus, TokenBridgingData} from "../../common/Messaging.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
@@ -39,15 +39,9 @@ struct L2TransactionRequestTwoBridgesInner {
     bytes32 txDataHash;
 }
 
-struct BaseTokenData {
-    bytes32 assetId;
-    address originalToken;
-    uint256 originChainId;
-}
-
 struct BridgehubMintCTMAssetData {
     uint256 chainId;
-    BaseTokenData baseTokenData;
+    TokenBridgingData baseTokenBridgingData;
     uint256 batchNumber;
     bytes ctmData;
     bytes chainData;
@@ -187,7 +181,7 @@ interface IBridgehubBase {
     function forwardedBridgeMint(
         bytes32 _assetId,
         uint256 _chainId,
-        BaseTokenData calldata _baseTokenData
+        TokenBridgingData calldata _baseTokenBridgingData
     ) external returns (address zkChain, address ctm);
 
     function registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) external;

@@ -22,13 +22,13 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
-import {BaseTokenData, BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {IL2AssetRouter} from "../../../../../contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "../../../../../contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "../../../../../contracts/bridge/asset-router/IL1AssetRouter.sol";
 
-import {BridgehubL2TransactionRequest, L2Message, MessageInclusionProof} from "../../../../../contracts/common/Messaging.sol";
+import {BridgehubL2TransactionRequest, L2Message, MessageInclusionProof, TokenBridgingData} from "../../../../../contracts/common/Messaging.sol";
 import {IInteropCenter, InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
 import {L2WrappedBaseToken} from "../../../../../contracts/bridge/L2WrappedBaseToken.sol";
 import {L2SharedBridgeLegacy} from "../../../../../contracts/bridge/L2SharedBridgeLegacy.sol";
@@ -338,7 +338,11 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         );
         BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
             chainId: _chainId,
-            baseTokenData: BaseTokenData({assetId: baseTokenAssetId, originalToken: address(0), originChainId: 0}),
+            baseTokenBridgingData: TokenBridgingData({
+                assetId: baseTokenAssetId,
+                originToken: address(0),
+                originChainId: 0
+            }),
             batchNumber: 0,
             ctmData: ctmData,
             chainData: chainData,

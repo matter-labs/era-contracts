@@ -420,9 +420,9 @@
         "internalType": "uint256"
       },
       {
-        "name": "_baseTokenData",
+        "name": "_baseTokenBridgingData",
         "type": "tuple",
-        "internalType": "struct BaseTokenData",
+        "internalType": "struct TokenBridgingData",
         "components": [
           {
             "name": "assetId",
@@ -430,14 +430,14 @@
             "internalType": "bytes32"
           },
           {
-            "name": "originalToken",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
             "name": "originChainId",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "originToken",
+            "type": "address",
+            "internalType": "address"
           }
         ]
       }

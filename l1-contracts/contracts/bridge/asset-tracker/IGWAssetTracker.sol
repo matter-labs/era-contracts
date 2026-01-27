@@ -3,13 +3,12 @@
 pragma solidity ^0.8.21;
 
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
-import {BalanceChange, ConfirmBalanceMigrationData} from "../../common/Messaging.sol";
-import {BaseTokenData} from "../../core/bridgehub/IBridgehubBase.sol";
+import {BalanceChange, ConfirmBalanceMigrationData, TokenBridgingData} from "../../common/Messaging.sol";
 
 interface IGWAssetTracker {
     function setAddresses(uint256 _l1ChainId) external;
 
-    function registerBaseTokenOnGateway(BaseTokenData calldata _baseTokenData) external;
+    function registerBaseTokenOnGateway(TokenBridgingData calldata _baseTokenBridgingData) external;
 
     function handleChainBalanceIncreaseOnGateway(
         uint256 _chainId,

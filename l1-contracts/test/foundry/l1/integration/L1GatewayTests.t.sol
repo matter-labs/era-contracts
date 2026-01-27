@@ -10,7 +10,7 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
-import {IBridgehubBase, BridgehubBurnCTMAssetData, BaseTokenData, BridgehubMintCTMAssetData, L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase, BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
@@ -18,7 +18,7 @@ import {GatewayDeployer} from "./_SharedGatewayDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR, GW_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L2CanonicalTransaction, L2Message, TxStatus, ConfirmTransferResultData} from "contracts/common/Messaging.sol";
+import {L2CanonicalTransaction, L2Message, TxStatus, ConfirmTransferResultData, TokenBridgingData} from "contracts/common/Messaging.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -348,14 +348,14 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
             abi.encode(addresses.chainTypeManager.protocolVersion())
         );
-        BaseTokenData memory baseTokenData = BaseTokenData({
+        TokenBridgingData memory baseTokenBridgingData = TokenBridgingData({
             assetId: baseTokenAssetId,
-            originalToken: makeAddr("baseTokenOrigin"),
+            originToken: makeAddr("baseTokenOrigin"),
             originChainId: currentChainId
         });
         vm.expectCall(
             GW_ASSET_TRACKER_ADDR,
-            abi.encodeCall(IGWAssetTracker.registerBaseTokenOnGateway, (baseTokenData))
+            abi.encodeCall(IGWAssetTracker.registerBaseTokenOnGateway, (baseTokenBridgingData))
         );
         vm.mockCall(
             GW_ASSET_TRACKER_ADDR,
@@ -374,7 +374,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
         BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
             chainId: migratingChainId,
-            baseTokenData: baseTokenData,
+            baseTokenBridgingData: baseTokenBridgingData,
             batchNumber: 0,
             ctmData: ctmData,
             chainData: chainData,

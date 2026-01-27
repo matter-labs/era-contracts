@@ -7,8 +7,9 @@ import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/Enumerable
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {IBridgehubBase, BridgehubBurnCTMAssetData, BaseTokenData, BridgehubMintCTMAssetData} from "../bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase, BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData} from "../bridgehub/IBridgehubBase.sol";
 import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
+import {TokenBridgingData} from "../../common/Messaging.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
@@ -218,9 +219,9 @@ abstract contract ChainAssetHandlerBase is
         uint256 batchNumber = IMessageRoot(_messageRoot()).currentChainBatchNumber(bridgehubBurnData.chainId);
 
         bytes32 assetId = IBridgehubBase(_bridgehub()).baseTokenAssetId(bridgehubBurnData.chainId);
-        BaseTokenData memory baseTokenData = BaseTokenData({
+        TokenBridgingData memory baseTokenBridgingData = TokenBridgingData({
             assetId: assetId,
-            originalToken: address(0),
+            originToken: address(0),
             originChainId: 0
         });
         if (block.chainid == _l1ChainId()) {
@@ -228,13 +229,13 @@ abstract contract ChainAssetHandlerBase is
             // This is so that the GW Asset Tracker can register the chain's base token
             IL1AssetRouter l1AssetRouter = IL1AssetRouter(address(_assetRouter()));
             INativeTokenVaultBase l1Ntv = l1AssetRouter.nativeTokenVault();
-            baseTokenData.originalToken = l1Ntv.originToken(assetId);
-            baseTokenData.originChainId = l1Ntv.originChainId(assetId);
+            baseTokenBridgingData.originToken = l1Ntv.originToken(assetId);
+            baseTokenBridgingData.originChainId = l1Ntv.originChainId(assetId);
         }
 
         BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
             chainId: bridgehubBurnData.chainId,
-            baseTokenData: baseTokenData,
+            baseTokenBridgingData: baseTokenBridgingData,
             batchNumber: batchNumber,
             ctmData: ctmMintData,
             chainData: chainMintData,
@@ -274,7 +275,7 @@ abstract contract ChainAssetHandlerBase is
         (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeMint(
             _assetId,
             bridgehubMintData.chainId,
-            bridgehubMintData.baseTokenData
+            bridgehubMintData.baseTokenBridgingData
         );
 
         bool contractAlreadyDeployed = zkChain != address(0);

@@ -7,7 +7,7 @@ import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/Enumerable
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {IBridgehubBase, BaseTokenData} from "./IBridgehubBase.sol";
+import {IBridgehubBase} from "./IBridgehubBase.sol";
 
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1BaseTokenAssetHandler} from "../../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
@@ -15,7 +15,7 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 
-import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "../../common/Messaging.sol";
+import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus, TokenBridgingData} from "../../common/Messaging.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "../message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
@@ -477,13 +477,13 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     /// @notice IL1AssetHandler interface, used to migrate (transfer) a chain to the settlement layer.
     /// @param _assetId The asset ID of the chain.
     /// @param _chainId The chain ID of the ZK chain.
-    /// @param _baseTokenData The data for the base token.
+    /// @param _baseTokenBridgingData The data for the base token.
     /// @return zkChain The address of the ZK chain.
     /// @return ctm The address of the CTM of the chain.
     function forwardedBridgeMint(
         bytes32 _assetId,
         uint256 _chainId,
-        BaseTokenData calldata _baseTokenData
+        TokenBridgingData calldata _baseTokenBridgingData
     ) external onlyChainAssetHandler returns (address zkChain, address ctm) {
         ctm = ctmAssetIdToAddress[_assetId];
         if (ctm == address(0)) {
@@ -495,13 +495,13 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
 
         settlementLayer[_chainId] = block.chainid;
         chainTypeManager[_chainId] = ctm;
-        baseTokenAssetId[_chainId] = _baseTokenData.assetId;
+        baseTokenAssetId[_chainId] = _baseTokenBridgingData.assetId;
         // To keep `assetIdIsRegistered` consistent, we'll also automatically register the base token.
         // It is assumed that if the bridging happened, the token was approved on L1 already.
-        assetIdIsRegistered[_baseTokenData.assetId] = true;
+        assetIdIsRegistered[_baseTokenBridgingData.assetId] = true;
 
         if (block.chainid != _l1ChainId()) {
-            GW_ASSET_TRACKER.registerBaseTokenOnGateway(_baseTokenData);
+            GW_ASSET_TRACKER.registerBaseTokenOnGateway(_baseTokenBridgingData);
         }
 
         zkChain = getZKChain(_chainId);
