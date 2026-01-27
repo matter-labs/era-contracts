@@ -39,16 +39,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {InvalidChainId} from "contracts/common/L1ContractErrors.sol";
-
-contract GWAssetTrackerTestHelper is GWAssetTracker {
-    function getOriginToken(bytes32 _assetId) external view returns (address) {
-        return originToken[_assetId];
-    }
-
-    function getTokenOriginChainId(bytes32 _assetId) external view returns (uint256) {
-        return tokenOriginChainId[_assetId];
-    }
-}
+import {GWAssetTrackerTestHelper} from "../unit/concrete/Bridge/AssetTracker/GWAssetTracker.t.sol";
 
 contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;

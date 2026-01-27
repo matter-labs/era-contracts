@@ -27,20 +27,7 @@ import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
 import {L2_TO_L1_LOGS_MERKLE_TREE_DEPTH, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH} from "contracts/common/Config.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 import {DynamicIncrementalMerkleMemory} from "contracts/common/libraries/DynamicIncrementalMerkleMemory.sol";
-
-contract GWAssetTrackerTestHelper is GWAssetTracker {
-    function getEmptyMessageRoot(uint256 _chainId) external returns (bytes32) {
-        return _getEmptyMessageRoot(_chainId);
-    }
-
-    function getOriginToken(bytes32 _assetId) external view returns (address) {
-        return originToken[_assetId];
-    }
-
-    function getTokenOriginChainId(bytes32 _assetId) external view returns (uint256) {
-        return tokenOriginChainId[_assetId];
-    }
-}
+import {GWAssetTrackerTestHelper} from "./GWAssetTracker.t.sol";
 
 contract GWAssetTrackerExtendedTest is Test {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
