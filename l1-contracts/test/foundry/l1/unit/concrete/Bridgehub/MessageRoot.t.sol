@@ -155,12 +155,18 @@ contract MessageRootTest is Test {
         vm.prank(L2_BRIDGEHUB_ADDR);
         l2MessageRoot.addNewChain(alphaChainId, 0);
 
+        // Verify totalPublishedInteropRoots is 0 before adding batch root
+        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 0, "totalPublishedInteropRoots should be 0 before");
+
         vm.prank(alphaChainSender);
         vm.expectEmit(true, false, false, false);
         emit IMessageRoot.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
         vm.expectEmit(true, false, false, false);
         emit IMessageRoot.NewChainRoot(alphaChainId, bytes32(0), bytes32(0));
         l2MessageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
+
+        // Verify totalPublishedInteropRoots incremented after addChainBatchRoot
+        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 1, "totalPublishedInteropRoots should be 1 after");
     }
 
     function test_updateFullTree() public {
@@ -193,9 +199,29 @@ contract MessageRootTest is Test {
         vm.prank(L2_BRIDGEHUB_ADDR);
         l2MessageRoot.addNewChain(alphaChainId, 0);
         vm.chainId(gatewayChainId);
+
+        // Verify totalPublishedInteropRoots before adding batch root
+        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 0, "totalPublishedInteropRoots should be 0 before");
+
         vm.prank(GW_ASSET_TRACKER_ADDR);
         l2MessageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
+
+        // Verify totalPublishedInteropRoots after adding batch root (L2MessageRoot.addChainBatchRoot calls _emitRoot)
+        assertEq(
+            l2MessageRoot.totalPublishedInteropRoots(),
+            1,
+            "totalPublishedInteropRoots should be 1 after addChainBatchRoot"
+        );
+
         l2MessageRoot.updateFullTree();
+
+        // Verify totalPublishedInteropRoots after updateFullTree
+        assertEq(
+            l2MessageRoot.totalPublishedInteropRoots(),
+            2,
+            "totalPublishedInteropRoots should be 2 after updateFullTree"
+        );
+
         assertEq(l2MessageRoot.getAggregatedRoot(), 0x0ef1ac67d77f177a33449c47a8f05f0283300a81adca6f063c92c774beed140c);
     }
 
@@ -262,5 +288,30 @@ contract MessageRootTest is Test {
         bytes32 finalChainRoot = messageRoot.getChainRoot(alphaChainId);
         // Chain root is computed - the test verifies the function can be called without reverting
         // The actual root value depends on the merkle tree implementation
+    }
+
+    function test_getMerklePathForChain() public {
+        uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
+        uint256 betaChainId = uint256(uint160(makeAddr("betaChainId")));
+
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(alphaChainId, 0);
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(betaChainId, 0);
+
+        bytes32 hash0 = MessageHashing.chainIdLeafHash(0x00, block.chainid);
+        bytes32 hash1 = MessageHashing.chainIdLeafHash(0x00, alphaChainId);
+        bytes32 hash2 = MessageHashing.chainIdLeafHash(0x00, betaChainId);
+
+        bytes32[] memory pathFor1 = messageRoot.getMerklePathForChain(alphaChainId);
+        bytes32[] memory expectedPath = new bytes32[](2);
+        expectedPath[0] = hash0;
+        expectedPath[1] = keccak256(abi.encodePacked(hash2, SHARED_ROOT_TREE_EMPTY_HASH));
+        assertEq(pathFor1, expectedPath, "Incorrect path for alpha chain");
+
+        bytes32[] memory pathFor2 = messageRoot.getMerklePathForChain(betaChainId);
+        expectedPath[0] = SHARED_ROOT_TREE_EMPTY_HASH;
+        expectedPath[1] = keccak256(abi.encodePacked(hash0, hash1));
+        assertEq(pathFor2, expectedPath, "Incorrect path for beta chain");
     }
 }

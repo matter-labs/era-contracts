@@ -149,7 +149,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         deployDAValidators();
         deployIfNeededMulticall3();
 
-        ctmAddresses.stateTransition.bytecodesSupplier = deploySimpleContract("BytecodesSupplier", false);
+        (
+            ctmAddresses.stateTransition.implementations.bytecodesSupplier,
+            ctmAddresses.stateTransition.proxies.bytecodesSupplier
+        ) = deployTuppWithContract("BytecodesSupplier", false);
 
         deployVerifiers();
 
@@ -339,10 +342,15 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", ctmAddresses.stateTransition.defaultUpgrade);
         vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);
+        vm.serializeAddress(
+            "state_transition",
+            "bytecodes_supplier_impl_addr",
+            ctmAddresses.stateTransition.implementations.bytecodesSupplier
+        );
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "bytecodes_supplier_addr",
-            ctmAddresses.stateTransition.bytecodesSupplier
+            ctmAddresses.stateTransition.proxies.bytecodesSupplier
         );
 
         vm.serializeBytes("contracts_config", "diamond_cut_data", config.contracts.diamondCutData);

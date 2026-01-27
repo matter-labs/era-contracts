@@ -240,7 +240,6 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 defaultUpgrade: address(0),
                 legacyValidatorTimelock: address(0),
                 eraDiamondProxy: address(0),
-                bytecodesSupplier: address(0),
                 rollupDAManager: expectedGatewayContracts.daContracts.rollupDAManager,
                 rollupSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator
             }),
