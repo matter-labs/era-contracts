@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IBaseTokenHolder} from "../../common/l2-helpers/IBaseTokenHolder.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_HANDLER} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_HANDLER} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 
 /**
@@ -38,9 +38,9 @@ import {Unauthorized} from "../../common/L1ContractErrors.sol";
  */
 // slither-disable-next-line locked-ether
 contract BaseTokenHolder is IBaseTokenHolder {
-    /// @notice Modifier that restricts access to the bootloader or InteropHandler.
-    modifier onlyAuthorizedCaller() {
-        if (msg.sender != L2_BOOTLOADER_ADDRESS && msg.sender != address(L2_INTEROP_HANDLER)) {
+    /// @notice Modifier that restricts access to the InteropHandler only.
+    modifier onlyInteropHandler() {
+        if (msg.sender != address(L2_INTEROP_HANDLER)) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -51,7 +51,7 @@ contract BaseTokenHolder is IBaseTokenHolder {
     /// @dev The actual transfer is done via L2BaseToken.transferFromTo to maintain balance consistency.
     /// @param _to The address to receive the base tokens.
     /// @param _amount The amount of base tokens to give out.
-    function give(address _to, uint256 _amount) external override onlyAuthorizedCaller {
+    function give(address _to, uint256 _amount) external override onlyInteropHandler {
         if (_amount == 0) {
             return;
         }
@@ -63,9 +63,5 @@ contract BaseTokenHolder is IBaseTokenHolder {
 
     /// @notice Fallback to accept base token transfers from InteropHandler only.
     /// @dev Restricts token reception to prevent accidental transfers.
-    receive() external payable {
-        if (msg.sender != address(L2_INTEROP_HANDLER)) {
-            revert Unauthorized(msg.sender);
-        }
-    }
+    receive() external payable onlyInteropHandler {}
 }
