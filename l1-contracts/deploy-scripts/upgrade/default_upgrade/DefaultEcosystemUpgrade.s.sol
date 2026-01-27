@@ -166,18 +166,12 @@ contract DefaultEcosystemUpgrade is Script {
         console.log("Preparing combined governance calls...");
 
         // Get governance calls from core upgrade
-        (
-            Call[] memory coreStage0,
-            Call[] memory coreStage1,
-            Call[] memory coreStage2
-        ) = coreUpgrade.prepareDefaultGovernanceCalls();
+        (Call[] memory coreStage0, Call[] memory coreStage1, Call[] memory coreStage2) = coreUpgrade
+            .prepareDefaultGovernanceCalls();
 
         // Get governance calls from CTM upgrade
-        (
-            Call[] memory ctmStage0,
-            Call[] memory ctmStage1,
-            Call[] memory ctmStage2
-        ) = ctmUpgrade.prepareDefaultGovernanceCalls();
+        (Call[] memory ctmStage0, Call[] memory ctmStage1, Call[] memory ctmStage2) = ctmUpgrade
+            .prepareDefaultGovernanceCalls();
 
         // Merge stage 0 calls
         Call[][] memory stage0Array = new Call[][](2);

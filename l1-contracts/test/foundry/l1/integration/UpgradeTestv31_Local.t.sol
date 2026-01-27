@@ -116,7 +116,7 @@ contract UpgradeIntegrationTest_Local is
         // Both need to be set to satisfy: require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
         // Note: These are absolute storage slots, not relative to DIAMOND_STORAGE_POSITION
         // See: contracts/state-transition/chain-deps/ZKChainStorage.sol
-        bytes32 totalBatchesExecutedSlot = bytes32(uint256(11));  // STORAGE SLOT: 11
+        bytes32 totalBatchesExecutedSlot = bytes32(uint256(11)); // STORAGE SLOT: 11
         bytes32 totalBatchesCommittedSlot = bytes32(uint256(13)); // STORAGE SLOT: 13
         address eraChainDiamond = addresses.bridgehub.getZKChain(eraZKChainId);
 

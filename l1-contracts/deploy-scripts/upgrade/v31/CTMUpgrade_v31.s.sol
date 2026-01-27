@@ -38,7 +38,6 @@ import {DefaultCTMUpgrade} from "../default_upgrade/DefaultCTMUpgrade.s.sol";
 
 /// @notice Script used for v31 upgrade flow
 contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
-
     /// @notice E2e upgrade generation
     function run() public virtual override {
         initialize(

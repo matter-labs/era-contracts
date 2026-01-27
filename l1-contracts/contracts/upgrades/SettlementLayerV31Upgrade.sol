@@ -29,7 +29,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
         IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
-        address assetRouter = address(bridgehub.assetRouter()); 
+        address assetRouter = address(bridgehub.assetRouter());
         address nativeTokenVaultAddr = address(IL1AssetRouter(assetRouter).nativeTokenVault());
 
         /// We write to storage to avoid reentrancy.
@@ -43,9 +43,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
 
         bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(s.chainId);
-        INativeTokenVaultBase nativeTokenVault = INativeTokenVaultBase(
-            nativeTokenVaultAddr
-        );
+        INativeTokenVaultBase nativeTokenVault = INativeTokenVaultBase(nativeTokenVaultAddr);
 
         uint256 baseTokenOriginChainId = nativeTokenVault.originChainId(baseTokenAssetId);
         address baseTokenOriginAddress = nativeTokenVault.originToken(baseTokenAssetId);

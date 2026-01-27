@@ -157,11 +157,7 @@ contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
     }
 
     /// @notice Migrate token balances from DEPRECATED_chainBalance to AssetTracker
-    function migrateTokenBalances(
-        address _ntv,
-        address _assetTracker,
-        IBridgehubBase _bridgehub
-    ) internal {
+    function migrateTokenBalances(address _ntv, address _assetTracker, IBridgehubBase _bridgehub) internal {
         console.log("Migrating token balances...");
 
         L1NativeTokenVault ntv = L1NativeTokenVault(payable(_ntv));

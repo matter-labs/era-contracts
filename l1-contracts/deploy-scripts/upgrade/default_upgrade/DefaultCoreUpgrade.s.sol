@@ -110,10 +110,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         return coreAddresses.bridgehub;
     }
 
-    function initializeConfig(
-        string memory permanentValuesInputPath,
-        string memory upgradeInputPath
-    ) public virtual {
+    function initializeConfig(string memory permanentValuesInputPath, string memory upgradeInputPath) public virtual {
         string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
         string memory upgradeToml = vm.readFile(upgradeInputPath);
 

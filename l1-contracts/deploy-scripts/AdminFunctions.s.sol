@@ -207,7 +207,10 @@ contract AdminFunctions is Script, IAdminFunctions {
         );
 
         // Get the upgrade data from CTM using the GetDiamondCutData library
-        Diamond.DiamondCutData memory diamondCut = GetDiamondCutData.getDiamondCutData(ctmAddress, currentProtocolVersion);
+        Diamond.DiamondCutData memory diamondCut = GetDiamondCutData.getDiamondCutData(
+            ctmAddress,
+            currentProtocolVersion
+        );
 
         // Execute the upgrade through the admin flow
         Utils.adminExecute(
