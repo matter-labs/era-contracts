@@ -182,6 +182,8 @@ error InvalidNumberOfBlobs(uint256 expected, uint256 numCommitments, uint256 num
 error InvalidPackedPrecommitmentLength(uint256 length);
 // 0x09bde339
 error InvalidProof();
+// 0x5a1c353a
+error InvalidProofFormat();
 // 0x48c5fa28
 error InvalidProofLengthForFinalNode();
 // 0x5428eae7
