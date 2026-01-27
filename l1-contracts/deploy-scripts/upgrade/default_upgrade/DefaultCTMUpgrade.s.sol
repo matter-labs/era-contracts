@@ -137,7 +137,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     function initializeConfig(
         ChainCreationParamsConfig memory chainCreationParams,
-        PermanentCTMConfig memory permanentConfig
+        PermanentCTMConfig memory permanentConfig,
+        // Optional
+        address governance
     ) public {
         _initCreate2FactoryParams(permanentConfig.create2FactoryAddr, permanentConfig.create2FactorySalt);
         config.l1ChainId = block.chainid;
@@ -150,11 +152,11 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
         config.contracts.chainCreationParams = chainCreationParams;
 
-        // if (governance != address(0)) {
-        //     config.ownerAddress = governance;
-        // } else {
-        // }
-        config.ownerAddress = ctmAddresses.admin.governance;
+        if (governance != address(0)) {
+            config.ownerAddress = governance;
+        } else {
+            config.ownerAddress = ctmAddresses.admin.governance;
+        }
         newConfig.ecosystemAdminAddress = ctmAddresses.admin.governance;
         config.contracts.governanceSecurityCouncilAddress = Governance(payable(ctmAddresses.admin.governance))
             .securityCouncil();
@@ -208,7 +210,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             chainCreationParamsPath(permanentConfig.isZKsyncOS)
         );
 
-        initializeConfig(chainCreationParams, permanentConfig);
+        initializeConfig(chainCreationParams, permanentConfig, address(0));
     }
 
     /// @notice Full default upgrade preparation flow

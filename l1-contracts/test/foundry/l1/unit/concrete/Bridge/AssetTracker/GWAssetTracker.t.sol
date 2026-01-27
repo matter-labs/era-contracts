@@ -1320,7 +1320,9 @@ contract GWAssetTrackerTest is Test {
         );
 
         // Chain balance should be set
-        assertEq(gwAssetTracker.chainBalance(_chainId, _assetId), _amount, "chainBalance should match deposit amount");
+        // If assetId equals baseTokenAssetId, both amounts are added to the same balance
+        uint256 expectedBalance = _assetId == _baseTokenAssetId ? _amount + _baseTokenAmount : _amount;
+        assertEq(gwAssetTracker.chainBalance(_chainId, _assetId), expectedBalance, "chainBalance should match deposit amount");
     }
 
     /// @notice Test that the optimization triggers for both assetId and baseTokenAssetId independently
