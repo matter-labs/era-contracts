@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {BALANCE_CHANGE_VERSION, SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, INTEROP_BALANCE_CHANGE_VERSION} from "./IAssetTrackerBase.sol";
-import {BUNDLE_IDENTIFIER, BalanceChange, InteropBalanceChange, ConfirmBalanceMigrationData, InteropBundle, InteropCall, L2Log, TokenBalanceMigrationData, TxStatus, AssetBalanceChange, TokenBridgingData} from "../../common/Messaging.sol";
+import {BUNDLE_IDENTIFIER, BalanceChange, InteropBalanceChange, InteropBundle, InteropCall, L2Log, TokenBalanceMigrationData, TxStatus, AssetBalanceChange, TokenBridgingData} from "../../common/Messaging.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR, L2_ASSET_ROUTER, L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AssetRouterBase} from "../asset-router/AssetRouterBase.sol";
@@ -628,10 +628,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     /// @notice Confirms a migration operation has been completed and updates the asset migration number.
     /// @param _data The migration confirmation data containing chain ID, asset ID, and migration number.
-    function confirmMigrationOnGateway(
-        ConfirmBalanceMigrationData calldata _data
-    ) external onlyServiceTransactionSender {
-        assetMigrationNumber[_data.chainId][_data.assetId] = _data.migrationNumber;
+    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _data) external onlyServiceTransactionSender {
+        assetMigrationNumber[_data.chainId][_data.assetId] = _data.assetMigrationNumber;
         // Register the token if it wasn't already
         if (originToken[_data.assetId] == address(0)) {
             originToken[_data.assetId] = _data.originToken;

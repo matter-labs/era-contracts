@@ -6,7 +6,7 @@
       {
         "name": "_tokenBalanceMigrationData",
         "type": "tuple",
-        "internalType": "struct ConfirmBalanceMigrationData",
+        "internalType": "struct TokenBalanceMigrationData",
         "components": [
           {
             "name": "version",
@@ -39,12 +39,17 @@
             "internalType": "uint256"
           },
           {
-            "name": "migrationNumber",
+            "name": "amount",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "amount",
+            "name": "chainMigrationNumber",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "assetMigrationNumber",
             "type": "uint256",
             "internalType": "uint256"
           }

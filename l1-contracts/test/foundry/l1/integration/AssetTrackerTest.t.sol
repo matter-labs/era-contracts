@@ -17,7 +17,7 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
-import {ConfirmBalanceMigrationData, L2Message, TokenBalanceMigrationData} from "contracts/common/Messaging.sol";
+import {L2Message, TokenBalanceMigrationData} from "contracts/common/Messaging.sol";
 import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
@@ -176,14 +176,15 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             originToken: tokenAddress,
             isL1ToGateway: true
         });
-        ConfirmBalanceMigrationData memory confirmData = ConfirmBalanceMigrationData({
+        TokenBalanceMigrationData memory confirmData = TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             isL1ToGateway: true,
             chainId: eraZKChainId,
             assetId: assetId,
             originToken: tokenAddress,
             tokenOriginChainId: originalChainId,
-            migrationNumber: migrationNumber,
+            chainMigrationNumber: 0,
+            assetMigrationNumber: migrationNumber,
             amount: amount
         });
         bytes memory encodedData = abi.encodeCall(IAssetTrackerDataEncoding.receiveMigrationOnL1, data);
@@ -329,14 +330,15 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             originToken: tokenAddress,
             isL1ToGateway: false
         });
-        ConfirmBalanceMigrationData memory confirmData = ConfirmBalanceMigrationData({
+        TokenBalanceMigrationData memory confirmData = TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             isL1ToGateway: false,
             chainId: eraZKChainId,
             assetId: assetId,
             originToken: tokenAddress,
             tokenOriginChainId: originalChainId,
-            migrationNumber: migrationNumber,
+            chainMigrationNumber: 0,
+            assetMigrationNumber: migrationNumber,
             amount: amount
         });
         bytes memory encodedData = abi.encodeCall(IAssetTrackerDataEncoding.receiveMigrationOnL1, data);
