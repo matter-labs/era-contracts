@@ -25,6 +25,8 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {ChainCreationParamsLib} from "../../ctm/ChainCreationParamsLib.sol";
 
 /// @notice Script used for default ecosystem upgrade flow should be run as a first for the upgrade.
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
@@ -39,6 +41,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     struct AdditionalConfigParams {
         uint256 newProtocolVersion;
+        bool isZKsyncOS;
     }
     AdditionalConfigParams internal additionalConfig;
 
@@ -117,7 +120,14 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesInputPath);
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
         //        config.supportL2LegacySharedBridgeTest = permanentValuesToml.readBool("$.support_l2_legacy_shared_bridge_test");
-        additionalConfig.newProtocolVersion = upgradeToml.readUint("$.contracts.new_protocol_version");
+
+        // Read isZKsyncOS flag from permanent values
+        if (permanentValuesToml.keyExists("$.is_zk_sync_os")) {
+            additionalConfig.isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
+        }
+
+        // Protocol version comes from genesis config
+        additionalConfig.newProtocolVersion = loadProtocolVersionFromGenesis();
 
         coreAddresses.bridgehub.proxies.bridgehub = permanentValuesToml.readAddress(
             "$.core_contracts.bridgehub_proxy_addr"
@@ -449,5 +459,18 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     }
 
     // add this to be excluded from coverage report
+
+    // cspell:ignore Ksync zksync
+    /// @notice Load protocol version from genesis config
+    /// @dev Reads from Era or ZKsync OS genesis based on config.isZKsyncOS flag
+    function loadProtocolVersionFromGenesis() internal virtual returns (uint256) {
+        string memory genesisFilename = additionalConfig.isZKsyncOS ? "zksync-os/latest.json" : "era/latest.json";
+        string memory genesisPath = string.concat(vm.projectRoot(), "/../configs/genesis/", genesisFilename);
+        return
+            ChainCreationParamsLib
+                .getChainCreationParams(genesisPath, additionalConfig.isZKsyncOS)
+                .latestProtocolVersion;
+    }
+
     function test() internal override {}
 }
