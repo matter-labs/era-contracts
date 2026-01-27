@@ -36,6 +36,7 @@ import {Unauthorized} from "../../common/L1ContractErrors.sol";
  * - Underflow: The chain operator must ensure the base token's total supply is below 2^127.
  *   This is true for all known tokens including meme coins.
  */
+// slither-disable-next-line locked-ether
 contract BaseTokenHolder is IBaseTokenHolder {
     /// @notice Modifier that restricts access to the bootloader or InteropHandler.
     modifier onlyAuthorizedCaller() {
