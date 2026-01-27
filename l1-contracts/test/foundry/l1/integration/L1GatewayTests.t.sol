@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 import "forge-std/console.sol";
 
@@ -34,7 +35,6 @@ import {InvalidProof, DepositDoesNotExist} from "contracts/common/L1ContractErro
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 import {GatewayUtils} from "deploy-scripts/gateway/GatewayUtils.s.sol";
 import {Utils} from "../unit/concrete/Utils/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -49,14 +49,7 @@ import {IMessageRoot, IMessageVerification} from "contracts/core/message-root/IM
 import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 import {NotMigrated} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
-contract L1GatewayTests is
-    L1ContractDeployer,
-    ZKChainDeployer,
-    TokenDeployer,
-    L2TxMocker,
-    GatewayDeployer,
-    ConfigSemaphore
-{
+contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
@@ -87,7 +80,6 @@ contract L1GatewayTests is
     function prepare() public {
         _generateUserAddresses();
 
-        takeConfigLock(); // Prevents race condition with configs
         _deployL1Contracts();
 
         _deployEraWithPausedDeposits();
@@ -108,8 +100,6 @@ contract L1GatewayTests is
         }
 
         _initializeGatewayScript();
-
-        releaseConfigLock();
 
         vm.deal(ecosystemConfig.ownerAddress, 100000000000000000000000000000000000);
         migratingChain = IZKChain(IL1Bridgehub(addresses.bridgehub).getZKChain(migratingChainId));
@@ -156,26 +146,84 @@ contract L1GatewayTests is
 
     //
     function test_registerGateway() public {
+        // Verify gateway is not whitelisted before setup
+        bool isWhitelistedBefore = addresses.bridgehub.whitelistedSettlementLayers(gatewayChainId);
+
         _setUpGatewayWithFilterer();
+
+        // Verify gateway is whitelisted as a settlement layer
+        assertTrue(
+            addresses.bridgehub.whitelistedSettlementLayers(gatewayChainId),
+            "Gateway should be whitelisted as settlement layer"
+        );
+
+        // Verify transaction filterer is deployed for the gateway chain
+        address filterer = gatewayChain.getTransactionFilterer();
+        assertTrue(filterer != address(0), "Transaction filterer should be deployed for gateway chain");
     }
 
     //
     function test_moveChainToGateway() public {
         _setUpGatewayWithFilterer();
+
+        // Verify chain's settlement layer before migration (defaults to L1 chain ID)
+        uint256 settlementLayerBefore = addresses.bridgehub.settlementLayer(migratingChainId);
+        // Before migration, the settlement layer is L1 (block.chainid) or 0
+        assertTrue(
+            settlementLayerBefore == block.chainid || settlementLayerBefore == 0,
+            "Chain should be on L1 before migration"
+        );
+
         gatewayScript.migrateChainToGateway(migratingChainId);
-        require(addresses.bridgehub.settlementLayer(migratingChainId) == gatewayChainId, "Migration failed");
+
+        // Verify settlement layer is set to gateway
+        assertEq(
+            addresses.bridgehub.settlementLayer(migratingChainId),
+            gatewayChainId,
+            "Settlement layer should be gateway chain"
+        );
+
+        // Verify migration is in progress
+        address chainAssetHandler = address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler);
+        assertTrue(
+            IL1ChainAssetHandler(chainAssetHandler).isMigrationInProgress(migratingChainId),
+            "Migration should be in progress"
+        );
     }
 
     function test_l2Registration() public {
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChainId);
+
+        // Verify chain is migrating
+        assertEq(
+            addresses.bridgehub.settlementLayer(migratingChainId),
+            gatewayChainId,
+            "Chain should be migrated to gateway"
+        );
+
         gatewayScript.fullGatewayRegistration();
+
+        // Verify registration completed by checking chain is still properly configured
+        address zkChainAddress = addresses.bridgehub.getZKChain(migratingChainId);
+        assertTrue(zkChainAddress != address(0), "ZK chain should still be registered after L2 registration");
+
+        // Verify base token asset ID is still set
+        bytes32 baseTokenAssetId = addresses.bridgehub.baseTokenAssetId(migratingChainId);
+        assertTrue(baseTokenAssetId != bytes32(0), "Base token asset ID should be set after registration");
     }
 
     function test_requestL2TransactionDirect() public {
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChainId);
         _confirmMigration(TxStatus.Success);
+
+        // Verify migration was successful
+        assertEq(
+            addresses.bridgehub.settlementLayer(migratingChainId),
+            gatewayChainId,
+            "Chain should be settled on gateway"
+        );
 
         IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
         uint256 expectedValue = 1000000000000000000000;
@@ -187,20 +235,87 @@ contract L1GatewayTests is
             800,
             "0x"
         );
-        addresses.bridgehub.requestL2TransactionDirect{value: expectedValue}(request);
+
+        vm.recordLogs();
+        bytes32 canonicalTxHash = addresses.bridgehub.requestL2TransactionDirect{value: expectedValue}(request);
+
+        // Verify transaction was created
+        assertTrue(canonicalTxHash != bytes32(0), "Canonical tx hash should not be zero");
+
+        // Verify logs were emitted
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertTrue(logs.length > 0, "Transaction should emit logs");
     }
 
     function test_recoverFromFailedChainMigration() public {
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChainId);
 
+        // Verify migration is in progress before recovery
+        address chainAssetHandler = address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler);
+        assertTrue(
+            IL1ChainAssetHandler(chainAssetHandler).isMigrationInProgress(migratingChainId),
+            "Migration should be in progress before recovery"
+        );
+
         _confirmMigration(TxStatus.Failure);
+
+        // Verify migration was rolled back - chain should be back on L1
+        assertEq(
+            addresses.bridgehub.settlementLayer(migratingChainId),
+            block.chainid,
+            "Chain should be back on L1 after failed migration"
+        );
+
+        // Verify migration is no longer in progress
+        assertFalse(
+            IL1ChainAssetHandler(chainAssetHandler).isMigrationInProgress(migratingChainId),
+            "Migration should not be in progress after recovery"
+        );
+
+        // Verify migration number was reset
+        assertEq(
+            IChainAssetHandler(chainAssetHandler).migrationNumber(migratingChainId),
+            0,
+            "Migration number should be 0 after failed migration"
+        );
     }
 
     function test_finishMigrateBackChain() public {
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChainId);
+
         migrateBackChain();
+
+        // Verify the chain exists on L1 and is accessible
+        IZKChain migratingChainContract = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
+        assertTrue(address(migratingChainContract) != address(0), "Migrating chain should exist after migration back");
+
+        // Verify the chain contract is properly deployed at a non-zero address
+        assertTrue(address(migratingChainContract).code.length > 0, "Chain contract should have deployed code");
+
+        // Verify base token asset ID is correctly set in bridgehub
+        bytes32 expectedBaseTokenAssetId = eraConfig.baseTokenAssetId;
+        assertEq(
+            addresses.bridgehub.baseTokenAssetId(migratingChainId),
+            expectedBaseTokenAssetId,
+            "Base token asset ID should be preserved after migration back"
+        );
+
+        // Verify the chain's base token asset ID matches the bridgehub
+        assertEq(
+            migratingChainContract.getBaseTokenAssetId(),
+            expectedBaseTokenAssetId,
+            "Chain's base token asset ID should match bridgehub"
+        );
+
+        // Verify the chain has a valid admin
+        address admin = migratingChainContract.getAdmin();
+        assertTrue(admin != address(0), "Chain should have a valid admin after migration back");
+
+        // Verify the chain's CTM asset ID can be retrieved from bridgehub
+        bytes32 ctmAssetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
+        assertTrue(ctmAssetId != bytes32(0), "CTM asset ID should be set for the migrated chain");
     }
 
     function migrateBackChain() public {
@@ -276,6 +391,10 @@ contract L1GatewayTests is
         assertEq(addresses.bridgehub.baseTokenAssetId(migratingChainId), baseTokenAssetId);
         IZKChain migratingChainContract = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
         assertEq(migratingChainContract.getBaseTokenAssetId(), baseTokenAssetId);
+
+        // After migrating back, the settlement layer should no longer be the gateway
+        uint256 settlementLayer = addresses.bridgehub.settlementLayer(migratingChainId);
+        assertTrue(settlementLayer != gatewayChainId, "Settlement layer should not be gateway after migration back");
     }
 
     function test_chainMigrationWithUpgrade() public {

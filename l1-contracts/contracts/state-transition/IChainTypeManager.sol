@@ -125,6 +125,8 @@ interface IChainTypeManager {
 
     function validatorTimelock() external view returns (address);
 
+    function validatorTimelockPostV29() external view returns (address);
+
     function initialize(ChainTypeManagerInitializeData calldata _initializeData) external;
 
     function setLegacyValidatorTimelock(address _validatorTimelock) external;

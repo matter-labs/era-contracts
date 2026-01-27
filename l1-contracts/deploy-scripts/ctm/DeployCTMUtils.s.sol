@@ -323,7 +323,11 @@ abstract contract DeployCTMUtils is DeployUtils {
                         return type(EraTestnetVerifier).creationCode;
                     }
                 } else {
-                    return type(EraDualVerifier).creationCode;
+                    if (config.isZKsyncOS) {
+                        return type(ZKsyncOSDualVerifier).creationCode;
+                    } else {
+                        return type(EraDualVerifier).creationCode;
+                    }
                 }
             } else if (compareStrings(contractName, "EraVerifierFflonk")) {
                 return type(EraVerifierFflonk).creationCode;
@@ -461,7 +465,7 @@ abstract contract DeployCTMUtils is DeployUtils {
                 interopCenterProxy: L2_INTEROP_CENTER_ADDR,
                 rollupDAManager: ctmAddresses.daAddresses.rollupDAManager,
                 chainAssetHandler: coreAddresses.bridgehub.proxies.chainAssetHandler,
-                l1BytecodesSupplier: ctmAddresses.stateTransition.bytecodesSupplier,
+                l1BytecodesSupplier: ctmAddresses.stateTransition.proxies.bytecodesSupplier,
                 eip7702Checker: ctmAddresses.admin.eip7702Checker,
                 verifierFflonk: ctmAddresses.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: ctmAddresses.stateTransition.verifiers.verifierPlonk,
@@ -503,6 +507,8 @@ abstract contract DeployCTMUtils is DeployUtils {
                     ValidatorTimelock.initialize,
                     (config.deployerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
                 );
+        } else if (compareStrings(contractName, "BytecodesSupplier")) {
+            return abi.encodeCall(BytecodesSupplier.initialize, ());
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }

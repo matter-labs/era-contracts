@@ -145,8 +145,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         // Pass bytecodesSupplier to introspection - will overwrite incorrect V29 value
         setAddressesBasedOnCTM(permanentConfig.bytecodesSupplier);
-        // ctmAddresses.stateTransition.rollupDAManager = permanentConfig.rollupDAManager;
-
+        ctmAddresses.stateTransition.rollupDAManager = permanentConfig.rollupDAManager;
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
         config.contracts.chainCreationParams = chainCreationParams;
 
@@ -362,7 +361,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             coreAddresses = AddressIntrospector.getCoreDeployedAddressesV29(bridgehubAddr);
 
             // V29 introspection returns zero for bytecodesSupplier, overwrite with correct value
-            ctmAddresses.stateTransition.bytecodesSupplier = _bytecodesSupplier;
+            ctmAddresses.stateTransition.proxies.bytecodesSupplier = _bytecodesSupplier;
         } else {
             ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
             coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubAddr);
@@ -400,6 +399,11 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function getFullListOfFactoryDependencies() internal virtual returns (bytes[] memory factoryDeps) {
+        if (config.isZKsyncOS) {
+            // TODO: for now, we do not provide any factory deps for zksync os
+            return factoryDeps;
+        }
+
         bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
 
         string[] memory additionalForceDeployments = getAdditionalDependenciesNames();
@@ -463,12 +467,17 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function publishBytecodes() public virtual {
+        if (config.isZKsyncOS) {
+            // TODO: for now, we do not provide any factory deps for zksync os
+            return;
+        }
+
         bytes[] memory allDeps = getFullListOfFactoryDependencies();
         uint256[] memory factoryDeps = new uint256[](allDeps.length);
         require(factoryDeps.length <= 64, "Too many deps");
 
-        BytecodePublisher.publishBytecodesInBatches(
-            BytecodesSupplier(ctmAddresses.stateTransition.bytecodesSupplier),
+        BytecodePublisher.publishEraBytecodesInBatches(
+            BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier),
             allDeps
         );
 
@@ -911,7 +920,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         vm.serializeAddress(
             "state_transition",
             "bytecodes_supplier_addr",
-            ctmAddresses.stateTransition.bytecodesSupplier
+            ctmAddresses.stateTransition.proxies.bytecodesSupplier
         );
         string memory stateTransition = vm.serializeAddress(
             "state_transition",

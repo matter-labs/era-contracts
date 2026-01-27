@@ -28,12 +28,7 @@ jobs:
           python-version: 3.8
 
       - name: Install foundry-zksync
-        run: |
-          mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.30/foundry_zksync_v0.0.30_linux_amd64.tar.gz
-          tar zxf foundry_zksync_v0.0.30_linux_amd64.tar.gz -C ./foundry-zksync
-          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+        uses: ./.github/actions/install-zksync-foundry
 
       - name: Install Slither
         run: |
@@ -55,7 +50,7 @@ jobs:
           rm -rf ./l1-contracts/contracts/dev-contracts/test/VerifierTest.sol
           rm -rf ./l1-contracts/contracts/dev-contracts/test/VerifierRecursiveTest.sol
           rm -rf ./l1-contracts/contracts/dev-contracts/test/DummyPlonkVerifier.sol
-          rm -rf ./l1-contracts/contracts/state-transition/chain-deps/GatewayCTMDeployer.sol
+          rm -rf ./l1-contracts/contracts/state-transition/chain-deps/gateway-ctm-deployer/
           rm -rf ./l1-contracts/contracts/script-interfaces/
           rm -rf ./l1-contracts/deploy-scripts/
 

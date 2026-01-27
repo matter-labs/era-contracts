@@ -5,6 +5,12 @@ pragma solidity ^0.8.21;
 import {ConfirmBalanceMigrationData} from "../../common/Messaging.sol";
 
 interface IL2AssetTracker {
+    /// @notice Emitted when L1 to Gateway migration is initiated for an asset
+    /// @param assetId The asset ID being migrated
+    /// @param chainId The chain ID from which the migration is initiated
+    /// @param amount The amount being migrated
+    event L1ToGatewayMigrationInitiated(bytes32 indexed assetId, uint256 chainId, uint256 amount);
+
     function setAddresses(uint256 _l1ChainId, bytes32 _baseTokenAssetId) external;
 
     function migrateTokenBalanceFromNTVV31(bytes32 _assetId) external;
