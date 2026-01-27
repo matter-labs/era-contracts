@@ -964,7 +964,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // A zero timestamp means we don't have a recorded "requested at" time for this priority tx.
         // This can happen when:
         //  - the priority queue is empty, or
-        //  - immediately after the chain upgraded to the `PriorityMode` protocol version.
+        //  - immediately after the chain upgraded to the v31 protocol version.
         //
         // In the upgrade case, priority transactions may already exist in the contract state,
         // but `priorityOpsRequestTimestamp` has not been populated for "old" priority transactions.
