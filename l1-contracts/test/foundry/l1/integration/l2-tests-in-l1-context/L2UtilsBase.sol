@@ -36,6 +36,7 @@ import {DummyL2L1Messenger} from "../../../../../contracts/dev-contracts/test/Du
 
 import {DummyL2StandardTriggerAccount} from "../../../../../contracts/dev-contracts/test/DummyL2StandardTriggerAccount.sol";
 import {DummyL2BaseTokenSystemContract} from "../../../../../contracts/dev-contracts/test/DummyBaseTokenSystemContract.sol";
+import {DummyL2BaseTokenHolder} from "../../../../../contracts/dev-contracts/test/DummyL2BaseTokenHolder.sol";
 import {DummyL2InteropAccount} from "../../../../../contracts/dev-contracts/test/DummyL2InteropAccount.sol";
 
 import {SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
@@ -144,6 +145,11 @@ library L2UtilsBase {
         {
             address l2DummyBaseTokenSystemContract = address(new DummyL2BaseTokenSystemContract());
             vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, l2DummyBaseTokenSystemContract.code);
+
+            // Deploy DummyL2BaseTokenHolder at the reserved address
+            address l2DummyBaseTokenHolder = address(new DummyL2BaseTokenHolder());
+            vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, l2DummyBaseTokenHolder.code);
+
             // Initialize the BaseTokenHolder's balance with 2^127 - 1 tokens
             // This mirrors the production setup where BaseTokenHolder starts with this balance
             DummyL2BaseTokenSystemContract(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).setBalance(
