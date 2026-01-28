@@ -63,7 +63,7 @@
     "clean:foundry": "forge clean",
     "test": "yarn workspace da-contracts build && hardhat test test/unit_tests/*.spec.ts --network hardhat",
     "test:foundry": "forge script --sig 0x2dd0ebe3 DeployCTMScript --ffi && forge test --threads 1 --ffi --match-path 'test/foundry/{l1,zksync-os}/*' --no-match-test 'test_DefaultUpgrade_MainnetFork' --no-match-contract 'ChainRegistrarTest'",
-    "test:zkfoundry": "forge script --sig 0x2dd0ebe3 DeployCTMScript --ffi && forge test --zksync --match-path 'test/foundry/l2/*' --gas-limit 20000000000 --skip 'test/foundry/l1/*' '*/L2BaseToken.sol' '*/Burner.sol'",
+    "test:zkfoundry": "forge script --sig 0x2dd0ebe3 DeployCTMScript --ffi && forge test --zksync --match-path 'test/foundry/l2/*' --gas-limit 20000000000 --skip 'test/foundry/l1/*' '*/L2BaseToken.sol' '*/Burner.sol' '*/L2NativeTokenVault.t.sol'",
     "test:mainnet-upgrade-fork": "forge test --match-test test_DefaultUpgrade_MainnetFork --ffi --rpc-url $INFURA_MAINNET --gas-limit 2000000000",
     "test:fork": "TEST_CONTRACTS_FORK=1 yarn run hardhat test test/unit_tests/*.fork.ts --network hardhat",
     "test:invariant:l1-context": "WHERE=L1 scripts/run-invariant-tests",
