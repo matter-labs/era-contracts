@@ -69,5 +69,4 @@ contract DummyBridgehub {
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
     ) external payable returns (bytes32 canonicalTxHash) {}
-    
 }
