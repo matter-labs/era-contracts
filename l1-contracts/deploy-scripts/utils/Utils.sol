@@ -1044,13 +1044,7 @@ library Utils {
         string memory contractName
     ) internal view returns (bytes memory) {
         // Use relative path from l1-contracts to system-contracts
-        string memory path = string.concat(
-            "/../system-contracts/zkout/",
-            fileName,
-            "/",
-            contractName,
-            ".json"
-        );
+        string memory path = string.concat("/../system-contracts/zkout/", fileName, "/", contractName, ".json");
         bytes memory bytecode = readFoundryBytecode(path);
         return bytecode;
     }
