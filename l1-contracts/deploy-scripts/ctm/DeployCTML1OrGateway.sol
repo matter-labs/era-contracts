@@ -40,12 +40,7 @@ library DeployCTML1OrGateway {
             return abi.encode(config.l1ChainId, config.rollupDAManager, config.testnetVerifier);
         } else if (contractName == CTMContract.MailboxFacet) {
             return
-                abi.encode(
-                    config.l1ChainId,
-                    config.chainAssetHandler,
-                    config.eip7702Checker,
-                    config.testnetVerifier
-                );
+                abi.encode(config.l1ChainId, config.chainAssetHandler, config.eip7702Checker, config.testnetVerifier);
         } else if (contractName == CTMContract.ValidatorTimelock) {
             return abi.encode(config.bridgehubProxy);
         } else if (contractName == CTMContract.ExecutorFacet) {
