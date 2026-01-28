@@ -71,6 +71,15 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         deployUpgradeStageValidator();
         deployGovernanceUpgradeTimer();
 
+        // Deploy BytecodesSupplier as TUPP (was a simple contract in old version)
+        // This creates both implementation and proxy
+        (
+            ctmAddresses.stateTransition.implementations.bytecodesSupplier,
+            ctmAddresses.stateTransition.proxies.bytecodesSupplier
+        ) = deployTuppWithContract("BytecodesSupplier", false);
+
+        // Deploy new ChainTypeManager implementation
+        // The constructor will receive the new BytecodesSupplier proxy address
         ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(
             "EraChainTypeManager",
             false
