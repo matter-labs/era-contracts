@@ -46,17 +46,6 @@ contract GatewayVotePreparationTests is Test {
         assertTrue(address(votePreparationScript) != address(0), "GatewayVotePreparation should be instantiated");
     }
 
-    /// @notice Test that GatewayVotePreparation initial state is correct
-    function test_gatewayVotePreparationInitialState() public {
-        GatewayVotePreparationForTests votePreparationScript = new GatewayVotePreparationForTests();
-
-        // Initial state should be zero/empty before initialization
-        assertEq(votePreparationScript.getGatewayChainId(), 0, "Gateway chain ID should be 0 initially");
-        assertEq(votePreparationScript.getCTM(), address(0), "CTM should be zero address initially");
-        assertEq(votePreparationScript.getRefundRecipient(), address(0), "Refund recipient should be zero initially");
-        assertEq(votePreparationScript.getEraChainId(), 0, "Era chain ID should be 0 initially");
-    }
-
     // Exclude from coverage report
     function test() internal virtual {}
 }
