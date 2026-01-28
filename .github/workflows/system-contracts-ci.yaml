@@ -1,0 +1,180 @@
+name: System contracts CI
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install foundry-zksync
+        uses: ./.github/actions/install-zksync-foundry
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.20.8
+
+      - name: Install Yarn
+        run: npm install -g yarn
+
+      - name: Build da-contracts artifacts
+        run: yarn da build:foundry
+
+      - name: Build artifacts
+        working-directory: system-contracts
+        run: |
+          yarn install
+          yarn build
+          yarn build:foundry
+
+      - name: Build artifacts
+        working-directory: l1-contracts
+        run: |
+          yarn install
+          yarn build:foundry
+
+      - name: Create cache
+        uses: actions/cache/save@v4
+        with:
+          key: artifacts-system-${{ github.sha }}
+          path: |
+            system-contracts/zkout
+            system-contracts/cache-forge
+            system-contracts/bootloader/build
+            system-contracts/artifacts-zk
+            system-contracts/cache-zk
+            system-contracts/typechain
+            system-contracts/contracts-preprocessed
+            l1-contracts/zkout
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.20.8
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Run lint
+        run: yarn lint:check
+
+  test-bootloader:
+    needs: [build, lint]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Install rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly-2024-08-01
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-system-${{ github.sha }}
+          path: |
+            system-contracts/zkout
+            system-contracts/cache-forge
+            system-contracts/bootloader/build
+            system-contracts/artifacts-zk
+            system-contracts/cache-zk
+            system-contracts/typechain
+            system-contracts/contracts-preprocessed
+            l1-contracts/zkout
+
+      - name: Run bootloader tests
+        run: |
+          cd system-contracts/bootloader/test_infra
+          cargo run
+
+  # FIXME: uncomment once fixed.
+  # test-contracts:
+  #   needs: [build, lint]
+  #   runs-on: ubuntu-latest
+
+  #   steps:
+  #     - name: Checkout the repository
+  #       uses: actions/checkout@v4
+
+  #     - name: Use Node.js
+  #       uses: actions/setup-node@v3
+  #       with:
+  #         node-version: 18.20.8
+  #         cache: yarn
+
+  #     - name: Run anvil-zksync
+  #       uses: dutterbutter/anvil-zksync-action@v1.3.0
+  #       with:
+  #         mode: run
+  #         protocolVersion: 29
+  #         evmInterpreter: true
+  #         logFilePath: "anvil_zksync.log"
+  #         offline: true
+
+  #     - name: Install dependencies
+  #       run: yarn
+
+  #     - name: Restore artifacts cache
+  #       uses: actions/cache/restore@v3
+  #       with:
+  #         fail-on-cache-miss: true
+  #         key: artifacts-system-${{ github.sha }}
+  #         path: |
+  #           system-contracts/zkout
+  #           system-contracts/cache-forge
+  #           system-contracts/bootloader/build
+  #           system-contracts/artifacts-zk
+  #           system-contracts/cache-zk
+  #           system-contracts/typechain
+  #           system-contracts/contracts-preprocessed
+
+  #     - name: Run tests
+  #       run: yarn sc test
+
+  #     - name: Print output logs of anvil-zksync
+  #       if: always()
+  #       run: cat anvil_zksync.log
+
+  test-contracts-foundry:
+    needs: [lint]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.20.8
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Install foundry-zksync
+        uses: ./.github/actions/install-zksync-foundry
+
+      - name: Run tests using foundry
+        run: yarn sc test:foundry

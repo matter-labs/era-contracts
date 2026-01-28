@@ -6,6 +6,8 @@ import {Merkle} from "./Merkle.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, SUPPORTED_PROOF_METADATA_VERSION} from "../Config.sol";
 import {MerklePathEmpty} from "../L1ContractErrors.sol";
 import {UncheckedMath} from "./UncheckedMath.sol";
+import {L2Log, L2Message, ProofData, TxStatus} from "../Messaging.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
 
 import {UnsupportedProofMetadataVersion} from "../../state-transition/L1StateTransitionErrors.sol";
 import {HashedLogIsDefault, InvalidProofLengthForFinalNode} from "../../common/L1ContractErrors.sol";
@@ -13,19 +15,58 @@ import {HashedLogIsDefault, InvalidProofLengthForFinalNode} from "../../common/L
 bytes32 constant BATCH_LEAF_PADDING = keccak256("zkSync:BatchLeaf");
 bytes32 constant CHAIN_ID_LEAF_PADDING = keccak256("zkSync:ChainIdLeaf");
 
-struct ProofData {
-    uint256 settlementLayerChainId;
-    uint256 settlementLayerBatchNumber;
-    uint256 settlementLayerBatchRootMask;
-    uint256 batchLeafProofLen;
-    bytes32 batchSettlementRoot;
-    bytes32 chainIdLeaf;
-    uint256 ptr;
-    bool finalProofNode;
-}
-
 library MessageHashing {
     using UncheckedMath for uint256;
+
+    function getLeafHashFromMessage(L2Message memory _message) internal pure returns (bytes32 hashedLog) {
+        L2Log memory l2Log = _l2MessageToLog(_message);
+        hashedLog = getLeafHashFromLog(l2Log);
+    }
+
+    /// @dev Convert arbitrary-length message to the raw L2 log
+    function _l2MessageToLog(L2Message memory _message) internal pure returns (L2Log memory) {
+        return
+            L2Log({
+                l2ShardId: 0,
+                isService: true,
+                txNumberInBatch: _message.txNumberInBatch,
+                sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+                key: bytes32(uint256(uint160(_message.sender))),
+                value: keccak256(_message.data)
+            });
+    }
+
+    function getL2LogFromL1ToL2Transaction(
+        uint16 _l2TxNumberInBatch,
+        bytes32 _l2TxHash,
+        TxStatus _status
+    ) internal pure returns (L2Log memory l2Log) {
+        // Bootloader sends an L2 -> L1 log only after processing the L1 -> L2 transaction.
+        // Thus, we can verify that the L1 -> L2 transaction was included in the L2 batch with specified status.
+        //
+        // The semantics of such L2 -> L1 log is always:
+        // - sender = L2_BOOTLOADER_ADDRESS
+        // - key = hash(L1ToL2Transaction)
+        // - value = status of the processing transaction (1 - success & 0 - fail)
+        // - isService = true (just a conventional value)
+        // - l2ShardId = 0 (means that L1 -> L2 transaction was processed in a rollup shard, other shards are not available yet anyway)
+        // - txNumberInBatch = number of transaction in the batch
+        l2Log = L2Log({
+            l2ShardId: 0,
+            isService: true,
+            txNumberInBatch: _l2TxNumberInBatch,
+            sender: L2_BOOTLOADER_ADDRESS,
+            key: _l2TxHash,
+            value: bytes32(uint256(_status))
+        });
+    }
+
+    function getLeafHashFromLog(L2Log memory _log) internal pure returns (bytes32 hashedLog) {
+        hashedLog = keccak256(
+            // solhint-disable-next-line func-named-parameters
+            abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
+        );
+    }
 
     /// @dev Returns the leaf hash for a chain with batch number and batch root.
     /// @param batchRoot The root hash of the batch.

@@ -11,6 +11,8 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {IExecutor, LogProcessingOutput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 
 contract TestExecutorFacet is ExecutorFacet {
@@ -44,10 +46,11 @@ contract TestExecutorFacet is ExecutorFacet {
     function test() internal virtual {}
 }
 
-contract ExecutorProofTest is Test {
+contract ExecutorProofTest is UtilsCallMockerTest {
     UtilsFacet internal utilsFacet;
     TestExecutorFacet internal executor;
     address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    DummyBridgehub internal dummyBridgehub;
 
     function getTestExecutorFacetSelectors() private pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](3);
@@ -71,8 +74,11 @@ contract ExecutorProofTest is Test {
             isFreezable: true,
             selectors: Utils.getUtilsFacetSelectors()
         });
+        bytes32 baseTokenAssetId = bytes32(uint256(uint160(makeAddr("baseTokenAssetId"))));
+        dummyBridgehub = new DummyBridgehub();
+        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), baseTokenAssetId);
 
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
+        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, address(dummyBridgehub));
         executor = TestExecutorFacet(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }
@@ -121,15 +127,15 @@ contract ExecutorProofTest is Test {
         );
         assertEq(
             nextCommitment,
-            0x9fae89899313dc524150960147a32da2521608231cb39e2741b2ca13435d3f12,
+            0x34fb9fa208735dbedb259d815c79e77427a5af4b4c3c4898a98a0a6a5f1586ad,
             "nextCommitment computation failed"
         );
 
         bytes32 prevCommitment = 0x8199d18dbc01ea80a635f515d6a12312daa1aa32b5404944477dcd41fd7b2bdf;
         uint256 result = executor.getBatchProofPublicInput(prevCommitment, nextCommitment);
-        assertEq(result, 0xC09291737B046C329198E1BEE081240EAFC26B675F0124BFB2A12FA6, "getBatchProofPublicInput");
+        assertEq(result, 0xB29C9ADF0177455F74D0A0F38065E77A6D425370D418CD37DBF3EAA0, "getBatchProofPublicInput");
     }
 
     // add this to be excluded from coverage report
-    function test() internal {}
+    function test() internal override {}
 }

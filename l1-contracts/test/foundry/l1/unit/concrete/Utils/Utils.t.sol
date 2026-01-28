@@ -5,10 +5,12 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, L2_TO_L1_MESSENGER, SystemLogKey, Utils, L2_DA_COMMITMENT_SCHEME} from "./Utils.sol";
 
+import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+
 // solhint-enable max-line-length
 
-contract UtilsTest is Test {
-    function test_PackBatchTimestampAndBlockTimestamp() public {
+contract UtilsTest is UtilsCallMockerTest {
+    function test_PackBatchTimestampAndBlockTimestamp() public virtual {
         uint64 batchTimestamp = 0x12345678;
         uint64 blockTimestamp = 0x87654321;
         bytes32 packedBytes = Utils.packBatchTimestampAndBlockTimestamp(batchTimestamp, blockTimestamp);
@@ -20,7 +22,7 @@ contract UtilsTest is Test {
         );
     }
 
-    function test_ConstructL2Log() public {
+    function test_ConstructL2Log() public virtual {
         bytes memory l2Log = Utils.constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -41,10 +43,10 @@ contract UtilsTest is Test {
         );
     }
 
-    function test_CreateSystemLogs() public {
+    function test_CreateSystemLogs() public virtual {
         bytes[] memory logs = Utils.createSystemLogs(bytes32(0));
 
-        assertEq(logs.length, 9, "logs length should be correct");
+        assertEq(logs.length, 10, "logs length should be correct");
 
         assertEq(
             logs[0],
@@ -147,5 +149,5 @@ contract UtilsTest is Test {
     }
 
     // add this to be excluded from coverage report
-    function test() internal virtual {}
+    function test() internal virtual override {}
 }

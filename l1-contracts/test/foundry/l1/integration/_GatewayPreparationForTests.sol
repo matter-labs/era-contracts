@@ -1,12 +1,15 @@
 import {stdToml} from "forge-std/StdToml.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
+// import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+// import {IBridgehub} from "contracts/core/bridgehub/IBridgehub.sol";
+// import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {GatewayGovernanceUtils} from "deploy-scripts/gateway/GatewayGovernanceUtils.s.sol";
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {DeployGatewayTransactionFilterer} from "deploy-scripts/gateway/DeployGatewayTransactionFilterer.s.sol";
 
-import {ChainInfoFromBridgehub, Utils} from "deploy-scripts/Utils.sol";
+import {ChainInfoFromBridgehub, Utils} from "deploy-scripts/utils/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {AdminFunctions} from "deploy-scripts/AdminFunctions.s.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -21,11 +24,33 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         string memory toml = vm.readFile(path);
 
         uint256 gatewayChainId = toml.readUint("$.chain.chain_chain_id");
+        gatewayChainId = 506; //toml.readUint("$.chain.chain_chain_id");
+        // // currently there is a single gateway test file.
+        // console.log("Gateway chain id skipped value = %s", toml.readUint("$.chain.chain_chain_id"));
 
         // Grab config from output of l1 deployment
-        path = string.concat(root, vm.envString("L1_OUTPUT"));
+        path = string.concat(root, vm.envString("CTM_OUTPUT"));
         toml = vm.readFile(path);
 
+        // config.gatewayChainId = 506; //toml.readUint("$.chain.chain_chain_id");
+        // currently there is a single gateway test file.
+        // console.log("Gateway chain id skipped value = %s", toml.readUint("$.chain.chain_chain_id"));
+
+        // path = string.concat(root, vm.envString("GATEWAY_AS_CHAIN_OUTPUT"));
+        // toml = vm.readFile(path);
+
+        // config.gatewayChainAdmin = IZKChain(IBridgehubBase(config.bridgehub).getZKChain(config.gatewayChainId)).getAdmin();
+        // // toml.readAddress("$.chain_admin_addr");
+        // config.gatewayChainProxyAdmin = toml.readAddress("$.chain_proxy_admin_addr");
+        // config.gatewayAccessControlRestriction = toml.readAddress(
+        //     "$.deployed_addresses.access_control_restriction_addr"
+        // );
+        // config.l1NullifierProxy = address(IL1AssetRouter(IBridgehubBase(config.bridgehub).assetRouter()).L1_NULLIFIER());
+
+        // console.log("chain chain id = ", config.gatewayChainId);
+
+        // // This value is never checked in the integration tests
+        // config.gatewayDiamondCutData = hex"";
         _initializeGatewayGovernanceConfig(
             GatewayGovernanceConfig({
                 bridgehubProxy: toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr"),
@@ -60,13 +85,11 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         vm.stopBroadcast();
 
         // The values provided here are dummy, but allow the test to be run smoothly
+        // Note: create2FactoryAddress and create2FactorySalt are read from permanent-values.toml
         address transactionFiltererProxy = deployer.run(
             _gatewayGovernanceConfig.bridgehubProxy,
             chainInfo.admin,
-            address(proxyAdmin),
-            // Unknown
-            address(0),
-            bytes32(0)
+            address(proxyAdmin)
         );
 
         AdminFunctions adminScript = new AdminFunctions();

@@ -3,6 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {IZKChainBase} from "./IZKChainBase.sol";
+import {L2Log} from "../../common/Messaging.sol";
 import {L2DACommitmentScheme} from "../../common/Config.sol";
 
 /// @dev Enum used by L2 System Contracts to differentiate logs.
@@ -19,6 +20,7 @@ enum SystemLogKey {
     USED_L2_DA_VALIDATOR_ADDRESS_KEY,
     MESSAGE_ROOT_ROLLING_HASH_KEY,
     L2_TXS_STATUS_ROLLING_HASH_KEY,
+    SETTLEMENT_LAYER_CHAIN_ID_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
@@ -37,6 +39,16 @@ struct LogProcessingOutput {
 
 /// @dev Maximal value that SystemLogKey variable can have.
 uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max);
+
+/// @notice The struct passed to the assetTracker.
+struct ProcessLogsInput {
+    L2Log[] logs;
+    bytes[] messages;
+    uint256 chainId;
+    uint256 batchNumber;
+    bytes32 chainBatchRoot;
+    bytes32 messageRoot;
+}
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch)
 uint256 constant L2_LOG_ADDRESS_OFFSET = 4;
@@ -131,7 +143,7 @@ interface IExecutor is IZKChainBase {
     /// @param newStateCommitment State commitment of the new state.
     /// @dev chain state commitment, this preimage is not opened on l1,
     /// it's guaranteed that this commitment commits to any state that needed for execution
-    /// (state root, block number, bloch hashes)
+    /// (state root, block number, block hashes)
     /// @param numberOfLayer1Txs Number of priority operations to be processed
     /// @param priorityOperationsHash Hash of all priority operations from this batch
     /// @param l2LogsTreeRoot Root hash of tree that contains L2 -> L1 messages from this batch

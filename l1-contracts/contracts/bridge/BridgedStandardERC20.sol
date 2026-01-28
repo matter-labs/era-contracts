@@ -34,8 +34,8 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
     /// @notice OpenZeppelin token represents `name` and `symbol` as storage variables and `decimals` as constant.
     uint8 private decimals_;
 
-    /// @notice The l2Bridge now is deprecated, use the L2AssetRouter and L2NativeTokenVault instead.
-    /// @dev Address of the L2 bridge that is used as trustee who can mint/burn tokens
+    /// @notice The l2Bridge is deprecated, use the L2AssetRouter and L2NativeTokenVault instead.
+    /// @dev Address of the deprecated L2 bridge that was used as trustee to mint/burn tokens
     address public override l2Bridge;
 
     /// @dev Address of the token on its origin chain that can be deposited to mint this bridged token
@@ -59,18 +59,14 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
                 originToken
             );
         }
-        if (msg.sender != ntv) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == ntv, Unauthorized(msg.sender));
         _;
     }
 
     modifier onlyNextVersion(uint8 _version) {
         // The version should be incremented by 1. Otherwise, the governor risks disabling
         // future reinitialization of the token by providing too large a version.
-        if (_version != _getInitializedVersion() + 1) {
-            revert NonSequentialVersion();
-        }
+        require(_version == _getInitializedVersion() + 1, NonSequentialVersion());
         _;
     }
 
@@ -87,9 +83,7 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
     /// @param _data The additional data that the L1 bridge provide for initialization.
     /// In this case, it is packed `name`/`symbol`/`decimals` of the L1 token.
     function bridgeInitialize(bytes32 _assetId, address _originToken, bytes calldata _data) external initializer {
-        if (_originToken == address(0)) {
-            revert ZeroAddress();
-        }
+        require(_originToken != address(0), ZeroAddress());
         originToken = _originToken;
         assetId = _assetId;
 
@@ -160,9 +154,7 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         // It is expected that this token is deployed as a beacon proxy, so we'll
         // allow the governor of the beacon to reinitialize the token.
         address beaconAddress = _getBeacon();
-        if (msg.sender != UpgradeableBeacon(beaconAddress).owner()) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == UpgradeableBeacon(beaconAddress).owner(), Unauthorized(msg.sender));
 
         __ERC20_init_unchained(_newName, _newSymbol);
         __ERC20Permit_init(_newName);
@@ -189,16 +181,22 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         emit BridgeBurn(_from, _amount);
     }
 
-    /// @dev External function to decode a string from bytes.
+    /// @notice Decodes a string from ABI-encoded bytes.
+    /// @param _input The ABI-encoded bytes containing a string.
+    /// @return result The decoded string.
     function decodeString(bytes calldata _input) external pure returns (string memory result) {
         (result) = abi.decode(_input, (string));
     }
 
-    /// @dev External function to decode a uint8 from bytes.
+    /// @notice Decodes a uint8 from ABI-encoded bytes.
+    /// @param _input The ABI-encoded bytes containing a uint8.
+    /// @return result The decoded uint8 value.
     function decodeUint8(bytes calldata _input) external pure returns (uint8 result) {
         (result) = abi.decode(_input, (uint8));
     }
 
+    /// @notice Returns the token name, reverts if name getter is disabled.
+    /// @return The token name string.
     function name() public view override returns (string memory) {
         // If method is not available, behave like a token that does not implement this method - revert on call.
         // solhint-disable-next-line reason-string, gas-custom-errors
@@ -206,6 +204,8 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         return super.name();
     }
 
+    /// @notice Returns the token symbol, reverts if symbol getter is disabled.
+    /// @return The token symbol string.
     function symbol() public view override returns (string memory) {
         // If method is not available, behave like a token that does not implement this method - revert on call.
         // solhint-disable-next-line reason-string, gas-custom-errors
@@ -213,6 +213,8 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         return super.symbol();
     }
 
+    /// @notice Returns the token decimals, reverts if decimals getter is disabled.
+    /// @return The number of decimals for the token.
     function decimals() public view override returns (uint8) {
         // If method is not available, behave like a token that does not implement this method - revert on call.
         // solhint-disable-next-line reason-string, gas-custom-errors

@@ -12,7 +12,7 @@ The YAML files under the `output/` directory contain critical upgrade informatio
 - `ENVIRONMENT` is the environment of the upgrade (e.g. `stage`, `testnet`, `mainnet`)
 - `VERSION` is the version of the upgrade (e.g. `v28`, or `v29.1`)
 
-For example, the YAML file for the v30.0 upgrade in the stage environment should be named something like `upgrade-envs/v0.30.0-interopB/output/stage/v30.0-ecosystem.yaml`.
+For example, the YAML file for the v31.0 upgrade in the stage environment should be named something like `upgrade-envs/v0.30.0-interopB/output/stage/v31.0-ecosystem.yaml`.
 
 ## Generating inputs
 

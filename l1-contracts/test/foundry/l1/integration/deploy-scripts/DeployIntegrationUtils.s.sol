@@ -6,11 +6,17 @@ pragma solidity ^0.8.24;
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
+import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
-abstract contract DeployIntegrationUtils is Script, DeployUtils {
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {GW_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+
+abstract contract DeployIntegrationUtils is Script, DeployCTMUtils {
     using stdToml for string;
 
     function test() internal virtual override {}
@@ -18,7 +24,9 @@ abstract contract DeployIntegrationUtils is Script, DeployUtils {
     function getInitializeCalldata(
         string memory contractName,
         bool isZKBytecode
-    ) internal virtual override returns (bytes memory);
+    ) internal virtual override returns (bytes memory) {
+        return super.getInitializeCalldata(contractName, isZKBytecode);
+    }
 
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
@@ -40,25 +48,25 @@ abstract contract DeployIntegrationUtils is Script, DeployUtils {
             bytes4[] memory executorFacetSelectorsArray = abi.decode(executorFacetSelectors, (bytes4[]));
 
             facetCuts[0] = Diamond.FacetCut({
-                facet: addresses.stateTransition.adminFacet,
+                facet: ctmAddresses.stateTransition.facets.adminFacet,
                 action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: adminFacetSelectorsArray
             });
             facetCuts[1] = Diamond.FacetCut({
-                facet: addresses.stateTransition.gettersFacet,
+                facet: ctmAddresses.stateTransition.facets.gettersFacet,
                 action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: gettersFacetSelectorsArray
             });
             facetCuts[2] = Diamond.FacetCut({
-                facet: addresses.stateTransition.mailboxFacet,
+                facet: ctmAddresses.stateTransition.facets.mailboxFacet,
                 action: Diamond.Action.Add,
                 isFreezable: true,
                 selectors: mailboxFacetSelectorsArray
             });
             facetCuts[3] = Diamond.FacetCut({
-                facet: addresses.stateTransition.executorFacet,
+                facet: ctmAddresses.stateTransition.facets.executorFacet,
                 action: Diamond.Action.Add,
                 isFreezable: true,
                 selectors: executorFacetSelectorsArray
@@ -68,7 +76,26 @@ abstract contract DeployIntegrationUtils is Script, DeployUtils {
 
     function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
+    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
         return getChainCreationFacetCuts(stateTransition);
+    }
+
+    function clearPriorityQueue(address _bridgehub, uint256 _chainId) public {
+        IZKChain chain = IZKChain(IBridgehubBase(_bridgehub).getZKChain(_chainId));
+        uint256 treeSize = chain.getPriorityQueueSize();
+        // The priorityTree sits at slot 51 of ZKChainStorage
+        // unprocessedIndex is the second field (51 + 1 = 52) in PriorityTree.Tree
+        bytes32 slot = bytes32(uint256(52));
+        uint256 value = uint256(vm.load(address(chain), slot));
+        // We modify the unprocessedIndex so that the tree size is zero
+        vm.store(address(chain), slot, bytes32(value + treeSize));
+    }
+
+    function pauseDepositsBeforeInitiatingMigration(address _bridgehub, uint256 _chainId) public {
+        IZKChain chain = IZKChain(IBridgehubBase(_bridgehub).getZKChain(_chainId));
+        uint256 l1ChainId = IL1Bridgehub(_bridgehub).L1_CHAIN_ID();
+        vm.prank(GW_ASSET_TRACKER_ADDR);
+        IMailboxImpl(address(chain)).pauseDepositsOnGateway(block.timestamp);
+        vm.warp(block.timestamp + 1);
     }
 }

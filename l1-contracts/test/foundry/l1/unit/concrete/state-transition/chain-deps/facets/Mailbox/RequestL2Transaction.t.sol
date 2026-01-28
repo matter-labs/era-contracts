@@ -3,15 +3,12 @@
 pragma solidity 0.8.28;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
-import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
+
 import {ETH_TOKEN_ADDRESS, MAX_NEW_FACTORY_DEPS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {TransactionFiltererTrue} from "contracts/dev-contracts/test/DummyTransactionFiltererTrue.sol";
-import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransactionFiltererFalse.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {GasPerPubdataMismatch, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps} from "contracts/common/L1ContractErrors.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 contract MailboxRequestL2TransactionTest is MailboxTest {
     address tempAddress;

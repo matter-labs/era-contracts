@@ -19,17 +19,12 @@ jobs:
           submodules: recursive
 
       - name: Install foundry-zksync
-        run: |
-          mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
-          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+        uses: ./.github/actions/install-zksync-foundry
 
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.18.0
+          node-version: 18.20.8
           cache: yarn
 
       - name: Install dependencies
@@ -43,7 +38,16 @@ jobs:
       - name: Build l1 contracts
         working-directory: l1-contracts
         run: |
+          rm -rf zkstack-out
           yarn build:foundry
+
+          # Fail if regenerated zkstack-out differs from what was committed
+          if [ -n "$(git status --porcelain -- zkstack-out)" ]; then
+            echo "::error::l1-contracts/zkstack-out is out of date. Run 'cd l1-contracts && yarn build:foundry' and commit the changes."
+            git --no-pager status --porcelain -- zkstack-out
+            git --no-pager diff -- zkstack-out || true
+            exit 1
+          fi
 
       - name: Build l2 contracts
         working-directory: l2-contracts
@@ -94,7 +98,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.18.0
+          node-version: 18.20.8
           cache: yarn
 
       - name: Install dependencies
@@ -117,7 +121,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.18.0
+          node-version: 18.20.8
           cache: yarn
       - name: Install dependencies
         run: yarn
@@ -146,6 +150,40 @@ jobs:
       - name: Check hashes
         run: yarn calculate-hashes:check
 
+  check-selectors:
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.20.8
+          cache: yarn
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-l1-${{ github.sha }}
+          path: |
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+
+      - name: Install foundry-zksync
+        uses: ./.github/actions/install-zksync-foundry
+
+      - name: Check selectors
+        run: yarn l1 selectors --check
+
   test-foundry:
     needs: [build, lint]
     runs-on: ubuntu-latest
@@ -159,16 +197,11 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.18.0
+          node-version: 18.20.8
           cache: yarn
 
       - name: Install foundry-zksync
-        run: |
-          mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
-          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+        uses: ./.github/actions/install-zksync-foundry
 
       - name: Install dependencies
         run: yarn
@@ -201,7 +234,7 @@ jobs:
       #   working-directory: ./l1-contracts
       #   run: forge test --match-test MeasureGas --gas-snapshot-check=true
 
-  # TODO: recover, not needed for zksync os specifically as it does not use zkEVM
+  # FIXME: uncomment once fixed.
   # test-foundry-zksync:
   #   needs: [build, lint]
   #   runs-on: ubuntu-latest
@@ -215,16 +248,11 @@ jobs:
   #     - name: Use Node.js
   #       uses: actions/setup-node@v3
   #       with:
-  #         node-version: 18.18.0
+  #         node-version: 18.20.8
   #         cache: yarn
 
   #     - name: Install foundry-zksync
-  #       run: |
-  #         mkdir ./foundry-zksync
-  #         curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
-  #         tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
-  #         chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-  #         echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+  #       uses: ./.github/actions/install-zksync-foundry
 
   #     - name: Install dependencies
   #       run: yarn
@@ -238,7 +266,6 @@ jobs:
   #         fail-on-cache-miss: true
   #         key: artifacts-l1-${{ github.sha }}
   #         path: |
-  #           da-contracts/cache-forge
   #           da-contracts/out
   #           l1-contracts/cache-forge
   #           l1-contracts/out
@@ -293,7 +320,7 @@ jobs:
     defaults:
       run:
         working-directory: l1-contracts
-    needs: [build, lint]
+    needs: [build] # TODO return lint into dependencies when it's fully fixed
     runs-on: ubuntu-latest
 
     steps:
@@ -305,16 +332,11 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.18.0
+          node-version: 18.20.8
           cache: yarn
 
       - name: Install foundry-zksync
-        run: |
-          mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
-          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+        uses: ./.github/actions/install-zksync-foundry
 
       - name: Install dependencies
         run: yarn
@@ -335,7 +357,7 @@ jobs:
             system-contracts/zkout
 
       - name: Run coverage
-        run: yarn test:foundry && yarn coverage:foundry --report summary --report lcov
+        run: yarn test:foundry --no-match-path 'test/foundry/l1/unit/concrete/Executor/*' && yarn coverage:foundry --report summary --report lcov
 
       # Installing the specific version of `lcov` because of
       # the `genhtml: ERROR: line ... of ... has branchcov but no linecov data` error.
@@ -394,7 +416,7 @@ jobs:
   #     - name: Use Node.js
   #       uses: actions/setup-node@v3
   #       with:
-  #         node-version: 18.18.0
+  #         node-version: 18.20.8
   #         cache: yarn
 
   #     - name: Install dependencies

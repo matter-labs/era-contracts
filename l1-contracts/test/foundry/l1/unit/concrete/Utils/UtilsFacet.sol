@@ -190,6 +190,62 @@ contract UtilsFacet is ZKChainBase {
         return s.l2DACommitmentScheme;
     }
 
+    function util_setSettlementLayer(address _settlementLayer) external {
+        s.settlementLayer = _settlementLayer;
+    }
+
+    function util_getSettlementLayer() external view returns (address) {
+        return s.settlementLayer;
+    }
+
+    function util_setPausedDepositsTimestamp(uint256 _timestamp) external {
+        s.pausedDepositsTimestamp = _timestamp;
+    }
+
+    function util_getPausedDepositsTimestamp() external view returns (uint256) {
+        return s.pausedDepositsTimestamp;
+    }
+
+    function util_setAssetTracker(address _assetTracker) external {
+        s.assetTracker = _assetTracker;
+    }
+
+    function util_setNativeTokenVault(address _nativeTokenVault) external {
+        s.nativeTokenVault = _nativeTokenVault;
+    }
+
+    function util_setTotalBatchesVerified(uint256 _totalBatchesVerified) external {
+        s.totalBatchesVerified = _totalBatchesVerified;
+    }
+
+    function util_getTotalBatchesVerified() external view returns (uint256) {
+        return s.totalBatchesVerified;
+    }
+
+    function util_getTotalBatchesExecuted() external view returns (uint256) {
+        return s.totalBatchesExecuted;
+    }
+
+    function util_getTotalBatchesCommitted() external view returns (uint256) {
+        return s.totalBatchesCommitted;
+    }
+
+    function util_setL2SystemContractsUpgradeBatchNumber(uint256 _batchNumber) external {
+        s.l2SystemContractsUpgradeBatchNumber = _batchNumber;
+    }
+
+    function util_getL2SystemContractsUpgradeBatchNumber() external view returns (uint256) {
+        return s.l2SystemContractsUpgradeBatchNumber;
+    }
+
+    function util_setL2SystemContractsUpgradeTxHash(bytes32 _txHash) external {
+        s.l2SystemContractsUpgradeTxHash = _txHash;
+    }
+
+    function util_getL2SystemContractsUpgradeTxHash() external view returns (bytes32) {
+        return s.l2SystemContractsUpgradeTxHash;
+    }
+
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }

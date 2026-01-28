@@ -17,21 +17,19 @@ jobs:
           submodules: true
 
       - name: Install foundry-zksync
-        run: |
-          mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
-          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+        uses: ./.github/actions/install-zksync-foundry
 
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18.18.0
+          node-version: 18.20.8
           cache: yarn
 
       - name: Install dependencies
         run: yarn
+
+      - name: Build da-contracts artifacts
+        run: yarn da build:foundry
 
       - name: Build artifacts
         run: yarn l1 build:foundry
@@ -41,9 +39,6 @@ jobs:
 
       - name: Build l2 artifacts
         run: yarn l2 build:foundry
-
-      - name: Build da-contracts artifacts
-        run: yarn da build:foundry
 
       - name: Create cache
         uses: actions/cache/save@v4
@@ -70,7 +65,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18.18.0
+          node-version: 18.20.8
           cache: yarn
 
       - name: Install dependencies
@@ -93,6 +88,10 @@ jobs:
 
       - name: Use Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        # Using "stable" channel leads to issues with files not being opened for writing.
+        # Before removing specific version, ensure the issue is resolved.
+        with:
+          version: "v1.4.0"
 
       - name: Copy configs from template
         working-directory: ./l1-contracts
@@ -122,7 +121,7 @@ jobs:
       - name: Run DeployL1CoreContracts script
         working-directory: ./l1-contracts
         # First we need to deploy the ecosystem contracts
-        run: forge script ./deploy-scripts/DeployL1CoreContracts.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY --skip '*/l1-contracts/contracts/*'
+        run: forge script ./deploy-scripts/ecosystem/DeployL1CoreContracts.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY --skip '*/l1-contracts/contracts/*'
 
       - name: Read bridgehub proxy address
         id: read-bridgehub
@@ -146,7 +145,7 @@ jobs:
       - name: Run DeployCTM script with bridgehub
         working-directory: ./l1-contracts
         run: |
-          forge script ./deploy-scripts/DeployCTM.s.sol \
+          forge script ./deploy-scripts/ctm/DeployCTM.s.sol \
             --ffi \
             --rpc-url $ANVIL_RPC_URL \
             --broadcast \
@@ -156,13 +155,13 @@ jobs:
 
       - name: Run DeployErc20 script
         working-directory: ./l1-contracts
-        run: forge script ./deploy-scripts/DeployErc20.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+        run: forge script ./deploy-scripts/tokens/DeployErc20.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
 # TODO restore scripts verification
 #      - name: Run RegisterZKChain script
 #        working-directory: ./l1-contracts
 #        run: |
 #          cat ./script-out/output-deploy-l1.toml >> ./script-config/register-zk-chain.toml
-#          forge script ./deploy-scripts/RegisterZKChain.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+#          forge script ./deploy-scripts/ctm/RegisterZKChain.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
 #      - name: Run InitializeL2WethToken script
 #        working-directory: ./l1-contracts-foundry
-#        run: forge script ./deploy-scripts/InitializeL2WethToken.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+#        run: forge script ./deploy-scripts/chain/InitializeL2WethToken.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY

@@ -10,9 +10,10 @@ import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
-import {InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, NewProtocolMajorVersionNotZero, PatchCantSetUpgradeTxn, PatchUpgradeCantSetBootloader, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetEvmEmulator, PreviousProtocolMajorVersionNotZero, PreviousUpgradeNotCleaned, PreviousUpgradeNotFinalized, ProtocolVersionMinorDeltaTooBig, ProtocolVersionTooSmall} from "./ZkSyncUpgradeErrors.sol";
+import {InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, NewProtocolMajorVersionNotZero, PatchCantSetUpgradeTxn, PatchUpgradeCantSetBootloader, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetEvmEmulator, PreviousProtocolMajorVersionNotZero, PreviousUpgradeNotCleaned, PreviousUpgradeNotFinalized, ProtocolVersionMinorDeltaTooBig, ProtocolVersionTooSmall, SettlementLayerUpgradeMustPrecedeChainUpgrade} from "./ZkSyncUpgradeErrors.sol";
 import {TimeNotReached, TooManyFactoryDeps} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
+import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
 /// @notice The struct that represents the upgrade proposal.
 /// @param l2ProtocolUpgradeTx The system upgrade transaction.
@@ -40,6 +41,8 @@ struct ProposedUpgrade {
     uint256 upgradeTimestamp;
     uint256 newProtocolVersion;
 }
+
+error UpgradeInnerFailed();
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -75,7 +78,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// do not validate any variants about the upgrade transaction or generally don't do anything related to the upgrade transaction.
     /// Updates on diamond proxy located not on settlement layer are needed to ensure that the logic of the contracts remains compatible with
     /// the diamond proxy on the settlement layer and so are still needed to update facets, verifiers and so on.
-    function upgrade(ProposedUpgrade calldata _proposedUpgrade) public virtual returns (bytes32 txHash) {
+    function upgrade(ProposedUpgrade memory _proposedUpgrade) public virtual returns (bytes32 txHash) {
         // Note that due to commitment delay, the timestamp of the L2 upgrade batch may be earlier than the timestamp
         // of the L1 block at which the upgrade occurred. This means that using timestamp as a signifier of "upgraded"
         // on the L2 side would be inaccurate. The effects of this "back-dating" of L2 upgrade batches will be reduced
@@ -85,6 +88,13 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         }
         // If settlement layer is 0, it means that this diamond proxy is located on the settlement layer.
         bool isOnSettlementLayer = s.settlementLayer == address(0);
+
+        if (!isOnSettlementLayer) {
+            require(
+                _proposedUpgrade.newProtocolVersion <= IZKChain(s.settlementLayer).getProtocolVersion(),
+                SettlementLayerUpgradeMustPrecedeChainUpgrade()
+            );
+        }
 
         (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(
             _proposedUpgrade.newProtocolVersion,
@@ -194,7 +204,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
 
     /// @notice Change the verifier parameters
     /// @param _newVerifierParams New parameters for the verifier
-    function _setVerifierParams(VerifierParams calldata _newVerifierParams) private {
+    function _setVerifierParams(VerifierParams memory _newVerifierParams) private {
         // An upgrade to the verifier params must be done carefully to ensure there aren't batches in the committed state
         // during the transition. If verifier is upgraded, it will immediately be used to prove all committed batches.
         // Batches committed expecting the old verifier params will fail. Ensure all committed batches are finalized before the
@@ -215,7 +225,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// @notice Updates the verifier and the verifier params
     /// @param _newVerifier The address of the new verifier. If 0, the verifier will not be updated.
     /// @param _verifierParams The new verifier params. If all of the fields are 0, the params will not be updated.
-    function _upgradeVerifier(address _newVerifier, VerifierParams calldata _verifierParams) internal {
+    function _upgradeVerifier(address _newVerifier, VerifierParams memory _verifierParams) internal {
         _setVerifier(IVerifier(_newVerifier));
         _setVerifierParams(_verifierParams);
     }
@@ -244,7 +254,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// @param _patchOnly Whether only the patch part of the protocol version semver has changed.
     /// @return System contracts upgrade transaction hash. Zero if no upgrade transaction is set.
     function _setL2SystemContractUpgrade(
-        L2CanonicalTransaction calldata _l2ProtocolUpgradeTx,
+        L2CanonicalTransaction memory _l2ProtocolUpgradeTx,
         uint32 _newMinorProtocolVersion,
         bool _patchOnly
     ) internal returns (bytes32) {
@@ -293,7 +303,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// @dev Note, that unlike normal L1->L2 transactions, factory dependencies for
     /// an upgrade transaction should be made available prior to the upgrade via publishing those
     /// to the `BytecodesSupplier` contract.
-    function _verifyFactoryDeps(uint256[] calldata _hashes) private pure {
+    function _verifyFactoryDeps(uint256[] memory _hashes) private pure {
         if (_hashes.length > MAX_NEW_FACTORY_DEPS) {
             revert TooManyFactoryDeps();
         }
@@ -308,7 +318,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     ) internal virtual returns (uint32 newMinorVersion, bool patchOnly) {
         uint256 previousProtocolVersion = s.protocolVersion;
         if (_newProtocolVersion <= previousProtocolVersion) {
-            revert ProtocolVersionTooSmall();
+            revert ProtocolVersionTooSmall(previousProtocolVersion, _newProtocolVersion);
         }
         // slither-disable-next-line unused-return
         (uint32 previousMajorVersion, uint32 previousMinorVersion, ) = SemVer.unpackSemVer(
@@ -362,11 +372,11 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// Typically this function will never be used.
     /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each
     /// upgrade.
-    function _upgradeL1Contract(bytes calldata _customCallDataForUpgrade) internal virtual {}
+    function _upgradeL1Contract(bytes memory _customCallDataForUpgrade) internal virtual {}
 
     /// @notice placeholder function for custom logic for post-upgrade logic.
     /// Typically this function will never be used.
     /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each
     /// upgrade.
-    function _postUpgrade(bytes calldata _customCallDataForUpgrade) internal virtual {}
+    function _postUpgrade(bytes memory _customCallDataForUpgrade) internal virtual {}
 }

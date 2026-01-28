@@ -1,0 +1,14 @@
+era_chain_id = 270
+
+[core_contracts]
+bridgehub_proxy_addr = "0xC0F09Cb637DCfDe54D8B7b5170736Ec21aBB33cd"
+
+[ctm_contracts]
+ctm_proxy_addr = "0x7f5401a0a0340f6a68fe3162e7bb3a57e262d18e"
+rollup_da_manager = "0xeb7c0daaddfb52afa05400b489e7497b271d6122"
+l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
+
+[permanent_contracts]
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+create2_factory_salt = "0x0000000000000000000000000000000000000000000000000000000000000000"
+

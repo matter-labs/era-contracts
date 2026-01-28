@@ -82,7 +82,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         ERA_CHAIN_ID = _eraChainId;
     }
 
-    /// @dev Initializes the reentrancy guard. Expected to be used in the proxy.
+    /// @notice Initializes the reentrancy guard for the proxy implementation.
     function initialize() external reentrancyGuardInitializer {}
 
     /*//////////////////////////////////////////////////////////////
@@ -131,9 +131,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
-        if (isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex]) {
-            revert WithdrawalAlreadyFinalized();
-        }
+        require(!isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex], WithdrawalAlreadyFinalized());
         // We don't need to set finalizeWithdrawal here, as we set it in the L1 Nullifier
 
         FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
@@ -149,7 +147,6 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     }
 
     /// @notice Initiates a deposit by locking funds on the contract and sending the request
-    /// @dev Initiates a deposit by locking funds on the contract and sending the request
     /// of processing an L2 transaction where tokens would be minted
     /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the
     /// newly-deployed token does not support any custom logic, i.e. rebase tokens' functionality is not supported.
@@ -181,18 +178,12 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) public payable nonReentrant returns (bytes32 l2TxHash) {
-        if (_amount == 0) {
-            // empty deposit amount
-            revert EmptyDeposit();
-        }
-        if (_l1Token == ETH_TOKEN_ADDRESS) {
-            revert ETHDepositNotSupported();
-        }
+        // empty deposit amount
+        require(_amount != 0, EmptyDeposit());
+        require(_l1Token != ETH_TOKEN_ADDRESS, ETHDepositNotSupported());
         uint256 amount = _approveFundsToAssetRouter(msg.sender, IERC20(_l1Token), _amount);
-        if (amount != _amount) {
-            // The token has non-standard transfer logic
-            revert TokensWithFeesNotSupported();
-        }
+        // The token has non-standard transfer logic
+        require(amount == _amount, TokensWithFeesNotSupported());
 
         l2TxHash = L1_ASSET_ROUTER.depositLegacyErc20Bridge{value: msg.value}({
             _originalCaller: msg.sender,
@@ -204,9 +195,8 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             _refundRecipient: _refundRecipient
         });
         // Ensuring that all the funds that were locked into this bridge were spent by the asset router / native token vault.
-        if (IERC20(_l1Token).allowance(address(this), address(L1_ASSET_ROUTER)) != 0) {
-            revert AssetRouterAllowanceNotZero();
-        }
+        uint256 allowance = IERC20(_l1Token).allowance(address(this), address(L1_ASSET_ROUTER));
+        require(allowance == 0, AssetRouterAllowanceNotZero());
         depositAmount[msg.sender][_l1Token][l2TxHash] = _amount;
         emit DepositInitiated({
             l2DepositTxHash: l2TxHash,
@@ -223,6 +213,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
     /// @dev Transfers tokens from the depositor address to this contract and force approves those
     /// to the asset router address.
+    /// @param _from The address to transfer tokens from.
+    /// @param _token The ERC20 token to transfer.
+    /// @param _amount The amount of tokens to transfer.
     /// @return The difference between the contract balance before and after the transferring of funds.
     function _approveFundsToAssetRouter(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
         uint256 balanceBefore = _token.balanceOf(address(this));
@@ -252,9 +245,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     ) external nonReentrant {
         uint256 amount = depositAmount[_depositSender][_l1Token][_l2TxHash];
         // empty deposit
-        if (amount == 0) {
-            revert EmptyDeposit();
-        }
+        require(amount != 0, EmptyDeposit());
         delete depositAmount[_depositSender][_l1Token][_l2TxHash];
 
         L1_NULLIFIER.claimFailedDepositLegacyErc20Bridge({
@@ -274,6 +265,8 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
                             ERA LEGACY GETTERS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Calculates the L2 token address for a given L1 token using CREATE2.
+    /// @param _l1Token The L1 token address to calculate the L2 counterpart for.
     /// @return The L2 token address that would be minted for deposit of the given L1 token on ZKsync Era.
     function l2TokenAddress(address _l1Token) external view returns (address) {
         bytes32 constructorInputHash = keccak256(abi.encode(l2TokenBeacon, ""));

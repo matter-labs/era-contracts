@@ -6,13 +6,14 @@ import "forge-std/console.sol";
 import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {L2Message} from "contracts/common/Messaging.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 
 contract L1AssetRouterLegacyTest is L1AssetRouterTest {
     function test_depositLegacyERC20Bridge() public {
@@ -54,7 +55,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         vm.deal(address(sharedBridge), amount);
 
         /// storing chainBalance
-        _setNativeTokenVaultChainBalance(eraChainId, ETH_TOKEN_ADDRESS, amount);
+        _setAssetTrackerChainBalance(eraChainId, ETH_TOKEN_ADDRESS, amount);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehubBase.baseToken.selector),
@@ -69,10 +70,10 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehubBase.proveL2MessageInclusion.selector,
+                IMessageVerification.proveL2MessageInclusionShared.selector,
                 eraChainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -100,7 +101,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
 
     function test_finalizeWithdrawalLegacyErc20Bridge_ErcOnEth() public {
         /// storing chainBalance
-        _setNativeTokenVaultChainBalance(eraChainId, address(token), amount);
+        _setAssetTrackerChainBalance(eraChainId, address(token), amount);
 
         // solhint-disable-next-line func-named-parameters
         bytes memory message = abi.encodePacked(
@@ -116,10 +117,10 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehubBase.proveL2MessageInclusion.selector,
+                IMessageVerification.proveL2MessageInclusionShared.selector,
                 eraChainId,
                 l2BatchNumber,
                 l2MessageIndex,

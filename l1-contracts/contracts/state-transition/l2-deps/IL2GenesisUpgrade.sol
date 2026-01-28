@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {TokenMetadata, TokenBridgingData} from "../../common/Messaging.sol";
+
 /// @notice A struct that describes a forced deployment on an address
 struct ForceDeployment {
     // The bytecode hash to put on an address
@@ -17,14 +19,13 @@ struct ForceDeployment {
 
 // solhint-disable-next-line gas-struct-packing
 struct ZKChainSpecificForceDeploymentsData {
-    bytes32 baseTokenAssetId;
     address l2LegacySharedBridge;
     address predeployedL2WethAddress;
     address baseTokenL1Address;
     /// @dev Some info about the base token, it is
     /// needed to deploy weth token in case it is not present
-    string baseTokenName;
-    string baseTokenSymbol;
+    TokenMetadata baseTokenMetadata;
+    TokenBridgingData baseTokenBridgingData;
 }
 
 /// @notice The structure that describes force deployments that are the same for each chain.
@@ -33,6 +34,7 @@ struct ZKChainSpecificForceDeploymentsData {
 // solhint-disable-next-line gas-struct-packing
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
+    uint256 gatewayChainId;
     uint256 eraChainId;
     address l1AssetRouter;
     bytes32 l2TokenProxyBytecodeHash;
@@ -43,9 +45,13 @@ struct FixedForceDeploymentsData {
     bytes l2NtvBytecodeInfo;
     bytes messageRootBytecodeInfo;
     bytes chainAssetHandlerBytecodeInfo;
+    bytes interopCenterBytecodeInfo;
+    bytes interopHandlerBytecodeInfo;
+    bytes assetTrackerBytecodeInfo;
     bytes beaconDeployerInfo;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
+    address aliasedChainRegistrationSender;
     // The forced beacon address. It is needed only for internal testing.
     // MUST be equal to 0 in production.
     // It will be the job of the governance to ensure that this value is set correctly.

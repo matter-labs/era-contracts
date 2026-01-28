@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {L1Erc20BridgeTest} from "./_L1Erc20Bridge_Shared.t.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+
 import {EmptyDeposit} from "contracts/common/L1ContractErrors.sol";
 
 contract ClaimFailedDepositTest is L1Erc20BridgeTest {

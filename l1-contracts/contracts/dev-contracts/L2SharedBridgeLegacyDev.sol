@@ -7,7 +7,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {BridgedStandardERC20} from "../bridge/BridgedStandardERC20.sol";
 
 import {L2SharedBridgeLegacy} from "../bridge/L2SharedBridgeLegacy.sol";
-import {AmountMustBeGreaterThanZero, DeployFailed, EmptyBytes32, InvalidCaller, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {EmptyBytes32, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 contract L2SharedBridgeLegacyDev is L2SharedBridgeLegacy {
     constructor() L2SharedBridgeLegacy() {}

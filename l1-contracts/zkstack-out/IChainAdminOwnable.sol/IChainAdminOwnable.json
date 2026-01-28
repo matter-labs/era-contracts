@@ -1,0 +1,171 @@
+[
+  {
+    "type": "function",
+    "name": "multicall",
+    "inputs": [
+      {
+        "name": "_calls",
+        "type": "tuple[]",
+        "internalType": "struct IChainAdminOwnable.Call[]",
+        "components": [
+          {
+            "name": "target",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "value",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      },
+      {
+        "name": "_requireSuccess",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "setTokenMultiplier",
+    "inputs": [
+      {
+        "name": "_chainContract",
+        "type": "address",
+        "internalType": "contract IAdmin"
+      },
+      {
+        "name": "_nominator",
+        "type": "uint128",
+        "internalType": "uint128"
+      },
+      {
+        "name": "_denominator",
+        "type": "uint128",
+        "internalType": "uint128"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setTokenMultiplierSetter",
+    "inputs": [
+      {
+        "name": "_tokenMultiplierSetter",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setUpgradeTimestamp",
+    "inputs": [
+      {
+        "name": "_protocolVersion",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_upgradeTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "CallExecuted",
+    "inputs": [
+      {
+        "name": "_call",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct IChainAdminOwnable.Call",
+        "components": [
+          {
+            "name": "target",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "value",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      },
+      {
+        "name": "_success",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      },
+      {
+        "name": "_returnData",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "NewTokenMultiplierSetter",
+    "inputs": [
+      {
+        "name": "_oldTokenMultiplierSetter",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "_newTokenMultiplierSetter",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "UpdateUpgradeTimestamp",
+    "inputs": [
+      {
+        "name": "_protocolVersion",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "_upgradeTimestamp",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  }
+]

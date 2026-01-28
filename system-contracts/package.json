@@ -52,14 +52,14 @@
     ]
   },
   "scripts": {
-    "build": "yarn build:system-contracts && yarn build:bootloader",
-    "build:foundry": "yarn preprocess:emulator && yarn preprocess:system-contracts && forge build --zksync && yarn preprocess:bootloader && forge build --zksync",
+    "build": "yarn preprocess:emulator && yarn preprocess:system-contracts && forge build --zksync && yarn preprocess:bootloader && forge build --zksync",
+    "build:foundry": "yarn build",
     "build:bootloader": "yarn preprocess:bootloader && yarn compile-yul compile-bootloader",
     "build:system-contracts": "yarn preprocess:emulator && yarn preprocess:system-contracts && hardhat compile && yarn compile-yul compile-precompiles",
     "build:test-system-contracts": "yarn preprocess:system-contracts --test-mode && hardhat compile && yarn compile-yul compile-precompiles && yarn compile-zasm",
     "clean": "yarn clean:bootloader && yarn clean:system-contracts",
     "clean:bootloader": "rm -rf ./bootloader/build ./bootloader/tests/artifacts",
-    "clean:system-contracts": "rm -rf ./contracts-preprocessed && hardhat clean",
+    "clean:system-contracts": "rm -rf ./contracts-preprocessed && hardhat clean && forge clean",
     "compile-yul": "ts-node scripts/compile-yul.ts",
     "compile-zasm": "ts-node scripts/compile-zasm.ts",
     "deploy-preimages": "ts-node scripts/deploy-preimages.ts",

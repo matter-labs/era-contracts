@@ -16,7 +16,7 @@ import {IL2AssetRouter} from "./asset-router/IL2AssetRouter.sol";
 import {IL2NativeTokenVault} from "./ntv/IL2NativeTokenVault.sol";
 
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
-import {AmountMustBeGreaterThanZero, DeployFailed, EmptyBytes32, InvalidCaller, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {AmountMustBeGreaterThanZero, DeployFailed, EmptyBytes32, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -44,16 +44,12 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
     address public override l1Bridge;
 
     modifier onlyNTV() {
-        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == L2_NATIVE_TOKEN_VAULT_ADDR, Unauthorized(msg.sender));
         _;
     }
 
     modifier onlyAssetRouter() {
-        if (msg.sender != L2_ASSET_ROUTER_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == L2_ASSET_ROUTER_ADDR, Unauthorized(msg.sender));
         _;
     }
 
@@ -70,17 +66,11 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         bytes32 _l2TokenProxyBytecodeHash,
         address _aliasedOwner
     ) external reinitializer(2) {
-        if (_l1SharedBridge == address(0)) {
-            revert ZeroAddress();
-        }
+        require(_l1SharedBridge != address(0), ZeroAddress());
 
-        if (_l2TokenProxyBytecodeHash == bytes32(0)) {
-            revert EmptyBytes32();
-        }
+        require(_l2TokenProxyBytecodeHash != bytes32(0), EmptyBytes32());
 
-        if (_aliasedOwner == address(0)) {
-            revert ZeroAddress();
-        }
+        require(_aliasedOwner != address(0), ZeroAddress());
 
         l1SharedBridge = _l1SharedBridge;
 
@@ -95,21 +85,19 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         }
     }
 
-    /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
+    /// @notice Initiates a withdrawal by burning funds and sending the message to L1
     /// where tokens would be unlocked
     /// @param _l1Receiver The account address that should receive funds on L1
     /// @param _l2Token The L2 token address which is withdrawn
     /// @param _amount The total amount of tokens to be withdrawn
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external override {
-        if (_amount == 0) {
-            revert AmountMustBeGreaterThanZero();
-        }
+        require(_amount != 0, AmountMustBeGreaterThanZero());
         IL2AssetRouter(L2_ASSET_ROUTER_ADDR).withdrawLegacyBridge(_l1Receiver, _l2Token, _amount, msg.sender);
     }
 
     /// @notice Finalize the deposit and mint funds
     /// @param _l1Sender The account address that initiated the deposit on L1
-    /// @param _l2Receiver The account address that would receive minted ether
+    /// @param _l2Receiver The account address that would receive minted tokens
     /// @param _l1Token The address of the token that was locked on the L1
     /// @param _amount Total amount of tokens deposited from L1
     /// @param _data The additional data that user can pass with the deposit
@@ -125,7 +113,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
             AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1Bridge &&
             AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1SharedBridge
         ) {
-            revert InvalidCaller(msg.sender);
+            revert Unauthorized(msg.sender);
         }
 
         IL2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDepositLegacyBridge({
@@ -169,9 +157,11 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         salt = bytes32(uint256(uint160(_l1Token)));
     }
 
-    /// @dev Deploy the beacon proxy for the L2 token, while using ContractDeployer system contract.
+    /// @notice Deploys a beacon proxy for an L2 token using the ContractDeployer system contract.
     /// @dev This function uses raw call to ContractDeployer to make sure that exactly `l2TokenProxyBytecodeHash` is used
     /// for the code of the proxy.
+    /// @param salt The salt used for CREATE2 deployment to ensure deterministic addresses.
+    /// @return proxy The address of the deployed beacon proxy contract.
     function deployBeaconProxy(bytes32 salt) external onlyNTV returns (address proxy) {
         (bool success, bytes memory returndata) = SystemContractsCaller.systemCallWithReturndata(
             uint32(gasleft()),
@@ -184,12 +174,13 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         );
 
         // The deployment should be successful and return the address of the proxy
-        if (!success) {
-            revert DeployFailed();
-        }
+        require(success, DeployFailed());
         proxy = abi.decode(returndata, (address));
     }
 
+    /// @notice Sends a message from to L1.
+    /// @param _message The message data to send to L1.
+    /// @return The hash of the sent message.
     function sendMessageToL1(bytes calldata _message) external override onlyAssetRouter returns (bytes32) {
         // slither-disable-next-line unused-return
         return L2ContractHelper.sendMessageToL1(_message);

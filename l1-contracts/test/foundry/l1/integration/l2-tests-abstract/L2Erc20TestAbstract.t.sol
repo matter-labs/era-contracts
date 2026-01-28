@@ -3,54 +3,36 @@
 pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
-import {Test} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
-
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
-import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+
+import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
+import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {SystemContractsArgs} from "./Utils.sol";
+import {InteropCall, InteropCallStarter} from "contracts/common/Messaging.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
 abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
-    function performDeposit(address depositor, address receiver, uint256 amount) internal {
-        vm.prank(aliasedL1AssetRouter);
-        L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDeposit({
-            _l1Sender: depositor,
-            _l2Receiver: receiver,
-            _l1Token: L1_TOKEN_ADDRESS,
-            _amount: amount,
-            _data: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
-        });
-    }
-
-    function initializeTokenByDeposit() internal returns (address l2TokenAddress) {
-        performDeposit(makeAddr("someDepositor"), makeAddr("someReeiver"), 1);
-
-        l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
-        if (l2TokenAddress == address(0)) {
-            revert("Token not initialized");
-        }
-    }
+    using stdStorage for StdStorage;
 
     function test_shouldFinalizeERC20Deposit() public {
         address depositor = makeAddr("depositor");
@@ -84,7 +66,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         assertEq(BridgedStandardERC20(l2TokenAddress).decimals(), 18);
     }
 
-    function test_governanceShouldlNotBeAbleToSkipInitializerVersions() public {
+    function test_governanceShouldNotBeAbleToSkipInitializerVersions() public {
         address l2TokenAddress = initializeTokenByDeposit();
 
         BridgedStandardERC20.ERC20Getters memory getters = BridgedStandardERC20.ERC20Getters({
@@ -101,8 +83,12 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
     function test_withdrawTokenNoRegistration() public {
         TestnetERC20Token l2NativeToken = new TestnetERC20Token("token", "T", 18);
 
-        l2NativeToken.mint(address(this), 100);
-        l2NativeToken.approve(L2_NATIVE_TOKEN_VAULT_ADDR, 100);
+        uint256 mintAmount = 100;
+        l2NativeToken.mint(address(this), mintAmount);
+        l2NativeToken.approve(L2_NATIVE_TOKEN_VAULT_ADDR, mintAmount);
+
+        // Verify initial balance
+        assertEq(l2NativeToken.balanceOf(address(this)), mintAmount, "Initial balance should be minted amount");
 
         // Basically we want all L2->L1 transactions to pass
         vm.mockCall(
@@ -113,9 +99,15 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(l2NativeToken));
 
+        // Verify asset ID is properly constructed
+        assertTrue(assetId != bytes32(0), "Asset ID should be non-zero");
+
         IL2AssetRouter(L2_ASSET_ROUTER_ADDR).withdraw(
             assetId,
-            DataEncoding.encodeBridgeBurnData(100, address(1), address(l2NativeToken))
+            DataEncoding.encodeBridgeBurnData(mintAmount, address(1), address(l2NativeToken))
         );
+
+        // After withdrawal, tokens should be burned from the sender
+        assertEq(l2NativeToken.balanceOf(address(this)), 0, "Balance should be zero after withdrawal");
     }
 }

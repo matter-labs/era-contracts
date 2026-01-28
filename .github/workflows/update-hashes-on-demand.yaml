@@ -1,0 +1,86 @@
+name: Update Hashes in PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Pull Request number to update"
+        required: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # We need full history to fetch PR branch
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Get PR branch info
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: parseInt(context.payload.inputs.pr_number, 10),
+            });
+            core.setOutput("head_ref", pr.data.head.ref);
+            core.setOutput("head_repo", pr.data.head.repo.full_name);
+
+            // We only want to allow updating PRs from this repo, not from forks
+            if (pr.data.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              core.setFailed(`PR head repo is ${pr.data.head.repo.full_name}, expected ${context.repo.owner}/${context.repo.repo}`);
+            }
+
+      - name: Checkout PR branch
+        run: |
+          git fetch origin "${{ steps.pr.outputs.head_ref }}"
+          git checkout "${{ steps.pr.outputs.head_ref }}"
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.20.8
+          cache: yarn
+
+      - name: Install foundry-zksync
+        uses: ./.github/actions/install-zksync-foundry
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Run command
+        run: |
+          set -euo pipefail
+          echo "Updating PR #${{ github.event.inputs.pr_number }} on branch ${{ steps.pr.outputs.head_ref }}"
+          git submodule update --init --recursive
+
+          yarn
+
+          yarn --cwd da-contracts build:foundry
+          yarn --cwd l1-contracts build:foundry
+          yarn --cwd l2-contracts build:foundry
+          yarn --cwd system-contracts build:foundry
+
+          yarn calculate-hashes:fix
+
+      - name: Commit and push changes
+        run: |
+          set -euo pipefail
+          git config user.name "zksync[bot]"
+          git config user.email "zksync[bot]@users.noreply.github.com"
+
+          git add AllContractsHashes.json
+          # Check if there are any changes to commit
+          git diff --cached --quiet && { echo "No hash changes to commit"; exit 0; }
+          # Push changes otherwise
+          git commit -m "chore: Updated hashes from CI"
+          git push origin HEAD

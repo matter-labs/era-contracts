@@ -10,7 +10,7 @@ import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {L2DAValidator} from "./libraries/L2DAValidator.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {COMPUTATIONAL_PRICE_FOR_PUBDATA, KNOWN_CODE_STORAGE_CONTRACT, L2_MESSAGE_ROOT, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, L2_TO_L1_LOG_SERIALIZE_SIZE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, SYSTEM_CONTEXT_CONTRACT, SystemLogKey, L2DACommitmentScheme} from "./Constants.sol";
-import {PubdataField, ReconstructionMismatch} from "./SystemContractErrors.sol";
+import {PubdataField, ReconstructionMismatch, TooManyL2ToL1Logs} from "./SystemContractErrors.sol";
 import {IL2DAValidator} from "./interfaces/IL2DAValidator.sol";
 
 /**
@@ -111,6 +111,9 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         chainedLogsHash = keccak256(abi.encode(chainedLogsHash, hashedLog));
 
         logIdInMerkleTree = numberOfLogsToProcess;
+        if (numberOfLogsToProcess >= L2_TO_L1_LOGS_MERKLE_TREE_LEAVES) {
+            revert TooManyL2ToL1Logs();
+        }
         ++numberOfLogsToProcess;
 
         emit L2ToL1LogSent(_l2ToL1Log);
