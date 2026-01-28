@@ -9,11 +9,14 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 
 import {IBridgehubBase, BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData} from "../bridgehub/IBridgehubBase.sol";
 import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
+import {TokenBridgingData} from "../../common/Messaging.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 import {IMessageRoot} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
+import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
+import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol";
 
 import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../../common/Config.sol";
 import {IncorrectChainAssetId, IncorrectSender, MigrationNotToL1, MigrationNumberAlreadySet, MigrationNumberMismatch, NotSystemContext, OnlyChain, SLHasDifferentCTM, ZKChainNotRegistered, IteratedMigrationsNotSupported} from "../bridgehub/L1BridgehubErrors.sol";
@@ -215,9 +218,24 @@ abstract contract ChainAssetHandlerBase is
 
         uint256 batchNumber = IMessageRoot(_messageRoot()).currentChainBatchNumber(bridgehubBurnData.chainId);
 
+        bytes32 assetId = IBridgehubBase(_bridgehub()).baseTokenAssetId(bridgehubBurnData.chainId);
+        TokenBridgingData memory baseTokenBridgingData = TokenBridgingData({
+            assetId: assetId,
+            originToken: address(0),
+            originChainId: 0
+        });
+        if (block.chainid == _l1ChainId()) {
+            // We only need to define these values when migrating to GW
+            // This is so that the GW Asset Tracker can register the chain's base token
+            IL1AssetRouter l1AssetRouter = IL1AssetRouter(address(_assetRouter()));
+            INativeTokenVaultBase l1Ntv = l1AssetRouter.nativeTokenVault();
+            baseTokenBridgingData.originToken = l1Ntv.originToken(assetId);
+            baseTokenBridgingData.originChainId = l1Ntv.originChainId(assetId);
+        }
+
         BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
             chainId: bridgehubBurnData.chainId,
-            baseTokenAssetId: IBridgehubBase(_bridgehub()).baseTokenAssetId(bridgehubBurnData.chainId),
+            baseTokenBridgingData: baseTokenBridgingData,
             batchNumber: batchNumber,
             ctmData: ctmMintData,
             chainData: chainMintData,
@@ -257,7 +275,7 @@ abstract contract ChainAssetHandlerBase is
         (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeMint(
             _assetId,
             bridgehubMintData.chainId,
-            bridgehubMintData.baseTokenAssetId
+            bridgehubMintData.baseTokenBridgingData
         );
 
         bool contractAlreadyDeployed = zkChain != address(0);
