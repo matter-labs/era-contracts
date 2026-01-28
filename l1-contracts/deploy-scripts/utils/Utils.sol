@@ -1043,18 +1043,8 @@ library Utils {
         string memory fileName,
         string memory contractName
     ) internal view returns (bytes memory) {
-        // kl todo add contracts path here
-        string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
-
-        string memory path = string.concat(
-            "/",
-            CONTRACTS_PATH,
-            "/system-contracts/zkout/",
-            fileName,
-            "/",
-            contractName,
-            ".json"
-        );
+        // Use relative path from l1-contracts to system-contracts
+        string memory path = string.concat("/../system-contracts/zkout/", fileName, "/", contractName, ".json");
         bytes memory bytecode = readFoundryBytecode(path);
         return bytecode;
     }
