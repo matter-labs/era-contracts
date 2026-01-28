@@ -56,7 +56,13 @@ contract GatewayGovernanceUtilsForTest is GatewayGovernanceUtils {
 /// @title GatewayVotePreparationTests
 /// @notice Integration tests for GatewayVotePreparation functionality
 /// @dev Tests the GatewayGovernanceUtils functions which are core to GatewayVotePreparation
-contract GatewayVotePreparationTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
+contract GatewayVotePreparationTests is
+    L1ContractDeployer,
+    ZKChainDeployer,
+    TokenDeployer,
+    L2TxMocker,
+    GatewayDeployer
+{
     uint256 constant TEST_USERS_COUNT = 5;
     address[] public users;
 
@@ -104,12 +110,17 @@ contract GatewayVotePreparationTests is L1ContractDeployer, ZKChainDeployer, Tok
 
         gatewayGovernanceUtils.initializeGatewayGovernanceConfigPublic(config);
 
-        GatewayGovernanceUtils.GatewayGovernanceConfig memory storedConfig = gatewayGovernanceUtils.getGatewayGovernanceConfig();
+        GatewayGovernanceUtils.GatewayGovernanceConfig memory storedConfig = gatewayGovernanceUtils
+            .getGatewayGovernanceConfig();
 
         assertEq(storedConfig.bridgehubProxy, address(addresses.bridgehub), "Bridgehub proxy mismatch");
         assertEq(storedConfig.l1AssetRouterProxy, address(addresses.sharedBridge), "L1AssetRouter proxy mismatch");
         assertEq(storedConfig.chainTypeManagerProxy, address(addresses.chainTypeManager), "CTM proxy mismatch");
-        assertEq(storedConfig.ctmDeploymentTrackerProxy, address(addresses.ctmDeploymentTracker), "CTMDeploymentTracker proxy mismatch");
+        assertEq(
+            storedConfig.ctmDeploymentTrackerProxy,
+            address(addresses.ctmDeploymentTracker),
+            "CTMDeploymentTracker proxy mismatch"
+        );
         assertEq(storedConfig.gatewayChainId, gatewayChainId, "Gateway chain ID mismatch");
     }
 
@@ -159,15 +170,16 @@ contract GatewayVotePreparationTests is L1ContractDeployer, ZKChainDeployer, Tok
         address dummyServerNotifier = makeAddr("serverNotifier");
         address refundRecipient = users[0];
 
-        GatewayGovernanceUtils.PrepareGatewayGovernanceCalls memory prepareStruct = GatewayGovernanceUtils.PrepareGatewayGovernanceCalls({
-            _l1GasPrice: 10 gwei,
-            _gatewayCTMAddress: dummyGatewayCTM,
-            _gatewayRollupDAManager: dummyRollupDAManager,
-            _gatewayValidatorTimelock: dummyValidatorTimelock,
-            _gatewayServerNotifier: dummyServerNotifier,
-            _refundRecipient: refundRecipient,
-            _ctmRepresentativeChainId: 0
-        });
+        GatewayGovernanceUtils.PrepareGatewayGovernanceCalls memory prepareStruct = GatewayGovernanceUtils
+            .PrepareGatewayGovernanceCalls({
+                _l1GasPrice: 10 gwei,
+                _gatewayCTMAddress: dummyGatewayCTM,
+                _gatewayRollupDAManager: dummyRollupDAManager,
+                _gatewayValidatorTimelock: dummyValidatorTimelock,
+                _gatewayServerNotifier: dummyServerNotifier,
+                _refundRecipient: refundRecipient,
+                _ctmRepresentativeChainId: 0
+            });
 
         Call[] memory calls = gatewayGovernanceUtils.prepareGatewayGovernanceCallsPublic(prepareStruct);
 
@@ -191,22 +203,26 @@ contract GatewayVotePreparationTests is L1ContractDeployer, ZKChainDeployer, Tok
         address refundRecipient = users[0];
 
         // When ctmRepresentativeChainId equals gatewayChainId, it should include register settlement layer calls
-        GatewayGovernanceUtils.PrepareGatewayGovernanceCalls memory prepareStruct = GatewayGovernanceUtils.PrepareGatewayGovernanceCalls({
-            _l1GasPrice: 10 gwei,
-            _gatewayCTMAddress: dummyGatewayCTM,
-            _gatewayRollupDAManager: dummyRollupDAManager,
-            _gatewayValidatorTimelock: dummyValidatorTimelock,
-            _gatewayServerNotifier: dummyServerNotifier,
-            _refundRecipient: refundRecipient,
-            _ctmRepresentativeChainId: gatewayChainId // Same as gateway chain ID
-        });
+        GatewayGovernanceUtils.PrepareGatewayGovernanceCalls memory prepareStruct = GatewayGovernanceUtils
+            .PrepareGatewayGovernanceCalls({
+                _l1GasPrice: 10 gwei,
+                _gatewayCTMAddress: dummyGatewayCTM,
+                _gatewayRollupDAManager: dummyRollupDAManager,
+                _gatewayValidatorTimelock: dummyValidatorTimelock,
+                _gatewayServerNotifier: dummyServerNotifier,
+                _refundRecipient: refundRecipient,
+                _ctmRepresentativeChainId: gatewayChainId // Same as gateway chain ID
+            });
 
         Call[] memory calls = gatewayGovernanceUtils.prepareGatewayGovernanceCallsPublic(prepareStruct);
 
         assertTrue(calls.length > 0, "Should generate governance calls");
 
         // First call should be to register settlement layer when ctmRepresentativeChainId == gatewayChainId
-        bytes memory expectedFirstCallData = abi.encodeCall(IL1Bridgehub.registerSettlementLayer, (gatewayChainId, true));
+        bytes memory expectedFirstCallData = abi.encodeCall(
+            IL1Bridgehub.registerSettlementLayer,
+            (gatewayChainId, true)
+        );
         assertEq(calls[0].target, address(addresses.bridgehub), "First call should target bridgehub");
         assertEq(calls[0].data, expectedFirstCallData, "First call should register settlement layer");
     }
@@ -221,15 +237,16 @@ contract GatewayVotePreparationTests is L1ContractDeployer, ZKChainDeployer, Tok
         address dummyServerNotifier = makeAddr("serverNotifier");
         address refundRecipient = users[0];
 
-        GatewayGovernanceUtils.PrepareGatewayGovernanceCalls memory prepareStruct = GatewayGovernanceUtils.PrepareGatewayGovernanceCalls({
-            _l1GasPrice: 10 gwei,
-            _gatewayCTMAddress: dummyGatewayCTM,
-            _gatewayRollupDAManager: dummyRollupDAManager,
-            _gatewayValidatorTimelock: dummyValidatorTimelock,
-            _gatewayServerNotifier: dummyServerNotifier,
-            _refundRecipient: refundRecipient,
-            _ctmRepresentativeChainId: 0
-        });
+        GatewayGovernanceUtils.PrepareGatewayGovernanceCalls memory prepareStruct = GatewayGovernanceUtils
+            .PrepareGatewayGovernanceCalls({
+                _l1GasPrice: 10 gwei,
+                _gatewayCTMAddress: dummyGatewayCTM,
+                _gatewayRollupDAManager: dummyRollupDAManager,
+                _gatewayValidatorTimelock: dummyValidatorTimelock,
+                _gatewayServerNotifier: dummyServerNotifier,
+                _refundRecipient: refundRecipient,
+                _ctmRepresentativeChainId: 0
+            });
 
         Call[] memory calls = gatewayGovernanceUtils.prepareGatewayGovernanceCallsPublic(prepareStruct);
 
