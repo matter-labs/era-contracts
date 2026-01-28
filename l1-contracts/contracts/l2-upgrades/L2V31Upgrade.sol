@@ -23,9 +23,8 @@ contract L2V31Upgrade {
         // TODO: add all setAddresses, initL2 and updateL2s from genesis upgrade.
 
         // Initialize the BaseTokenHolder balance in L2BaseToken.
-        // This is only needed on zkSync OS chains where the BaseTokenHolder approach is used.
-        // Era VM chains use a different mechanism and don't need this initialization.
-        if (_isZkSyncOS) {
+        // Era VM chains initialization only.
+        if (!_isZkSyncOS) {
             L2_BASE_TOKEN_SYSTEM_CONTRACT.initializeBaseTokenHolderBalance();
         }
     }
