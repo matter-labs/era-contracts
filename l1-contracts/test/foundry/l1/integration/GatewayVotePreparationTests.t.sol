@@ -11,14 +11,48 @@ import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {GatewayDeployer} from "./_SharedGatewayDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 
+import {GatewayVotePreparation} from "deploy-scripts/gateway/GatewayVotePreparation.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
+/// @title GatewayVotePreparationForTests
+/// @notice Test version of GatewayVotePreparation that exposes internal state for testing
+contract GatewayVotePreparationForTests is GatewayVotePreparation {
+    /// @notice Override initializeConfig to use test paths
+    function initializeConfigForTest(
+        string memory configPath,
+        string memory permanentValuesPath,
+        address bridgehubProxy,
+        uint256 ctmRepresentativeChainId
+    ) public {
+        initializeConfig(configPath, permanentValuesPath, bridgehubProxy, ctmRepresentativeChainId);
+    }
+
+    /// @notice Get the gateway chain ID from config
+    function getGatewayChainId() public view returns (uint256) {
+        return gatewayChainId;
+    }
+
+    /// @notice Get the CTM address
+    function getCTM() public view returns (address) {
+        return ctm;
+    }
+
+    /// @notice Get the refund recipient
+    function getRefundRecipient() public view returns (address) {
+        return refundRecipient;
+    }
+
+    /// @notice Get the era chain ID
+    function getEraChainId() public view returns (uint256) {
+        return eraChainId;
+    }
+}
+
 /// @title GatewayVotePreparationTests
-/// @notice Integration tests for GatewayVotePreparation functionality
-/// @dev Tests the gateway registration and governance call generation
+/// @notice Integration tests for GatewayVotePreparation script
 contract GatewayVotePreparationTests is
     L1ContractDeployer,
     ZKChainDeployer,
@@ -31,6 +65,8 @@ contract GatewayVotePreparationTests is
 
     uint256 gatewayChainId = 506;
     IZKChain gatewayChain;
+
+    GatewayVotePreparationForTests public votePreparationScript;
 
     function _generateUserAddresses() internal {
         require(users.length == 0, "Addresses already generated");
@@ -54,18 +90,47 @@ contract GatewayVotePreparationTests is
         vm.deal(ecosystemConfig.ownerAddress, 100 ether);
         gatewayChain = IZKChain(IL1Bridgehub(addresses.bridgehub).getZKChain(gatewayChainId));
         vm.deal(gatewayChain.getAdmin(), 100 ether);
+
+        // Create the GatewayVotePreparation test script
+        votePreparationScript = new GatewayVotePreparationForTests();
     }
 
-    /// @notice Test that gateway can be registered as settlement layer
-    function test_gatewayPreparationForTests_governanceRegisterGateway() public {
+    /// @notice Test that GatewayVotePreparation can initialize config correctly
+    function test_initializeConfig() public {
+        // Set up environment variables for config paths
+        string memory root = vm.projectRoot();
+        string memory configPath = string.concat(
+            root,
+            "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm.toml"
+        );
+        string memory permanentValuesPath = string.concat(
+            root,
+            "/test/foundry/l1/integration/deploy-scripts/script-config/permanent-values.toml"
+        );
+
+        // Initialize config - this should not revert
+        votePreparationScript.initializeConfigForTest(
+            configPath,
+            permanentValuesPath,
+            address(addresses.bridgehub),
+            gatewayChainId
+        );
+
+        // Verify config was loaded correctly
+        address ctmAddr = votePreparationScript.getCTM();
+        assertTrue(ctmAddr != address(0), "CTM should be set after config initialization");
+    }
+
+    /// @notice Test gateway registration using gatewayScript (existing infrastructure)
+    function test_gatewayRegistration() public {
         // Verify gateway is not whitelisted before
         bool isWhitelistedBefore = addresses.bridgehub.whitelistedSettlementLayers(gatewayChainId);
         assertFalse(isWhitelistedBefore, "Gateway should not be whitelisted initially");
 
-        // Register gateway as settlement layer using the gatewayScript
+        // Register gateway as settlement layer
         gatewayScript.governanceRegisterGateway();
 
-        // Verify gateway is now whitelisted as a settlement layer
+        // Verify gateway is now whitelisted
         assertTrue(
             addresses.bridgehub.whitelistedSettlementLayers(gatewayChainId),
             "Gateway should be whitelisted as settlement layer"
@@ -73,7 +138,7 @@ contract GatewayVotePreparationTests is
     }
 
     /// @notice Test deploying and setting the gateway transaction filterer
-    function test_gatewayPreparationForTests_deployAndSetTransactionFilterer() public {
+    function test_deployAndSetTransactionFilterer() public {
         // First register gateway
         gatewayScript.governanceRegisterGateway();
 
@@ -91,7 +156,7 @@ contract GatewayVotePreparationTests is
 
     /// @notice Test the full gateway registration flow
     function test_fullGatewayRegistrationFlow() public {
-        // First register gateway as settlement layer
+        // Register gateway as settlement layer
         gatewayScript.governanceRegisterGateway();
 
         // Deploy and set the transaction filterer
