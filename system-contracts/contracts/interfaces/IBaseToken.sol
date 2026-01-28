@@ -19,6 +19,8 @@ interface IBaseToken {
 
     function burnMsgValue() external payable;
 
+    function initializeBaseTokenHolderBalance() external;
+
     event Mint(address indexed account, uint256 amount);
 
     event Transfer(address indexed from, address indexed to, uint256 value);

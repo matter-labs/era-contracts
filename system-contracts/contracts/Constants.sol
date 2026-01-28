@@ -27,6 +27,7 @@ import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 import {IInteropHandler} from "./interfaces/IInteropHandler.sol";
 import {IInteropCenter} from "./interfaces/IInteropCenter.sol";
 import {IL2InteropRootStorage} from "./interfaces/IL2InteropRootStorage.sol";
+import {IBaseTokenHolder} from "./interfaces/IBaseTokenHolder.sol";
 
 /// @dev All the system contracts introduced by ZKsync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
@@ -143,6 +144,15 @@ IL2AssetTracker constant L2_ASSET_TRACKER = IL2AssetTracker(address(L2_ASSET_TRA
 address constant GW_ASSET_TRACKER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x10);
 IGWAssetTracker constant GW_ASSET_TRACKER = IGWAssetTracker(address(GW_ASSET_TRACKER_ADDRESS));
 
+/// @dev The address of the base token holder contract that holds chain's base token reserves.
+/// @dev This contract holds ~2^127 base tokens and transfers them out during deposits/interops
+/// instead of minting, making the system more EVM-compatible.
+address constant BASE_TOKEN_HOLDER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x11);
+IBaseTokenHolder constant BASE_TOKEN_HOLDER = IBaseTokenHolder(payable(BASE_TOKEN_HOLDER_ADDRESS));
+
+/// @dev The initial balance of the BaseTokenHolder contract (2^127 - 1).
+/// @dev Used to derive the real circulating supply: INITIAL - currentHolderBalance = circulatingSupply
+uint256 constant INITIAL_BASE_TOKEN_HOLDER_BALANCE = (2 ** 127) - 1;
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.
