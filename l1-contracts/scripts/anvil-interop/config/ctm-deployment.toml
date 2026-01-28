@@ -1,0 +1,23 @@
+era_chain_id = 270
+owner_address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+testnet_verifier = true
+support_l2_legacy_shared_bridge_test = false
+is_zk_sync_os = false
+
+[contracts]
+governance_addr = "0x098327cfAc4dEAe27A5AF97AF0f288692e8f8c1B"
+chain_admin_addr = "0xcD0100a6e4f98390E8938d8E033b45a47556873f"
+governance_security_council_address = "0x0000000000000000000000000000000000000000"
+governance_min_delay = 0
+create2_factory_salt = "0x00000000000000000000000000000000000000000000000000000000000000ff"
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+validator_timelock_execution_delay = 0
+genesis_root = "0x1000000000000000000000000000000000000000000000000000000000000000"
+genesis_rollup_leaf_index = 1
+genesis_batch_commitment = "0x1000000000000000000000000000000000000000000000000000000000000000"
+latest_protocol_version = 120259084288
+bootloader_hash = "0x0100085F9382A7928DD83BFC529121827B5F29F18B9AA10D18AA68E1BE7DDC35"
+default_aa_hash = "0x010005F767ED85C548BCE536C18ED2E1643CA8A6F27EE40826D6936AEA0C87D4"
+evm_emulator_hash = "0x01000D83E0329D9144AD041430FAFCBC2B388E5434DB8CB8A96E80157738A1DA"
+force_deployments_data = "0x00"
+diamond_cut_data = "0x00"

@@ -55,6 +55,15 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         bridgehub.acceptAdmin();
     }
 
+    function runForAnvil() public {
+        // For Anvil testing: deploy contracts but skip acceptAdmin() which requires
+        // broadcasting from a contract address (ChainAdminOwnable)
+        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"));
+
+        // Note: acceptAdmin() is skipped for local Anvil testing
+        // The admin can be accepted manually if needed for testing
+    }
+
     function getAddresses() public view returns (CoreDeployedAddresses memory) {
         return coreAddresses;
     }
