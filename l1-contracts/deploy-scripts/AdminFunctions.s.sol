@@ -17,6 +17,7 @@ import {ChainInfoFromBridgehub, Utils} from "./utils/Utils.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {GetDiamondCutData} from "./utils/GetDiamondCutData.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
@@ -172,6 +173,55 @@ contract AdminFunctions is Script, IAdminFunctions {
             abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
             0
         );
+    }
+
+    /// @notice Upgrade a chain by reading the diamond cut directly from the CTM
+    /// @dev This avoids TOML parsing issues with large hex strings
+    /// @param chainAddress The address of the chain proxy to upgrade
+    /// @param ctmAddress The address of the ChainTypeManager
+    /// @param adminAddr The address of the ChainAdmin
+    /// @param accessControlRestriction The address of the AccessControlRestriction
+    function upgradeChainFromCTM(
+        address chainAddress,
+        address ctmAddress,
+        address adminAddr,
+        address accessControlRestriction
+    ) public {
+        console.log("AdminFunctions: upgrading chain", chainAddress);
+        console.log("AdminFunctions: using CTM", ctmAddress);
+
+        IZKChain chain = IZKChain(chainAddress);
+        IChainTypeManager ctm = IChainTypeManager(ctmAddress);
+
+        // Get the protocol version from CTM
+        uint256 newProtocolVersion = ctm.protocolVersion();
+        console.log("AdminFunctions: new protocol version", newProtocolVersion);
+
+        // Get the current chain protocol version
+        uint256 currentProtocolVersion = chain.getProtocolVersion();
+        console.log("AdminFunctions: current chain protocol version", currentProtocolVersion);
+
+        require(
+            newProtocolVersion > currentProtocolVersion,
+            "AdminFunctions: new protocol version must be greater than current"
+        );
+
+        // Get the upgrade data from CTM using the GetDiamondCutData library
+        Diamond.DiamondCutData memory diamondCut = GetDiamondCutData.getDiamondCutData(
+            ctmAddress,
+            currentProtocolVersion
+        );
+
+        // Execute the upgrade through the admin flow
+        Utils.adminExecute(
+            adminAddr,
+            accessControlRestriction,
+            chainAddress,
+            abi.encodeCall(IAdmin.upgradeChainFromVersion, (currentProtocolVersion, diamondCut)),
+            0
+        );
+
+        console.log("AdminFunctions: upgrade completed successfully");
     }
 
     function adminScheduleUpgrade(

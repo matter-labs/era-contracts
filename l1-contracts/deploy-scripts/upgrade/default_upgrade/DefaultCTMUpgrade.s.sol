@@ -94,7 +94,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         bytes32 create2FactorySalt;
         address ctmProxy;
         address bytecodesSupplier;
-        address rollupDAManager;
+        // address rollupDAManager;
         bool isZKsyncOS;
     }
 
@@ -144,9 +144,11 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         _initCreate2FactoryParams(permanentConfig.create2FactoryAddr, permanentConfig.create2FactorySalt);
         config.l1ChainId = block.chainid;
         newConfig.ctm = permanentConfig.ctmProxy;
-        ctmAddresses.stateTransition.proxies.bytecodesSupplier = permanentConfig.bytecodesSupplier;
-        ctmAddresses.stateTransition.rollupDAManager = permanentConfig.rollupDAManager;
-        setAddressesBasedOnCTM();
+
+        // Pass bytecodesSupplier to introspection - will overwrite incorrect V29 value
+        setAddressesBasedOnCTM(permanentConfig.bytecodesSupplier);
+        // We will not need this in V31, and it will not be part of permanentConfig with V31 onwards.
+        // ctmAddresses.stateTransition.rollupDAManager = permanentConfig.rollupDAManager;
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
         config.contracts.chainCreationParams = chainCreationParams;
 
@@ -178,7 +180,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         address ctm = permanentValuesToml.readAddress("$.ctm_contracts.ctm_proxy_addr");
         address bytecodesSupplier = permanentValuesToml.readAddress("$.ctm_contracts.l1_bytecodes_supplier_addr");
-        address rollupDAManager = permanentValuesToml.readAddress("$.ctm_contracts.rollup_da_manager");
+        // address rollupDAManager = permanentValuesToml.readAddress("$.ctm_contracts.rollup_da_manager");
 
         // TODO can we discover it?. Try to get it from the chain
         bool isZKsyncOS;
@@ -189,7 +191,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         permanentConfig = PermanentCTMConfig({
             ctmProxy: ctm,
             bytecodesSupplier: bytecodesSupplier,
-            rollupDAManager: rollupDAManager,
+            // rollupDAManager: address(0),
             isZKsyncOS: isZKsyncOS,
             create2FactoryAddr: create2FactoryAddr,
             create2FactorySalt: create2FactorySalt
@@ -203,19 +205,12 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
         string memory toml = vm.readFile(newConfigPath);
 
-        address governance;
-        if (toml.keyExists("$.governance")) {
-            governance = toml.readAddress("$.governance");
-        } else {
-            governance = address(0);
-        }
-
         PermanentCTMConfig memory permanentConfig = initializePermanentConfig(permanentValuesInputPath);
         ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(
             chainCreationParamsPath(permanentConfig.isZKsyncOS)
         );
 
-        initializeConfig(chainCreationParams, permanentConfig, governance);
+        initializeConfig(chainCreationParams, permanentConfig, address(0));
     }
 
     /// @notice Full default upgrade preparation flow
@@ -350,20 +345,46 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         });
     }
 
-    function setAddressesBasedOnCTM() internal virtual {
+    function setAddressesBasedOnCTM(address _bytecodesSupplier) internal virtual {
         address ctm = newConfig.ctm;
-        ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
-        bridgehub = L1Bridgehub(ChainTypeManagerBase(ctm).BRIDGE_HUB());
-        coreAddresses = AddressIntrospector.getCoreDeployedAddresses(address(bridgehub));
+
+        // Verify CTM contract exists
+        require(ctm.code.length > 0, "CTM contract does not exist at specified address");
+
+        // CTM exists - get bridgehub and determine which introspection to use
+        address bridgehubAddr = ChainTypeManagerBase(ctm).BRIDGE_HUB();
+        bridgehub = L1Bridgehub(bridgehubAddr);
+
+        // Determine which introspection method to use based on protocol version
+        bool useV29Introspection = AddressIntrospector.shouldUseV29Introspection(bridgehubAddr);
+
+        // Use appropriate introspection based on version
+        if (useV29Introspection) {
+            ctmAddresses = AddressIntrospector.getCTMAddressesV29(ctm);
+            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV29(bridgehubAddr);
+
+            // V29 introspection returns zero for bytecodesSupplier, overwrite with correct value
+            ctmAddresses.stateTransition.proxies.bytecodesSupplier = _bytecodesSupplier;
+        } else {
+            ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
+            coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubAddr);
+        }
+
         config.ownerAddress = ctmAddresses.admin.governance;
         config.eraChainId = AddressIntrospector.getEraChainId(coreAddresses.bridges.proxies.l1AssetRouter);
 
-        discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(
-            IZKChain(bridgehub.getZKChain(config.eraChainId))
-        );
+        address eraChainAddress = bridgehub.getZKChain(config.eraChainId);
+        if (eraChainAddress != address(0)) {
+            // ERA chain exists, discover its addresses
+            discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(IZKChain(eraChainAddress));
+            ctmAddresses.daAddresses.l1RollupDAValidator = discoveredEraZkChain.l1DAValidator;
+        } else {
+            // ERA chain doesn't exist yet (fresh deployment), use up-to-date addresses
+            console.log("ERA chain not found in bridgehub, using up-to-date addresses");
+        }
+
         upToDateZkChain = AddressIntrospector.getUptoDateZkChainAddresses(ChainTypeManagerBase(ctm));
 
-        ctmAddresses.daAddresses.l1RollupDAValidator = discoveredEraZkChain.l1DAValidator;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         newConfig.oldProtocolVersion = ctmProtocolVersion;
         require(

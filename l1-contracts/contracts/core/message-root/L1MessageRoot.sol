@@ -50,8 +50,8 @@ contract L1MessageRoot is MessageRootBase {
         _disableInitializers();
     }
 
-    /// @dev Initializes a contract for later use. Expected to be used in the proxy on L1, on L2 it is a system contract without a proxy.
-    function initialize() external reinitializer(2) {
+    /// @dev Initializes a contract for later use. Expected to be used in the proxy on L1, on L2 it is a built-in contract without a proxy.
+    function initialize() external reinitializer(1) {
         _initialize();
         uint256[] memory allZKChains = IBridgehubBase(BRIDGE_HUB).getAllZKChainChainIDs();
         uint256 allZKChainsLength = allZKChains.length;
