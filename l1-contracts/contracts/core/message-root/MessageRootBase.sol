@@ -19,6 +19,8 @@ import {MessageVerification} from "../../common/MessageVerification.sol";
 
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 
+event AppendedChainRoot(uint256 indexed chainId, uint256 indexed batchNumber, bytes32 indexed chainRoot);
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
@@ -196,6 +198,8 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
 
         chainBatchRoots[_chainId][_batchNumber] = _chainBatchRoot;
         ++currentChainBatchNumber[_chainId];
+        emit AppendedChainRoot(_chainId, _batchNumber, _chainBatchRoot);
+
         if (block.chainid == L1_CHAIN_ID()) {
             /// On L1 we only store the chainBatchRoot, but don't update the chainTree or sharedTree.
             return;

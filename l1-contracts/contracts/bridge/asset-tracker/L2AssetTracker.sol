@@ -78,9 +78,10 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     function _registerTokenOnL2(bytes32 _assetId) internal {
         /// If the chain is settling on Gateway, then withdrawals are not automatically allowed for new tokens.
-        if (L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == _l1ChainId()) {
-            assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.migrationNumber(block.chainid);
-        }
+        // FIXME
+        // if (L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == _l1ChainId()) {
+        //     assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.migrationNumber(block.chainid);
+        // }
     }
 
     /// @notice Registers a legacy token on this L2 chain for backwards compatibility.
@@ -150,11 +151,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         /// Note we always allow bridging when settling on L1.
         /// On Gateway we require that the tokenBalance be migrated to Gateway from L1,
         /// otherwise withdrawals might fail in the GWAssetTracker when the chain settles.
-        require(
-            savedAssetMigrationNumber == migrationNumber ||
-                L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == _l1ChainId(),
-            TokenBalanceNotMigratedToGateway(_assetId, savedAssetMigrationNumber, migrationNumber)
-        );
+        // FIXME
+        // require(
+        //     savedAssetMigrationNumber == migrationNumber ||
+        //         L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == _l1ChainId(),
+        //     TokenBalanceNotMigratedToGateway(_assetId, savedAssetMigrationNumber, migrationNumber)
+        // );
     }
 
     /// @notice Handles the initiation of base token bridging operations on L2.
@@ -263,37 +265,38 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @dev This function is permissionless, it does not affect the state of the contract substantially, and can be called multiple times.
     /// @dev The value to migrate is read from the L2, but the tracking is done on L1/GW.
     function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external {
-        require(
-            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
-            OnlyGatewaySettlementLayer()
-        );
-        address tokenAddress = _tryGetTokenAddress(_assetId);
+        revert("Disabled for zksync os");
+        // require(
+        //     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
+        //     OnlyGatewaySettlementLayer()
+        // );
+        // address tokenAddress = _tryGetTokenAddress(_assetId);
 
-        uint256 originChainId = L2_NATIVE_TOKEN_VAULT.originChainId(_assetId);
-        address originalToken = L2_NATIVE_TOKEN_VAULT.originToken(_assetId);
+        // uint256 originChainId = L2_NATIVE_TOKEN_VAULT.originChainId(_assetId);
+        // address originalToken = L2_NATIVE_TOKEN_VAULT.originToken(_assetId);
 
-        uint256 chainMigrationNumber = _getChainMigrationNumber(block.chainid);
-        uint256 assetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
-        if (chainMigrationNumber == assetMigrationNumber) {
-            /// In this case the token was either already migrated, or the migration number was set using _forceSetAssetMigrationNumber.
-            return;
-        }
-        uint256 amount = _getOrSaveTotalSupply(_assetId, chainMigrationNumber, originChainId, tokenAddress);
+        // uint256 chainMigrationNumber = _getChainMigrationNumber(block.chainid);
+        // uint256 assetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
+        // if (chainMigrationNumber == assetMigrationNumber) {
+        //     /// In this case the token was either already migrated, or the migration number was set using _forceSetAssetMigrationNumber.
+        //     return;
+        // }
+        // uint256 amount = _getOrSaveTotalSupply(_assetId, chainMigrationNumber, originChainId, tokenAddress);
 
-        TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
-            chainId: block.chainid,
-            assetId: _assetId,
-            tokenOriginChainId: originChainId,
-            amount: amount,
-            chainMigrationNumber: chainMigrationNumber,
-            assetMigrationNumber: assetMigrationNumber,
-            originToken: originalToken,
-            isL1ToGateway: true
-        });
-        _sendMigrationDataToL1(tokenBalanceMigrationData);
+        // TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
+        //     version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+        //     chainId: block.chainid,
+        //     assetId: _assetId,
+        //     tokenOriginChainId: originChainId,
+        //     amount: amount,
+        //     chainMigrationNumber: chainMigrationNumber,
+        //     assetMigrationNumber: assetMigrationNumber,
+        //     originToken: originalToken,
+        //     isL1ToGateway: true
+        // });
+        // _sendMigrationDataToL1(tokenBalanceMigrationData);
 
-        emit IL2AssetTracker.L1ToGatewayMigrationInitiated(_assetId, block.chainid, amount);
+        // emit IL2AssetTracker.L1ToGatewayMigrationInitiated(_assetId, block.chainid, amount);
     }
 
     /// @notice Confirms a migration operation has been completed and updates the asset migration number.
