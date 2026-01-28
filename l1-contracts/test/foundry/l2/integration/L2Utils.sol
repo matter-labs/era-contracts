@@ -32,7 +32,21 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
 
-import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
+// Define SystemContractsArgs locally to avoid importing from L1 abstract (which has EXTCODECOPY)
+struct SystemContractsArgs {
+    bool broadcast;
+    uint256 l1ChainId;
+    uint256 gatewayChainId;
+    uint256 eraChainId;
+    address l1AssetRouter;
+    address legacySharedBridge;
+    address l2TokenBeacon;
+    bytes32 l2TokenProxyBytecodeHash;
+    address aliasedOwner;
+    bool contractsDeployedAlready;
+    address l1CtmDeployer;
+    uint256 maxNumberOfZKChains;
+}
 
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
@@ -201,23 +215,7 @@ library L2Utils {
 
     function forceDeployWithoutConstructor(string memory _contractName, address _address) public {
         bytes memory bytecode = Utils.readZKFoundryBytecodeL1(string.concat(_contractName, ".sol"), _contractName);
-
-        bytes32 bytecodehash = L2ContractHelper.hashL2Bytecode(bytecode);
-
-        IContractDeployer.ForceDeployment[] memory deployments = new IContractDeployer.ForceDeployment[](1);
-        deployments[0] = IContractDeployer.ForceDeployment({
-            bytecodeHash: bytecodehash,
-            newAddress: _address,
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        console.logBytes32(bytecodehash);
-
-        prankOrBroadcast(false, L2_FORCE_DEPLOYER_ADDR);
-        IContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(deployments);
-
-        // In test environment, we need to actually etch the bytecode at the target address
+        // Simply etch the bytecode at the target address - no need for forceDeployOnAddresses in test environment
         vm.etch(_address, bytecode);
     }
 
