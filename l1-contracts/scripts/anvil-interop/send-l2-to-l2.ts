@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
-import { JsonRpcProvider, Wallet, AbiCoder } from "ethers";
+import { JsonRpcProvider, Wallet, Contract, AbiCoder } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { getDefaultAccountPrivateKey } from "./src/utils";
 
 /**
- * Send a cross-chain message from one L2 chain to another L2 chain
+ * Send a cross-chain message from one L2 chain to another L2 chain using InteropCenter
  *
  * Usage:
  *   yarn send:l2-to-l2 [sourceChainId] [targetChainId] [targetAddress] [calldata]
@@ -15,16 +15,13 @@ import { getDefaultAccountPrivateKey } from "./src/utils";
  *   yarn send:l2-to-l2  # Uses defaults: 11 -> 12
  */
 async function main() {
-  console.log("\n=== Sending L2→L2 Cross-Chain Message ===\n");
+  console.log("\n=== Sending L2→L2 Cross-Chain Message via InteropCenter ===\n");
 
   const runner = new DeploymentRunner();
   const state = runner.loadState();
 
   if (!state.chains?.l2) {
     throw new Error("L2 chains not found. Run 'yarn step1' first.");
-  }
-  if (!state.chainAddresses || state.chainAddresses.length === 0) {
-    throw new Error("Chain addresses not found. Run 'yarn step3' first.");
   }
 
   // Parse arguments
@@ -55,31 +52,45 @@ async function main() {
   const sourceProvider = new JsonRpcProvider(sourceChain.rpcUrl);
   const wallet = new Wallet(privateKey, sourceProvider);
 
-  // The L2→L2 relayer watches for transactions to this special address
-  const CROSS_CHAIN_MESSENGER = "0x0000000000000000000000000000000000000420";
+  // InteropCenter is deployed at system address
+  const INTEROP_CENTER_ADDR = "0x000000000000000000000000000000000001000d";
 
-  // Encode the cross-chain message
+  // InteropCenter ABI - sendBundle function
+  const interopCenterAbi = [
+    "function sendBundle(bytes calldata _destinationChainId, tuple(address target, uint256 value, bytes data)[] calldata _callStarters, bytes[] calldata _bundleAttributes) external payable returns (bytes32)",
+    "event InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, tuple(bytes32 canonicalHash, bytes32 chainTreeRoot, bytes32 destination, uint256 nonce, tuple(address target, uint256 value, bytes data)[] calls) interopBundle)",
+  ];
+
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, interopCenterAbi, wallet);
+
+  // Encode destination chain ID (uint256 as bytes)
   const abiCoder = AbiCoder.defaultAbiCoder();
-  const messageData = abiCoder.encode(
-    ["uint256", "address", "bytes"],
-    [targetChainId, targetAddress, targetCalldata]
-  );
+  const destinationChainIdBytes = abiCoder.encode(["uint256"], [targetChainId]);
 
-  console.log("📝 Preparing cross-chain message...");
-  console.log(`   Message Marker Address: ${CROSS_CHAIN_MESSENGER}`);
-  console.log(`   Encoded Message Length: ${messageData.length} bytes`);
+  // Create call starter
+  const callStarter = {
+    target: targetAddress,
+    value: 0,
+    data: targetCalldata,
+  };
+
+  const bundleAttributes: string[] = []; // No attributes for now
+
+  console.log("📝 Preparing InteropCenter.sendBundle() call...");
+  console.log(`   InteropCenter: ${INTEROP_CENTER_ADDR}`);
+  console.log(`   Destination Chain: ${targetChainId}`);
+  console.log(`   Call Starter Target: ${targetAddress}`);
   console.log();
 
-  console.log("🚀 Sending L2 transaction with cross-chain message...");
+  // Get target chain provider and starting block BEFORE sending to avoid missing the relayed tx
+  const targetProvider = new JsonRpcProvider(targetChain.rpcUrl);
+  const startBlock = await targetProvider.getBlockNumber();
+
+  console.log("🚀 Sending cross-chain message via InteropCenter...");
 
   try {
-    // Send transaction to the special cross-chain messenger address
-    // The L2→L2 relayer will detect this and relay it through L1
-    const tx = await wallet.sendTransaction({
-      to: CROSS_CHAIN_MESSENGER,
-      value: 0,
-      data: messageData,
-      gasLimit: 100000,
+    const tx = await interopCenter.sendBundle(destinationChainIdBytes, [callStarter], bundleAttributes, {
+      gasLimit: 500000,
     });
 
     console.log(`   Transaction sent: ${tx.hash}`);
@@ -87,17 +98,81 @@ async function main() {
 
     const receipt = await tx.wait();
     console.log(`   ✅ Transaction confirmed in block ${receipt?.blockNumber}`);
+
+    // Parse InteropBundleSent event
+    console.log();
+    console.log("📋 Transaction Events:");
+    if (receipt && receipt.logs) {
+      for (const log of receipt.logs) {
+        try {
+          const parsed = interopCenter.interface.parseLog({
+            topics: log.topics as string[],
+            data: log.data,
+          });
+          if (parsed && parsed.name === "InteropBundleSent") {
+            console.log(`   ✅ InteropBundleSent event emitted`);
+            console.log(`      Bundle Hash: ${parsed.args.interopBundleHash}`);
+            console.log(`      L2→L1 Msg Hash: ${parsed.args.l2l1MsgHash}`);
+          }
+        } catch (e) {
+          // Not an InteropCenter event
+        }
+      }
+    }
+
+    console.log();
+    console.log("=== ✅ L2→L2 Message Sent ===");
+    console.log(`Source Chain: ${sourceChainId}`);
+    console.log(`Source Tx:    ${tx.hash}`);
     console.log();
 
-    console.log("=== ✅ L2→L2 Message Sent ===");
-    console.log(`L2 Source Tx: ${tx.hash} on chain ${sourceChainId}`);
+    // Wait for relaying to complete
+    console.log("⏳ Waiting for L2→L2 relayer to process message...");
+    console.log("   (This typically takes 2-5 seconds)");
+    let targetTxHash: string | null = null;
+    let attempts = 0;
+    const maxAttempts = 20; // 20 seconds max wait
+
+    while (!targetTxHash && attempts < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      attempts++;
+
+      const currentBlock = await targetProvider.getBlockNumber();
+
+      // Check recent blocks for transactions to the target address
+      for (let i = startBlock; i <= currentBlock; i++) {
+        const block = await targetProvider.getBlock(i, true);
+        if (block && block.transactions) {
+          for (const txHash of block.transactions) {
+            const tx = await targetProvider.getTransaction(txHash as string);
+            if (tx && tx.to?.toLowerCase() === targetAddress.toLowerCase()) {
+              // Check if data matches (accounting for possible encoding differences)
+              if (targetCalldata === "0x" || tx.data.toLowerCase().includes(targetCalldata.slice(2).toLowerCase())) {
+                targetTxHash = txHash as string;
+                break;
+              }
+            }
+          }
+        }
+        if (targetTxHash) break;
+      }
+    }
+
     console.log();
-    console.log("The L2→L2 relayer will:");
-    console.log("  1. Detect this message on the source chain");
-    console.log("  2. Relay it through L1 Bridgehub");
-    console.log("  3. L1→L2 relayer will execute it on the target chain");
-    console.log();
-    console.log(`Check the logs to see the relaying process.`);
+    if (targetTxHash) {
+      console.log("=== ✅ L2→L2 Message Relayed ===");
+      console.log(`Target Chain:  ${targetChainId}`);
+      console.log(`Target Tx:     ${targetTxHash}`);
+      console.log();
+      console.log("✅ Cross-chain message successfully relayed!");
+      console.log();
+      console.log("To see the full trace:");
+      console.log(`  cast run ${tx.hash} -r ${sourceChain.rpcUrl}`);
+      console.log(`  cast run ${targetTxHash} -r ${targetChain.rpcUrl}`);
+    } else {
+      console.log("⚠️  Timeout waiting for relay (message may still be processing)");
+      console.log("   Check daemon logs: tail -f /tmp/step6-output.log");
+    }
   } catch (error: any) {
     console.error("\n❌ Transaction failed:");
     console.error(`   ${error.message}`);
@@ -111,5 +186,6 @@ async function main() {
 }
 
 main().catch((error) => {
+  console.error("❌ Failed:", error);
   process.exit(1);
 });

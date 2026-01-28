@@ -1,141 +1,95 @@
 # Quick Start Guide
 
-## Installation
+## Setup (One Time)
+
+1. **Build contracts:**
+   ```bash
+   cd /path/to/contracts/l1-contracts
+   forge build
+   ```
+
+2. **Navigate to anvil-interop:**
+   ```bash
+   cd scripts/anvil-interop
+   ```
+
+## Running the Stack
+
+### Option A: All at Once (Recommended)
+```bash
+yarn step:all
+```
+
+This runs steps 1-5 automatically with proper error handling.
+
+### Option B: Step by Step
+```bash
+yarn step1  # Start Anvil chains
+yarn step2  # Deploy L1 contracts
+yarn step3  # Register L2 chains
+yarn step4  # Initialize L2 (L2GenesisUpgrade with isZKsyncOS=true)
+yarn step5  # Setup gateway
+```
+
+## Testing L2→L2 Messaging
 
 ```bash
-cd scripts/anvil-interop
-yarn install
+# Basic test (chain 11 → chain 12)
+yarn send:l2-to-l2
+
+# Custom parameters
+yarn send:l2-to-l2 [sourceChainId] [targetChainId] [targetAddress] [calldata]
 ```
 
-## Start the Environment
+## Cleanup
 
 ```bash
-yarn start
+yarn cleanup
 ```
 
-Expected output:
-```
-🚀 Starting Multi-Chain Anvil Testing Environment
+Stops all Anvil processes and cleans up deployment state.
 
-=== Step 1: Starting Anvil Chains ===
-🚀 Starting L1 Chain 1 on port 9545...
-✅ L1 Chain 1 on port 9545 started successfully
-🚀 Starting L2 Chain 10 on port 4050...
-✅ L2 Chain 10 on port 4050 started successfully
-🚀 Starting L2 Chain 11 on port 4051...
-✅ L2 Chain 11 on port 4051 started successfully
-🚀 Starting L2 Chain 12 on port 4052...
-✅ L2 Chain 12 on port 4052 started successfully
+## Quick Check
 
-=== Step 2: Deploying L1 Contracts ===
-📦 Deploying L1 core contracts...
-✅ L1 core contracts deployed
-
-L1 Core Addresses:
-  Bridgehub: 0x...
-  L1SharedBridge: 0x...
-
-📦 Deploying ChainTypeManager...
-✅ ChainTypeManager deployed
-
-CTM Addresses:
-  ChainTypeManager: 0x...
-
-📝 Registering ChainTypeManager with Bridgehub...
-✅ ChainTypeManager registered
-
-=== Step 3: Registering L2 Chains ===
-📝 Registering L2 chain 10...
-✅ Chain 10 registered
-📝 Registering L2 chain 11...
-✅ Chain 11 registered
-📝 Registering L2 chain 12...
-✅ Chain 12 registered
-
-=== Step 4: Initializing L2 System Contracts ===
-🔧 Initializing L2 system contracts for chain 10...
-✅ L2 system contracts initialized for chain 10
-🔧 Initializing L2 system contracts for chain 11...
-✅ L2 system contracts initialized for chain 11
-🔧 Initializing L2 system contracts for chain 12...
-✅ L2 system contracts initialized for chain 12
-
-=== Step 5: Setting Up Gateway ===
-🌐 Designating chain 11 as Gateway...
-✅ Chain 11 designated as Gateway
-
-=== Step 6: Starting Batch Settler Daemon ===
-🔄 Starting batch settler daemon...
-✅ Batch settler daemon started
-
-=== ✅ Multi-Chain Environment Ready ===
-
-Environment Details:
-  L1 Chain: 1 at http://127.0.0.1:9545
-  L2 Chain: 10 at http://127.0.0.1:4050
-  L2 Chain: 11 at http://127.0.0.1:4051 (Gateway)
-  L2 Chain: 12 at http://127.0.0.1:4052
-
-Press Ctrl+C to stop all chains and exit.
-```
-
-## Test It
-
-### Send a transaction on L2
+**Verify everything is running:**
 ```bash
-cast send 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 \
-  --value 1ether \
-  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-  --rpc-url http://127.0.0.1:4050
+# Check Anvil processes
+ps aux | grep anvil
+
+# Check PIDs file
+cat outputs/anvil-pids.json
+
+# Check deployment state
+ls outputs/state/
 ```
-
-Watch the batch settler automatically commit, prove, and execute the batch:
-```
-📊 Chain 10: Processing blocks 1 to 1
-📝 Committing batch for chain 10...
-✅ Batch 1 committed for chain 10
-🔍 Proving batch for chain 10...
-✅ Batch 1 proved for chain 10
-⚡ Executing batch for chain 10...
-✅ Batch 1 executed for chain 10
-```
-
-## RPC Endpoints
-
-- **L1**: `http://127.0.0.1:9545`
-- **L2 Chain 10**: `http://127.0.0.1:4050`
-- **L2 Chain 11** (Gateway): `http://127.0.0.1:4051`
-- **L2 Chain 12**: `http://127.0.0.1:4052`
-
-## Default Anvil Account
-
-- **Address**: `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`
-- **Private Key**: `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`
-- **Balance**: 10,000 ETH
-
-## Stop the Environment
-
-Press `Ctrl+C` to gracefully shutdown all chains.
 
 ## Troubleshooting
 
-### "Port already in use"
-```bash
-pkill anvil
-# or
-lsof -ti:9545,4050,4051,4052 | xargs kill -9
-```
+| Issue | Solution |
+|-------|----------|
+| "L2 chains not found" | Run `yarn step1` first |
+| step:all stops at step1 | **FIXED** - now uses detached processes |
+| "Could not read [Contract]" | Run `forge build` first |
+| Transaction reverted | Check gas limit (should be 50M), verify L1 deployed |
 
-### "Forge script failed"
-- Ensure Foundry is installed: `forge --version`
-- Check config files in `config/`
-- Review error output in terminal
+## Key Changes
 
-### "Chain not ready"
-- Wait 30 seconds for chains to fully start
-- Check Anvil logs for errors
-- Verify no port conflicts
+- ✅ **Anvil processes now stay running** after step1 exits
+- ✅ **Uses L2GenesisUpgrade** with `isZKsyncOS = true`
+- ✅ **Normal solc bytecodes** from `out/` directory
+- ✅ **PID tracking** for process management
+- ✅ **step:all works correctly** now
 
-## Full Documentation
+## What's Next?
 
-See [README.md](./README.md) for complete documentation.
+After successful setup:
+- `yarn step6` - Start the settler daemon
+- `yarn test:interop` - Run interop tests
+- `yarn deploy:test-token` - Deploy test ERC20 token
+- `yarn send:token` - Send token transfers
+
+---
+
+For detailed technical information, see:
+- `FIXED_L2_SETUP.md` - Complete changelog
+- `L2_GENESIS_UPGRADE_CHANGES.md` - Technical details

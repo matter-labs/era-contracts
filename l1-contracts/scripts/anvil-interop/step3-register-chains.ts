@@ -20,7 +20,7 @@ async function main() {
     state.ctmAddresses
   );
 
-  console.log("\n📝 Chain addresses saved to outputs/state/chain-addresses.json");
+  console.log("\n📝 Chain addresses saved to outputs/state/chains.json");
   console.log("\nNext: Run 'yarn start' for full setup or continue with manual steps");
 }
 

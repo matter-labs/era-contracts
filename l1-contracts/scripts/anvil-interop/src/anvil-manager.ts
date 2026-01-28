@@ -1,10 +1,17 @@
 import { spawn } from "child_process";
 import { JsonRpcProvider } from "ethers";
+import * as fs from "fs";
+import * as path from "path";
 import type { AnvilChain } from "./types";
 import { waitForChainReady, formatChainInfo } from "./utils";
 
 export class AnvilManager {
   private chains: Map<number, AnvilChain> = new Map();
+  private pidFilePath: string;
+
+  constructor() {
+    this.pidFilePath = path.join(__dirname, "../outputs/anvil-pids.json");
+  }
 
   async startChain(config: Omit<AnvilChain, "rpcUrl" | "process">): Promise<void> {
     const { chainId, port, isL1 } = config;
@@ -23,27 +30,18 @@ export class AnvilManager {
       "10000",
       "--block-time",
       "1",
+      "--gas-limit",
+      "100000000", // Increase block gas limit to 100M to accommodate L2 genesis upgrade
       "--auto-impersonate", // Allow impersonating any address without signatures
     ];
 
     const process = spawn("anvil", args, {
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: "ignore", // Must ignore all streams for detached process to truly detach
+      detached: true, // Detach from parent process
     });
 
-    process.stdout?.on("data", (data) => {
-      const output = data.toString();
-      if (output.includes("Listening on")) {
-        console.log(`   Anvil listening for chain ${chainId}`);
-      }
-    });
-
-    process.stderr?.on("data", (data) => {
-      console.error(`   Anvil error (chain ${chainId}): ${data.toString()}`);
-    });
-
-    process.on("exit", (code) => {
-      console.log(`   Anvil process exited for chain ${chainId} with code ${code}`);
-    });
+    // Unref the process so the parent can exit while child continues
+    process.unref();
 
     const chain: AnvilChain = {
       chainId,
@@ -55,12 +53,45 @@ export class AnvilManager {
 
     this.chains.set(chainId, chain);
 
+    // Save PID to file for tracking
+    this.savePids();
+
     const isReady = await waitForChainReady(rpcUrl);
     if (!isReady) {
       throw new Error(`Failed to start ${formatChainInfo(chainId, port, isL1)}`);
     }
 
     console.log(`✅ ${formatChainInfo(chainId, port, isL1)} started successfully`);
+  }
+
+  private savePids(): void {
+    const pids: Record<number, number> = {};
+    for (const [chainId, chain] of this.chains) {
+      if (chain.process && chain.process.pid) {
+        pids[chainId] = chain.process.pid;
+      }
+    }
+
+    const dir = path.dirname(this.pidFilePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    fs.writeFileSync(this.pidFilePath, JSON.stringify(pids, null, 2));
+  }
+
+  loadPids(): void {
+    if (!fs.existsSync(this.pidFilePath)) {
+      return;
+    }
+
+    try {
+      const pids = JSON.parse(fs.readFileSync(this.pidFilePath, "utf-8"));
+      console.log("📋 Found existing Anvil PIDs:", pids);
+      console.log("   (Use 'yarn cleanup' to stop them)");
+    } catch (error) {
+      console.warn("⚠️  Could not read PID file:", error);
+    }
   }
 
   async stopChain(chainId: number): Promise<void> {
@@ -99,6 +130,12 @@ export class AnvilManager {
     const stopPromises = Array.from(this.chains.keys()).map((chainId) => this.stopChain(chainId));
     await Promise.all(stopPromises);
     this.chains.clear();
+
+    // Clean up PID file
+    if (fs.existsSync(this.pidFilePath)) {
+      fs.unlinkSync(this.pidFilePath);
+    }
+
     console.log("✅ All chains stopped");
   }
 

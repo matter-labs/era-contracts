@@ -76,7 +76,13 @@ async function main() {
       }
     }
 
-    settler = await runner.step6StartBatchSettler(l1Provider, l2Providers, chainAddressesMap, config);
+    const { settler: batchSettler, l1ToL2Relayer, l2ToL2Relayer } = await runner.step6StartBatchSettler(
+      l1Provider,
+      l2Providers,
+      chainAddressesMap,
+      config
+    );
+    settler = batchSettler;
 
     // Store context for potential future use
     context = {

@@ -30,8 +30,10 @@ async function main() {
     state.ctmAddresses
   );
 
-  console.log(`\n✅ Gateway Chain ${gatewayChainId} configured`);
-  console.log(`   Gateway CTM: ${gatewayCTMAddr}`);
+  console.log(`\n✅ Gateway setup complete`);
+  console.log(`   CTM Address: ${gatewayCTMAddr}`);
+  console.log(`\nℹ️  Note: Full gateway functionality requires zkstack CLI`);
+  console.log(`   For production setup, use: zkstack chain gateway convert-to-gateway`);
   console.log("\nNext: Run 'yarn step6' to start batch settler");
 }
 

@@ -22,6 +22,7 @@ export interface DeploymentState {
   l1Addresses?: CoreDeployedAddresses;
   ctmAddresses?: CTMDeployedAddresses;
   chainAddresses?: ChainAddresses[];
+  testTokens?: { [chainId: number]: string };
 }
 
 export class DeploymentRunner {
@@ -39,41 +40,15 @@ export class DeploymentRunner {
   }
 
   loadState(): DeploymentState {
-    const state: DeploymentState = {};
-
     const chainsPath = path.join(this.stateDir, "chains.json");
     if (fs.existsSync(chainsPath)) {
-      state.chains = JSON.parse(fs.readFileSync(chainsPath, "utf-8"));
+      return JSON.parse(fs.readFileSync(chainsPath, "utf-8"));
     }
-
-    const l1DeploymentPath = path.join(this.stateDir, "l1-deployment.json");
-    if (fs.existsSync(l1DeploymentPath)) {
-      const deployment = JSON.parse(fs.readFileSync(l1DeploymentPath, "utf-8"));
-      state.l1Addresses = deployment.l1Addresses;
-      state.ctmAddresses = deployment.ctmAddresses;
-    }
-
-    const chainAddressesPath = path.join(this.stateDir, "chain-addresses.json");
-    if (fs.existsSync(chainAddressesPath)) {
-      state.chainAddresses = JSON.parse(fs.readFileSync(chainAddressesPath, "utf-8"));
-    }
-
-    return state;
+    return {};
   }
 
-  saveChains(chainInfo: ChainInfo): void {
-    fs.writeFileSync(path.join(this.stateDir, "chains.json"), JSON.stringify(chainInfo, null, 2));
-  }
-
-  saveL1Deployment(l1Addresses: CoreDeployedAddresses, ctmAddresses: CTMDeployedAddresses): void {
-    fs.writeFileSync(
-      path.join(this.stateDir, "l1-deployment.json"),
-      JSON.stringify({ l1Addresses, ctmAddresses }, null, 2)
-    );
-  }
-
-  saveChainAddresses(chainAddresses: ChainAddresses[]): void {
-    fs.writeFileSync(path.join(this.stateDir, "chain-addresses.json"), JSON.stringify(chainAddresses, null, 2));
+  saveState(state: DeploymentState): void {
+    fs.writeFileSync(path.join(this.stateDir, "chains.json"), JSON.stringify(state, null, 2));
   }
 
   async step1StartChains(
@@ -102,7 +77,9 @@ export class DeploymentRunner {
       config: config.chains,
     };
 
-    this.saveChains(chainInfo);
+    const state = this.loadState();
+    state.chains = chainInfo;
+    this.saveState(state);
 
     return { chains: chainInfo };
   }
@@ -130,7 +107,10 @@ export class DeploymentRunner {
 
     await deployer.registerCTM(l1Addresses.bridgehub, ctmAddresses.chainTypeManager);
 
-    this.saveL1Deployment(l1Addresses, ctmAddresses);
+    const state = this.loadState();
+    state.l1Addresses = l1Addresses;
+    state.ctmAddresses = ctmAddresses;
+    this.saveState(state);
 
     return { l1Addresses, ctmAddresses };
   }
@@ -168,7 +148,9 @@ export class DeploymentRunner {
       console.log(`  Chain ${l2Chain.chainId} registered at: ${addresses.diamondProxy}`);
     }
 
-    this.saveChainAddresses(chainAddresses);
+    const state = this.loadState();
+    state.chainAddresses = chainAddresses;
+    this.saveState(state);
 
     return { chainAddresses };
   }
@@ -184,8 +166,21 @@ export class DeploymentRunner {
     const privateKey = getDefaultAccountPrivateKey();
     const registry = new ChainRegistry(l1RpcUrl, privateKey, l1Addresses, ctmAddresses);
 
+    // NOTE: Deposits are already enabled since we register chains without --pause-deposits
+    // No need to unpause deposits in this simplified Anvil environment
+    console.log("ℹ️  Deposits already enabled (chains registered without --pause-deposits)\n");
+
+    // Load state to get L2 chain RPC URLs
+    const state = this.loadState();
+    const l2Chains = state.chains?.l2 || [];
+
+    console.log("Initializing L2 system contracts...\n");
     for (const chain of chainAddresses) {
-      await registry.initializeL2SystemContracts(chain.chainId, chain.diamondProxy);
+      const l2Chain = l2Chains.find((c) => c.chainId === chain.chainId);
+      if (!l2Chain) {
+        throw new Error(`L2 chain ${chain.chainId} not found in state`);
+      }
+      await registry.initializeL2SystemContracts(chain.chainId, chain.diamondProxy, l2Chain.rpcUrl);
       console.log(`  Chain ${chain.chainId} system contracts initialized`);
     }
   }

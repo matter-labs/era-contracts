@@ -20,7 +20,7 @@ async function main() {
   console.log(`  ChainTypeManager: ${ctmAddresses.chainTypeManager}`);
 
   console.log("\n✅ ChainTypeManager registered with Bridgehub");
-  console.log("\n📝 Deployment info saved to outputs/state/l1-deployment.json");
+  console.log("\n📝 Deployment info saved to outputs/state/chains.json");
   console.log("\nNext: Run 'yarn step3' to register L2 chains");
 }
 

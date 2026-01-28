@@ -8,8 +8,26 @@ set -e
 
 echo "🧹 Cleaning up Anvil interop environment..."
 
-# Stop all Anvil instances - be aggressive
+# Stop all Anvil instances - try graceful shutdown first using PIDs
 echo "Stopping Anvil instances..."
+
+# Try to use PID file for graceful shutdown
+if [ -f "outputs/anvil-pids.json" ]; then
+    echo "Found PID file, attempting graceful shutdown..."
+    # Extract PIDs and kill them
+    pids=$(cat outputs/anvil-pids.json | grep -o '"[0-9]*":' | grep -o '[0-9]*' || true)
+    for pid in $pids; do
+        if kill -0 "$pid" 2>/dev/null; then
+            echo "  Stopping Anvil process $pid..."
+            kill -TERM "$pid" 2>/dev/null || true
+        fi
+    done
+    sleep 2
+    # Remove PID file
+    rm -f outputs/anvil-pids.json
+fi
+
+# Fallback: Kill any remaining anvil processes
 pkill -9 -f "anvil" 2>/dev/null || true
 sleep 1
 pkill -9 anvil 2>/dev/null || true
@@ -17,7 +35,12 @@ sleep 1
 
 # Stop any running ts-node processes from previous runs
 pkill -9 -f "ts-node index.ts" 2>/dev/null || true
+pkill -9 -f "ts-node step6-start-settler.ts" 2>/dev/null || true
 pkill -9 -f "yarn start" 2>/dev/null || true
+pkill -9 -f "yarn step6" 2>/dev/null || true
+
+# Clean up step6 log file
+rm -f /tmp/step6-output.log 2>/dev/null || true
 
 # Final check
 if pgrep -f "anvil" > /dev/null 2>&1; then

@@ -26,8 +26,12 @@ export class L2ToL2Relayer {
   private lastProcessedBlocks: Map<number, number> = new Map();
   private processedTxHashes: Set<string> = new Set();
 
-  // Special marker address for cross-chain messages on L2
-  private readonly CROSS_CHAIN_MESSENGER = "0x0000000000000000000000000000000000000420";
+  // InteropCenter system contract address
+  private readonly INTEROP_CENTER_ADDR = "0x000000000000000000000000000000000001000d";
+
+  // InteropBundleSent event signature
+  // event InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle interopBundle)
+  private readonly INTEROP_BUNDLE_SENT_TOPIC = "0xd5e1642d9c6ff371d1f102384c70a9a38530493e4747a53919f128685013cb6e";
 
   constructor(
     l1Provider: JsonRpcProvider,
@@ -142,14 +146,29 @@ export class L2ToL2Relayer {
       return;
     }
 
-    const tx = await provider.getTransaction(txHash);
+    // Get transaction receipt to check for InteropBundleSent event
+    const receipt = await provider.getTransactionReceipt(txHash);
 
-    if (!tx) {
+    if (!receipt || !receipt.logs) {
       return;
     }
 
-    // Check if this is a cross-chain message (sent to our special address)
-    if (tx.to?.toLowerCase() !== this.CROSS_CHAIN_MESSENGER.toLowerCase()) {
+    // Check if any log is an InteropBundleSent event from InteropCenter
+    let foundInteropEvent = false;
+    let interopEventLog: any = null;
+
+    for (const log of receipt.logs) {
+      if (
+        log.address.toLowerCase() === this.INTEROP_CENTER_ADDR.toLowerCase() &&
+        log.topics[0] === this.INTEROP_BUNDLE_SENT_TOPIC
+      ) {
+        foundInteropEvent = true;
+        interopEventLog = log;
+        break;
+      }
+    }
+
+    if (!foundInteropEvent) {
       return;
     }
 
@@ -157,7 +176,7 @@ export class L2ToL2Relayer {
     console.log(`      Source Tx Hash: ${txHash}`);
 
     try {
-      await this.relayCrossChainMessage(sourceChainId, tx);
+      await this.relayCrossChainMessage(sourceChainId, txHash, interopEventLog, provider);
       this.processedTxHashes.add(txHash);
       console.log(`      ✅ Cross-chain message relayed`);
     } catch (error: any) {
@@ -165,65 +184,88 @@ export class L2ToL2Relayer {
     }
   }
 
-  private async relayCrossChainMessage(sourceChainId: number, sourceTx: any): Promise<void> {
-    // Decode the cross-chain message data
-    // Expected format: (uint256 targetChainId, address targetAddress, bytes targetCalldata)
+  private async relayCrossChainMessage(
+    sourceChainId: number,
+    sourceTxHash: string,
+    interopEventLog: any,
+    sourceProvider: JsonRpcProvider
+  ): Promise<void> {
+    // Parse InteropBundleSent event to extract destination chain and calls
     const abiCoder = AbiCoder.defaultAbiCoder();
 
+    // InteropBundleSent event structure:
+    // event InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle interopBundle)
+    // InteropBundle: (bytes32 canonicalHash, bytes32 chainTreeRoot, bytes32 destination, uint256 nonce, InteropCallStarter[] calls)
+    // InteropCallStarter: (address target, uint256 value, bytes data)
+
     let targetChainId: number;
-    let targetAddress: string;
-    let targetCalldata: string;
+    let calls: Array<{ target: string; value: bigint; data: string }>;
 
     try {
-      const decoded = abiCoder.decode(["uint256", "address", "bytes"], sourceTx.data);
-      targetChainId = Number(decoded[0]);
-      targetAddress = decoded[1];
-      targetCalldata = decoded[2];
+      // The third parameter (index 2) in the event is the InteropBundle struct
+      // Data field contains the non-indexed parameters
+      const decodedData = abiCoder.decode(
+        [
+          "bytes32", // l2l1MsgHash
+          "bytes32", // interopBundleHash
+          "tuple(bytes1,uint256,uint256,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes))", // InteropBundle
+        ],
+        interopEventLog.data
+      );
+
+      const interopBundle = decodedData[2];
+      targetChainId = Number(interopBundle[2]); // bytes32 destination
+      const rawCalls = interopBundle[4]; // InteropCallStarter[] calls (as arrays)
+
+      // Decode destination (uint256 encoded as bytes32)
+      // destinationChainId extracted above
+
+      // Convert tuple arrays to objects
+      calls = rawCalls.map((call: any) => ({
+        target: call[2], // address to (index 2) // address
+        value: call[4],  // uint256 value (index 4)  // uint256
+        data: call[5],   // bytes data (index 5)   // bytes
+      }));
 
       console.log(`      From Chain: ${sourceChainId}`);
       console.log(`      To Chain: ${targetChainId}`);
-      console.log(`      Target Address: ${targetAddress}`);
-      console.log(`      Calldata Length: ${targetCalldata.length} bytes`);
+      console.log(`      Calls: ${calls.length}`);
+
+      for (let i = 0; i < calls.length; i++) {
+        console.log(`      Call ${i + 1}: ${calls[i].target} with ${calls[i].data.length} bytes data`);
+      }
     } catch (error) {
-      console.error(`      Failed to decode cross-chain message:`, error);
+      console.error(`      Failed to decode InteropBundleSent event:`, error);
       return;
     }
 
     // Verify target chain exists
-    if (!this.chainAddresses.has(targetChainId)) {
+    const targetProvider = this.l2Providers.get(targetChainId);
+    if (!targetProvider) {
       console.error(`      Target chain ${targetChainId} not found`);
       return;
     }
 
-    // Send the message through L1 bridgehub
-    const bridgehubAbi = [
-      "function requestL2TransactionDirect(tuple(uint256 chainId, uint256 mintValue, address l2Contract, uint256 l2Value, bytes l2Calldata, uint256 l2GasLimit, uint256 l2GasPerPubdataByteLimit, bytes[] factoryDeps, address refundRecipient) _request) external payable returns (bytes32)",
-    ];
+    console.log(`      Executing ${calls.length} call(s) on target L2 chain...`);
 
-    const bridgehub = new Contract(this.l1Addresses.bridgehub, bridgehubAbi, this.l1Wallet);
+    // Direct execution on target L2 (bypassing L1 for Anvil testing)
+    const targetWallet = new Wallet(this.l1Wallet.privateKey, targetProvider);
 
-    const request = {
-      chainId: targetChainId,
-      mintValue: 0,
-      l2Contract: targetAddress,
-      l2Value: 0,
-      l2Calldata: targetCalldata,
-      l2GasLimit: 1000000,
-      l2GasPerPubdataByteLimit: 800,
-      factoryDeps: [],
-      refundRecipient: this.l1Wallet.address,
-    };
+    // Execute each call in the bundle
+    for (let i = 0; i < calls.length; i++) {
+      const call = calls[i];
+      const tx = await targetWallet.sendTransaction({
+        to: call.target,
+        value: call.value,
+        data: call.data,
+        gasLimit: 1000000,
+      });
 
-    console.log(`      Relaying through L1 bridgehub...`);
+      console.log(`      L2 Target Tx ${i + 1}: ${tx.hash}`);
 
-    const l1Tx = await bridgehub.requestL2TransactionDirect(request, {
-      value: 0,
-    });
-
-    console.log(`      L1 Relay Tx: ${l1Tx.hash}`);
-
-    await l1Tx.wait();
-    console.log(`      L1 relay confirmed, L1→L2 relayer will execute on target chain`);
+      const receipt = await tx.wait();
+      console.log(`      Confirmed in L2 block ${receipt?.blockNumber}`);
+    }
   }
 
   getStats(): { processedMessages: number; chainsMonitored: number } {
