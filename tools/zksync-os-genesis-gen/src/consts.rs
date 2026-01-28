@@ -53,12 +53,6 @@ pub const GW_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal:
     "0000000000000000000000000000000000010010"
 )));
 
-/// The address of the base token holder contract that holds chain's base token reserves.
-/// Located at USER_CONTRACTS_OFFSET + 0x11 = 0x10011
-pub const BASE_TOKEN_HOLDER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
-    "0000000000000000000000000000000000010011"
-)));
-
 // System contracts
 pub const L2_DEPLOYER_SYSTEM_CONTRACT_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "0000000000000000000000000000000000008006"
@@ -86,7 +80,7 @@ pub const EIP1967_ADMIN_SLOT: B256 = FixedBytes::<32>(hex_literal::hex!(
     "b53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103"
 ));
 
-pub const INITIAL_CONTRACTS: [(Address, &str); 19] = [
+pub const INITIAL_CONTRACTS: [(Address, &str); 18] = [
     (L2_COMPLEX_UPGRADER_ADDR, "SystemContractProxy"),
     (L2_GENESIS_UPGRADE, "L2GenesisUpgrade"),
     (L2_WRAPPED_BASE_TOKEN, "L2WrappedBaseToken"),
@@ -102,7 +96,6 @@ pub const INITIAL_CONTRACTS: [(Address, &str); 19] = [
     (GW_ASSET_TRACKER_ADDR, "GWAssetTracker"),
     (L2_INTEROP_CENTER_ADDR, "InteropCenter"),
     (L2_INTEROP_HANDLER_ADDR, "InteropHandler"),
-    (BASE_TOKEN_HOLDER_ADDR, "BaseTokenHolder"),
     // System contracts (0x8000 range)
     (L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, "ZKOSContractDeployer"),
     (L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "L1Messenger"),

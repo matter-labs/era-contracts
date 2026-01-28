@@ -164,8 +164,6 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
 
         // Only initialize if not already set (idempotent)
         if (balance[BASE_TOKEN_HOLDER_ADDRESS] == 0) {
-            // Read the old totalSupply and compute the holder balance so that
-            // totalSupply() = INITIAL_BASE_TOKEN_HOLDER_BALANCE - balance[holder] = __DEPRECATED_totalSupply
             balance[BASE_TOKEN_HOLDER_ADDRESS] = INITIAL_BASE_TOKEN_HOLDER_BALANCE - __DEPRECATED_totalSupply;
         }
     }
