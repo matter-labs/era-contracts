@@ -21,6 +21,7 @@
     "send:l2-to-l2": "ts-node send-l2-to-l2.ts",
     "deploy:test-token": "ts-node deploy-test-token.ts",
     "send:token": "ts-node send-token-transfer.ts",
+    "send:token-simple": "ts-node send-token-simple.ts",
     "deploy:l2-contracts": "ts-node deploy-all-l2-contracts.ts",
     "deploy:enhanced-mock": "ts-node deploy-enhanced-mock.ts",
     "init:l2-contracts": "ts-node initialize-all-l2-contracts.ts"

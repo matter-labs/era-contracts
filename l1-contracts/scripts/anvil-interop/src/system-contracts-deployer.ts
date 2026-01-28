@@ -99,6 +99,21 @@ export class SystemContractsDeployer {
     // 5. InteropCenter at 0x1000d
     await this.deployInteropCenter();
 
+    // 6. L2AssetRouter at 0x010003
+    await this.deployL2AssetRouter();
+
+    // 7. L2ChainAssetHandler at 0x1000a
+    await this.deployL2ChainAssetHandler();
+
+    // 8. L2AssetTracker at 0x1000f
+    await this.deployL2AssetTracker(chainId);
+
+    // 9. L2NativeTokenVault at 0x010004
+    await this.deployL2NativeTokenVault();
+
+    // 9. Register asset handlers for test tokens
+    await this.registerAssetHandlers(chainId);
+
     console.log(`✅ All system contracts deployed for chain ${chainId}`);
   }
 
@@ -335,6 +350,284 @@ export class SystemContractsDeployer {
       console.log(`   ✅ InteropCenter unpaused`);
     } else {
       console.log(`   ✅ InteropCenter already unpaused`);
+    }
+  }
+
+  /**
+   * Deploy and initialize L2AssetRouter for token bridging
+   */
+  private async deployL2AssetRouter(): Promise<void> {
+    const L2_ASSET_ROUTER_ADDR = "0x0000000000000000000000000000000000010003";
+
+    const l2AssetRouterAbi = [
+      "function initL2(uint256 _l1ChainId, uint256 _eraChainId, address _l1AssetRouter, address _legacySharedBridge, bytes32 _baseTokenAssetId, address _aliasedOwner) external",
+      "function L1_CHAIN_ID() external view returns (uint256)",
+    ];
+
+    const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, l2AssetRouterAbi, this.l2Provider);
+
+    // Check if already initialized
+    let isInitialized = false;
+    try {
+      const l1ChainId = await l2AssetRouter.L1_CHAIN_ID();
+      if (l1ChainId === 1n) {
+        console.log(`   ✅ L2AssetRouter already initialized`);
+        isInitialized = true;
+      }
+    } catch {
+      // Will deploy and initialize
+    }
+
+    if (!isInitialized) {
+      await this.deploySystemContract(
+        L2_ASSET_ROUTER_ADDR,
+        "l1-contracts/out/L2AssetRouter.sol/L2AssetRouter.json",
+        "L2AssetRouter"
+      );
+
+      const ownerAddress = await this.l2Wallet.getAddress();
+      const { keccak256, AbiCoder } = require("ethers");
+      const abiCoder = AbiCoder.defaultAbiCoder();
+      const ethAssetId = keccak256(
+        abiCoder.encode(["uint256", "address"], [1, "0x0000000000000000000000000000000000000001"])
+      );
+
+      await this.initializeContract(
+        L2_ASSET_ROUTER_ADDR,
+        l2AssetRouterAbi,
+        "initL2",
+        [
+          1, // L1 chain ID
+          270, // Era chain ID
+          "0x0000000000000000000000000000000000000001", // L1AssetRouter (dummy)
+          "0x0000000000000000000000000000000000000002", // LegacySharedBridge (dummy)
+          ethAssetId, // Base token asset ID
+          ownerAddress,
+        ],
+        "0x000000000000000000000000000000000000800f", // L2_COMPLEX_UPGRADER
+        "L2AssetRouter"
+      );
+    }
+  }
+
+  /**
+   * Deploy and initialize L2ChainAssetHandler at 0x1000a
+   */
+  private async deployL2ChainAssetHandler(): Promise<void> {
+    const L2_CHAIN_ASSET_HANDLER_ADDR = "0x000000000000000000000000000000000001000a";
+
+    const l2ChainAssetHandlerAbi = [
+      "function L1_CHAIN_ID() external view returns (uint256)",
+      "function migrationNumber(uint256 _chainId) external view returns (uint256)",
+    ];
+
+    const l2ChainAssetHandler = new Contract(L2_CHAIN_ASSET_HANDLER_ADDR, l2ChainAssetHandlerAbi, this.l2Provider);
+
+    // Check if already deployed
+    let isDeployed = false;
+    try {
+      const code = await this.l2Provider.getCode(L2_CHAIN_ASSET_HANDLER_ADDR);
+      if (code !== "0x") {
+        console.log(`   ✅ L2ChainAssetHandler already deployed`);
+        isDeployed = true;
+      }
+    } catch {
+      // Will deploy
+    }
+
+    if (!isDeployed) {
+      await this.deploySystemContract(
+        L2_CHAIN_ASSET_HANDLER_ADDR,
+        "l1-contracts/out/L2ChainAssetHandler.sol/L2ChainAssetHandler.json",
+        "L2ChainAssetHandler"
+      );
+
+      // For now, just deploy without initialization
+      // Full initialization would require bridgehub, message root, asset router addresses
+      console.log(`   ⚠️  L2ChainAssetHandler deployed but not initialized`);
+    }
+  }
+
+  /**
+   * Deploy and initialize L2AssetTracker at 0x1000f
+   */
+  private async deployL2AssetTracker(chainId: number): Promise<void> {
+    const L2_ASSET_TRACKER_ADDR = "0x000000000000000000000000000000000001000f";
+    const L2_COMPLEX_UPGRADER_ADDR = "0x000000000000000000000000000000000000800f";
+
+    const l2AssetTrackerAbi = [
+      "function L1_CHAIN_ID() external view returns (uint256)",
+      "function BASE_TOKEN_ASSET_ID() external view returns (bytes32)",
+      "function setAddresses(uint256 _l1ChainId, bytes32 _baseTokenAssetId) external",
+    ];
+
+    const l2AssetTracker = new Contract(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAbi, this.l2Provider);
+
+    // Check if already initialized
+    let isInitialized = false;
+    try {
+      const l1ChainId = await l2AssetTracker.L1_CHAIN_ID();
+      if (l1ChainId === 1n) {
+        console.log(`   ✅ L2AssetTracker already initialized`);
+        isInitialized = true;
+      }
+    } catch {
+      // Will deploy and initialize
+    }
+
+    if (!isInitialized) {
+      await this.deploySystemContract(
+        L2_ASSET_TRACKER_ADDR,
+        "l1-contracts/out/L2AssetTracker.sol/L2AssetTracker.json",
+        "L2AssetTracker"
+      );
+
+      // Initialize via L2ComplexUpgrader
+      const { keccak256, AbiCoder } = require("ethers");
+      const abiCoder = AbiCoder.defaultAbiCoder();
+
+      // Calculate ETH asset ID (keccak256(abi.encode(1, 0x0000...0001)))
+      const ethAssetId = keccak256(
+        abiCoder.encode(["uint256", "address"], [1, "0x0000000000000000000000000000000000000001"])
+      );
+
+      await this.initializeContract(
+        L2_ASSET_TRACKER_ADDR,
+        l2AssetTrackerAbi,
+        "setAddresses",
+        [
+          1, // L1 chain ID
+          ethAssetId, // Base token asset ID
+        ],
+        L2_COMPLEX_UPGRADER_ADDR,
+        "L2AssetTracker"
+      );
+    }
+  }
+
+  /**
+   * Deploy L2NativeTokenVault for token management
+   */
+  private async deployL2NativeTokenVault(): Promise<void> {
+    const L2_NATIVE_TOKEN_VAULT_ADDR = "0x0000000000000000000000000000000000010004";
+
+    const l2NativeTokenVaultAbi = [
+      "function L1_CHAIN_ID() external view returns (uint256)",
+    ];
+
+    const l2NativeTokenVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultAbi, this.l2Provider);
+
+    // Check if already initialized
+    let isInitialized = false;
+    try {
+      const l1ChainId = await l2NativeTokenVault.L1_CHAIN_ID();
+      if (l1ChainId === 1n) {
+        console.log(`   ✅ L2NativeTokenVault already initialized`);
+        isInitialized = true;
+      }
+    } catch {
+      // Will deploy
+    }
+
+    if (!isInitialized) {
+      await this.deploySystemContract(
+        L2_NATIVE_TOKEN_VAULT_ADDR,
+        "l1-contracts/out/L2NativeTokenVault.sol/L2NativeTokenVault.json",
+        "L2NativeTokenVault"
+      );
+
+      console.log(`   ✅ L2NativeTokenVault deployed (registerToken works without initialization)`);
+    }
+  }
+
+  /**
+   * Register asset handlers for tokens
+   */
+  private async registerAssetHandlers(chainId: number): Promise<void> {
+    const L2_ASSET_ROUTER_ADDR = "0x0000000000000000000000000000000000010003";
+    const L2_NATIVE_TOKEN_VAULT_ADDR = "0x0000000000000000000000000000000000010004";
+
+    // Get test token addresses from state
+    // Use process.cwd() which gives the directory from where the script was run
+    // This is more reliable than __dirname with ts-node
+    const stateFile = path.join(process.cwd(), "outputs/state/chains.json");
+
+    console.log(`   Checking for test tokens in: ${stateFile}`);
+    if (!fs.existsSync(stateFile)) {
+      console.log(`   ⚠️  State file not found, skipping asset handler registration`);
+      return;
+    }
+
+    const state = JSON.parse(fs.readFileSync(stateFile, "utf-8"));
+    if (!state.testTokens || !state.testTokens[chainId]) {
+      console.log(`   ⚠️  No test token for chain ${chainId}, skipping asset handler registration`);
+      return;
+    }
+
+    const tokenAddress = state.testTokens[chainId];
+    const { keccak256, AbiCoder } = require("ethers");
+    const abiCoder = AbiCoder.defaultAbiCoder();
+    // Asset ID format: keccak256(abi.encode(chainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress))
+    const assetId = keccak256(abiCoder.encode(["uint256", "address", "address"], [chainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress]));
+
+    console.log(`   Registering asset handler for token ${tokenAddress}...`);
+    console.log(`   Asset ID: ${assetId}`);
+
+    const l2AssetRouterAbi = [
+      "function assetHandlerAddress(bytes32 _assetId) external view returns (address)",
+      "function setLegacyTokenAssetHandler(bytes32 _assetId) external",
+    ];
+
+    const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, l2AssetRouterAbi, this.l2Provider);
+
+    // Check if asset handler already registered
+    const currentHandler = await l2AssetRouter.assetHandlerAddress(assetId);
+    if (currentHandler === "0x0000000000000000000000000000000000000000") {
+      // Register L2NativeTokenVault as the handler
+      // We need to impersonate L2NativeTokenVault to call setLegacyTokenAssetHandler
+      await this.l2Provider.send("anvil_impersonateAccount", [L2_NATIVE_TOKEN_VAULT_ADDR]);
+      await this.l2Provider.send("anvil_setBalance", [L2_NATIVE_TOKEN_VAULT_ADDR, "0x56BC75E2D63100000"]);
+
+      const signer = await this.l2Provider.getSigner(L2_NATIVE_TOKEN_VAULT_ADDR);
+      const l2AssetRouterWithSigner = l2AssetRouter.connect(signer);
+
+      const tx = await l2AssetRouterWithSigner.getFunction("setLegacyTokenAssetHandler")(assetId);
+      await tx.wait();
+
+      await this.l2Provider.send("anvil_stopImpersonatingAccount", [L2_NATIVE_TOKEN_VAULT_ADDR]);
+
+      console.log(`   ✅ Asset handler registered: ${L2_NATIVE_TOKEN_VAULT_ADDR}`);
+    } else {
+      console.log(`   ✅ Asset handler already registered: ${currentHandler}`);
+    }
+
+    // Now register the token in L2NativeTokenVault
+    const l2NativeTokenVaultAbi = [
+      "function assetId(address _token) external view returns (bytes32)",
+      "function registerToken(address _nativeToken) external",
+    ];
+
+    const l2NativeTokenVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultAbi, this.l2Provider);
+
+    // Check if token is already registered
+    const registeredAssetId = await l2NativeTokenVault.assetId(tokenAddress);
+    if (registeredAssetId !== "0x0000000000000000000000000000000000000000000000000000000000000000") {
+      console.log(`   ✅ Token already registered in L2NativeTokenVault`);
+      return;
+    }
+
+    // Call registerToken()
+    console.log(`   Calling registerToken(${tokenAddress})...`);
+    try {
+      const l2NativeTokenVaultWithWallet = l2NativeTokenVault.connect(this.l2Wallet);
+      const registerTx = await l2NativeTokenVaultWithWallet.getFunction("registerToken")(tokenAddress);
+      await registerTx.wait();
+
+      console.log(`   ✅ Token registered in L2NativeTokenVault`);
+      console.log(`      assetId: ${assetId}`);
+    } catch (error: any) {
+      console.error(`   ❌ registerToken failed: ${error.message}`);
+      throw error;
     }
   }
 }
