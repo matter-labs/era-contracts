@@ -11,6 +11,7 @@ cache/
 contracts-preprocessed/
 era_test_node.log*
 node_modules/
+foundry.lock
 out/
 target/
 tools/verifier-gen/data/*.sol

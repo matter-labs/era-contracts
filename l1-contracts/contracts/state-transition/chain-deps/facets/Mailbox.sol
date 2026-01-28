@@ -23,10 +23,7 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {L1_GAS_PER_PUBDATA_BYTE, MAX_NEW_FACTORY_DEPS, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "../../../common/Config.sol";
 import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
-import {IAssetRouterShared} from "../../../bridge/asset-router/IAssetRouterShared.sol";
-
-import {AddressNotZero, BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, NotAssetRouter, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
+import {AddressNotZero, BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {DepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 import {DepthMoreThanOneForRecursiveMerkleProof} from "../../../core/bridgehub/L1BridgehubErrors.sol";
 
@@ -54,9 +51,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     /// @dev Deployed utility contract to check that account is EIP7702 one
     IEIP7702Checker internal immutable EIP_7702_CHECKER;
 
-    /// @dev Era's chainID
-    uint256 internal immutable ERA_CHAIN_ID;
-
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
     uint256 internal immutable L1_CHAIN_ID;
@@ -82,19 +76,12 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         _;
     }
 
-    constructor(
-        uint256 _eraChainId,
-        uint256 _l1ChainId,
-        address _chainAssetHandler,
-        IEIP7702Checker _eip7702Checker,
-        bool _isTestnet
-    ) {
+    constructor(uint256 _l1ChainId, address _chainAssetHandler, IEIP7702Checker _eip7702Checker, bool _isTestnet) {
         if (address(_eip7702Checker) == address(0) && block.chainid == _l1ChainId) {
             revert ZeroAddress();
         } else if (address(_eip7702Checker) != address(0) && block.chainid != _l1ChainId) {
             revert AddressNotZero();
         }
-        ERA_CHAIN_ID = _eraChainId;
         L1_CHAIN_ID = _l1ChainId;
         CHAIN_ASSET_HANDLER = _chainAssetHandler;
         EIP_7702_CHECKER = _eip7702Checker;
@@ -663,67 +650,5 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     // solhint-disable-next-line no-unused-vars
     function _writePriorityOpHash(bytes32 _canonicalTxHash, uint64 _expirationTimestamp) internal {
         s.priorityTree.push(_canonicalTxHash);
-    }
-
-    ///////////////////////////////////////////////////////
-    //////// Legacy Era functions
-
-    /// @inheritdoc IMailboxImpl
-    function finalizeEthWithdrawal(
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external nonReentrant onlyL1 {
-        if (s.chainId != ERA_CHAIN_ID) {
-            revert OnlyEraSupported();
-        }
-        address sharedBridge = address(IBridgehubBase(s.bridgehub).assetRouter());
-        IL1AssetRouter(sharedBridge).finalizeWithdrawal({
-            _chainId: ERA_CHAIN_ID,
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _message: _message,
-            _merkleProof: _merkleProof
-        });
-    }
-
-    /// @inheritdoc IMailboxImpl
-    function requestL2Transaction(
-        address _contractL2,
-        uint256 _l2Value,
-        bytes calldata _calldata,
-        uint256 _l2GasLimit,
-        uint256 _l2GasPerPubdataByteLimit,
-        bytes[] calldata _factoryDeps,
-        address _refundRecipient
-    ) external payable onlyL1 returns (bytes32 canonicalTxHash) {
-        if (s.chainId != ERA_CHAIN_ID) {
-            revert OnlyEraSupported();
-        }
-        address assetRouter = address(IBridgehubBase(s.bridgehub).assetRouter());
-        require(msg.sender != assetRouter, NotAssetRouter(msg.sender, assetRouter));
-        canonicalTxHash = _requestL2TransactionSender(
-            BridgehubL2TransactionRequest({
-                sender: msg.sender,
-                contractL2: _contractL2,
-                mintValue: msg.value,
-                l2Value: _l2Value,
-                l2GasLimit: _l2GasLimit,
-                l2Calldata: _calldata,
-                l2GasPerPubdataByteLimit: _l2GasPerPubdataByteLimit,
-                factoryDeps: _factoryDeps,
-                refundRecipient: _refundRecipient
-            })
-        );
-        address sharedBridge = address(IBridgehubBase(s.bridgehub).assetRouter());
-        IAssetRouterShared(sharedBridge).bridgehubDepositBaseToken{value: msg.value}(
-            s.chainId,
-            s.baseTokenAssetId,
-            msg.sender,
-            msg.value
-        );
     }
 }

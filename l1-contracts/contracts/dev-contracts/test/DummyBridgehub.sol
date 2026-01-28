@@ -8,6 +8,8 @@ import {IMessageRoot} from "../../core/message-root/IMessageRoot.sol";
 
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 
+import {L2TransactionRequestDirect} from "../../core/bridgehub/IBridgehubBase.sol";
+
 /// @title DummyBridgehub
 /// @notice A test smart contract that allows to set State Transition Manager for a given chain
 contract DummyBridgehub {
@@ -63,4 +65,8 @@ contract DummyBridgehub {
     function settlementLayer(uint256) external view returns (uint256) {
         return 0;
     }
+
+    function requestL2TransactionDirect(
+        L2TransactionRequestDirect calldata _request
+    ) external payable returns (bytes32 canonicalTxHash) {}
 }

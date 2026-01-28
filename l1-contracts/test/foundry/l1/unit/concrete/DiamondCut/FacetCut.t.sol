@@ -17,8 +17,6 @@ contract FacetCutTest is DiamondCutTest {
     ExecutorFacet private executorFacet1;
     ExecutorFacet private executorFacet2;
 
-    uint256 eraChainId;
-
     function getExecutorSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](4);
         uint256 i = 0;
@@ -30,10 +28,9 @@ contract FacetCutTest is DiamondCutTest {
     }
 
     function setUp() public {
-        eraChainId = 9;
         diamondCutTestContract = new DiamondCutTestContract();
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
-        mailboxFacet = new MailboxFacet(eraChainId, block.chainid, address(0), eip7702Checker, false);
+        mailboxFacet = new MailboxFacet(block.chainid, address(0), eip7702Checker, false);
         gettersFacet = new GettersFacet();
         executorFacet1 = new ExecutorFacet(block.chainid);
         executorFacet2 = new ExecutorFacet(block.chainid);

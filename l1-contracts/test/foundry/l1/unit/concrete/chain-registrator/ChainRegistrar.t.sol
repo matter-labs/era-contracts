@@ -14,7 +14,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import "contracts/chain-registrar/ChainRegistrar.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {console2 as console} from "forge-std/Script.sol";
@@ -252,7 +252,7 @@ contract ChainRegistrarTest is Test {
 
     function registerChainAndVerify(address author, uint256 chainId) internal {
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
-        DummyZKChain zkChain = new DummyZKChain(address(bridgeHub), 270, 6, address(0), eip7702Checker);
+        DummyZKChain zkChain = new DummyZKChain(address(bridgeHub), 6, address(0), eip7702Checker);
         vm.prank(admin);
         ctm.setZKChain(1, address(zkChain));
         vm.prank(admin);

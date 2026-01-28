@@ -70,7 +70,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
     bytes internal forceDeploymentsData = hex"";
 
-    uint256 eraChainId = 9;
     uint256 internal constant MAX_NUMBER_OF_ZK_CHAINS = 10;
 
     Diamond.FacetCut[] internal facetCuts;
@@ -159,13 +158,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         facetCuts.push(
             Diamond.FacetCut({
                 facet: address(
-                    new MailboxFacet(
-                        eraChainId,
-                        block.chainid,
-                        address(0),
-                        IEIP7702Checker(makeAddr("eip7702Checker")),
-                        false
-                    )
+                    new MailboxFacet(block.chainid, address(0), IEIP7702Checker(makeAddr("eip7702Checker")), false)
                 ),
                 action: Diamond.Action.Add,
                 isFreezable: false,
