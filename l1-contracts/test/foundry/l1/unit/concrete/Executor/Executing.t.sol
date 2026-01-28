@@ -387,11 +387,7 @@ contract ExecutingTest is ExecutorTest {
         uint256 l2Value = 10 ether;
         uint256 totalCost = baseCost + l2Value;
 
-<<<<<<< HEAD
         dummyBridgehub.requestL2TransactionDirect{value: totalCost}(
-=======
-       dummyBridgehub.requestL2TransactionDirect{value: totalCost}(
->>>>>>> ae5a78d1e (Mailbox constructor changes, rm eraChainID)
             L2TransactionRequestDirect({
                 chainId: l2ChainId,
                 mintValue: totalCost,
@@ -403,11 +399,7 @@ contract ExecutingTest is ExecutorTest {
                 factoryDeps: factoryDeps,
                 refundRecipient: address(0)
             })
-<<<<<<< HEAD
         );
-=======
-       );
->>>>>>> ae5a78d1e (Mailbox constructor changes, rm eraChainID)
 
         vm.prank(validator);
         vm.expectRevert(PriorityOperationsRollingHashMismatch.selector);

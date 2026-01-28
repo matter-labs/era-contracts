@@ -78,12 +78,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
-<<<<<<< HEAD
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         //TODO deprecate, eventually
-=======
-    modifier onlyBridgehubOrEra(uint256 _chainId) {//TODO deprecate, eventually
->>>>>>> ae5a78d1e (Mailbox constructor changes, rm eraChainID)
         require(
             msg.sender == address(BRIDGE_HUB) || (_chainId == ERA_CHAIN_ID && msg.sender == address(ERA_DIAMOND_PROXY)),
             Unauthorized(msg.sender)

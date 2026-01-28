@@ -102,10 +102,6 @@ contract GatewayCTMDeployerTest is Test {
 
     // This is done merely to publish the respective bytecodes.
     function _predeployContracts() internal {
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> ae5a78d1e (Mailbox constructor changes, rm eraChainID)
         new MailboxFacet(1, L2_CHAIN_ASSET_HANDLER_ADDR, IEIP7702Checker(address(0)), false);
         new ExecutorFacet(1);
         new GettersFacet();
@@ -113,12 +109,7 @@ contract GatewayCTMDeployerTest is Test {
 
         new DiamondInit(false);
         new L1GenesisUpgrade();
-<<<<<<< HEAD
-=======
-=======
->>>>>>> ae5a78d1e (Mailbox constructor changes, rm eraChainID)
         // DA contracts
->>>>>>> b9f26d282 (feat: Splitting GatewayCTMDeployer (#1964))
         new RollupDAManager();
         new ValidiumL1DAValidator();
         new RelayedSLDAValidator();

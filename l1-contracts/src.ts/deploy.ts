@@ -641,15 +641,7 @@ export class Deployer {
     }
     const contractAddress = await this.deployViaCreate2(
       "MailboxFacet",
-<<<<<<< HEAD
-<<<<<<< HEAD
       [await this.getL1ChainId(), chainAssetHandler, eip7702Checker, isTestnet],
-=======
-      [await this.getL1ChainId(), chainAssetHandler],
->>>>>>> ae5a78d1e (Mailbox constructor changes, rm eraChainID)
-=======
-      [await this.getL1ChainId(), chainAssetHandler, eip7702Checker, isTestnet],
->>>>>>> c54858d26 (Rm inmut var)
       create2Salt,
       ethTxOptions
     );
