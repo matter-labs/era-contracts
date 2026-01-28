@@ -46,16 +46,6 @@ contract GatewayVotePreparationTests is Test {
         assertTrue(address(votePreparationScript) != address(0), "GatewayVotePreparation should be instantiated");
     }
 
-    /// @notice Test that multiple GatewayVotePreparation instances can be created
-    function test_multipleGatewayVotePreparationInstances() public {
-        GatewayVotePreparationForTests script1 = new GatewayVotePreparationForTests();
-        GatewayVotePreparationForTests script2 = new GatewayVotePreparationForTests();
-
-        assertTrue(address(script1) != address(0), "First instance should be created");
-        assertTrue(address(script2) != address(0), "Second instance should be created");
-        assertTrue(address(script1) != address(script2), "Instances should have different addresses");
-    }
-
     /// @notice Test that GatewayVotePreparation initial state is correct
     function test_gatewayVotePreparationInitialState() public {
         GatewayVotePreparationForTests votePreparationScript = new GatewayVotePreparationForTests();
@@ -65,19 +55,6 @@ contract GatewayVotePreparationTests is Test {
         assertEq(votePreparationScript.getCTM(), address(0), "CTM should be zero address initially");
         assertEq(votePreparationScript.getRefundRecipient(), address(0), "Refund recipient should be zero initially");
         assertEq(votePreparationScript.getEraChainId(), 0, "Era chain ID should be 0 initially");
-    }
-
-    /// @notice Test that GatewayVotePreparation inherits from expected base contracts
-    /// @dev This tests the inheritance chain by checking that we can call base contract methods
-    function test_gatewayVotePreparationInheritance() public {
-        GatewayVotePreparationForTests votePreparationScript = new GatewayVotePreparationForTests();
-
-        // Verify we can access the contract - this implicitly tests that inheritance is correct
-        // since GatewayVotePreparation inherits from DeployCTMUtils and GatewayGovernanceUtils
-        assertTrue(
-            address(votePreparationScript) != address(0),
-            "Contract should be deployed with correct inheritance"
-        );
     }
 
     // Exclude from coverage report
