@@ -120,6 +120,14 @@ library Utils {
     bytes internal constant CREATE2_FACTORY_BYTECODE =
         hex"604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
 
+    // Runtime bytecode of the Crea§te2Factory contract.
+    bytes internal constant CREATE2_FACTORY_RUNTIME_BYTECODE =
+        hex"7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
+
+    // Deterministic Create2Factory address (deployed via Arachnid's deterministic-deployment-proxy)
+    // https://github.com/Arachnid/deterministic-deployment-proxy
+    address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
+
     uint256 internal constant MAX_PRIORITY_TX_GAS = 72000000;
 
     /**
@@ -262,7 +270,7 @@ library Utils {
         }
 
         vm.broadcast();
-        (bool success, bytes memory data) = _factory.call(abi.encodePacked(_salt, _bytecode));
+        (bool success, bytes memory data) = _factory.call(getDeterministicCreate2FactoryCalldata(_salt, _bytecode));
         contractAddress = bytesToAddress(data);
 
         if (!success || contractAddress == address(0) || contractAddress.code.length == 0) {
@@ -332,6 +340,27 @@ library Utils {
         bytecodeHash = L2ContractHelper.hashL2Bytecode(bytecode);
 
         data = abi.encodeWithSignature("create2(bytes32,bytes32,bytes)", create2Salt, bytecodeHash, constructorArgs);
+    }
+
+    /// @notice Prepares calldata for the deterministic CREATE2 factory (Arachnid's proxy).
+    /// @dev The format is: salt (32 bytes) + initCode.
+    /// @param salt The salt value.
+    /// @param initCode The initialization code (bytecode + constructor args).
+    /// @return The calldata to send to the deterministic CREATE2 factory.
+    function getDeterministicCreate2FactoryCalldata(
+        bytes32 salt,
+        bytes memory initCode
+    ) internal pure returns (bytes memory) {
+        return abi.encodePacked(salt, initCode);
+    }
+
+    /// @notice Computes the L2 address via the deterministic CREATE2 factory.
+    /// @dev This uses standard EVM CREATE2 address derivation (not ZKsync-specific).
+    /// @param salt The salt value.
+    /// @param initCode The initialization code (bytecode + constructor args).
+    /// @return The computed CREATE2 address.
+    function getL2AddressViaDeterministicCreate2(bytes32 salt, bytes memory initCode) internal view returns (address) {
+        return vm.computeCreate2Address(salt, keccak256(initCode), DETERMINISTIC_CREATE2_ADDRESS);
     }
 
     function appendArray(bytes[] memory array, bytes memory element) internal pure returns (bytes[] memory) {
@@ -507,7 +536,7 @@ library Utils {
         uint256 chainId,
         address bridgehubAddress,
         address l1SharedBridgeProxy
-    ) public returns (bytes32 txHash) {
+    ) internal returns (bytes32 txHash) {
         runL1L2Transaction({
             l2Calldata: hex"",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -1356,7 +1385,7 @@ library Utils {
         return abi.encode(bytecodeInfo, proxyBytecodeInfo);
     }
 
-    function mergeCalls(Call[] memory a, Call[] memory b) public pure returns (Call[] memory result) {
+    function mergeCalls(Call[] memory a, Call[] memory b) internal pure returns (Call[] memory result) {
         result = new Call[](a.length + b.length);
         for (uint256 i = 0; i < a.length; i++) {
             result[i] = a[i];
@@ -1366,7 +1395,7 @@ library Utils {
         }
     }
 
-    function appendCall(Call[] memory a, Call memory b) public pure returns (Call[] memory result) {
+    function appendCall(Call[] memory a, Call memory b) internal pure returns (Call[] memory result) {
         result = new Call[](a.length + 1);
         for (uint256 i = 0; i < a.length; i++) {
             result[i] = a[i];
@@ -1374,7 +1403,7 @@ library Utils {
         result[a.length] = b;
     }
 
-    function compareStrings(string memory a, string memory b) public pure returns (bool) {
+    function compareStrings(string memory a, string memory b) internal pure returns (bool) {
         return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 

@@ -17,3 +17,5 @@ l1-contracts/zkstack-out
 l2-contracts/zkout
 system-contracts/zkout
 configs/*
+.claude
+**/.claude
