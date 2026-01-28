@@ -283,7 +283,6 @@ library GatewayCTMDeployerHelper {
 
         // MailboxFacet
         bytes memory mailboxFacetArgs = abi.encode(
-            config.eraChainId,
             config.l1ChainId,
             L2_CHAIN_ASSET_HANDLER_ADDR,
             address(0), // eip7702Checker
