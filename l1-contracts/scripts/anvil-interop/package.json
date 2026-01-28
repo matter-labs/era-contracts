@@ -15,10 +15,15 @@
     "step4": "ts-node step4-initialize-l2.ts",
     "step5": "ts-node step5-setup-gateway.ts",
     "step6": "ts-node step6-start-settler.ts",
-    "step:all": "yarn step1 && yarn step2 && yarn step3 && yarn step4 && yarn step5",
+    "step:all": "bash run-all-steps.sh",
     "test:interop": "ts-node test-interop.ts",
     "send:interop": "ts-node send-interop-tx.ts",
-    "send:l2-to-l2": "ts-node send-l2-to-l2.ts"
+    "send:l2-to-l2": "ts-node send-l2-to-l2.ts",
+    "deploy:test-token": "ts-node deploy-test-token.ts",
+    "send:token": "ts-node send-token-transfer.ts",
+    "deploy:l2-contracts": "ts-node deploy-all-l2-contracts.ts",
+    "deploy:enhanced-mock": "ts-node deploy-enhanced-mock.ts",
+    "init:l2-contracts": "ts-node initialize-all-l2-contracts.ts"
   },
   "keywords": [
     "anvil",
