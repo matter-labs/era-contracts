@@ -45,9 +45,7 @@ contract MailboxOnGatewayTest is UtilsCallMockerTest {
         // Deploy without EIP7702Checker since we're not on L1
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(
-                new MailboxFacet(l1ChainId, address(chainAssetHandler), IEIP7702Checker(address(0)), false)
-            ),
+            facet: address(new MailboxFacet(l1ChainId, address(chainAssetHandler), IEIP7702Checker(address(0)), false)),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: Utils.getMailboxSelectors()
