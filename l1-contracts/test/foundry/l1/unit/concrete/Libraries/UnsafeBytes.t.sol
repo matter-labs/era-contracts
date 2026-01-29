@@ -248,4 +248,105 @@ contract UnsafeBytesTest is Test {
         assertEq(val256, 456);
         assertEq(remaining, trailer);
     }
+
+    function test_regression_consecutiveReadsRequireOffsetUpdate() public pure {
+        // Encode two different uint256 values: chainId = 7, batchNumber = 123
+        uint256 chainId = 7;
+        uint256 batchNumber = 123;
+        bytes memory message = abi.encodePacked(
+            bytes4(0x12345678), // 4 byte selector
+            chainId, // 32 bytes
+            batchNumber // 32 bytes
+        );
+
+        uint256 offset = 4; // Start after selector
+
+        // CORRECT PATTERN: Capture the updated offset
+        uint256 readChainId;
+        (readChainId, offset) = UnsafeBytes.readUint256(message, offset);
+
+        uint256 readBatchNumber;
+        (readBatchNumber, ) = UnsafeBytes.readUint256(message, offset);
+
+        // Both values should be read correctly
+        assertEq(readChainId, chainId, "ChainId should be read correctly");
+        assertEq(readBatchNumber, batchNumber, "BatchNumber should be read correctly");
+        assertNotEq(readChainId, readBatchNumber, "ChainId and BatchNumber should be different");
+    }
+
+    /// @notice Demonstrates the bug pattern - what happens when offset is not captured
+    /// @dev This shows that discarding the offset causes both reads to return the same value
+    function test_regression_discardingOffsetCausesDuplicateReads() public pure {
+        // Encode two different uint256 values
+        uint256 firstValue = 42;
+        uint256 secondValue = 999;
+        bytes memory message = abi.encodePacked(firstValue, secondValue);
+
+        uint256 offset = 0;
+
+        // BUGGY PATTERN: Discard the updated offset (using _ placeholder)
+        uint256 read1;
+        // Note: This is the buggy pattern - we intentionally discard the offset
+        (read1, ) = UnsafeBytes.readUint256(message, offset);
+
+        uint256 read2;
+        // This read uses the same offset as the first read!
+        (read2, ) = UnsafeBytes.readUint256(message, offset);
+
+        // Both reads return the SAME value because offset wasn't updated
+        assertEq(read1, firstValue, "First read should return first value");
+        assertEq(read2, firstValue, "Second read also returns first value (bug!)");
+        assertEq(read1, read2, "Both reads return the same value when offset is discarded");
+    }
+
+    /// @notice Test the exact scenario from the bug: chainId and batchNumber decoding
+    /// @dev Simulates the L1MessageRoot.saveV30UpgradeChainBatchNumberOnL1 message format
+    function test_regression_v30UpgradeMessageDecodingPattern() public pure {
+        // Simulate the message format that was being decoded
+        // Format: selector (4 bytes) + chainId (32 bytes) + v30UpgradeChainBatchNumber (32 bytes)
+        bytes4 functionSelector = bytes4(keccak256("saveV30UpgradeChainBatchNumberOnL1()"));
+        uint256 expectedChainId = 270; // ZKSync Era chain ID
+        uint256 expectedBatchNumber = 50000; // Some batch number
+
+        bytes memory message = abi.encodePacked(functionSelector, expectedChainId, expectedBatchNumber);
+
+        // Read selector and update offset
+        uint256 offset = 0;
+        (uint32 selector, ) = UnsafeBytes.readUint32(message, offset);
+        offset = 4; // After selector
+
+        // CORRECT: Read chainId and capture the new offset
+        uint256 decodedChainId;
+        (decodedChainId, offset) = UnsafeBytes.readUint256(message, offset);
+
+        // CORRECT: Read batchNumber using the updated offset
+        uint256 decodedBatchNumber;
+        (decodedBatchNumber, ) = UnsafeBytes.readUint256(message, offset);
+
+        // Verify correct decoding
+        assertEq(bytes4(bytes32(uint256(selector) << 224)), functionSelector, "Selector mismatch");
+        assertEq(decodedChainId, expectedChainId, "ChainId should match");
+        assertEq(decodedBatchNumber, expectedBatchNumber, "BatchNumber should match");
+
+        // Key assertion: The values should be different!
+        // Before the fix, decodedBatchNumber would equal decodedChainId (270)
+        assertNotEq(decodedChainId, decodedBatchNumber, "ChainId and BatchNumber should be different values");
+    }
+
+    /// @notice Fuzz test for consecutive uint256 reads with proper offset handling
+    function testFuzz_regression_consecutiveUint256Reads(uint256 value1, uint256 value2) public pure {
+        bytes memory data = abi.encodePacked(value1, value2);
+
+        uint256 offset = 0;
+        uint256 read1;
+        uint256 read2;
+
+        // Correctly capture offset
+        (read1, offset) = UnsafeBytes.readUint256(data, offset);
+        (read2, offset) = UnsafeBytes.readUint256(data, offset);
+
+        assertEq(read1, value1, "First value should be read correctly");
+        assertEq(read2, value2, "Second value should be read correctly");
+        assertEq(offset, 64, "Final offset should be 64 (2 * 32 bytes)");
+    }
 }

@@ -80,3 +80,136 @@ When debugging Solidity compilation or script failures:
    - Use forge script traces to see where execution fails
 
 - If the function was introduced in a new version, query the protocol version from the ChainTypeManager or the Diamond proxy.
+
+## Running Foundry Tests
+
+### Installing foundry-zksync
+
+The tests require `foundry-zksync` (ZKSync's fork of Foundry) to be installed. Download the specific version used in CI:
+
+```bash
+mkdir ./foundry-zksync
+curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.30/foundry_zksync_v0.0.30_linux_amd64.tar.gz
+tar zxf foundry_zksync_v0.0.30_linux_amd64.tar.gz -C ./foundry-zksync
+chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+rm foundry_zksync_v0.0.30_linux_amd64.tar.gz
+export PATH="$PWD/foundry-zksync:$PATH"
+```
+
+### Building Artifacts
+
+Before running tests, build all required artifacts from the repository root:
+
+```bash
+# Build da-contracts
+yarn da build:foundry
+
+# Build l1-contracts
+yarn l1 build:foundry
+
+# Build system-contracts
+yarn sc build:foundry
+
+# Build l2-contracts
+yarn l2 build:foundry
+```
+
+### Running Tests
+
+```bash
+# Run l1-contracts foundry tests
+cd l1-contracts
+yarn test:foundry
+
+# Run system-contracts foundry tests
+cd system-contracts
+yarn test:foundry
+```
+
+### Common Issues
+
+1. **Missing zkout files**: If tests fail with "zkout/BeaconProxy.sol/BeaconProxy.json not found", ensure you've built all artifacts with the steps above.
+
+2. **Config lock errors**: Some tests may fail with "Can't acquire config lock". This is usually a transient issue - try running the tests again.
+
+3. **L1-context vs L2-context tests**: Tests in `l2-tests-in-l1-context` run L2 logic in an L1 environment. Some L2 system contract features may not work as expected in these tests, so assertions should account for this limitation.
+
+4. **zkstack-out artifacts out of date**: If CI fails with "l1-contracts/zkstack-out is out of date", you need to regenerate the compiled artifacts. This happens when you modify interface files (e.g., adding events, functions). Run:
+
+   ```bash
+   cd l1-contracts
+   forge build
+   npx ts-node scripts/copy-to-zkstack-out.ts
+   cd ..
+   yarn prettier:fix  # Required to add trailing newlines to JSON files
+   ```
+
+   Then commit the updated JSON files in `zkstack-out/`.
+
+5. **Selectors out of date**: If CI fails with selectors check, regenerate them:
+
+   ```bash
+   cd l1-contracts
+   yarn selectors --fix
+   ```
+
+   Then commit the updated `selectors` file.
+
+## Before Pushing Changes
+
+**ALWAYS run linting and formatting before pushing to ensure CI passes:**
+
+### Running Linting and Formatting
+
+From the repository root:
+
+```bash
+# Fix Solidity linting issues
+yarn lint:sol --fix --noPrompt
+
+# Fix TypeScript linting issues
+yarn lint:ts --fix
+
+# Fix formatting issues
+yarn prettier:fix
+```
+
+### Pre-Push Checklist
+
+1. **Run linting fixes**: `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix`
+2. **Run foundry tests**: `cd l1-contracts && yarn test:foundry`
+3. **Verify no uncommitted changes**: `git status`
+4. **Commit and push**: Only after all checks pass
+
+### Common Linting Issues
+
+1. **Line length**: Solidity lines should not exceed the configured max length
+2. **Import ordering**: Imports may need to be reordered
+3. **Trailing whitespace**: Will be fixed by prettier
+4. **Missing or extra newlines**: Will be fixed by prettier
+
+## Git Best Practices
+
+### Never Force Push
+
+**Do NOT use `--force`, `--force-with-lease`, or `git push -f`**
+
+- Always use regular `git push`
+- If you need to make additional changes, create a new commit instead of amending
+- Force pushing rewrites history and can cause issues for others working on the same branch
+
+❌ **FORBIDDEN:**
+
+```bash
+git commit --amend
+git push --force
+git push --force-with-lease
+git push -f
+```
+
+✅ **CORRECT:**
+
+```bash
+git commit -m "Fix: additional changes"
+git push
+```
