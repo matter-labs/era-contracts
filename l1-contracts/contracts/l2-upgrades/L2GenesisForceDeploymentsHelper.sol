@@ -158,9 +158,10 @@ library L2GenesisForceDeploymentsHelper {
             }
         }
 
-        // If the address does not have any bytecode, we expect that it is a proxy
+        // If the address does not have any bytecode, we expect that it is a proxy.
         if (_newAddress.code.length == 0) {
-            forceDeployOnAddressZKsyncOS(bytecodeInfoSystemProxy, _newAddress);
+            // We can call unsafe directly, since the code length is checked to be 0 already.
+            unsafeForceDeployZKsyncOS(bytecodeInfoSystemProxy, _newAddress);
             ISystemContractProxy(_newAddress).forceInitAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR);
         }
 
