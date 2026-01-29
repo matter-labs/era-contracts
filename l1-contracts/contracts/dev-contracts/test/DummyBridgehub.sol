@@ -6,6 +6,8 @@ import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IMessageRoot} from "../../core/message-root/IMessageRoot.sol";
 
+import {L2TransactionRequestDirect} from "../../core/bridgehub/IBridgehubBase.sol";
+
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 
 /// @title DummyBridgehub
@@ -63,4 +65,8 @@ contract DummyBridgehub {
     function settlementLayer(uint256) external view returns (uint256) {
         return 0;
     }
+
+    function requestL2TransactionDirect(
+        L2TransactionRequestDirect calldata _request
+    ) external payable returns (bytes32 canonicalTxHash) {}
 }

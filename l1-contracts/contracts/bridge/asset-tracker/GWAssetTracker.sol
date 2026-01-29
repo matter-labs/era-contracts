@@ -22,6 +22,7 @@ import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IMailboxImpl} from "../../state-transition/chain-interfaces/IMailboxImpl.sol";
+import {IMailboxLegacy} from "../../state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {LegacySharedBridgeAddresses, SharedBridgeOnChainId} from "./LegacySharedBridgeAddresses.sol";
 import {InteropDataEncoding} from "../../interop/InteropDataEncoding.sol";
@@ -515,7 +516,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         // slither-disable-next-line unused-return
         (bytes4 functionSignature, , uint256 amount) = DataEncoding.decodeBaseTokenFinalizeWithdrawalData(_message);
         require(
-            functionSignature == IMailboxImpl.finalizeEthWithdrawal.selector,
+            functionSignature == IMailboxLegacy.finalizeEthWithdrawal.selector,
             InvalidFunctionSignature(functionSignature)
         );
         _decreaseChainBalance(_chainId, _baseTokenAssetId, amount);

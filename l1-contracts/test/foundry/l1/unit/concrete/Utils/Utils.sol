@@ -377,13 +377,11 @@ library Utils {
     }
 
     function getMailboxSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](9);
+        bytes4[] memory selectors = new bytes4[](7);
         uint256 i = 0;
         selectors[i++] = MailboxFacet.proveL2MessageInclusion.selector;
         selectors[i++] = MailboxFacet.proveL2LogInclusion.selector;
         selectors[i++] = MailboxFacet.proveL1ToL2TransactionStatus.selector;
-        selectors[i++] = MailboxFacet.finalizeEthWithdrawal.selector;
-        selectors[i++] = MailboxFacet.requestL2Transaction.selector;
         selectors[i++] = MailboxFacet.bridgehubRequestL2Transaction.selector;
         selectors[i++] = MailboxFacet.l2TransactionBaseCost.selector;
         selectors[i++] = MailboxFacet.proveL2LeafInclusion.selector;
