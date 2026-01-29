@@ -1,6 +1,11 @@
 name: Check Dead Links in Markdown Files
 
-on: pull_request
+# Only run on pull requests to main branch
+# Otherwise, any external change (like docs location change), can cause 100s of PRs to start failing.
+on:
+  pull_request:
+    branches:
+      - main
 
 jobs:
   check-dead-links:

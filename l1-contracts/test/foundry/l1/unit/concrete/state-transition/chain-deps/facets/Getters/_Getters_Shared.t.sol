@@ -8,7 +8,8 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "contracts/state-transition/chain-interfaces/ILegacyGetters.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {PriorityOperation} from "contracts/state-transition/libraries/PriorityQueue.sol";
+import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 contract GettersFacetWrapper is GettersFacet, Test {
     function util_setVerifier(address _verifier) external {
@@ -165,6 +166,34 @@ contract GettersFacetWrapper is GettersFacet, Test {
     function util_setFacetAddress(bytes4 _selector, address _facet) external {
         Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
         ds.selectorToFacet[_selector].facetAddress = _facet;
+    }
+
+    function util_setChainId(uint256 _chainId) external {
+        s.chainId = _chainId;
+    }
+
+    function util_setPriorityTreeStartIndex(uint256 _startIndex) external {
+        s.priorityTree.startIndex = _startIndex;
+    }
+
+    function util_setPubdataPricingMode(uint8 _mode) external {
+        s.feeParams.pubdataPricingMode = PubdataPricingMode(_mode);
+    }
+
+    function util_setL1DAValidator(address _validator) external {
+        s.l1DAValidator = _validator;
+    }
+
+    function util_setL2DACommitmentScheme(uint8 _scheme) external {
+        s.l2DACommitmentScheme = L2DACommitmentScheme(_scheme);
+    }
+
+    function util_setSettlementLayer(address _settlementLayer) external {
+        s.settlementLayer = _settlementLayer;
+    }
+
+    function util_setTransactionFilterer(address _transactionFilterer) external {
+        s.transactionFilterer = _transactionFilterer;
     }
 
     // add this to be excluded from coverage report

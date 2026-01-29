@@ -3,26 +3,20 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "../Utils.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
-import {L2ContractsBytecodesLib} from "../L2ContractsBytecodesLib.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {Call as GovernanceCall} from "contracts/governance/Common.sol"; // renamed to avoid conflict
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {Call as GovernanceCall} from "contracts/governance/Common.sol";
+
+import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {MulticallWithGas} from "./MulticallWithGas.sol";
+import {MulticallWithGas} from "../utils/MulticallWithGas.sol";
+import {IFinalizeUpgrade} from "contracts/script-interfaces/IFinalizeUpgrade.sol";
 
 /// @notice Script intended to help us finalize the governance upgrade
-contract FinalizeUpgrade is Script {
+contract FinalizeUpgrade is Script, IFinalizeUpgrade {
     using stdToml for string;
 
     function initChains(address bridgehub, uint256[] calldata chains) external {
@@ -32,7 +26,7 @@ contract FinalizeUpgrade is Script {
 
             if (bh.baseTokenAssetId(chains[i]) == bytes32(0)) {
                 vm.broadcast();
-                L1Bridgehub(bridgehub).registerLegacyChain(chains[i]);
+                // L1Bridgehub(bridgehub).registerLegacyChain(chains[i]);
             }
         }
     }
@@ -158,19 +152,17 @@ contract FinalizeUpgrade is Script {
                 console.log("Processing chain: ", params.chains[i]);
                 if (bh.baseTokenAssetId(params.chains[i]) == bytes32(0)) {
                     // Register legacy chain if needed
-                    bytes memory data = abi.encodeWithSelector(
-                        L1Bridgehub.registerLegacyChain.selector,
-                        params.chains[i]
-                    );
-
+                    // bytes memory data = abi.encodeWithSelector(
+                    // L1Bridgehub.registerLegacyChain.selector,
+                    // params.chains[i]
+                    // );
                     // Add call to aggregator calls array
-                    callIndex = addCall(calls, callIndex, params.bridgehub, data);
-
+                    // callIndex = addCall(calls, callIndex, params.bridgehub, data);
                     // If we've hit max calls, flush
-                    if (callIndex == MAX_CALLS_PER_BATCH) {
-                        flushBatch(params.aggregator, calls, callIndex);
-                        callIndex = 0;
-                    }
+                    // if (callIndex == MAX_CALLS_PER_BATCH) {
+                    //     flushBatch(params.aggregator, calls, callIndex);
+                    //     callIndex = 0;
+                    // }
                 }
             }
 

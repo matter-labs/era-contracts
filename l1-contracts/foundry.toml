@@ -1,13 +1,21 @@
 [profile.default]
-allow_paths = ["../l2-contracts/contracts"]
+allow_paths = ["../l2-contracts/contracts", "../lib"]
 src = "contracts"
 out = "out"
 libs = ["./lib"]
 cache_path = "cache-forge"
 test = "test/foundry"
 solc_version = "0.8.28"
-evm_version = "cancun"
+evm_version = "prague"
 fs_permissions = [
+    { access = "read-write", path = "./script-out" },
+    { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-config/" },
+    { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-out/" },
+    { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-config/" },
+    { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-out/" },
+    { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/permanent-values/" },
+    { access = "read-write", path = "./script-config/permanent-values.toml" },
+    { access = "read-write", path = "./upgrade-envs/permanent-values/local.toml" },
     { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
     { access = "read", path = "../system-contracts/artifacts-zk/" },
     { access = "read", path = "../system-contracts/contracts-preprocessed/precompiles/artifacts" },
@@ -17,38 +25,37 @@ fs_permissions = [
     { access = "read", path = "../l2-contracts/artifacts-zk/" },
     { access = "read", path = "../l2-contracts/zkout/" },
     { access = "read", path = "../l1-contracts/artifacts-zk/" },
-    { access = "read-write", path = "../l1-contracts/script-out/" },
+    { access = "read", path = "../l1-contracts/script-out/" },
+    { access = "read", path = "../l1-contracts/broadcast/" },
     { access = "read", path = "../da-contracts/" },
     { access = "read", path = "../system-contracts/zkout/" },
     { access = "read", path = "./script-config" },
-    { access = "read-write", path = "./script-out" },
     { access = "read", path = "./upgrade-envs/" },
     { access = "read", path = "./out" },
-    { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-config/" },
-    { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-out/" },
-    { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-config/" },
-    { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-out/" },
     { access = "read", path = "zkout" },
     { access = "read", path = "./deploy-scripts/evm-predeploys/evm-predeploy-datas" },
+    { access = "read", path = "../configs/genesis/" },
+    { access = "read", path = "../configs/" },
 ]
 ignored_error_codes = ["missing-receive-ether", "code-size"]
 ignored_warnings_from = ["test", "contracts/dev-contracts"]
 suppressed_warnings = ["txorigin"]
 remappings = [
-    "forge-std/=lib/forge-std/src/",
-    "murky/=lib/murky/src/",
-    "foundry-test/=test/foundry/",
-    "l2-contracts/=../l2-contracts/contracts/",
-    "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
-    "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
+  "forge-std/=lib/forge-std/src/",
+  "murky/=lib/murky/src/",
+  "foundry-test/=test/foundry/",
+  "l2-contracts/=../l2-contracts/contracts/",
+  "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
+  "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
 ]
 optimizer = true
-optimizer_runs = 28000
+optimizer_runs = 9999999
 # TODO(X): the latest foundry disallows reverts that happen inside the internal calls and we should fix tests that rely
 # on such reverts
 allow_internal_expect_revert = true
 
-[profile.default.zksync] 
+
+[profile.default.zksync]
 enable_eravm_extensions = true
 zksolc = "1.5.11"
 

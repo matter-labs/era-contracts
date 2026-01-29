@@ -25,50 +25,6 @@ interface IL1Messenger {
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice Interface for the contract that is used to deploy contracts on L2.
- */
-interface IContractDeployer {
-    /// @notice A struct that describes a forced deployment on an address.
-    /// @param bytecodeHash The bytecode hash to put on an address.
-    /// @param newAddress The address on which to deploy the bytecodehash to.
-    /// @param callConstructor Whether to run the constructor on the force deployment.
-    /// @param value The `msg.value` with which to initialize a contract.
-    /// @param input The constructor calldata.
-    struct ForceDeployment {
-        bytes32 bytecodeHash;
-        address newAddress;
-        bool callConstructor;
-        uint256 value;
-        bytes input;
-    }
-
-    /// @notice This method is to be used only during an upgrade to set bytecodes on specific addresses.
-    /// @param _deployParams A set of parameters describing force deployment.
-    function forceDeployOnAddresses(ForceDeployment[] calldata _deployParams) external payable;
-
-    /// @notice Creates a new contract at a determined address using the `CREATE2` salt on L2
-    /// @param _salt a unique value to create the deterministic address of the new contract
-    /// @param _bytecodeHash the bytecodehash of the new contract to be deployed
-    /// @param _input the calldata to be sent to the constructor of the new contract
-    function create2(bytes32 _salt, bytes32 _bytecodeHash, bytes calldata _input) external returns (address);
-
-    /// @notice Calculates the address of a create2 contract deployment
-    /// @param _sender The address of the sender.
-    /// @param _bytecodeHash The bytecode hash of the new contract to be deployed.
-    /// @param _salt a unique value to create the deterministic address of the new contract
-    /// @param _input the calldata to be sent to the constructor of the new contract
-    /// @return newAddress The derived address of the account.
-    function getNewAddressCreate2(
-        address _sender,
-        bytes32 _bytecodeHash,
-        bytes32 _salt,
-        bytes calldata _input
-    ) external view returns (address newAddress);
-}
-
-/**
- * @author Matter Labs
- * @custom:security-contact security@matterlabs.dev
  * @notice Interface for the contract that is used to simulate ETH on L2.
  */
 interface IBaseToken {
@@ -120,8 +76,6 @@ address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0
 address constant DEPLOYER_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x06);
 
 address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
-
-uint256 constant L1_CHAIN_ID = 1;
 
 IL1Messenger constant L2_MESSENGER = IL1Messenger(address(SYSTEM_CONTRACTS_OFFSET + 0x08));
 

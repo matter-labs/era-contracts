@@ -12,7 +12,7 @@ contract setUpgradeDiamondCutTest is ChainTypeManagerTest {
     function test_SettingUpgradeDiamondCut() public {
         assertEq(chainContractAddress.protocolVersion(), 0, "Initial protocol version is not correct");
 
-        address randomDiamondInit = address(0x303030303030303030303);
+        address randomDiamondInit = makeAddr("randomDiamondInit");
         Diamond.DiamondCutData memory newDiamondCutData = getDiamondCutData(address(randomDiamondInit));
         bytes32 newCutHash = keccak256(abi.encode(newDiamondCutData));
 
