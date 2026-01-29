@@ -478,13 +478,6 @@ library L2GenesisForceDeploymentsHelper {
                 L2_INTEROP_HANDLER_ADDR
             );
         }
-
-        // Deploy BaseTokenHolder contract
-        conductContractUpgrade(
-            expectedUpgradeType,
-            fixedForceDeploymentsData.baseTokenHolderBytecodeInfo,
-            L2_BASE_TOKEN_HOLDER_ADDR
-        );
     }
 
     function _finalizeDeployments(
