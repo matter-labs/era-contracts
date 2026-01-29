@@ -125,7 +125,7 @@ contract GatewayCTMDeployerTest is Test {
 
         // Direct deployment contracts (no deployer)
         new AdminFacet(1, RollupDAManager(address(0)), false);
-        new MailboxFacet(1, 1, L2_CHAIN_ASSET_HANDLER_ADDR, IEIP7702Checker(address(0)), false);
+        new MailboxFacet(1, L2_CHAIN_ASSET_HANDLER_ADDR, IEIP7702Checker(address(0)), false);
         new ExecutorFacet(1);
         new GettersFacet();
         new DiamondInit(false);

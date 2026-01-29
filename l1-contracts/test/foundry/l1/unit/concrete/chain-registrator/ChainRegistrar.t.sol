@@ -252,7 +252,7 @@ contract ChainRegistrarTest is Test {
 
     function registerChainAndVerify(address author, uint256 chainId) internal {
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
-        DummyZKChain zkChain = new DummyZKChain(address(bridgeHub), 270, 6, address(0), eip7702Checker);
+        DummyZKChain zkChain = new DummyZKChain(address(bridgeHub), 6, address(0), eip7702Checker);
         vm.prank(admin);
         ctm.setZKChain(1, address(zkChain));
         vm.prank(admin);

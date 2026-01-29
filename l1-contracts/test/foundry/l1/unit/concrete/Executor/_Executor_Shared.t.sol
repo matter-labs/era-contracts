@@ -241,7 +241,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         admin = new AdminFacet(block.chainid, RollupDAManager(address(0)), false);
         getters = new GettersFacet();
         executor = new TestExecutor();
-        mailbox = new MailboxFacet(l2ChainId, block.chainid, address(chainAssetHandler), eip7702Checker, false);
+        mailbox = new MailboxFacet(block.chainid, address(chainAssetHandler), eip7702Checker, false);
 
         DummyCTM chainTypeManager = new DummyCTM(owner, address(0));
         vm.mockCall(

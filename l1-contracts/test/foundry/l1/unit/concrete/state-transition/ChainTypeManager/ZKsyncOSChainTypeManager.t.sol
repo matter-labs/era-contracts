@@ -160,7 +160,6 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             Diamond.FacetCut({
                 facet: address(
                     new MailboxFacet(
-                        eraChainId,
                         block.chainid,
                         address(0),
                         IEIP7702Checker(makeAddr("eip7702Checker")),

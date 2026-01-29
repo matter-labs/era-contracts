@@ -23,10 +23,8 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {L1_GAS_PER_PUBDATA_BYTE, MAX_NEW_FACTORY_DEPS, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "../../../common/Config.sol";
 import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
-import {IAssetRouterShared} from "../../../bridge/asset-router/IAssetRouterShared.sol";
 
-import {AddressNotZero, BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, NotAssetRouter, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
+import {AddressNotZero, BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {DepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 import {DepthMoreThanOneForRecursiveMerkleProof} from "../../../core/bridgehub/L1BridgehubErrors.sol";
 
@@ -54,9 +52,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     /// @dev Deployed utility contract to check that account is EIP7702 one
     IEIP7702Checker internal immutable EIP_7702_CHECKER;
 
-    /// @dev Era's chainID
-    uint256 internal immutable ERA_CHAIN_ID;
-
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
     uint256 internal immutable L1_CHAIN_ID;
@@ -83,7 +78,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     }
 
     constructor(
-        uint256 _eraChainId,
         uint256 _l1ChainId,
         address _chainAssetHandler,
         IEIP7702Checker _eip7702Checker,
@@ -94,7 +88,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         } else if (address(_eip7702Checker) != address(0) && block.chainid != _l1ChainId) {
             revert AddressNotZero();
         }
-        ERA_CHAIN_ID = _eraChainId;
         L1_CHAIN_ID = _l1ChainId;
         CHAIN_ASSET_HANDLER = _chainAssetHandler;
         EIP_7702_CHECKER = _eip7702Checker;

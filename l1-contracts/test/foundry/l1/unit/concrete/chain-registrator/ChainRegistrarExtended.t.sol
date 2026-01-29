@@ -177,7 +177,6 @@ contract ChainRegistrarExtendedTest is Test {
         // First set up the chain as deployed in CTM
         DummyZKChain zkChain = new DummyZKChain(
             address(bridgeHub),
-            270,
             block.chainid,
             address(assetRouter),
             eip7702Checker
@@ -218,7 +217,6 @@ contract ChainRegistrarExtendedTest is Test {
         // Set up chain in CTM
         DummyZKChain zkChain = new DummyZKChain(
             address(bridgeHub),
-            270,
             block.chainid,
             address(assetRouter),
             eip7702Checker
