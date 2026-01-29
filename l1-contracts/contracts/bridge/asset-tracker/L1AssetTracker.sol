@@ -330,17 +330,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         assetMigrationNumber[data.chainId][data.assetId] = data.chainMigrationNumber;
 
-        TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
-            isL1ToGateway: data.isL1ToGateway,
-            originToken: data.originToken,
-            chainId: data.chainId,
-            assetId: data.assetId,
-            tokenOriginChainId: data.tokenOriginChainId,
-            amount: data.amount,
-            chainMigrationNumber: 0,
-            assetMigrationNumber: data.chainMigrationNumber
-        });
+        TokenBalanceMigrationData memory tokenBalanceMigrationData = data;
+        tokenBalanceMigrationData.assetMigrationNumber = data.chainMigrationNumber;
+        tokenBalanceMigrationData.chainMigrationNumber = 0;
 
         _sendConfirmationToChains(
             data.isL1ToGateway ? currentSettlementLayer : _finalizeWithdrawalParams.chainId,
