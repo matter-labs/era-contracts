@@ -105,6 +105,19 @@
   },
   {
     "type": "function",
+    "name": "OPTIONAL_UPGRADER_ADMIN_ROLE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "PRECOMMITTER_ROLE",
     "inputs": [],
     "outputs": [
@@ -132,6 +145,19 @@
   {
     "type": "function",
     "name": "REVERTER_ROLE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "UPGRADER_ROLE",
     "inputs": [],
     "outputs": [
       {
@@ -219,6 +245,11 @@
           },
           {
             "name": "rotateExecutorRole",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "rotateUpgraderRole",
             "type": "bool",
             "internalType": "bool"
           }
@@ -511,6 +542,11 @@
             "name": "rotateExecutorRole",
             "type": "bool",
             "internalType": "bool"
+          },
+          {
+            "name": "rotateUpgraderRole",
+            "type": "bool",
+            "internalType": "bool"
           }
         ]
       }
@@ -544,6 +580,29 @@
         "name": "_executionDelay",
         "type": "uint32",
         "internalType": "uint32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "upgradeChainFromVersion",
+    "inputs": [
+      {
+        "name": "_chainAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_oldProtocolVersion",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_diamondCut",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
     "outputs": [],
