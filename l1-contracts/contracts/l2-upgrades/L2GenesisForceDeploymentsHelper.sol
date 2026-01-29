@@ -487,7 +487,7 @@ library L2GenesisForceDeploymentsHelper {
         );
 
         // Initialize the BaseTokenHolder balance (Era only - for ZKsyncOS it's done in Rust genesis)
-        if (_isGenesisUpgrade && !_isZKsyncOS) {
+        if (_isGenesisUpgrade) {
             L2_BASE_TOKEN_SYSTEM_CONTRACT.initializeBaseTokenHolderBalance();
         }
     }
