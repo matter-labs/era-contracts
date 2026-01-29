@@ -22,6 +22,7 @@ struct BytecodeInfo {
     bytes interopCenterBytecodeInfo;
     bytes interopHandlerBytecodeInfo;
     bytes assetTrackerBytecodeInfo;
+    bytes baseTokenHolderBytecodeInfo;
 }
 
 library L2GenesisUpgradeTestHelper {
@@ -65,6 +66,10 @@ library L2GenesisUpgradeTestHelper {
 
         info.assetTrackerBytecodeInfo = abi.encode(
             L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("L2AssetTracker.sol", "L2AssetTracker"))
+        );
+
+        info.baseTokenHolderBytecodeInfo = abi.encode(
+            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("BaseTokenHolder.sol", "BaseTokenHolder"))
         );
     }
 
@@ -110,6 +115,7 @@ library L2GenesisUpgradeTestHelper {
                     interopHandlerBytecodeInfo: _bytecodeInfo.interopHandlerBytecodeInfo,
                     assetTrackerBytecodeInfo: _bytecodeInfo.assetTrackerBytecodeInfo,
                     beaconDeployerInfo: _bytecodeInfo.beaconDeployerBytecodeInfo,
+                    baseTokenHolderBytecodeInfo: _bytecodeInfo.baseTokenHolderBytecodeInfo,
                     l2SharedBridgeLegacyImpl: address(0),
                     l2BridgedStandardERC20Impl: address(0),
                     aliasedChainRegistrationSender: address(1),

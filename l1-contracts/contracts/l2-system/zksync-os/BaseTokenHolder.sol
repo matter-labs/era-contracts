@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IBaseTokenHolder} from "../../common/l2-helpers/IBaseTokenHolder.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_HANDLER} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_HANDLER} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 
 /**
@@ -48,7 +48,6 @@ contract BaseTokenHolder is IBaseTokenHolder {
 
     /// @notice Gives out base tokens from the holder to a recipient.
     /// @dev This replaces the mint operation. Tokens are transferred from this contract's balance.
-    /// @dev The actual transfer is done via L2BaseToken.transferFromTo to maintain balance consistency.
     /// @param _to The address to receive the base tokens.
     /// @param _amount The amount of base tokens to give out.
     function give(address _to, uint256 _amount) external override onlyInteropHandler {
@@ -56,9 +55,9 @@ contract BaseTokenHolder is IBaseTokenHolder {
             return;
         }
 
-        // Transfer base tokens from this holder to the recipient
-        // This uses the L2BaseToken's transferFromTo which handles balance updates
-        L2_BASE_TOKEN_SYSTEM_CONTRACT.transferFromTo(address(this), _to, _amount);
+        // Transfer base tokens from this holder to the recipient using native transfer
+        (bool success, ) = _to.call{value: _amount}("");
+        require(success, "Transfer failed");
     }
 
     /// @notice Fallback to accept base token transfers from InteropHandler only.

@@ -515,6 +515,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             assetTrackerBytecodeInfo: config.isZKsyncOS
                 ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2AssetTracker.sol", "L2AssetTracker")
                 : abi.encode(getL2BytecodeHash("L2AssetTracker")),
+            baseTokenHolderBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("BaseTokenHolder.sol", "BaseTokenHolder")
+                : abi.encode(getL2BytecodeHash("BaseTokenHolder")),
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),

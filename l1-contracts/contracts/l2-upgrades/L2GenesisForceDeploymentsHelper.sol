@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, L2_INTEROP_CENTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, L2_INTEROP_CENTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL2WrappedBaseToken} from "../bridge/interfaces/IL2WrappedBaseToken.sol";
@@ -477,6 +477,18 @@ library L2GenesisForceDeploymentsHelper {
                 fixedForceDeploymentsData.interopHandlerBytecodeInfo,
                 L2_INTEROP_HANDLER_ADDR
             );
+        }
+
+        // Deploy BaseTokenHolder contract
+        conductContractUpgrade(
+            expectedUpgradeType,
+            fixedForceDeploymentsData.baseTokenHolderBytecodeInfo,
+            L2_BASE_TOKEN_HOLDER_ADDR
+        );
+
+        // Initialize the BaseTokenHolder balance (Era only - for ZKsyncOS it's done in Rust genesis)
+        if (_isGenesisUpgrade && !_isZKsyncOS) {
+            L2_BASE_TOKEN_SYSTEM_CONTRACT.initializeBaseTokenHolderBalance();
         }
     }
 
