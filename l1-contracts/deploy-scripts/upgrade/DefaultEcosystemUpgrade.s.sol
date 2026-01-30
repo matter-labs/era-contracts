@@ -168,11 +168,11 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
     function initialize(string memory newConfigPath, string memory _outputPath) public virtual {
         string memory root = vm.projectRoot();
-        newConfigPath = string.concat(root, newConfigPath);
+        newConfigPath = string.concat(root, "/", newConfigPath);
 
         initializeConfig(newConfigPath);
 
-        upgradeConfig.outputPath = string.concat(root, _outputPath);
+        upgradeConfig.outputPath = string.concat(root, "/", _outputPath);
         upgradeConfig.initialized = true;
     }
 

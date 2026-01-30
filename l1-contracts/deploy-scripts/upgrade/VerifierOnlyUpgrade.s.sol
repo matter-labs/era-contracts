@@ -45,7 +45,7 @@ contract VerifierOnlyUpgrade is DefaultEcosystemUpgrade {
 
         // Read old chain creation params from input
         string memory root = vm.projectRoot();
-        string memory toml = vm.readFile(string.concat(root, newConfigPath));
+        string memory toml = vm.readFile(string.concat(root, "/", newConfigPath));
 
         _readOldChainCreationParams(toml);
         _verifyChainCreationParamsHash();
