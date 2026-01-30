@@ -134,6 +134,16 @@ function TEST_validateOperatorProvidedPrices3() {
     validateOperatorProvidedPrices(1000000000000, 100000000000000)
 }
 
+function TEST_txStatusRollingHash_calculatedCorrectly() {
+    appendTransactionStatus(0x1234567890123456789012345678901234567890123456789012345678901234, 1)
+    appendTransactionStatus(0x1234567890123456789012345678901234567890123456789012345678901234, 0)
+    appendTransactionStatus(0x1234567890123456789012345678901234567890123456789012345678901234, 1)
+    let actualHash := mload(TXS_STATUS_ROLLING_HASH_BEGIN_BYTE())
+    let expectedHash := 0x33f60227f4b0273c1b0475b96365fb3386b1b9f02fb8ca3db01e5f6413d36d97
+
+    testing_assertEq(actualHash, expectedHash, "Invalid tx status rolling hash")
+}
+
 function TEST_getFeeParams_HighPubdataPrice() {
     // Under very large L1 gas price, the L2 base fee will start rising to ensure the
     // boundary on the gasLimit
@@ -171,14 +181,14 @@ function TEST_getFeeParams_LowPubdataPrice() {
     testing_assertEq(gasPricePerPubdata, div(veryLowL1GasPrice, l2GasPrice), "Invalid gasPricePerPubdata")
 }
 
- function TEST_systemLogKeys() {
+function TEST_systemLogKeys() {
      // Test that the values for various system log keys are correct
      let chainedPriorityTxnHashLogKey := chainedPriorityTxnHashLogKey()
      let numberOfLayer1TxsLogKey := numberOfLayer1TxsLogKey()
      let protocolUpgradeTxHashKey := protocolUpgradeTxHashKey()
      testing_assertEq(chainedPriorityTxnHashLogKey, 2, "Invalid priority txn hash log key")
      testing_assertEq(numberOfLayer1TxsLogKey, 3, "Invalid num layer 1 txns log key")
-     testing_assertEq(protocolUpgradeTxHashKey, 7, "Invalid protocol upgrade txn hash log key")
+     testing_assertEq(protocolUpgradeTxHashKey, 9, "Invalid protocol upgrade txn hash log key")
  }
 
 function TEST_safeAdd() {

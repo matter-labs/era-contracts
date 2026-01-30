@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
-import {ZeroAddress, Unauthorized, WrappedBaseTokenAlreadyRegistered} from "../common/L1ContractErrors.sol";
+import {Unauthorized, WrappedBaseTokenAlreadyRegistered, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @title L2WrappedBaseTokenStore
 /// @author Matter Labs

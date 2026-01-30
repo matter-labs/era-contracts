@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.sol";
 import {PubdataPricingMode} from "../../state-transition/chain-deps/ZKChainStorage.sol";
 import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExecutor.sol";
-import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 
 contract ExecutorProvingTest is ExecutorFacet {
     constructor() ExecutorFacet(block.chainid) {}
@@ -31,7 +30,7 @@ contract ExecutorProvingTest is ExecutorFacet {
         CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash,
         PubdataPricingMode
-    ) external view returns (LogProcessingOutput memory logOutput) {
+    ) external returns (LogProcessingOutput memory logOutput) {
         return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
     }
 

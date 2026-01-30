@@ -44,7 +44,7 @@
     "path": "^0.12.7",
     "querystring": "^0.2.0",
     "solc": "0.8.17",
-    "solhint": "^3.6.2",
+    "solhint": "^5.1.0",
     "solidity-coverage": "^0.8.5",
     "ts-generator": "^0.1.1",
     "ts-node": "^10.1.0",
@@ -57,7 +57,9 @@
     "build:foundry": "forge build",
     "clean": "hardhat clean",
     "clean:foundry": "forge clean",
-    "verify": "hardhat run --network env scripts/verify.ts"
+    "verify": "hardhat run --network env scripts/verify.ts",
+    "test": "forge test --ffi --match-path 'test/foundry/*'",
+    "test:foundry": "forge test --ffi --match-path 'test/foundry/*'"
   },
   "dependencies": {
     "dotenv": "^16.0.3",

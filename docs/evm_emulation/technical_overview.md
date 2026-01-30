@@ -44,7 +44,7 @@ Additionally EVM contracts can be deployed from EraVM environment using **system
 - `createEVM` - `CREATE`-like behavior
 - `create2EVM` - `CREATE2`-like behavior
 
-They use the same address derivation schemes as corresponding EVM opcodes. To derive the deployed contract’s address for EOAs we use the main nonce for this operation, while for contracts we use their deployment nonce. You can read more about the two types of nonces in the [NonceHolder system contract’s documentation](https://docs.zksync.io/build/developer-reference/era-contracts/system-contracts#nonceholder).
+They use the same address derivation schemes as corresponding EVM opcodes. To derive the deployed contract’s address for EOAs we use the main nonce for this operation, while for contracts we use their deployment nonce. You can read more about the two types of nonces in the [NonceHolder system contract’s documentation](https://docs.zksync.io/zksync-protocol/contracts/system-contracts#nonceholder).
 
 ❗ Note, that these two functions are not used (and can’t be used!) from the EVM environment. EVM smart contracts can’t perform **system** calls. EVM opcodes `CREATE` and `CREATE2` should be used instead.
 

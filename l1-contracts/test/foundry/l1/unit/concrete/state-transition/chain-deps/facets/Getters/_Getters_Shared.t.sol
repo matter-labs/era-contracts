@@ -7,9 +7,8 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "contracts/state-transition/chain-interfaces/ILegacyGetters.sol";
-import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {PriorityOperation} from "contracts/state-transition/libraries/PriorityQueue.sol";
-import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 contract GettersFacetWrapper is GettersFacet, Test {
     function util_setVerifier(address _verifier) external {

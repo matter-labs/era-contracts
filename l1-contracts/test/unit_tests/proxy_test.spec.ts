@@ -102,7 +102,6 @@ describe("Diamond proxy tests", function () {
         l2EvmEmulatorBytecodeHash: "0x0100000000000000000000000000000000000000000000000000000000000000",
         priorityTxMaxGasLimit: 500000, // priority tx max L2 gas limit
         feeParams: defaultFeeParams(),
-        blobVersionedHashRetriever: "0x0000000000000000000000000000000000000001",
       },
     ]);
 

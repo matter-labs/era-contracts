@@ -5,8 +5,8 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
-import {GatewayCTMDeployer, GatewayCTMDeployerConfig, DeployedContracts, StateTransitionContracts, DAContracts} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
-import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {DAContracts, DeployedContracts, GatewayCTMDeployer, GatewayCTMDeployerConfig, StateTransitionContracts} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
+import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
@@ -19,27 +19,27 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {RelayedSLDAValidator} from "contracts/state-transition/data-availability/RelayedSLDAValidator.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 
-import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
-import {L1VerifierFflonk} from "contracts/state-transition/verifiers/L1VerifierFflonk.sol";
-import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
-import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
+import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
+import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
+import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
+import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
+import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 
-import {L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
-import {GatewayCTMDeployerHelper} from "deploy-scripts/GatewayCTMDeployerHelper.sol";
-
-import {L2_CREATE2_FACTORY_ADDRESS} from "deploy-scripts/Utils.sol";
+import {GatewayCTMDeployerHelper} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
 
 // We need to use contract the zkfoundry consistently uses
 // zk environment only within a deployed contract
@@ -47,7 +47,7 @@ contract GatewayCTMDeployerTester {
     function deployCTMDeployer(
         bytes memory data
     ) external returns (DeployedContracts memory deployedContracts, address addr) {
-        (bool success, bytes memory result) = L2_CREATE2_FACTORY_ADDRESS.call(data);
+        (bool success, bytes memory result) = L2_CREATE2_FACTORY_ADDR.call(data);
         require(success, "failed to deploy");
 
         addr = abi.decode(result, (address));
@@ -66,21 +66,21 @@ contract GatewayCTMDeployerTest is Test {
         new GettersFacet();
         new AdminFacet(1, RollupDAManager(address(0)));
 
-        new DiamondInit();
+        new DiamondInit(false);
         new L1GenesisUpgrade();
         new RollupDAManager();
         new ValidiumL1DAValidator();
         new RelayedSLDAValidator();
-        new ChainTypeManager(address(0));
+        new ZKsyncOSChainTypeManager(address(0));
+        new EraChainTypeManager(address(0));
         new ProxyAdmin();
 
-        new L1VerifierFflonk();
-        new L1VerifierPlonk();
+        new EraVerifierFflonk();
+        new EraVerifierPlonk();
 
-        new TestnetVerifier(L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)));
-        new DualVerifier(L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)));
+        new EraTestnetVerifier(EraVerifierFflonk(address(0)), EraVerifierPlonk(address(0)));
 
-        new ValidatorTimelock(address(0), 0);
+        new ValidatorTimelock(L2_BRIDGEHUB_ADDR);
         new ServerNotifier();
 
         // This call will likely fail due to various checks, but we just need to get the bytecode published
@@ -94,7 +94,6 @@ contract GatewayCTMDeployerTest is Test {
             salt: keccak256("test-salt"),
             eraChainId: 1001,
             l1ChainId: 1,
-            rollupL2DAValidatorAddress: address(0x456),
             testnetVerifier: true,
             adminSelectors: new bytes4[](2),
             executorSelectors: new bytes4[](2),
@@ -122,7 +121,8 @@ contract GatewayCTMDeployerTest is Test {
             genesisRollupLeafIndex: 10,
             genesisBatchCommitment: bytes32(uint256(0x456)),
             forceDeploymentsData: hex"deadbeef",
-            protocolVersion: 1
+            protocolVersion: 1,
+            isZKsyncOS: false
         });
 
         // Initialize selectors with sample function selectors
@@ -181,11 +181,6 @@ library DeployedContractsComparator {
         StateTransitionContracts memory a,
         StateTransitionContracts memory b
     ) internal pure {
-        require(a.chainTypeManagerProxy == b.chainTypeManagerProxy, "chainTypeManagerProxy differs");
-        require(
-            a.chainTypeManagerImplementation == b.chainTypeManagerImplementation,
-            "chainTypeManagerImplementation differs"
-        );
         require(a.verifier == b.verifier, "verifier differs");
         require(a.adminFacet == b.adminFacet, "adminFacet differs");
         require(a.mailboxFacet == b.mailboxFacet, "mailboxFacet differs");
@@ -196,6 +191,11 @@ library DeployedContractsComparator {
         require(a.validatorTimelock == b.validatorTimelock, "validatorTimelock differs");
         require(a.chainTypeManagerProxyAdmin == b.chainTypeManagerProxyAdmin, "chainTypeManagerProxyAdmin differs");
         require(a.serverNotifierProxy == b.serverNotifierProxy, "serverNotifier proxy differs");
+        require(a.chainTypeManagerProxy == b.chainTypeManagerProxy, "chainTypeManagerProxy differs");
+        require(
+            a.chainTypeManagerImplementation == b.chainTypeManagerImplementation,
+            "chainTypeManagerImplementation differs"
+        );
     }
 
     function compareDAContracts(DAContracts memory a, DAContracts memory b) internal pure {

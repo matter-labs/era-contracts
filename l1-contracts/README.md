@@ -11,15 +11,26 @@ write smart contracts in C++, Rust and other popular languages.
 
 ### Building
 
-Compile the solidity and yul contracts: `yarn l1 build`
+```shell
+cd era-contracts
+./recompute_hashes.sh
+```
 
 ### Testing
 
-To run unit tests, execute `yarn l1 test`.
+Use the following commands to run tests.
 
-Similarly, to run tests in Foundry execute `yarn l1 test:foundry`.
+```shell
+cd era-contracts
+yarn l1 test:foundry
+yarn l1 test:zkfoundry
+```
 
-To run the fork test, use `yarn l1 test:fork`
+And the following command for the fork tests.
+
+```shell
+yarn l1 test:fork
+```
 
 ### Security Testing and Linting
 
@@ -47,11 +58,67 @@ If you need to add a word to the databases of these tools please insert it into 
 Some of the contracts inside the `l1-contracts` folder are predeployed on all ZK Chains. In order to verify those on explorer, build the contracts via `yarn build:foundry` and then run the following command:
 
 ```
-VERIFICATION_URL=<explorer-verification-url> yarn verify-l2-contracts
+VERIFICATION_URL=<explorer-verification-url> yarn verify-on-l2-explorer
 ```
 
-For example, for zksync Era testnet environment it would look the following way:
+For example, for ZKsync Era testnet environment it would look the following way:
 
 ```
-VERIFICATION_URL=https://explorer.sepolia.era.zksync.dev/contract_verification yarn verify-l2-contracts
+VERIFICATION_URL=https://explorer.sepolia.era.zksync.dev/contract_verification yarn verify-on-l2-explorer
 ```
+
+### Verifying Contracts from Deployment Logs
+
+We provide a script [`verify-contracts.ts`](./scripts/verify-contracts.ts) that automates contract verification from deployment logs.
+
+#### Usage
+
+```bash
+yarn verify-contracts <log_file> --chain [stage|testnet|mainnet]
+```
+
+log_file — path to a deployment log containing forge verify-contract commands
+
+chain — one of stage, testnet, or mainnet (default: stage)
+
+#### Behavior
+
+- Parses all forge verify-contract commands in the log
+
+- Locates matching .sol sources inside l1-contracts or da-contracts
+
+- Supports fallback mappings (e.g. VerifierFflonk → L1VerifierFflonk)
+
+- Executes forge verify-contract from the correct project root
+
+- If verification fails, retries with:
+
+  - the original contract name (in case of fallback)
+
+  - TransparentUpgradeableProxy (useful for proxy deployments)
+
+- Redacts ETHERSCAN_API_KEY in printed commands to avoid leaking secrets
+
+#### ZKsync Support
+
+If a log line includes --verifier zksync, the script automatically appends the correct ZKsync verifier URL (no ETHERSCAN_API_KEY required).
+
+For non-ZKsync logs, the script uses Etherscan-style verification and requires ETHERSCAN_API_KEY.
+
+#### Examples
+
+_Etherscan-style (Ethereum):_
+
+```bash
+export ETHERSCAN_API_KEY=$API_KEY
+yarn verify-contracts ./deployment-logs.txt --chain mainnet
+```
+
+_ZKsync logs (no API key needed):_
+
+```bash
+yarn verify-contracts ./deployment-logs.txt --chain stage
+```
+
+If the file contains both Ethereum and ZKsync logs, it will process both successfully.
+At the end of execution, the script prints a summary of verified and skipped contracts.

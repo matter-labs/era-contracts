@@ -4,7 +4,7 @@ import { ethers } from "ethers";
 
 const OUTPUT_DIR = "bootloader/artifacts";
 
-const ARTIFACT_PATH = "zkout/{file}/contracts-preprocessed/bootloader/{file}.json";
+const ARTIFACT_PATH = "zkout/{file}/Bootloader.json";
 
 const bootloaderArtifacts = ["fee_estimate.yul", "gas_test.yul", "playground_batch.yul", "proved_batch.yul"];
 

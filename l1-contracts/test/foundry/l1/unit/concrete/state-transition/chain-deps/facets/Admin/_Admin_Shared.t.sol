@@ -9,7 +9,7 @@ import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -17,23 +17,25 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 contract AdminTest is Test {
     IAdmin internal adminFacet;
     UtilsFacet internal utilsFacet;
-    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](13);
-        selectors[0] = IAdmin.setPendingAdmin.selector;
-        selectors[1] = IAdmin.acceptAdmin.selector;
-        selectors[2] = IAdmin.setValidator.selector;
-        selectors[3] = IAdmin.setPorterAvailability.selector;
-        selectors[4] = IAdmin.setPriorityTxMaxGasLimit.selector;
-        selectors[5] = IAdmin.changeFeeParams.selector;
-        selectors[6] = IAdmin.setTokenMultiplier.selector;
-        selectors[7] = IAdmin.upgradeChainFromVersion.selector;
-        selectors[8] = IAdmin.executeUpgrade.selector;
-        selectors[9] = IAdmin.freezeDiamond.selector;
-        selectors[10] = IAdmin.unfreezeDiamond.selector;
-        selectors[11] = IAdmin.setTransactionFilterer.selector;
-        selectors[12] = IAdmin.setPubdataPricingMode.selector;
+        bytes4[] memory selectors = new bytes4[](14);
+        uint256 i = 0;
+        selectors[i++] = IAdmin.setPendingAdmin.selector;
+        selectors[i++] = IAdmin.acceptAdmin.selector;
+        selectors[i++] = IAdmin.setValidator.selector;
+        selectors[i++] = IAdmin.setPorterAvailability.selector;
+        selectors[i++] = IAdmin.setPriorityTxMaxGasLimit.selector;
+        selectors[i++] = IAdmin.changeFeeParams.selector;
+        selectors[i++] = IAdmin.setTokenMultiplier.selector;
+        selectors[i++] = IAdmin.upgradeChainFromVersion.selector;
+        selectors[i++] = IAdmin.executeUpgrade.selector;
+        selectors[i++] = IAdmin.freezeDiamond.selector;
+        selectors[i++] = IAdmin.unfreezeDiamond.selector;
+        selectors[i++] = IAdmin.setTransactionFilterer.selector;
+        selectors[i++] = IAdmin.setPubdataPricingMode.selector;
+        selectors[i++] = IAdmin.setDAValidatorPair.selector;
         return selectors;
     }
 

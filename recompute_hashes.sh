@@ -1,9 +1,11 @@
 # Script to recompile and recreate the hashes for the contracts.
 # source ./recompute_hashes.sh
 
+set -e
+
 # Expected Foundry version and commit
-EXPECTED_VERSION="0.0.2"
-EXPECTED_COMMIT="27360d4c8"
+EXPECTED_VERSION="forge 0.0.4"
+EXPECTED_COMMIT="ae913af"
 
 # Check if Foundry is installed
 if ! command -V forge &> /dev/null; then
@@ -11,39 +13,47 @@ if ! command -V forge &> /dev/null; then
   exit 1
 fi
 
-# Get installed Foundry version
-FORGE_OUTPUT=$(forge --version)
-INSTALLED_VERSION=$(echo "$FORGE_OUTPUT" | awk '{print $2}')
-INSTALLED_COMMIT=$(echo "$FORGE_OUTPUT" | awk -F'[()]' '{print $2}' | awk '{print $1}')
+# Get installed Foundry version (first line only)
+FORGE_OUTPUT=$(forge --version | head -n 1)
 
-# Check if Foundry version is as expected
-if [ "$INSTALLED_VERSION" != "$EXPECTED_VERSION" ] || [ "$INSTALLED_COMMIT" != "$EXPECTED_COMMIT" ]; then
+# Forge 0.0.4 version output is broken on Linux returning VERGEN_IDEMPOTENT_OUTPUT instead of the commit hash.
+# So we accept both the expected commit and VERGEN_IDEMPOTENT_OUTPUT with regex:
+# - must start with "forge 0.0.4"
+# - must have "(...)" after it
+# - inside parentheses: either the expected commit OR VERGEN_IDEMPOTENT_OUTPUT
+if [[ ! "$FORGE_OUTPUT" =~ ^${EXPECTED_VERSION}\ \(((${EXPECTED_COMMIT})|VERGEN_IDEMPOTENT_OUTPUT).* ]]; then
   echo "Incorrect Foundry version."
-  echo "Expected: forge ${EXPECTED_VERSION} (${EXPECTED_COMMIT})"
-  echo "Found:    ${FORGE_OUTPUT})"
-  echo "Run: foundryup-zksync --commit ${EXPECTED_COMMIT}"
+  echo "Expected:"
+  echo "  ${EXPECTED_VERSION} (${EXPECTED_COMMIT})"
+  echo "  or ${EXPECTED_VERSION} (VERGEN_IDEMPOTENT_OUTPUT ...)"
+  echo "Found:"
+  echo "  ${FORGE_OUTPUT}"
+  exit 1
+fi
+
+if [ "$(git rev-parse --show-toplevel)" != "$PWD" ]; then
+  echo "error: must be run at the root of matter-labs/era-contracts repository" >&2
   exit 1
 fi
 
 # Update submodules (just in case)
 git submodule update --init --recursive
 
+yarn
 
 # Cleanup everything and recompile
-pushd da-contracts && \
-forge clean && popd && \
-pushd l1-contracts && \
-yarn clean && forge clean && popd && \
-pushd l2-contracts && \
-yarn clean && forge clean && popd && \
-pushd system-contracts && \
-yarn clean && forge clean && popd && \
-pushd da-contracts && \
-yarn build:foundry && popd && \
-pushd l1-contracts && \
-yarn build:foundry && popd && \
-pushd l2-contracts && \
-yarn build:foundry && popd && \
-pushd system-contracts && \
-yarn build:foundry && popd && \
+yarn --cwd da-contracts clean
+forge clean --root da-contracts
+yarn --cwd l1-contracts clean
+forge clean --root l1-contracts
+yarn --cwd l2-contracts clean
+forge clean --root l2-contracts
+yarn --cwd system-contracts clean
+forge clean --root system-contracts
+
+yarn --cwd da-contracts build:foundry
+yarn --cwd l1-contracts build:foundry
+yarn --cwd l2-contracts build:foundry
+yarn --cwd system-contracts build:foundry
+
 yarn calculate-hashes:fix

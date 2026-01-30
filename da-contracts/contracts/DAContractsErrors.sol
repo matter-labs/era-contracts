@@ -42,3 +42,12 @@ error BlobCommitmentNotPublished();
 
 // 0x5717f940
 error InvalidPubdataSource(uint8 pubdataSource);
+
+// 0x6122198f
+error InvalidBlobsDAInputLength(uint256 pubdataInputLength);
+
+// 0x783ab813
+error BlobNotPublished();
+
+// 0x8b003a9d
+error InvalidBlobsPublished(bytes32 publishedHash, bytes32 expectedHash);

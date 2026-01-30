@@ -13,7 +13,7 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {Call as GovernanceCall} from "contracts/governance/Common.sol"; // renamed to avoid conflict
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
@@ -28,11 +28,11 @@ contract FinalizeUpgrade is Script {
     function initChains(address bridgehub, uint256[] calldata chains) external {
         // We do not change this method
         for (uint256 i = 0; i < chains.length; ++i) {
-            Bridgehub bh = Bridgehub(bridgehub);
+            L1Bridgehub bh = L1Bridgehub(bridgehub);
 
             if (bh.baseTokenAssetId(chains[i]) == bytes32(0)) {
                 vm.broadcast();
-                Bridgehub(bridgehub).registerLegacyChain(chains[i]);
+                L1Bridgehub(bridgehub).registerLegacyChain(chains[i]);
             }
         }
     }
@@ -154,12 +154,12 @@ contract FinalizeUpgrade is Script {
             // 1. Combine logic of initChains
             // ---------------------------------------------------
             for (uint256 i = currentPosition; i < params.chains.length && i < currentEnd; i++) {
-                Bridgehub bh = Bridgehub(params.bridgehub);
+                L1Bridgehub bh = L1Bridgehub(params.bridgehub);
                 console.log("Processing chain: ", params.chains[i]);
                 if (bh.baseTokenAssetId(params.chains[i]) == bytes32(0)) {
                     // Register legacy chain if needed
                     bytes memory data = abi.encodeWithSelector(
-                        Bridgehub.registerLegacyChain.selector,
+                        L1Bridgehub.registerLegacyChain.selector,
                         params.chains[i]
                     );
 

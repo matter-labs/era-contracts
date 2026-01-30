@@ -12,11 +12,12 @@ fs_permissions = [
     { access = "read", path = "../system-contracts/artifacts-zk/" },
     { access = "read", path = "../system-contracts/contracts-preprocessed/precompiles/artifacts" },
     { access = "read", path = "../system-contracts/contracts-preprocessed/artifacts" },
+    { access = "read", path = "../system-contracts/scripts/evm-predeploys-data" },
     { access = "read", path = "../system-contracts/zkout" },
     { access = "read", path = "../l2-contracts/artifacts-zk/" },
     { access = "read", path = "../l2-contracts/zkout/" },
     { access = "read", path = "../l1-contracts/artifacts-zk/" },
-    { access = "read", path = "../l1-contracts/script-out/" },
+    { access = "read-write", path = "../l1-contracts/script-out/" },
     { access = "read", path = "../da-contracts/" },
     { access = "read", path = "../system-contracts/zkout/" },
     { access = "read", path = "./script-config" },
@@ -42,7 +43,7 @@ remappings = [
     "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
 ]
 optimizer = true
-optimizer_runs = 9999999
+optimizer_runs = 28000
 # TODO(X): the latest foundry disallows reverts that happen inside the internal calls and we should fix tests that rely
 # on such reverts
 allow_internal_expect_revert = true

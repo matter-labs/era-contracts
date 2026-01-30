@@ -656,6 +656,26 @@ for { } true { } {
         sp, stackHead := pushStackItem(sp, _baseFee, stackHead)
         ip := add(ip, 1)
     }
+    case 0x49 { // OP_BLOBHASH
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
+        // "Consume" idx
+        let _idx := accessStackHead(sp, stackHead)
+
+        // We don't fully support BLOBHASH. Just return 0
+        stackHead := 0
+
+        ip := add(ip, 1)
+    }
+    case 0x4A { // OP_BLOBBASEFEE
+        evmGasLeft := chargeGas(evmGasLeft, 2)
+
+        // We don't fully support BLOBBASEFEE. Just return 1 as MIN_BASE_FEE_PER_BLOB_GAS (EIP-4844)
+        // 1 instead of 0 may prevent some unexpected division by zero in user contracts
+        sp, stackHead := pushStackItem(sp, 1, stackHead)
+
+        ip := add(ip, 1)
+    }
     case 0x50 { // OP_POP
         evmGasLeft := chargeGas(evmGasLeft, 2)
 

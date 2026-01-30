@@ -1,6 +1,8 @@
 # Compiler files
 cache/
+cache-forge-tests/
 out/
+out-tests/
 zkout/
 
 # Ignores development broadcast logs
@@ -13,3 +15,8 @@ docs/
 
 # Dotenv file
 .env
+
+# Test files
+.cache/
+anvil-zksync.log
+bin/

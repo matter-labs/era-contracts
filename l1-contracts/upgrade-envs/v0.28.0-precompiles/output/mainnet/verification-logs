@@ -1,0 +1,462 @@
+Script ran successfully.
+
+== Logs ==
+  Using configured Create2Factory address: 0x4e59b44847b379578588920cA78FbF26c0B4956C
+  VerifierFflonk has been deployed at 0xD5dBE903F5382B052317D326FA1a7B63710C6a5b
+  forge verify-contract 0xD5dBE903F5382B052317D326FA1a7B63710C6a5b VerifierFflonk
+  VerifierPlonk has been deployed at 0x5BAfEF6729228add8775aF4Cecd2E68a51424Ee1
+  forge verify-contract 0x5BAfEF6729228add8775aF4Cecd2E68a51424Ee1 VerifierPlonk
+  Verifier has been deployed at 0x53F5DE9De3B2DA90633a2c74BEb3b9912cdd1579
+  forge verify-contract 0x53F5DE9De3B2DA90633a2c74BEb3b9912cdd1579 Verifier --constructor-args 0x000000000000000000000000d5dbe903f5382b052317d326fa1a7b63710c6a5b0000000000000000000000005bafef6729228add8775af4cecd2e68a51424ee1
+  UpgradeStageValidator has been deployed at 0x1546FE0d2702C2892cC97632842a77B08A61A9f8
+  forge verify-contract 0x1546FE0d2702C2892cC97632842a77B08A61A9f8 UpgradeStageValidator --constructor-args 0x000000000000000000000000c2ee6b6af7d616f6e27ce7f4a451aedc2b0f5f5c0000000000000000000000000000000000000000000000000000001c00000000
+  DefaultUpgrade has been deployed at 0xDA65afc634528bC2ef5149d811Acda864dD78Ab6
+  forge verify-contract 0xDA65afc634528bC2ef5149d811Acda864dD78Ab6 DefaultUpgrade
+  L1GenesisUpgrade has been deployed at 0x7Dde6ce8Ee4865f4BBD134d3BE827DBE5282100E
+  forge verify-contract 0x7Dde6ce8Ee4865f4BBD134d3BE827DBE5282100E L1GenesisUpgrade
+  Bridgehub has been deployed at 0x08A98B1048Fb61E9Fff7d7d98305aC6286Ae9F32
+  forge verify-contract 0x08A98B1048Fb61E9Fff7d7d98305aC6286Ae9F32 Bridgehub --constructor-args 0x0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000e30dca3047b37dc7d88849de4a4dc07937ad5ab30000000000000000000000000000000000000000000000000000000000000064
+  L1Nullifier has been deployed at 0xC6f08EFb7BA78f40d00F41aFAC00211d59eb9431
+  forge verify-contract 0xC6f08EFb7BA78f40d00F41aFAC00211d59eb9431 L1Nullifier --constructor-args 0x000000000000000000000000303a465b659cbb0ab36ee643ea362c509eeb5213000000000000000000000000000000000000000000000000000000000000014400000000000000000000000032400084c286cf3e17e7b677ea9583e60a000324
+  L1AssetRouter has been deployed at 0x0cb7f11BA981E13598D70625dF8f4597d59f2F4F
+  forge verify-contract 0x0cb7f11BA981E13598D70625dF8f4597d59f2F4F L1AssetRouter --constructor-args 0x000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000303a465b659cbb0ab36ee643ea362c509eeb5213000000000000000000000000d7f9f54194c633f36ccd5f3da84ad4a1c38cb2cb000000000000000000000000000000000000000000000000000000000000014400000000000000000000000032400084c286cf3e17e7b677ea9583e60a000324
+  L1NativeTokenVault has been deployed at 0xBa05B8B761386289Ba413a74AF1933d6a76E1b52
+  forge verify-contract 0xBa05B8B761386289Ba413a74AF1933d6a76E1b52 L1NativeTokenVault --constructor-args 0x000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000008829ad80e425c646dab305381ff105169feece56000000000000000000000000d7f9f54194c633f36ccd5f3da84ad4a1c38cb2cb
+  GovernanceUpgradeTimer has been deployed at 0x22322D45b7667F8DC1c8BbABc33C11Ea59b4c5a9
+  forge verify-contract 0x22322D45b7667F8DC1c8BbABc33C11Ea59b4c5a9 GovernanceUpgradeTimer --constructor-args 0x000000000000000000000000000000000000000000000000000000000002a3000000000000000000000000000000000000000000000000000000000000127500000000000000000000000000e30dca3047b37dc7d88849de4a4dc07937ad5ab30000000000000000000000002cf3bd6a9056b39999f3883955e183f655345063
+  MessageRoot has been deployed at 0x382fb241396eA915108e7B7Ce1adE1322bA73aeE
+  forge verify-contract 0x382fb241396eA915108e7B7Ce1adE1322bA73aeE MessageRoot --constructor-args 0x000000000000000000000000303a465b659cbb0ab36ee643ea362c509eeb5213
+  ExecutorFacet has been deployed at 0x2f116b9033d88Bb3Cf64C371AE5458fbA22BA39A
+  forge verify-contract 0x2f116b9033d88Bb3Cf64C371AE5458fbA22BA39A ExecutorFacet --constructor-args 0x0000000000000000000000000000000000000000000000000000000000000001
+  AdminFacet has been deployed at 0x431449e2a28A69122860A4956A3f7191eE15aFBC
+  forge verify-contract 0x431449e2a28A69122860A4956A3f7191eE15aFBC AdminFacet --constructor-args 0x0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000e689e79a06d3d09f99c21e534ccf6a8b7c9b3c45
+  MailboxFacet has been deployed at 0x365D0ae3ECA13004daf2A4ba1501c01AaEbb4fec
+  forge verify-contract 0x365D0ae3ECA13004daf2A4ba1501c01AaEbb4fec MailboxFacet --constructor-args 0x00000000000000000000000000000000000000000000000000000000000001440000000000000000000000000000000000000000000000000000000000000001
+  GettersFacet has been deployed at 0xae5cbB5f70e134668a13d7C8EcEF5e9E6FffCF22
+  forge verify-contract 0xae5cbB5f70e134668a13d7C8EcEF5e9E6FffCF22 GettersFacet
+  DiamondInit has been deployed at 0x84B53B9F74921112681461275ac26363bF396D77
+  forge verify-contract 0x84B53B9F74921112681461275ac26363bF396D77 DiamondInit
+  BlobVersionedHashRetriever has been deployed at 0x259418006a600C32c6f2dc6d48f5789BE19Ca7f1
+  forge verify-contract 0x259418006a600C32c6f2dc6d48f5789BE19Ca7f1 BlobVersionedHashRetriever
+  ChainTypeManager has been deployed at 0x345314c7E4af84B763d98d23f772622E23AfB5CE
+  forge verify-contract 0x345314c7E4af84B763d98d23f772622E23AfB5CE ChainTypeManager --constructor-args 0x000000000000000000000000303a465b659cbb0ab36ee643ea362c509eeb5213
+  Ecosystem contracts are deployed!
+  VerifierFflonk has been deployed at 0x63825fc80a4B8d96EE99d37E958a3A5B01b995D9
+  forge verify-contract 0x63825fc80a4B8d96EE99d37E958a3A5B01b995D9 VerifierFflonk --verifier zksync
+  VerifierPlonk has been deployed at 0xb742F4d52F6A5e98F11EAc60A7f75Acee534B831
+  forge verify-contract 0xb742F4d52F6A5e98F11EAc60A7f75Acee534B831 VerifierPlonk --verifier zksync
+  Verifier has been deployed at 0xA7F2EDAcDcc54a9c711639eEe9d0b27C96F0F3B6
+  forge verify-contract 0xA7F2EDAcDcc54a9c711639eEe9d0b27C96F0F3B6 Verifier --constructor-args 0x00000000000000000000000063825fc80a4b8d96ee99d37e958a3a5b01b995d9000000000000000000000000b742f4d52f6a5e98f11eac60a7f75acee534b831 --verifier zksync
+  ExecutorFacet has been deployed at 0x4659780be9E0863eFB2BAE5DD77E31e371f2d3C8
+  forge verify-contract 0x4659780be9E0863eFB2BAE5DD77E31e371f2d3C8 ExecutorFacet --constructor-args 0x0000000000000000000000000000000000000000000000000000000000000001 --verifier zksync
+  AdminFacet has been deployed at 0xa365401Dc76d077c702965ECc39CfbfE436A6167
+  forge verify-contract 0xa365401Dc76d077c702965ECc39CfbfE436A6167 AdminFacet --constructor-args 0x00000000000000000000000000000000000000000000000000000000000000010000000000000000000000005e12d7e0bb68029afbec83ccb9e8ede6019ef073 --verifier zksync
+  MailboxFacet has been deployed at 0x7f124F72fB4f978798ffdedAD3332b0ce750F399
+  forge verify-contract 0x7f124F72fB4f978798ffdedAD3332b0ce750F399 MailboxFacet --constructor-args 0x00000000000000000000000000000000000000000000000000000000000001440000000000000000000000000000000000000000000000000000000000000001 --verifier zksync
+  GettersFacet has been deployed at 0xEE7f08400FDa3A46D32Ae78eBEC2D3841CeC53b7
+  forge verify-contract 0xEE7f08400FDa3A46D32Ae78eBEC2D3841CeC53b7 GettersFacet --verifier zksync
+  DiamondInit has been deployed at 0x0ba2a65bb5CaB6b4b4CA797C4Aa825118a6A2A63
+  forge verify-contract 0x0ba2a65bb5CaB6b4b4CA797C4Aa825118a6A2A63 DiamondInit --verifier zksync
+  DefaultUpgrade has been deployed at 0x69653a812038424290EFd0e7Ae8DcFB2Bbf9c9b2
+  forge verify-contract 0x69653a812038424290EFd0e7Ae8DcFB2Bbf9c9b2 DefaultUpgrade --verifier zksync
+  L1GenesisUpgrade has been deployed at 0x540E6ED9FC06dFCbf0a38Dcc7Ed7Ea3F56C551de
+  forge verify-contract 0x540E6ED9FC06dFCbf0a38Dcc7Ed7Ea3F56C551de L1GenesisUpgrade --verifier zksync
+  ChainTypeManager has been deployed at 0x6655933e34d8FD8f6d2CC7d5175bFC06112B7474
+  forge verify-contract 0x6655933e34d8FD8f6d2CC7d5175bFC06112B7474 ChainTypeManager --constructor-args 0x0000000000000000000000000000000000000000000000000000000000010002 --verifier zksync
+  Ecosystem contracts for GW are deployed!
+  Publishing the following bytecode:
+  0x0100099f5ca0a8b6327c30672e3e94fc56203860f4159d615463ab99cf0eeece
+  Publishing the following bytecode:
+  0x010005f76ff9047aa9a0caabf27b4d40c44bafa64cbcda4bb85104a46fc6210c
+  Publishing the following bytecode:
+  0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63
+  Publishing the following bytecode:
+  0x0100000741c40b7a529bf86f3e5887e1def0cd99ca7797e67404a956571dbdd0
+  Publishing the following bytecode:
+  0x01000013b6aa87cfb417bfbef5d7864c129a50be27260ee9711957f3b3e8c7aa
+  Publishing the following bytecode:
+  0x010000175c81bf3ec57fe19ec2fdce8d0a775eb4498a0f8ee866e4ebfce1e546
+  Publishing the following bytecode:
+  0x0100000de1c15777f9defee208d5903d948e2fa89720136ff56d7af0d8d937b7
+  Publishing the following bytecode:
+  0x0100000b820f8c54defefff268bb401158b07b6dec415de42fb0ae5bd321c51b
+  Publishing the following bytecode:
+  0x0100000ba3233410e658281af241070f240abaac0caee3646d8111bee357af1d
+  Publishing the following bytecode:
+  0x01000019db74c0d154af4bc3ca537904dc435f198aab7d515a3aaf8f5eb587f7
+  Publishing the following bytecode:
+  0x01000025a010894b4f4efe3b991ffca3c9db42625ca22c8f8e8f90087936e17c
+  Publishing the following bytecode:
+  0x0100007578731f0437a370fc3edd3ac4e0ac0f645a707c4d9af6219877ff7beb
+  Publishing the following bytecode:
+  0x010000d94bcfaf36f7b3cf3fef8ca680ffcd2fe959e2907c303a375ddf5b674e
+  Publishing the following bytecode:
+  0x010000c95a0bb3579c5f4cd9c1f4355854297bc5f58510a4888c4fe4e74b0bcc
+  Publishing the following bytecode:
+  0x01000033589473fbebcc76ef4ea6b53fc36519f7a7f5ba343ed7c3fb79882926
+  Publishing the following bytecode:
+  0x010006abfde9f9298a8fe3fc73077057d152adb765687436f77b17b97b76802d
+  Publishing the following bytecode:
+  0x010001cb34d64f8510e90bc404b0a3268a665a311dfb88579e727dec1ed368db
+  Publishing the following bytecode:
+  0x0100005788967f78898bca9b5878d048877171640d68fb4dba4199a4b3f118dd
+  Publishing the following bytecode:
+  0x010000edcfd28a316880ae4e464d2eb16732123d540670afb092401d4bd9fc43
+  Publishing the following bytecode:
+  0x0100016d7b663226e159cb39b904931b0c5c1183783f0f9f6102147b3b748dde
+  Publishing the following bytecode:
+  0x0100092520da714bdf3d05fc7854dc9f5f57cbc554728e5164e49e08e839945c
+  Publishing the following bytecode:
+  0x010000178ae193f7c1b347d1f5d0996694d644697ef8fe37d7a1942f3933af00
+  Publishing the following bytecode:
+  0x01000139fe97df83ca3b72f335a2478a7013471f389e1a08e409699d9a62f2ad
+  Publishing the following bytecode:
+  0x010000a9df989cffaf5fc36cc569c2707d133bb89f3951cbfdbc25261a6a4381
+  Publishing the following bytecode:
+  0x0100000f02a69edb5e67931d7a6509ca1d26b574d90c48166a42f2ee95681858
+  Publishing the following bytecode:
+  0x010000252ec93a9a41d099b47744e2702e36ef476ec71f08f2f2d157140de735
+  Publishing the following bytecode:
+  0x01000071fd1257f0b015a3b1c28dac8f0d0aa572c61a43e3930510c41ec2fd2a
+  Publishing the following bytecode:
+  0x010000ef4dc3a08b6758f7b77b35867fd0e5d1ac11fab15dfbc4a53f4d28b445
+  Publishing the following bytecode:
+  0x010000172aa10a234758ad262007cc0070d0f68ac9cd211676dd31bdcbffbf32
+  Publishing the following bytecode:
+  0x0100000fa92f8f145a288a1024f70f30031837e6c6d9781ebc605ac5b523a527
+  Publishing the following bytecode:
+  0x01000043b0cfe05b1a7765d25579bbb43a3fefeaf2b318968852bc8330bc838e
+  Publishing the following bytecode:
+  0x0100003f6d40bb6f1cd04e79eaca2d9995d2880b52f17efce67df2a1e1ec9874
+  Publishing the following bytecode:
+  0x010001d3c2ac896973a604fce8e7be4d632850c05c8b796604177e02ffd482f0
+  Publishing the following bytecode:
+  0x0100000f8335ff3253d3d96c7f3de3b62614f0705fc7624b48906355882a0286
+  Publishing the following bytecode:
+  0x010009d5c08d170f8454406170cd611ff9158049a726e72ef2d0d54c53adbd5c
+  Publishing the following bytecode:
+  0x01000531fda8689bd3f229b567e263cf0ab2f5fecdb32440b89f2f1e25c27253
+  Publishing the following bytecode:
+  0x0100084f2886061c815d89a5a09a231658dd752aa2a9fd5663aa406f92c1744f
+  Publishing the following bytecode:
+  0x010003656b4351d3dcae03e66f4e6a9ecd90ff99308c2f65d7522befe238e9b5
+  Publishing the following bytecode:
+  0x01000341b36200377ffbd818df266b7cb12659f0d912c90c7ef9c9c430b7eaa7
+  Publishing the following bytecode:
+  0x01000195acddddb3f30491590ace202bd804fdbfc630ba66c9a7189dd7308f87
+  Publishing the following bytecode:
+  0x010004edcd31c0ae981120363f5d684ae2b41aa8f0dd2b7a0a1b6a6350478656
+  Publishing the following bytecode:
+  0x0100014b71adee1c18588b50320637a120674a4b52d784f61898605b9703b70e
+  Publishing the following bytecode:
+  0x0100001514035ffeada9f49d08e3fc7bd1035416a5e7482e05a25137d770ee16
+  Publishing the following bytecode:
+  0x01000245c177e1fa3ca6e96d11f615c4ae879fa18fb70250080bccc89e90d72e
+  Bytecodes published!
+  Generated fixed force deployments data
+  Prepared diamond cut data
+  UpgradeCutGenerated
+  Upgrade data generated!
+  Base token not ETH, approving
+  Base token not ETH, approving
+  Base token not ETH, approving
+  Base token not ETH, approving
+  Base token not ETH, approving
+  Base token not ETH, approving
+
+## Setting up 1 EVM.
+
+==========================
+
+Chain 1
+
+Estimated gas price: 1.827571988 gwei
+
+Estimated total gas used for script: 112382680
+
+Estimated amount required: 0.20538743790436784 ETH
+
+==========================
+
+##### mainnet
+✅  [Success]Hash: 0xee8210a1be4ea7fa26e9468125d822e87ccbdcbdb8804ed0d6c43451ebe68413
+Block: 22492296
+Paid: 0.003345026819215884 ETH (3781052 gas * 0.884681517 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xeb3eb137a995b25f3cad467f5bed65e78268e8406639ee1fc8527c7682096935
+Block: 22492297
+Paid: 0.0003969908160199 ETH (451460 gas * 0.879348815 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x659c7c27ff075be88dd75174ecec395d28c754a20c6b84c1f7860b7365393dea
+Block: 22492298
+Paid: 0.00027094018096755 ETH (305950 gas * 0.885570129 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xfe10e1866a5831d566972aca0559ddafcf42fb8724b604b7e9c252d3714debb2
+Block: 22492299
+Paid: 0.001381930178272425 ETH (1518795 gas * 0.909885915 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x05939c7278f7473342b2cd853d1ae20b96ce7a549c43cae7e59b419d3457f3ed
+Block: 22492300
+Paid: 0.003379974291098 ETH (3748616 gas * 0.90165925 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x459c41533dfd9c99bd2b982f1fd92e4b1c4e717f2af5a6db9773ea8457ed0eb0
+Block: 22492301
+Paid: 0.005014789677761545 ETH (5307269 gas * 0.944890805 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x8956849bbc1bb8d3fdf322d0ad99ec855814ae1905858e8e5caff0f8c081c9f0
+Block: 22492302
+Paid: 0.0032471228827765 ETH (3430700 gas * 0.946489895 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x8ba4ee7ad3947aa7426c219ec269c5e17f197365f1e8281a735373ac2ffee161
+Block: 22492303
+Paid: 0.004124181160804791 ETH (4322091 gas * 0.954209701 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x08a71933eb85a79cea3cf11da662b993aad7bfeaa49d841ade4de9f65a00d429
+Block: 22492304
+Paid: 0.004195904053655158 ETH (4317679 gas * 0.971796202 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xd92a730e4708c65a317fca57ce88dd1894f92b45fd95753697a084826c238454
+Block: 22492305
+Paid: 0.000490279720213842 ETH (513071 gas * 0.955578702 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x88a1604d952c75f290804b1138108444dc4a5a5242993a2f356ca9b41e49fdd1
+Block: 22492306
+Paid: 0.001440903901503392 ETH (1554088 gas * 0.927170084 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x31c80cecfbb736bca740b4122e72d38f9b20219faa4703e48c71fc93ab859ae6
+Block: 22492307
+Paid: 0.003363655647443286 ETH (3508049 gas * 0.958839414 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xe78703e9e6bc0e01808a6b2c6c577cb6d91a2c86f03035cef513db230d7952fd
+Block: 22492308
+Paid: 0.004724742214406448 ETH (4707062 gas * 1.003756104 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xf3ed014824bbb2e63d7476d914bc8399297a1dc4cb11129fd075ad8969984d60
+Block: 22492309
+Paid: 0.003434619879037345 ETH (3435581 gas * 0.999720245 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x456694205af8b45a06c2fffa549cd8cc3180757759284673cb651cef740cb3e3
+Block: 22492310
+Paid: 0.001154759516726812 ETH (1150931 gas * 1.003326452 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x2d4ebb3d6fbf604775245335e2e23a0c32dd88e6aeb9598242d1a31cb5d649e4
+Block: 22492311
+Paid: 0.000637469050276358 ETH (646454 gas * 0.986101177 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x37d2593a74cf427e89fdd4472f4d8b46391bbdeb5a44d9f8027664ba48632382
+Block: 22492312
+Paid: 0.000053137380392112 ETH (56181 gas * 0.945824752 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x53ffcf2a42ee00c09fc575b741a778d936c141fd512ffc655ab74ea231a57f7c
+Block: 22492313
+Paid: 0.004060913622466536 ETH (4351166 gas * 0.933293196 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xe2fec6ee778dad322110fdd951c59ebade0f9432574fe87668168fac0e538723
+Block: 22492314
+Paid: 0.0000375909287724 ETH (39280 gas * 0.956999205 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x6b0cfa6ab29c857bc6763025d6e02b9eb4a15e52da05e1a80cabc55d15511002
+Block: 22492315
+Paid: 0.0022716606155776 ETH (2487680 gas * 0.91316432 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x65467c873e400375cb902fd72b2d2488c40d8cee070afd1ae4dad55de73203f8
+Block: 22492316
+Paid: 0.00003902397311712 ETH (39280 gas * 0.993482004 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xafb680783bcf167e3acf2bb8b4e9c2af691b3a011d96961959f7a371b309f4bc
+Block: 22492317
+Paid: 0.003388180708756398 ETH (3467621 gas * 0.977090838 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x8935a173e8bb10a3f980aac9dfe86d76a2df8414cc177d8557b8334cd9634eb1
+Block: 22492318
+Paid: 0.00003637979775744 ETH (36480 gas * 0.997253228 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xf73d3c420039a1f02295738f33f984917fc9c556633bbd0a3a07ea5ac0210db3
+Block: 22492319
+Paid: 0.000457438156912634 ETH (441598 gas * 1.035870083 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x861ebeb3561405d5901c8b77f0d77952baa95237696e286165c415fc14a92867
+Block: 22492320
+Paid: 0.00003736933628928 ETH (36480 gas * 1.024378736 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x8f1a068fd0d014117329f552ad0824fa3ac06ec69fc13fd70c5fc2bcfc232754
+Block: 22492321
+Paid: 0.00176369569537464 ETH (1603332 gas * 1.10001902 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xe36b22652f79c50e0559b5e0302e2f07b7e5f702f1fe3fd119d895b53dc1b299
+Block: 22492322
+Paid: 0.00004093632168768 ETH (36480 gas * 1.122157941 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xb92b055fdd2dde386f37fdd482382bbfc07846fe23f904fc159180e4f3e49cdf
+Block: 22492323
+Paid: 0.001920684670576352 ETH (1715344 gas * 1.119708158 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xbd4657e4ea3634465f497c75fb1f1e499ee727c019e208d7f1c43026235d7e3f
+Block: 22492324
+Paid: 0.00004158262106688 ETH (36480 gas * 1.139874481 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x497b16bbb02a6bf84e7aaed538358dd081f4ba9446d4f20296a65bf6aa83d5cb
+Block: 22492325
+Paid: 0.001734156836015136 ETH (1596768 gas * 1.086041827 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xc754abe8408eb28dcc5cf685dd3fd93b9561439df38ca20f739834f942ffc9aa
+Block: 22492326
+Paid: 0.000038022354336 ETH (36480 gas * 1.04227945 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xa888e88d89cb542a52ddfd6f031537ae4949cb828ca8915ab75d0ee3ffeca20c
+Block: 22492327
+Paid: 0.000674868413647286 ETH (619013 gas * 1.090233022 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xb77f1caee16bbc68949725008540d72ebcfd9362ae37dcc13142d4037e2a7dc9
+Block: 22492328
+Paid: 0.00003802875829056 ETH (36480 gas * 1.042454997 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x3b6c56a2728eb1f76000fe99e9ccba9c3bfa884be775e2bde33f4684011cd94f
+Block: 22492329
+Paid: 0.000386226183847886 ETH (359003 gas * 1.075829962 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x344104612291b9f05511bf20f3b2d0403b740e1131021015654f7f93755e8eac
+Block: 22492330
+Paid: 0.00003676251009408 ETH (36480 gas * 1.007744246 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x76ce003ae533dda4390a29e6857077dbad2a4240f792af60e99dc593a7798f3a
+Block: 22492331
+Paid: 0.000801831284536672 ETH (850252 gas * 0.943051336 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xd415f795590c82d3d5cb4846f59040009d3ec3897336679755d9fdc1a77a9ae8
+Block: 22492332
+Paid: 0.00003625699276224 ETH (36480 gas * 0.993886863 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xbe95ef5ea1718992b4d4bdaf60112888fb9050363ad470f805e8e773bb87db1b
+Block: 22492333
+Paid: 0.001858283670367056 ETH (1725968 gas * 1.076661717 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xf344653547bb9a2689d408bcc2ea6f984c53151a4916c6daedb6c43d223e288a
+Block: 22492335
+Paid: 0.0000389993998176 ETH (36480 gas * 1.069062495 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xdde5b4d28b64d7b3d134ca76f88fdb0aa6a263ce3052a31c172bca9dcdc99c50
+Block: 22492336
+Paid: 0.001856985511469305 ETH (1763195 gas * 1.053193499 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x1ac49ab2b02477ce4087103568b1559711edc283af1bd81cb5960ddc5ec96449
+Block: 22492337
+Paid: 0.00301215122869056 ETH (2861760 gas * 1.052552006 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x1e19a5aa0b26bfb051771b406f4c579feadf52020cd42011b69d7c58701412eb
+Block: 22492338
+Paid: 0.002941312306601 ETH (2696500 gas * 1.090788914 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x992990c914854782c40f73af829839deab725b0a41d21158ec0e5023bf3824d9
+Block: 22492340
+Paid: 0.002358629334571 ETH (2519980 gas * 0.93597145 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xa9c30bd1e3d8ba5a749456b5b5c69f91d96ff0d6f17ec188a423636472e1cce8
+Block: 22492341
+Paid: 0.00310382025600751 ETH (2965570 gas * 1.046618443 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x35a4d3cdb851eaf0470815d2b76311aa815cd19309772f93cf5b3b9bb80f5fe4
+Block: 22492342
+Paid: 0.00305891008949238 ETH (2952790 gas * 1.035938922 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0xa9099583b90c9cd57c2d5635f7d583402d14c581e77c8d8b0d4f080d28629560
+Block: 22492343
+Paid: 0.00311746163855379 ETH (2978590 gas * 1.046623281 gwei)
+
+
+##### mainnet
+✅  [Success]Hash: 0x1e196960a4d2570835a3a9a14e96237e8740a0537c378514481796662328a784
+Block: 22492344
+Paid: 0.00212023362424104 ETH (2023560 gas * 1.047774034 gwei)
+
+✅ Sequence #1 on mainnet | Total Paid: 0.081964824212267409 ETH (83141599 gas * avg 1.00231589 gwei)

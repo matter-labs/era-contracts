@@ -4,8 +4,8 @@ pragma solidity ^0.8.20;
 
 import {EfficientCall} from "./EfficientCall.sol";
 import {RLPEncoder} from "./RLPEncoder.sol";
-import {MalformedBytecode, BytecodeError, Overflow} from "../SystemContractErrors.sol";
-import {ERA_VM_BYTECODE_FLAG, EVM_BYTECODE_FLAG, CREATE2_EVM_PREFIX} from "../Constants.sol";
+import {BytecodeError, MalformedBytecode, Overflow} from "../SystemContractErrors.sol";
+import {CREATE2_EVM_PREFIX, ERA_VM_BYTECODE_FLAG, EVM_BYTECODE_FLAG} from "../Constants.sol";
 
 /**
  * @author Matter Labs
@@ -43,6 +43,14 @@ library Utils {
         }
 
         return uint24(_x);
+    }
+
+    function safeCastToU8(uint256 _x) internal pure returns (uint8) {
+        if (_x > type(uint8).max) {
+            revert Overflow();
+        }
+
+        return uint8(_x);
     }
 
     /// @return If this bytecode hash for EVM contract or not

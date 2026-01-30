@@ -237,7 +237,6 @@ function checkValidInitialCutHashParams(
   l2DefaultAccountBytecodeHash: string,
   l2EvmEmulatorBytecodeHash: string,
   verifier: string,
-  blobVersionedHashRetriever: string,
   priorityTxMaxGasLimit: number
 ) {
   // We do not fetch the following numbers from the environment because they are very rarely changed
@@ -270,9 +269,6 @@ function checkValidInitialCutHashParams(
   if (verifier === ethers.constants.AddressZero) {
     throw new Error("Verifier address is zero");
   }
-  if (blobVersionedHashRetriever === ethers.constants.AddressZero) {
-    throw new Error("Blob versioned hash retriever address is zero");
-  }
   if (priorityTxMaxGasLimit !== EXPECTED_PRIORITY_TX_MAX_GAS_LIMIT) {
     throw new Error(
       `Expected priority tx max gas limit to be ${EXPECTED_PRIORITY_TX_MAX_GAS_LIMIT}, got ${priorityTxMaxGasLimit}`
@@ -288,7 +284,6 @@ export function compileInitialCutHash(
   l2DefaultAccountBytecodeHash: string,
   l2EvmEmulatorBytecodeHash: string,
   verifier: string,
-  blobVersionedHashRetriever: string,
   priorityTxMaxGasLimit: number,
   diamondInit: string,
   strictMode: boolean = true
@@ -301,7 +296,6 @@ export function compileInitialCutHash(
       l2DefaultAccountBytecodeHash,
       l2EvmEmulatorBytecodeHash,
       verifier,
-      blobVersionedHashRetriever,
       priorityTxMaxGasLimit
     );
   }
@@ -335,7 +329,6 @@ export function compileInitialCutHash(
       l2EvmEmulatorBytecodeHash,
       priorityTxMaxGasLimit,
       feeParams,
-      blobVersionedHashRetriever,
     },
   ]);
 

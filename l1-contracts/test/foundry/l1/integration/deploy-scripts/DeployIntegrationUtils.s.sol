@@ -7,23 +7,27 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {StateTransitionDeployedAddresses, FacetCut, Action} from "deploy-scripts/Utils.sol";
+import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 abstract contract DeployIntegrationUtils is Script, DeployUtils {
     using stdToml for string;
 
     function test() internal virtual override {}
 
-    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory);
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual override returns (bytes memory);
 
-    function getFacetCuts(
+    function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override returns (FacetCut[] memory facetCuts) {
+    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
         string memory root = vm.projectRoot();
         string memory inputPath = string.concat(root, "/script-out/diamond-selectors.toml");
         string memory toml = vm.readFile(inputPath);
 
-        facetCuts = new FacetCut[](4);
+        facetCuts = new Diamond.FacetCut[](4);
         {
             bytes memory adminFacetSelectors = toml.readBytes("$.admin_facet_selectors");
             bytes memory gettersFacetSelectors = toml.readBytes("$.getters_facet_selectors");
@@ -35,30 +39,36 @@ abstract contract DeployIntegrationUtils is Script, DeployUtils {
             bytes4[] memory mailboxFacetSelectorsArray = abi.decode(mailboxFacetSelectors, (bytes4[]));
             bytes4[] memory executorFacetSelectorsArray = abi.decode(executorFacetSelectors, (bytes4[]));
 
-            facetCuts[0] = FacetCut({
+            facetCuts[0] = Diamond.FacetCut({
                 facet: addresses.stateTransition.adminFacet,
-                action: Action.Add,
+                action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: adminFacetSelectorsArray
             });
-            facetCuts[1] = FacetCut({
+            facetCuts[1] = Diamond.FacetCut({
                 facet: addresses.stateTransition.gettersFacet,
-                action: Action.Add,
+                action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: gettersFacetSelectorsArray
             });
-            facetCuts[2] = FacetCut({
+            facetCuts[2] = Diamond.FacetCut({
                 facet: addresses.stateTransition.mailboxFacet,
-                action: Action.Add,
+                action: Diamond.Action.Add,
                 isFreezable: true,
                 selectors: mailboxFacetSelectorsArray
             });
-            facetCuts[3] = FacetCut({
+            facetCuts[3] = Diamond.FacetCut({
                 facet: addresses.stateTransition.executorFacet,
-                action: Action.Add,
+                action: Diamond.Action.Add,
                 isFreezable: true,
                 selectors: executorFacetSelectorsArray
             });
         }
+    }
+
+    function getUpgradeAddedFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
+        return getChainCreationFacetCuts(stateTransition);
     }
 }

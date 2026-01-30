@@ -2,14 +2,14 @@
 
 pragma solidity 0.8.28;
 
-import {stdStorage, StdStorage, Test} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehubBase.sol";
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
 import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
@@ -17,29 +17,27 @@ import {DummyBridgehubSetter} from "contracts/dev-contracts/test/DummyBridgehubS
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
-import {L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-import {L2TransactionRequestTwoBridgesInner} from "contracts/bridgehub/IBridgehub.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "contracts/common/Config.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {SecondBridgeAddressTooLow} from "contracts/bridgehub/L1BridgehubErrors.sol";
-import {AssetIdNotSupported, ZeroChainId, AssetIdAlreadyRegistered, ChainIdTooBig, WrongMagicValue, SharedBridgeNotSet, BridgeHubAlreadyRegistered, MsgValueMismatch, SlotOccupied, CTMAlreadyRegistered, Unauthorized, NonEmptyMsgValue, CTMNotRegistered} from "contracts/common/L1ContractErrors.sol";
+import {AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdTooBig, MsgValueMismatch, NonEmptyMsgValue, SharedBridgeNotSet, SlotOccupied, Unauthorized, WrongMagicValue, ZeroChainId} from "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
 
     address weth;
-    Bridgehub bridgeHub;
+    L1Bridgehub bridgeHub;
     DummyBridgehubSetter dummyBridgehub;
     address public bridgeOwner;
     address public testTokenAddress;
@@ -70,6 +68,7 @@ contract ExperimentalBridgeTest is Test {
 
     address mockL2Contract;
 
+    uint256 l1ChainId;
     uint256 eraChainId;
 
     address deployerAddress;
@@ -97,12 +96,12 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function setUp() public {
-        deployerAddress = makeAddr("DEPLOYER_ADDRESS");
+        l1ChainId = 1;
         eraChainId = 320;
-        uint256 l1ChainId = block.chainid;
+        deployerAddress = makeAddr("DEPLOYER_ADDRESS");
         bridgeOwner = makeAddr("BRIDGE_OWNER");
-        dummyBridgehub = new DummyBridgehubSetter(l1ChainId, bridgeOwner, type(uint256).max);
-        bridgeHub = Bridgehub(address(dummyBridgehub));
+        dummyBridgehub = new DummyBridgehubSetter(bridgeOwner, type(uint256).max);
+        bridgeHub = L1Bridgehub(address(dummyBridgehub));
         weth = makeAddr("WETH");
         mockCTM = new DummyChainTypeManagerWBH(address(bridgeHub));
         mockChainContract = new DummyZKChain(address(bridgeHub), eraChainId, block.chainid);
@@ -127,7 +126,7 @@ contract ExperimentalBridgeTest is Test {
         ntv.registerToken(address(testToken));
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(testToken));
 
-        messageRoot = new MessageRoot(bridgeHub);
+        messageRoot = new L1MessageRoot(address(bridgeHub));
 
         sharedBridge = new L1AssetRouter(
             mockL1WethAddress,
@@ -223,7 +222,7 @@ contract ExperimentalBridgeTest is Test {
         vm.startPrank(bridgeOwner);
         bridgeHub.addChainTypeManager(address(mockCTM));
         bridgeHub.addTokenAssetId(tokenAssetId);
-        bridgeHub.setAddresses(sharedBridgeAddress, ICTMDeploymentTracker(address(0)), messageRoot);
+        bridgeHub.setAddresses(sharedBridgeAddress, ICTMDeploymentTracker(address(0)), messageRoot, address(0));
         vm.stopPrank();
 
         vm.prank(l1Nullifier.owner());
@@ -425,7 +424,12 @@ contract ExperimentalBridgeTest is Test {
 
     function test_addAssetId(address randomAddress) public {
         vm.startPrank(bridgeOwner);
-        bridgeHub.setAddresses(address(mockSharedBridge), ICTMDeploymentTracker(address(0)), IMessageRoot(address(0)));
+        bridgeHub.setAddresses(
+            address(mockSharedBridge),
+            ICTMDeploymentTracker(address(0)),
+            IMessageRoot(address(0)),
+            address(0)
+        );
         vm.stopPrank();
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, testTokenAddress);
@@ -459,7 +463,12 @@ contract ExperimentalBridgeTest is Test {
         uint256 randomValue
     ) public useRandomToken(randomValue) {
         vm.startPrank(bridgeOwner);
-        bridgeHub.setAddresses(address(mockSharedBridge), ICTMDeploymentTracker(address(0)), IMessageRoot(address(0)));
+        bridgeHub.setAddresses(
+            address(mockSharedBridge),
+            ICTMDeploymentTracker(address(0)),
+            IMessageRoot(address(0)),
+            address(0)
+        );
         vm.stopPrank();
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, testTokenAddress);
@@ -489,7 +498,7 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function test_setAddresses(address randomAssetRouter, address randomCTMDeployer, address randomMessageRoot) public {
-        assertTrue(bridgeHub.sharedBridge() == address(0), "Shared bridge is already there");
+        assertTrue(bridgeHub.assetRouter() == address(0), "Shared bridge is already there");
         assertTrue(bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
         assertTrue(bridgeHub.messageRoot() == IMessageRoot(address(0)), "Message root is already there");
 
@@ -497,10 +506,11 @@ contract ExperimentalBridgeTest is Test {
         bridgeHub.setAddresses(
             randomAssetRouter,
             ICTMDeploymentTracker(randomCTMDeployer),
-            IMessageRoot(randomMessageRoot)
+            IMessageRoot(randomMessageRoot),
+            address(0)
         );
 
-        assertTrue(bridgeHub.sharedBridge() == randomAssetRouter, "Shared bridge is already there");
+        assertTrue(bridgeHub.assetRouter() == randomAssetRouter, "Shared bridge is already there");
         assertTrue(
             bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(randomCTMDeployer),
             "L1 CTM deployer is already there"
@@ -517,14 +527,15 @@ contract ExperimentalBridgeTest is Test {
         vm.assume(randomCaller != bridgeOwner);
 
         vm.prank(randomCaller);
-        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
         bridgeHub.setAddresses(
             randomAssetRouter,
             ICTMDeploymentTracker(randomCTMDeployer),
-            IMessageRoot(randomMessageRoot)
+            IMessageRoot(randomMessageRoot),
+            address(0)
         );
 
-        assertTrue(bridgeHub.sharedBridge() == address(0), "Shared bridge is already there");
+        assertTrue(bridgeHub.assetRouter() == address(0), "Shared bridge is already there");
         assertTrue(bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
         assertTrue(bridgeHub.messageRoot() == IMessageRoot(address(0)), "Message root is already there");
     }
@@ -1024,7 +1035,7 @@ contract ExperimentalBridgeTest is Test {
         _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, true, address(0));
 
         assertTrue(bridgeHub.baseTokenAssetId(l2TxnReqDirect.chainId) == ETH_TOKEN_ASSET_ID);
-        console.log(IL1AssetRouter(bridgeHub.sharedBridge()).assetHandlerAddress(ETH_TOKEN_ASSET_ID));
+        console.log(IL1AssetRouter(bridgeHub.assetRouter()).assetHandlerAddress(ETH_TOKEN_ASSET_ID));
         assertTrue(bridgeHub.baseToken(l2TxnReqDirect.chainId) == ETH_TOKEN_ADDRESS);
 
         assertTrue(bridgeHub.getZKChain(l2TxnReqDirect.chainId) == address(mockChainContract));

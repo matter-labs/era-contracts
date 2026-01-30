@@ -2,14 +2,15 @@
 
 pragma solidity 0.8.28;
 
-import {IL1Messenger, L2ToL1Log, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG_SERIALIZE_SIZE} from "./interfaces/IL1Messenger.sol";
+import {IL1Messenger, L2ToL1Log} from "./interfaces/IL1Messenger.sol";
 
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
+import {L2DAValidator} from "./libraries/L2DAValidator.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, COMPUTATIONAL_PRICE_FOR_PUBDATA, L2_MESSAGE_ROOT} from "./Constants.sol";
-import {ReconstructionMismatch, PubdataField} from "./SystemContractErrors.sol";
+import {COMPUTATIONAL_PRICE_FOR_PUBDATA, KNOWN_CODE_STORAGE_CONTRACT, L2_MESSAGE_ROOT, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, L2_TO_L1_LOG_SERIALIZE_SIZE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, SYSTEM_CONTEXT_CONTRACT, SystemLogKey, L2DACommitmentScheme} from "./Constants.sol";
+import {PubdataField, ReconstructionMismatch} from "./SystemContractErrors.sol";
 import {IL2DAValidator} from "./interfaces/IL2DAValidator.sol";
 
 /**
@@ -186,20 +187,22 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
 
     /// @notice Verifies that the {_operatorInput} reflects what occurred within the L1Batch and that
     ///         the compressed statediffs are equivalent to the full state diffs.
-    /// @param _l2DAValidator the address of the l2 da validator
+    /// @param _l2DACommitmentScheme The scheme of L2 DA commitment. Different L1 validators may use different schemes.
     /// @param _operatorInput The total pubdata and uncompressed state diffs of transactions that were
-    ///        processed in the current L1 Batch. Pubdata consists of L2 to L1 Logs, messages, deployed bytecode, and state diffs.
+    ///        processed in the current L1 Batch. Pubdata consists of L2 to L1 Logs, messages, deployed bytecodes, and state diffs.
     /// @dev Function that should be called exactly once per L1 Batch by the bootloader.
     /// @dev Checks that totalL2ToL1Pubdata is strictly packed data that should to be published to L1.
     /// @dev The data passed in also contains the encoded state diffs to be checked again, however this is aux data that is not
     ///      part of the committed pubdata.
-    /// @dev Performs calculation of L2ToL1Logs merkle tree root, "sends" such root and keccak256(totalL2ToL1Pubdata)
+    /// @dev Performs calculation of L2ToL1Logs merkle tree root, "sends" such root and L2 DA commitment
     /// to L1 using low-level (VM) L2Log.
     function publishPubdataAndClearState(
-        address _l2DAValidator,
+        L2DACommitmentScheme _l2DACommitmentScheme,
         bytes calldata _operatorInput
     ) external onlyCallFromBootloader {
         uint256 calldataPtr = 0;
+
+        // Note that provided function sig and values of hashes are used only for backward compatibility and sanity checks.
 
         // Check function sig and data in the other hashes
         // 4 + 32 + 32 + 32 + 32 + 32 + 32
@@ -212,6 +215,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         //                32 bytes for length
 
         bytes4 inputL2DAValidatePubdataFunctionSig = bytes4(_operatorInput[calldataPtr:calldataPtr + 4]);
+        // Implemented for backward compatibility with operator's encoding.
         if (inputL2DAValidatePubdataFunctionSig != IL2DAValidator.validatePubdata.selector) {
             revert ReconstructionMismatch(
                 PubdataField.InputDAFunctionSig,
@@ -222,22 +226,25 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         calldataPtr += 4;
 
         bytes32 inputChainedLogsHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
+        // Sanity check
         if (inputChainedLogsHash != chainedLogsHash) {
             revert ReconstructionMismatch(PubdataField.InputLogsHash, chainedLogsHash, inputChainedLogsHash);
         }
         calldataPtr += 32;
 
-        // Check happens below after we reconstruct the logs root hash
+        // Sanity check happens below after we reconstruct the logs root hash
         bytes32 inputChainedLogsRootHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
         calldataPtr += 32;
 
         bytes32 inputChainedMsgsHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
+        // Sanity check
         if (inputChainedMsgsHash != chainedMessagesHash) {
             revert ReconstructionMismatch(PubdataField.InputMsgsHash, chainedMessagesHash, inputChainedMsgsHash);
         }
         calldataPtr += 32;
 
         bytes32 inputChainedBytecodesHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
+        // Sanity check
         if (inputChainedBytecodesHash != chainedL1BytecodesRevealDataHash) {
             revert ReconstructionMismatch(
                 PubdataField.InputBytecodeHash,
@@ -259,7 +266,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         // Shift calldata ptr past the pubdata offset and len
         calldataPtr += 64;
 
-        /// Check logs
+        /// Check logs. Full logs root hash is published even for Validiums without DA.
         uint32 numberOfL2ToL1Logs = uint32(bytes4(_operatorInput[calldataPtr:calldataPtr + 4]));
         if (numberOfL2ToL1Logs > L2_TO_L1_LOGS_MERKLE_TREE_LEAVES) {
             revert ReconstructionMismatch(
@@ -289,6 +296,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
             l2ToL1LogsTreeArray[i] = hashedLog;
             reconstructedChainedLogsHash = keccak256(abi.encode(reconstructedChainedLogsHash, hashedLog));
         }
+        // Sanity check
         if (reconstructedChainedLogsHash != chainedLogsHash) {
             revert ReconstructionMismatch(PubdataField.LogsHash, chainedLogsHash, reconstructedChainedLogsHash);
         }
@@ -309,29 +317,33 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         bytes32 aggregatedRootHash = L2_MESSAGE_ROOT.getAggregatedRoot();
         bytes32 fullRootHash = keccak256(bytes.concat(localLogsRootHash, aggregatedRootHash));
 
+        // Sanity check
         if (inputChainedLogsRootHash != localLogsRootHash) {
             revert ReconstructionMismatch(PubdataField.InputLogsRootHash, localLogsRootHash, inputChainedLogsRootHash);
         }
 
-        bytes32 l2DAValidatorOutputhash = bytes32(0);
-        if (_l2DAValidator != address(0)) {
-            bytes memory returnData = EfficientCall.call({
-                _gas: gasleft(),
-                _address: _l2DAValidator,
-                _value: 0,
-                _data: _operatorInput,
-                _isSystem: false
-            });
+        // Pubdata-related input, includes logs, messages, bytecodes, compressed and uncompressed state diffs
+        // encoded as `bytes`, so it has offset and length
+        uint256 operatorDataOffset = 4 + uint256(bytes32(_operatorInput[4 + 32 * 4:4 + 32 * 4 + 32]));
+        uint256 operatorDataLength = uint256(bytes32(_operatorInput[operatorDataOffset:operatorDataOffset + 32]));
 
-            l2DAValidatorOutputhash = abi.decode(returnData, (bytes32));
-        }
+        // Validate pubdata and make commitment. Logs are not checked since we already checked them above.
+        // Does nothing if commitment scheme is EMPTY_NO_DA.
+        // It is expected that operator data includes logs, messages, bytecodes and compressed state diffs.
+        // inputChainedMsgsHash and inputChainedBytecodesHash values are used to double-check messages and bytecodes validity.
+        bytes32 l2DAValidatorOutputhash = L2DAValidator.makeDACommitment(
+            _l2DACommitmentScheme,
+            inputChainedMsgsHash,
+            inputChainedBytecodesHash,
+            _operatorInput[operatorDataOffset + 32:operatorDataOffset + 32 + operatorDataLength] // Operator data
+        );
 
         /// Native (VM) L2 to L1 log
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)), fullRootHash);
         SystemContractHelper.toL1(
             true,
-            bytes32(uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)),
-            bytes32(uint256(uint160(_l2DAValidator)))
+            bytes32(uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY)),
+            bytes32(uint256(_l2DACommitmentScheme))
         );
         SystemContractHelper.toL1(
             true,

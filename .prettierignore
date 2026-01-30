@@ -1,4 +1,4 @@
-tools/data
+tools/verifier-gen/data
 l1-contracts/lib
 l1-contracts-foundry/lib
 lib

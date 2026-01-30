@@ -3,9 +3,9 @@
 pragma solidity ^0.8.20;
 pragma abicoder v2;
 
-import {LOAD_LATEST_RETURNDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, SystemContractsCaller, CalldataForwardingMode, RAW_FAR_CALL_BY_REF_CALL_ADDRESS} from "../libraries/SystemContractsCaller.sol";
+import {CalldataForwardingMode, LOAD_LATEST_RETURNDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, RAW_FAR_CALL_BY_REF_CALL_ADDRESS, SystemContractsCaller} from "../libraries/SystemContractsCaller.sol";
 import {EfficientCall, KECCAK256_SYSTEM_CONTRACT} from "../libraries/EfficientCall.sol";
-import {CallToKeccakShouldHaveSucceeded, KeccakReturnDataSizeShouldBe32Bytes, KeccakResultIsNotCorrect, KeccakShouldStartWorkingAgain, KeccakMismatchBetweenNumberOfInputsAndOutputs, KeccakHashWasNotCalculatedCorrectly} from "contracts/SystemContractErrors.sol";
+import {CallToKeccakShouldHaveSucceeded, KeccakHashWasNotCalculatedCorrectly, KeccakMismatchBetweenNumberOfInputsAndOutputs, KeccakResultIsNotCorrect, KeccakReturnDataSizeShouldBe32Bytes, KeccakShouldStartWorkingAgain} from "contracts/SystemContractErrors.sol";
 
 // In this test it is important to actually change the real Keccak256's contract's bytecode,
 // which requires changes in the real AccountCodeStorage contract

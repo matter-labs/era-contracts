@@ -5,7 +5,7 @@ import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_ROOT_HASH} from "contracts/common/Config.sol";
+import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
 
 contract SetChainCreationParamsTest is ChainTypeManagerTest {
     function setUp() public {
@@ -48,6 +48,7 @@ contract SetChainCreationParamsTest is ChainTypeManagerTest {
             numberOfLayer1Txs: 0,
             priorityOperationsHash: EMPTY_STRING_KECCAK,
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+            dependencyRootsRollingHash: bytes32(0),
             timestamp: 0,
             commitment: genesisBatchCommitment
         });

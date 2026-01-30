@@ -1,27 +1,27 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {StdStorage, stdStorage} from "forge-std/Test.sol";
-import {Test} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ERC20} from "@openzeppelin/contracts-v4/token/ERC20/ERC20.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
-import {IL1AssetHandler} from "contracts/bridge/interfaces/IL1AssetHandler.sol";
+
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
+
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract L1AssetRouterTest is Test {
@@ -131,7 +131,7 @@ contract L1AssetRouterTest is Test {
 
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
         l1NullifierImpl = new L1NullifierDev({
-            _bridgehub: IBridgehub(bridgehubAddress),
+            _bridgehub: IL1Bridgehub(bridgehubAddress),
             _eraChainId: eraChainId,
             _eraDiamondProxy: eraDiamondProxy
         });
@@ -145,7 +145,7 @@ contract L1AssetRouterTest is Test {
 
         l1Nullifier = L1Nullifier(payable(l1NullifierProxy));
         sharedBridgeImpl = new L1AssetRouter({
-            _l1WethAddress: l1WethAddress,
+            _l1WethToken: l1WethAddress,
             _bridgehub: bridgehubAddress,
             _l1Nullifier: address(l1Nullifier),
             _eraChainId: eraChainId,
@@ -158,8 +158,8 @@ contract L1AssetRouterTest is Test {
         );
         sharedBridge = L1AssetRouter(payable(sharedBridgeProxy));
         nativeTokenVaultImpl = new L1NativeTokenVault({
-            _l1WethAddress: l1WethAddress,
-            _l1AssetRouter: address(sharedBridge),
+            _wethToken: l1WethAddress,
+            _assetRouter: address(sharedBridge),
             _l1Nullifier: l1Nullifier
         });
         address tokenBeacon = makeAddr("tokenBeacon");
@@ -180,7 +180,7 @@ contract L1AssetRouterTest is Test {
         sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(l1ERC20BridgeAddress));
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
         vm.prank(owner);
-        sharedBridge.setNativeTokenVault(INativeTokenVault(address(nativeTokenVault)));
+        sharedBridge.setNativeTokenVault(INativeTokenVaultBase(address(nativeTokenVault)));
         vm.prank(address(nativeTokenVault));
         nativeTokenVault.registerToken(address(token));
         nativeTokenVault.registerEthToken();
@@ -201,17 +201,17 @@ contract L1AssetRouterTest is Test {
 
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
             abi.encode(ETH_TOKEN_ASSET_ID)
         );
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, chainId),
             abi.encode(ETH_TOKEN_ASSET_ID)
         );
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.requestL2TransactionDirect.selector),
+            abi.encodeWithSelector(IL1Bridgehub.requestL2TransactionDirect.selector),
             abi.encode(txHash)
         );
 
@@ -255,7 +255,7 @@ contract L1AssetRouterTest is Test {
         vm.mockCall(
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(IBridgehub.baseToken.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.baseToken.selector, chainId),
             abi.encode(ETH_TOKEN_ADDRESS)
         );
     }
@@ -292,7 +292,7 @@ contract L1AssetRouterTest is Test {
         // vm.prank(bridgehubAddress);
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, chainId),
             abi.encode(_assetId)
         );
     }

@@ -185,7 +185,6 @@ export async function initialPreUpgradeContractsDeployment(
 
   await deployer.deployChainAdmin(create2Salt, { gasPrice, nonce });
   await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
-  await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
 
   // note we should also deploy the old ERC20Bridge here, but we can do that later.
 
@@ -351,7 +350,6 @@ export class EraDeployer extends Deployer {
         l2EvmEmulatorBytecodeHash: L2_EVM_EMULATOR_BYTECODE_HASH,
         priorityTxMaxGasLimit,
         feeParams,
-        blobVersionedHashRetriever: this.addresses.BlobVersionedHashRetriever,
       },
     ]);
 

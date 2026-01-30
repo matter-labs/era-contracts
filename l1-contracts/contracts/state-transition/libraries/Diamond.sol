@@ -4,7 +4,7 @@ pragma solidity ^0.8.21;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
-import {NoFunctionsForDiamondCut, UndefinedDiamondCutAction, AddressHasNoCode, FacetExists, RemoveFunctionFacetAddressZero, SelectorsMustAllHaveSameFreezability, NonEmptyCalldata, ReplaceFunctionFacetAddressZero, RemoveFunctionFacetAddressNotZero, DelegateCallFailed} from "../../common/L1ContractErrors.sol";
+import {AddressHasNoCode, DelegateCallFailed, FacetExists, NoFunctionsForDiamondCut, NonEmptyCalldata, RemoveFunctionFacetAddressNotZero, RemoveFunctionFacetAddressZero, ReplaceFunctionFacetAddressZero, SelectorsMustAllHaveSameFreezability, UndefinedDiamondCutAction} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

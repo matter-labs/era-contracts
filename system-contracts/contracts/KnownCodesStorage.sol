@@ -5,8 +5,8 @@ pragma solidity 0.8.28;
 import {IKnownCodesStorage} from "./interfaces/IKnownCodesStorage.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {COMPRESSOR_CONTRACT, L1_MESSENGER_CONTRACT, DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
-import {Unauthorized, MalformedBytecode, BytecodeError} from "./SystemContractErrors.sol";
+import {COMPRESSOR_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, L1_MESSENGER_CONTRACT} from "./Constants.sol";
+import {BytecodeError, MalformedBytecode, Unauthorized} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs

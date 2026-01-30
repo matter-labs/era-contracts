@@ -8,6 +8,8 @@ import {PriorityQueue} from "../../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 import {Unauthorized} from "../../../common/L1ContractErrors.sol";
+import {IL1Bridgehub} from "../../../bridgehub/IL1Bridgehub.sol";
+import {PRIORITY_OPERATION_L2_TX_TYPE, SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "../../../common/Config.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
@@ -49,6 +51,13 @@ contract ZKChainBase is ReentrancyGuard {
         _;
     }
 
+    modifier onlyChainAssetHandler() {
+        if (msg.sender != IL1Bridgehub(s.bridgehub).chainAssetHandler()) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     modifier onlyAdminOrChainTypeManager() {
         if (msg.sender != s.admin && msg.sender != s.chainTypeManager) {
             revert Unauthorized(msg.sender);
@@ -80,7 +89,7 @@ contract ZKChainBase is ReentrancyGuard {
     /// @notice Returns whether the priority queue is still active, i.e.
     /// the chain has not processed all transactions from it
     function _isPriorityQueueActive() internal view returns (bool) {
-        return s.priorityQueue.getFirstUnprocessedPriorityTx() < s.priorityTree.startIndex;
+        return s.__DEPRECATED_priorityQueue.getFirstUnprocessedPriorityTx() < s.priorityTree.startIndex;
     }
 
     /// @notice Ensures that the queue is deactivated. Should be invoked
@@ -90,16 +99,20 @@ contract ZKChainBase is ReentrancyGuard {
         // overriding `tail`/`head` on L1 deployment.
         if (_isPriorityQueueActive()) {
             uint256 startIndex = s.priorityTree.startIndex;
-            s.priorityQueue.head = startIndex;
-            s.priorityQueue.tail = startIndex;
+            s.__DEPRECATED_priorityQueue.head = startIndex;
+            s.__DEPRECATED_priorityQueue.tail = startIndex;
         }
     }
 
     function _getTotalPriorityTxs() internal view returns (uint256) {
-        if (_isPriorityQueueActive()) {
-            return s.priorityQueue.getTotalPriorityTxs();
-        } else {
-            return s.priorityTree.getTotalPriorityTxs();
-        }
+        return s.priorityTree.getTotalPriorityTxs();
+    }
+
+    function _getPriorityTxType() internal view returns (uint256) {
+        return s.zksyncOS ? ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE : PRIORITY_OPERATION_L2_TX_TYPE;
+    }
+
+    function _getUpgradeTxType() internal view returns (uint256) {
+        return s.zksyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
     }
 }

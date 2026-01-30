@@ -19,7 +19,7 @@ jobs:
       - name: Install foundry-zksync
         run: |
           mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b/foundry_nightly_linux_amd64.tar.gz
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
           tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
@@ -46,10 +46,11 @@ jobs:
         run: yarn da build:foundry
 
       - name: Create cache
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           key: artifacts-l1-contracts-foudry-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
@@ -66,6 +67,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
 
       - name: Restore artifacts cache
         uses: actions/cache/restore@v3
@@ -73,6 +82,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-contracts-foudry-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
@@ -109,11 +119,40 @@ jobs:
             exit 1
           fi
 
-      - name: Run DeployL1 script
+      - name: Run DeployL1CoreContracts script
         working-directory: ./l1-contracts
-        # l1-contracts are skipped because we don't want to recompile Bridgehub with a high optimizer-runs value.
-        # Otherwise, the Bridgehub contract size would be too large.
-        run: forge script ./deploy-scripts/DeployL1.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY --skip '*/l1-contracts/contracts/*'
+        # First we need to deploy the ecosystem contracts
+        run: forge script ./deploy-scripts/DeployL1CoreContracts.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY --skip '*/l1-contracts/contracts/*'
+
+      - name: Read bridgehub proxy address
+        id: read-bridgehub
+        working-directory: ./l1-contracts
+        run: |
+          # Extract bridgehub_proxy_addr allowing leading whitespace
+          BRIDGEHUB=$(
+            sed -nE 's/^[[:space:]]*bridgehub_proxy_addr[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' \
+              ./script-out/output-deploy-l1.toml | head -n1
+          )
+
+          echo "Parsed bridgehub_proxy_addr: $BRIDGEHUB"
+
+          if [[ -z "$BRIDGEHUB" || ! "$BRIDGEHUB" =~ ^0x[0-9a-fA-F]{40}$ ]]; then
+            echo "❌ Failed to parse a valid bridgehub address"
+            exit 1
+          fi
+
+          echo "BRIDGEHUB=$BRIDGEHUB" >> $GITHUB_ENV
+
+      - name: Run DeployCTM script with bridgehub
+        working-directory: ./l1-contracts
+        run: |
+          forge script ./deploy-scripts/DeployCTM.s.sol \
+            --ffi \
+            --rpc-url $ANVIL_RPC_URL \
+            --broadcast \
+            --private-key $ANVIL_PRIVATE_KEY \
+            --sig "runWithBridgehub(address,bool)" $BRIDGEHUB "false" \
+            --skip '*/l1-contracts/contracts/*'
 
       - name: Run DeployErc20 script
         working-directory: ./l1-contracts
