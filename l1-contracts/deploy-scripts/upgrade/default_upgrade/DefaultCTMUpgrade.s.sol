@@ -132,6 +132,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual override returns (bool) {
+        // For ZKsync OS, factory deps are handled differently, so skip the check
+        if (config.isZKsyncOS) {
+            return true;
+        }
         return isHashInFactoryDeps[bytecodeHash];
     }
 
@@ -206,6 +210,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         string memory toml = vm.readFile(newConfigPath);
 
         PermanentCTMConfig memory permanentConfig = initializePermanentConfig(permanentValuesInputPath);
+        // Set config.isZKsyncOS BEFORE calling getChainCreationParamsConfig, because
+        // getChainCreationParamsConfig calls ChainCreationParamsLib.getChainCreationParams
+        // which reads from config.isZKsyncOS
+        config.isZKsyncOS = permanentConfig.isZKsyncOS;
         ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(
             chainCreationParamsPath(permanentConfig.isZKsyncOS)
         );
