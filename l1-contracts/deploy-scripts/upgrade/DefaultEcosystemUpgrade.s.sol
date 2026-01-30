@@ -1053,6 +1053,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         vm.serializeBytes("root", "ecosystem_admin_calls", new bytes(0)); // Will be populated later
         vm.serializeBytes("root", "test_upgrade_calls", new bytes(0)); // Will be populated later
         vm.serializeBytes("root", "v29", new bytes(0)); // Will be populated later
+        vm.serializeString("root", "old_chain_creation_params", '{ "l1": {}, "gateway": {} }'); // monkey patch: VerifierOnlyUpgrade cannot create the keys
 
         vm.serializeUint(
             "root",
