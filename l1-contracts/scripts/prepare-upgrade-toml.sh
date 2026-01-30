@@ -143,7 +143,6 @@ yarn ts-node scripts/fetch-chain-creation-params.ts \
   --output "$OLD_CHAIN_CREATION_PARAMS_TOML"
 
 cat "$OLD_CHAIN_CREATION_PARAMS_TOML" >> "$OUTPUT"
-rm "$OLD_CHAIN_CREATION_PARAMS_TOML"
 
 echo ""
 echo "Done! Output file: $OUTPUT"
