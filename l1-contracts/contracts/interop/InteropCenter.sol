@@ -271,7 +271,7 @@ contract InteropCenter is
                 MsgValueMismatch(_totalBurnedCallsValue + _totalIndirectCallsValue, msg.value)
             );
             // FIXME: does not burn, just sends to a a bad address.
-            // slither-disable-next-line arbitrary-send-eth,low-level-calls
+            // slither-disable-next-line arbitrary-send-eth,unchecked-low-level-calls
             address(0xdeadbeef).call{value: _totalBurnedCallsValue}("");
         } else {
             require(msg.value == _totalIndirectCallsValue, MsgValueMismatch(_totalIndirectCallsValue, msg.value));
