@@ -83,10 +83,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         // Select the correct ChainTypeManager based on chain type (Era vs ZKsyncOS)
         string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
         console.log("Deploying ChainTypeManager:", ctmContractName);
-        ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(
-            ctmContractName,
-            false
-        );
+        ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName, false);
 
         deployStateTransitionDiamondFacets();
     }
