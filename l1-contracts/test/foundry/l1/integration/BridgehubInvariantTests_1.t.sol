@@ -8,7 +8,7 @@ import {IBridgehubBase, L2TransactionRequestDirect, L2TransactionRequestTwoBridg
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
+import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
@@ -559,7 +559,7 @@ contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, Token
         }
 
         bytes memory message = abi.encodePacked(
-            IMailboxImpl.finalizeEthWithdrawal.selector,
+            IMailboxLegacy.finalizeEthWithdrawal.selector,
             currentUser,
             amountToWithdraw
         );

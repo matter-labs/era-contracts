@@ -45,9 +45,7 @@ contract MailboxOnGatewayTest is UtilsCallMockerTest {
         // Deploy without EIP7702Checker since we're not on L1
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(
-                new MailboxFacet(eraChainId, l1ChainId, address(chainAssetHandler), IEIP7702Checker(address(0)), false)
-            ),
+            facet: address(new MailboxFacet(l1ChainId, address(chainAssetHandler), IEIP7702Checker(address(0)), false)),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: Utils.getMailboxSelectors()
@@ -101,7 +99,7 @@ contract MailboxConstructorTest is Test {
         // On L1, EIP7702Checker cannot be zero
         vm.chainId(1); // L1 chain ID
         vm.expectRevert(ZeroAddress.selector);
-        new MailboxFacet(9, 1, address(0x123), IEIP7702Checker(address(0)), false);
+        new MailboxFacet(1, address(0x123), IEIP7702Checker(address(0)), false);
     }
 
     function test_Constructor_RevertWhen_EIP7702CheckerIsNotZeroOnGateway() public {
@@ -109,19 +107,19 @@ contract MailboxConstructorTest is Test {
         vm.chainId(505); // Gateway chain ID
         IEIP7702Checker eip7702Checker = IEIP7702Checker(makeAddr("eip7702Checker"));
         vm.expectRevert(AddressNotZero.selector);
-        new MailboxFacet(9, 1, address(0x123), eip7702Checker, false);
+        new MailboxFacet(1, address(0x123), eip7702Checker, false);
     }
 
     function test_Constructor_Success_OnL1WithChecker() public {
         vm.chainId(1); // L1 chain ID
         IEIP7702Checker eip7702Checker = IEIP7702Checker(makeAddr("eip7702Checker"));
-        MailboxFacet mailbox = new MailboxFacet(9, 1, address(0x123), eip7702Checker, false);
+        MailboxFacet mailbox = new MailboxFacet(1, address(0x123), eip7702Checker, false);
         assertNotEq(address(mailbox), address(0));
     }
 
     function test_Constructor_Success_OnGatewayWithoutChecker() public {
         vm.chainId(505); // Gateway chain ID
-        MailboxFacet mailbox = new MailboxFacet(9, 1, address(0x123), IEIP7702Checker(address(0)), false);
+        MailboxFacet mailbox = new MailboxFacet(1, address(0x123), IEIP7702Checker(address(0)), false);
         assertNotEq(address(mailbox), address(0));
     }
 }

@@ -10,6 +10,7 @@ cache-zk/
 cache/
 contracts-preprocessed/
 era_test_node.log*
+foundry.lock
 node_modules/
 out/
 target/

@@ -147,13 +147,11 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getMailboxSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](6);
+        bytes4[] memory selectors = new bytes4[](4);
         uint256 i = 0;
         selectors[i++] = mailbox.proveL2MessageInclusion.selector;
         selectors[i++] = mailbox.proveL2LogInclusion.selector;
         selectors[i++] = mailbox.proveL1ToL2TransactionStatus.selector;
-        selectors[i++] = mailbox.finalizeEthWithdrawal.selector;
-        selectors[i++] = mailbox.requestL2Transaction.selector;
         selectors[i++] = mailbox.l2TransactionBaseCost.selector;
         return selectors;
     }
@@ -243,7 +241,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         admin = new AdminFacet(block.chainid, RollupDAManager(address(0)), false);
         getters = new GettersFacet();
         executor = new TestExecutor();
-        mailbox = new MailboxFacet(l2ChainId, block.chainid, address(chainAssetHandler), eip7702Checker, false);
+        mailbox = new MailboxFacet(block.chainid, address(chainAssetHandler), eip7702Checker, false);
 
         DummyCTM chainTypeManager = new DummyCTM(owner, address(0));
         vm.mockCall(
