@@ -243,6 +243,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
         console.log("Accepting AssetTracker ownership and setting in NativeTokenVault");
         console.log("NTV address:", ntvProxy);
         console.log("AssetTracker address:", assetTrackerProxy);
+        // console.log()
 
         // Note: AssetTracker.setAddresses() was already called during deployment
         // in updateContractConnections(), and ownership was transferred to governance.
@@ -265,5 +266,15 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
         });
 
         return calls;
+    }
+
+    /// @notice Save v31-specific addresses to output file
+    function saveOutputVersionSpecific() public virtual override {
+        // Save AssetTracker address for Rust test to read
+        vm.writeToml(
+            vm.toString(coreAddresses.bridgehub.proxies.assetTracker),
+            upgradeConfig.outputPath,
+            ".asset_tracker_proxy_addr"
+        );
     }
 }

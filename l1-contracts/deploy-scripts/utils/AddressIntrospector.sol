@@ -184,6 +184,7 @@ library AddressIntrospector {
     function getCTMAddresses(ChainTypeManagerBase _ctm) public view returns (CTMDeployedAddresses memory info) {
         address ctmAddr = address(_ctm);
         address validatorTimelockPostV29 = _tryAddress(ctmAddr, "validatorTimelockPostV29()");
+        address bytecodesSupplier = _tryAddress(ctmAddr, "L1_BYTECODES_SUPPLIER()");
 
         // Try to get facet addresses and verifier from an up-to-date zkChain
         Facets memory facets = _getFacetsFromUptoDateZkChain(_ctm);
@@ -197,7 +198,7 @@ library AddressIntrospector {
                     validatorTimelock: validatorTimelockPostV29 != address(0)
                         ? validatorTimelockPostV29
                         : _ctm.validatorTimelock(),
-                    bytecodesSupplier: _ctm.L1_BYTECODES_SUPPLIER()
+                    bytecodesSupplier: bytecodesSupplier
                 }),
                 implementations: StateTransitionContracts({
                     chainTypeManager: Utils.getImplementation(ctmAddr),
