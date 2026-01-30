@@ -56,8 +56,7 @@ struct FixedForceDeploymentsData {
     // MUST be equal to 0 in production.
     // It will be the job of the governance to ensure that this value is set correctly.
     address dangerousTestOnlyForcedBeacon;
-    // Bridging data for the ZK token (assetId, origin chain ID, and token address on origin chain).
-    TokenBridgingData zkTokenBridgingData;
+    bytes32 zkTokenAssetId;
 }
 
 /// @author Matter Labs

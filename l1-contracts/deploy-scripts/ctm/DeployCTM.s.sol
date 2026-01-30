@@ -525,12 +525,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
                 coreAddresses.bridgehub.proxies.chainRegistrationSender
             ),
             dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon,
-            // TODO: Load zkTokenBridgingData from config for production deployments.
-            zkTokenBridgingData: TokenBridgingData({
-                assetId: DataEncoding.encodeNTVAssetId(0, address(0)),
-                originChainId: 0,
-                originToken: address(0)
-            })
+            zkTokenAssetId: config.zkTokenAssetId
         });
     }
 

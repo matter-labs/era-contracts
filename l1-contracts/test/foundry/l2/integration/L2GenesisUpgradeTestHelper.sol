@@ -114,11 +114,7 @@ library L2GenesisUpgradeTestHelper {
                     l2BridgedStandardERC20Impl: address(0),
                     aliasedChainRegistrationSender: address(1),
                     dangerousTestOnlyForcedBeacon: address(0),
-                    zkTokenBridgingData: TokenBridgingData({
-                        assetId: bytes32(0),
-                        originChainId: 0,
-                        originToken: address(0)
-                    })
+                    zkTokenAssetId: bytes32(0)
                 })
             );
     }

@@ -249,11 +249,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
             data.beaconDeployerInfo = "";
         }
 
-        data.zkTokenBridgingData = TokenBridgingData({
-            assetId: DataEncoding.encodeNTVAssetId(324, address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E)),
-            originChainId: 324,
-            originToken: address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E)
-        });
+        data.zkTokenAssetId = DataEncoding.encodeNTVAssetId(324, address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E));
 
         return data;
     }
@@ -276,11 +272,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         data.interopHandlerBytecodeInfo = abi.encode(keccak256("interopHandler"));
         data.assetTrackerBytecodeInfo = abi.encode(keccak256("assetTracker"));
         data.beaconDeployerInfo = abi.encode(keccak256("beaconDeployer"));
-        data.zkTokenBridgingData = TokenBridgingData({
-            assetId: DataEncoding.encodeNTVAssetId(324, address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E)),
-            originChainId: 324,
-            originToken: address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E)
-        });
+        data.zkTokenAssetId = DataEncoding.encodeNTVAssetId(324, address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E));
 
         return data;
     }

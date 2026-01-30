@@ -432,12 +432,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             ),
             // upgradeAddresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
             dangerousTestOnlyForcedBeacon: address(0),
-            // TODO: Load zkTokenBridgingData from config for production deployments.
-            zkTokenBridgingData: TokenBridgingData({
-                assetId: DataEncoding.encodeNTVAssetId(0, address(0)),
-                originChainId: 0,
-                originToken: address(0)
-            })
+            zkTokenAssetId: config.zkTokenAssetId
         });
     }
 
