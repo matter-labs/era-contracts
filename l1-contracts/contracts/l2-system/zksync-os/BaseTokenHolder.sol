@@ -57,6 +57,7 @@ contract BaseTokenHolder is IBaseTokenHolder {
 
         // Transfer base tokens from this holder to the recipient using native transfer
         (bool success, ) = _to.call{value: _amount}("");
+        // solhint-disable-next-line gas-custom-errors
         require(success, "Transfer failed");
     }
 

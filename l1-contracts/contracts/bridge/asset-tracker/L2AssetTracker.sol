@@ -4,13 +4,13 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
-import {ConfirmBalanceMigrationData, TokenBalanceMigrationData} from "../../common/Messaging.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {SavedTotalSupply, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
+import {ConfirmBalanceMigrationData} from "../../common/Messaging.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {Unauthorized, InvalidChainId} from "../../common/L1ContractErrors.sol";
 
-import {AssetIdNotRegistered, MissingBaseTokenAssetId, OnlyGatewaySettlementLayer, TokenBalanceNotMigratedToGateway, MaxChainBalanceAlreadyAssigned} from "./AssetTrackerErrors.sol";
+import {AssetIdNotRegistered, MissingBaseTokenAssetId, MaxChainBalanceAlreadyAssigned} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 
@@ -146,7 +146,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @notice This function is used to check the asset migration number.
     /// @dev This is used to pause outgoing withdrawals and interop transactions after the chain migrates to Gateway.
     function _checkAssetMigrationNumber(bytes32 _assetId) internal view {
+        // solhint-disable-next-line no-unused-vars
         uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
+        // solhint-disable-next-line no-unused-vars
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
         /// Note we always allow bridging when settling on L1.
         /// On Gateway we require that the tokenBalance be migrated to Gateway from L1,
@@ -264,7 +266,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @dev This function can be called multiple times on the chain it does not have a direct effect.
     /// @dev This function is permissionless, it does not affect the state of the contract substantially, and can be called multiple times.
     /// @dev The value to migrate is read from the L2, but the tracking is done on L1/GW.
+    // solhint-disable-next-line no-unused-vars
     function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external {
+        // solhint-disable-next-line gas-custom-errors
         revert("Disabled for zksync os");
         // require(
         //     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
