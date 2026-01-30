@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {IBaseToken} from "./interfaces/IBaseToken.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {BASE_TOKEN_HOLDER_ADDRESS, BOOTLOADER_FORMAL_ADDRESS, COMPLEX_UPGRADER_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, INITIAL_BASE_TOKEN_HOLDER_BALANCE, L1_MESSENGER_CONTRACT, L2_ASSET_TRACKER, L2_INTEROP_HANDLER, MSG_VALUE_SYSTEM_CONTRACT} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, L1_MESSENGER_CONTRACT, L2_ASSET_TRACKER, MSG_VALUE_SYSTEM_CONTRACT} from "./Constants.sol";
 import {IMailboxImpl} from "./interfaces/IMailboxImpl.sol";
 import {InsufficientFunds, Unauthorized} from "./SystemContractErrors.sol";
 
@@ -20,18 +20,8 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
     /// @notice The balances of the users.
     mapping(address account => uint256 balance) internal balance;
 
-    /// @notice Deprecated: The old storage variable for total supply.
-    /// @dev This variable is kept to preserve storage layout. It is only read during the V31 upgrade
-    /// @dev to initialize the BaseTokenHolder balance correctly. After V31, totalSupply is computed
-    /// @dev dynamically from the BaseTokenHolder's balance.
-    uint256 internal __DEPRECATED_totalSupply;
-
-    /// @notice Returns the total circulating supply of base tokens.
-    /// @dev Computed as: INITIAL_BASE_TOKEN_HOLDER_BALANCE - current holder balance
-    /// @dev This replaces the previous storage-based totalSupply that was incremented on mint.
-    function totalSupply() external view override returns (uint256) {
-        return INITIAL_BASE_TOKEN_HOLDER_BALANCE - balance[BASE_TOKEN_HOLDER_ADDRESS];
-    }
+    /// @notice The total amount of tokens that have been minted.
+    uint256 public override totalSupply;
 
     /// @notice Transfer tokens from one address to another.
     /// @param _from The address to transfer the ETH from.
@@ -44,9 +34,7 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
         if (
             msg.sender != MSG_VALUE_SYSTEM_CONTRACT &&
             msg.sender != address(DEPLOYER_SYSTEM_CONTRACT) &&
-            msg.sender != BOOTLOADER_FORMAL_ADDRESS &&
-            msg.sender != address(L2_INTEROP_HANDLER) &&
-            msg.sender != BASE_TOKEN_HOLDER_ADDRESS
+            msg.sender != BOOTLOADER_FORMAL_ADDRESS
         ) {
             revert Unauthorized(msg.sender);
         }
@@ -73,16 +61,13 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
         return balance[address(uint160(_account))];
     }
 
-    /// @notice Increase the balance of the receiver by transferring from BaseTokenHolder.
+    /// @notice Increase the total supply of tokens and balance of the receiver.
     /// @dev This method is only callable by the bootloader.
-    /// @dev The totalSupply is now computed from BaseTokenHolder balance, so we only update balances.
     /// @param _account The address which to mint the funds to.
     /// @param _amount The amount of ETH in wei to be minted.
     function mint(address _account, uint256 _amount) external override onlyCallFromBootloaderOrInteropHandler {
         L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(_amount);
-        // Transfer from BaseTokenHolder to the recipient
-        // This decreases holder balance, which increases totalSupply() automatically
-        balance[BASE_TOKEN_HOLDER_ADDRESS] -= _amount;
+        totalSupply += _amount;
         balance[_account] += _amount;
         emit Mint(_account, _amount);
     }
@@ -121,13 +106,12 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
         /// @dev This function is called to check if the token is withdrawable.
         L2_ASSET_TRACKER.handleInitiateBaseTokenBridgingOnL2(amount);
 
-        // Transfer the ether back to BaseTokenHolder (effectively "burning" from circulation)
+        // Silent burning of the ether
         unchecked {
             // This is safe, since this contract holds the ether balances, and if user
             // sends a `msg.value` it will be added to the contract (`this`) balance.
             balance[address(this)] -= amount;
-            // Return to BaseTokenHolder, which decreases totalSupply() automatically
-            balance[BASE_TOKEN_HOLDER_ADDRESS] += amount;
+            totalSupply -= amount;
         }
     }
 
@@ -149,22 +133,5 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
     ) internal pure returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
         return abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, _to, _amount, _sender, _additionalData);
-    }
-
-    /// @notice Initializes the BaseTokenHolder's balance during the V31 upgrade.
-    /// @dev Reads the old totalSupply from __DEPRECATED_totalSupply and sets the holder balance
-    /// @dev such that the new computed totalSupply() equals the old value.
-    /// @dev Formula: balance[holder] = INITIAL_BASE_TOKEN_HOLDER_BALANCE - __DEPRECATED_totalSupply
-    /// @dev Can only be called by the ComplexUpgrader contract.
-    /// @dev This function is idempotent - calling it when the balance is already set has no effect.
-    function initializeBaseTokenHolderBalance() external {
-        if (msg.sender != address(COMPLEX_UPGRADER_CONTRACT)) {
-            revert Unauthorized(msg.sender);
-        }
-
-        // Only initialize if not already set (idempotent)
-        if (balance[BASE_TOKEN_HOLDER_ADDRESS] == 0) {
-            balance[BASE_TOKEN_HOLDER_ADDRESS] = INITIAL_BASE_TOKEN_HOLDER_BALANCE - __DEPRECATED_totalSupply;
-        }
     }
 }

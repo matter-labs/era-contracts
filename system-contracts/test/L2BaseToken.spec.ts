@@ -5,11 +5,7 @@ import type { L2BaseToken } from "../typechain";
 import { L2BaseTokenFactory } from "../typechain";
 import { deployContractOnAddress, getWallets, loadArtifact, provider } from "./shared/utils";
 import type { BigNumber } from "ethers";
-import {
-  TEST_BOOTLOADER_FORMAL_ADDRESS,
-  TEST_BASE_TOKEN_SYSTEM_CONTRACT_ADDRESS,
-  REAL_BASE_TOKEN_HOLDER_ADDRESS,
-} from "./shared/constants";
+import { TEST_BOOTLOADER_FORMAL_ADDRESS, TEST_BASE_TOKEN_SYSTEM_CONTRACT_ADDRESS } from "./shared/constants";
 import { prepareEnvironment, setResult } from "./shared/mocks";
 import { randomBytes } from "crypto";
 
@@ -26,18 +22,6 @@ describe("L2BaseToken tests", () => {
     L2BaseToken = L2BaseTokenFactory.connect(TEST_BASE_TOKEN_SYSTEM_CONTRACT_ADDRESS, richWallet);
     bootloaderAccount = await ethers.getImpersonatedSigner(TEST_BOOTLOADER_FORMAL_ADDRESS);
     mailboxIface = new ethers.utils.Interface((await loadArtifact("IMailbox")).abi);
-
-    // Initialize BASE_TOKEN_HOLDER balance to 2^127 - 1
-    // The balance mapping is at storage slot 0, so we compute keccak256(address . slot)
-    const balanceSlot = ethers.utils.keccak256(
-      ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [REAL_BASE_TOKEN_HOLDER_ADDRESS, 0])
-    );
-    const initialBalance = ethers.BigNumber.from(2).pow(127).sub(1);
-    await network.provider.send("hardhat_setStorageAt", [
-      TEST_BASE_TOKEN_SYSTEM_CONTRACT_ADDRESS,
-      balanceSlot,
-      ethers.utils.hexZeroPad(initialBalance.toHexString(), 32),
-    ]);
   });
 
   beforeEach(async () => {

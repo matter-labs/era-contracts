@@ -227,14 +227,12 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 proxies: StateTransitionContracts({
                     chainTypeManager: expectedGatewayContracts.stateTransition.chainTypeManagerProxy,
                     serverNotifier: expectedGatewayContracts.stateTransition.serverNotifierProxy,
-                    validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelockProxy,
-                    bytecodesSupplier: address(0)
+                    validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelockProxy
                 }),
                 implementations: StateTransitionContracts({
                     chainTypeManager: expectedGatewayContracts.stateTransition.chainTypeManagerImplementation,
                     serverNotifier: expectedGatewayContracts.stateTransition.serverNotifierImplementation,
-                    validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelockImplementation,
-                    bytecodesSupplier: address(0)
+                    validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelockImplementation
                 }),
                 verifiers: expectedGatewayContracts.stateTransition.verifiers,
                 facets: expectedGatewayContracts.stateTransition.facets,
