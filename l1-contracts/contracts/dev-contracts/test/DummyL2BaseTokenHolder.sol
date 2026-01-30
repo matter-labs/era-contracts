@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.24;
 
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
-
 /// @title DummyL2BaseTokenHolder
 /// @notice A test smart contract that simulates BaseTokenHolder for testing interop flows
 contract DummyL2BaseTokenHolder {
@@ -16,11 +14,8 @@ contract DummyL2BaseTokenHolder {
             return;
         }
 
-        // Transfer base tokens from this holder to the recipient using DummyL2BaseTokenSystemContract
-        // solhint-disable-next-line avoid-low-level-calls
-        (bool success, ) = L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR.call(
-            abi.encodeWithSignature("transferFromTo(address,address,uint256)", address(this), _to, _amount)
-        );
+        // Transfer base tokens using native transfer
+        (bool success, ) = _to.call{value: _amount}("");
         require(success, "Transfer failed");
     }
 
