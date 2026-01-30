@@ -1,0 +1,1 @@
+forge verify-contract 0x8419fC5E2f47373EF9f39fc5A11C90ECfFC4881a MultisigCommitter --constructor-args 0x000000000000000000000000236d1c3ff32bd0ca26b72af287e895627c0478ce --chain sepolia
