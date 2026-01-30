@@ -9,6 +9,7 @@ import {console2 as console} from "forge-std/Script.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
+import {Utils} from "../Utils.sol";
 
 library BytecodePublisher {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
@@ -104,7 +105,7 @@ library BytecodePublisher {
     /// @param batch The batch of bytecodes to publish
     /// @param isEVM If true, publish as EVM bytecodes, otherwise as Era bytecodes
     function _publishBatch(BytecodesSupplier bytecodesSupplier, bytes[] memory batch, bool isEVM) internal {
-        vm.broadcast();
+        vm.broadcast(Utils.getBroadcasterAddress());
         if (isEVM) {
             bytecodesSupplier.publishEVMBytecodes(batch);
         } else {

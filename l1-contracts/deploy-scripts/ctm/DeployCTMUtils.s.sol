@@ -250,7 +250,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         ChainCreationParams memory chainCreationParams = getChainCreationParams(stateTransition);
         return
             ChainTypeManagerInitializeData({
-                owner: msg.sender,
+                owner: Utils.getBroadcasterAddress(),
                 validatorTimelock: stateTransition.proxies.validatorTimelock,
                 chainCreationParams: chainCreationParams,
                 protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
@@ -471,8 +471,9 @@ abstract contract DeployCTMUtils is DeployUtils {
                 verifierFflonk: ctmAddresses.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: ctmAddresses.stateTransition.verifiers.verifierPlonk,
                 // For L1 deployment we need to use the deployer as the owner of the verifier,
-                // because we set the dual verifier later
-                verifierOwner: msg.sender
+                // because we set the dual verifier later. Use Utils.getBroadcasterAddress() to get
+                // the actual EOA when this is called from a contract created via `new` during the script.
+                verifierOwner: Utils.getBroadcasterAddress()
             });
     }
 

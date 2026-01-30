@@ -45,6 +45,7 @@ import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
 import {DefaultGatewayUpgrade} from "../default_upgrade/DefaultGatewayUpgrade.s.sol";
 import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
+import {Utils} from "../../utils/Utils.sol";
 
 /// @notice Script used for v31 upgrade flow
 contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
@@ -161,14 +162,14 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
         // This sets: chainAssetHandler = IChainAssetHandler(BRIDGE_HUB.chainAssetHandler())
         // At this point, deployer is the owner (set in initialize() during proxy deployment)
         console.log("Calling setAddresses() on AssetTracker...");
-        vm.broadcast();
+        vm.broadcast(Utils.getBroadcasterAddress());
         IL1AssetTracker(assetTrackerProxy).setAddresses();
         console.log("AssetTracker.setAddresses() completed");
 
         // Transfer ownership to the proper owner (governance)
         address properOwner = getOwnerAddress();
         console.log("Transferring AssetTracker ownership from deployer to governance:", properOwner);
-        vm.broadcast();
+        vm.broadcast(Utils.getBroadcasterAddress());
         Ownable2StepUpgradeable(assetTrackerProxy).transferOwnership(properOwner);
         console.log("AssetTracker ownership transfer initiated (pending acceptance by governance)");
     }
@@ -203,11 +204,11 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
 
         // In Forge scripts with vm.broadcast(), msg.sender is the script address,
         // but tx.origin is the address of the private key being used for broadcasts.
-        // We need to use tx.origin as the deployer address.
-        config.deployerAddress = tx.origin;
+        // We need to use Utils.getBroadcasterAddress() to get the actual deployer address.
+        config.deployerAddress = Utils.getBroadcasterAddress();
         console.log("Overriding deployerAddress in upgrade context:");
         console.log("  msg.sender (script):", msg.sender);
-        console.log("  tx.origin (actual deployer):", tx.origin);
+        console.log("  actual deployer:", Utils.getBroadcasterAddress());
         console.log("  config.deployerAddress:", config.deployerAddress);
     }
 

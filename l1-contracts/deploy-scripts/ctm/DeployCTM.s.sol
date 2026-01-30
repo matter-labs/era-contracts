@@ -218,7 +218,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         if (config.isZKsyncOS) {
             // We add the verifier to the default execution version
-            vm.startBroadcast(msg.sender);
+            // Use tx.origin to ensure the correct sender even when called from nested contracts
+            vm.startBroadcast(Utils.getBroadcasterAddress());
             ZKsyncOSDualVerifier(ctmAddresses.stateTransition.verifiers.verifier).addVerifier(
                 DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
                 IVerifierV2(ctmAddresses.stateTransition.verifiers.verifierFflonk),
@@ -233,7 +234,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function setChainTypeManagerInServerNotifier() internal {
         ServerNotifier serverNotifier = ServerNotifier(ctmAddresses.stateTransition.proxies.serverNotifier);
-        vm.broadcast(msg.sender);
+        vm.broadcast(Utils.getBroadcasterAddress());
         serverNotifier.setChainTypeManager(IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager));
         console.log("ChainTypeManager set in ServerNotifier");
     }
@@ -263,7 +264,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         } else {
             ctmAddresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
         }
-        vm.startBroadcast(msg.sender);
+        vm.startBroadcast(Utils.getBroadcasterAddress());
         IRollupDAManager rollupDAManager = IRollupDAManager(ctmAddresses.daAddresses.rollupDAManager);
         rollupDAManager.updateDAPair(
             ctmAddresses.daAddresses.l1RollupDAValidator,
@@ -282,9 +283,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function updateRollupDAManager() internal virtual {
         IOwnable rollupDAManager = IOwnable(ctmAddresses.daAddresses.rollupDAManager);
-        if (rollupDAManager.owner() != address(msg.sender)) {
-            if (rollupDAManager.pendingOwner() == address(msg.sender)) {
-                vm.broadcast(msg.sender);
+        if (rollupDAManager.owner() != Utils.getBroadcasterAddress()) {
+            if (rollupDAManager.pendingOwner() == Utils.getBroadcasterAddress()) {
+                vm.broadcast(Utils.getBroadcasterAddress());
                 rollupDAManager.acceptOwnership();
             } else {
                 require(rollupDAManager.owner() == config.ownerAddress, "Ownership was not set correctly");
@@ -293,7 +294,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function updateOwners() internal {
-        vm.startBroadcast(msg.sender);
+        vm.startBroadcast(Utils.getBroadcasterAddress());
 
         ValidatorTimelock validatorTimelock = ValidatorTimelock(ctmAddresses.stateTransition.proxies.validatorTimelock);
         validatorTimelock.transferOwnership(config.ownerAddress);
