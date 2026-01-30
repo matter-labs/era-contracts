@@ -42,6 +42,13 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         L1_CHAIN_ID = _l1ChainId;
     }
 
+    /// @notice Allows the contract to receive native ETH from L2_BASE_TOKEN_HOLDER.
+    /// @dev This is required because L2_BASE_TOKEN_HOLDER.give() transfers ETH to this contract
+    ///      before forwarding it to the interop call recipient.
+    receive() external payable {
+        require(msg.sender == address(L2_BASE_TOKEN_HOLDER), Unauthorized(msg.sender));
+    }
+
     /// @notice Executes a full bundle atomically.
     /// @dev Reverts if any call fails, or if bundle has been processed already.
     /// @param _bundle ABI-encoded InteropBundle to execute.

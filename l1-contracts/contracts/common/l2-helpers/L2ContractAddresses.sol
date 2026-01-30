@@ -155,7 +155,7 @@ address constant L2_INTEROP_CENTER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x
 IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(L2_INTEROP_CENTER_ADDR);
 
 /// @dev the address of the L2 interop handler
-address constant L2_INTEROP_HANDLER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0e);
+address payable constant L2_INTEROP_HANDLER_ADDR = payable(address(BUILT_IN_CONTRACTS_OFFSET + 0x0e));
 IInteropHandler constant L2_INTEROP_HANDLER = IInteropHandler(L2_INTEROP_HANDLER_ADDR);
 
 /// @dev the address of the L2 asset tracker
