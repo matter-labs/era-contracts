@@ -80,8 +80,11 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
 
         // Deploy new ChainTypeManager implementation
         // The constructor will receive the new BytecodesSupplier proxy address
+        // Select the correct ChainTypeManager based on chain type (Era vs ZKsyncOS)
+        string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
+        console.log("Deploying ChainTypeManager:", ctmContractName);
         ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(
-            "EraChainTypeManager",
+            ctmContractName,
             false
         );
 
