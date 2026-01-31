@@ -14,12 +14,12 @@ import {IL1Bridgehub} from "../../../bridgehub/IL1Bridgehub.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidPubdataPricingMode, PriorityTxPubdataExceedsMaxPubDataPerBatch, NotAZKChain, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized, InvalidL2DACommitmentScheme} from "../../../common/L1ContractErrors.sol";
+import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidPubdataPricingMode, PriorityTxPubdataExceedsMaxPubDataPerBatch, NotAZKChain, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized, InvalidL2DACommitmentScheme, CodeSizeLimitTooLow, CodeSizeLimitTooBig} from "../../../common/L1ContractErrors.sol";
 import {AlreadyMigrated, ContractNotDeployed, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
-import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../../../common/Config.sol";
+import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, MIN_CODE_SIZE_LIMIT, MAX_CODE_SIZE_LIMIT} from "../../../common/Config.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -205,6 +205,17 @@ contract AdminFacet is ZKChainBase, IAdmin {
             abi.encodeCall(IL2ContractDeployer.setAllowedBytecodeTypesToDeploy, AllowedBytecodeTypes.EraVmAndEVM)
         );
         emit EnableEvmEmulator();
+    }
+
+    /// @inheritdoc IAdmin
+    function setCodeSizeLimit(uint32 _codeSizeLimit) external onlyAdmin {
+        if (_codeSizeLimit < MIN_CODE_SIZE_LIMIT) {
+            revert CodeSizeLimitTooLow(_codeSizeLimit, MIN_CODE_SIZE_LIMIT);
+        }
+        if (_codeSizeLimit > MAX_CODE_SIZE_LIMIT) {
+            revert CodeSizeLimitTooBig(_codeSizeLimit, MAX_CODE_SIZE_LIMIT);
+        }
+        s.codeSizeLimit = _codeSizeLimit;
     }
 
     /*//////////////////////////////////////////////////////////////

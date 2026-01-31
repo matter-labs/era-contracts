@@ -5,6 +5,7 @@ pragma solidity ^0.8.21;
 import {IVerifier, VerifierParams} from "./IVerifier.sol";
 import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
 
+/// @dev Chain initialization data
 /// @param chainId the id of the chain
 /// @param bridgehub the address of the bridgehub contract
 /// @param chainTypeManager contract's address
@@ -39,6 +40,7 @@ struct InitializeData {
     FeeParams feeParams;
 }
 
+/// @dev General part of the chain initialize data, this part of data is same for all chains.
 /// @param verifier address of Verifier contract
 /// @param verifierParams Verifier config parameters that describes the circuit to be verified
 /// @param l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
