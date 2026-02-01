@@ -54,4 +54,22 @@ contract L2NativeTokenVaultBridgeBurnRegressionTest is
     ) internal view virtual override returns (bytes memory) {
         return super.getCreationCode(contractName, false);
     }
+
+    /// @notice Skip this test in L2 (zkfoundry) context because stdstore doesn't work with ZK bytecode
+    /// @dev The test is verified in L1 context (L2NativeTokenVaultBridgeBurnRegressionL1Test)
+    function test_regression_bridgeBurnRegularBridgedTokenStillCallsBridgeBurn() external override {
+        vm.skip(true);
+    }
+
+    /// @notice Skip this test in L2 (zkfoundry) context because system contracts don't work properly
+    /// @dev The test is verified in L1 context (L2NativeTokenVaultBridgeBurnRegressionL1Test)
+    function test_regression_bridgeBurnBaseTokenAsBridgedTokenCallsBurnMsgValue() external override {
+        vm.skip(true);
+    }
+
+    /// @notice Skip this test in L2 (zkfoundry) context because system contracts don't work properly
+    /// @dev The test is verified in L1 context (L2NativeTokenVaultBridgeBurnRegressionL1Test)
+    function testFuzz_regression_bridgeBurnBaseTokenVariousAmounts(uint256) external override {
+        vm.skip(true);
+    }
 }

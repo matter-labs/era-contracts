@@ -12,6 +12,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
@@ -22,7 +23,7 @@ import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
 abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
 
-    function test_regression_bridgeBurnBaseTokenAsBridgedTokenCallsBurnMsgValue() external {
+    function test_regression_bridgeBurnBaseTokenAsBridgedTokenCallsBurnMsgValue() external virtual {
         L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
         // Get the base token asset ID
@@ -89,7 +90,7 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
 
     /// @notice Test that bridgeBurn still works correctly for regular bridged tokens (non-base token)
     /// @dev This is a sanity check to ensure the fix doesn't break normal bridged token burning
-    function test_regression_bridgeBurnRegularBridgedTokenStillCallsBridgeBurn() external {
+    function test_regression_bridgeBurnRegularBridgedTokenStillCallsBridgeBurn() external virtual {
         L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
         // Create a regular bridged token (not the base token)
@@ -147,6 +148,12 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
             abi.encode(originToken)
         );
 
+        // Mock the ERC20 metadata calls (name, symbol, decimals)
+        // These are called by BridgeHelper.getERC20Getters when getting ERC20 metadata
+        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20Metadata.name, ()), abi.encode("TestToken"));
+        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20Metadata.symbol, ()), abi.encode("TT"));
+        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20Metadata.decimals, ()), abi.encode(uint8(18)));
+
         // Expect the bridgeBurn call on the bridged token
         vm.expectCall(
             expectedL2TokenAddress,
@@ -162,7 +169,7 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
 
     /// @notice Test the base token bridgeBurn with different origin chain scenarios
     /// @dev Fuzz test to verify the fix works for various amounts
-    function testFuzz_regression_bridgeBurnBaseTokenVariousAmounts(uint256 depositAmount) external {
+    function testFuzz_regression_bridgeBurnBaseTokenVariousAmounts(uint256 depositAmount) external virtual {
         vm.assume(depositAmount > 0 && depositAmount < type(uint128).max);
 
         L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
