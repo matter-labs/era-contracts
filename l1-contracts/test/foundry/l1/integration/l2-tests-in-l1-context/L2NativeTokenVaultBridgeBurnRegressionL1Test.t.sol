@@ -16,7 +16,11 @@ import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 
-contract L2NativeTokenVaultBridgeBurnRegressionL1Test is Test, SharedL2ContractL1Deployer, L2NativeTokenVaultBridgeBurnRegressionTestAbstract {
+contract L2NativeTokenVaultBridgeBurnRegressionL1Test is
+    Test,
+    SharedL2ContractL1Deployer,
+    L2NativeTokenVaultBridgeBurnRegressionTestAbstract
+{
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {}
 
     function initSystemContracts(

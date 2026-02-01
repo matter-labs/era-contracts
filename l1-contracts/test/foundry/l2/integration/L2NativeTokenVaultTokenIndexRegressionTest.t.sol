@@ -16,7 +16,11 @@ import {Create2FactoryUtils} from "deploy-scripts/utils/deploy/Create2FactoryUti
 import {ChainCreationParamsConfig} from "deploy-scripts/utils/Types.sol";
 import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
 
-contract L2NativeTokenVaultTokenIndexRegressionTest is Test, SharedL2ContractL2Deployer, L2NativeTokenVaultTokenIndexRegressionTestAbstract {
+contract L2NativeTokenVaultTokenIndexRegressionTest is
+    Test,
+    SharedL2ContractL2Deployer,
+    L2NativeTokenVaultTokenIndexRegressionTestAbstract
+{
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL2Deployer) {}
 
     function getChainCreationParamsConfig(
