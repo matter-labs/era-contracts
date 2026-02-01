@@ -94,7 +94,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         );
         ctmAddresses.stateTransition.facets.executorFacet = address(new ExecutorFacet(config.l1ChainId));
         ctmAddresses.stateTransition.facets.adminFacet = address(
-            new AdminFacet(config.l1ChainId, RollupDAManager(ctmAddresses.daAddresses.rollupDAManager), false)
+            new AdminFacet(config.l1ChainId, RollupDAManager(ctmAddresses.daAddresses.rollupDAManager), true)
         );
         ctmAddresses.stateTransition.facets.mailboxFacet = address(
             new MailboxFacet(
