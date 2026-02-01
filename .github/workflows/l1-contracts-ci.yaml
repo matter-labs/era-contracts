@@ -234,49 +234,49 @@ jobs:
       #   working-directory: ./l1-contracts
       #   run: forge test --match-test MeasureGas --gas-snapshot-check=true
 
-  # FIXME: uncomment once fixed.
-  # test-foundry-zksync:
-  #   needs: [build, lint]
-  #   runs-on: ubuntu-latest
+  FIXME: uncomment once fixed.
+  test-foundry-zksync:
+    needs: [build, lint]
+    runs-on: ubuntu-latest
 
-  #   steps:
-  #     - name: Checkout the repository
-  #       uses: actions/checkout@v4
-  #       with:
-  #         submodules: recursive
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-  #     - name: Use Node.js
-  #       uses: actions/setup-node@v3
-  #       with:
-  #         node-version: 18.20.8
-  #         cache: yarn
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.20.8
+          cache: yarn
 
-  #     - name: Install foundry-zksync
-  #       uses: ./.github/actions/install-zksync-foundry
+      - name: Install foundry-zksync
+        uses: ./.github/actions/install-zksync-foundry
 
-  #     - name: Install dependencies
-  #       run: yarn
+      - name: Install dependencies
+        run: yarn
 
-  #     - name: Build system contract artifacts
-  #       run: yarn sc build:foundry
+      - name: Build system contract artifacts
+        run: yarn sc build:foundry
 
-  #     - name: Restore artifacts cache
-  #       uses: actions/cache/restore@v3
-  #       with:
-  #         fail-on-cache-miss: true
-  #         key: artifacts-l1-${{ github.sha }}
-  #         path: |
-  #           da-contracts/out
-  #           l1-contracts/cache-forge
-  #           l1-contracts/out
-  #           # TODO: cached `zkout` and the one for tests produce different hashes and so it causes the tests to fail
-  #           l2-contracts/cache-forge
-  #           l2-contracts/zkout
-  #           system-contracts/zkout
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-l1-${{ github.sha }}
+          path: |
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+            # TODO: cached `zkout` and the one for tests produce different hashes and so it causes the tests to fail
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
 
-  #     - name: Run tests
-  #       working-directory: ./l1-contracts
-  #       run: yarn test:zkfoundry
+      - name: Run tests
+        working-directory: ./l1-contracts
+        run: yarn test:zkfoundry
 
   check-verifier-generator-l1:
     runs-on: ubuntu-latest
