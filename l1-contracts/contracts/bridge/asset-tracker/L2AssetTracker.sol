@@ -298,9 +298,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// @notice Confirms a migration operation has been completed and updates the asset migration number.
     /// @dev This function is called by L1 after a migration has been processed to update local state.
-    /// @param data The migration confirmation data containing the asset ID and migration number.
-    function confirmMigrationOnL2(TokenBalanceMigrationData calldata data) external onlyServiceTransactionSender {
-        assetMigrationNumber[block.chainid][data.assetId] = data.assetMigrationNumber;
+    /// @param _data The migration confirmation data containing the asset ID and migration number.
+    function confirmMigrationOnL2(TokenBalanceMigrationData calldata _data) external onlyServiceTransactionSender {
+        assetMigrationNumber[block.chainid][_data.assetId] = _data.assetMigrationNumber;
     }
 
     /*//////////////////////////////////////////////////////////////
