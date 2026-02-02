@@ -92,7 +92,7 @@ abstract contract GatewayCTMDeployerCTMBase {
         GatewayCTMDeployerConfig memory baseConfig = _config.baseConfig;
         Facets memory facets = _config.facets;
 
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](5);
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](6);
         facetCuts[0] = Diamond.FacetCut({
             facet: facets.adminFacet,
             action: Diamond.Action.Add,
@@ -122,6 +122,12 @@ abstract contract GatewayCTMDeployerCTMBase {
             action: Diamond.Action.Add,
             isFreezable: false,
             selectors: baseConfig.migratorSelectors
+        });
+        facetCuts[5] = Diamond.FacetCut({
+            facet: facets.committerFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: baseConfig.committerSelectors
         });
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({

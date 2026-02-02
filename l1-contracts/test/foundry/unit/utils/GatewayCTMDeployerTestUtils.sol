@@ -61,6 +61,7 @@ library DeployedContractsComparator {
         require(a.executorFacet == b.executorFacet, "executorFacet differs");
         require(a.gettersFacet == b.gettersFacet, "gettersFacet differs");
         require(a.migratorFacet == b.migratorFacet, "migratorFacet differs");
+        require(a.committerFacet == b.committerFacet, "committerFacet differs");
         require(a.diamondInit == b.diamondInit, "diamondInit differs");
     }
 

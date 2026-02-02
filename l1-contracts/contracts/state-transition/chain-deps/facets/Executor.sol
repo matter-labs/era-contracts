@@ -159,6 +159,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
+    // slither-disable-next-line reentrancy-no-eth
     function executeBatchesSharedBridge(
         address, // _chainAddress
         uint256 _processFrom,
