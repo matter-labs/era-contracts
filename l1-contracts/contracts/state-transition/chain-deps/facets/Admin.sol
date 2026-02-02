@@ -265,6 +265,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
             L2_INTEROP_CENTER_ADDR,
             abi.encodeCall(IInteropCenter.setInteropFee, (_fee))
         );
+        emit InteropFeeUpdateRequested(_fee, canonicalTxHash);
     }
 
     /*//////////////////////////////////////////////////////////////

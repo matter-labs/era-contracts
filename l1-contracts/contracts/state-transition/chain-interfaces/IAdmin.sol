@@ -117,6 +117,9 @@ interface IAdmin is IZKChainBase {
     /// @notice Fee params for L1->L2 transactions changed
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
 
+    /// @notice Interop fee update requested on L2
+    event InteropFeeUpdateRequested(uint256 newFee, bytes32 l2TxHash);
+
     /// @notice Validium mode status changed
     event PubdataPricingModeUpdate(PubdataPricingMode validiumMode);
 
