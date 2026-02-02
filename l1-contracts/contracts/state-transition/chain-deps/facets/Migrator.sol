@@ -111,6 +111,8 @@ contract Migrator is ZKChainBase, IMigrator {
     }
 
     /// @inheritdoc IMigrator
+    /// @dev Diamond facet: ETH is stored in the Diamond proxy, not this contract.
+    // slither-disable-next-line locked-ether
     function forwardedBridgeBurn(
         address _settlementLayer,
         address _originalCaller,

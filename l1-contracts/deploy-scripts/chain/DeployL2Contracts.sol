@@ -22,7 +22,7 @@ contract DeployL2Script is Script, IDeployL2Contracts {
     using stdToml for string;
 
     Config internal config;
-    DeployedContrats internal deployed;
+    DeployedContracts internal deployed;
 
     enum DAValidatorType {
         Rollup,
