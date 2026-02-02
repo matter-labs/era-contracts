@@ -16,6 +16,7 @@ struct CTMCoreDeploymentConfig {
     address verifierFflonk;
     address verifierPlonk;
     address verifierOwner;
+    address permissionlessValidator;
 }
 
 enum CTMContract {
@@ -71,9 +72,21 @@ library DeployCTML1OrGateway {
                 }
             }
         } else if (contractName == CTMContract.ZKsyncOSChainTypeManager) {
-            return abi.encode(config.bridgehubProxy, config.interopCenterProxy, config.l1BytecodesSupplier);
+            return
+                abi.encode(
+                    config.bridgehubProxy,
+                    config.interopCenterProxy,
+                    config.l1BytecodesSupplier,
+                    config.permissionlessValidator
+                );
         } else if (contractName == CTMContract.EraChainTypeManager) {
-            return abi.encode(config.bridgehubProxy, config.interopCenterProxy, config.l1BytecodesSupplier);
+            return
+                abi.encode(
+                    config.bridgehubProxy,
+                    config.interopCenterProxy,
+                    config.l1BytecodesSupplier,
+                    config.permissionlessValidator
+                );
         } else if (contractName == CTMContract.BlobsL1DAValidatorZKsyncOS) {
             return abi.encode();
         } else {

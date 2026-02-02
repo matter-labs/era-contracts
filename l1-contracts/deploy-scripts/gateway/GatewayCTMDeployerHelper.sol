@@ -983,7 +983,8 @@ library GatewayCTMDeployerHelper {
                 eip7702Checker: address(0),
                 verifierFflonk: _deployedContracts.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: _deployedContracts.stateTransition.verifiers.verifierPlonk,
-                verifierOwner: _config.aliasedGovernanceAddress
+                verifierOwner: _config.aliasedGovernanceAddress,
+                permissionlessValidator: _config.permissionlessValidator
             });
     }
 
