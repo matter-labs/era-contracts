@@ -12,7 +12,7 @@ pub fn da_contract_name_to_code(contract_name: &str) -> Vec<u8> {
 
 fn contract_artifact_to_code(path: &str, contract_name: &str) -> Vec<u8> {
     let file_content =
-        std::fs::read_to_string(path).expect("Failed to read contract bytecode file");
+        std::fs::read_to_string(path).expect(format!("Failed to read contract bytecode file {}", path).as_str());
     let artifact: serde_json::Value =
         serde_json::from_str(&file_content).expect("Failed to parse JSON file");
 
