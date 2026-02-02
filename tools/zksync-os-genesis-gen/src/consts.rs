@@ -100,7 +100,11 @@ pub const EIP1967_ADMIN_SLOT: B256 = FixedBytes::<32>(hex_literal::hex!(
     "b53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103"
 ));
 
-pub const INITIAL_CONTRACTS: [(Address, ContractSource); 19] = [
+const L2_INTEROP_ROOT_STORAGE: Address = Address(FixedBytes::<20>(hex_literal::hex!("0000000000000000000000000000000000010008")));
+const L2_MESSAGE_VERIFICATION: Address = Address(FixedBytes::<20>(hex_literal::hex!("0000000000000000000000000000000000010009")));
+
+// FIXME: consider reducing the size of the genesis by deploying those inside L2GensisUpgrade
+pub const INITIAL_CONTRACTS: [(Address, ContractSource); 21] = [
     (L2_COMPLEX_UPGRADER_ADDR, ContractSource::L1ContractName("SystemContractProxy")),
     (L2_GENESIS_UPGRADE, ContractSource::L1ContractName("L2GenesisUpgrade")),
     (L2_WRAPPED_BASE_TOKEN, ContractSource::L1ContractName("L2WrappedBaseToken")),
@@ -116,6 +120,8 @@ pub const INITIAL_CONTRACTS: [(Address, ContractSource); 19] = [
     (GW_ASSET_TRACKER_ADDR, ContractSource::L1ContractName("GWAssetTracker")),
     (L2_INTEROP_CENTER_ADDR, ContractSource::L1ContractName("InteropCenter")),
     (L2_INTEROP_HANDLER_ADDR, ContractSource::L1ContractName("InteropHandler")),
+    (L2_INTEROP_ROOT_STORAGE, ContractSource::L1ContractName("L2InteropRootStorage")),
+    (L2_MESSAGE_VERIFICATION, ContractSource::L1ContractName("L2MessageVerification")),
     // System contracts (0x8000 range)
     (L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, ContractSource::L1ContractName("ZKOSContractDeployer")),
     (L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, ContractSource::L1ContractName("L1Messenger")),

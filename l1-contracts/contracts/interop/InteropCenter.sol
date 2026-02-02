@@ -270,8 +270,9 @@ contract InteropCenter is
                 msg.value == _totalBurnedCallsValue + _totalIndirectCallsValue,
                 MsgValueMismatch(_totalBurnedCallsValue + _totalIndirectCallsValue, msg.value)
             );
+            // FIXME: does not burn, just sends to a a bad address.
             // slither-disable-next-line arbitrary-send-eth
-            L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalBurnedCallsValue}();
+            address(0xdeadbeef).call{value: _totalBurnedCallsValue}("");
         } else {
             require(msg.value == _totalIndirectCallsValue, MsgValueMismatch(_totalIndirectCallsValue, msg.value));
             if (_totalBurnedCallsValue > 0) {
@@ -297,7 +298,8 @@ contract InteropCenter is
         BundleAttributes memory _bundleAttributes,
         bytes[][] memory _originalCallAttributes
     ) internal returns (bytes32 bundleHash) {
-        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
+        // FIXME: Turned off for zksync os for now
+        // require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
 
         // Form an InteropBundle.
         InteropBundle memory bundle = InteropBundle({
