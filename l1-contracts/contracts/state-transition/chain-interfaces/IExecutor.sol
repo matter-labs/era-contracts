@@ -244,13 +244,10 @@ interface IExecutor is IZKChainBase {
     /// counters that are responsible for the number of batches
     function revertBatchesSharedBridge(address _chainAddress, uint256 _newLastBatch) external;
 
-    /// @notice Activates the Priority Mode if the whitelisted operator fails
-    /// to process priority transactions within the allotted time.
-    /// @dev Priority Mode is an escape hatch mechanism in which anyone can settle batches (only with L1 -> L2 transactions).
-    /// @dev Priority Mode can be activated if:
-    ///      1. The Chain Admin has explicitly enabled the Priority Mode feature.
-    ///      2. A priority transaction has been outstanding for at least `PRIORITY_EXPIRATION` since it was requested.
-    function activatePriorityMode() external;
+    /// @notice Reverts batches during priority mode activation.
+    /// @dev This is called internally by the Admin facet during priority mode activation.
+    /// @param _newLastBatch The batch number to revert to (all batches after this will be reverted).
+    function revertBatchesForPriorityMode(uint256 _newLastBatch) external;
 
     /// @notice Event emitted when a batch is committed
     /// @param batchNumber Number of the batch committed
@@ -297,7 +294,4 @@ interface IExecutor is IZKChainBase {
         uint64 indexed firstBlockNumber,
         uint64 indexed lastBlockNumber
     );
-
-    /// @notice Emitted when Priority Mode is activated for the chain.
-    event PriorityModeActivated();
 }

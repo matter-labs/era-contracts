@@ -955,31 +955,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
-    function activatePriorityMode() external onlySettlementLayer onlyL1 notPriorityMode nonReentrant {
-        if (!s.priorityModeInfo.canBeActivated) {
-            revert PriorityModeIsNotAllowed();
-        }
-        uint256 firstUnprocessedTx = s.priorityTree.getFirstUnprocessedPriorityTx();
-        uint256 unprocessedTxRequestedAt = s.priorityOpsRequestTimestamp[firstUnprocessedTx];
-        // A zero timestamp means we don't have a recorded "requested at" time for this priority tx.
-        // This can happen when:
-        //  - the priority queue is empty, or
-        //  - immediately after the chain upgraded to the v31 protocol version.
-        //
-        // In the upgrade case, priority transactions may already exist in the contract state,
-        // but `priorityOpsRequestTimestamp` has not been populated for "old" priority transactions.
-        if (unprocessedTxRequestedAt == 0) {
-            revert PriorityOpsRequestTimestampMissing(firstUnprocessedTx);
-        }
-        uint256 earliestActivationTimestamp = unprocessedTxRequestedAt + PRIORITY_EXPIRATION;
-        if (block.timestamp < earliestActivationTimestamp) {
-            revert PriorityModeActivationTooEarly(earliestActivationTimestamp, block.timestamp);
-        }
-        s.priorityModeInfo.activated = true;
-        // Revert all batches that are not finalized yet to allow the `PermissionlessValidator`
-        // to commit, prove, and execute batches in one go.
-        _revertBatches(s.totalBatchesExecuted);
-        emit PriorityModeActivated();
+    function revertBatchesForPriorityMode(uint256 _newLastBatch) external onlySelf {
+        _revertBatches(_newLastBatch);
     }
 
     function _revertBatches(uint256 _newLastBatch) internal {

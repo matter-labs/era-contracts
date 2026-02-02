@@ -62,6 +62,14 @@ interface IAdmin is IZKChainBase {
     /// @notice Deactivate Priority Mode and return the chain to normal mode.
     function deactivatePriorityMode() external;
 
+    /// @notice Activates the Priority Mode if the whitelisted operator fails
+    /// to process priority transactions within the allotted time.
+    /// @dev Priority Mode is an escape hatch mechanism in which anyone can settle batches (only with L1 -> L2 transactions).
+    /// @dev Priority Mode can be activated if:
+    ///      1. The Chain Admin has explicitly enabled the Priority Mode feature.
+    ///      2. A priority transaction has been outstanding for at least `PRIORITY_EXPIRATION` since it was requested.
+    function activatePriorityMode() external;
+
     /// @notice Perform the upgrade from the current protocol version with the corresponding upgrade data
     /// @param _protocolVersion The current protocol version from which upgrade is executed
     /// @param _cutData The diamond cut parameters that is executed in the upgrade
@@ -165,4 +173,7 @@ interface IAdmin is IZKChainBase {
     event PriorityModeAllowed();
 
     event PriorityModeDeactivated();
+
+    /// @notice Emitted when Priority Mode is activated for the chain.
+    event PriorityModeActivated();
 }

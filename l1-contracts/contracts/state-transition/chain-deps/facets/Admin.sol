@@ -4,15 +4,17 @@ pragma solidity 0.8.28;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
+import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION} from "../../../common/Config.sol";
+import {L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, PRIORITY_EXPIRATION} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {L1DAValidatorAddressIsZero, NotL1, PriorityModeAlreadyAllowed} from "../../L1StateTransitionErrors.sol";
-import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized, NotCompatibleWithPriorityMode} from "../../../common/L1ContractErrors.sol";
+import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, PriorityModeActivationTooEarly, PriorityModeIsNotAllowed, PriorityOpsRequestTimestampMissing, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized, NotCompatibleWithPriorityMode} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
+import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
 
@@ -23,6 +25,8 @@ import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract AdminFacet is ZKChainBase, IAdmin {
+    using PriorityTree for PriorityTree.Tree;
+
     /// @inheritdoc IZKChainBase
     // solhint-disable-next-line const-name-snakecase
     string public constant override getName = "AdminFacet";
@@ -238,6 +242,34 @@ contract AdminFacet is ZKChainBase, IAdmin {
     function deactivatePriorityMode() external onlyPriorityMode onlyChainTypeManager onlySettlementLayer onlyL1 {
         s.priorityModeInfo.activated = false;
         emit PriorityModeDeactivated();
+    }
+
+    /// @inheritdoc IAdmin
+    function activatePriorityMode() external onlySettlementLayer onlyL1 notPriorityMode nonReentrant {
+        if (!s.priorityModeInfo.canBeActivated) {
+            revert PriorityModeIsNotAllowed();
+        }
+        uint256 firstUnprocessedTx = s.priorityTree.getFirstUnprocessedPriorityTx();
+        uint256 unprocessedTxRequestedAt = s.priorityOpsRequestTimestamp[firstUnprocessedTx];
+        // A zero timestamp means we don't have a recorded "requested at" time for this priority tx.
+        // This can happen when:
+        //  - the priority queue is empty, or
+        //  - immediately after the chain upgraded to the v31 protocol version.
+        //
+        // In the upgrade case, priority transactions may already exist in the contract state,
+        // but `priorityOpsRequestTimestamp` has not been populated for "old" priority transactions.
+        if (unprocessedTxRequestedAt == 0) {
+            revert PriorityOpsRequestTimestampMissing(firstUnprocessedTx);
+        }
+        uint256 earliestActivationTimestamp = unprocessedTxRequestedAt + PRIORITY_EXPIRATION;
+        if (block.timestamp < earliestActivationTimestamp) {
+            revert PriorityModeActivationTooEarly(earliestActivationTimestamp, block.timestamp);
+        }
+        s.priorityModeInfo.activated = true;
+        // Revert all batches that are not finalized yet to allow the `PermissionlessValidator`
+        // to commit, prove, and execute batches in one go.
+        IExecutor(address(this)).revertBatchesForPriorityMode(s.totalBatchesExecuted);
+        emit PriorityModeActivated();
     }
 
     /// @inheritdoc IAdmin
