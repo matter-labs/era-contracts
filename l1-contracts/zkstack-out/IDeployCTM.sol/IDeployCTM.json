@@ -116,6 +116,11 @@
                     "internalType": "address"
                   },
                   {
+                    "name": "migratorFacet",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
                     "name": "diamondInit",
                     "type": "address",
                     "internalType": "address"
