@@ -51,10 +51,6 @@ library L2UtilsBase {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
     Vm internal constant vm = Vm(VM_ADDRESS);
 
-    // Storage slots for reentrancy guards (from OpenZeppelin ReentrancyGuard)
-    bytes32 internal constant REENTRANCY_GUARD_STORAGE_SLOT =
-        0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4;
-
     /// @dev We provide a fast form of debugging the L2 contracts using L1 foundry. We also test using zk foundry.
     function initSystemContracts(SystemContractsArgs memory _args) internal {
         // Variables that will be used across multiple scopes
@@ -126,12 +122,9 @@ library L2UtilsBase {
         {
             address interopHandler = address(new InteropHandler());
             vm.etch(L2_INTEROP_HANDLER_ADDR, interopHandler.code);
-            /// storing the reentrancy guard as the constructor is not called.
-            vm.store(
-                L2_INTEROP_HANDLER_ADDR,
-                bytes32(0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4),
-                bytes32(uint256(1))
-            );
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(_args.l1ChainId);
+
             address l2AssetTrackerAddress = address(new L2AssetTracker());
             vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
@@ -208,16 +201,8 @@ library L2UtilsBase {
             L2NativeTokenVaultDev(L2_NATIVE_TOKEN_VAULT_ADDR).deployBridgedStandardERC20(_args.aliasedOwner);
         }
 
+        // Initialize GWAssetTracker after NTV is deployed (needs WETH_TOKEN)
         {
-            address interopHandler = address(new InteropHandler());
-            vm.etch(L2_INTEROP_HANDLER_ADDR, interopHandler.code);
-            // Initialize reentrancy guard for InteropHandler
-            _initializeReentrancyGuard(L2_INTEROP_HANDLER_ADDR);
-            address l2AssetTrackerAddress = address(new L2AssetTracker());
-            vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
-            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            L2AssetTracker(L2_ASSET_TRACKER_ADDR).setAddresses(_args.l1ChainId, bytes32(0));
-
             // Deploy a real ERC20 token for the wrapped ZK token BEFORE setting up GWAssetTracker
             TestnetERC20Token wrappedZKToken = new TestnetERC20Token("Wrapped ZK", "WZK", 18);
             address wrappedZKTokenAddr = address(wrappedZKToken);
@@ -229,8 +214,6 @@ library L2UtilsBase {
                 abi.encode(wrappedZKTokenAddr)
             );
 
-            address gwAssetTrackerAddress = address(new GWAssetTracker());
-            vm.etch(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAddress.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
             GWAssetTracker(GW_ASSET_TRACKER_ADDR).setAddresses(_args.l1ChainId);
 
@@ -269,11 +252,5 @@ library L2UtilsBase {
                 GWAssetTracker(GW_ASSET_TRACKER_ADDR).agreeToPaySettlementFees(chainIds[i]);
             }
         }
-    }
-
-    /// @notice Initialize reentrancy guard for a contract
-    /// @dev This sets the reentrancy guard storage slot to 1 (NOT_ENTERED state)
-    function _initializeReentrancyGuard(address contractAddr) internal {
-        vm.store(contractAddr, REENTRANCY_GUARD_STORAGE_SLOT, bytes32(uint256(1)));
     }
 }
