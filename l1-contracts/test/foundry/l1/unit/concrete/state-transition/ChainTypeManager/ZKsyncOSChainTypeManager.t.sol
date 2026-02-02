@@ -197,7 +197,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
-        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain(testnetVerifier);
+        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain(testnetVerifier, address(0));
         bytes memory initCalldata = abi.encode(initializeData);
         return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
     }

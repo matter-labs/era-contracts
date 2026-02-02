@@ -203,7 +203,8 @@ library AddressIntrospector {
                 legacyValidatorTimelock: _ctm.validatorTimelock(),
                 eraDiamondProxy: address(0), // Not available from CTM directly
                 rollupDAManager: address(0), // Not available from CTM directly
-                rollupSLDAValidator: address(0) // Not available from CTM directly
+                rollupSLDAValidator: address(0), // Not available from CTM directly
+                permissionlessValidator: address(0) // Not available from CTM directly
             }),
             daAddresses: DataAvailabilityDeployedAddresses({
                 rollupDAManager: address(0), // Not available from CTM directly

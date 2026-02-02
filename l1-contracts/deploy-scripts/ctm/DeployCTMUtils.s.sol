@@ -284,7 +284,7 @@ abstract contract DeployCTMUtils is DeployUtils {
                 l2BootloaderBytecodeHash: config.contracts.chainCreationParams.bootloaderHash,
                 l2DefaultAccountBytecodeHash: config.contracts.chainCreationParams.defaultAAHash,
                 l2EvmEmulatorBytecodeHash: config.contracts.chainCreationParams.evmEmulatorHash,
-                permissionlessValidator: config.contracts.chainCreationParams.permissionlessValidator
+                permissionlessValidator: stateTransition.permissionlessValidator
             });
     }
 

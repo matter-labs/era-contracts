@@ -11,7 +11,7 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 
 import {ActivatePriorityModeNotImplementedInValidatorContract, RoleAccessDenied, TimeNotReached, NotAZKChain} from "contracts/common/L1ContractErrors.sol";
-import {IValidatorTimelock} from "contracts/state-transition/IValidatorTimelock.sol";
+import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
 
