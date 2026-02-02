@@ -76,7 +76,7 @@ contract CommittingTest is ExecutorTest {
             wrongGenesisStoredBatchInfo,
             newCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithWrongOrderOfBatches() public {
@@ -93,7 +93,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithWrongNewBatchTimestamp() public {
@@ -122,7 +122,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithTooSmallNewBatchTimestamp() public {
@@ -151,7 +151,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingTooBigLastL2BatchTimestamp() public {
@@ -180,7 +180,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithWrongPreviousBatchHash() public {
@@ -208,7 +208,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithoutProcessingSystemContextLog() public {
@@ -230,7 +230,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithProcessingSystemContextLogTwice() public {
@@ -262,7 +262,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_UnexpectedL2ToL1Log() public {
@@ -294,7 +294,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithWrongCanonicalTxHash() public {
@@ -322,7 +322,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithWrongNumberOfLayer1txs() public {
@@ -350,7 +350,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithUnknownSystemLogKey() public {
@@ -374,7 +374,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_SystemLogIsFromIncorrectAddress() public {
@@ -406,7 +406,7 @@ contract CommittingTest is ExecutorTest {
                 genesisStoredBatchInfo,
                 wrongNewCommitBatchInfoArray
             );
-            executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+            committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
         }
     }
 
@@ -431,7 +431,7 @@ contract CommittingTest is ExecutorTest {
                 genesisStoredBatchInfo,
                 wrongNewCommitBatchInfoArray
             );
-            executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+            committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
         }
     }
 
@@ -500,7 +500,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
@@ -540,7 +540,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
@@ -609,7 +609,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
@@ -637,7 +637,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_EmptyPubdataCommitments() public {
@@ -667,7 +667,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_PartialPubdataCommitment() public {
@@ -707,7 +707,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_TooManyPubdataCommitments() public {
@@ -748,7 +748,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_NotEnoughPubdataCommitments() public {
@@ -779,7 +779,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
 
         vm.clearMockedCalls();
     }
@@ -807,7 +807,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
 
         vm.clearMockedCalls();
     }
@@ -840,7 +840,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
 
         vm.clearMockedCalls();
     }
@@ -899,7 +899,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_SecondBlobLinearHashNotZeroWithEmptyCommitment() public {
@@ -955,7 +955,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     // For accurate measuring of gas usage via snapshot cheatcodes,
@@ -995,7 +995,7 @@ contract CommittingTest is ExecutorTest {
     function test_commitBlockRealData() public {
         vm.prank(validator);
         vm.expectRevert();
-        executor.commitBatchesSharedBridge(
+        committer.commitBatchesSharedBridge(
             address(0),
             1,
             1,

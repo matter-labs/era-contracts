@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IExecutor} from "../chain-interfaces/IExecutor.sol";
+import {ICommitter} from "../chain-interfaces/ICommitter.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -31,7 +32,7 @@ contract PermissionlessValidator is ReentrancyGuard {
         bytes calldata _proveData,
         bytes calldata _executeData
     ) external nonReentrant {
-        IExecutor(_chainAddress).commitBatchesSharedBridge(
+        ICommitter(_chainAddress).commitBatchesSharedBridge(
             _chainAddress,
             _processBatchFrom,
             _processBatchTo,

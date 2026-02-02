@@ -20,6 +20,7 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Migrator} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
+import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
@@ -182,6 +183,14 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
                 action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: Utils.getMigratorSelectors()
+            })
+        );
+        facetCuts.push(
+            Diamond.FacetCut({
+                facet: address(new CommitterFacet(block.chainid)),
+                action: Diamond.Action.Add,
+                isFreezable: true,
+                selectors: Utils.getCommitterSelectors()
             })
         );
 

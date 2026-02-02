@@ -9,6 +9,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -346,10 +347,18 @@ library Utils {
     function getExecutorSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](4);
         uint256 i = 0;
-        selectors[i++] = ExecutorFacet.commitBatchesSharedBridge.selector;
         selectors[i++] = ExecutorFacet.proveBatchesSharedBridge.selector;
         selectors[i++] = ExecutorFacet.executeBatchesSharedBridge.selector;
         selectors[i++] = ExecutorFacet.revertBatchesSharedBridge.selector;
+        selectors[i++] = ExecutorFacet.revertBatchesForPriorityMode.selector;
+        return selectors;
+    }
+
+    function getCommitterSelectors() public pure returns (bytes4[] memory) {
+        bytes4[] memory selectors = new bytes4[](2);
+        uint256 i = 0;
+        selectors[i++] = CommitterFacet.commitBatchesSharedBridge.selector;
+        selectors[i++] = CommitterFacet.precommitSharedBridge.selector;
         return selectors;
     }
 

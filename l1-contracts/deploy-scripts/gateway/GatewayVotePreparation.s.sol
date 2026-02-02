@@ -106,6 +106,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
             gettersSelectors: Utils.getAllSelectorsForFacet("Getters"),
             migratorSelectors: Utils.getAllSelectorsForFacet("Migrator"),
+            committerSelectors: Utils.getAllSelectorsForFacet("Committer"),
             bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
             defaultAccountHash: config.contracts.chainCreationParams.defaultAAHash,
             evmEmulatorHash: config.contracts.chainCreationParams.evmEmulatorHash,

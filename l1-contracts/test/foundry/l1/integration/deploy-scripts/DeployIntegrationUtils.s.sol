@@ -9,6 +9,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
 import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {Utils} from "deploy-scripts/utils/Utils.sol";
 
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -35,17 +36,19 @@ abstract contract DeployIntegrationUtils is Script, DeployCTMUtils {
         string memory inputPath = string.concat(root, "/script-out/diamond-selectors.toml");
         string memory toml = vm.readFile(inputPath);
 
-        facetCuts = new Diamond.FacetCut[](4);
+        facetCuts = new Diamond.FacetCut[](6);
         {
             bytes memory adminFacetSelectors = toml.readBytes("$.admin_facet_selectors");
             bytes memory gettersFacetSelectors = toml.readBytes("$.getters_facet_selectors");
             bytes memory mailboxFacetSelectors = toml.readBytes("$.mailbox_facet_selectors");
             bytes memory executorFacetSelectors = toml.readBytes("$.executor_facet_selectors");
+            bytes memory migratorFacetSelectors = toml.readBytes("$.migrator_facet_selectors");
 
             bytes4[] memory adminFacetSelectorsArray = abi.decode(adminFacetSelectors, (bytes4[]));
             bytes4[] memory gettersFacetSelectorsArray = abi.decode(gettersFacetSelectors, (bytes4[]));
             bytes4[] memory mailboxFacetSelectorsArray = abi.decode(mailboxFacetSelectors, (bytes4[]));
             bytes4[] memory executorFacetSelectorsArray = abi.decode(executorFacetSelectors, (bytes4[]));
+            bytes4[] memory migratorFacetSelectorsArray = abi.decode(migratorFacetSelectors, (bytes4[]));
 
             facetCuts[0] = Diamond.FacetCut({
                 facet: ctmAddresses.stateTransition.facets.adminFacet,
@@ -70,6 +73,18 @@ abstract contract DeployIntegrationUtils is Script, DeployCTMUtils {
                 action: Diamond.Action.Add,
                 isFreezable: true,
                 selectors: executorFacetSelectorsArray
+            });
+            facetCuts[4] = Diamond.FacetCut({
+                facet: ctmAddresses.stateTransition.facets.migratorFacet,
+                action: Diamond.Action.Add,
+                isFreezable: false,
+                selectors: migratorFacetSelectorsArray
+            });
+            facetCuts[5] = Diamond.FacetCut({
+                facet: ctmAddresses.stateTransition.facets.committerFacet,
+                action: Diamond.Action.Add,
+                isFreezable: true,
+                selectors: Utils.getAllSelectors(ctmAddresses.stateTransition.facets.committerFacet.code)
             });
         }
     }

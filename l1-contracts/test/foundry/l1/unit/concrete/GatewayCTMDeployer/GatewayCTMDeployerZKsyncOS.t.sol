@@ -108,6 +108,7 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
             mailboxSelectors: new bytes4[](2),
             gettersSelectors: new bytes4[](2),
             migratorSelectors: new bytes4[](2),
+            committerSelectors: new bytes4[](2),
             bootloaderHash: bytes32(uint256(0xabc)),
             defaultAccountHash: bytes32(uint256(0xdef)),
             evmEmulatorHash: bytes32(uint256(0xdef)),
@@ -131,6 +132,8 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
         config.gettersSelectors[1] = bytes4(keccak256("gettersFunction2()"));
         config.migratorSelectors[0] = bytes4(keccak256("migratorFunction1()"));
         config.migratorSelectors[1] = bytes4(keccak256("migratorFunction2()"));
+        config.committerSelectors[0] = bytes4(keccak256("committerFunction1()"));
+        config.committerSelectors[1] = bytes4(keccak256("committerFunction2()"));
 
         deployerConfig = config;
     }

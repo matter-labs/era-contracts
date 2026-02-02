@@ -24,6 +24,7 @@ enum CTMContract {
     MailboxFacet,
     ExecutorFacet,
     MigratorFacet,
+    CommitterFacet,
     DiamondInit,
     ValidatorTimelock,
     Verifier,
@@ -55,6 +56,8 @@ library DeployCTML1OrGateway {
             return abi.encode(config.l1ChainId);
         } else if (contractName == CTMContract.MigratorFacet) {
             return abi.encode(config.l1ChainId, config.testnetVerifier);
+        } else if (contractName == CTMContract.CommitterFacet) {
+            return abi.encode(config.l1ChainId);
         } else if (contractName == CTMContract.DiamondInit) {
             return abi.encode(config.isZKsyncOS);
         } else if (contractName == CTMContract.Verifier) {
@@ -105,6 +108,8 @@ library DeployCTML1OrGateway {
             return CTMContract.DiamondInit;
         } else if (compareStrings(contractName, "MigratorFacet")) {
             return CTMContract.MigratorFacet;
+        } else if (compareStrings(contractName, "CommitterFacet")) {
+            return CTMContract.CommitterFacet;
         } else if (compareStrings(contractName, "ValidatorTimelock")) {
             return CTMContract.ValidatorTimelock;
         } else if (compareStrings(contractName, "Verifier")) {

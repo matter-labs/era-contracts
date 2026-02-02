@@ -61,7 +61,7 @@ contract CommittingTest is ExecutorTest {
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
             .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, correctCommitBatchInfoArray);
         vm.prank(validator);
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_SuccessfullyCommitBatchWithBlobs() public {
@@ -99,7 +99,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.blobhashes(blobVersionedHashes);
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_SuccessfullyCommitBatchWithBlobsPrepublished() public {
@@ -140,7 +140,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.blobhashes(new bytes32[](0));
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_SuccessfullyCommitBatchValidium() public {
@@ -169,7 +169,7 @@ contract CommittingTest is ExecutorTest {
         admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
 
         vm.prank(validator);
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithWrongL2DACommitmentScheme() public {
@@ -208,7 +208,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
         vm.blobhashes(blobVersionedHashes);
         vm.expectRevert(abi.encodeWithSelector(MismatchL2DACommitmentScheme.selector, 3, 4));
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithWrongCalldata() public {
@@ -253,7 +253,7 @@ contract CommittingTest is ExecutorTest {
             .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, correctCommitBatchInfoArray);
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSelector(InvalidPubdataHash.selector, totalL2PubdataHash, keccak256(pubdata)));
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithWrongBlobs() public {
@@ -298,7 +298,7 @@ contract CommittingTest is ExecutorTest {
                 daCommitment
             )
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithNotPrepublishedBlobs() public {
@@ -336,7 +336,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(BlobNotPublished.selector);
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_BatchNumberMismatch() public {
@@ -361,7 +361,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSignature("BatchNumberMismatch(uint256,uint256)", 1, 5));
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_IncorrectBatchChainId() public {
@@ -386,7 +386,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSignature("IncorrectBatchChainId(uint256,uint256)", 999, l2ChainId));
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_InvalidBlockRange() public {
@@ -412,7 +412,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSignature("InvalidBlockRange(uint64,uint64,uint64)", 1, 10, 5));
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_L2TimestampTooBig() public {
@@ -438,7 +438,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSignature("L2TimestampTooBig()"));
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_TimeNotReached() public {
@@ -464,6 +464,6 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(); // TimeNotReached error
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 }

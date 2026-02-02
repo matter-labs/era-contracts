@@ -65,6 +65,7 @@ struct DirectCreate2Calldata {
     bytes executorFacetCalldata;
     bytes gettersFacetCalldata;
     bytes migratorFacetCalldata;
+    bytes committerFacetCalldata;
     bytes diamondInitCalldata;
     bytes genesisUpgradeCalldata;
     bytes multicall3Calldata;
@@ -324,6 +325,16 @@ library GatewayCTMDeployerHelper {
             "Migrator.sol",
             "Migrator",
             migratorFacetArgs,
+            config.isZKsyncOS
+        );
+
+        // CommitterFacet
+        bytes memory committerFacetArgs = abi.encode(config.l1ChainId);
+        (addresses.facets.committerFacet, data.committerFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+            _create2Salt,
+            "Committer.sol",
+            "CommitterFacet",
+            committerFacetArgs,
             config.isZKsyncOS
         );
 
@@ -727,7 +738,7 @@ library GatewayCTMDeployerHelper {
 
         // Build diamond cut data
         Facets memory facets = config.facets;
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](5);
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](6);
         facetCuts[0] = Diamond.FacetCut({
             facet: facets.adminFacet,
             action: Diamond.Action.Add,
@@ -757,6 +768,12 @@ library GatewayCTMDeployerHelper {
             action: Diamond.Action.Add,
             isFreezable: false,
             selectors: baseConfig.migratorSelectors
+        });
+        facetCuts[5] = Diamond.FacetCut({
+            facet: facets.committerFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: baseConfig.committerSelectors
         });
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
@@ -851,7 +868,7 @@ library GatewayCTMDeployerHelper {
 
         // Build diamond cut data
         Facets memory facets = config.facets;
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](5);
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](6);
         facetCuts[0] = Diamond.FacetCut({
             facet: facets.adminFacet,
             action: Diamond.Action.Add,
@@ -881,6 +898,12 @@ library GatewayCTMDeployerHelper {
             action: Diamond.Action.Add,
             isFreezable: false,
             selectors: baseConfig.migratorSelectors
+        });
+        facetCuts[5] = Diamond.FacetCut({
+            facet: facets.committerFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: baseConfig.committerSelectors
         });
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
@@ -1097,9 +1120,9 @@ library GatewayCTMDeployerHelper {
         // + 2 ValidatorTimelock contracts (implementation + proxy)
         // + 4 Verifier contracts (Era only)
         // + 2 CTM contracts (ServerNotifier, EraChainTypeManager)
-        // + 9 direct contracts (AdminFacet, MailboxFacet, ExecutorFacet, GettersFacet, MigratorFacet, DiamondInit, GenesisUpgrade, Multicall3, DiamondProxy)
-        // Total: 5 + 3 + 1 + 2 + 4 + 2 + 9 = 26
-        uint256 totalDependencies = 26;
+        // + 10 direct contracts (AdminFacet, MailboxFacet, ExecutorFacet, GettersFacet, MigratorFacet, CommitterFacet, DiamondInit, GenesisUpgrade, Multicall3, DiamondProxy)
+        // Total: 5 + 3 + 1 + 2 + 4 + 2 + 10 = 27
+        uint256 totalDependencies = 27;
         dependencies = new bytes[](totalDependencies);
         uint256 index = 0;
 
@@ -1150,6 +1173,7 @@ library GatewayCTMDeployerHelper {
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("Executor.sol", "ExecutorFacet");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("Getters.sol", "GettersFacet");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("Migrator.sol", "Migrator");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("Committer.sol", "CommitterFacet");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("DiamondInit.sol", "DiamondInit");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("L1GenesisUpgrade.sol", "L1GenesisUpgrade");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("Multicall3.sol", "Multicall3");

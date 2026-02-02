@@ -35,7 +35,7 @@ contract PrecommittingTest is ExecutorTest {
         vm.prank(validator);
         vm.recordLogs();
 
-        executor.precommitSharedBridge(address(0), batchNumber, precommitData());
+        committer.precommitSharedBridge(address(0), batchNumber, precommitData());
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 

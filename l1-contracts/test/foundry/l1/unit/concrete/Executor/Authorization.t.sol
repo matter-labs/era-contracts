@@ -50,7 +50,7 @@ contract AuthorizationTest is ExecutorTest {
             storedBatchInfo,
             commitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_ProvingByUnauthorisedAddress() public {

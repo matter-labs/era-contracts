@@ -7,6 +7,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 
@@ -162,7 +163,7 @@ contract ValidatorTimelockTest is Test {
 
     function test_validatorCanMakeCall() public {
         // Setup Mock call to executor
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), "");
+        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), "");
 
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
         IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
@@ -198,7 +199,7 @@ contract ValidatorTimelockTest is Test {
         vm.warp(timestamp);
         vm.mockCall(
             zkSync,
-            abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector),
+            abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector),
             abi.encode(eraChainId)
         );
 
@@ -220,7 +221,7 @@ contract ValidatorTimelockTest is Test {
     }
 
     function test_commitBatches() public {
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), abi.encode(chainId));
+        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), abi.encode(chainId));
 
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
         IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
@@ -274,7 +275,7 @@ contract ValidatorTimelockTest is Test {
         uint64 timestamp = 123456;
         uint64 batchNumber = 123;
         // Commit batches first to have the valid timestamp
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), abi.encode(zkSync));
+        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), abi.encode(zkSync));
 
         IExecutor.StoredBatchInfo memory storedBatch1 = Utils.createStoredBatchInfo();
         IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
@@ -399,7 +400,7 @@ contract ValidatorTimelockTest is Test {
         uint64 timestamp = 123456;
         uint64 batchNumber = 123;
         // Prove batches first to have the valid timestamp
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), abi.encode(chainId));
+        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), abi.encode(chainId));
 
         IExecutor.StoredBatchInfo memory storedBatch1 = Utils.createStoredBatchInfo();
         IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
@@ -508,7 +509,7 @@ contract ValidatorTimelockTest is Test {
     }
 
     function test_precommitSharedBridge() public {
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.precommitSharedBridge.selector), "");
+        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.precommitSharedBridge.selector), "");
 
         vm.prank(alice);
         validator.precommitSharedBridge(zkSync, 1, "");
@@ -574,7 +575,7 @@ contract ValidatorTimelockTest is Test {
     }
 
     function test_commitBatches_MultipleBatches() public {
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), abi.encode(chainId));
+        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), abi.encode(chainId));
 
         uint64 timestamp = 123456;
         uint64 batchNumberStart = 10;

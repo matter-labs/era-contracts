@@ -128,7 +128,7 @@ contract ExecutingTest is ExecutorTest {
             genesisStoredBatchInfo,
             commitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
         /// These constants were the hashes that are needed for the test to run. PriorityTree hashing validity is checked separately.
         executor.setPriorityTreeHistoricalRoot(0x682709a1fd539b1a69dfd64ade8d17231d5498c372fb8a6325ec545137f8a35a);
         executor.setPriorityTreeHistoricalRoot(0xa09200c9b365ebf37db651d6096b20c46ea62ff692839090fb0494a53ee80b28);
@@ -269,7 +269,7 @@ contract ExecutingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         IExecutor.StoredBatchInfo memory correctNewStoredBatchInfo = newStoredBatchInfo;
@@ -350,7 +350,7 @@ contract ExecutingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         IExecutor.StoredBatchInfo memory correctNewStoredBatchInfo = newStoredBatchInfo;
@@ -441,7 +441,7 @@ contract ExecutingTest is ExecutorTest {
             genesisBlock,
             correctNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_ShouldExecuteBatchesSuccessfully() public {

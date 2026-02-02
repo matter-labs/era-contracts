@@ -8,6 +8,13 @@
   },
   {
     "type": "function",
+    "name": "activatePriorityMode",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "allowEvmEmulation",
     "inputs": [],
     "outputs": [
@@ -735,6 +742,12 @@
         "internalType": "address"
       }
     ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PriorityModeActivated",
+    "inputs": [],
     "anonymous": false
   },
   {

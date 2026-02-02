@@ -30,7 +30,7 @@ contract ExecutorExtendedTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSelector(BatchNumberMismatch.selector, 1, 5));
-        executor.commitBatchesSharedBridge(address(0), 5, 5, commitData);
+        committer.commitBatchesSharedBridge(address(0), 5, 5, commitData);
     }
 
     function test_CommitBatches_MultipleBatches_Fails() public {
@@ -51,7 +51,7 @@ contract ExecutorExtendedTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(CanOnlyProcessOneBatch.selector);
-        executor.commitBatchesSharedBridge(address(0), 1, 2, commitData);
+        committer.commitBatchesSharedBridge(address(0), 1, 2, commitData);
     }
 
     function test_CommitBatches_SystemLogsLengthInvalid() public {
@@ -69,7 +69,7 @@ contract ExecutorExtendedTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(InvalidSystemLogsLength.selector);
-        executor.commitBatchesSharedBridge(address(0), processFrom, processTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), processFrom, processTo, commitData);
     }
 
     function test_PrecommitSharedBridge_InvalidBatchNumber() public {
@@ -81,7 +81,7 @@ contract ExecutorExtendedTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSelector(InvalidBatchNumber.selector, 5, 1));
-        executor.precommitSharedBridge(address(0), 5, precommitData);
+        committer.precommitSharedBridge(address(0), 5, precommitData);
     }
 
     function test_PrecommitSharedBridge_EmptyPrecommitData() public {
@@ -92,7 +92,7 @@ contract ExecutorExtendedTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSelector(EmptyPrecommitData.selector, 1));
-        executor.precommitSharedBridge(address(0), 1, precommitData);
+        committer.precommitSharedBridge(address(0), 1, precommitData);
     }
 
     function test_CommitBatches_UnauthorizedValidator() public {
@@ -106,7 +106,7 @@ contract ExecutorExtendedTest is ExecutorTest {
 
         vm.prank(randomSigner);
         vm.expectRevert();
-        executor.commitBatchesSharedBridge(address(0), processFrom, processTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), processFrom, processTo, commitData);
     }
 
     function testFuzz_CommitBatches_DifferentTimestamps(uint64 timestamp) public {
@@ -266,7 +266,7 @@ contract ExecutorRevertBatchesTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(InvalidProtocolVersion.selector);
-        executor.commitBatchesSharedBridge(address(0), 1, 1, commitData);
+        committer.commitBatchesSharedBridge(address(0), 1, 1, commitData);
     }
 
     // add this to be excluded from coverage report

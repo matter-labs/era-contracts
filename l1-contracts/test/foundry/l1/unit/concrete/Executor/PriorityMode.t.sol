@@ -40,7 +40,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, validator));
-        executor.commitBatchesSharedBridge(address(0), 0, 0, "");
+        committer.commitBatchesSharedBridge(address(0), 0, 0, "");
     }
 
     function test_revertWhen_precommitInPriorityMode() public {
@@ -48,7 +48,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(OnlyNormalMode.selector);
-        executor.precommitSharedBridge(address(0), 1, "");
+        committer.precommitSharedBridge(address(0), 1, "");
     }
 
     function test_revertWhen_priorityModeBatchHasL2Txs() public {
@@ -88,7 +88,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
 
         vm.prank(address(permissionlessValidator));
         vm.expectRevert(abi.encodeWithSelector(InvalidTxCountInPriorityMode.selector, l2TxCount, 0));
-        executor.commitBatchesSharedBridge(address(0), commitFrom, commitTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitFrom, commitTo, commitData);
     }
 
     function test_revertWhen_priorityModeBatchHasNoL1Txs() public {
@@ -130,7 +130,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
 
         vm.prank(address(permissionlessValidator));
         vm.expectRevert(abi.encodeWithSelector(InvalidTxCountInPriorityMode.selector, l2TxCount, l1TxCount));
-        executor.commitBatchesSharedBridge(address(0), commitFrom, commitTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitFrom, commitTo, commitData);
     }
 
     function _activatePriorityMode() internal {

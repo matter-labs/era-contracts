@@ -144,13 +144,6 @@
   },
   {
     "type": "function",
-    "name": "activatePriorityMode",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "addValidator",
     "inputs": [
       {
@@ -527,6 +520,19 @@
   },
   {
     "type": "function",
+    "name": "revertBatchesForPriorityMode",
+    "inputs": [
+      {
+        "name": "_newLastBatch",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "revertBatchesSharedBridge",
     "inputs": [
       {
@@ -686,12 +692,6 @@
         "internalType": "uint256"
       }
     ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "PriorityModeActivated",
-    "inputs": [],
     "anonymous": false
   },
   {
