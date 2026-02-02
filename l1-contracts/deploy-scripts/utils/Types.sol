@@ -3,7 +3,7 @@ pragma solidity ^0.8.10;
 
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
-import {Verifiers, Facets} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
+import {Facets, Verifiers} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 
 struct BridgehubContracts {
     address bridgehub;
@@ -90,6 +90,7 @@ struct StateTransitionContracts {
     address chainTypeManager;
     address serverNotifier;
     address validatorTimelock;
+    address bytecodesSupplier;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -102,7 +103,6 @@ struct StateTransitionDeployedAddresses {
     address defaultUpgrade;
     address legacyValidatorTimelock;
     address eraDiamondProxy;
-    address bytecodesSupplier;
     address rollupDAManager;
     address rollupSLDAValidator;
 }
