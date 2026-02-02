@@ -344,6 +344,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     }
 
     /// @inheritdoc IMailboxImpl
+    // slither-disable-next-line reentrancy-no-eth
     function requestL2TransactionToGatewayMailboxWithBalanceChange(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
