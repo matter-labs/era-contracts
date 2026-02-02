@@ -16,7 +16,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
 import {IL2NativeTokenVault} from "../../../../../contracts/bridge/ntv/IL2NativeTokenVault.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_ROUTER, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_ROUTER, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
@@ -118,7 +118,9 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         UNBUNDLER_ADDRESS = makeAddr("unbundlerAddress");
         EXECUTION_ADDRESS = makeAddr("executionAddress");
 
+        // Create the interop target contract address - actual deployment done in deployer subclasses
         interopTargetContract = makeAddr("interopTargetContract");
+        vm.deal(interopTargetContract, 1000 ether);
         originalChainId = block.chainid;
 
         coreAddresses.bridgehub.proxies.bridgehub = L2_BRIDGEHUB_ADDR;
@@ -169,7 +171,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
-            abi.encode(bytes(""))
+            abi.encode(bytes32(uint256(1)))
         );
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
@@ -193,8 +195,37 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
             abi.encode(bytes(""))
         );
+
+        // Fund InteropHandler with ETH so it can send value with receiveMessage calls
+        // The mint mock doesn't actually give ETH, so we need to fund it manually
+        vm.deal(L2_INTEROP_HANDLER_ADDR, 1000 ether);
+
+        // Mock currentSettlementLayerChainId for gateway mode check in InteropHandler
         vm.mockCall(
-            address(interopTargetContract),
+            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
+            abi.encode(block.chainid)
+        );
+
+        // Mock receiveMessage on interopTargetContract
+        // This is needed because zkfoundry may not execute contract bytecode correctly
+        // Mock for calls without value (default)
+        vm.mockCall(
+            interopTargetContract,
+            abi.encodeWithSelector(IERC7786Recipient.receiveMessage.selector),
+            abi.encode(IERC7786Recipient.receiveMessage.selector)
+        );
+        // Mock for calls with value 0
+        vm.mockCall(
+            interopTargetContract,
+            0,
+            abi.encodeWithSelector(IERC7786Recipient.receiveMessage.selector),
+            abi.encode(IERC7786Recipient.receiveMessage.selector)
+        );
+        // Mock for calls with value 100 (common test value)
+        vm.mockCall(
+            interopTargetContract,
+            100,
             abi.encodeWithSelector(IERC7786Recipient.receiveMessage.selector),
             abi.encode(IERC7786Recipient.receiveMessage.selector)
         );
