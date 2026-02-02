@@ -22,17 +22,19 @@ contract DeployCTMIntegrationScript is Script, DeployCTMScript {
         string memory inputPath = string.concat(root, "/script-out/diamond-selectors.toml");
         string memory toml = vm.readFile(inputPath);
 
-        facetCuts = new Diamond.FacetCut[](4);
+        facetCuts = new Diamond.FacetCut[](5);
         {
             bytes memory adminFacetSelectors = toml.readBytes("$.admin_facet_selectors");
             bytes memory gettersFacetSelectors = toml.readBytes("$.getters_facet_selectors");
             bytes memory mailboxFacetSelectors = toml.readBytes("$.mailbox_facet_selectors");
             bytes memory executorFacetSelectors = toml.readBytes("$.executor_facet_selectors");
+            bytes memory migratorFacetSelectors = toml.readBytes("$.migrator_facet_selectors");
 
             bytes4[] memory adminFacetSelectorsArray = abi.decode(adminFacetSelectors, (bytes4[]));
             bytes4[] memory gettersFacetSelectorsArray = abi.decode(gettersFacetSelectors, (bytes4[]));
             bytes4[] memory mailboxFacetSelectorsArray = abi.decode(mailboxFacetSelectors, (bytes4[]));
             bytes4[] memory executorFacetSelectorsArray = abi.decode(executorFacetSelectors, (bytes4[]));
+            bytes4[] memory migratorFacetSelectorsArray = abi.decode(migratorFacetSelectors, (bytes4[]));
 
             facetCuts[0] = Diamond.FacetCut({
                 facet: ctmAddresses.stateTransition.facets.adminFacet,
@@ -57,6 +59,12 @@ contract DeployCTMIntegrationScript is Script, DeployCTMScript {
                 action: Diamond.Action.Add,
                 isFreezable: true,
                 selectors: executorFacetSelectorsArray
+            });
+            facetCuts[4] = Diamond.FacetCut({
+                facet: ctmAddresses.stateTransition.facets.migratorFacet,
+                action: Diamond.Action.Add,
+                isFreezable: false,
+                selectors: migratorFacetSelectorsArray
             });
         }
     }
