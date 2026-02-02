@@ -386,20 +386,22 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         address _settlementFeePayer,
         uint256 _chargeableInteropCount
     ) internal {
-        if (_chargeableInteropCount > 0 && gatewaySettlementFee > 0) {
-            if (!settlementFeePayerAgreement[_settlementFeePayer][_chainId]) {
-                revert SettlementFeePayerNotAgreed(_settlementFeePayer, _chainId);
-            }
-
-            uint256 totalFee = gatewaySettlementFee * _chargeableInteropCount;
-
-            // Transfer Wrapped ZK tokens from the settlement fee payer to this contract.
-            // The fee payer must have pre-approved this contract to spend wrapped ZK tokens.
-            // slither-disable-next-line arbitrary-send-erc20
-            wrappedZKToken.safeTransferFrom(_settlementFeePayer, address(this), totalFee);
-
-            emit GatewaySettlementFeesCollected(_chainId, _settlementFeePayer, totalFee, _chargeableInteropCount);
+        if (_chargeableInteropCount == 0 || gatewaySettlementFee == 0) {
+            return;
         }
+
+        if (!settlementFeePayerAgreement[_settlementFeePayer][_chainId]) {
+            revert SettlementFeePayerNotAgreed(_settlementFeePayer, _chainId);
+        }
+
+        uint256 totalFee = gatewaySettlementFee * _chargeableInteropCount;
+
+        // Transfer Wrapped ZK tokens from the settlement fee payer to this contract.
+        // The fee payer must have pre-approved this contract to spend wrapped ZK tokens.
+        // slither-disable-next-line arbitrary-send-erc20
+        wrappedZKToken.safeTransferFrom(_settlementFeePayer, address(this), totalFee);
+
+        emit GatewaySettlementFeesCollected(_chainId, _settlementFeePayer, totalFee, _chargeableInteropCount);
     }
 
     function _getEmptyMessageRoot(uint256 _chainId) internal returns (bytes32) {
