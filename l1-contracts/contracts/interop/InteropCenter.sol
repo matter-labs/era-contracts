@@ -119,17 +119,14 @@ contract InteropCenter is
     ///      This means useFixedFee=true is only available after ZK token is bridged to the source chain.
     /// @return The ZK token contract interface.
     function _getZKToken() internal returns (IERC20) {
-        // Return cached token if available
-        if (address(zkToken) != address(0)) {
-            return zkToken;
-        }
-
         address tokenAddress = getZKTokenAddress();
         require(tokenAddress != address(0), ZKTokenNotAvailable());
 
-        // Cache the resolved token
-        zkToken = IERC20(tokenAddress);
-        return zkToken;
+        // Cache the resolved token if not already cached
+        if (address(zkToken) == address(0)) {
+            zkToken = IERC20(tokenAddress);
+        }
+        return IERC20(tokenAddress);
     }
 
     /// @notice To avoid parity hack
