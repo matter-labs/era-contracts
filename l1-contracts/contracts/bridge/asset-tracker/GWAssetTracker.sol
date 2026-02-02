@@ -3,8 +3,8 @@
 pragma solidity 0.8.28;
 
 import {BALANCE_CHANGE_VERSION, SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, INTEROP_BALANCE_CHANGE_VERSION} from "./IAssetTrackerBase.sol";
-import {BUNDLE_IDENTIFIER, BalanceChange, InteropBalanceChange, ConfirmBalanceMigrationData, InteropBundle, InteropCall, L2Log, TokenBalanceMigrationData, TxStatus, AssetBalanceChange} from "../../common/Messaging.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR, L2_ASSET_ROUTER} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {BUNDLE_IDENTIFIER, BalanceChange, InteropBalanceChange, InteropBundle, InteropCall, L2Log, TokenBalanceMigrationData, TxStatus, AssetBalanceChange, TokenBridgingData} from "../../common/Messaging.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR, L2_ASSET_ROUTER, L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AssetRouterBase} from "../asset-router/AssetRouterBase.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
@@ -16,7 +16,7 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed, InvalidInteropBalanceChange} from "./AssetTrackerErrors.sol";
+import {InvalidAssetMigrationNumber, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed, InvalidInteropBalanceChange} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
@@ -87,6 +87,13 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         _;
     }
 
+    modifier onlyBridgehub() {
+        if (msg.sender != L2_BRIDGEHUB_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     function setAddresses(uint256 _l1ChainId) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
     }
@@ -135,6 +142,14 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     function registerNewToken(bytes32, uint256) public override onlyNativeTokenVault {
         revert RegisterNewTokenNotAllowed();
+    }
+
+    function registerBaseTokenOnGateway(TokenBridgingData calldata _baseTokenBridgingData) external onlyBridgehub {
+        _registerToken(
+            _baseTokenBridgingData.assetId,
+            _baseTokenBridgingData.originToken,
+            _baseTokenBridgingData.originChainId
+        );
     }
 
     /// @notice The function that is expected to be called by the InteropCenter whenever an L1->L2
@@ -552,7 +567,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
         // If the chain already migrated back to GW, then we need the previous migration number.
         uint256 chainMigrationNumber = _calculatePreviousChainMigrationNumber(_chainId);
-        require(assetMigrationNumber[_chainId][_assetId] < chainMigrationNumber, InvalidAssetId(_assetId));
+        require(assetMigrationNumber[_chainId][_assetId] < chainMigrationNumber, InvalidAssetMigrationNumber());
         // We don't save chainBalance here since it might not be the final chainBalance for this value of the chainMigrationNumber.
         uint256 amount = _getOrSaveChainBalance(_chainId, _assetId, chainMigrationNumber);
 
@@ -613,10 +628,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     /// @notice Confirms a migration operation has been completed and updates the asset migration number.
     /// @param _data The migration confirmation data containing chain ID, asset ID, and migration number.
-    function confirmMigrationOnGateway(
-        ConfirmBalanceMigrationData calldata _data
-    ) external onlyServiceTransactionSender {
-        assetMigrationNumber[_data.chainId][_data.assetId] = _data.migrationNumber;
+    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _data) external onlyServiceTransactionSender {
+        assetMigrationNumber[_data.chainId][_data.assetId] = _data.assetMigrationNumber;
+        // Register the token if it wasn't already
+        _registerToken(_data.assetId, _data.originToken, _data.tokenOriginChainId);
         if (_data.isL1ToGateway) {
             /// In this case the balance might never have been migrated back to L1.
             chainBalance[_data.chainId][_data.assetId] += _data.amount;

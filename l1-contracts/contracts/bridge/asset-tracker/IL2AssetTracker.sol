@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {ConfirmBalanceMigrationData} from "../../common/Messaging.sol";
+import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
 
 interface IL2AssetTracker {
     /// @notice Emitted when L1 to Gateway migration is initiated for an asset
@@ -30,7 +30,7 @@ interface IL2AssetTracker {
 
     function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external;
 
-    function confirmMigrationOnL2(ConfirmBalanceMigrationData calldata _tokenBalanceMigrationData) external;
+    function confirmMigrationOnL2(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
 
     function registerLegacyTokenOnChain(bytes32 _assetId) external;
 }
