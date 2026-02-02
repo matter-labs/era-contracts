@@ -702,14 +702,14 @@ library GatewayCTMDeployerHelper {
             result.chainTypeManagerImplementation = _deployInternalWithParams(
                 "ZKsyncOSChainTypeManager",
                 "ZKsyncOSChainTypeManager.sol",
-                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0)),
+                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), baseConfig.permissionlessValidator),
                 innerConfig
             );
         } else {
             result.chainTypeManagerImplementation = _deployInternalWithParams(
                 "EraChainTypeManager",
                 "EraChainTypeManager.sol",
-                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0)),
+                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), baseConfig.permissionlessValidator),
                 innerConfig
             );
         }
@@ -818,7 +818,7 @@ library GatewayCTMDeployerHelper {
             result.chainTypeManagerImplementation = _deployInternalWithParamsWithMode(
                 "ZKsyncOSChainTypeManager",
                 "ZKsyncOSChainTypeManager.sol",
-                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0)),
+                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), baseConfig.permissionlessValidator),
                 innerConfig,
                 isZKsyncOS
             );
@@ -826,7 +826,7 @@ library GatewayCTMDeployerHelper {
             result.chainTypeManagerImplementation = _deployInternalWithParamsWithMode(
                 "EraChainTypeManager",
                 "EraChainTypeManager.sol",
-                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0)),
+                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), baseConfig.permissionlessValidator),
                 innerConfig,
                 isZKsyncOS
             );

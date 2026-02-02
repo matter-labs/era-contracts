@@ -39,6 +39,9 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @notice Address of the L1 bytecodes supplier used for upgrades
     address public immutable L1_BYTECODES_SUPPLIER;
 
+    /// @notice Address of the permissionless validator used in Priority Mode
+    address public immutable PERMISSIONLESS_VALIDATOR;
+
     /// @notice The map from chainId => zkChain contract
     EnumerableMap.UintToAddressMap internal __DEPRECATED_zkChainMap;
 
@@ -95,10 +98,16 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// - It prevents the function from being called twice (including in the proxy impl).
     /// - It makes the local version consistent with the one in production, which already had the reentrancy guard
     /// initialized.
-    constructor(address _bridgehub, address _interopCenter, address _l1BytecodesSupplier) reentrancyGuardInitializer {
+    constructor(
+        address _bridgehub,
+        address _interopCenter,
+        address _l1BytecodesSupplier,
+        address _permissionlessValidator
+    ) reentrancyGuardInitializer {
         BRIDGE_HUB = _bridgehub;
         INTEROP_CENTER = _interopCenter;
         L1_BYTECODES_SUPPLIER = _l1BytecodesSupplier;
+        PERMISSIONLESS_VALIDATOR = _permissionlessValidator;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages

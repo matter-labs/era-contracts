@@ -120,7 +120,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         );
 
         vm.startPrank(address(bridgehub));
-        chainTypeManager = new ZKsyncOSChainTypeManager(address(bridgehub), interopCenterAddress, address(0));
+        chainTypeManager = new ZKsyncOSChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
         diamondInit = address(new DiamondInit(false));
         genesisUpgradeContract = new L1GenesisUpgrade();
 
@@ -210,6 +210,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         ZKsyncOSChainTypeManager ctm = new ZKsyncOSChainTypeManager(
             address(bridgehub),
             interopCenterAddress,
+            address(0),
             address(0)
         );
         assertEq(ctm.BRIDGE_HUB(), address(bridgehub));

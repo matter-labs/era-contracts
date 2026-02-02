@@ -14,7 +14,7 @@ contract DummyChainTypeManager is EraChainTypeManager {
     address zkChain;
 
     /// @notice Constructor
-    constructor() EraChainTypeManager(address(0), address(0), address(0)) {}
+    constructor() EraChainTypeManager(address(0), address(0), address(0), address(0)) {}
 
     function setZKChain(uint256 _chainId, address _zkChain) external {
         zkChain = _zkChain;

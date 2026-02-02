@@ -23,8 +23,15 @@ contract GatewayCTMDeployerCTMZKsyncOS is GatewayCTMDeployerCTMBase {
     }
 
     /// @inheritdoc GatewayCTMDeployerCTMBase
-    function _deployCTMImplementation(bytes32 _salt) internal override returns (address) {
+    function _deployCTMImplementation(bytes32 _salt, address _permissionlessValidator) internal override returns (address) {
         return
-            address(new ZKsyncOSChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0)));
+            address(
+                new ZKsyncOSChainTypeManager{salt: _salt}(
+                    L2_BRIDGEHUB_ADDR,
+                    L2_INTEROP_CENTER_ADDR,
+                    address(0),
+                    _permissionlessValidator
+                )
+            );
     }
 }

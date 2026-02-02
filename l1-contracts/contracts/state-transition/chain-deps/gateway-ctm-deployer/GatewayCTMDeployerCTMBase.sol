@@ -68,8 +68,9 @@ abstract contract GatewayCTMDeployerCTMBase {
     /// @notice Deploys the ChainTypeManager implementation contract.
     /// @dev Must be implemented by subclasses to deploy the specific CTM type.
     /// @param _salt Salt used for CREATE2 deployments.
+    /// @param _permissionlessValidator The address of the permissionless validator.
     /// @return The address of the deployed CTM implementation.
-    function _deployCTMImplementation(bytes32 _salt) internal virtual returns (address);
+    function _deployCTMImplementation(bytes32 _salt, address _permissionlessValidator) internal virtual returns (address);
 
     /// @notice Deploys the ChainTypeManager contract.
     /// @param _salt Salt used for CREATE2 deployments.
@@ -80,7 +81,7 @@ abstract contract GatewayCTMDeployerCTMBase {
         GatewayCTMFinalConfig memory _config,
         GatewayCTMFinalResult memory _result
     ) internal {
-        _result.chainTypeManagerImplementation = _deployCTMImplementation(_salt);
+        _result.chainTypeManagerImplementation = _deployCTMImplementation(_salt, _config.baseConfig.permissionlessValidator);
 
         GatewayCTMDeployerConfig memory baseConfig = _config.baseConfig;
         Facets memory facets = _config.facets;
