@@ -244,7 +244,11 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
 
         // CommitterFacet
         deployed = tester.deployDirect(directCalldata.committerFacetCalldata);
-        assertEq(deployed, calculatedContracts.stateTransition.facets.committerFacet, "CommitterFacet address mismatch");
+        assertEq(
+            deployed,
+            calculatedContracts.stateTransition.facets.committerFacet,
+            "CommitterFacet address mismatch"
+        );
 
         // DiamondInit
         deployed = tester.deployDirect(directCalldata.diamondInitCalldata);
