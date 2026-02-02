@@ -20,16 +20,9 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/co
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
 import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
-import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 
-contract ChainRegistrationSenderTests is
-    L1ContractDeployer,
-    ZKChainDeployer,
-    TokenDeployer,
-    L2TxMocker,
-    ConfigSemaphore
-{
+contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
@@ -48,7 +41,6 @@ contract ChainRegistrationSenderTests is
     }
 
     function prepare() public {
-        takeConfigLock(); // Prevents race condition with configs
         _generateUserAddresses();
 
         _deployL1Contracts();
@@ -57,8 +49,6 @@ contract ChainRegistrationSenderTests is
 
         _deployEra();
         _deployZKChain(ETH_TOKEN_ADDRESS);
-
-        releaseConfigLock();
 
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
@@ -72,7 +62,7 @@ contract ChainRegistrationSenderTests is
         prepare();
 
         vm.mockCall(
-            address(ecosystemAddresses.bridgehub.messageRootProxy),
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
             abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
         );
@@ -80,6 +70,10 @@ contract ChainRegistrationSenderTests is
 
     function test_chainRegistrationSender() public {
         address owner = Ownable(address(addresses.bridgehub)).owner();
+
+        // Verify chain is not registered before
+        bool registeredBefore = addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]);
+
         stdstore
             .target(address(addresses.chainRegistrationSender))
             .sig(addresses.chainRegistrationSender.chainRegisteredOnChain.selector)
@@ -87,15 +81,28 @@ contract ChainRegistrationSenderTests is
             .with_key(zkChainIds[1])
             .checked_write(false);
 
+        // Verify storage was updated
+        assertFalse(
+            addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
+            "Chain should not be registered before calling registerChain"
+        );
+
         vm.startBroadcast(owner);
         addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
         vm.stopBroadcast();
+
+        // Verify chain is now registered
+        assertTrue(
+            addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
+            "Chain should be registered after calling registerChain"
+        );
     }
 
     // deposits ERC20 token to the ZK chain where base token is ETH
     // this function use requestL2TransactionTwoBridges function from shared bridge.
     // tokenAddress should be any ERC20 token, excluding ETH
-    function chainRegistrationSenderDeposit(uint256 l2Value, address tokenAddress) private {
+    // Returns the resultant transaction hash
+    function chainRegistrationSenderDeposit(uint256 l2Value, address tokenAddress) private returns (bytes32) {
         TestnetERC20Token currentToken = TestnetERC20Token(tokenAddress);
         uint256 currentChainId = zkChainIds[0];
         address currentUser = users[0];
@@ -136,30 +143,37 @@ contract ChainRegistrationSenderTests is
         vm.recordLogs();
         bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: mintValue}(requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        // NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
-        // assertNotEq(resultantHash, bytes32(0));
-        // assertNotEq(request.txHash, bytes32(0));
-        // _handleRequestByMockL2Contract(request, RequestType.TWO_BRIDGES);
+        // Verify the transaction was successful
+        assertNotEq(resultantHash, bytes32(0), "Resultant hash should not be zero");
+        assertTrue(logs.length > 0, "Transaction should emit logs");
 
-        // depositsUsers[currentUser][ETH_TOKEN_ADDRESS] += mintValue;
-        // depositsBridge[currentChainAddress][ETH_TOKEN_ADDRESS] += mintValue;
-        // tokenSumDeposit[ETH_TOKEN_ADDRESS] += mintValue;
-
-        // depositsUsers[currentUser][currentTokenAddress] += l2Value;
-        // depositsBridge[currentChainAddress][currentTokenAddress] += l2Value;
-        // tokenSumDeposit[currentTokenAddress] += l2Value;
-        // l2ValuesSum[currentTokenAddress] += l2Value;
+        return resultantHash;
     }
 
     function test_chainRegistrationSenderDeposit() public {
+        // Verify chain is not registered initially
         stdstore
             .target(address(addresses.chainRegistrationSender))
             .sig(addresses.chainRegistrationSender.chainRegisteredOnChain.selector)
             .with_key(zkChainIds[0])
             .with_key(zkChainIds[1])
             .checked_write(false);
-        chainRegistrationSenderDeposit(1000000, ETH_TOKEN_ADDRESS);
+
+        assertFalse(
+            addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
+            "Chain should not be registered before deposit"
+        );
+
+        // Perform deposit and capture the transaction hash
+        bytes32 txHash = chainRegistrationSenderDeposit(1000000, ETH_TOKEN_ADDRESS);
+
+        // Verify the L2 transaction was submitted successfully
+        // The txHash is the canonical transaction hash for the L2 transaction
+        assertNotEq(txHash, bytes32(0), "Transaction hash should be non-zero after successful deposit");
+
+        // Verify the transaction hash has expected format (non-zero bytes)
+        assertTrue(uint256(txHash) > 0, "Transaction hash should be a valid non-zero value");
     }
 
     // add this to be excluded from coverage report

@@ -266,7 +266,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     location: SourceLocation.L1Contracts,
   },
   L2InteropRootStorage: {
-    address: "0x000000000000000000000000000000000001000b",
+    address: "0x0000000000000000000000000000000000010008",
     codeName: "L2InteropRootStorage",
     lang: Language.Solidity,
     location: SourceLocation.L1Contracts,
@@ -275,7 +275,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     // This is explicitly a non-system-contract address.
     // We do not use the same address as create2 factories on EVM, since
     // this is a zkEVM create2 factory.
-    address: "0x0000000000000000000000000000000000010008",
+    address: "0x000000000000000000000000000000000001000d",
     codeName: "InteropCenter",
     lang: Language.Solidity,
     location: SourceLocation.L1Contracts,
@@ -284,7 +284,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     // This is explicitly a non-system-contract address.
     // We do not use the same address as create2 factories on EVM, since
     // this is a zkEVM create2 factory.
-    address: "0x0000000000000000000000000000000000010009",
+    address: "0x000000000000000000000000000000000001000e",
     codeName: "InteropHandler",
     lang: Language.Solidity,
     location: SourceLocation.L1Contracts,

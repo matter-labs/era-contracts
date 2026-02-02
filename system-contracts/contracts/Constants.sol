@@ -133,12 +133,14 @@ IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(add
 address constant L2_CHAIN_ASSET_HANDLER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0a);
 IChainAssetHandler constant L2_CHAIN_ASSET_HANDLER = IChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDRESS);
 address constant L2_UPGRADEABLE_BEACON_DEPLOYER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0b);
-address constant L2_INTEROP_CENTER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0c);
+address constant L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0c);
+
+address constant L2_INTEROP_CENTER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0d);
 IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(L2_INTEROP_CENTER_ADDRESS);
-IInteropHandler constant L2_INTEROP_HANDLER = IInteropHandler(address(USER_CONTRACTS_OFFSET + 0x0d));
-address constant L2_ASSET_TRACKER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0e);
+IInteropHandler constant L2_INTEROP_HANDLER = IInteropHandler(address(USER_CONTRACTS_OFFSET + 0x0e));
+address constant L2_ASSET_TRACKER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0f);
 IL2AssetTracker constant L2_ASSET_TRACKER = IL2AssetTracker(address(L2_ASSET_TRACKER_ADDRESS));
-address constant GW_ASSET_TRACKER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0f);
+address constant GW_ASSET_TRACKER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x10);
 IGWAssetTracker constant GW_ASSET_TRACKER = IGWAssetTracker(address(GW_ASSET_TRACKER_ADDRESS));
 
 

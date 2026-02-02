@@ -19,6 +19,7 @@ yarn-debug.log*
 yarn-error.log*
 l1-contracts/yarn-error.log*
 l1-contracts/lcov.info
+l1-contracts/UNTESTED_LINES_REPORT.md
 l1-contracts/report/*
 l1-contracts/coverage/*
 l1-contracts/out/*
@@ -37,3 +38,7 @@ l1-contracts/test/foundry/integration/deploy-scripts/script-out/*
 l1-contracts/test/foundry/l1/integration/upgrade-envs/script-out/*.toml
 l1-contracts/zkout/*
 .lycheecache
+
+# Foundry binary
+foundry-zksync/
+l1-contracts/foundry-zksync/

@@ -13,6 +13,8 @@ import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_
 import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
 
 import {Create2FactoryUtils} from "deploy-scripts/utils/deploy/Create2FactoryUtils.s.sol";
+import {ChainCreationParamsConfig} from "deploy-scripts/utils/Types.sol";
+import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
 
 contract L2InteropLibraryTest is Test, L2InteropLibraryBasicTestAbstract, SharedL2ContractL2Deployer {
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL2Deployer) {}
@@ -34,5 +36,11 @@ contract L2InteropLibraryTest is Test, L2InteropLibraryBasicTestAbstract, Shared
         uint256 _l1ChainId
     ) public override(SharedL2ContractL2Deployer, SharedL2ContractDeployer) {
         super.deployL2Contracts(_l1ChainId);
+    }
+
+    function getChainCreationParamsConfig(
+        string memory _config
+    ) internal override(DeployCTMUtils, SharedL2ContractL2Deployer) returns (ChainCreationParamsConfig memory) {
+        return SharedL2ContractL2Deployer.getChainCreationParamsConfig(_config);
     }
 }

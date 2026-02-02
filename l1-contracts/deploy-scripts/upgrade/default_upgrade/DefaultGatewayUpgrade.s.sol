@@ -11,7 +11,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Utils} from "../../utils/Utils.sol";
-import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../../utils/Types.sol";
+import {StateTransitionDeployedAddresses, ChainCreationParamsConfig, StateTransitionDeployedAddresses, ZkChainAddresses} from "../../utils/Types.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
@@ -71,6 +71,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     // solhint-disable-next-line gas-struct-packing
     struct Gateway {
         StateTransitionDeployedAddresses gatewayStateTransition;
+        address gatewayTransparentProxyAdmin;
         bytes facetCutsData;
         uint256 chainId;
         bytes upgradeCutData;
@@ -85,9 +86,9 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
 
     AdditionalConfig internal newConfig;
     Gateway internal gatewayConfig;
-    AddressIntrospector.CTMAddresses internal discoveredCTM;
-    AddressIntrospector.ZkChainAddresses internal discoveredEraZkChain;
+    ZkChainAddresses internal discoveredEraZkChain;
     L1Bridgehub internal bridgehub;
+    CTMDeployedAddresses internal ctmDeployedAddresses;
 
     // TODO We need for composing upgrade transaction. but seems we don't need an upgrade transaction on gateway
     uint256[] internal factoryDepsHashes;
@@ -131,19 +132,20 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         if (_governance != address(0)) {
             config.ownerAddress = _governance;
         } else {
-            config.ownerAddress = discoveredCTM.governance;
+            config.ownerAddress = ctmDeployedAddresses.admin.governance;
         }
-        newConfig.ecosystemAdminAddress = discoveredCTM.governance;
+        newConfig.ecosystemAdminAddress = ctmDeployedAddresses.admin.governance;
         newConfig.priorityTxsL2GasLimit = _priorityTxsL2GasLimit;
         newConfig.maxExpectedL1GasPrice = _maxExpectedL1GasPrice;
         gatewayConfig = _gatewayConfig;
 
-        config.contracts.governanceSecurityCouncilAddress = Governance(payable(discoveredCTM.governance))
+        config.contracts.governanceSecurityCouncilAddress = Governance(payable(ctmDeployedAddresses.admin.governance))
             .securityCouncil();
-        config.contracts.governanceMinDelay = Governance(payable(discoveredCTM.governance)).minDelay();
-        config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(discoveredCTM.validatorTimelockPostV29)
-            .executionDelay();
-        (bool ok, bytes memory data) = discoveredEraZkChain.verifier.staticcall(
+        // config.contracts.governanceMinDelay = Governance(payable(ctmDeployedAddresses.admin.governance)).minDelay();
+        config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(
+            ctmDeployedAddresses.stateTransition.proxies.validatorTimelock
+        ).executionDelay();
+        (bool ok, bytes memory data) = ctmDeployedAddresses.stateTransition.verifiers.verifier.staticcall(
             abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
         );
         config.testnetVerifier = ok;
@@ -157,11 +159,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
         string memory toml = vm.readFile(newConfigPath);
 
-        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.contracts.create2_factory_salt");
-        address create2FactoryAddr;
-        if (vm.keyExistsToml(permanentValuesToml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = permanentValuesToml.readAddress("$.contracts.create2_factory_addr");
-        }
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesInputPath);
 
         // Can we safely get it from the CTM? is it always exists even for zksync os ?
         uint256 eraChainId = permanentValuesToml.readUint("$.era_chain_id");
@@ -185,11 +183,11 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         Gateway memory gateway;
         // Gateway params
         gateway.chainId = permanentValuesToml.readUint("$.gateway.chain_id");
-        gateway.gatewayStateTransition.chainTypeManagerProxy = permanentValuesToml.readAddress(
+        gateway.gatewayStateTransition.proxies.chainTypeManager = permanentValuesToml.readAddress(
             "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
         );
 
-        gateway.gatewayStateTransition.chainTypeManagerProxyAdmin = permanentValuesToml.readAddress(
+        gateway.gatewayTransparentProxyAdmin = permanentValuesToml.readAddress(
             "$.gateway.gateway_state_transition.chain_type_manager_proxy_admin"
         );
 
@@ -240,8 +238,8 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
             newConfig.priorityTxsL2GasLimit,
             new bytes[](0),
             gatewayConfig.chainId,
-            discoveredBridgehub.bridgehubProxy,
-            discoveredBridgehub.assetRouter
+            coreAddresses.bridgehub.proxies.bridgehub,
+            coreAddresses.bridges.proxies.l1AssetRouter
         );
         notifyAboutDeployment(contractAddress, contractName, creationCalldata, contractName, true);
     }
@@ -292,15 +290,15 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     }
 
     function setAddressesBasedOnBridgehub() internal virtual {
-        discoveredBridgehub = AddressIntrospector.getBridgehubAddresses(bridgehub);
-        config.ownerAddress = discoveredBridgehub.governance;
+        coreAddresses = AddressIntrospector.getCoreDeployedAddresses(address(bridgehub));
+        config.ownerAddress = coreAddresses.shared.governance;
         address ctm = bridgehub.chainTypeManager(config.eraChainId);
-        discoveredCTM = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
+        ctmDeployedAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
         discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(
             IZKChain(bridgehub.getZKChain(config.eraChainId))
         );
 
-        addresses.daAddresses.l1RollupDAValidator = discoveredEraZkChain.l1DAValidator;
+        ctmDeployedAddresses.daAddresses.l1RollupDAValidator = discoveredEraZkChain.l1DAValidator;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         newConfig.oldProtocolVersion = ctmProtocolVersion;
         require(
@@ -308,8 +306,8 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
             "The new protocol version is already present on the ChainTypeManager"
         );
 
-        newConfig.oldValidatorTimelock = discoveredCTM.validatorTimelockPostV29;
-        newConfig.ecosystemAdminAddress = discoveredBridgehub.admin;
+        newConfig.oldValidatorTimelock = ctmDeployedAddresses.stateTransition.proxies.validatorTimelock;
+        newConfig.ecosystemAdminAddress = coreAddresses.shared.bridgehubAdmin;
     }
 
     ////////////////////////////// Preparing calls /////////////////////////////////
@@ -420,20 +418,20 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     function deployNewEcosystemContractsGW() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
 
-        gatewayConfig.gatewayStateTransition.verifierFflonk = deployGWContract("EraVerifierFflonk");
-        gatewayConfig.gatewayStateTransition.verifierPlonk = deployGWContract("EraVerifierPlonk");
-        gatewayConfig.gatewayStateTransition.verifier = deployGWContract("Verifier");
+        gatewayConfig.gatewayStateTransition.verifiers.verifierFflonk = deployGWContract("EraVerifierFflonk");
+        gatewayConfig.gatewayStateTransition.verifiers.verifierPlonk = deployGWContract("EraVerifierPlonk");
+        gatewayConfig.gatewayStateTransition.verifiers.verifier = deployGWContract("Verifier");
 
-        gatewayConfig.gatewayStateTransition.executorFacet = deployGWContract("ExecutorFacet");
-        gatewayConfig.gatewayStateTransition.adminFacet = deployGWContract("AdminFacet");
-        gatewayConfig.gatewayStateTransition.mailboxFacet = deployGWContract("MailboxFacet");
-        gatewayConfig.gatewayStateTransition.gettersFacet = deployGWContract("GettersFacet");
-        gatewayConfig.gatewayStateTransition.diamondInit = deployGWContract("DiamondInit");
+        gatewayConfig.gatewayStateTransition.facets.executorFacet = deployGWContract("ExecutorFacet");
+        gatewayConfig.gatewayStateTransition.facets.adminFacet = deployGWContract("AdminFacet");
+        gatewayConfig.gatewayStateTransition.facets.mailboxFacet = deployGWContract("MailboxFacet");
+        gatewayConfig.gatewayStateTransition.facets.gettersFacet = deployGWContract("GettersFacet");
+        gatewayConfig.gatewayStateTransition.facets.diamondInit = deployGWContract("DiamondInit");
         gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
         gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
 
         string memory gwCtmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
-        gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = deployGWContract(gwCtmContractName);
+        gatewayConfig.gatewayStateTransition.implementations.chainTypeManager = deployGWContract(gwCtmContractName);
 
         deployUpgradeSpecificContractsGW();
     }
@@ -480,7 +478,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
         require(
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy != address(0),
+            gatewayConfig.gatewayStateTransition.proxies.chainTypeManager != address(0),
             "chainTypeManager on gateway is zero in newConfig"
         );
 
@@ -501,7 +499,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
             l2Calldata,
             l2GasLimit,
             l1GasPrice,
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
+            gatewayConfig.gatewayStateTransition.proxies.chainTypeManager
         );
     }
 
@@ -528,7 +526,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
         require(
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy != address(0),
+            gatewayConfig.gatewayStateTransition.proxies.chainTypeManager != address(0),
             "chainTypeManager on gateway is zero in newConfig"
         );
 
@@ -541,7 +539,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
             l2Calldata,
             l2GasLimit,
             l1GasPrice,
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
+            gatewayConfig.gatewayStateTransition.proxies.chainTypeManager
         );
     }
 
@@ -550,24 +548,19 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
         require(
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy != address(0),
+            gatewayConfig.gatewayStateTransition.proxies.chainTypeManager != address(0),
             "chainTypeManager on gateway is zero in newConfig"
         );
 
         bytes memory l2Calldata = abi.encodeCall(
             ProxyAdmin.upgrade,
             (
-                ITransparentUpgradeableProxy(payable(gatewayConfig.gatewayStateTransition.chainTypeManagerProxy)),
-                gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation
+                ITransparentUpgradeableProxy(payable(gatewayConfig.gatewayStateTransition.proxies.chainTypeManager)),
+                gatewayConfig.gatewayStateTransition.implementations.chainTypeManager
             )
         );
 
-        calls = _prepareL1ToGatewayCall(
-            l2Calldata,
-            l2GasLimit,
-            l1GasPrice,
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin
-        );
+        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, gatewayConfig.gatewayTransparentProxyAdmin);
     }
 
     function _prepareL1ToGatewayCall(
@@ -578,8 +571,11 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     ) internal view returns (Call[] memory calls) {
         require(gatewayConfig.chainId != 0, "Chain id of gateway is zero in newConfig");
 
-        require(discoveredBridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
-        require(discoveredBridgehub.assetRouter != address(0), "l1AssetRouterProxyAddress is zero in newConfig");
+        require(coreAddresses.bridgehub.proxies.bridgehub != address(0), "bridgehubProxyAddress is zero in newConfig");
+        require(
+            coreAddresses.bridges.proxies.l1AssetRouter != address(0),
+            "l1AssetRouterProxyAddress is zero in newConfig"
+        );
 
         calls = Utils.prepareGovernanceL1L2DirectTransaction(
             l1GasPrice,
@@ -588,8 +584,8 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
             new bytes[](0),
             dstAddress,
             gatewayConfig.chainId,
-            discoveredBridgehub.bridgehubProxy,
-            discoveredBridgehub.assetRouter,
+            coreAddresses.bridgehub.proxies.bridgehub,
+            coreAddresses.bridges.proxies.l1AssetRouter,
             msg.sender
         );
     }
@@ -598,7 +594,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         address spender,
         uint256 amount
     ) public virtual returns (Call[] memory calls) {
-        address token = IL1Bridgehub(discoveredBridgehub.bridgehubProxy).baseToken(gatewayConfig.chainId);
+        address token = IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).baseToken(gatewayConfig.chainId);
         require(token != address(0), "Base token for Gateway is zero");
         calls = new Call[](1);
         calls[0] = Call({target: token, data: abi.encodeCall(IERC20.approve, (spender, amount)), value: 0});
@@ -622,7 +618,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     }
 
     function getAddresses() public view virtual override returns (CTMDeployedAddresses memory) {
-        return addresses;
+        return ctmDeployedAddresses;
     }
 
     function getCreationCode(
@@ -651,17 +647,17 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         vm.serializeAddress(
             "gateway_state_transition",
             "chain_type_manager_implementation_addr",
-            gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation
+            gatewayConfig.gatewayStateTransition.implementations.chainTypeManager
         );
         vm.serializeAddress(
             "gateway_state_transition",
             "chain_type_manager_proxy",
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
+            gatewayConfig.gatewayStateTransition.proxies.chainTypeManager
         );
         vm.serializeAddress(
             "gateway_state_transition",
             "chain_type_manager_proxy_admin",
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin
+            gatewayConfig.gatewayTransparentProxyAdmin
         );
         vm.serializeAddress(
             "gateway_state_transition",
@@ -676,27 +672,27 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         vm.serializeAddress(
             "gateway_state_transition",
             "admin_facet_addr",
-            gatewayConfig.gatewayStateTransition.adminFacet
+            gatewayConfig.gatewayStateTransition.facets.adminFacet
         );
         vm.serializeAddress(
             "gateway_state_transition",
             "mailbox_facet_addr",
-            gatewayConfig.gatewayStateTransition.mailboxFacet
+            gatewayConfig.gatewayStateTransition.facets.mailboxFacet
         );
         vm.serializeAddress(
             "gateway_state_transition",
             "executor_facet_addr",
-            gatewayConfig.gatewayStateTransition.executorFacet
+            gatewayConfig.gatewayStateTransition.facets.executorFacet
         );
         vm.serializeAddress(
             "gateway_state_transition",
             "getters_facet_addr",
-            gatewayConfig.gatewayStateTransition.gettersFacet
+            gatewayConfig.gatewayStateTransition.facets.gettersFacet
         );
         vm.serializeAddress(
             "gateway_state_transition",
             "diamond_init_addr",
-            gatewayConfig.gatewayStateTransition.diamondInit
+            gatewayConfig.gatewayStateTransition.facets.diamondInit
         );
         vm.serializeAddress(
             "gateway_state_transition",
@@ -708,26 +704,30 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
             "genesis_upgrade_addr",
             gatewayConfig.gatewayStateTransition.genesisUpgrade
         );
-        vm.serializeAddress("gateway_state_transition", "verifier_addr", gatewayConfig.gatewayStateTransition.verifier);
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "verifier_addr",
+            gatewayConfig.gatewayStateTransition.verifiers.verifier
+        );
         vm.serializeAddress(
             "gateway_state_transition",
             "verifier_fflonk_addr",
-            gatewayConfig.gatewayStateTransition.verifierFflonk
+            gatewayConfig.gatewayStateTransition.verifiers.verifierFflonk
         );
         vm.serializeAddress(
             "gateway_state_transition",
             "validator_timelock_implementation_addr",
-            gatewayConfig.gatewayStateTransition.validatorTimelockImplementation
+            gatewayConfig.gatewayStateTransition.implementations.validatorTimelock
         );
         vm.serializeAddress(
             "gateway_state_transition",
             "validator_timelock_addr",
-            gatewayConfig.gatewayStateTransition.validatorTimelock
+            gatewayConfig.gatewayStateTransition.proxies.validatorTimelock
         );
         string memory gateway_state_transition = vm.serializeAddress(
             "gateway_state_transition",
             "verifier_plonk_addr",
-            gatewayConfig.gatewayStateTransition.verifierPlonk
+            gatewayConfig.gatewayStateTransition.verifiers.verifierPlonk
         );
 
         // Serialize generated gateway data

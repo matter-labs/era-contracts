@@ -398,7 +398,7 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](54);
+        bytes4[] memory selectors = new bytes4[](59);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
@@ -455,6 +455,20 @@ library Utils {
         selectors[i++] = UtilsFacet.util_getBaseTokenGasPriceMultiplierDenominator.selector;
         selectors[i++] = UtilsFacet.util_getBaseTokenGasPriceMultiplierNominator.selector;
         selectors[i++] = UtilsFacet.util_getL2DACommimentScheme.selector;
+        selectors[i++] = UtilsFacet.util_setSettlementLayer.selector;
+        selectors[i++] = UtilsFacet.util_getSettlementLayer.selector;
+        selectors[i++] = UtilsFacet.util_setPausedDepositsTimestamp.selector;
+        selectors[i++] = UtilsFacet.util_getPausedDepositsTimestamp.selector;
+        selectors[i++] = UtilsFacet.util_setAssetTracker.selector;
+        selectors[i++] = UtilsFacet.util_setNativeTokenVault.selector;
+        selectors[i++] = UtilsFacet.util_setTotalBatchesVerified.selector;
+        selectors[i++] = UtilsFacet.util_getTotalBatchesVerified.selector;
+        selectors[i++] = UtilsFacet.util_getTotalBatchesExecuted.selector;
+        selectors[i++] = UtilsFacet.util_getTotalBatchesCommitted.selector;
+        selectors[i++] = UtilsFacet.util_setL2SystemContractsUpgradeBatchNumber.selector;
+        selectors[i++] = UtilsFacet.util_getL2SystemContractsUpgradeBatchNumber.selector;
+        selectors[i++] = UtilsFacet.util_setL2SystemContractsUpgradeTxHash.selector;
+        selectors[i++] = UtilsFacet.util_getL2SystemContractsUpgradeTxHash.selector;
 
         return selectors;
     }

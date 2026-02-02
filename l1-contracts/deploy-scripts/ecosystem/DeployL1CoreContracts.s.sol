@@ -34,8 +34,9 @@ import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.so
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
 import {Config, CoreDeployedAddresses, DeployL1CoreUtils} from "./DeployL1CoreUtils.s.sol";
+import {IDeployL1CoreContracts} from "contracts/script-interfaces/IDeployL1CoreContracts.sol";
 
-contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
+contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1CoreContracts {
     using stdToml for string;
 
     function run() public virtual {
@@ -49,13 +50,13 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
 
         // In the production environment, there will be a separate script dedicated to accepting the adminship
         // but for testing purposes we'll have to do it here.
-        L1Bridgehub bridgehub = L1Bridgehub(addresses.bridgehub.bridgehubProxy);
-        vm.broadcast(addresses.chainAdmin);
+        L1Bridgehub bridgehub = L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
+        vm.broadcast(coreAddresses.shared.bridgehubAdmin);
         bridgehub.acceptAdmin();
     }
 
     function getAddresses() public view returns (CoreDeployedAddresses memory) {
-        return addresses;
+        return coreAddresses;
     }
 
     function getConfig() public view returns (Config memory) {
@@ -67,87 +68,97 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
         inputPath = string.concat(root, inputPath);
         outputPath = string.concat(root, outputPath);
 
+        createPermanentValuesIfNeeded();
+
         initializeConfig(inputPath);
 
         instantiateCreate2Factory();
 
-        (addresses.governance) = deploySimpleContract("Governance", false);
-        (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
-        addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
+        (coreAddresses.shared.governance) = deploySimpleContract("Governance", false);
+        (coreAddresses.shared.bridgehubAdmin) = deploySimpleContract("ChainAdminOwnable", false);
+        coreAddresses.shared.transparentProxyAdmin = deployWithCreate2AndOwner(
+            "ProxyAdmin",
+            coreAddresses.shared.governance,
+            false
+        );
 
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
-        addresses.accessControlRestrictionAddress = address(0);
-        (addresses.bridgehub.bridgehubImplementation, addresses.bridgehub.bridgehubProxy) = deployTuppWithContract(
-            "L1Bridgehub",
-            false
-        );
-        (addresses.bridgehub.messageRootImplementation, addresses.bridgehub.messageRootProxy) = deployTuppWithContract(
-            "L1MessageRoot",
-            false
-        );
+        coreAddresses.shared.accessControlRestrictionAddress = address(0);
+        (
+            coreAddresses.bridgehub.implementations.bridgehub,
+            coreAddresses.bridgehub.proxies.bridgehub
+        ) = deployTuppWithContract("L1Bridgehub", false);
+        (
+            coreAddresses.bridgehub.implementations.messageRoot,
+            coreAddresses.bridgehub.proxies.messageRoot
+        ) = deployTuppWithContract("L1MessageRoot", false);
 
-        (addresses.bridges.l1NullifierImplementation, addresses.bridges.l1NullifierProxy) = deployTuppWithContract(
-            "L1Nullifier",
+        (
+            coreAddresses.bridges.implementations.l1Nullifier,
+            coreAddresses.bridges.proxies.l1Nullifier
+        ) = deployTuppWithContract("L1Nullifier", false);
+        (
+            coreAddresses.bridges.implementations.l1AssetRouter,
+            coreAddresses.bridges.proxies.l1AssetRouter
+        ) = deployTuppWithContract("L1AssetRouter", false);
+        (coreAddresses.bridges.bridgedStandardERC20Implementation) = deploySimpleContract(
+            "BridgedStandardERC20",
             false
         );
-        (addresses.bridges.l1AssetRouterImplementation, addresses.bridges.l1AssetRouterProxy) = deployTuppWithContract(
-            "L1AssetRouter",
-            false
-        );
-        (addresses.bridges.bridgedStandardERC20Implementation) = deploySimpleContract("BridgedStandardERC20", false);
-        addresses.bridges.bridgedTokenBeacon = deployWithCreate2AndOwner(
+        coreAddresses.bridges.bridgedTokenBeacon = deployWithCreate2AndOwner(
             "BridgedTokenBeacon",
             config.ownerAddress,
             false
         );
         (
-            addresses.vaults.l1NativeTokenVaultImplementation,
-            addresses.vaults.l1NativeTokenVaultProxy
+            coreAddresses.bridges.implementations.l1NativeTokenVault,
+            coreAddresses.bridges.proxies.l1NativeTokenVault
         ) = deployTuppWithContract("L1NativeTokenVault", false);
         setL1NativeTokenVaultParams();
 
-        (addresses.bridges.erc20BridgeImplementation, addresses.bridges.erc20BridgeProxy) = deployTuppWithContract(
-            "L1ERC20Bridge",
-            false
-        );
         (
-            addresses.bridgehub.assetTrackerImplementation,
-            addresses.bridgehub.assetTrackerProxy
+            coreAddresses.bridges.implementations.erc20Bridge,
+            coreAddresses.bridges.proxies.erc20Bridge
+        ) = deployTuppWithContract("L1ERC20Bridge", false);
+        (
+            coreAddresses.bridgehub.implementations.assetTracker,
+            coreAddresses.bridgehub.proxies.assetTracker
         ) = deployTuppWithContract("L1AssetTracker", false);
         updateSharedBridge();
         (
-            addresses.bridgehub.ctmDeploymentTrackerImplementation,
-            addresses.bridgehub.ctmDeploymentTrackerProxy
+            coreAddresses.bridgehub.implementations.ctmDeploymentTracker,
+            coreAddresses.bridgehub.proxies.ctmDeploymentTracker
         ) = deployTuppWithContract("CTMDeploymentTracker", false);
 
         (
-            addresses.bridgehub.chainAssetHandlerImplementation,
-            addresses.bridgehub.chainAssetHandlerProxy
+            coreAddresses.bridgehub.implementations.chainAssetHandler,
+            coreAddresses.bridgehub.proxies.chainAssetHandler
         ) = deployTuppWithContract("L1ChainAssetHandler", false);
         (
-            addresses.bridgehub.chainRegistrationSenderImplementation,
-            addresses.bridgehub.chainRegistrationSenderProxy
+            coreAddresses.bridgehub.implementations.chainRegistrationSender,
+            coreAddresses.bridgehub.proxies.chainRegistrationSender
         ) = deployTuppWithContract("ChainRegistrationSender", false);
         setBridgehubParams();
 
         updateOwners();
 
         saveOutput(outputPath);
+        preparePermanentValues(outputPath);
     }
 
     function setBridgehubParams() internal {
-        IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub.bridgehubProxy);
-        IMessageRoot messageRoot = IMessageRoot(addresses.bridgehub.messageRootProxy);
-        IL1AssetTracker assetTracker = L1AssetTracker(addresses.bridgehub.assetTrackerProxy);
+        IL1Bridgehub bridgehub = IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
+        IMessageRoot messageRoot = IMessageRoot(coreAddresses.bridgehub.proxies.messageRoot);
+        IL1AssetTracker assetTracker = L1AssetTracker(coreAddresses.bridgehub.proxies.assetTracker);
         vm.startBroadcast(msg.sender);
         bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
         BridgehubBase(address(bridgehub)).setAddresses(
-            addresses.bridges.l1AssetRouterProxy,
-            ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
-            IMessageRoot(addresses.bridgehub.messageRootProxy),
-            addresses.bridgehub.chainAssetHandlerProxy,
-            addresses.bridgehub.chainRegistrationSenderProxy
+            coreAddresses.bridges.proxies.l1AssetRouter,
+            ICTMDeploymentTracker(coreAddresses.bridgehub.proxies.ctmDeploymentTracker),
+            IMessageRoot(coreAddresses.bridgehub.proxies.messageRoot),
+            coreAddresses.bridgehub.proxies.chainAssetHandler,
+            coreAddresses.bridgehub.proxies.chainRegistrationSender
         );
         assetTracker.setAddresses();
         vm.stopBroadcast();
@@ -155,129 +166,155 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
     }
 
     function updateSharedBridge() internal {
-        IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
+        IL1AssetRouter sharedBridge = IL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
         vm.broadcast(msg.sender);
-        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(addresses.bridges.erc20BridgeProxy));
+        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(coreAddresses.bridges.proxies.erc20Bridge));
         console.log("SharedBridge updated with ERC20Bridge address");
 
-        L1NativeTokenVault ntv = L1NativeTokenVault(payable(addresses.vaults.l1NativeTokenVaultProxy));
+        L1NativeTokenVault ntv = L1NativeTokenVault(payable(coreAddresses.bridges.proxies.l1NativeTokenVault));
         vm.broadcast(msg.sender);
-        ntv.setAssetTracker(addresses.bridgehub.assetTrackerProxy);
+        ntv.setAssetTracker(coreAddresses.bridgehub.proxies.assetTracker);
         console.log("L1NativeTokenVault updated with AssetTracker address");
 
         vm.broadcast(msg.sender);
-        IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
+        IL1NativeTokenVault(coreAddresses.bridges.proxies.l1NativeTokenVault).registerEthToken();
     }
 
     function setL1NativeTokenVaultParams() internal {
-        IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
-        IL1Nullifier l1Nullifier = IL1Nullifier(addresses.bridges.l1NullifierProxy);
-        // Ownable ownable = Ownable(addresses.bridges.l1AssetRouterProxy);
+        IL1AssetRouter sharedBridge = IL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
+        IL1Nullifier l1Nullifier = IL1Nullifier(coreAddresses.bridges.proxies.l1Nullifier);
+        // Ownable ownable = Ownable(coreAddresses.bridges.proxies.l1AssetRouter);
         vm.broadcast(msg.sender);
-        sharedBridge.setNativeTokenVault(INativeTokenVaultBase(addresses.vaults.l1NativeTokenVaultProxy));
+        sharedBridge.setNativeTokenVault(INativeTokenVaultBase(coreAddresses.bridges.proxies.l1NativeTokenVault));
         vm.broadcast(msg.sender);
-        l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
+        l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(coreAddresses.bridges.proxies.l1NativeTokenVault));
         vm.broadcast(msg.sender);
-        l1Nullifier.setL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
+        l1Nullifier.setL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
     }
 
     function updateOwners() internal {
         vm.startBroadcast(msg.sender);
 
-        IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub.bridgehubProxy);
-        IOwnable(address(bridgehub)).transferOwnership(addresses.governance);
-        bridgehub.setPendingAdmin(addresses.chainAdmin);
+        IL1Bridgehub bridgehub = IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
+        IOwnable(address(bridgehub)).transferOwnership(coreAddresses.shared.governance);
+        bridgehub.setPendingAdmin(coreAddresses.shared.bridgehubAdmin);
 
-        IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
-        IOwnable(address(sharedBridge)).transferOwnership(addresses.governance);
+        IL1AssetRouter sharedBridge = IL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
+        IOwnable(address(sharedBridge)).transferOwnership(coreAddresses.shared.governance);
 
-        IL1AssetTracker assetTracker = IL1AssetTracker(addresses.bridgehub.assetTrackerProxy);
-        IOwnable(address(assetTracker)).transferOwnership(addresses.governance);
+        IL1AssetTracker assetTracker = IL1AssetTracker(coreAddresses.bridgehub.proxies.assetTracker);
+        IOwnable(address(assetTracker)).transferOwnership(coreAddresses.shared.governance);
 
-        L1NativeTokenVault l1NativeTokenVault = L1NativeTokenVault(payable(addresses.vaults.l1NativeTokenVaultProxy));
+        L1NativeTokenVault l1NativeTokenVault = L1NativeTokenVault(
+            payable(coreAddresses.bridges.proxies.l1NativeTokenVault)
+        );
         l1NativeTokenVault.transferOwnership(config.ownerAddress);
 
         ICTMDeploymentTracker ctmDeploymentTracker = ICTMDeploymentTracker(
-            addresses.bridgehub.ctmDeploymentTrackerProxy
+            coreAddresses.bridgehub.proxies.ctmDeploymentTracker
         );
-        IOwnable(address(ctmDeploymentTracker)).transferOwnership(addresses.governance);
+        IOwnable(address(ctmDeploymentTracker)).transferOwnership(coreAddresses.shared.governance);
 
-        IOwnable(addresses.bridgehub.chainAssetHandlerProxy).transferOwnership(addresses.governance);
+        IOwnable(coreAddresses.bridgehub.proxies.chainAssetHandler).transferOwnership(coreAddresses.shared.governance);
 
         vm.stopBroadcast();
         console.log("Owners updated");
     }
 
     function saveOutput(string memory outputPath) internal virtual {
-        vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
-        vm.serializeAddress("bridgehub", "bridgehub_implementation_addr", addresses.bridgehub.bridgehubImplementation);
+        vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", coreAddresses.bridgehub.proxies.bridgehub);
+        vm.serializeAddress(
+            "bridgehub",
+            "bridgehub_implementation_addr",
+            coreAddresses.bridgehub.implementations.bridgehub
+        );
         vm.serializeAddress(
             "bridgehub",
             "chain_asset_handler_implementation_addr",
-            addresses.bridgehub.chainAssetHandlerImplementation
+            coreAddresses.bridgehub.implementations.chainAssetHandler
         );
-        vm.serializeAddress("bridgehub", "chain_asset_handler_proxy_addr", addresses.bridgehub.chainAssetHandlerProxy);
+        vm.serializeAddress(
+            "bridgehub",
+            "chain_asset_handler_proxy_addr",
+            coreAddresses.bridgehub.proxies.chainAssetHandler
+        );
         vm.serializeAddress(
             "bridgehub",
             "chain_registration_sender_proxy_addr",
-            addresses.bridgehub.chainRegistrationSenderProxy
+            coreAddresses.bridgehub.proxies.chainRegistrationSender
         );
         vm.serializeAddress(
             "bridgehub",
             "chain_registration_sender_implementation_addr",
-            addresses.bridgehub.chainRegistrationSenderImplementation
+            coreAddresses.bridgehub.implementations.chainRegistrationSender
         );
         vm.serializeAddress(
             "bridgehub",
             "ctm_deployment_tracker_proxy_addr",
-            addresses.bridgehub.ctmDeploymentTrackerProxy
+            coreAddresses.bridgehub.proxies.ctmDeploymentTracker
         );
         vm.serializeAddress(
             "bridgehub",
             "ctm_deployment_tracker_implementation_addr",
-            addresses.bridgehub.ctmDeploymentTrackerImplementation
+            coreAddresses.bridgehub.implementations.ctmDeploymentTracker
         );
-        vm.serializeAddress("bridgehub", "chain_asset_handler_proxy_addr", addresses.bridgehub.chainAssetHandlerProxy);
+        vm.serializeAddress(
+            "bridgehub",
+            "chain_asset_handler_proxy_addr",
+            coreAddresses.bridgehub.proxies.chainAssetHandler
+        );
         vm.serializeAddress(
             "bridgehub",
             "chain_asset_handler_implementation_addr",
-            addresses.bridgehub.chainAssetHandlerImplementation
+            coreAddresses.bridgehub.implementations.chainAssetHandler
         );
         vm.serializeAddress(
             "bridgehub",
             "l1_asset_tracker_implementation_addr",
-            addresses.bridgehub.assetTrackerImplementation
+            coreAddresses.bridgehub.implementations.assetTracker
         );
-        vm.serializeAddress("bridgehub", "l1_asset_tracker_proxy_addr", addresses.bridgehub.assetTrackerProxy);
-        vm.serializeAddress("bridgehub", "message_root_proxy_addr", addresses.bridgehub.messageRootProxy);
+        vm.serializeAddress("bridgehub", "l1_asset_tracker_proxy_addr", coreAddresses.bridgehub.proxies.assetTracker);
+        vm.serializeAddress("bridgehub", "message_root_proxy_addr", coreAddresses.bridgehub.proxies.messageRoot);
         string memory bridgehub = vm.serializeAddress(
             "bridgehub",
             "message_root_implementation_addr",
-            addresses.bridgehub.messageRootImplementation
+            coreAddresses.bridgehub.implementations.messageRoot
         );
 
-        vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", addresses.bridges.erc20BridgeImplementation);
-        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", addresses.bridges.erc20BridgeProxy);
-        vm.serializeAddress("bridges", "l1_nullifier_implementation_addr", addresses.bridges.l1NullifierImplementation);
-        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", addresses.bridges.l1NullifierProxy);
+        vm.serializeAddress(
+            "bridges",
+            "erc20_bridge_implementation_addr",
+            coreAddresses.bridges.implementations.erc20Bridge
+        );
+        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", coreAddresses.bridges.proxies.erc20Bridge);
+        vm.serializeAddress(
+            "bridges",
+            "l1_nullifier_implementation_addr",
+            coreAddresses.bridges.implementations.l1Nullifier
+        );
+        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", coreAddresses.bridges.proxies.l1Nullifier);
         vm.serializeAddress(
             "bridges",
             "shared_bridge_implementation_addr",
-            addresses.bridges.l1AssetRouterImplementation
+            coreAddresses.bridges.implementations.l1AssetRouter
         );
         string memory bridges = vm.serializeAddress(
             "bridges",
             "shared_bridge_proxy_addr",
-            addresses.bridges.l1AssetRouterProxy
+            coreAddresses.bridges.proxies.l1AssetRouter
         );
 
-        vm.serializeAddress("deployed_addresses", "governance_addr", addresses.governance);
-        vm.serializeAddress("deployed_addresses", "transparent_proxy_admin_addr", addresses.transparentProxyAdmin);
-        vm.serializeAddress("deployed_addresses", "chain_admin", addresses.chainAdmin);
+        vm.serializeAddress("deployed_addresses", "governance_addr", coreAddresses.shared.governance);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "transparent_proxy_admin_addr",
+            coreAddresses.shared.transparentProxyAdmin
+        );
+        vm.serializeAddress("deployed_addresses", "chain_admin", coreAddresses.shared.bridgehubAdmin);
         vm.serializeAddress(
             "deployed_addresses",
             "access_control_restriction_addr",
-            addresses.accessControlRestrictionAddress
+            coreAddresses.shared.accessControlRestrictionAddress
         );
         vm.serializeString("deployed_addresses", "bridgehub", bridgehub);
         vm.serializeString("deployed_addresses", "bridges", bridges);
@@ -285,7 +322,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
             "native_token_vault_addr",
-            addresses.vaults.l1NativeTokenVaultProxy
+            coreAddresses.bridges.proxies.l1NativeTokenVault
         );
 
         vm.serializeAddress("contracts", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
@@ -303,6 +340,70 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
+
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = getCreate2FactoryParams();
+        savePermanentValues(create2FactorySalt, create2FactoryAddr);
+    }
+
+    function createPermanentValuesIfNeeded() internal virtual {
+        // Determine the permanent values path
+        string memory permanentValuesPath = getPermanentValuesPath();
+        if (!vm.isFile(permanentValuesPath)) {
+            savePermanentValues(hex"88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5", address(0));
+        } else {
+            string memory permanentValuesToml = vm.readFile(permanentValuesPath);
+            if (!vm.keyExistsToml(permanentValuesToml, "$.permanent_contracts.create2_factory_salt")) {
+                savePermanentValues(hex"88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5", address(0));
+            }
+        }
+        (address create2FactoryAddr, ) = getPermanentValues(getPermanentValuesPath());
+        if (create2FactoryAddr.code.length == 0) {
+            savePermanentValues(hex"88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5", address(0));
+        }
+    }
+
+    function savePermanentValues(bytes32 create2FactorySalt, address create2FactoryAddr) internal virtual {
+        // Determine the permanent values path
+        string memory permanentValuesPath = getPermanentValuesPath();
+
+        // Create file if it doesn't exist
+        if (!vm.isFile(permanentValuesPath)) {
+            vm.writeFile(permanentValuesPath, "[contracts]\n");
+        }
+
+        vm.serializeString("permanent_contracts", "create2_factory_salt", vm.toString(create2FactorySalt));
+        string memory permanentContracts = vm.serializeAddress(
+            "permanent_contracts",
+            "create2_factory_addr",
+            create2FactoryAddr
+        );
+        string memory toml1 = vm.serializeString("root3", "permanent_contracts", permanentContracts);
+
+        vm.writeToml(toml1, permanentValuesPath);
+        console.log("Updated permanent values at:", permanentValuesPath);
+        console.log("create2_factory_addr:", create2FactoryAddr);
+    }
+
+    function preparePermanentValues(string memory outputPath) internal virtual {
+        // Read from the output file we just created
+        string memory outputDeployL1Toml = vm.readFile(outputPath);
+
+        address create2FactoryAddr;
+        bytes32 create2FactorySalt;
+        if (vm.keyExistsToml(outputDeployL1Toml, "$.permanent_contracts.create2_factory_addr")) {
+            create2FactoryAddr = outputDeployL1Toml.readAddress("$.permanent_contracts.create2_factory_addr");
+            create2FactorySalt = outputDeployL1Toml.readBytes32("$.permanent_contracts.create2_factory_salt");
+        }
+
+        // Only update if create2FactoryAddr is non-zero
+        if (create2FactoryAddr != address(0)) {
+            savePermanentValues(create2FactorySalt, create2FactoryAddr);
+        }
+    }
+
+    function getPermanentValuesPath() internal view virtual returns (string memory) {
+        string memory root = vm.projectRoot();
+        return string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
     }
 
     // add this to be excluded from coverage report

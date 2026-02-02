@@ -121,7 +121,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         interopTargetContract = makeAddr("interopTargetContract");
         originalChainId = block.chainid;
 
-        discoveredBridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
+        coreAddresses.bridgehub.proxies.bridgehub = L2_BRIDGEHUB_ADDR;
         sharedBridgeLegacy = deployL2SharedBridgeLegacy(
             L1_CHAIN_ID,
             ERA_CHAIN_ID,
@@ -156,13 +156,13 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             vm.prank(aliasedL1AssetRouter);
             l2AssetRouter.setAssetHandlerAddress(L1_CHAIN_ID, ctmAssetId, L2_CHAIN_ASSET_HANDLER_ADDR);
             vm.prank(ownerWallet);
-            l2Bridgehub.addChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
+            l2Bridgehub.addChainTypeManager(address(ctmAddresses.stateTransition.proxies.chainTypeManager));
             vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1CTMDeployer));
             l2Bridgehub.setCTMAssetAddress(
                 bytes32(uint256(uint160(l1CTM))),
-                address(addresses.stateTransition.chainTypeManagerProxy)
+                address(ctmAddresses.stateTransition.proxies.chainTypeManager)
             );
-            chainTypeManager = IChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
+            chainTypeManager = IChainTypeManager(address(ctmAddresses.stateTransition.proxies.chainTypeManager));
             getExampleChainCommitment();
         }
 

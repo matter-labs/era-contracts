@@ -12,7 +12,7 @@ import {IExecutor, LogProcessingOutput} from "contracts/state-transition/chain-i
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
+import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 
 contract TestExecutorFacet is ExecutorFacet {
@@ -46,7 +46,7 @@ contract TestExecutorFacet is ExecutorFacet {
     function test() internal virtual {}
 }
 
-contract ExecutorProofTest is UtilsTest {
+contract ExecutorProofTest is UtilsCallMockerTest {
     UtilsFacet internal utilsFacet;
     TestExecutorFacet internal executor;
     address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));

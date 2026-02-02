@@ -2,41 +2,79 @@
 pragma solidity ^0.8.10;
 
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {Facets, Verifiers} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 
-// solhint-disable-next-line gas-struct-packing
-struct L1NativeTokenVaultAddresses {
-    address l1NativeTokenVaultImplementation;
-    address l1NativeTokenVaultProxy;
+struct BridgehubContracts {
+    address bridgehub;
+    address messageRoot;
+    address ctmDeploymentTracker;
+    address chainAssetHandler;
+    address chainRegistrationSender;
+    address assetTracker;
 }
 
-// solhint-disable-next-line gas-struct-packing
-struct BridgehubDeployedAddresses {
-    address bridgehubImplementation;
-    address bridgehubProxy;
-    address ctmDeploymentTrackerImplementation;
-    address ctmDeploymentTrackerProxy;
-    address messageRootImplementation;
-    address messageRootProxy;
-    address chainAssetHandlerImplementation;
-    address chainAssetHandlerProxy;
-    address interopCenterImplementation;
-    address interopCenterProxy;
-    address chainRegistrationSenderProxy;
-    address chainRegistrationSenderImplementation;
-    address assetTrackerProxy;
-    address assetTrackerImplementation;
+struct BridgehubAddresses {
+    BridgehubContracts proxies;
+    BridgehubContracts implementations;
+}
+
+struct ZkChainAddresses {
+    uint256 chainId;
+    address zkChainProxy;
+    address chainAdmin;
+    address pendingChainAdmin;
+    address chainTypeManager;
+    address baseToken;
+    address transactionFilterer;
+    address settlementLayer;
+    address l1DAValidator;
+    L2DACommitmentScheme l2DAValidatorScheme;
+    bytes32 baseTokenAssetId;
+    address baseTokenAddress;
+    address governance;
+    address accessControlRestrictionAddress;
+    address diamondProxy;
+    address chainProxyAdmin;
+    address l2LegacySharedBridge;
+}
+
+struct L2ERC20BridgeAddresses {
+    address l2TokenBeacon;
+    address l2Bridge;
+    bytes32 l2TokenProxyBytecodeHash;
+}
+
+struct BridgeContracts {
+    address erc20Bridge;
+    address l1AssetRouter;
+    address l1Nullifier;
+    address l1NativeTokenVault;
 }
 
 // solhint-disable-next-line gas-struct-packing
 struct BridgesDeployedAddresses {
-    address erc20BridgeImplementation;
-    address erc20BridgeProxy;
-    address l1AssetRouterImplementation;
-    address l1AssetRouterProxy;
-    address l1NullifierImplementation;
-    address l1NullifierProxy;
+    BridgeContracts proxies;
+    BridgeContracts implementations;
     address bridgedStandardERC20Implementation;
     address bridgedTokenBeacon;
+    address l1WethToken;
+    bytes32 ethTokenAssetId;
+}
+
+struct L1CoreAdminAddresses {
+    address transparentProxyAdmin;
+    address governance;
+    address bridgehubAdmin;
+    address accessControlRestrictionAddress;
+    address create2Factory;
+}
+
+// solhint-disable-next-line gas-struct-packing
+struct CoreDeployedAddresses {
+    BridgehubAddresses bridgehub;
+    BridgesDeployedAddresses bridges;
+    L1CoreAdminAddresses shared;
 }
 
 struct DataAvailabilityDeployedAddresses {
@@ -48,38 +86,41 @@ struct DataAvailabilityDeployedAddresses {
     address l1BlobsDAValidatorZKsyncOS;
 }
 
-struct ZkChainAddresses {
-    address governance;
-    address diamondProxy;
-    address chainAdmin;
-    address l2LegacySharedBridge;
-    address accessControlRestrictionAddress;
-    address chainProxyAdmin;
+struct StateTransitionContracts {
+    address chainTypeManager;
+    address serverNotifier;
+    address validatorTimelock;
+    address bytecodesSupplier;
 }
 
 // solhint-disable-next-line gas-struct-packing
 struct StateTransitionDeployedAddresses {
-    address chainTypeManagerProxy;
-    address chainTypeManagerProxyAdmin;
-    address chainTypeManagerImplementation;
-    address verifier;
-    address verifierFflonk;
-    address verifierPlonk;
-    address adminFacet;
-    address mailboxFacet;
-    address executorFacet;
-    address gettersFacet;
-    address diamondInit;
+    StateTransitionContracts proxies;
+    StateTransitionContracts implementations;
+    Verifiers verifiers;
+    Facets facets;
     address genesisUpgrade;
     address defaultUpgrade;
-    address validatorTimelockImplementation;
-    address validatorTimelock;
-    address diamondProxy;
-    address bytecodesSupplier;
-    address serverNotifierProxy;
-    address serverNotifierImplementation;
+    address legacyValidatorTimelock;
+    address eraDiamondProxy;
     address rollupDAManager;
     address rollupSLDAValidator;
+}
+
+struct CTMAdminAddresses {
+    address transparentProxyAdmin;
+    address governance;
+    address accessControlRestrictionAddress;
+    address eip7702Checker;
+    address chainTypeManagerAdmin;
+    address chainTypeManagerOwner;
+}
+
+struct CTMDeployedAddresses {
+    StateTransitionDeployedAddresses stateTransition;
+    DataAvailabilityDeployedAddresses daAddresses;
+    CTMAdminAddresses admin;
+    address chainAdmin;
 }
 
 struct ChainCreationParamsConfig {

@@ -36,6 +36,9 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @notice Address of the interop center
     address public immutable INTEROP_CENTER;
 
+    /// @notice Address of the L1 bytecodes supplier used for upgrades
+    address public immutable L1_BYTECODES_SUPPLIER;
+
     /// @notice The map from chainId => zkChain contract
     EnumerableMap.UintToAddressMap internal __DEPRECATED_zkChainMap;
 
@@ -81,6 +84,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev It's used for easier tracking the upgrade cutData off-chain.
     mapping(uint256 protocolVersion => uint256) public upgradeCutDataBlock;
 
+    /// @dev The block number when newChainCreationParams was saved for some protocolVersion.
+    /// @dev It's used for easier tracking the upgrade cutData off-chain.
+    mapping(uint256 protocolVersion => uint256) public newChainCreationParamsBlock;
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     /// @dev Note, that while the contract does not use `nonReentrant` modifier, we still keep the `reentrancyGuardInitializer`
@@ -88,9 +95,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// - It prevents the function from being called twice (including in the proxy impl).
     /// - It makes the local version consistent with the one in production, which already had the reentrancy guard
     /// initialized.
-    constructor(address _bridgehub, address _interopCenter) reentrancyGuardInitializer {
+    constructor(address _bridgehub, address _interopCenter, address _l1BytecodesSupplier) reentrancyGuardInitializer {
         BRIDGE_HUB = _bridgehub;
         INTEROP_CENTER = _interopCenter;
+        L1_BYTECODES_SUPPLIER = _l1BytecodesSupplier;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
@@ -205,6 +213,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         initialCutHash = newInitialCutHash;
         bytes32 forceDeploymentHash = keccak256(abi.encode(_chainCreationParams.forceDeploymentsData));
         initialForceDeploymentHash = forceDeploymentHash;
+        newChainCreationParamsBlock[protocolVersion] = block.number;
 
         emit NewChainCreationParams({
             genesisUpgrade: _chainCreationParams.genesisUpgrade,

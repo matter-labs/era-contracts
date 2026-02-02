@@ -13,8 +13,9 @@ import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IRegisterCTM} from "contracts/script-interfaces/IRegisterCTM.sol";
 
-contract RegisterCTM is Script {
+contract RegisterCTM is Script, IRegisterCTM {
     using stdToml for string;
 
     struct Output {
@@ -93,7 +94,7 @@ contract RegisterCTM is Script {
 
             bytes32 assetId = bridgehub.ctmAssetIdFromAddress(chainTypeManagerProxy);
             console.log(
-                "CTM in router 1",
+                "CTM in router 2",
                 sharedBridge.assetHandlerAddress(assetId),
                 bridgehub.ctmAssetIdToAddress(assetId)
             );

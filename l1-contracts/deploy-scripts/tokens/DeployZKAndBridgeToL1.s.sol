@@ -21,6 +21,8 @@ import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {Utils} from "../utils/Utils.sol";
 import {MintFailed} from "../utils/ZkSyncScriptErrors.sol";
+import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 contract DeployZKScript is Script {
     using stdToml for string;
@@ -55,8 +57,8 @@ contract DeployZKScript is Script {
 
     Config internal config;
 
-    function run() public {
-        initializeConfig();
+    function run(address _bridgehub, uint256 _chainId) public {
+        initializeConfig(_bridgehub, _chainId);
         deployZkToken();
         saveOutput();
     }
@@ -65,7 +67,7 @@ contract DeployZKScript is Script {
         return config.zkToken.addr;
     }
 
-    function initializeConfig() internal {
+    function initializeConfig(address bridgehub, uint256 chainId) internal {
         config.deployerAddress = msg.sender;
 
         string memory root = vm.projectRoot();
@@ -84,14 +86,16 @@ contract DeployZKScript is Script {
         config.zkToken.implementation = toml.readString(string.concat(key, ".implementation"));
         config.zkToken.mint = toml.readUint(string.concat(key, ".mint"));
 
+        // Use AddressIntrospector to get addresses from deployed contracts
+        config.bridgehub = bridgehub;
+        BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(IL1Bridgehub(bridgehub));
+        config.l1SharedBridge = bhAddresses.assetRouter;
+        config.l1Nullifier = bhAddresses.assetRouterAddresses.l1Nullifier;
+        config.chainId = chainId;
+
         // Grab config from custom config file
         path = string.concat(root, vm.envString("ZK_CHAIN_CONFIG"));
         toml = vm.readFile(path);
-
-        config.bridgehub = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
-        config.l1SharedBridge = toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr");
-        config.l1Nullifier = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
-        config.chainId = toml.readUint("$.chain.chain_chain_id");
         config.chainGovernor = toml.readAddress("$.owner_address");
     }
 

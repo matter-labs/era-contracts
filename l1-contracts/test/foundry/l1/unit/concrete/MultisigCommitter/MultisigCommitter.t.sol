@@ -368,4 +368,111 @@ contract MultisigCommitterTest is Test {
             signatures
         );
     }
+
+    function test_getValidatorsMember_Shared() public view {
+        address member0 = multisigCommitter.getValidatorsMember(chainAddress, 0);
+        address member1 = multisigCommitter.getValidatorsMember(chainAddress, 1);
+        // members should be in the shared validators set
+        assertTrue(multisigCommitter.isSharedValidator(member0));
+        assertTrue(multisigCommitter.isSharedValidator(member1));
+    }
+
+    function test_getValidatorsMember_Custom() public {
+        // Enable custom validator set
+        vm.prank(ecosystemOwner);
+        multisigCommitter.useCustomSigningSet(chainAddress);
+
+        address member0 = multisigCommitter.getValidatorsMember(chainAddress, 0);
+        // should be the custom validator we added
+        assertEq(member0, validator1Custom);
+    }
+
+    function test_isValidator_Custom() public {
+        // Enable custom validator set
+        vm.prank(ecosystemOwner);
+        multisigCommitter.useCustomSigningSet(chainAddress);
+
+        assertTrue(multisigCommitter.isValidator(chainAddress, validator1Custom));
+        assertFalse(multisigCommitter.isValidator(chainAddress, validator1Shared));
+    }
+
+    function test_commit_with_custom_validators() public {
+        // Enable custom validator set and set threshold
+        vm.prank(ecosystemOwner);
+        multisigCommitter.useCustomSigningSet(chainAddress);
+        vm.prank(chainAdmin);
+        multisigCommitter.setCustomSigningThreshold(chainAddress, 1);
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = prepareCommit();
+        bytes32 digest = hashCommitData(commitBatchFrom, commitBatchTo, commitData);
+
+        address[] memory signers = new address[](1);
+        signers[0] = validator1Custom;
+
+        bytes[] memory signatures = new bytes[](1);
+        signatures[0] = sign_digest(validator1CustomKey, digest);
+
+        vm.prank(sequencer);
+        multisigCommitter.commitBatchesMultisig(
+            chainAddress,
+            commitBatchFrom,
+            commitBatchTo,
+            commitData,
+            signers,
+            signatures
+        );
+    }
+
+    function test_commit_with_custom_validators_unauthorized_shared() public {
+        // Enable custom validator set
+        vm.prank(ecosystemOwner);
+        multisigCommitter.useCustomSigningSet(chainAddress);
+        vm.prank(chainAdmin);
+        multisigCommitter.setCustomSigningThreshold(chainAddress, 1);
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = prepareCommit();
+        bytes32 digest = hashCommitData(commitBatchFrom, commitBatchTo, commitData);
+
+        // Try to use shared validator when custom set is active
+        address[] memory signers = new address[](1);
+        signers[0] = validator1Shared;
+
+        bytes[] memory signatures = new bytes[](1);
+        signatures[0] = sign_digest(validator1SharedKey, digest);
+
+        vm.prank(sequencer);
+        vm.expectRevert(abi.encodeWithSelector(SignerNotAuthorized.selector, validator1Shared));
+        multisigCommitter.commitBatchesMultisig(
+            chainAddress,
+            commitBatchFrom,
+            commitBatchTo,
+            commitData,
+            signers,
+            signatures
+        );
+    }
+
+    function test_sharedValidatorsMember() public view {
+        address member0 = multisigCommitter.sharedValidatorsMember(0);
+        address member1 = multisigCommitter.sharedValidatorsMember(1);
+        assertTrue(multisigCommitter.isSharedValidator(member0));
+        assertTrue(multisigCommitter.isSharedValidator(member1));
+    }
+
+    function test_addSharedValidator_NoOp() public {
+        // Adding an existing validator should be a no-op
+        uint256 countBefore = multisigCommitter.sharedValidatorsCount();
+        vm.prank(ecosystemOwner);
+        multisigCommitter.addSharedValidator(validator1Shared);
+        assertEq(multisigCommitter.sharedValidatorsCount(), countBefore);
+    }
+
+    function test_removeSharedValidator_NoOp() public {
+        // Removing a non-existent validator should be a no-op
+        address nonValidator = makeAddr("nonValidator");
+        uint256 countBefore = multisigCommitter.sharedValidatorsCount();
+        vm.prank(ecosystemOwner);
+        multisigCommitter.removeSharedValidator(nonValidator);
+        assertEq(multisigCommitter.sharedValidatorsCount(), countBefore);
+    }
 }

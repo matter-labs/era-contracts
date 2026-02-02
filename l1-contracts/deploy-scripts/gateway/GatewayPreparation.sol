@@ -22,7 +22,7 @@ import {ValidatorTimelock} from "contracts/state-transition/validators/Validator
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 import {IL2AssetRouter, L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -314,7 +314,7 @@ contract GatewayPreparation is Script {
         initializeConfig();
 
         bytes memory secondBridgeData = abi.encodePacked(
-            bytes1(0x01),
+            NEW_ENCODING_VERSION,
             abi.encode(config.chainTypeManagerProxy, gatewayCTMAddress)
         );
 
@@ -405,8 +405,7 @@ contract GatewayPreparation is Script {
             })
         );
 
-        // TODO: use constant for the 0x01
-        bytes memory secondBridgeData = abi.encodePacked(bytes1(0x01), abi.encode(chainAssetId, bridgehubData));
+        bytes memory secondBridgeData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
 
         bytes32 l2TxHash = Utils.runAdminL1L2TwoBridgesTransaction(
             _getL1GasPrice(),
@@ -490,7 +489,7 @@ contract GatewayPreparation is Script {
     ) public {
         initializeConfig();
 
-        L1Nullifier l1Nullifier = L1Nullifier(config.l1NullifierProxy);
+        L1Nullifier l1Nullifier = L1Nullifier(config.proxies.l1Nullifier);
         IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehub);
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
         vm.broadcast();

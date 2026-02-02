@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
+import {stdToml} from "forge-std/StdToml.sol";
+
 import {Utils} from "../Utils.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 import {AddressHasNoCode} from "../ZkSyncScriptErrors.sol";
@@ -12,6 +14,8 @@ import {AddressHasNoCode} from "../ZkSyncScriptErrors.sol";
 /// Create2Factory state and provides deployment helpers that are completely independent
 /// of other state.
 abstract contract Create2FactoryUtils is Script {
+    using stdToml for string;
+
     /// @notice Holds the final deployed Create2Factory address.
     struct Create2FactoryState {
         address create2FactoryAddress;
@@ -29,14 +33,15 @@ abstract contract Create2FactoryUtils is Script {
     /// @notice The input parameters for the Create2Factory.
     Create2FactoryParams internal create2FactoryParams;
 
-    /// @notice Constant for the known deterministic Create2Factory address.
-    address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
-
     /// @notice Initializes the Create2Factory parameters.
     /// @param _factoryAddress The preconfigured factory address (if any).
     /// @param _factorySalt The salt used for deterministic deployment.
     function _initCreate2FactoryParams(address _factoryAddress, bytes32 _factorySalt) internal {
         create2FactoryParams = Create2FactoryParams({factoryAddress: _factoryAddress, factorySalt: _factorySalt});
+    }
+
+    function getCreate2FactoryParams() public view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
+        return (create2FactoryState.create2FactoryAddress, create2FactoryParams.factorySalt);
     }
 
     /// @notice Instantiates the Create2Factory.
@@ -47,16 +52,19 @@ abstract contract Create2FactoryUtils is Script {
     function instantiateCreate2Factory() internal {
         address deployedAddress;
         bool isConfigured = create2FactoryParams.factoryAddress != address(0);
-        bool isDeterministicDeployed = DETERMINISTIC_CREATE2_ADDRESS.code.length > 0;
+        bool isDeterministicDeployed = Utils.DETERMINISTIC_CREATE2_ADDRESS.code.length > 0;
 
         if (isConfigured) {
             if (create2FactoryParams.factoryAddress.code.length == 0) {
-                revert AddressHasNoCode(create2FactoryParams.factoryAddress);
+                deployedAddress = Utils.deployCreate2Factory();
+                if (create2FactoryParams.factoryAddress.code.length == 0) {
+                    revert AddressHasNoCode(create2FactoryParams.factoryAddress);
+                }
             }
             deployedAddress = create2FactoryParams.factoryAddress;
             console.log("Using configured Create2Factory address:", deployedAddress);
         } else if (isDeterministicDeployed) {
-            deployedAddress = DETERMINISTIC_CREATE2_ADDRESS;
+            deployedAddress = Utils.DETERMINISTIC_CREATE2_ADDRESS;
             console.log("Using deterministic Create2Factory address:", deployedAddress);
         } else {
             deployedAddress = Utils.deployCreate2Factory();
@@ -238,5 +246,23 @@ abstract contract Create2FactoryUtils is Script {
     /// @return True if the strings are identical, false otherwise.
     function compareStrings(string memory a, string memory b) internal pure returns (bool) {
         return Utils.compareStrings(a, b);
+    }
+
+    function getPermanentValues() public view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
+        string memory permanentValuesPath = string.concat(vm.projectRoot(), vm.envString("PERMANENT_VALUES_INPUT"));
+        return getPermanentValues(permanentValuesPath);
+    }
+
+    function getPermanentValues(
+        string memory permanentValuesPath
+    ) public view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
+        // Read create2 factory values from permanent values file
+        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
+
+        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.permanent_contracts.create2_factory_salt");
+        address create2FactoryAddr;
+        if (vm.keyExistsToml(permanentValuesToml, "$.permanent_contracts.create2_factory_addr")) {
+            create2FactoryAddr = permanentValuesToml.readAddress("$.permanent_contracts.create2_factory_addr");
+        }
     }
 }

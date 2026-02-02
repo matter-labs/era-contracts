@@ -115,7 +115,7 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
         }
     }
 
-    function burnMsgValue() external payable override onlyCallFromInteropCenter {
+    function burnMsgValue() external payable override onlyCallFromInteropCenterOrNTV {
         _burnMsgValue();
     }
 

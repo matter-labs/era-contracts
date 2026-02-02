@@ -373,6 +373,8 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
         if (selector == this.executeBundle.selector) {
             _handleExecuteBundle(payload, senderChainId, senderAddress, sender);
+        } else if (selector == this.verifyBundle.selector) {
+            _handleVerifyBundle(payload);
         } else if (selector == this.unbundleBundle.selector) {
             _handleUnbundleBundle(payload, senderChainId, senderAddress, sender);
         } else {
@@ -410,6 +412,16 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         }
 
         this.executeBundle(bundle, proof);
+    }
+
+    function _handleVerifyBundle(bytes calldata payload) internal {
+        (bytes memory bundle, MessageInclusionProof memory proof) = abi.decode(
+            payload[4:],
+            (bytes, MessageInclusionProof)
+        );
+
+        // Bundle verification is permissionless
+        this.verifyBundle(bundle, proof);
     }
 
     function _handleUnbundleBundle(

@@ -130,12 +130,12 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
 
     // Unlike the original one, we do not fetch the L1 da validator address
     function setAddressesBasedOnBridgehub() internal override {
-        address ctm = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(getSampleChainId());
+        address ctm = IL1Bridgehub(addresses.bridgehub.proxies.bridgehub).chainTypeManager(getSampleChainId());
         config.ownerAddress = Ownable2StepUpgradeable(ctm).owner();
 
         addresses.stateTransition.chainTypeManagerProxy = ctm;
         // We have to set the diamondProxy address here - as it is used by multiple constructors (for example L1Nullifier etc)
-        addresses.stateTransition.diamondProxy = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
+        addresses.stateTransition.diamondProxy = IL1Bridgehub(addresses.bridgehub.proxies.bridgehub).getZKChain(
             getSampleChainId()
         );
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
@@ -143,31 +143,33 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
             ctmProtocolVersion != getNewProtocolVersion(),
             "The new protocol version is already present on the ChainTypeManager"
         );
-        addresses.bridges.l1AssetRouterProxy = L1Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
+        addresses.bridges.proxies.l1AssetRouter = L1Bridgehub(addresses.bridgehub.proxies.bridgehub).assetRouter();
         addresses.stateTransition.genesisUpgrade = address(IChainTypeManager(ctm).l1GenesisUpgrade());
 
-        addresses.vaults.l1NativeTokenVaultProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).nativeTokenVault()
+        addresses.vaults.proxies.l1NativeTokenVault = address(
+            L1AssetRouter(addresses.bridges.proxies.l1AssetRouter).nativeTokenVault()
         );
-        addresses.bridges.l1NullifierProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).L1_NULLIFIER()
+        addresses.bridges.proxies.l1Nullifier = address(
+            L1AssetRouter(addresses.bridges.proxies.l1AssetRouter).L1_NULLIFIER()
         );
-        addresses.bridges.erc20BridgeProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
-        );
-
-        addresses.bridgehub.ctmDeploymentTrackerProxy = address(
-            L1Bridgehub(addresses.bridgehub.bridgehubProxy).l1CtmDeployer()
+        addresses.bridges.proxies.erc20Bridge = address(
+            L1AssetRouter(addresses.bridges.proxies.l1AssetRouter).legacyBridge()
         );
 
-        addresses.bridgehub.messageRootProxy = address(L1Bridgehub(addresses.bridgehub.bridgehubProxy).messageRoot());
-
-        addresses.bridgehub.chainAssetHandlerProxy = address(
-            L1Bridgehub(addresses.bridgehub.bridgehubProxy).chainAssetHandler()
+        addresses.bridgehub.proxies.ctmDeploymentTracker = address(
+            L1Bridgehub(addresses.bridgehub.proxies.bridgehub).proxies.ctmDeploymentTracker()
         );
 
-        addresses.bridges.erc20BridgeProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
+        addresses.bridgehub.proxies.messageRoot = address(
+            L1Bridgehub(addresses.bridgehub.proxies.bridgehub).messageRoot()
+        );
+
+        addresses.bridgehub.proxies.chainAssetHandlerProxy = address(
+            L1Bridgehub(addresses.bridgehub.proxies.bridgehub).proxies.chainAssetHandler()
+        );
+
+        addresses.bridges.proxies.erc20Bridge = address(
+            L1AssetRouter(addresses.bridges.proxies.l1AssetRouter).legacyBridge()
         );
         addresses.stateTransition.serverNotifierProxy = IChainTypeManager(
             addresses.stateTransition.chainTypeManagerProxy
