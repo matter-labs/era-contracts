@@ -386,7 +386,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         address _settlementFeePayer,
         uint256 _chargeableInteropCount
     ) internal {
-        if (_chargeableInteropCount == 0 || gatewaySettlementFee == 0) {
+        uint256 cachedSettlementFee = gatewaySettlementFee;
+        if (_chargeableInteropCount == 0 || cachedSettlementFee == 0) {
             return;
         }
 
@@ -394,7 +395,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             revert SettlementFeePayerNotAgreed(_settlementFeePayer, _chainId);
         }
 
-        uint256 totalFee = gatewaySettlementFee * _chargeableInteropCount;
+        uint256 totalFee = cachedSettlementFee * _chargeableInteropCount;
 
         // Transfer Wrapped ZK tokens from the settlement fee payer to this contract.
         // The fee payer must have pre-approved this contract to spend wrapped ZK tokens.
