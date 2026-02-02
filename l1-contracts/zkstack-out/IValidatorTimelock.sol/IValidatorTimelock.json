@@ -564,56 +564,6 @@
   },
   {
     "type": "event",
-    "name": "BatchPrecommitmentSet",
-    "inputs": [
-      {
-        "name": "batchNumber",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "untrustedLastL2BlockNumberHint",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "precommitment",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "BlockCommit",
-    "inputs": [
-      {
-        "name": "batchNumber",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "batchHash",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "commitment",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "BlockExecution",
     "inputs": [
       {
@@ -690,31 +640,6 @@
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "ReportCommittedBatchRangeZKsyncOS",
-    "inputs": [
-      {
-        "name": "batchNumber",
-        "type": "uint64",
-        "indexed": true,
-        "internalType": "uint64"
-      },
-      {
-        "name": "firstBlockNumber",
-        "type": "uint64",
-        "indexed": true,
-        "internalType": "uint64"
-      },
-      {
-        "name": "lastBlockNumber",
-        "type": "uint64",
-        "indexed": true,
-        "internalType": "uint64"
       }
     ],
     "anonymous": false

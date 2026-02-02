@@ -37,56 +37,42 @@ abstract contract DeployIntegrationUtils is Script, DeployCTMUtils {
         string memory toml = vm.readFile(inputPath);
 
         facetCuts = new Diamond.FacetCut[](6);
-        {
-            bytes memory adminFacetSelectors = toml.readBytes("$.admin_facet_selectors");
-            bytes memory gettersFacetSelectors = toml.readBytes("$.getters_facet_selectors");
-            bytes memory mailboxFacetSelectors = toml.readBytes("$.mailbox_facet_selectors");
-            bytes memory executorFacetSelectors = toml.readBytes("$.executor_facet_selectors");
-            bytes memory migratorFacetSelectors = toml.readBytes("$.migrator_facet_selectors");
-
-            bytes4[] memory adminFacetSelectorsArray = abi.decode(adminFacetSelectors, (bytes4[]));
-            bytes4[] memory gettersFacetSelectorsArray = abi.decode(gettersFacetSelectors, (bytes4[]));
-            bytes4[] memory mailboxFacetSelectorsArray = abi.decode(mailboxFacetSelectors, (bytes4[]));
-            bytes4[] memory executorFacetSelectorsArray = abi.decode(executorFacetSelectors, (bytes4[]));
-            bytes4[] memory migratorFacetSelectorsArray = abi.decode(migratorFacetSelectors, (bytes4[]));
-
-            facetCuts[0] = Diamond.FacetCut({
-                facet: ctmAddresses.stateTransition.facets.adminFacet,
-                action: Diamond.Action.Add,
-                isFreezable: false,
-                selectors: adminFacetSelectorsArray
-            });
-            facetCuts[1] = Diamond.FacetCut({
-                facet: ctmAddresses.stateTransition.facets.gettersFacet,
-                action: Diamond.Action.Add,
-                isFreezable: false,
-                selectors: gettersFacetSelectorsArray
-            });
-            facetCuts[2] = Diamond.FacetCut({
-                facet: ctmAddresses.stateTransition.facets.mailboxFacet,
-                action: Diamond.Action.Add,
-                isFreezable: true,
-                selectors: mailboxFacetSelectorsArray
-            });
-            facetCuts[3] = Diamond.FacetCut({
-                facet: ctmAddresses.stateTransition.facets.executorFacet,
-                action: Diamond.Action.Add,
-                isFreezable: true,
-                selectors: executorFacetSelectorsArray
-            });
-            facetCuts[4] = Diamond.FacetCut({
-                facet: ctmAddresses.stateTransition.facets.migratorFacet,
-                action: Diamond.Action.Add,
-                isFreezable: false,
-                selectors: migratorFacetSelectorsArray
-            });
-            facetCuts[5] = Diamond.FacetCut({
-                facet: ctmAddresses.stateTransition.facets.committerFacet,
-                action: Diamond.Action.Add,
-                isFreezable: true,
-                selectors: Utils.getAllSelectors(ctmAddresses.stateTransition.facets.committerFacet.code)
-            });
-        }
+        facetCuts[0] = Diamond.FacetCut({
+            facet: ctmAddresses.stateTransition.facets.adminFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: abi.decode(toml.readBytes("$.admin_facet_selectors"), (bytes4[]))
+        });
+        facetCuts[1] = Diamond.FacetCut({
+            facet: ctmAddresses.stateTransition.facets.gettersFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: abi.decode(toml.readBytes("$.getters_facet_selectors"), (bytes4[]))
+        });
+        facetCuts[2] = Diamond.FacetCut({
+            facet: ctmAddresses.stateTransition.facets.mailboxFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: abi.decode(toml.readBytes("$.mailbox_facet_selectors"), (bytes4[]))
+        });
+        facetCuts[3] = Diamond.FacetCut({
+            facet: ctmAddresses.stateTransition.facets.executorFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: abi.decode(toml.readBytes("$.executor_facet_selectors"), (bytes4[]))
+        });
+        facetCuts[4] = Diamond.FacetCut({
+            facet: ctmAddresses.stateTransition.facets.migratorFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: abi.decode(toml.readBytes("$.migrator_facet_selectors"), (bytes4[]))
+        });
+        facetCuts[5] = Diamond.FacetCut({
+            facet: ctmAddresses.stateTransition.facets.committerFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: abi.decode(toml.readBytes("$.committer_facet_selectors"), (bytes4[]))
+        });
     }
 
     function getUpgradeAddedFacetCuts(

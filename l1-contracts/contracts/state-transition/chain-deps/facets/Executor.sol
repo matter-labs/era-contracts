@@ -6,7 +6,7 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {IMessageRoot} from "../../../core/message-root/IMessageRoot.sol";
 import {EMPTY_STRING_KECCAK, PUBLIC_INPUT_SHIFT, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH} from "../../../common/Config.sol";
-import {IExecutor, ProcessLogsInput, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
+import {IExecutor, ProcessLogsInput} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {GW_ASSET_TRACKER} from "../../../common/l2-helpers/L2ContractAddresses.sol";

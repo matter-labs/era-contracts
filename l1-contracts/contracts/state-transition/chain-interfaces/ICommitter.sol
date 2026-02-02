@@ -3,7 +3,6 @@
 pragma solidity ^0.8.21;
 
 import {IZKChainBase} from "./IZKChainBase.sol";
-import {IExecutor} from "./IExecutor.sol";
 
 /// @title The interface of the ZKsync Committer contract responsible for batch commitment operations.
 /// @author Matter Labs

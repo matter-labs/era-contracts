@@ -121,6 +121,11 @@
                     "internalType": "address"
                   },
                   {
+                    "name": "committerFacet",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
                     "name": "diamondInit",
                     "type": "address",
                     "internalType": "address"
