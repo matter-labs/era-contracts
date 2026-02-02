@@ -5,8 +5,6 @@ pragma solidity ^0.8.21;
 error AccessToFallbackDenied(address target, address invoker);
 // 0x3995f750
 error AccessToFunctionDenied(address target, bytes4 selector, address invoker);
-// 0x4f4a5b66
-error RevertBatchesForPriorityModeNotImplementedInValidatorContract();
 // 0x0dfb42bf
 error AddressAlreadySet(address addr);
 // 0x86bb51b8
@@ -350,6 +348,8 @@ error ReplaceFunctionFacetAddressZero();
 error RestrictionWasAlreadyPresent(address restriction);
 // 0x52e22c98
 error RestrictionWasNotPresent(address restriction);
+// 0xec7bcab7
+error RevertBatchesForPriorityModeNotImplementedInValidatorContract();
 // 0x9a67c1cb
 error RevertedBatchNotAfterNewLastBatch();
 // 0xfe0aa4f2
