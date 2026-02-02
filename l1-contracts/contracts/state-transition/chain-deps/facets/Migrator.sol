@@ -172,6 +172,8 @@ contract Migrator is ZKChainBase, IMigrator {
     }
 
     /// @inheritdoc IMigrator
+    /// @dev Diamond facet: ETH is stored in the Diamond proxy, not this contract.
+    // slither-disable-next-line locked-ether
     function forwardedBridgeMint(
         bytes calldata _data,
         bool _contractAlreadyDeployed
@@ -265,6 +267,8 @@ contract Migrator is ZKChainBase, IMigrator {
     }
 
     /// @inheritdoc IMigrator
+    /// @dev Diamond facet: ETH is stored in the Diamond proxy, not this contract.
+    // slither-disable-next-line locked-ether
     function forwardedBridgeConfirmTransferResult(
         uint256 /* _chainId */,
         TxStatus _txStatus,
