@@ -46,7 +46,7 @@ contract DeployL2Script is Script, IDeployL2Contracts {
         address consensusRegistryOwner;
     }
 
-    struct DeployedContrats {
+    struct DeployedContracts {
         address forceDeployUpgraderAddress;
         address consensusRegistryImplementation;
         address consensusRegistryProxy;
