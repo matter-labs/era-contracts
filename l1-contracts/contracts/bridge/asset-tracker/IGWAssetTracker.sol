@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
-import {BalanceChange, ConfirmBalanceMigrationData} from "../../common/Messaging.sol";
+import {BalanceChange, TokenBalanceMigrationData, TokenBridgingData} from "../../common/Messaging.sol";
 
 /// @title IGWAssetTracker
 interface IGWAssetTracker {
@@ -64,6 +64,8 @@ interface IGWAssetTracker {
 
     function setAddresses(uint256 _l1ChainId) external;
 
+    function registerBaseTokenOnGateway(TokenBridgingData calldata _baseTokenBridgingData) external;
+
     function handleChainBalanceIncreaseOnGateway(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
@@ -74,7 +76,7 @@ interface IGWAssetTracker {
 
     function initiateGatewayToL1MigrationOnGateway(uint256 _chainId, bytes32 _assetId) external;
 
-    function confirmMigrationOnGateway(ConfirmBalanceMigrationData calldata _tokenBalanceMigrationData) external;
+    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
 
     function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external;
 

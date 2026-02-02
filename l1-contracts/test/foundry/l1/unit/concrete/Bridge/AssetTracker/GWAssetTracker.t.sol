@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/console2.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 
-import {BalanceChange, ConfirmBalanceMigrationData} from "contracts/common/Messaging.sol";
+import {BalanceChange, TokenBalanceMigrationData} from "contracts/common/Messaging.sol";
 import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
@@ -29,6 +29,14 @@ contract GWAssetTrackerTestHelper is GWAssetTracker {
     constructor() GWAssetTracker() {}
     function getEmptyMessageRoot(uint256 _chainId) external returns (bytes32) {
         return _getEmptyMessageRoot(_chainId);
+    }
+
+    function getOriginToken(bytes32 _assetId) external view returns (address) {
+        return originToken[_assetId];
+    }
+
+    function getTokenOriginChainId(bytes32 _assetId) external view returns (uint256) {
+        return tokenOriginChainId[_assetId];
     }
 
     function getLegacySharedBridgeAddress(uint256 _chainId) external view returns (address) {
@@ -142,8 +150,8 @@ contract GWAssetTrackerTest is Test {
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), AMOUNT);
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), BASE_TOKEN_AMOUNT);
 
-        // Check that token was registered (these are internal mappings, so we can't test them directly)
-        // The token registration happens in the _registerToken function
+        assertEq(gwAssetTracker.getOriginToken(ASSET_ID), ORIGIN_TOKEN);
+        assertEq(gwAssetTracker.getTokenOriginChainId(ASSET_ID), ORIGIN_CHAIN_ID);
     }
 
     function test_HandleChainBalanceIncreaseOnGateway_Unauthorized() public {
@@ -197,12 +205,15 @@ contract GWAssetTrackerTest is Test {
     }
 
     function test_ConfirmMigrationOnGateway_Unauthorized() public {
-        ConfirmBalanceMigrationData memory data = ConfirmBalanceMigrationData({
+        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
-            migrationNumber: MIGRATION_NUMBER,
+            assetMigrationNumber: MIGRATION_NUMBER,
+            chainMigrationNumber: 0,
             isL1ToGateway: false
         });
 
@@ -319,12 +330,15 @@ contract GWAssetTrackerTest is Test {
 
         uint256 initialBalance = gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID);
 
-        ConfirmBalanceMigrationData memory data = ConfirmBalanceMigrationData({
+        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
-            migrationNumber: MIGRATION_NUMBER,
+            assetMigrationNumber: MIGRATION_NUMBER,
+            chainMigrationNumber: 0,
             isL1ToGateway: true
         });
 
@@ -591,12 +605,15 @@ contract GWAssetTrackerTest is Test {
             abi.encode(0) // Return 0 to indicate not settled on current chain
         );
 
-        ConfirmBalanceMigrationData memory data = ConfirmBalanceMigrationData({
+        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
-            migrationNumber: MIGRATION_NUMBER,
+            assetMigrationNumber: MIGRATION_NUMBER,
+            chainMigrationNumber: 0,
             isL1ToGateway: false
         });
 
@@ -608,12 +625,15 @@ contract GWAssetTrackerTest is Test {
     }
 
     function test_ConfirmMigrationOnGateway_InvalidVersion() public {
-        ConfirmBalanceMigrationData memory data = ConfirmBalanceMigrationData({
+        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
             version: 0, // Invalid version
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
-            migrationNumber: MIGRATION_NUMBER,
+            assetMigrationNumber: MIGRATION_NUMBER,
+            chainMigrationNumber: 0,
             isL1ToGateway: false
         });
 
@@ -685,12 +705,15 @@ contract GWAssetTrackerTest is Test {
     }
 
     function test_ConfirmMigrationOnGateway_L1ToGateway_ZeroAmount() public {
-        ConfirmBalanceMigrationData memory data = ConfirmBalanceMigrationData({
+        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: 0,
-            migrationNumber: MIGRATION_NUMBER,
+            assetMigrationNumber: MIGRATION_NUMBER,
+            chainMigrationNumber: 0,
             isL1ToGateway: true
         });
 
@@ -699,17 +722,22 @@ contract GWAssetTrackerTest is Test {
 
         // Balance should remain 0
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), 0);
+        assertEq(gwAssetTracker.getOriginToken(ASSET_ID), ORIGIN_TOKEN);
+        assertEq(gwAssetTracker.getTokenOriginChainId(ASSET_ID), ORIGIN_CHAIN_ID);
     }
 
     function testFuzz_ConfirmMigrationOnGateway_L1ToGateway(uint256 _amount) public {
         _amount = bound(_amount, 0, type(uint128).max);
 
-        ConfirmBalanceMigrationData memory data = ConfirmBalanceMigrationData({
+        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
+            originToken: ORIGIN_TOKEN,
+            tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: _amount,
-            migrationNumber: MIGRATION_NUMBER,
+            assetMigrationNumber: MIGRATION_NUMBER,
+            chainMigrationNumber: 0,
             isL1ToGateway: true
         });
 
@@ -1330,7 +1358,12 @@ contract GWAssetTrackerTest is Test {
         );
 
         // Chain balance should be set
-        assertEq(gwAssetTracker.chainBalance(_chainId, _assetId), _amount, "chainBalance should match deposit amount");
+        uint256 expectedAmount = _assetId == _baseTokenAssetId ? _amount + _baseTokenAmount : _amount;
+        assertEq(
+            gwAssetTracker.chainBalance(_chainId, _assetId),
+            expectedAmount,
+            "chainBalance should match deposit amount"
+        );
     }
 
     /// @notice Test that the optimization triggers for both assetId and baseTokenAssetId independently

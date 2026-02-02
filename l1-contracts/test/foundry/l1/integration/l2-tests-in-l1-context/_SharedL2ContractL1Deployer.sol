@@ -4,8 +4,7 @@ pragma solidity 0.8.28;
 import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -13,6 +12,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DeployCTMIntegrationScript} from "../deploy-scripts/DeployCTMIntegration.s.sol";
 
 import {SharedL2ContractDeployer, SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
+import {DummyInteropRecipient} from "contracts/dev-contracts/test/DummyInteropRecipient.sol";
 
 import {L2UtilsBase} from "./L2UtilsBase.sol";
 import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
@@ -27,11 +27,9 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
 
     function initSystemContracts(SystemContractsArgs memory _args) internal virtual override {
         L2UtilsBase.initSystemContracts(_args);
-        vm.mockCall(
-            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(ISystemContext.currentSettlementLayerChainId.selector),
-            abi.encode(9)
-        );
+        // Deploy DummyInteropRecipient and etch its bytecode to interopTargetContract
+        DummyInteropRecipient impl = new DummyInteropRecipient();
+        vm.etch(interopTargetContract, address(impl).code);
     }
 
     function deployL2Contracts(uint256 _l1ChainId) public virtual override {

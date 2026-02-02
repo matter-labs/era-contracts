@@ -17,7 +17,7 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
-import {ConfirmBalanceMigrationData, L2Message, TokenBalanceMigrationData} from "contracts/common/Messaging.sol";
+import {L2Message, TokenBalanceMigrationData} from "contracts/common/Messaging.sol";
 import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
@@ -29,7 +29,7 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IL2AssetTracker, L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {IL1AssetTracker, L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
-import {GWAssetTracker, IGWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
+import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 import {IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
 
 import {IAssetTrackerDataEncoding} from "contracts/bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
@@ -40,6 +40,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {InvalidChainId} from "contracts/common/L1ContractErrors.sol";
+import {GWAssetTrackerTestHelper} from "../unit/concrete/Bridge/AssetTracker/GWAssetTracker.t.sol";
 
 contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
@@ -51,7 +52,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     IBridgehubBase l2Bridgehub;
     IL1AssetTracker assetTracker;
     IL2AssetTracker l2AssetTracker;
-    IGWAssetTracker gwAssetTracker;
+    GWAssetTrackerTestHelper gwAssetTracker;
     address l1AssetTracker = address(0);
 
     address tokenAddress;
@@ -112,9 +113,9 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encode(mockWrappedZKToken)
         );
 
-        address gwAssetTrackerAddress = address(new GWAssetTracker());
+        address gwAssetTrackerAddress = address(new GWAssetTrackerTestHelper());
         vm.etch(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAddress.code);
-        gwAssetTracker = IGWAssetTracker(GW_ASSET_TRACKER_ADDR);
+        gwAssetTracker = GWAssetTrackerTestHelper(GW_ASSET_TRACKER_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2AssetTracker.setAddresses(block.chainid, bytes32(0));
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
@@ -184,12 +185,15 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             originToken: tokenAddress,
             isL1ToGateway: true
         });
-        ConfirmBalanceMigrationData memory confirmData = ConfirmBalanceMigrationData({
+        TokenBalanceMigrationData memory confirmData = TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             isL1ToGateway: true,
             chainId: eraZKChainId,
             assetId: assetId,
-            migrationNumber: migrationNumber,
+            originToken: tokenAddress,
+            tokenOriginChainId: originalChainId,
+            chainMigrationNumber: 0,
+            assetMigrationNumber: migrationNumber,
             amount: amount
         });
         bytes memory encodedData = abi.encodeCall(IAssetTrackerDataEncoding.receiveMigrationOnL1, data);
@@ -288,6 +292,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             assetId
         );
         assertEq(assetMigrationNumGW, migrationNumber, "Asset migration number should be updated on Gateway");
+        assertEq(gwAssetTracker.getOriginToken(assetId), tokenAddress);
+        assertEq(gwAssetTracker.getTokenOriginChainId(assetId), originalChainId);
     }
 
     function test_migrationGatewayToL1() public {
@@ -333,12 +339,15 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             originToken: tokenAddress,
             isL1ToGateway: false
         });
-        ConfirmBalanceMigrationData memory confirmData = ConfirmBalanceMigrationData({
+        TokenBalanceMigrationData memory confirmData = TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             isL1ToGateway: false,
             chainId: eraZKChainId,
             assetId: assetId,
-            migrationNumber: migrationNumber,
+            originToken: tokenAddress,
+            tokenOriginChainId: originalChainId,
+            chainMigrationNumber: 0,
+            assetMigrationNumber: migrationNumber,
             amount: amount
         });
         bytes memory encodedData = abi.encodeCall(IAssetTrackerDataEncoding.receiveMigrationOnL1, data);
@@ -433,6 +442,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             migrationNumber,
             "Asset migration number should be updated on Gateway after confirmation"
         );
+        assertEq(gwAssetTracker.getOriginToken(assetId), tokenAddress);
+        assertEq(gwAssetTracker.getTokenOriginChainId(assetId), originalChainId);
     }
 
     function test_migrateTokenBalanceFromNTVV31_L2Chain() public {
