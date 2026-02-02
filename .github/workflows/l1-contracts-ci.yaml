@@ -38,16 +38,7 @@ jobs:
       - name: Build l1 contracts
         working-directory: l1-contracts
         run: |
-          rm -rf zkstack-out
           yarn build:foundry
-
-          # Fail if regenerated zkstack-out differs from what was committed
-          if [ -n "$(git status --porcelain -- zkstack-out)" ]; then
-            echo "::error::l1-contracts/zkstack-out is out of date. Run 'cd l1-contracts && yarn build:foundry' and commit the changes."
-            git --no-pager status --porcelain -- zkstack-out
-            git --no-pager diff -- zkstack-out || true
-            exit 1
-          fi
 
       - name: Build l2 contracts
         working-directory: l2-contracts
@@ -109,6 +100,41 @@ jobs:
 
       - name: Lint errors
         run: yarn l1 errors-lint --check
+
+  check-zkstack-out:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install foundry-zksync
+        uses: ./.github/actions/install-zksync-foundry
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.20.8
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build and check zkstack-out
+        working-directory: l1-contracts
+        run: |
+          rm -rf zkstack-out
+          yarn build:foundry
+
+          # Fail if regenerated zkstack-out differs from what was committed
+          if [ -n "$(git status --porcelain -- zkstack-out)" ]; then
+            echo "::error::l1-contracts/zkstack-out is out of date. Run 'cd l1-contracts && yarn build:foundry' and commit the changes."
+            git --no-pager status --porcelain -- zkstack-out
+            git --no-pager diff -- zkstack-out || true
+            exit 1
+          fi
 
   check-hashes:
     needs: [build]
