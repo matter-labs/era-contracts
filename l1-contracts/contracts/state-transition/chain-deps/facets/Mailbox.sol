@@ -37,7 +37,7 @@ import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol
 import {BALANCE_CHANGE_VERSION} from "../../../bridge/asset-tracker/IAssetTrackerBase.sol";
 import {INativeTokenVaultBase} from "../../../bridge/ntv/INativeTokenVaultBase.sol";
 import {OnlyGateway} from "../../../core/bridgehub/L1BridgehubErrors.sol";
-import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
+import {IMigrator} from "../../chain-interfaces/IMigrator.sol";
 import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAssetHandler.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
@@ -473,7 +473,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
     function pauseDepositsOnGateway(uint256 _timestamp) external onlyGatewayAssetTracker onlyGateway {
         s.pausedDepositsTimestamp = _timestamp;
-        emit IAdmin.DepositsPaused(s.chainId, _timestamp);
+        emit IMigrator.DepositsPaused(s.chainId, _timestamp);
     }
 
     function _requestL2TransactionSender(

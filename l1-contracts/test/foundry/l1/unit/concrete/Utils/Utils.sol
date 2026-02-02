@@ -12,6 +12,7 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {Migrator} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 
 import {FeeParams, IVerifier, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
@@ -306,7 +307,7 @@ library Utils {
     }
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](20);
+        bytes4[] memory selectors = new bytes4[](18);
         uint256 i = 0;
         selectors[i++] = AdminFacet.setPendingAdmin.selector;
         selectors[i++] = AdminFacet.acceptAdmin.selector;
@@ -326,8 +327,18 @@ library Utils {
         selectors[i++] = AdminFacet.unfreezeDiamond.selector;
         selectors[i++] = AdminFacet.genesisUpgrade.selector;
         selectors[i++] = AdminFacet.setDAValidatorPair.selector;
-        selectors[i++] = AdminFacet.pauseDepositsBeforeInitiatingMigration.selector;
-        selectors[i++] = AdminFacet.unpauseDeposits.selector;
+        return selectors;
+    }
+
+    function getMigratorSelectors() public pure returns (bytes4[] memory) {
+        bytes4[] memory selectors = new bytes4[](6);
+        uint256 i = 0;
+        selectors[i++] = Migrator.pauseDepositsBeforeInitiatingMigration.selector;
+        selectors[i++] = Migrator.unpauseDeposits.selector;
+        selectors[i++] = Migrator.forwardedBridgeBurn.selector;
+        selectors[i++] = Migrator.forwardedBridgeMint.selector;
+        selectors[i++] = Migrator.forwardedBridgeConfirmTransferResult.selector;
+        selectors[i++] = Migrator.prepareChainCommitment.selector;
         return selectors;
     }
 

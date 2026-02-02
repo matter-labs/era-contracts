@@ -14,6 +14,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 contract ZKChainDeployer is L1ContractDeployer {
@@ -65,7 +66,7 @@ contract ZKChainDeployer is L1ContractDeployer {
 
         address chainAddress = getZKChainAddress(eraZKChainId);
         if (!_pausedDeposits) {
-            IAdmin(chainAddress).unpauseDeposits();
+            IMigrator(chainAddress).unpauseDeposits();
         }
         eraConfig = deployScript.getConfig();
     }
@@ -78,7 +79,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         uint256 chainId = _deployZKChainInner(_baseToken, _chainId);
 
         address chainAddress = getZKChainAddress(chainId);
-        IAdmin(chainAddress).unpauseDeposits();
+        IMigrator(chainAddress).unpauseDeposits();
     }
 
     function _deployZKChainWithPausedDeposits(address _baseToken, uint256 _chainId) internal {

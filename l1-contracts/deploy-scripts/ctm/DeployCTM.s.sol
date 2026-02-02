@@ -48,6 +48,7 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {Migrator} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
@@ -534,7 +535,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function saveDiamondSelectors() public {
-        AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)), false);
+        AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)));
         GettersFacet gettersFacet = new GettersFacet();
         MailboxFacet mailboxFacet = new MailboxFacet(
             1,
@@ -544,10 +545,12 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             false
         );
         ExecutorFacet executorFacet = new ExecutorFacet(1);
+        Migrator migratorFacet = new Migrator(1, false);
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);
         bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);
         bytes4[] memory mailboxFacetSelectors = Utils.getAllSelectors(address(mailboxFacet).code);
         bytes4[] memory executorFacetSelectors = Utils.getAllSelectors(address(executorFacet).code);
+        bytes4[] memory migratorFacetSelectors = Utils.getAllSelectors(address(migratorFacet).code);
 
         string memory root = vm.projectRoot();
         string memory outputPath = string.concat(root, "/script-out/diamond-selectors.toml");
@@ -556,14 +559,16 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         bytes memory gettersFacetSelectorsBytes = abi.encode(gettersFacetSelectors);
         bytes memory mailboxFacetSelectorsBytes = abi.encode(mailboxFacetSelectors);
         bytes memory executorFacetSelectorsBytes = abi.encode(executorFacetSelectors);
+        bytes memory migratorFacetSelectorsBytes = abi.encode(migratorFacetSelectors);
 
         vm.serializeBytes("diamond_selectors", "admin_facet_selectors", adminFacetSelectorsBytes);
         vm.serializeBytes("diamond_selectors", "getters_facet_selectors", gettersFacetSelectorsBytes);
         vm.serializeBytes("diamond_selectors", "mailbox_facet_selectors", mailboxFacetSelectorsBytes);
+        vm.serializeBytes("diamond_selectors", "executor_facet_selectors", executorFacetSelectorsBytes);
         string memory toml = vm.serializeBytes(
             "diamond_selectors",
-            "executor_facet_selectors",
-            executorFacetSelectorsBytes
+            "migrator_facet_selectors",
+            migratorFacetSelectorsBytes
         );
 
         vm.writeToml(toml, outputPath);

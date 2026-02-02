@@ -19,6 +19,7 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {Migrator} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
@@ -137,7 +138,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         );
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)), false)),
+                facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)))),
                 action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: Utils.getAdminSelectors()
@@ -173,6 +174,14 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
                 action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: Utils.getMailboxSelectors()
+            })
+        );
+        facetCuts.push(
+            Diamond.FacetCut({
+                facet: address(new Migrator(block.chainid, false)),
+                action: Diamond.Action.Add,
+                isFreezable: false,
+                selectors: Utils.getMigratorSelectors()
             })
         );
 

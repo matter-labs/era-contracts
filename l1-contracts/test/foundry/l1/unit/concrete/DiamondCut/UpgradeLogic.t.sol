@@ -57,7 +57,7 @@ contract UpgradeLogicTest is DiamondCutTest {
 
         diamondCutTestContract = new DiamondCutTestContract();
         diamondInit = new DiamondInit(false);
-        adminFacet = new AdminFacet(block.chainid, RollupDAManager(address(0)), false);
+        adminFacet = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         gettersFacet = new GettersFacet();
         permissionlessValidator = new PermissionlessValidator();
 

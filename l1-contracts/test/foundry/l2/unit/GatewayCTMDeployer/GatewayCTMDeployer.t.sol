@@ -124,7 +124,7 @@ contract GatewayCTMDeployerTest is Test {
         new EraChainTypeManager(address(0), address(0), address(0), address(0));
 
         // Direct deployment contracts (no deployer)
-        new AdminFacet(1, RollupDAManager(address(0)), false);
+        new AdminFacet(1, RollupDAManager(address(0)));
         new MailboxFacet(1, 1, L2_CHAIN_ASSET_HANDLER_ADDR, IEIP7702Checker(address(0)), false);
         new ExecutorFacet(1);
         new GettersFacet();

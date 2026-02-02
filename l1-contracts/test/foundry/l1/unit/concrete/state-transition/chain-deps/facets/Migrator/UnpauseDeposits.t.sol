@@ -2,14 +2,14 @@
 
 pragma solidity 0.8.28;
 
-import {AdminTest} from "./_Admin_Shared.t.sol";
+import {MigratorTest} from "./_Migrator_Shared.t.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {DepositsNotPaused, MigrationInProgress} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
-contract UnpauseDepositsTest is AdminTest {
+contract UnpauseDepositsTest is MigratorTest {
     event DepositsUnpaused(uint256 chainId);
 
     // The `pausedDepositsTimestamp` sits at slot 62 of ZKChainStorage
@@ -25,7 +25,7 @@ contract UnpauseDepositsTest is AdminTest {
         // We first need to pause deposits before we get to unpause them
         address admin = utilsFacet.util_getAdmin();
         vm.startPrank(admin);
-        adminFacet.pauseDepositsBeforeInitiatingMigration();
+        migratorFacet.pauseDepositsBeforeInitiatingMigration();
     }
 
     function test_revertWhen_calledByNonAdmin() public {
@@ -34,7 +34,7 @@ contract UnpauseDepositsTest is AdminTest {
 
         vm.startPrank(nonAdmin);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonAdmin));
-        adminFacet.unpauseDeposits();
+        migratorFacet.unpauseDeposits();
     }
 
     function test_revertWhen_depositsNotPaused() public {
@@ -42,22 +42,22 @@ contract UnpauseDepositsTest is AdminTest {
         address admin = utilsFacet.util_getAdmin();
         vm.startPrank(admin);
         vm.expectRevert(abi.encodeWithSelector(DepositsNotPaused.selector));
-        adminFacet.unpauseDeposits();
+        migratorFacet.unpauseDeposits();
 
         // The priorityTree sits at slot 51 of ZKChainStorage
         bytes32 slot = bytes32(uint256(51));
         // Fake a deposit by extending the priority tree so `getTotalPriorityTxs` returns non-zero
-        vm.store(address(adminFacet), slot, bytes32(uint256(1)));
+        vm.store(address(migratorFacet), slot, bytes32(uint256(1)));
         // The `pausedDepositsTimestamp` will therefore be set to the current `block.timestamp`
         _pauseDeposits();
 
         // Call reverts before the paused window comes into effect
         vm.expectRevert(abi.encodeWithSelector(DepositsNotPaused.selector));
-        adminFacet.unpauseDeposits();
+        migratorFacet.unpauseDeposits();
         // Call also reverts after the paused window ends
         vm.warp(block.timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET);
         vm.expectRevert(abi.encodeWithSelector(DepositsNotPaused.selector));
-        adminFacet.unpauseDeposits();
+        migratorFacet.unpauseDeposits();
     }
 
     function test_revertWhen_migrationInProgress() public {
@@ -81,7 +81,7 @@ contract UnpauseDepositsTest is AdminTest {
 
         vm.startPrank(admin);
         vm.expectRevert(abi.encodeWithSelector(MigrationInProgress.selector));
-        adminFacet.unpauseDeposits();
+        migratorFacet.unpauseDeposits();
     }
 
     function test_successfulCall() public {
@@ -105,10 +105,10 @@ contract UnpauseDepositsTest is AdminTest {
         vm.startPrank(admin);
         vm.expectEmit(true, false, false, false);
         emit DepositsUnpaused(chainId);
-        adminFacet.unpauseDeposits();
+        migratorFacet.unpauseDeposits();
 
         // Read storage to check that the recorded timestamp is reset to 0
-        uint256 pausedDepositsTimestamp = uint256(vm.load(address(adminFacet), pausedDepositsTimestampSlot));
+        uint256 pausedDepositsTimestamp = uint256(vm.load(address(migratorFacet), pausedDepositsTimestampSlot));
         assertEq(pausedDepositsTimestamp, 0);
     }
 }
