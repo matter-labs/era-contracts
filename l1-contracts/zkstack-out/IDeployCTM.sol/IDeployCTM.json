@@ -151,6 +151,11 @@
                 "name": "rollupSLDAValidator",
                 "type": "address",
                 "internalType": "address"
+              },
+              {
+                "name": "permissionlessValidator",
+                "type": "address",
+                "internalType": "address"
               }
             ]
           },

@@ -144,6 +144,13 @@
   },
   {
     "type": "function",
+    "name": "activatePriorityMode",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "addValidator",
     "inputs": [
       {
@@ -679,6 +686,12 @@
         "internalType": "uint256"
       }
     ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PriorityModeActivated",
+    "inputs": [],
     "anonymous": false
   },
   {
