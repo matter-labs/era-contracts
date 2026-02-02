@@ -34,6 +34,13 @@ import {ChainCreationParamsConfig} from "deploy-scripts/utils/Types.sol";
 contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
     using stdToml for string;
 
+    function initSystemContracts(SystemContractsArgs memory _args) internal virtual override {
+        L2Utils.initSystemContracts(_args);
+        // Deploy DummyInteropRecipient using force deploy pattern for zkfoundry
+        L2Utils.deployDummyInteropRecipient(interopTargetContract);
+        vm.deal(interopTargetContract, 1000 ether);
+    }
+
     /// @notice Override to avoid library delegatecall issues in ZKsync mode
     /// Returns hardcoded values from the test config
     function getChainCreationParamsConfig(
@@ -53,10 +60,6 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         chainCreationParams.evmEmulatorHash = bytes32(
             0x01000D83E0329D9144AD041430FAFCBC2B388E5434DB8CB8A96E80157738A1DA
         );
-    }
-
-    function initSystemContracts(SystemContractsArgs memory _args) internal virtual override {
-        L2Utils.initSystemContracts(_args);
     }
 
     /// @notice this is duplicate code, but the inheritance is already complex

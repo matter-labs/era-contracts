@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {Utils} from "deploy-scripts/utils/Utils.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {TokenMetadata, TokenBridgingData} from "contracts/common/Messaging.sol";
 import {Vm} from "forge-std/Vm.sol";
@@ -24,48 +22,63 @@ struct BytecodeInfo {
     bytes assetTrackerBytecodeInfo;
 }
 
-library L2GenesisUpgradeTestHelper {
-    function getBytecodeInfo() public view returns (BytecodeInfo memory info) {
-        bytes memory messageRootBytecode = Utils.readZKFoundryBytecodeL1("L2MessageRoot.sol", "L2MessageRoot");
-        info.messageRootBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(messageRootBytecode));
+struct ContractName {
+    string file;
+    string name;
+}
 
-        bytes memory l2NativeTokenVaultBytecode = Utils.readZKFoundryBytecodeL1(
-            "L2NativeTokenVault.sol",
-            "L2NativeTokenVault"
-        );
-        info.l2NtvBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(l2NativeTokenVaultBytecode));
+struct BytecodeNames {
+    // For force deployments data
+    ContractName messageRoot;
+    ContractName l2Ntv;
+    ContractName l2AssetRouter;
+    ContractName bridgehub;
+    ContractName chainAssetHandler;
+    ContractName beaconDeployer;
+    ContractName interopCenter;
+    ContractName interopHandler;
+    ContractName assetTracker;
+    // For setUp etching
+    ContractName complexUpgrader;
+    ContractName genesisUpgrade;
+    ContractName systemContext;
+    ContractName wrappedBaseToken;
+    ContractName systemContractProxyAdmin;
+}
 
-        info.l2AssetRouterBytecodeInfo = abi.encode(
-            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("L2AssetRouter.sol", "L2AssetRouter"))
-        );
+contract L2GenesisUpgradeTestHelper {
+    function getBytecodeNames() public pure returns (BytecodeNames memory names) {
+        // For force deployments data
+        names.messageRoot = ContractName("L2MessageRoot.sol", "L2MessageRoot");
+        names.l2Ntv = ContractName("L2NativeTokenVault.sol", "L2NativeTokenVault");
+        names.l2AssetRouter = ContractName("L2AssetRouter.sol", "L2AssetRouter");
+        names.bridgehub = ContractName("L2Bridgehub.sol", "L2Bridgehub");
+        names.chainAssetHandler = ContractName("L2ChainAssetHandler.sol", "L2ChainAssetHandler");
+        names.beaconDeployer = ContractName("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer");
+        names.interopCenter = ContractName("InteropCenter.sol", "InteropCenter");
+        names.interopHandler = ContractName("InteropHandler.sol", "InteropHandler");
+        names.assetTracker = ContractName("L2AssetTracker.sol", "L2AssetTracker");
+        // For setUp etching
+        names.complexUpgrader = ContractName("L2ComplexUpgrader.sol", "L2ComplexUpgrader");
+        names.genesisUpgrade = ContractName("L2GenesisUpgrade.sol", "L2GenesisUpgrade");
+        names.systemContext = ContractName("SystemContext.sol", "SystemContext");
+        names.wrappedBaseToken = ContractName("L2WrappedBaseToken.sol", "L2WrappedBaseToken");
+        names.systemContractProxyAdmin = ContractName("SystemContractProxyAdmin.sol", "SystemContractProxyAdmin");
+    }
 
-        info.bridgehubBytecodeInfo = abi.encode(
-            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("L2Bridgehub.sol", "L2Bridgehub"))
-        );
-
-        info.chainAssetHandlerBytecodeInfo = abi.encode(
-            L2ContractHelper.hashL2Bytecode(
-                Utils.readZKFoundryBytecodeL1("L2ChainAssetHandler.sol", "L2ChainAssetHandler")
-            )
-        );
-
-        info.beaconDeployerBytecodeInfo = abi.encode(
-            L2ContractHelper.hashL2Bytecode(
-                Utils.readZKFoundryBytecodeL1("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer")
-            )
-        );
-
-        info.interopCenterBytecodeInfo = abi.encode(
-            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("InteropCenter.sol", "InteropCenter"))
-        );
-
-        info.interopHandlerBytecodeInfo = abi.encode(
-            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("InteropHandler.sol", "InteropHandler"))
-        );
-
-        info.assetTrackerBytecodeInfo = abi.encode(
-            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("L2AssetTracker.sol", "L2AssetTracker"))
-        );
+    /// @notice Builds BytecodeInfo from an array of encoded bytecode hashes
+    /// @param bytecodeHashes Array of 9 elements in order: messageRoot, l2Ntv, l2AssetRouter, bridgehub,
+    ///        chainAssetHandler, beaconDeployer, interopCenter, interopHandler, assetTracker
+    function buildBytecodeInfo(bytes[9] memory bytecodeHashes) public pure returns (BytecodeInfo memory info) {
+        info.messageRootBytecodeInfo = bytecodeHashes[0];
+        info.l2NtvBytecodeInfo = bytecodeHashes[1];
+        info.l2AssetRouterBytecodeInfo = bytecodeHashes[2];
+        info.bridgehubBytecodeInfo = bytecodeHashes[3];
+        info.chainAssetHandlerBytecodeInfo = bytecodeHashes[4];
+        info.beaconDeployerBytecodeInfo = bytecodeHashes[5];
+        info.interopCenterBytecodeInfo = bytecodeHashes[6];
+        info.interopHandlerBytecodeInfo = bytecodeHashes[7];
+        info.assetTrackerBytecodeInfo = bytecodeHashes[8];
     }
 
     function getAdditionalForceDeploymentsData() public pure returns (bytes memory) {
