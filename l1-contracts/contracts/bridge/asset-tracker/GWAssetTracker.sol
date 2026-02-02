@@ -457,7 +457,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// @notice Handles an interop center message and returns the number of chargeable calls for settlement fees.
     /// @param _chainId The source chain ID.
     /// @param _message The message data from InteropCenter.
-    /// @return chargeableCallCount Number of calls that should incur gateway settlement fees (0 if useFixedFee=true or not a bundle).
+    /// @return chargeableCallCount Number of calls that should incur gateway settlement fees.
     function _handleInteropCenterMessage(
         uint256 _chainId,
         bytes calldata _message
