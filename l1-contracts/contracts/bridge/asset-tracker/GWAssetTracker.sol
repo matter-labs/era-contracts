@@ -631,10 +631,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _data) external onlyServiceTransactionSender {
         assetMigrationNumber[_data.chainId][_data.assetId] = _data.assetMigrationNumber;
         // Register the token if it wasn't already
-        if (originToken[_data.assetId] == address(0)) {
-            originToken[_data.assetId] = _data.originToken;
-            tokenOriginChainId[_data.assetId] = _data.tokenOriginChainId;
-        }
+        _registerToken(_data.assetId, _data.originToken, _data.tokenOriginChainId);
         if (_data.isL1ToGateway) {
             /// In this case the balance might never have been migrated back to L1.
             chainBalance[_data.chainId][_data.assetId] += _data.amount;
