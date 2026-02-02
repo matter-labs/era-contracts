@@ -24,7 +24,10 @@ contract GatewayCTMDeployerCTM is GatewayCTMDeployerCTMBase {
     }
 
     /// @inheritdoc GatewayCTMDeployerCTMBase
-    function _deployCTMImplementation(bytes32 _salt, address _permissionlessValidator) internal override returns (address) {
+    function _deployCTMImplementation(
+        bytes32 _salt,
+        address _permissionlessValidator
+    ) internal override returns (address) {
         return
             address(
                 new EraChainTypeManager{salt: _salt}(
