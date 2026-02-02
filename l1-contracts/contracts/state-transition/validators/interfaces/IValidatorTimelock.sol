@@ -142,5 +142,5 @@ interface IValidatorTimelock is IExecutor {
     ) external;
     /// @dev Declared just to formally satisfy the inherited {IExecutor} interface.
     /// NOTE: calls to this function revert in this contract.
-    function activatePriorityMode() external;
+    function revertBatchesForPriorityMode(uint256 _newLastBatch) external;
 }

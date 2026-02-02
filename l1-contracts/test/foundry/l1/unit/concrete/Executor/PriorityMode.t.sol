@@ -11,7 +11,7 @@ import {PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS, PRIORITY_EXPIRATION, RE
 contract PriorityModeExecutorTest is ExecutorTest {
     function test_revertWhen_activatePriorityMode_notAllowed() public {
         vm.expectRevert(PriorityModeIsNotAllowed.selector);
-        executor.activatePriorityMode();
+        admin.activatePriorityMode();
     }
 
     function test_revertWhen_activatePriorityMode_missingTimestamp() public {
@@ -19,7 +19,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
         admin.permanentlyAllowPriorityMode();
 
         vm.expectRevert(abi.encodeWithSelector(PriorityOpsRequestTimestampMissing.selector, 0));
-        executor.activatePriorityMode();
+        admin.activatePriorityMode();
     }
 
     function test_revertWhen_activatePriorityMode_tooEarly() public {
@@ -32,7 +32,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
 
         vm.warp(earliest - 1);
         vm.expectRevert(abi.encodeWithSelector(PriorityModeActivationTooEarly.selector, earliest, earliest - 1));
-        executor.activatePriorityMode();
+        admin.activatePriorityMode();
     }
 
     function test_revertWhen_validatorCommitsInPriorityMode() public {
@@ -138,7 +138,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
         admin.permanentlyAllowPriorityMode();
         _requestPriorityOp();
         vm.warp(block.timestamp + PRIORITY_EXPIRATION + 1);
-        executor.activatePriorityMode();
+        admin.activatePriorityMode();
     }
 
     function _requestPriorityOp() internal returns (uint256 requestTimestamp) {

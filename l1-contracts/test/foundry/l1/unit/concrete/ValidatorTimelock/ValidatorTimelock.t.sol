@@ -10,7 +10,7 @@ import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.s
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 
-import {ActivatePriorityModeNotImplementedInValidatorContract, RoleAccessDenied, TimeNotReached, NotAZKChain} from "contracts/common/L1ContractErrors.sol";
+import {RevertBatchesForPriorityModeNotImplementedInValidatorContract, RoleAccessDenied, TimeNotReached, NotAZKChain} from "contracts/common/L1ContractErrors.sol";
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
@@ -236,9 +236,9 @@ contract ValidatorTimelockTest is Test {
         validator.commitBatchesSharedBridge(zkSync, commitBatchFrom, commitBatchTo, commitData);
     }
 
-    function test_revertWhen_activatePriorityMode() public {
-        vm.expectRevert(ActivatePriorityModeNotImplementedInValidatorContract.selector);
-        validator.activatePriorityMode();
+    function test_revertWhen_revertBatchesForPriorityMode() public {
+        vm.expectRevert(RevertBatchesForPriorityModeNotImplementedInValidatorContract.selector);
+        validator.revertBatchesForPriorityMode(0);
     }
 
     function test_revertBatchesSharedBridge() public {

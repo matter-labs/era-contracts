@@ -78,7 +78,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     uint256[] internal proofInput;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](13);
+        bytes4[] memory selectors = new bytes4[](14);
         uint256 i = 0;
         selectors[i++] = admin.setPendingAdmin.selector;
         selectors[i++] = admin.acceptAdmin.selector;
@@ -93,6 +93,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         selectors[i++] = admin.unfreezeDiamond.selector;
         selectors[i++] = admin.setDAValidatorPair.selector;
         selectors[i++] = admin.permanentlyAllowPriorityMode.selector;
+        selectors[i++] = admin.activatePriorityMode.selector;
         return selectors;
     }
 
@@ -107,7 +108,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         selectors[i++] = executor.setPriorityTreeHistoricalRoot.selector;
         selectors[i++] = executor.appendPriorityOp.selector;
         selectors[i++] = executor.precommitSharedBridge.selector;
-        selectors[i++] = executor.activatePriorityMode.selector;
+        selectors[i++] = executor.revertBatchesForPriorityMode.selector;
         return selectors;
     }
 

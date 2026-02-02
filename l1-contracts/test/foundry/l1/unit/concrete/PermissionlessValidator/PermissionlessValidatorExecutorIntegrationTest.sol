@@ -68,7 +68,7 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
             _refundRecipient: prioritySender
         });
         vm.warp(block.timestamp + PRIORITY_EXPIRATION + 1);
-        executor.activatePriorityMode();
+        admin.activatePriorityMode();
     }
 
     function test_settleBatchesSharedBridge_withExecutor() public {
