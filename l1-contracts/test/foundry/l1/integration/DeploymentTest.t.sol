@@ -96,13 +96,14 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 addresses.chainTypeManager.protocolVersion(),
                 addresses.chainTypeManager.storedBatchZero(),
                 address(addresses.bridgehub),
-                address(addresses.interopCenter)
+                address(addresses.interopCenter),
+                address(addresses.chainTypeManager)
             );
 
             address stmAddr = IZKChain(chain).getChainTypeManager();
 
             vm.startBroadcast(owner);
-            addresses.bridgehub.addChainTypeManager(stmAddr);
+            // CTM is already registered from prepare(), no need to add it again
             addresses.bridgehub.addTokenAssetId(baseTokenAssetId);
             addresses.bridgehub.registerAlreadyDeployedZKChain(chainId, chain);
             vm.stopBroadcast();
@@ -136,7 +137,8 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 addresses.chainTypeManager.protocolVersion(),
                 addresses.chainTypeManager.storedBatchZero(),
                 address(addresses.bridgehub),
-                address(addresses.interopCenter)
+                address(addresses.interopCenter),
+                address(addresses.chainTypeManager)
             );
 
             // Verify chain was deployed
