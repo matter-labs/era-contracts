@@ -72,6 +72,14 @@ contract InteropCenter is
     /// @notice Cached ZK token contract address (resolved from asset ID).
     IERC20 private zkToken;
 
+    /// @notice Accumulated protocol fees (base token) per coinbase.
+    /// @dev Coinbase addresses can claim their accumulated fees via claimProtocolFees().
+    mapping(address coinbase => uint256 amount) public accumulatedProtocolFees;
+
+    /// @notice Accumulated ZK fees per coinbase.
+    /// @dev Coinbase addresses can claim their accumulated fees via claimZKFees().
+    mapping(address coinbase => uint256 amount) public accumulatedZKFees;
+
     modifier onlyL1() {
         require(L1_CHAIN_ID == block.chainid, NotL1(L1_CHAIN_ID, block.chainid));
         _;
@@ -362,11 +370,17 @@ contract InteropCenter is
                 );
             }
         }
-        // Send protocol fee directly to block.coinbase
+        // Send protocol fee to block.coinbase. If transfer fails (e.g., coinbase is a reverting contract),
+        // accumulate the fee for later withdrawal via claimProtocolFees().
+        // This is handled to not allow malicious operator to fail sending bundles by providing faulty coinbase.
         if (protocolFee > 0) {
             (bool success, ) = block.coinbase.call{value: protocolFee}("");
-            require(success, FeeWithdrawalFailed());
-            emit ProtocolFeesCollected(block.coinbase, protocolFee);
+            if (success) {
+                emit ProtocolFeesCollected(block.coinbase, protocolFee);
+            } else {
+                accumulatedProtocolFees[block.coinbase] += protocolFee;
+                emit ProtocolFeesAccumulated(block.coinbase, protocolFee);
+            }
         }
     }
 
@@ -413,11 +427,26 @@ contract InteropCenter is
             }
         }
 
-        // If using fixed fees, collect ZK tokens per-call and send to block.coinbase
+        // If using fixed fees, collect ZK tokens per-call and send to block.coinbase.
+        // If transfer to coinbase fails, accumulate for later withdrawal via claimZKFees().
+        // This is handled to not allow malicious operator to fail sending bundles by providing malicious coinbase.
         if (_bundleAttributes.useFixedFee) {
             uint256 totalZKFee = ZK_INTEROP_FEE * callStartersLength;
-            _getZKToken().safeTransferFrom(msg.sender, block.coinbase, totalZKFee);
-            emit FixedZKFeesCollected(msg.sender, block.coinbase, totalZKFee);
+            IERC20 token = _getZKToken();
+            // First transfer from user to this contract
+            token.safeTransferFrom(msg.sender, address(this), totalZKFee);
+            // Then try to forward to coinbase
+            // Using low-level call to handle potential reverts from coinbase
+            (bool success, ) = address(token).call(
+                abi.encodeWithSelector(IERC20.transfer.selector, block.coinbase, totalZKFee)
+            );
+            if (success) {
+                emit FixedZKFeesCollected(msg.sender, block.coinbase, totalZKFee);
+            } else {
+                // solhint-disable-next-line reentrancy
+                accumulatedZKFees[block.coinbase] += totalZKFee;
+                emit FixedZKFeesAccumulated(msg.sender, block.coinbase, totalZKFee);
+            }
         }
 
         // Ensure that tokens required for bundle execution were received.
@@ -679,5 +708,38 @@ contract InteropCenter is
         uint256 oldFee = interopProtocolFee;
         interopProtocolFee = _fee;
         emit InteropFeeUpdated(oldFee, _fee);
+    }
+
+    /// @notice Allows a coinbase to claim their accumulated protocol fees (base token).
+    /// @dev Transfers all accumulated base token fees to the specified receiver.
+    /// @param _receiver Address to receive the fees.
+    function claimProtocolFees(address _receiver) external nonReentrant {
+        uint256 amount = accumulatedProtocolFees[msg.sender];
+        if (amount == 0) {
+            return;
+        }
+
+        accumulatedProtocolFees[msg.sender] = 0;
+
+        // slither-disable-next-line arbitrary-send-eth
+        (bool success, ) = _receiver.call{value: amount}("");
+        require(success, FeeWithdrawalFailed());
+
+        emit ProtocolFeesClaimed(msg.sender, _receiver, amount);
+    }
+
+    /// @notice Allows a coinbase to claim their accumulated ZK fees.
+    /// @dev Transfers all accumulated ZK token fees to the specified receiver.
+    /// @param _receiver Address to receive the fees.
+    function claimZKFees(address _receiver) external nonReentrant {
+        uint256 amount = accumulatedZKFees[msg.sender];
+        if (amount == 0) {
+            return;
+        }
+
+        accumulatedZKFees[msg.sender] = 0;
+        _getZKToken().safeTransfer(_receiver, amount);
+
+        emit ZKFeesClaimed(msg.sender, _receiver, amount);
     }
 }

@@ -15,16 +15,39 @@ interface IInteropCenter {
     /// @notice Emitted when the interop protocol fee is updated.
     event InteropFeeUpdated(uint256 indexed oldFee, uint256 indexed newFee);
 
-    /// @notice Emitted when protocol fees (base token) are collected and sent to the recipient
-    /// @param recipient Address that received the fees (always block.coinbase in current release).
+    /// @notice Emitted when protocol fees (base token) are collected and sent to the coinbase.
+    /// @param recipient Address that received the fees (block.coinbase).
     /// @param amount Total amount of base token collected.
     event ProtocolFeesCollected(address indexed recipient, uint256 amount);
 
-    /// @notice Emitted when fixed ZK fees are collected from a user.
+    /// @notice Emitted when fixed ZK fees are collected from a user and sent to the coinbase.
     /// @param payer Address that paid the fees.
-    /// @param recipient Address that received the fees (always block.coinbase in current release).
+    /// @param recipient Address that received the fees (block.coinbase).
     /// @param amount Total amount of ZK tokens collected.
     event FixedZKFeesCollected(address indexed payer, address indexed recipient, uint256 amount);
+
+    /// @notice Emitted when protocol fees (base token) transfer to coinbase failed and fees are accumulated.
+    /// @param coinbase Address of the block producer (block.coinbase) that earned the fees.
+    /// @param amount Amount of base token accumulated (claimable via claimProtocolFees).
+    event ProtocolFeesAccumulated(address indexed coinbase, uint256 amount);
+
+    /// @notice Emitted when ZK fees transfer to coinbase failed and fees are accumulated.
+    /// @param payer Address that paid the fees.
+    /// @param coinbase Address of the block producer (block.coinbase) that earned the fees.
+    /// @param amount Amount of ZK tokens accumulated (claimable via claimZKFees).
+    event FixedZKFeesAccumulated(address indexed payer, address indexed coinbase, uint256 amount);
+
+    /// @notice Emitted when a coinbase claims their accumulated protocol fees (base token).
+    /// @param coinbase Address of the coinbase claiming the fees.
+    /// @param receiver Address that received the fees.
+    /// @param amount Amount of base token claimed.
+    event ProtocolFeesClaimed(address indexed coinbase, address indexed receiver, uint256 amount);
+
+    /// @notice Emitted when a coinbase claims their accumulated ZK fees.
+    /// @param coinbase Address of the coinbase claiming the fees.
+    /// @param receiver Address that received the fees.
+    /// @param amount Amount of ZK tokens claimed.
+    event ZKFeesClaimed(address indexed coinbase, address indexed receiver, uint256 amount);
 
     /// @notice Restrictions for parsing attributes.
     /// @param OnlyInteropCallValue: Only attribute for interop call value is allowed.
@@ -56,9 +79,29 @@ interface IInteropCenter {
     /// @notice Returns ZK token address if available, zero address otherwise.
     function getZKTokenAddress() external view returns (address);
 
+    /// @notice Returns the accumulated protocol fees (base token) for a coinbase.
+    /// @param coinbase Address of the coinbase.
+    /// @return Amount of accumulated base token fees.
+    function accumulatedProtocolFees(address coinbase) external view returns (uint256);
+
+    /// @notice Returns the accumulated ZK fees for a coinbase.
+    /// @param coinbase Address of the coinbase.
+    /// @return Amount of accumulated ZK token fees.
+    function accumulatedZKFees(address coinbase) external view returns (uint256);
+
     /// @notice Sets the base token fee per interop call (used when useFixedFee=false).
     /// @param _fee New fee amount in base token wei.
     function setInteropFee(uint256 _fee) external;
+
+    /// @notice Allows a coinbase to claim their accumulated protocol fees (base token).
+    /// @dev Transfers all accumulated base token fees to the specified receiver.
+    /// @param _receiver Address to receive the fees.
+    function claimProtocolFees(address _receiver) external;
+
+    /// @notice Allows a coinbase to claim their accumulated ZK fees.
+    /// @dev Transfers all accumulated ZK token fees to the specified receiver.
+    /// @param _receiver Address to receive the fees.
+    function claimZKFees(address _receiver) external;
 
     /// @notice Checks if the attribute selector is supported by the InteropCenter.
     /// @param _attributeSelector The attribute selector to check.
