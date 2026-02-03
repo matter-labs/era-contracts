@@ -300,7 +300,13 @@ contract ExecutorTest is UtilsCallMockerTest {
             l2DefaultAccountBytecodeHash: dummyHash,
             l2EvmEmulatorBytecodeHash: dummyHash
         });
-        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), baseTokenAssetId);
+        mockDiamondInitInteropCenterCallsWithAddress(
+            address(dummyBridgehub),
+            address(0),
+            baseTokenAssetId,
+            address(chainTypeManager),
+            address(permissionlessValidator)
+        );
 
         bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 
