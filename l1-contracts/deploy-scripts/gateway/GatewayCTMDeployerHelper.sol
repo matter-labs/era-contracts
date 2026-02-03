@@ -323,7 +323,7 @@ library GatewayCTMDeployerHelper {
         (addresses.facets.migratorFacet, data.migratorFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "Migrator.sol",
-            "Migrator",
+            "MigratorFacet",
             migratorFacetArgs,
             config.isZKsyncOS
         );
@@ -1172,7 +1172,7 @@ library GatewayCTMDeployerHelper {
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("Mailbox.sol", "MailboxFacet");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("Executor.sol", "ExecutorFacet");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("Getters.sol", "GettersFacet");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("Migrator.sol", "Migrator");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("Migrator.sol", "MigratorFacet");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("Committer.sol", "CommitterFacet");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("DiamondInit.sol", "DiamondInit");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("L1GenesisUpgrade.sol", "L1GenesisUpgrade");

@@ -22,7 +22,7 @@ import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 /// @title Migrator Contract handles chain migration between settlement layers.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract Migrator is ZKChainBase, IMigrator {
+contract MigratorFacet is ZKChainBase, IMigrator {
     using PriorityTree for PriorityTree.Tree;
     using PriorityQueue for PriorityQueue.Queue;
 
@@ -34,12 +34,16 @@ contract Migrator is ZKChainBase, IMigrator {
     /// L1 that is at the most base layer.
     uint256 internal immutable L1_CHAIN_ID;
 
+    /// @notice The timestamp when chain migration becomes available.
     uint256 internal immutable CHAIN_MIGRATION_TIME_WINDOW_START;
 
+    /// @notice The timestamp when chain migration is no longer available.
     uint256 internal immutable CHAIN_MIGRATION_TIME_WINDOW_END;
 
+    /// @notice The timestamp when deposit pausing becomes available.
     uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_START;
 
+    /// @notice The timestamp when deposit pausing is no longer available.
     uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_END;
 
     constructor(uint256 _l1ChainId, bool _isTestnet) {
@@ -111,7 +115,6 @@ contract Migrator is ZKChainBase, IMigrator {
     }
 
     /// @inheritdoc IMigrator
-    /// @dev Diamond facet: ETH is stored in the Diamond proxy, not this contract.
     // slither-disable-next-line locked-ether
     function forwardedBridgeBurn(
         address _settlementLayer,
@@ -172,7 +175,6 @@ contract Migrator is ZKChainBase, IMigrator {
     }
 
     /// @inheritdoc IMigrator
-    /// @dev Diamond facet: ETH is stored in the Diamond proxy, not this contract.
     // slither-disable-next-line locked-ether
     function forwardedBridgeMint(
         bytes calldata _data,
@@ -258,16 +260,7 @@ contract Migrator is ZKChainBase, IMigrator {
         emit MigrationComplete();
     }
 
-    /// @notice Sets the DA validator pair with the given values.
-    /// @param _l1DAValidator The address of the L1 DA validator.
-    /// @param _l2DACommitmentScheme The scheme of the L2 DA commitment.
-    function _setDAValidatorPair(address _l1DAValidator, L2DACommitmentScheme _l2DACommitmentScheme) internal {
-        s.l1DAValidator = _l1DAValidator;
-        s.l2DACommitmentScheme = _l2DACommitmentScheme;
-    }
-
     /// @inheritdoc IMigrator
-    /// @dev Diamond facet: ETH is stored in the Diamond proxy, not this contract.
     // slither-disable-next-line locked-ether
     function forwardedBridgeConfirmTransferResult(
         uint256 /* _chainId */,

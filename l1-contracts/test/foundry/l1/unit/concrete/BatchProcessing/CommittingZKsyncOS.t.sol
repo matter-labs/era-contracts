@@ -7,6 +7,7 @@ import {Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {MismatchL2DACommitmentScheme} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
@@ -49,12 +50,11 @@ contract CommittingTest is ExecutorTest {
             blobsLinearHashes
         );
 
-        IExecutor.CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
         correctNewCommitBatchInfo.daCommitment = daCommitment;
 
-        IExecutor.CommitBatchInfoZKsyncOS[]
-            memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -79,13 +79,12 @@ contract CommittingTest is ExecutorTest {
             )
         );
 
-        IExecutor.CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
         correctNewCommitBatchInfo.daCommitment = daCommitment;
         correctNewCommitBatchInfo.daCommitmentScheme = L2DACommitmentScheme.BLOBS_ZKSYNC_OS;
 
-        IExecutor.CommitBatchInfoZKsyncOS[]
-            memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -117,13 +116,12 @@ contract CommittingTest is ExecutorTest {
             )
         );
 
-        IExecutor.CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
         correctNewCommitBatchInfo.daCommitment = daCommitment;
         correctNewCommitBatchInfo.daCommitmentScheme = L2DACommitmentScheme.BLOBS_ZKSYNC_OS;
 
-        IExecutor.CommitBatchInfoZKsyncOS[]
-            memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -150,13 +148,12 @@ contract CommittingTest is ExecutorTest {
 
         bytes32 daCommitment = bytes32(0); // empty
 
-        IExecutor.CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
         correctNewCommitBatchInfo.daCommitment = daCommitment;
         correctNewCommitBatchInfo.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
 
-        IExecutor.CommitBatchInfoZKsyncOS[]
-            memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -187,13 +184,12 @@ contract CommittingTest is ExecutorTest {
             )
         );
 
-        IExecutor.CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
         correctNewCommitBatchInfo.daCommitment = daCommitment;
         correctNewCommitBatchInfo.daCommitmentScheme = L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256;
 
-        IExecutor.CommitBatchInfoZKsyncOS[]
-            memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -240,12 +236,11 @@ contract CommittingTest is ExecutorTest {
             blobsLinearHashes
         );
 
-        IExecutor.CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
         correctNewCommitBatchInfo.daCommitment = daCommitment;
 
-        IExecutor.CommitBatchInfoZKsyncOS[]
-            memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -271,13 +266,12 @@ contract CommittingTest is ExecutorTest {
             )
         );
 
-        IExecutor.CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
         correctNewCommitBatchInfo.daCommitment = daCommitment;
         correctNewCommitBatchInfo.daCommitmentScheme = L2DACommitmentScheme.BLOBS_ZKSYNC_OS;
 
-        IExecutor.CommitBatchInfoZKsyncOS[]
-            memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -316,13 +310,12 @@ contract CommittingTest is ExecutorTest {
             )
         );
 
-        IExecutor.CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
         correctNewCommitBatchInfo.daCommitment = daCommitment;
         correctNewCommitBatchInfo.daCommitmentScheme = L2DACommitmentScheme.BLOBS_ZKSYNC_OS;
 
-        IExecutor.CommitBatchInfoZKsyncOS[]
-            memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -343,13 +336,13 @@ contract CommittingTest is ExecutorTest {
         bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
         bytes32 daCommitment = bytes32(0);
 
-        IExecutor.CommitBatchInfoZKsyncOS memory wrongBatchInfo = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory wrongBatchInfo = newCommitBatchInfoZKsyncOS;
         wrongBatchInfo.operatorDAInput = operatorDAInput;
         wrongBatchInfo.daCommitment = daCommitment;
         wrongBatchInfo.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
         wrongBatchInfo.batchNumber = 5; // Wrong batch number, should be 1
 
-        IExecutor.CommitBatchInfoZKsyncOS[] memory batchArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
         batchArray[0] = wrongBatchInfo;
 
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
@@ -368,13 +361,13 @@ contract CommittingTest is ExecutorTest {
         bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
         bytes32 daCommitment = bytes32(0);
 
-        IExecutor.CommitBatchInfoZKsyncOS memory wrongChainBatch = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory wrongChainBatch = newCommitBatchInfoZKsyncOS;
         wrongChainBatch.operatorDAInput = operatorDAInput;
         wrongChainBatch.daCommitment = daCommitment;
         wrongChainBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
         wrongChainBatch.chainId = 999; // Wrong chain ID
 
-        IExecutor.CommitBatchInfoZKsyncOS[] memory batchArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
         batchArray[0] = wrongChainBatch;
 
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
@@ -393,14 +386,14 @@ contract CommittingTest is ExecutorTest {
         bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
         bytes32 daCommitment = bytes32(0);
 
-        IExecutor.CommitBatchInfoZKsyncOS memory invalidBlockBatch = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory invalidBlockBatch = newCommitBatchInfoZKsyncOS;
         invalidBlockBatch.operatorDAInput = operatorDAInput;
         invalidBlockBatch.daCommitment = daCommitment;
         invalidBlockBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
         invalidBlockBatch.firstBlockNumber = 10; // firstBlockNumber > lastBlockNumber
         invalidBlockBatch.lastBlockNumber = 5;
 
-        IExecutor.CommitBatchInfoZKsyncOS[] memory batchArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
         batchArray[0] = invalidBlockBatch;
 
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
@@ -419,14 +412,14 @@ contract CommittingTest is ExecutorTest {
         bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
         bytes32 daCommitment = bytes32(0);
 
-        IExecutor.CommitBatchInfoZKsyncOS memory futureTimestampBatch = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory futureTimestampBatch = newCommitBatchInfoZKsyncOS;
         futureTimestampBatch.operatorDAInput = operatorDAInput;
         futureTimestampBatch.daCommitment = daCommitment;
         futureTimestampBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
         // Set lastBlockTimestamp far in the future
         futureTimestampBatch.lastBlockTimestamp = uint64(block.timestamp + 365 days);
 
-        IExecutor.CommitBatchInfoZKsyncOS[] memory batchArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
         batchArray[0] = futureTimestampBatch;
 
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
@@ -445,14 +438,14 @@ contract CommittingTest is ExecutorTest {
         bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
         bytes32 daCommitment = bytes32(0);
 
-        IExecutor.CommitBatchInfoZKsyncOS memory pastTimestampBatch = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory pastTimestampBatch = newCommitBatchInfoZKsyncOS;
         pastTimestampBatch.operatorDAInput = operatorDAInput;
         pastTimestampBatch.daCommitment = daCommitment;
         pastTimestampBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
         // Set firstBlockTimestamp far in the past
         pastTimestampBatch.firstBlockTimestamp = 1;
 
-        IExecutor.CommitBatchInfoZKsyncOS[] memory batchArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
         batchArray[0] = pastTimestampBatch;
 
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils

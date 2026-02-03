@@ -11,7 +11,10 @@ import {Unauthorized, OnlyNormalMode, OnlyPriorityMode} from "../../../common/L1
 import {L2_INTEROP_CENTER_ADDR, GW_ASSET_TRACKER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
-import {PRIORITY_OPERATION_L2_TX_TYPE, SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "../../../common/Config.sol";
+import {PRIORITY_OPERATION_L2_TX_TYPE, SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE, L2DACommitmentScheme, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH} from "../../../common/Config.sol";
+import {RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch} from "../../../common/L1ContractErrors.sol";
+import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
+import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
@@ -174,5 +177,44 @@ contract ZKChainBase is ReentrancyGuard {
 
     function _getUpgradeTxType() internal view returns (uint256) {
         return s.zksyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
+    }
+
+    /// @notice Sets the DA validator pair with the given values.
+    /// @dev It does not check for these values to be non-zero, since when migrating to a new settlement
+    /// layer, we set them to zero.
+    /// @param _l1DAValidator The address of the L1 DA validator.
+    /// @param _l2DACommitmentScheme The scheme of the L2 DA commitment.
+    function _setDAValidatorPair(address _l1DAValidator, L2DACommitmentScheme _l2DACommitmentScheme) internal {
+        emit IAdmin.NewL1DAValidator(s.l1DAValidator, _l1DAValidator);
+        emit IAdmin.NewL2DACommitmentScheme(s.l2DACommitmentScheme, _l2DACommitmentScheme);
+
+        s.l1DAValidator = _l1DAValidator;
+        s.l2DACommitmentScheme = _l2DACommitmentScheme;
+    }
+
+    /// @notice Reverts uncommitted batches
+    /// @param _newLastBatch The batch number after which batches should be reverted.
+    function _revertBatches(uint256 _newLastBatch) internal {
+        if (s.totalBatchesCommitted < _newLastBatch) {
+            revert RevertedBatchNotAfterNewLastBatch();
+        }
+        if (_newLastBatch < s.totalBatchesExecuted) {
+            revert CantRevertExecutedBatch();
+        }
+
+        s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
+
+        if (_newLastBatch < s.totalBatchesVerified) {
+            s.totalBatchesVerified = _newLastBatch;
+        }
+        s.totalBatchesCommitted = _newLastBatch;
+
+        // Reset the batch number of the executed system contracts upgrade transaction if the batch
+        // where the system contracts upgrade was committed is among the reverted batches.
+        if (s.l2SystemContractsUpgradeBatchNumber > _newLastBatch) {
+            delete s.l2SystemContractsUpgradeBatchNumber;
+        }
+
+        emit IExecutor.BlocksRevert(s.totalBatchesCommitted, s.totalBatchesVerified, s.totalBatchesExecuted);
     }
 }

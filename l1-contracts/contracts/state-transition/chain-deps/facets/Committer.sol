@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {COMMIT_TIMESTAMP_APPROXIMATION_DELTA, L2_TO_L1_LOG_SERIALIZE_SIZE, MAINNET_CHAIN_ID, MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PACKED_L2_PRECOMMITMENT_LENGTH, PACKED_NUMBER_OF_L1_TRANSACTIONS_LOG_MASK, PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH} from "../../../common/Config.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, LogProcessingOutput, MAX_LOG_KEY, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
-import {ICommitter} from "../../chain-interfaces/ICommitter.sol";
+import {ICommitter, CommitBatchInfo, CommitBatchInfoZKsyncOS, PrecommitInfo} from "../../chain-interfaces/ICommitter.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
@@ -64,7 +64,7 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         if (_batchNumber != expectedBatchNumber) {
             revert InvalidBatchNumber(_batchNumber, expectedBatchNumber);
         }
-        IExecutor.PrecommitInfo memory info = BatchDecoder.decodeAndCheckPrecommitData(_precommitData);
+        PrecommitInfo memory info = BatchDecoder.decodeAndCheckPrecommitData(_precommitData);
         if (info.packedTxsCommitments.length == 0) {
             revert EmptyPrecommitData(_batchNumber);
         }
@@ -117,7 +117,7 @@ contract CommitterFacet is ZKChainBase, ICommitter {
     ) internal {
         (
             IExecutor.StoredBatchInfo memory lastCommittedBatchData,
-            IExecutor.CommitBatchInfo[] memory newBatchesData
+            CommitBatchInfo[] memory newBatchesData
         ) = BatchDecoder.decodeAndCheckCommitData(_commitData, _processFrom, _processTo);
         // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
         // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
@@ -159,7 +159,7 @@ contract CommitterFacet is ZKChainBase, ICommitter {
     ) internal {
         (
             IExecutor.StoredBatchInfo memory lastCommittedBatchData,
-            IExecutor.CommitBatchInfoZKsyncOS[] memory newBatchesData
+            CommitBatchInfoZKsyncOS[] memory newBatchesData
         ) = BatchDecoder.decodeAndCheckCommitDataZKsyncOS(_commitData, _processFrom, _processTo);
         // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
         // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
@@ -184,7 +184,7 @@ contract CommitterFacet is ZKChainBase, ICommitter {
     /// @param _systemContractUpgradeTxHash The transaction hash of the system contract upgrade (bytes32(0) if none).
     function _commitBatchesEra(
         IExecutor.StoredBatchInfo memory _lastCommittedBatchData,
-        IExecutor.CommitBatchInfo[] memory _newBatchesData,
+        CommitBatchInfo[] memory _newBatchesData,
         bytes32 _systemContractUpgradeTxHash
     ) internal {
         // We disable this check because calldata array length is cheap.
@@ -212,7 +212,7 @@ contract CommitterFacet is ZKChainBase, ICommitter {
 
     function _commitBatchesZKsyncOS(
         IExecutor.StoredBatchInfo memory _lastCommittedBatchData,
-        IExecutor.CommitBatchInfoZKsyncOS[] memory _newBatchesData,
+        CommitBatchInfoZKsyncOS[] memory _newBatchesData,
         bool _processSystemUpgradeTx
     ) internal {
         bytes32 upgradeTxHash;
@@ -256,7 +256,7 @@ contract CommitterFacet is ZKChainBase, ICommitter {
     /// @notice Does not change storage
     function _commitOneBatchEra(
         IExecutor.StoredBatchInfo memory _previousBatch,
-        IExecutor.CommitBatchInfo memory _newBatch,
+        CommitBatchInfo memory _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
     ) internal returns (IExecutor.StoredBatchInfo memory storedBatchInfo) {
         // only commit next batch
@@ -340,7 +340,7 @@ contract CommitterFacet is ZKChainBase, ICommitter {
 
     function _commitOneBatchZKsyncOS(
         IExecutor.StoredBatchInfo memory _previousBatch,
-        IExecutor.CommitBatchInfoZKsyncOS memory _newBatch,
+        CommitBatchInfoZKsyncOS memory _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
     ) internal returns (IExecutor.StoredBatchInfo memory storedBatchInfo) {
         // only commit next batch
@@ -528,7 +528,7 @@ contract CommitterFacet is ZKChainBase, ICommitter {
     ///      SystemLogKey enum in Constants.sol is processed per new batch.
     /// @dev Data returned from here will be used to form the batch commitment.
     function _processL2Logs(
-        IExecutor.CommitBatchInfo memory _newBatch,
+        CommitBatchInfo memory _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
     ) internal view returns (LogProcessingOutput memory logOutput) {
         // Copy L2 to L1 logs into memory.
@@ -682,7 +682,7 @@ contract CommitterFacet is ZKChainBase, ICommitter {
 
     /// @dev Creates batch commitment from its data
     function _createBatchCommitment(
-        IExecutor.CommitBatchInfo memory _newBatchData,
+        CommitBatchInfo memory _newBatchData,
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
@@ -696,7 +696,7 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         commitment = keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
     }
 
-    function _batchPassThroughData(IExecutor.CommitBatchInfo memory _batch) internal pure returns (bytes memory) {
+    function _batchPassThroughData(CommitBatchInfo memory _batch) internal pure returns (bytes memory) {
         return
             abi.encodePacked(
                 // solhint-disable-next-line func-named-parameters
@@ -718,7 +718,7 @@ contract CommitterFacet is ZKChainBase, ICommitter {
     }
 
     function _batchAuxiliaryOutput(
-        IExecutor.CommitBatchInfo memory _batch,
+        CommitBatchInfo memory _batch,
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes

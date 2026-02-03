@@ -4,13 +4,14 @@ pragma solidity 0.8.28;
 
 import {CommitterFacet} from "../../state-transition/chain-deps/facets/Committer.sol";
 import {PubdataPricingMode} from "../../state-transition/chain-deps/ZKChainStorage.sol";
-import {LogProcessingOutput, IExecutor} from "../../state-transition/chain-interfaces/IExecutor.sol";
+import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfo} from "../../state-transition/chain-interfaces/ICommitter.sol";
 
 contract CommitterProvingTest is CommitterFacet {
     constructor() CommitterFacet(block.chainid) {}
 
     function createBatchCommitment(
-        IExecutor.CommitBatchInfo calldata _newBatchData,
+        CommitBatchInfo calldata _newBatchData,
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
@@ -20,7 +21,7 @@ contract CommitterProvingTest is CommitterFacet {
     }
 
     function processL2Logs(
-        IExecutor.CommitBatchInfo calldata _newBatch,
+        CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash,
         PubdataPricingMode
     ) external view returns (LogProcessingOutput memory logOutput) {

@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
-import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, PRIORITY_EXPIRATION} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
@@ -162,19 +161,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
         return address(ROLLUP_DA_MANAGER);
     }
 
-    /// @notice Sets the DA validator pair with the given values.
-    /// @param _l1DAValidator The address of the L1 DA validator.
-    /// @param _l2DACommitmentScheme The scheme of the L2 DA commitment.
-    /// @dev It does not check for these values to be non-zero, since when migrating to a new settlement
-    /// layer, we set them to zero.
-    function _setDAValidatorPair(address _l1DAValidator, L2DACommitmentScheme _l2DACommitmentScheme) internal {
-        emit NewL1DAValidator(s.l1DAValidator, _l1DAValidator);
-        emit NewL2DACommitmentScheme(s.l2DACommitmentScheme, _l2DACommitmentScheme);
-
-        s.l1DAValidator = _l1DAValidator;
-        s.l2DACommitmentScheme = _l2DACommitmentScheme;
-    }
-
     /// @inheritdoc IAdmin
     function setDAValidatorPair(address _l1DAValidator, L2DACommitmentScheme _l2DACommitmentScheme) external onlyAdmin {
         if (_l1DAValidator == address(0)) {
@@ -268,7 +254,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         s.priorityModeInfo.activated = true;
         // Revert all batches that are not finalized yet to allow the `PermissionlessValidator`
         // to commit, prove, and execute batches in one go.
-        IExecutor(address(this)).revertBatchesForPriorityMode(s.totalBatchesExecuted);
+        _revertBatches(s.totalBatchesExecuted);
         emit PriorityModeActivated();
     }
 

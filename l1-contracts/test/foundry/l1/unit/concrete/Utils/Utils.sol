@@ -13,12 +13,13 @@ import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Commi
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {Migrator} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
+import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 
 import {FeeParams, IVerifier, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfo, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {InteropRoot, L2CanonicalTransaction, L2Log} from "contracts/common/Messaging.sol";
 
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
@@ -202,9 +203,9 @@ library Utils {
             });
     }
 
-    function createCommitBatchInfo() public view returns (IExecutor.CommitBatchInfo memory) {
+    function createCommitBatchInfo() public view returns (CommitBatchInfo memory) {
         return
-            IExecutor.CommitBatchInfo({
+            CommitBatchInfo({
                 batchNumber: 1,
                 timestamp: uint64(uint256(randomBytes32("timestamp"))),
                 indexRepeatedStorageChanges: 0,
@@ -228,7 +229,7 @@ library Utils {
 
     function encodeCommitBatchesData(
         IExecutor.StoredBatchInfo memory _lastCommittedBatchData,
-        IExecutor.CommitBatchInfo[] memory _newBatchesData
+        CommitBatchInfo[] memory _newBatchesData
     ) internal pure returns (uint256, uint256, bytes memory) {
         return (
             _newBatchesData[0].batchNumber,
@@ -242,7 +243,7 @@ library Utils {
 
     function encodeCommitBatchesDataZKsyncOS(
         IExecutor.StoredBatchInfo memory _lastCommittedBatchData,
-        IExecutor.CommitBatchInfoZKsyncOS[] memory _newBatchesData
+        CommitBatchInfoZKsyncOS[] memory _newBatchesData
     ) internal pure returns (uint256, uint256, bytes memory) {
         return (
             _newBatchesData[0].batchNumber,
@@ -335,22 +336,21 @@ library Utils {
     function getMigratorSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](6);
         uint256 i = 0;
-        selectors[i++] = Migrator.pauseDepositsBeforeInitiatingMigration.selector;
-        selectors[i++] = Migrator.unpauseDeposits.selector;
-        selectors[i++] = Migrator.forwardedBridgeBurn.selector;
-        selectors[i++] = Migrator.forwardedBridgeMint.selector;
-        selectors[i++] = Migrator.forwardedBridgeConfirmTransferResult.selector;
-        selectors[i++] = Migrator.prepareChainCommitment.selector;
+        selectors[i++] = MigratorFacet.pauseDepositsBeforeInitiatingMigration.selector;
+        selectors[i++] = MigratorFacet.unpauseDeposits.selector;
+        selectors[i++] = MigratorFacet.forwardedBridgeBurn.selector;
+        selectors[i++] = MigratorFacet.forwardedBridgeMint.selector;
+        selectors[i++] = MigratorFacet.forwardedBridgeConfirmTransferResult.selector;
+        selectors[i++] = MigratorFacet.prepareChainCommitment.selector;
         return selectors;
     }
 
     function getExecutorSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](4);
+        bytes4[] memory selectors = new bytes4[](3);
         uint256 i = 0;
         selectors[i++] = ExecutorFacet.proveBatchesSharedBridge.selector;
         selectors[i++] = ExecutorFacet.executeBatchesSharedBridge.selector;
         selectors[i++] = ExecutorFacet.revertBatchesSharedBridge.selector;
-        selectors[i++] = ExecutorFacet.revertBatchesForPriorityMode.selector;
         return selectors;
     }
 
@@ -579,7 +579,7 @@ library Utils {
     }
 
     function createBatchCommitment(
-        IExecutor.CommitBatchInfo calldata _newBatchData,
+        CommitBatchInfo calldata _newBatchData,
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
@@ -593,7 +593,7 @@ library Utils {
         return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
     }
 
-    function _batchPassThroughData(IExecutor.CommitBatchInfo calldata _batch) internal pure returns (bytes memory) {
+    function _batchPassThroughData(CommitBatchInfo calldata _batch) internal pure returns (bytes memory) {
         return
             // solhint-disable-next-line func-named-parameters
             abi.encodePacked(
@@ -611,7 +611,7 @@ library Utils {
     }
 
     function _batchAuxiliaryOutput(
-        IExecutor.CommitBatchInfo calldata _batch,
+        CommitBatchInfo calldata _batch,
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes

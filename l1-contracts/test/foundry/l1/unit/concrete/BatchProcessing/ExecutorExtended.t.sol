@@ -7,6 +7,7 @@ import "./_Executor_Shared.t.sol";
 import {Utils} from "../Utils/Utils.sol";
 import {UtilsFacet} from "../Utils/UtilsFacet.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {BatchNumberMismatch, CanOnlyProcessOneBatch, InvalidSystemLogsLength, EmptyPrecommitData, InvalidBatchNumber, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, CantExecuteUnprovenBatches, VerifiedBatchesExceedsCommittedBatches, InvalidProof, InvalidProtocolVersion} from "contracts/common/L1ContractErrors.sol";
 import {InvalidBatchesDataLength} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -17,10 +18,10 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 contract ExecutorExtendedTest is ExecutorTest {
     function test_CommitBatches_BatchNumberMismatch() public {
         // Try to commit a batch with wrong batch number (should be 1, but we'll send 5)
-        IExecutor.CommitBatchInfo memory wrongBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory wrongBatchInfo = newCommitBatchInfo;
         wrongBatchInfo.batchNumber = 5;
 
-        IExecutor.CommitBatchInfo[] memory newBatchesData = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory newBatchesData = new CommitBatchInfo[](1);
         newBatchesData[0] = wrongBatchInfo;
 
         bytes memory commitData = bytes.concat(
@@ -35,10 +36,10 @@ contract ExecutorExtendedTest is ExecutorTest {
 
     function test_CommitBatches_MultipleBatches_Fails() public {
         // Try to commit multiple batches at once (only 1 is allowed)
-        IExecutor.CommitBatchInfo[] memory newBatchesData = new IExecutor.CommitBatchInfo[](2);
+        CommitBatchInfo[] memory newBatchesData = new CommitBatchInfo[](2);
 
-        IExecutor.CommitBatchInfo memory batch1 = newCommitBatchInfo;
-        IExecutor.CommitBatchInfo memory batch2 = newCommitBatchInfo;
+        CommitBatchInfo memory batch1 = newCommitBatchInfo;
+        CommitBatchInfo memory batch2 = newCommitBatchInfo;
         batch2.batchNumber = 2;
 
         newBatchesData[0] = batch1;
@@ -55,11 +56,11 @@ contract ExecutorExtendedTest is ExecutorTest {
     }
 
     function test_CommitBatches_SystemLogsLengthInvalid() public {
-        IExecutor.CommitBatchInfo memory invalidBatch = newCommitBatchInfo;
+        CommitBatchInfo memory invalidBatch = newCommitBatchInfo;
         // Set invalid system logs length (not multiple of L2_TO_L1_LOG_SERIALIZE_SIZE)
         invalidBatch.systemLogs = hex"0102030405";
 
-        IExecutor.CommitBatchInfo[] memory newBatchesData = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory newBatchesData = new CommitBatchInfo[](1);
         newBatchesData[0] = invalidBatch;
 
         (uint256 processFrom, uint256 processTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
@@ -96,7 +97,7 @@ contract ExecutorExtendedTest is ExecutorTest {
     }
 
     function test_CommitBatches_UnauthorizedValidator() public {
-        IExecutor.CommitBatchInfo[] memory newBatchesData = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory newBatchesData = new CommitBatchInfo[](1);
         newBatchesData[0] = newCommitBatchInfo;
 
         (uint256 processFrom, uint256 processTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
@@ -116,14 +117,14 @@ contract ExecutorExtendedTest is ExecutorTest {
         // Warp to a time that allows this timestamp
         vm.warp(timestamp + 1);
 
-        IExecutor.CommitBatchInfo memory batchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory batchInfo = newCommitBatchInfo;
         batchInfo.timestamp = timestamp;
 
         // Need to recreate system logs with the new timestamp
         bytes memory l2Logs = Utils.encodePacked(Utils.createSystemLogs(bytes32(0)));
         batchInfo.systemLogs = l2Logs;
 
-        IExecutor.CommitBatchInfo[] memory newBatchesData = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory newBatchesData = new CommitBatchInfo[](1);
         newBatchesData[0] = batchInfo;
 
         // This will likely fail due to timestamp validation, but we're testing the path
@@ -232,8 +233,8 @@ contract ExecutorRevertBatchesTest is ExecutorTest {
         address ctm = utilsFacet.util_getChainTypeManager();
         vm.mockCall(ctm, abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector), abi.encode(false));
 
-        IExecutor.CommitBatchInfo[] memory newBatchesData = new IExecutor.CommitBatchInfo[](1);
-        newBatchesData[0] = IExecutor.CommitBatchInfo({
+        CommitBatchInfo[] memory newBatchesData = new CommitBatchInfo[](1);
+        newBatchesData[0] = CommitBatchInfo({
             batchNumber: 1,
             timestamp: uint64(block.timestamp),
             indexRepeatedStorageChanges: 0,

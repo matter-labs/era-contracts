@@ -4,7 +4,6 @@ pragma solidity ^0.8.21;
 
 import {IZKChainBase} from "./IZKChainBase.sol";
 import {L2Log} from "../../common/Messaging.sol";
-import {L2DACommitmentScheme} from "../../common/Config.sol";
 
 /// @dev Enum used by L2 System Contracts to differentiate logs.
 enum SystemLogKey {
@@ -108,77 +107,6 @@ interface IExecutor is IZKChainBase {
         bytes32 commitment;
     }
 
-    /// @notice Data needed to commit new batch
-    /// @param batchNumber Number of the committed batch
-    /// @param timestamp Unix timestamp denoting the start of the batch execution
-    /// @param indexRepeatedStorageChanges The serial number of the shortcut index that's used as a unique identifier for storage keys that were used twice or more
-    /// @param newStateRoot The state root of the full state tree
-    /// @param numberOfLayer1Txs Number of priority operations to be processed
-    /// @param priorityOperationsHash Hash of all priority operations from this batch
-    /// @param bootloaderHeapInitialContentsHash Hash of the initial contents of the bootloader heap. In practice it serves as the commitment to the transactions in the batch.
-    /// @param eventsQueueStateHash Hash of the events queue state. In practice it serves as the commitment to the events in the batch.
-    /// @param systemLogs concatenation of all L2 -> L1 system logs in the batch
-    /// @param operatorDAInput Packed pubdata commitments/data.
-    /// @dev pubdataCommitments format: This will always start with a 1 byte pubdataSource flag. Current allowed values are 0 (calldata) or 1 (blobs)
-    ///                             kzg: list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes) = 144 bytes
-    ///                             calldata: pubdataCommitments.length - 1 - 32 bytes of pubdata
-    ///                                       and 32 bytes appended to serve as the blob commitment part for the aux output part of the batch commitment
-    /// @dev For 2 blobs we will be sending 288 bytes of calldata instead of the full amount for pubdata.
-    /// @dev When using calldata, we only need to send one blob commitment since the max number of bytes in calldata fits in a single blob and we can pull the
-    ///     linear hash from the system logs
-    struct CommitBatchInfo {
-        uint64 batchNumber;
-        uint64 timestamp;
-        uint64 indexRepeatedStorageChanges;
-        bytes32 newStateRoot;
-        uint256 numberOfLayer1Txs;
-        bytes32 priorityOperationsHash;
-        bytes32 bootloaderHeapInitialContentsHash;
-        bytes32 eventsQueueStateHash;
-        bytes systemLogs;
-        bytes operatorDAInput;
-    }
-
-    /// @notice Commit batch info for ZKsync OS
-    /// @param batchNumber Number of the committed batch
-    /// @param newStateCommitment State commitment of the new state.
-    /// @dev chain state commitment, this preimage is not opened on l1,
-    /// it's guaranteed that this commitment commits to any state that needed for execution
-    /// (state root, block number, block hashes)
-    /// @param numberOfLayer1Txs Number of priority operations to be processed
-    /// @param numberOfLayer2Txs Number of L2 transactions executed in the batch
-    /// @param priorityOperationsHash Hash of all priority operations from this batch
-    /// @param l2LogsTreeRoot Root hash of tree that contains L2 -> L1 messages from this batch
-    /// @param daCommitmentScheme commitment scheme used to generate pubdata commitment for this batch
-    /// @param daCommitment commitment to the batch pubdata to validate DA in the l1 da validator
-    // solhint-disable-next-line gas-struct-packing
-    struct CommitBatchInfoZKsyncOS {
-        uint64 batchNumber;
-        bytes32 newStateCommitment;
-        uint256 numberOfLayer1Txs;
-        uint256 numberOfLayer2Txs;
-        bytes32 priorityOperationsHash;
-        bytes32 dependencyRootsRollingHash;
-        bytes32 l2LogsTreeRoot;
-        L2DACommitmentScheme daCommitmentScheme;
-        bytes32 daCommitment;
-        uint64 firstBlockTimestamp;
-        uint64 firstBlockNumber;
-        uint64 lastBlockTimestamp;
-        uint64 lastBlockNumber;
-        uint256 chainId;
-        bytes operatorDAInput;
-    }
-
-    /// @notice Container for a list of transaction statuses to precommit.
-    /// @param txs A packed array of individual transaction status commitments for the batch. Each is expected to be
-    /// of length 33 and have the following format: <32-byte tx hash, 1-byte status>. where status is either 0 (failed) or 1 (success).
-    /// @param untrustedLastL2BlockNumberHint The "hint" for what the last L2 block number that these txs represent is.
-    struct PrecommitInfo {
-        bytes packedTxsCommitments;
-        uint256 untrustedLastL2BlockNumberHint;
-    }
-
     /// @notice Batches commitment verification.
     /// @dev Only verifies batch commitments without any other processing.
     /// @param _chainAddress The address of the DiamondProxy of the chain. Note, that it is not used in the implementation,
@@ -218,11 +146,6 @@ interface IExecutor is IZKChainBase {
     /// NOTE: Doesn't delete the stored data about batches, but only decreases
     /// counters that are responsible for the number of batches
     function revertBatchesSharedBridge(address _chainAddress, uint256 _newLastBatch) external;
-
-    /// @notice Reverts batches during priority mode activation.
-    /// @dev This is called internally by the Admin facet during priority mode activation.
-    /// @param _newLastBatch The batch number to revert to (all batches after this will be reverted).
-    function revertBatchesForPriorityMode(uint256 _newLastBatch) external;
 
     /// @notice Event emitted when batches are verified
     /// @param previousLastVerifiedBatch Batch number of the previous last verified batch

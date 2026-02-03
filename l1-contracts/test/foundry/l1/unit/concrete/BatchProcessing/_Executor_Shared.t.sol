@@ -26,6 +26,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfo, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
@@ -62,8 +63,8 @@ contract ExecutorTest is UtilsCallMockerTest {
     bytes32 internal newCommittedBlockBatchHash;
     bytes32 internal newCommittedBlockCommitment;
     uint256 internal currentTimestamp;
-    IExecutor.CommitBatchInfo internal newCommitBatchInfo;
-    IExecutor.CommitBatchInfoZKsyncOS internal newCommitBatchInfoZKsyncOS;
+    CommitBatchInfo internal newCommitBatchInfo;
+    CommitBatchInfoZKsyncOS internal newCommitBatchInfoZKsyncOS;
     IExecutor.StoredBatchInfo internal newStoredBatchInfo;
     DummyEraBaseTokenBridge internal sharedBridge;
     ValidatorTimelock internal validatorTimelock;
@@ -100,7 +101,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](7);
+        bytes4[] memory selectors = new bytes4[](6);
         uint256 i = 0;
         selectors[i++] = executor.proveBatchesSharedBridge.selector;
         selectors[i++] = executor.executeBatchesSharedBridge.selector;
@@ -108,7 +109,6 @@ contract ExecutorTest is UtilsCallMockerTest {
         selectors[i++] = executor.setPriorityTreeStartIndex.selector;
         selectors[i++] = executor.setPriorityTreeHistoricalRoot.selector;
         selectors[i++] = executor.appendPriorityOp.selector;
-        selectors[i++] = executor.revertBatchesForPriorityMode.selector;
         return selectors;
     }
 
@@ -369,7 +369,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         currentTimestamp = block.timestamp;
 
         bytes memory l2Logs = Utils.encodePacked(Utils.createSystemLogs(bytes32(0)));
-        newCommitBatchInfo = IExecutor.CommitBatchInfo({
+        newCommitBatchInfo = CommitBatchInfo({
             batchNumber: 1,
             timestamp: uint64(currentTimestamp),
             indexRepeatedStorageChanges: 0,
@@ -381,7 +381,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             systemLogs: l2Logs,
             operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
-        newCommitBatchInfoZKsyncOS = IExecutor.CommitBatchInfoZKsyncOS({
+        newCommitBatchInfoZKsyncOS = CommitBatchInfoZKsyncOS({
             batchNumber: 1,
             newStateCommitment: Utils.randomBytes32("newStateCommitment"),
             numberOfLayer1Txs: 0,

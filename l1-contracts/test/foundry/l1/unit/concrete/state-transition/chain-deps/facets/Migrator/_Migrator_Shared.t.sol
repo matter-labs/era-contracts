@@ -7,7 +7,7 @@ import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 
-import {Migrator} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
+import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
@@ -36,7 +36,7 @@ contract MigratorTest is UtilsCallMockerTest {
     function setUp() public virtual {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(new Migrator(block.chainid, false)),
+            facet: address(new MigratorFacet(block.chainid, false)),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: getMigratorSelectors()

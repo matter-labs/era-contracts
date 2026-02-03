@@ -5,13 +5,13 @@ pragma solidity 0.8.28;
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {IMessageRoot} from "../../../core/message-root/IMessageRoot.sol";
-import {EMPTY_STRING_KECCAK, PUBLIC_INPUT_SHIFT, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH} from "../../../common/Config.sol";
+import {EMPTY_STRING_KECCAK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
 import {IExecutor, ProcessLogsInput} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {GW_ASSET_TRACKER} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
-import {BatchHashMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, InvalidMessageRoot, InvalidProof, NonSequentialBatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, VerifiedBatchesExceedsCommittedBatches} from "../../../common/L1ContractErrors.sol";
+import {BatchHashMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, InvalidMessageRoot, InvalidProof, NonSequentialBatch, PriorityOperationsRollingHashMismatch, VerifiedBatchesExceedsCommittedBatches} from "../../../common/L1ContractErrors.sol";
 import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MessageRootIsZero, MismatchNumberOfLayer1Txs} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -318,35 +318,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _newLastBatch
     ) external nonReentrant onlyValidatorOrChainTypeManager notPriorityMode onlySettlementLayer {
         _revertBatches(_newLastBatch);
-    }
-
-    /// @inheritdoc IExecutor
-    function revertBatchesForPriorityMode(uint256 _newLastBatch) external onlySelf {
-        _revertBatches(_newLastBatch);
-    }
-
-    function _revertBatches(uint256 _newLastBatch) internal {
-        if (s.totalBatchesCommitted < _newLastBatch) {
-            revert RevertedBatchNotAfterNewLastBatch();
-        }
-        if (_newLastBatch < s.totalBatchesExecuted) {
-            revert CantRevertExecutedBatch();
-        }
-
-        s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
-
-        if (_newLastBatch < s.totalBatchesVerified) {
-            s.totalBatchesVerified = _newLastBatch;
-        }
-        s.totalBatchesCommitted = _newLastBatch;
-
-        // Reset the batch number of the executed system contracts upgrade transaction if the batch
-        // where the system contracts upgrade was committed is among the reverted batches.
-        if (s.l2SystemContractsUpgradeBatchNumber > _newLastBatch) {
-            delete s.l2SystemContractsUpgradeBatchNumber;
-        }
-
-        emit BlocksRevert(s.totalBatchesCommitted, s.totalBatchesVerified, s.totalBatchesExecuted);
     }
 
     /// @notice Returns the keccak hash of the ABI-encoded StoredBatchInfo

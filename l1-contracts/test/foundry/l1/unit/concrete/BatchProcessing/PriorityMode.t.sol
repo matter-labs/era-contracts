@@ -5,6 +5,7 @@ import {Utils, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {IExecutor, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {InvalidTxCountInPriorityMode, OnlyNormalMode, PriorityModeActivationTooEarly, PriorityModeIsNotAllowed, PriorityOpsRequestTimestampMissing, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 
@@ -54,7 +55,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
     function test_revertWhen_priorityModeBatchHasL2Txs() public {
         _activatePriorityMode();
 
-        IExecutor.CommitBatchInfo memory commitInfo = newCommitBatchInfo;
+        CommitBatchInfo memory commitInfo = newCommitBatchInfo;
 
         (bytes32 l2DAValidatorOutputHash, bytes memory operatorDAInput) = _mockDAForCommit(commitInfo.batchNumber);
         bytes[] memory logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
@@ -78,7 +79,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
         commitInfo.operatorDAInput = operatorDAInput;
         commitInfo.timestamp = uint64(currentTimestamp);
 
-        IExecutor.CommitBatchInfo[] memory commitInfos = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory commitInfos = new CommitBatchInfo[](1);
         commitInfos[0] = commitInfo;
 
         (uint256 commitFrom, uint256 commitTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
@@ -94,7 +95,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
     function test_revertWhen_priorityModeBatchHasNoL1Txs() public {
         _activatePriorityMode();
 
-        IExecutor.CommitBatchInfo memory commitInfo = newCommitBatchInfo;
+        CommitBatchInfo memory commitInfo = newCommitBatchInfo;
 
         (bytes32 l2DAValidatorOutputHash, bytes memory operatorDAInput) = _mockDAForCommit(commitInfo.batchNumber);
         bytes[] memory logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
@@ -120,7 +121,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
         commitInfo.operatorDAInput = operatorDAInput;
         commitInfo.timestamp = uint64(currentTimestamp);
 
-        IExecutor.CommitBatchInfo[] memory commitInfos = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory commitInfos = new CommitBatchInfo[](1);
         commitInfos[0] = commitInfo;
 
         (uint256 commitFrom, uint256 commitTo, bytes memory commitData) = Utils.encodeCommitBatchesData(

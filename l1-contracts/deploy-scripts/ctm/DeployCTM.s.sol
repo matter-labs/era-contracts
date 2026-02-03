@@ -48,7 +48,7 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {Migrator} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
+import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
@@ -546,7 +546,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             false
         );
         ExecutorFacet executorFacet = new ExecutorFacet(1);
-        Migrator migratorFacet = new Migrator(1, false);
+        MigratorFacet migratorFacet = new MigratorFacet(1, false);
         CommitterFacet committerFacet = new CommitterFacet(1);
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);
         bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);

@@ -10,6 +10,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {IExecutor, LogProcessingOutput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
@@ -34,7 +35,7 @@ contract TestCommitterFacet is CommitterFacet {
     constructor() CommitterFacet(block.chainid) {}
 
     function createBatchCommitment(
-        IExecutor.CommitBatchInfo calldata _newBatchData,
+        CommitBatchInfo calldata _newBatchData,
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
@@ -44,7 +45,7 @@ contract TestCommitterFacet is CommitterFacet {
     }
 
     function processL2Logs(
-        IExecutor.CommitBatchInfo calldata _newBatch,
+        CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
     ) external view returns (LogProcessingOutput memory logOutput) {
         return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
@@ -117,7 +118,7 @@ contract ExecutorProofTest is UtilsCallMockerTest {
 
         bytes[] memory mockSystemLogs = Utils.createSystemLogsWithNoneDAValidator();
 
-        IExecutor.CommitBatchInfo memory nextBatch = IExecutor.CommitBatchInfo({
+        CommitBatchInfo memory nextBatch = CommitBatchInfo({
             // ignored
             batchNumber: 1,
             // ignored

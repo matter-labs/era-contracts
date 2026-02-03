@@ -52,7 +52,7 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {Migrator} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
+import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
@@ -374,7 +374,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             } else if (compareStrings(contractName, "GettersFacet")) {
                 return type(GettersFacet).creationCode;
             } else if (compareStrings(contractName, "MigratorFacet")) {
-                return type(Migrator).creationCode;
+                return type(MigratorFacet).creationCode;
             } else if (compareStrings(contractName, "CommitterFacet")) {
                 return type(CommitterFacet).creationCode;
             } else if (compareStrings(contractName, "DiamondInit")) {

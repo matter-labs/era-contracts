@@ -8,6 +8,7 @@ import {EMPTY_PREPUBLISHED_COMMITMENT, ExecutorTest, POINT_EVALUATION_PRECOMPILE
 
 import {POINT_EVALUATION_PRECOMPILE_ADDR, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {RevertedBatchNotAfterNewLastBatch} from "contracts/common/L1ContractErrors.sol";
 
 contract RevertingTest is ExecutorTest {
@@ -34,7 +35,7 @@ contract RevertingTest is ExecutorTest {
         newCommitBatchInfo.systemLogs = l2Logs;
         newCommitBatchInfo.operatorDAInput = operatorDAInput;
 
-        IExecutor.CommitBatchInfo[] memory commitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory commitBatchInfoArray = new CommitBatchInfo[](1);
         commitBatchInfoArray[0] = newCommitBatchInfo;
 
         vm.prank(validator);

@@ -8,6 +8,7 @@ import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {PrecommitInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 
 contract PrecommittingTest is ExecutorTest {
     uint256 constant TOTAL_TRANSACTIONS = 100;
@@ -23,7 +24,7 @@ contract PrecommittingTest is ExecutorTest {
             );
         }
 
-        IExecutor.PrecommitInfo memory precommitInfo = IExecutor.PrecommitInfo({
+        PrecommitInfo memory precommitInfo = PrecommitInfo({
             packedTxsCommitments: packedTxsCommitments,
             untrustedLastL2BlockNumberHint: l2BlockNumber
         });

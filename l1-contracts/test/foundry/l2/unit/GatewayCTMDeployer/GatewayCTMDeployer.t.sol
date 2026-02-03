@@ -19,7 +19,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
-import {Migrator} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
+import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {RelayedSLDAValidator} from "contracts/state-transition/data-availability/RelayedSLDAValidator.sol";
@@ -129,7 +129,7 @@ contract GatewayCTMDeployerTest is Test {
         new MailboxFacet(1, 1, L2_CHAIN_ASSET_HANDLER_ADDR, IEIP7702Checker(address(0)), false);
         new ExecutorFacet(1);
         new GettersFacet();
-        new Migrator(1, false);
+        new MigratorFacet(1, false);
         new DiamondInit(false);
         new L1GenesisUpgrade();
         new Multicall3();
