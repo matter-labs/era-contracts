@@ -10,11 +10,11 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IInteropCenter} from "./IInteropCenter.sol";
 
-import {GW_ASSET_TRACKER, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_COMPLEX_UPGRADER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_HOLDER_ADDR, L2_BRIDGEHUB, L2_COMPLEX_UPGRADER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BUNDLE_IDENTIFIER, BalanceChange, BundleAttributes, CallAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal} from "../common/Messaging.sol";
-import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
+import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized, WithdrawFailed} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
 import {AttributeAlreadySet, AttributeViolatesRestriction, DestinationChainNotRegistered, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty} from "./InteropErrors.sol";
@@ -270,8 +270,10 @@ contract InteropCenter is
                 msg.value == _totalBurnedCallsValue + _totalIndirectCallsValue,
                 MsgValueMismatch(_totalBurnedCallsValue + _totalIndirectCallsValue, msg.value)
             );
+            // Send tokens to BaseTokenHolder (effectively "burning" from circulation)
             // slither-disable-next-line arbitrary-send-eth
-            L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalBurnedCallsValue}();
+            (bool success, ) = L2_BASE_TOKEN_HOLDER_ADDR.call{value: _totalBurnedCallsValue}("");
+            require(success, WithdrawFailed());
         } else {
             require(msg.value == _totalIndirectCallsValue, MsgValueMismatch(_totalIndirectCallsValue, msg.value));
             if (_totalBurnedCallsValue > 0) {

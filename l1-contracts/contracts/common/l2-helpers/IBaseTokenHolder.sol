@@ -11,13 +11,4 @@ interface IBaseTokenHolder {
     /// @param _to The address to receive the base tokens.
     /// @param _amount The amount of base tokens to give out.
     function give(address _to, uint256 _amount) external;
-
-    /// @notice Initiates withdrawal of the base token to L1.
-    /// @param _l1Receiver The address on L1 to receive the funds.
-    function withdraw(address _l1Receiver) external payable;
-
-    /// @notice Initiates withdrawal of the base token to L1 with additional data.
-    /// @param _l1Receiver The address on L1 to receive the funds.
-    /// @param _additionalData Additional data to be sent to L1 with the withdrawal.
-    function withdrawWithMessage(address _l1Receiver, bytes calldata _additionalData) external payable;
 }

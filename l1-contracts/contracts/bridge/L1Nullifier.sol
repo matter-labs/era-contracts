@@ -24,7 +24,7 @@ import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {AddressAlreadySet, DepositDoesNotExist, DepositExists, InvalidProof, InvalidSelector, LegacyBridgeNotSet, LegacyMethodForNonL1Token, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotLegacy, Unauthorized, WithdrawalAlreadyFinalized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {EthAlreadyMigratedToL1NTV, NativeTokenVaultAlreadySet, WrongL2Sender} from "./L1BridgeContractErrors.sol";
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
@@ -521,29 +521,14 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             address l2Sender = _finalizeWithdrawalParams.l2Sender;
             bool baseTokenWithdrawal = (assetId == BRIDGE_HUB.baseTokenAssetId(_finalizeWithdrawalParams.chainId));
 
-            // Accept messages from L2AssetRouter, L2BaseToken (legacy), BaseTokenHolder (new),
-            // or deprecated legacy bridge addresses for backwards compatibility.
             bool isL2SenderCorrect = l2Sender == L2_ASSET_ROUTER_ADDR ||
                 l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR ||
-                l2Sender == L2_BASE_TOKEN_HOLDER_ADDR ||
                 l2Sender == __DEPRECATED_l2BridgeAddress[_finalizeWithdrawalParams.chainId];
             require(isL2SenderCorrect, WrongL2Sender(l2Sender));
 
-            // For base token withdrawals, determine the correct sender:
-            // - L2_BASE_TOKEN_HOLDER_ADDR for new withdrawals (from BaseTokenHolder)
-            // - L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR for legacy withdrawals (from L2BaseToken)
-            address messageSender;
-            if (baseTokenWithdrawal && l2Sender == L2_BASE_TOKEN_HOLDER_ADDR) {
-                messageSender = L2_BASE_TOKEN_HOLDER_ADDR;
-            } else if (baseTokenWithdrawal) {
-                messageSender = L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
-            } else {
-                messageSender = l2Sender;
-            }
-
             l2ToL1Message = L2Message({
                 txNumberInBatch: _finalizeWithdrawalParams.l2TxNumberInBatch,
-                sender: messageSender,
+                sender: baseTokenWithdrawal ? L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR : l2Sender,
                 data: _finalizeWithdrawalParams.message
             });
         }

@@ -7,7 +7,7 @@ import {StdStorage, Test, stdStorage, console} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
-import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER, L2_ASSET_TRACKER_ADDR, L2_CHAIN_ASSET_HANDLER, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_HOLDER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER, L2_ASSET_TRACKER_ADDR, L2_CHAIN_ASSET_HANDLER, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {MAX_TOKEN_BALANCE} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
@@ -249,8 +249,8 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             .with_key(baseTokenAssetId)
             .checked_write(uint256(1));
 
-        // Call as L2 Base Token Holder (new caller after upgrade)
-        vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
+        // Call as L2 Base Token System Contract
+        vm.prank(address(L2_BASE_TOKEN_SYSTEM_CONTRACT));
         L2_ASSET_TRACKER.handleInitiateBaseTokenBridgingOnL2(amount);
 
         // Verify chain balance decreased
