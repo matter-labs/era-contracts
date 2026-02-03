@@ -105,6 +105,12 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         return config;
     }
 
+    /// @notice Returns the address to use as the deployer/owner for contracts.
+    /// @dev This is virtual so test scripts can override it. By default returns tx.origin.
+    function getDeployerAddress() public view virtual returns (address) {
+        return tx.origin;
+    }
+
     function runInner(
         string memory permanentValuesInputPath,
         string memory inputPath,
@@ -218,8 +224,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         if (config.isZKsyncOS) {
             // We add the verifier to the default execution version
-            // Use tx.origin to ensure the correct sender even when called from nested contracts
-            vm.startBroadcast(Utils.getBroadcasterAddress());
+            // Use getDeployerAddress() to ensure the correct sender even when called from nested contracts
+            vm.startBroadcast(getDeployerAddress());
             ZKsyncOSDualVerifier(ctmAddresses.stateTransition.verifiers.verifier).addVerifier(
                 DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
                 IVerifierV2(ctmAddresses.stateTransition.verifiers.verifierFflonk),
@@ -234,7 +240,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function setChainTypeManagerInServerNotifier() internal {
         ServerNotifier serverNotifier = ServerNotifier(ctmAddresses.stateTransition.proxies.serverNotifier);
-        vm.broadcast(Utils.getBroadcasterAddress());
+        vm.broadcast(getDeployerAddress());
         serverNotifier.setChainTypeManager(IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager));
         console.log("ChainTypeManager set in ServerNotifier");
     }
@@ -244,7 +250,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function deployDAValidators() internal {
-        ctmAddresses.daAddresses.rollupDAManager = deployWithCreate2AndOwner("RollupDAManager", msg.sender, false);
+        ctmAddresses.daAddresses.rollupDAManager = deployWithCreate2AndOwner(
+            "RollupDAManager",
+            getDeployerAddress(),
+            false
+        );
         updateRollupDAManager();
 
         // This contract is located in the `da-contracts` folder, we output it the same way for consistency/ease of use.
@@ -264,7 +274,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         } else {
             ctmAddresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
         }
-        vm.startBroadcast(Utils.getBroadcasterAddress());
+        vm.startBroadcast(getDeployerAddress());
         IRollupDAManager rollupDAManager = IRollupDAManager(ctmAddresses.daAddresses.rollupDAManager);
         rollupDAManager.updateDAPair(
             ctmAddresses.daAddresses.l1RollupDAValidator,
@@ -283,9 +293,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function updateRollupDAManager() internal virtual {
         IOwnable rollupDAManager = IOwnable(ctmAddresses.daAddresses.rollupDAManager);
-        if (rollupDAManager.owner() != Utils.getBroadcasterAddress()) {
-            if (rollupDAManager.pendingOwner() == Utils.getBroadcasterAddress()) {
-                vm.broadcast(Utils.getBroadcasterAddress());
+        address deployer = getDeployerAddress();
+        if (rollupDAManager.owner() != deployer) {
+            if (rollupDAManager.pendingOwner() == deployer) {
+                vm.broadcast(deployer);
                 rollupDAManager.acceptOwnership();
             } else {
                 require(rollupDAManager.owner() == config.ownerAddress, "Ownership was not set correctly");
@@ -294,7 +305,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function updateOwners() internal {
-        vm.startBroadcast(Utils.getBroadcasterAddress());
+        vm.startBroadcast(getDeployerAddress());
 
         ValidatorTimelock validatorTimelock = ValidatorTimelock(ctmAddresses.stateTransition.proxies.validatorTimelock);
         validatorTimelock.transferOwnership(config.ownerAddress);

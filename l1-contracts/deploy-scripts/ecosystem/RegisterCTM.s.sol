@@ -23,6 +23,12 @@ contract RegisterCTM is Script, IRegisterCTM {
         bytes encodedData;
     }
 
+    /// @notice Returns the address to use as the deployer/owner for contracts.
+    /// @dev This is virtual so test scripts can override it. By default returns tx.origin.
+    function getDeployerAddress() public view virtual returns (address) {
+        return tx.origin;
+    }
+
     function registerCTM(address bridgehub, address chainTypeManagerProxy, bool shouldSend) public virtual {
         console.log("Registering CTM for L1 contracts");
 
@@ -104,7 +110,7 @@ contract RegisterCTM is Script, IRegisterCTM {
 
     function registerChainTypeManagerForTest(address bridgehubProxy, address chainTypeManagerProxy) internal {
         IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubProxy);
-        vm.startBroadcast(msg.sender);
+        vm.startBroadcast(getDeployerAddress());
         bridgehub.addChainTypeManager(chainTypeManagerProxy);
         console.log("ChainTypeManager registered");
         address ctmDeploymentTrackerProxy = address(bridgehub.l1CtmDeployer());
