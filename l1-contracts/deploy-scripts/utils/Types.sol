@@ -105,6 +105,7 @@ struct StateTransitionDeployedAddresses {
     address eraDiamondProxy;
     address rollupDAManager;
     address rollupSLDAValidator;
+    address permissionlessValidator;
 }
 
 struct CTMAdminAddresses {
@@ -132,5 +133,4 @@ struct ChainCreationParamsConfig {
     bytes32 bootloaderHash;
     bytes32 defaultAAHash;
     bytes32 evmEmulatorHash;
-    address permissionlessValidator;
 }

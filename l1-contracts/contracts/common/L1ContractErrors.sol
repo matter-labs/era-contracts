@@ -194,6 +194,8 @@ error InvalidSelector(bytes4 func);
 error InvalidSystemLogsLength();
 // 0x7b7a98f1
 error InvalidThreshold(uint256 max, uint256 got);
+// 0xd857fbc0
+error InvalidTxCountInPriorityMode(uint256 l2TxCount, uint256 l1TxCount);
 // 0x5f1aa154
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xfb5c22e6
@@ -276,6 +278,8 @@ error NotARestriction(address addr);
 error NotAssetRouter(address _sender, address _assetRouter);
 // 0xb49df1f2
 error NotAZKChain(address addr);
+// 0x7fdf8632
+error NotCompatibleWithPriorityMode();
 // 0x5e67e793
 error NotCurrentSettlementLayer();
 // 0x230f9d11
@@ -290,6 +294,10 @@ error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
 error NotWhitelisted(address);
 // 0xf3ed9dfa
 error OnlyEraSupported();
+// 0x9d7bb13f
+error OnlyNormalMode();
+// 0xd702c443
+error OnlyPriorityMode();
 // 0x6c167909
 error OnlySelfAllowed();
 // 0x1a21feed
@@ -306,8 +314,14 @@ error PayloadTooShort();
 error PrecommitmentMismatch(uint256 batchNumber, bytes32 expected, bytes32 found);
 // 0x9b48e060
 error PreviousOperationNotExecuted();
+// 0x67c198fe
+error PriorityModeActivationTooEarly(uint256 earliestActivationTimestamp, uint256 currentTimestamp);
+// 0xdbfcbbef
+error PriorityModeIsNotAllowed();
 // 0xd5a99014
 error PriorityOperationsRollingHashMismatch();
+// 0xbeda0935
+error PriorityOpsRequestTimestampMissing(uint256 requestId);
 // 0x1a4d284a
 error PriorityTxPubdataExceedsMaxPubDataPerBatch();
 // 0xa461f651
@@ -432,22 +446,6 @@ error ZeroChainId();
 error ZKChainLimitReached();
 // 0x646ac57e
 error ZKsyncOSNotForceDeployForExistingContract(address);
-// 0xbeda0935
-error PriorityOpsRequestTimestampMissing(uint256 requestId);
-// 0x67c198fe
-error PriorityModeActivationTooEarly(uint256 earliestActivationTimestamp, uint256 currentTimestamp);
-// 0xd702c443
-error OnlyPriorityMode();
-// 0x9d7bb13f
-error OnlyNormalMode();
-// 0xdda650de
-error ActivatePriorityModeNotImplementedInValidatorContract();
-// 0xd857fbc0
-error InvalidTxCountInPriorityMode(uint256 l2TxCount, uint256 l1TxCount);
-// 0xdbfcbbef
-error PriorityModeIsNotAllowed();
-// 0x7fdf8632
-error NotCompatibleWithPriorityMode();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

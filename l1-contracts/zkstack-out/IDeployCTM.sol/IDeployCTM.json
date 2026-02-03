@@ -116,6 +116,16 @@
                     "internalType": "address"
                   },
                   {
+                    "name": "migratorFacet",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "committerFacet",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
                     "name": "diamondInit",
                     "type": "address",
                     "internalType": "address"
@@ -149,6 +159,11 @@
               },
               {
                 "name": "rollupSLDAValidator",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "permissionlessValidator",
                 "type": "address",
                 "internalType": "address"
               }

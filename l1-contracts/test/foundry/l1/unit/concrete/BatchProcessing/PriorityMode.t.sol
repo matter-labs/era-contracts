@@ -5,13 +5,14 @@ import {Utils, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {IExecutor, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {InvalidTxCountInPriorityMode, OnlyNormalMode, PriorityModeActivationTooEarly, PriorityModeIsNotAllowed, PriorityOpsRequestTimestampMissing, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 
 contract PriorityModeExecutorTest is ExecutorTest {
     function test_revertWhen_activatePriorityMode_notAllowed() public {
         vm.expectRevert(PriorityModeIsNotAllowed.selector);
-        executor.activatePriorityMode();
+        admin.activatePriorityMode();
     }
 
     function test_revertWhen_activatePriorityMode_missingTimestamp() public {
@@ -19,7 +20,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
         admin.permanentlyAllowPriorityMode();
 
         vm.expectRevert(abi.encodeWithSelector(PriorityOpsRequestTimestampMissing.selector, 0));
-        executor.activatePriorityMode();
+        admin.activatePriorityMode();
     }
 
     function test_revertWhen_activatePriorityMode_tooEarly() public {
@@ -32,7 +33,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
 
         vm.warp(earliest - 1);
         vm.expectRevert(abi.encodeWithSelector(PriorityModeActivationTooEarly.selector, earliest, earliest - 1));
-        executor.activatePriorityMode();
+        admin.activatePriorityMode();
     }
 
     function test_revertWhen_validatorCommitsInPriorityMode() public {
@@ -40,7 +41,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, validator));
-        executor.commitBatchesSharedBridge(address(0), 0, 0, "");
+        committer.commitBatchesSharedBridge(address(0), 0, 0, "");
     }
 
     function test_revertWhen_precommitInPriorityMode() public {
@@ -48,13 +49,13 @@ contract PriorityModeExecutorTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(OnlyNormalMode.selector);
-        executor.precommitSharedBridge(address(0), 1, "");
+        committer.precommitSharedBridge(address(0), 1, "");
     }
 
     function test_revertWhen_priorityModeBatchHasL2Txs() public {
         _activatePriorityMode();
 
-        IExecutor.CommitBatchInfo memory commitInfo = newCommitBatchInfo;
+        CommitBatchInfo memory commitInfo = newCommitBatchInfo;
 
         (bytes32 l2DAValidatorOutputHash, bytes memory operatorDAInput) = _mockDAForCommit(commitInfo.batchNumber);
         bytes[] memory logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
@@ -78,7 +79,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
         commitInfo.operatorDAInput = operatorDAInput;
         commitInfo.timestamp = uint64(currentTimestamp);
 
-        IExecutor.CommitBatchInfo[] memory commitInfos = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory commitInfos = new CommitBatchInfo[](1);
         commitInfos[0] = commitInfo;
 
         (uint256 commitFrom, uint256 commitTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
@@ -88,13 +89,13 @@ contract PriorityModeExecutorTest is ExecutorTest {
 
         vm.prank(address(permissionlessValidator));
         vm.expectRevert(abi.encodeWithSelector(InvalidTxCountInPriorityMode.selector, l2TxCount, 0));
-        executor.commitBatchesSharedBridge(address(0), commitFrom, commitTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitFrom, commitTo, commitData);
     }
 
     function test_revertWhen_priorityModeBatchHasNoL1Txs() public {
         _activatePriorityMode();
 
-        IExecutor.CommitBatchInfo memory commitInfo = newCommitBatchInfo;
+        CommitBatchInfo memory commitInfo = newCommitBatchInfo;
 
         (bytes32 l2DAValidatorOutputHash, bytes memory operatorDAInput) = _mockDAForCommit(commitInfo.batchNumber);
         bytes[] memory logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
@@ -120,7 +121,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
         commitInfo.operatorDAInput = operatorDAInput;
         commitInfo.timestamp = uint64(currentTimestamp);
 
-        IExecutor.CommitBatchInfo[] memory commitInfos = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory commitInfos = new CommitBatchInfo[](1);
         commitInfos[0] = commitInfo;
 
         (uint256 commitFrom, uint256 commitTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
@@ -130,7 +131,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
 
         vm.prank(address(permissionlessValidator));
         vm.expectRevert(abi.encodeWithSelector(InvalidTxCountInPriorityMode.selector, l2TxCount, l1TxCount));
-        executor.commitBatchesSharedBridge(address(0), commitFrom, commitTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitFrom, commitTo, commitData);
     }
 
     function _activatePriorityMode() internal {
@@ -138,7 +139,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
         admin.permanentlyAllowPriorityMode();
         _requestPriorityOp();
         vm.warp(block.timestamp + PRIORITY_EXPIRATION + 1);
-        executor.activatePriorityMode();
+        admin.activatePriorityMode();
     }
 
     function _requestPriorityOp() internal returns (uint256 requestTimestamp) {

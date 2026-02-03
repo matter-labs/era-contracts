@@ -2,10 +2,10 @@
 
 pragma solidity 0.8.28;
 
-import {AdminTest} from "./_Admin_Shared.t.sol";
+import {MigratorTest} from "./_Migrator_Shared.t.sol";
 import {Unauthorized, NotAZKChain} from "contracts/common/L1ContractErrors.sol";
 import {NotL1, AlreadyMigrated, NotChainAdmin, NotEraChain, NotAllBatchesExecuted, ProtocolVersionNotUpToDate, OutdatedProtocolVersion, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, InvalidNumberOfBatchHashes, NotMigrated, NotHistoricalRoot, ContractNotDeployed} from "contracts/state-transition/L1StateTransitionErrors.sol";
-import {IAdmin, ZKChainCommitment} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {ZKChainCommitment} from "contracts/common/Config.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 import {PriorityTreeCommitment} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -15,7 +15,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET, CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
-contract ForwardedBridgeFunctionsTest is AdminTest {
+contract ForwardedBridgeFunctionsTest is MigratorTest {
     address chainAssetHandler;
     address admin;
 
@@ -42,7 +42,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
 
         vm.prank(notHandler);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notHandler));
-        adminFacet.forwardedBridgeBurn(address(0), admin, data);
+        migratorFacet.forwardedBridgeBurn(address(0), admin, data);
     }
 
     function test_forwardedBridgeBurn_RevertWhen_AlreadyMigrated() public {
@@ -52,7 +52,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
 
         vm.prank(chainAssetHandler);
         vm.expectRevert(AlreadyMigrated.selector);
-        adminFacet.forwardedBridgeBurn(address(0), admin, data);
+        migratorFacet.forwardedBridgeBurn(address(0), admin, data);
     }
 
     function test_forwardedBridgeBurn_RevertWhen_NotChainAdmin() public {
@@ -61,7 +61,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
 
         vm.prank(chainAssetHandler);
         vm.expectRevert(abi.encodeWithSelector(NotChainAdmin.selector, notAdmin, admin));
-        adminFacet.forwardedBridgeBurn(address(0), notAdmin, data);
+        migratorFacet.forwardedBridgeBurn(address(0), notAdmin, data);
     }
 
     function _setupPausedDepositsState() internal {
@@ -95,7 +95,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
 
         vm.prank(chainAssetHandler);
         vm.expectRevert(abi.encodeWithSelector(NotAZKChain.selector, fakeSettlementLayer));
-        adminFacet.forwardedBridgeBurn(fakeSettlementLayer, admin, data);
+        migratorFacet.forwardedBridgeBurn(fakeSettlementLayer, admin, data);
     }
 
     function test_forwardedBridgeBurn_RevertWhen_NotEraChain() public {
@@ -131,7 +131,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
 
         vm.prank(chainAssetHandler);
         vm.expectRevert(NotEraChain.selector);
-        adminFacet.forwardedBridgeBurn(settlementLayer, admin, data);
+        migratorFacet.forwardedBridgeBurn(settlementLayer, admin, data);
     }
 
     function test_forwardedBridgeBurn_RevertWhen_ProtocolVersionNotUpToDate() public {
@@ -145,7 +145,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
         vm.expectRevert(
             abi.encodeWithSelector(ProtocolVersionNotUpToDate.selector, currentProtocolVersion, differentVersion)
         );
-        adminFacet.forwardedBridgeBurn(L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, admin, data);
+        migratorFacet.forwardedBridgeBurn(L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, admin, data);
     }
 
     function test_forwardedBridgeBurn_RevertWhen_NotAllBatchesExecuted() public {
@@ -159,7 +159,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
 
         vm.prank(chainAssetHandler);
         vm.expectRevert(NotAllBatchesExecuted.selector);
-        adminFacet.forwardedBridgeBurn(L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, admin, data);
+        migratorFacet.forwardedBridgeBurn(L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, admin, data);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -172,7 +172,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
 
         vm.prank(notHandler);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notHandler));
-        adminFacet.forwardedBridgeMint(data, false);
+        migratorFacet.forwardedBridgeMint(data, false);
     }
 
     function test_forwardedBridgeMint_RevertWhen_OutdatedProtocolVersion() public {
@@ -213,7 +213,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
         vm.expectRevert(
             abi.encodeWithSelector(OutdatedProtocolVersion.selector, differentVersion, currentProtocolVersion)
         );
-        adminFacet.forwardedBridgeMint(data, false);
+        migratorFacet.forwardedBridgeMint(data, false);
     }
 
     function test_forwardedBridgeMint_RevertWhen_ExecutedIsNotConsistentWithVerified() public {
@@ -249,7 +249,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
 
         vm.prank(chainAssetHandler);
         vm.expectRevert(abi.encodeWithSelector(ExecutedIsNotConsistentWithVerified.selector, 8, 5));
-        adminFacet.forwardedBridgeMint(data, false);
+        migratorFacet.forwardedBridgeMint(data, false);
     }
 
     function test_forwardedBridgeMint_RevertWhen_VerifiedIsNotConsistentWithCommitted() public {
@@ -285,7 +285,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
 
         vm.prank(chainAssetHandler);
         vm.expectRevert(abi.encodeWithSelector(VerifiedIsNotConsistentWithCommitted.selector, 8, 5));
-        adminFacet.forwardedBridgeMint(data, false);
+        migratorFacet.forwardedBridgeMint(data, false);
     }
 
     function test_forwardedBridgeMint_RevertWhen_InvalidNumberOfBatchHashes() public {
@@ -322,7 +322,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
 
         vm.prank(chainAssetHandler);
         vm.expectRevert(abi.encodeWithSelector(InvalidNumberOfBatchHashes.selector, 2, 6));
-        adminFacet.forwardedBridgeMint(data, false);
+        migratorFacet.forwardedBridgeMint(data, false);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -335,7 +335,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
 
         vm.prank(notHandler);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notHandler));
-        adminFacet.forwardedBridgeConfirmTransferResult(1, TxStatus.Failure, bytes32(0), address(0), data);
+        migratorFacet.forwardedBridgeConfirmTransferResult(1, TxStatus.Failure, bytes32(0), address(0), data);
     }
 
     function test_forwardedBridgeConfirmTransferResult_Success_ReturnsEarlyOnSuccess() public {
@@ -343,7 +343,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
 
         // Should return early without checking migration state when TxStatus.Success
         vm.prank(chainAssetHandler);
-        adminFacet.forwardedBridgeConfirmTransferResult(1, TxStatus.Success, bytes32(0), address(0), data);
+        migratorFacet.forwardedBridgeConfirmTransferResult(1, TxStatus.Success, bytes32(0), address(0), data);
     }
 
     function test_forwardedBridgeConfirmTransferResult_RevertWhen_NotMigrated() public {
@@ -352,7 +352,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
         // Settlement layer is address(0) which means not migrated
         vm.prank(chainAssetHandler);
         vm.expectRevert(NotMigrated.selector);
-        adminFacet.forwardedBridgeConfirmTransferResult(1, TxStatus.Failure, bytes32(0), address(0), data);
+        migratorFacet.forwardedBridgeConfirmTransferResult(1, TxStatus.Failure, bytes32(0), address(0), data);
     }
 
     function test_forwardedBridgeConfirmTransferResult_RevertWhen_OutdatedProtocolVersion() public {
@@ -367,7 +367,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
         vm.expectRevert(
             abi.encodeWithSelector(OutdatedProtocolVersion.selector, differentVersion, currentProtocolVersion)
         );
-        adminFacet.forwardedBridgeConfirmTransferResult(1, TxStatus.Failure, bytes32(0), address(0), data);
+        migratorFacet.forwardedBridgeConfirmTransferResult(1, TxStatus.Failure, bytes32(0), address(0), data);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -413,38 +413,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
         // On L1, should revert with NotHistoricalRoot
         vm.prank(chainAssetHandler);
         vm.expectRevert(abi.encodeWithSelector(NotHistoricalRoot.selector, sides[0]));
-        adminFacet.forwardedBridgeMint(data, true);
-    }
-
-    function test_forwardedBridgeMint_RevertWhen_ContractNotDeployed_OnL1() public {
-        // Setup: on L1, historical root is valid but contract not deployed
-        address ctm = utilsFacet.util_getChainTypeManager();
-        uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
-        vm.mockCall(
-            ctm,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
-            abi.encode(currentProtocolVersion)
-        );
-
-        // Use empty sides array (isHistoricalRoot will be checked with last side, and empty means no check happens)
-        // Actually we need to make the historical root check pass
-        // The priorityTree.sides array needs to have the last element be a historical root
-        // We need to set up the priority tree's historical roots in storage
-
-        // For this test, let's use a slot-based approach to set a historical root
-        // Or we can use an empty sides array which would still fail at a different point
-
-        // Looking at the code again:
-        // if (!s.priorityTree.isHistoricalRoot(_commitment.priorityTree.sides[_commitment.priorityTree.sides.length - 1]))
-        // So we need at least one side, and that side must be a historical root
-
-        // The simplest approach: mock the storage to mark a root as historical
-        // priorityTree is at slot 51, and historicalRoots is a mapping inside
-
-        // For now, let's test with an empty sides which would cause array out of bounds
-        // Actually that would panic, not revert with our error
-
-        // Let's skip this specific test and test the NotMigrated path instead
+        migratorFacet.forwardedBridgeMint(data, true);
     }
 
     function test_forwardedBridgeMint_RevertWhen_NotMigrated_OnL1_ContractAlreadyDeployed() public {
@@ -476,7 +445,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
         // So historicalRoots[key] = keccak256(abi.encode(key, 53))
 
         bytes32 mappingSlot = keccak256(abi.encode(historicalRoot, uint256(53)));
-        vm.store(address(adminFacet), mappingSlot, bytes32(uint256(1)));
+        vm.store(address(migratorFacet), mappingSlot, bytes32(uint256(1)));
 
         bytes32[] memory sides = new bytes32[](1);
         sides[0] = historicalRoot;
@@ -505,7 +474,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
         // On L1, with _contractAlreadyDeployed=true but settlementLayer=address(0), should revert
         vm.prank(chainAssetHandler);
         vm.expectRevert(NotMigrated.selector);
-        adminFacet.forwardedBridgeMint(data, true);
+        migratorFacet.forwardedBridgeMint(data, true);
     }
 
     function test_forwardedBridgeMint_RevertWhen_NotMigrated_OnGateway_ContractAlreadyDeployed() public {
@@ -548,7 +517,7 @@ contract ForwardedBridgeFunctionsTest is AdminTest {
         // On Gateway, with _contractAlreadyDeployed=true but settlementLayer=address(0), should revert with NotMigrated
         vm.prank(chainAssetHandler);
         vm.expectRevert(NotMigrated.selector);
-        adminFacet.forwardedBridgeMint(data, true);
+        migratorFacet.forwardedBridgeMint(data, true);
     }
 
     // add this to be excluded from coverage report

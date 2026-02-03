@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {ExecutorTest, EMPTY_PREPUBLISHED_COMMITMENT, POINT_EVALUATION_PRECOMPILE_RESULT} from "../Executor/_Executor_Shared.t.sol";
+import {ExecutorTest, EMPTY_PREPUBLISHED_COMMITMENT, POINT_EVALUATION_PRECOMPILE_RESULT} from "../BatchProcessing/_Executor_Shared.t.sol";
 import {Utils, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
 import {IExecutor, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
@@ -68,12 +69,12 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
             _refundRecipient: prioritySender
         });
         vm.warp(block.timestamp + PRIORITY_EXPIRATION + 1);
-        executor.activatePriorityMode();
+        admin.activatePriorityMode();
     }
 
     function test_settleBatchesSharedBridge_withExecutor() public {
         PriorityOpsBatchInfo[] memory priorityOps = Utils.generatePriorityOps(1, 1);
-        IExecutor.CommitBatchInfo memory commitInfo;
+        CommitBatchInfo memory commitInfo;
         {
             bytes32 rollingHash = _rollingHash(priorityOps[0].itemHashes);
             bytes32[] memory merkleItemHashes = new bytes32[](priorityOps[0].itemHashes.length);
@@ -90,7 +91,7 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
             commitInfo = _buildCommitInfo(rollingHash, priorityOps[0].itemHashes.length);
         }
 
-        IExecutor.CommitBatchInfo[] memory commitInfos = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory commitInfos = new CommitBatchInfo[](1);
         commitInfos[0] = commitInfo;
 
         vm.blobhashes(defaultBlobVersionedHashes);
@@ -138,8 +139,8 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
     function _buildCommitInfo(
         bytes32 priorityOpsHash,
         uint256 numberOfLayer1Txs
-    ) internal returns (IExecutor.CommitBatchInfo memory) {
-        IExecutor.CommitBatchInfo memory info = newCommitBatchInfo;
+    ) internal returns (CommitBatchInfo memory) {
+        CommitBatchInfo memory info = newCommitBatchInfo;
         bytes[] memory logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
         logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
             true,
@@ -167,7 +168,7 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
     }
 
     function _buildStoredBatchInfo(
-        IExecutor.CommitBatchInfo memory commitInfo
+        CommitBatchInfo memory commitInfo
     ) internal returns (IExecutor.StoredBatchInfo memory) {
         vm.blobhashes(defaultBlobVersionedHashes);
         L1DAValidatorOutput memory daOutput = IL1DAValidator(rollupL1DAValidator).checkDA({

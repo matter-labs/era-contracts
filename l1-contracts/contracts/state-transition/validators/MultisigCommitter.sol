@@ -5,7 +5,7 @@ import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable-v4/utils/cr
 import {SignatureCheckerUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/utils/cryptography/SignatureCheckerUpgradeable.sol";
 import {EnumerableSetUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/utils/structs/EnumerableSetUpgradeable.sol";
 import {SignersNotSorted, SignerNotAuthorized, SignatureNotValid, ChainRequiresValidatorsSignaturesForCommit, SignaturesLengthMismatch, NotEnoughSigners, InvalidThreshold} from "../../common/L1ContractErrors.sol";
-import {IExecutor} from "../chain-interfaces/IExecutor.sol";
+import {ICommitter} from "../chain-interfaces/ICommitter.sol";
 import {ValidatorTimelock} from "./ValidatorTimelock.sol";
 import {IValidatorTimelock} from "./interfaces/IValidatorTimelock.sol";
 import {IMultisigCommitter} from "./interfaces/IMultisigCommitter.sol";
@@ -98,7 +98,7 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
         // signatures validated, follow normal commitBatchesSharedBridge flow
         _recordBatchCommitment(chainAddress, processBatchFrom, processBatchTo);
         // we cannot use _propagateToZKChain here, because function signature is altered
-        IExecutor(chainAddress).commitBatchesSharedBridge(chainAddress, processBatchFrom, processBatchTo, batchData);
+        ICommitter(chainAddress).commitBatchesSharedBridge(chainAddress, processBatchFrom, processBatchTo, batchData);
     }
 
     /// @inheritdoc IMultisigCommitter

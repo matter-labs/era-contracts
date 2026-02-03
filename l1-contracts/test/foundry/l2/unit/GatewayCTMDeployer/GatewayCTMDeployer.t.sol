@@ -19,6 +19,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {RelayedSLDAValidator} from "contracts/state-transition/data-availability/RelayedSLDAValidator.sol";
@@ -106,8 +107,8 @@ contract GatewayCTMDeployerTest is Test {
         new RollupDAManager();
         new ValidiumL1DAValidator();
         new RelayedSLDAValidator();
-        new ZKsyncOSChainTypeManager(address(0), address(0), address(0));
-        new EraChainTypeManager(address(0), address(0), address(0));
+        new ZKsyncOSChainTypeManager(address(0), address(0), address(0), address(0));
+        new EraChainTypeManager(address(0), address(0), address(0), address(0));
         new ProxyAdmin();
 
         // ValidatorTimelock contracts
@@ -120,14 +121,15 @@ contract GatewayCTMDeployerTest is Test {
 
         // CTM contracts
         new ServerNotifier();
-        new ZKsyncOSChainTypeManager(address(0), address(0), address(0));
-        new EraChainTypeManager(address(0), address(0), address(0));
+        new ZKsyncOSChainTypeManager(address(0), address(0), address(0), address(0));
+        new EraChainTypeManager(address(0), address(0), address(0), address(0));
 
         // Direct deployment contracts (no deployer)
-        new AdminFacet(1, RollupDAManager(address(0)), false);
+        new AdminFacet(1, RollupDAManager(address(0)));
         new MailboxFacet(1, 1, L2_CHAIN_ASSET_HANDLER_ADDR, IEIP7702Checker(address(0)), false);
         new ExecutorFacet(1);
         new GettersFacet();
+        new MigratorFacet(1, false);
         new DiamondInit(false);
         new L1GenesisUpgrade();
         new Multicall3();
@@ -149,6 +151,8 @@ contract GatewayCTMDeployerTest is Test {
             executorSelectors: new bytes4[](2),
             mailboxSelectors: new bytes4[](2),
             gettersSelectors: new bytes4[](2),
+            migratorSelectors: new bytes4[](2),
+            committerSelectors: new bytes4[](2),
             bootloaderHash: bytes32(uint256(0xabc)),
             defaultAccountHash: bytes32(uint256(0xdef)),
             evmEmulatorHash: bytes32(uint256(0xdef)),
@@ -169,6 +173,8 @@ contract GatewayCTMDeployerTest is Test {
         config.mailboxSelectors[1] = bytes4(keccak256("mailboxFunction2()"));
         config.gettersSelectors[0] = bytes4(keccak256("gettersFunction1()"));
         config.gettersSelectors[1] = bytes4(keccak256("gettersFunction2()"));
+        config.migratorSelectors[0] = bytes4(keccak256("migratorFunction1()"));
+        config.migratorSelectors[1] = bytes4(keccak256("migratorFunction2()"));
 
         deployerConfig = config;
 

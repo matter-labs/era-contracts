@@ -18,6 +18,7 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {FeeParams, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {TestExecutor} from "contracts/dev-contracts/test/TestExecutor.sol";
+import {TestCommitter} from "contracts/dev-contracts/test/TestCommitter.sol";
 
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -25,6 +26,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfo, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
@@ -55,13 +57,14 @@ contract ExecutorTest is UtilsCallMockerTest {
     address internal l1DAValidator;
     AdminFacet internal admin;
     TestExecutor internal executor;
+    TestCommitter internal committer;
     GettersFacet internal getters;
     MailboxFacet internal mailbox;
     bytes32 internal newCommittedBlockBatchHash;
     bytes32 internal newCommittedBlockCommitment;
     uint256 internal currentTimestamp;
-    IExecutor.CommitBatchInfo internal newCommitBatchInfo;
-    IExecutor.CommitBatchInfoZKsyncOS internal newCommitBatchInfoZKsyncOS;
+    CommitBatchInfo internal newCommitBatchInfo;
+    CommitBatchInfoZKsyncOS internal newCommitBatchInfoZKsyncOS;
     IExecutor.StoredBatchInfo internal newStoredBatchInfo;
     DummyEraBaseTokenBridge internal sharedBridge;
     ValidatorTimelock internal validatorTimelock;
@@ -78,7 +81,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     uint256[] internal proofInput;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](13);
+        bytes4[] memory selectors = new bytes4[](14);
         uint256 i = 0;
         selectors[i++] = admin.setPendingAdmin.selector;
         selectors[i++] = admin.acceptAdmin.selector;
@@ -93,21 +96,27 @@ contract ExecutorTest is UtilsCallMockerTest {
         selectors[i++] = admin.unfreezeDiamond.selector;
         selectors[i++] = admin.setDAValidatorPair.selector;
         selectors[i++] = admin.permanentlyAllowPriorityMode.selector;
+        selectors[i++] = admin.activatePriorityMode.selector;
         return selectors;
     }
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](9);
+        bytes4[] memory selectors = new bytes4[](6);
         uint256 i = 0;
-        selectors[i++] = executor.commitBatchesSharedBridge.selector;
         selectors[i++] = executor.proveBatchesSharedBridge.selector;
         selectors[i++] = executor.executeBatchesSharedBridge.selector;
         selectors[i++] = executor.revertBatchesSharedBridge.selector;
         selectors[i++] = executor.setPriorityTreeStartIndex.selector;
         selectors[i++] = executor.setPriorityTreeHistoricalRoot.selector;
         selectors[i++] = executor.appendPriorityOp.selector;
-        selectors[i++] = executor.precommitSharedBridge.selector;
-        selectors[i++] = executor.activatePriorityMode.selector;
+        return selectors;
+    }
+
+    function getCommitterSelectors() private view returns (bytes4[] memory) {
+        bytes4[] memory selectors = new bytes4[](2);
+        uint256 i = 0;
+        selectors[i++] = committer.commitBatchesSharedBridge.selector;
+        selectors[i++] = committer.precommitSharedBridge.selector;
         return selectors;
     }
 
@@ -245,9 +254,10 @@ contract ExecutorTest is UtilsCallMockerTest {
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
 
-        admin = new AdminFacet(block.chainid, RollupDAManager(address(0)), false);
+        admin = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         getters = new GettersFacet();
         executor = new TestExecutor();
+        committer = new TestCommitter();
         mailbox = new MailboxFacet(l2ChainId, block.chainid, address(chainAssetHandler), eip7702Checker, false);
 
         DummyCTM chainTypeManager = new DummyCTM(owner, address(0));
@@ -288,14 +298,19 @@ contract ExecutorTest is UtilsCallMockerTest {
             verifier: IVerifier(testnetVerifier), // verifier
             l2BootloaderBytecodeHash: dummyHash,
             l2DefaultAccountBytecodeHash: dummyHash,
-            l2EvmEmulatorBytecodeHash: dummyHash,
-            permissionlessValidator: address(permissionlessValidator)
+            l2EvmEmulatorBytecodeHash: dummyHash
         });
-        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), baseTokenAssetId);
+        mockDiamondInitInteropCenterCallsWithAddress(
+            address(dummyBridgehub),
+            address(0),
+            baseTokenAssetId,
+            address(chainTypeManager),
+            address(permissionlessValidator)
+        );
 
         bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](5);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(admin),
             action: Diamond.Action.Add,
@@ -309,12 +324,18 @@ contract ExecutorTest is UtilsCallMockerTest {
             selectors: getExecutorSelectors()
         });
         facetCuts[2] = Diamond.FacetCut({
+            facet: address(committer),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: getCommitterSelectors()
+        });
+        facetCuts[3] = Diamond.FacetCut({
             facet: address(getters),
             action: Diamond.Action.Add,
             isFreezable: false,
             selectors: getGettersSelectors()
         });
-        facetCuts[3] = Diamond.FacetCut({
+        facetCuts[4] = Diamond.FacetCut({
             facet: address(mailbox),
             action: Diamond.Action.Add,
             isFreezable: true,
@@ -331,6 +352,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
 
         executor = TestExecutor(address(diamondProxy));
+        committer = TestCommitter(address(diamondProxy));
         getters = GettersFacet(address(diamondProxy));
         mailbox = MailboxFacet(address(diamondProxy));
         admin = AdminFacet(address(diamondProxy));
@@ -352,7 +374,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         currentTimestamp = block.timestamp;
 
         bytes memory l2Logs = Utils.encodePacked(Utils.createSystemLogs(bytes32(0)));
-        newCommitBatchInfo = IExecutor.CommitBatchInfo({
+        newCommitBatchInfo = CommitBatchInfo({
             batchNumber: 1,
             timestamp: uint64(currentTimestamp),
             indexRepeatedStorageChanges: 0,
@@ -364,7 +386,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             systemLogs: l2Logs,
             operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
-        newCommitBatchInfoZKsyncOS = IExecutor.CommitBatchInfoZKsyncOS({
+        newCommitBatchInfoZKsyncOS = CommitBatchInfoZKsyncOS({
             batchNumber: 1,
             newStateCommitment: Utils.randomBytes32("newStateCommitment"),
             numberOfLayer1Txs: 0,

@@ -95,6 +95,8 @@ interface IChainTypeManager {
 
     function BRIDGE_HUB() external view returns (address);
 
+    function PERMISSIONLESS_VALIDATOR() external view returns (address);
+
     function setPendingAdmin(address _newPendingAdmin) external;
 
     function acceptAdmin() external;

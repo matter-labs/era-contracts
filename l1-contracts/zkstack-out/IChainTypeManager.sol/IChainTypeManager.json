@@ -14,6 +14,19 @@
   },
   {
     "type": "function",
+    "name": "PERMISSIONLESS_VALIDATOR",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "acceptAdmin",
     "inputs": [],
     "outputs": [],

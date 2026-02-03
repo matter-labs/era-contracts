@@ -7,6 +7,7 @@ import {IAdminFunctions} from "contracts/script-interfaces/IAdminFunctions.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
@@ -434,7 +435,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         calls[0] = Call({
             target: chainInfo.diamondProxy,
             value: 0,
-            data: abi.encodeCall(IAdmin.pauseDepositsBeforeInitiatingMigration, ())
+            data: abi.encodeCall(IMigrator.pauseDepositsBeforeInitiatingMigration, ())
         });
 
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
@@ -444,7 +445,11 @@ contract AdminFunctions is Script, IAdminFunctions {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
         Call[] memory calls = new Call[](1);
-        calls[0] = Call({target: chainInfo.diamondProxy, value: 0, data: abi.encodeCall(IAdmin.unpauseDeposits, ())});
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IMigrator.unpauseDeposits, ())
+        });
 
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }

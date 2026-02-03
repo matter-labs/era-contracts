@@ -19,6 +19,8 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
+import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
@@ -123,7 +125,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(address(bridgehub));
-        chainTypeManager = new EraChainTypeManager(address(bridgehub), interopCenterAddress, address(0));
+        chainTypeManager = new EraChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
         diamondInit = address(new DiamondInit(false));
         genesisUpgradeContract = new L1GenesisUpgrade();
 
@@ -137,7 +139,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         );
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)), false)),
+                facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)))),
                 action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: Utils.getAdminSelectors()
@@ -173,6 +175,22 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
                 action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: Utils.getMailboxSelectors()
+            })
+        );
+        facetCuts.push(
+            Diamond.FacetCut({
+                facet: address(new MigratorFacet(block.chainid, false)),
+                action: Diamond.Action.Add,
+                isFreezable: false,
+                selectors: Utils.getMigratorSelectors()
+            })
+        );
+        facetCuts.push(
+            Diamond.FacetCut({
+                facet: address(new CommitterFacet(block.chainid)),
+                action: Diamond.Action.Add,
+                isFreezable: true,
+                selectors: Utils.getCommitterSelectors()
             })
         );
 

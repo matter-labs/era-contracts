@@ -9,6 +9,8 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {MultisigCommitter} from "contracts/state-transition/validators/MultisigCommitter.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -212,14 +214,14 @@ contract MultisigCommitterTest is Test {
     function prepareCommit() internal returns (uint256, uint256, bytes memory) {
         vm.mockCall(
             chainAddress,
-            abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector),
+            abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector),
             abi.encode(chainId)
         );
 
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
-        IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
+        CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
 
-        IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](1);
         batchesToCommit[0] = batchToCommit;
 
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(

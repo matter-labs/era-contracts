@@ -3,10 +3,11 @@ pragma solidity 0.8.28;
 
 import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
+import {ICommitter} from "../../chain-interfaces/ICommitter.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IValidatorTimelock is IExecutor {
+interface IValidatorTimelock is IExecutor, ICommitter {
     /// @notice Struct specifying which validator roles to grant or revoke in a single call.
     /// @param rotatePrecommitterRole Whether to rotate the PRECOMMITTER_ROLE.
     /// @param rotateCommitterRole Whether to rotate the COMMITTER_ROLE.
@@ -140,7 +141,4 @@ interface IValidatorTimelock is IExecutor {
         uint256 _processBatchTo,
         bytes calldata _batchData
     ) external;
-    /// @dev Declared just to formally satisfy the inherited {IExecutor} interface.
-    /// NOTE: calls to this function revert in this contract.
-    function activatePriorityMode() external;
 }

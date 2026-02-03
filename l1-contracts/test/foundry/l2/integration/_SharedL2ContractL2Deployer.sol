@@ -16,6 +16,8 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
+import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -97,7 +99,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         );
         ctmAddresses.stateTransition.facets.executorFacet = address(new ExecutorFacet(config.l1ChainId));
         ctmAddresses.stateTransition.facets.adminFacet = address(
-            new AdminFacet(config.l1ChainId, RollupDAManager(ctmAddresses.daAddresses.rollupDAManager), true)
+            new AdminFacet(config.l1ChainId, RollupDAManager(ctmAddresses.daAddresses.rollupDAManager))
         );
         ctmAddresses.stateTransition.facets.mailboxFacet = address(
             new MailboxFacet(
@@ -109,15 +111,17 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
             )
         );
         ctmAddresses.stateTransition.facets.gettersFacet = address(new GettersFacet());
+        ctmAddresses.stateTransition.facets.migratorFacet = address(new MigratorFacet(config.l1ChainId, true));
+        ctmAddresses.stateTransition.facets.committerFacet = address(new CommitterFacet(config.l1ChainId));
         ctmAddresses.stateTransition.facets.diamondInit = address(new DiamondInit(false));
         // Deploy ChainTypeManager implementation
         if (config.isZKsyncOS) {
             ctmAddresses.stateTransition.implementations.chainTypeManager = address(
-                new ZKsyncOSChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0))
+                new ZKsyncOSChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0))
             );
         } else {
             ctmAddresses.stateTransition.implementations.chainTypeManager = address(
-                new EraChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0))
+                new EraChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0))
             );
         }
 

@@ -16,7 +16,6 @@ import {IVerifier} from "./IVerifier.sol";
 /// @param l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
 /// @param l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
 /// @param l2EvmEmulatorBytecodeHash The hash of EVM emulator L2 bytecode
-/// @param permissionlessValidator The address of permissionless validator contract
 // solhint-disable-next-line gas-struct-packing
 struct InitializeData {
     uint256 chainId;
@@ -32,20 +31,17 @@ struct InitializeData {
     bytes32 l2BootloaderBytecodeHash;
     bytes32 l2DefaultAccountBytecodeHash;
     bytes32 l2EvmEmulatorBytecodeHash;
-    address permissionlessValidator;
 }
 
 /// @param verifier address of Verifier contract
 /// @param l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
 /// @param l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
 /// @param l2EvmEmulatorBytecodeHash The hash of EVM emulator L2 bytecode
-/// @param permissionlessValidator The address of permissionless validator contract
 struct InitializeDataNewChain {
     IVerifier verifier;
     bytes32 l2BootloaderBytecodeHash;
     bytes32 l2DefaultAccountBytecodeHash;
     bytes32 l2EvmEmulatorBytecodeHash;
-    address permissionlessValidator;
 }
 
 interface IDiamondInit {

@@ -2,11 +2,11 @@
 
 pragma solidity 0.8.28;
 
-import {AdminTest} from "./_Admin_Shared.t.sol";
-import {ZKChainCommitment} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {MigratorTest} from "./_Migrator_Shared.t.sol";
+import {ZKChainCommitment} from "contracts/common/Config.sol";
 import {ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
-contract PrepareChainCommitmentTest is AdminTest {
+contract PrepareChainCommitmentTest is MigratorTest {
     function test_prepareChainCommitment_RevertWhen_ExecutedExceedsVerified() public {
         // Set up inconsistent batch counts where executed > verified
         utilsFacet.util_setTotalBatchesExecuted(10);
@@ -14,7 +14,7 @@ contract PrepareChainCommitmentTest is AdminTest {
         utilsFacet.util_setTotalBatchesCommitted(15);
 
         vm.expectRevert(abi.encodeWithSelector(ExecutedIsNotConsistentWithVerified.selector, 10, 5));
-        adminFacet.prepareChainCommitment();
+        migratorFacet.prepareChainCommitment();
     }
 
     function test_prepareChainCommitment_RevertWhen_VerifiedExceedsCommitted() public {
@@ -24,7 +24,7 @@ contract PrepareChainCommitmentTest is AdminTest {
         utilsFacet.util_setTotalBatchesCommitted(10);
 
         vm.expectRevert(abi.encodeWithSelector(VerifiedIsNotConsistentWithCommitted.selector, 15, 10));
-        adminFacet.prepareChainCommitment();
+        migratorFacet.prepareChainCommitment();
     }
 
     function test_prepareChainCommitment_Success() public {
@@ -33,7 +33,7 @@ contract PrepareChainCommitmentTest is AdminTest {
         utilsFacet.util_setTotalBatchesVerified(8);
         utilsFacet.util_setTotalBatchesCommitted(10);
 
-        ZKChainCommitment memory commitment = adminFacet.prepareChainCommitment();
+        ZKChainCommitment memory commitment = migratorFacet.prepareChainCommitment();
 
         assertEq(commitment.totalBatchesExecuted, 5);
         assertEq(commitment.totalBatchesVerified, 8);
@@ -52,7 +52,7 @@ contract PrepareChainCommitmentTest is AdminTest {
         bytes32 upgradeTxHash = keccak256("upgradeTxHash");
         utilsFacet.util_setL2SystemContractsUpgradeTxHash(upgradeTxHash);
 
-        ZKChainCommitment memory commitment = adminFacet.prepareChainCommitment();
+        ZKChainCommitment memory commitment = migratorFacet.prepareChainCommitment();
 
         assertEq(commitment.totalBatchesExecuted, 2);
         assertEq(commitment.totalBatchesVerified, 3);

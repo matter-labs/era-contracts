@@ -105,6 +105,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
             gettersSelectors: Utils.getAllSelectorsForFacet("Getters"),
+            migratorSelectors: Utils.getAllSelectorsForFacet("Migrator"),
+            committerSelectors: Utils.getAllSelectorsForFacet("Committer"),
             bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
             defaultAccountHash: config.contracts.chainCreationParams.defaultAAHash,
             evmEmulatorHash: config.contracts.chainCreationParams.evmEmulatorHash,
@@ -112,7 +114,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             genesisRollupLeafIndex: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
             forceDeploymentsData: forceDeploymentsData,
-            protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion
+            protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
+            permissionlessValidator: addresses.stateTransition.permissionlessValidator
         });
     }
 
@@ -243,7 +246,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 legacyValidatorTimelock: address(0),
                 eraDiamondProxy: address(0),
                 rollupDAManager: expectedGatewayContracts.daContracts.rollupDAManager,
-                rollupSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator
+                rollupSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator,
+                permissionlessValidator: gatewayCTMDeployerConfig.permissionlessValidator
             }),
             multicall3: expectedGatewayContracts.multicall3,
             diamondCutData: expectedGatewayContracts.diamondCutData,

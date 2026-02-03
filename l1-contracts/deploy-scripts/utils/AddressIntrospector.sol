@@ -128,6 +128,8 @@ library AddressIntrospector {
             address mailboxFacet = address(0);
             address executorFacet = address(0);
             address gettersFacet = address(0);
+            address migratorFacet = address(0);
+            address committerFacet = address(0);
 
             // Iterate through facets to identify each one by calling getName()
             for (uint256 j = 0; j < facets.length; j++) {
@@ -144,6 +146,10 @@ library AddressIntrospector {
                         executorFacet = facetAddr;
                     } else if (keccak256(bytes(name)) == keccak256(bytes("GettersFacet"))) {
                         gettersFacet = facetAddr;
+                    } else if (keccak256(bytes(name)) == keccak256(bytes("MigratorFacet"))) {
+                        migratorFacet = facetAddr;
+                    } else if (keccak256(bytes(name)) == keccak256(bytes("CommitterFacet"))) {
+                        committerFacet = facetAddr;
                     }
                 }
             }
@@ -153,6 +159,8 @@ library AddressIntrospector {
                 mailboxFacet: mailboxFacet,
                 executorFacet: executorFacet,
                 gettersFacet: gettersFacet,
+                migratorFacet: migratorFacet,
+                committerFacet: committerFacet,
                 diamondInit: address(0) // Not available from CTM directly
             });
             return facetsResult;
@@ -164,6 +172,8 @@ library AddressIntrospector {
             mailboxFacet: address(0),
             executorFacet: address(0),
             gettersFacet: address(0),
+            migratorFacet: address(0),
+            committerFacet: address(0),
             diamondInit: address(0)
         });
     }
@@ -203,7 +213,8 @@ library AddressIntrospector {
                 legacyValidatorTimelock: _ctm.validatorTimelock(),
                 eraDiamondProxy: address(0), // Not available from CTM directly
                 rollupDAManager: address(0), // Not available from CTM directly
-                rollupSLDAValidator: address(0) // Not available from CTM directly
+                rollupSLDAValidator: address(0), // Not available from CTM directly
+                permissionlessValidator: address(0) // Not available from CTM directly
             }),
             daAddresses: DataAvailabilityDeployedAddresses({
                 rollupDAManager: address(0), // Not available from CTM directly

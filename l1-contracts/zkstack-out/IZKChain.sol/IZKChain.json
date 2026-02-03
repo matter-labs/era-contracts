@@ -8,6 +8,13 @@
   },
   {
     "type": "function",
+    "name": "activatePriorityMode",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "allowEvmEmulation",
     "inputs": [],
     "outputs": [
@@ -176,29 +183,8 @@
   },
   {
     "type": "function",
-    "name": "commitBatchesSharedBridge",
-    "inputs": [
-      {
-        "name": "_chainAddress",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_processFrom",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_processTo",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_commitData",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
+    "name": "deactivatePriorityMode",
+    "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -1138,24 +1124,8 @@
   },
   {
     "type": "function",
-    "name": "precommitSharedBridge",
-    "inputs": [
-      {
-        "name": "_chainAddress",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_batchNumber",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_precommitData",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
+    "name": "permanentlyAllowPriorityMode",
+    "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -1911,6 +1881,19 @@
   },
   {
     "type": "function",
+    "name": "setPriorityModeTransactionFilterer",
+    "inputs": [
+      {
+        "name": "_priorityModeTransactionFilterer",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setPriorityTxMaxGasLimit",
     "inputs": [
       {
@@ -2073,56 +2056,6 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "event",
-    "name": "BatchPrecommitmentSet",
-    "inputs": [
-      {
-        "name": "batchNumber",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "untrustedLastL2BlockNumberHint",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "precommitment",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "BlockCommit",
-    "inputs": [
-      {
-        "name": "batchNumber",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "batchHash",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "commitment",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
   },
   {
     "type": "event",
@@ -2519,6 +2452,25 @@
   },
   {
     "type": "event",
+    "name": "NewPriorityModeTransactionFilterer",
+    "inputs": [
+      {
+        "name": "oldTransactionFilterer",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "newTransactionFilterer",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "NewPriorityRequest",
     "inputs": [
       {
@@ -2720,6 +2672,24 @@
   },
   {
     "type": "event",
+    "name": "PriorityModeActivated",
+    "inputs": [],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PriorityModeAllowed",
+    "inputs": [],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PriorityModeDeactivated",
+    "inputs": [],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "ProposeTransparentUpgrade",
     "inputs": [
       {
@@ -2791,31 +2761,6 @@
         "type": "uint8",
         "indexed": false,
         "internalType": "enum PubdataPricingMode"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "ReportCommittedBatchRangeZKsyncOS",
-    "inputs": [
-      {
-        "name": "batchNumber",
-        "type": "uint64",
-        "indexed": true,
-        "internalType": "uint64"
-      },
-      {
-        "name": "firstBlockNumber",
-        "type": "uint64",
-        "indexed": true,
-        "internalType": "uint64"
-      },
-      {
-        "name": "lastBlockNumber",
-        "type": "uint64",
-        "indexed": true,
-        "internalType": "uint64"
       }
     ],
     "anonymous": false
