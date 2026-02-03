@@ -348,8 +348,6 @@ error ReplaceFunctionFacetAddressZero();
 error RestrictionWasAlreadyPresent(address restriction);
 // 0x52e22c98
 error RestrictionWasNotPresent(address restriction);
-// 0xec7bcab7
-error RevertBatchesForPriorityModeNotImplementedInValidatorContract();
 // 0x9a67c1cb
 error RevertedBatchNotAfterNewLastBatch();
 // 0xfe0aa4f2
