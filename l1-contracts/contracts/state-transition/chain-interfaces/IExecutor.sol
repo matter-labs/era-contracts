@@ -245,14 +245,12 @@ interface IExecutor is IZKChainBase {
     /// `ValidatorTimelock` and `Executor` for easier and cheaper implementation of the timelock.
     /// @param _processFrom The batch number from which the execution starts.
     /// @param _processTo The batch number at which the execution ends.
-    /// @param _executeData The encoded data of the new batches to be executed.
-    /// @param _settlementFeePayer Address that pays gateway settlement fees. Must have approved GWAssetTracker to spend wrapped ZK tokens.
+    /// @param _executeData The encoded data of the new batches to be executed. Contains settlement fee payer address.
     function executeBatchesSharedBridge(
         address _chainAddress,
         uint256 _processFrom,
         uint256 _processTo,
-        bytes calldata _executeData,
-        address _settlementFeePayer
+        bytes calldata _executeData
     ) external;
 
     /// @notice Reverts unexecuted batches

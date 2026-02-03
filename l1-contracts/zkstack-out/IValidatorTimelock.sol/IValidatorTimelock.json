@@ -279,11 +279,6 @@
         "name": "_batchData",
         "type": "bytes",
         "internalType": "bytes"
-      },
-      {
-        "name": "_settlementFeePayer",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "outputs": [],

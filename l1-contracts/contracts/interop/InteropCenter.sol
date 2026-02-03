@@ -64,8 +64,7 @@ contract InteropCenter is
     ///      operator settings, ensuring interop works even if the operator sets arbitrary dynamic fees.
     ///      Note, that it's not changeable throughout the code. It's not constant to make it possible to change
     ///      the exact value with protocol upgrade without redeploying contract.
-    /// TODO: Decide on the exact value for fixed fee.
-    uint256 public ZK_INTEROP_FEE = 1e18;
+    uint256 public ZK_INTEROP_FEE;
 
     /// @notice ZK token asset ID for resolving token address via native token vault.
     bytes32 public ZK_TOKEN_ASSET_ID;
@@ -141,6 +140,8 @@ contract InteropCenter is
         L1_CHAIN_ID = _l1ChainId;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
         ZK_TOKEN_ASSET_ID = _zkTokenAssetId;
+        /// TODO: Decide on the exact value for fixed fee.
+        ZK_INTEROP_FEE = 1e18;
 
         _transferOwnership(_owner);
     }

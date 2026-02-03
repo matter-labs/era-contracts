@@ -6,6 +6,9 @@ import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
+/// @dev Note: In our CTM we have a single implementation of ValidatorTimelock for everyone,
+/// so the interface must remain backwards compatible as the same timelock is utilized
+/// for chains with different protocol versions.
 interface IValidatorTimelock is IExecutor {
     /// @notice Struct specifying which validator roles to grant or revoke in a single call.
     /// @param rotatePrecommitterRole Whether to rotate the PRECOMMITTER_ROLE.
@@ -134,12 +137,11 @@ interface IValidatorTimelock is IExecutor {
     ) external;
     /// @dev Check that batches were committed at least X time ago and
     /// make a call to the zkChain diamond contract with the same calldata.
-    /// @param _settlementFeePayer Address that pays gateway settlement fees. Must have approved GWAssetTracker to spend wrapped ZK tokens.
+    /// @dev Settlement fee payer address is encoded within _batchData to maintain interface stability.
     function executeBatchesSharedBridge(
         address _chainAddress,
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
-        bytes calldata _batchData,
-        address _settlementFeePayer
+        bytes calldata _batchData
     ) external;
 }

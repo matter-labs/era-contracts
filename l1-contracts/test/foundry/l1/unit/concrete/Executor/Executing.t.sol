@@ -182,7 +182,7 @@ contract ExecutingTest is ExecutorTest {
         );
 
         vm.store(address(messageRoot), getV31UpgradeChainBatchNumberLocation(bytes32(l2ChainId)), bytes32(uint256(1)));
-        executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData, address(0));
+        executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData);
     }
 
     function test_RevertWhen_ExecutingBlockWithWrongData() public {
@@ -207,7 +207,7 @@ contract ExecutingTest is ExecutorTest {
                 storedBatchInfoArray,
                 Utils.generatePriorityOps(storedBatchInfoArray.length)
             );
-        executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData, address(0));
+        executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData);
     }
 
     function test_RevertWhen_ExecutingRevertedBlockWithoutCommittingAndProvingAgain() public {
@@ -226,7 +226,7 @@ contract ExecutingTest is ExecutorTest {
                 storedBatchInfoArray,
                 Utils.generatePriorityOps(storedBatchInfoArray.length)
             );
-        executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData, address(0));
+        executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData);
     }
 
     function test_RevertWhen_ExecutingUnavailablePriorityOperationHash() public {
@@ -301,7 +301,7 @@ contract ExecutingTest is ExecutorTest {
                 correctNewStoredBatchInfoArray,
                 Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length, 1)
             );
-            executor.executeBatchesSharedBridge(address(0), processBatchFrom, processBatchTo, processData, address(0));
+            executor.executeBatchesSharedBridge(address(0), processBatchFrom, processBatchTo, processData);
         }
     }
 
@@ -404,7 +404,7 @@ contract ExecutingTest is ExecutorTest {
                 correctNewStoredBatchInfoArray,
                 Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length, 2)
             );
-            executor.executeBatchesSharedBridge(address(0), processBatchFrom, processBatchTo, processData, address(0));
+            executor.executeBatchesSharedBridge(address(0), processBatchFrom, processBatchTo, processData);
         }
     }
 
@@ -456,7 +456,7 @@ contract ExecutingTest is ExecutorTest {
                 storedBatchInfoArray,
                 Utils.generatePriorityOps(storedBatchInfoArray.length)
             );
-        executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData, address(0));
+        executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData);
 
         uint256 totalBlocksExecuted = getters.getTotalBlocksExecuted();
         assertEq(totalBlocksExecuted, 1);
@@ -482,13 +482,7 @@ contract ExecutingTest is ExecutorTest {
                 storedBatchInfoArray,
                 Utils.generatePriorityOps(storedBatchInfoArray.length)
             );
-        validatorTimelock.executeBatchesSharedBridge(
-            address(executor),
-            executeBatchFrom,
-            executeBatchTo,
-            executeData,
-            address(0)
-        );
+        validatorTimelock.executeBatchesSharedBridge(address(executor), executeBatchFrom, executeBatchTo, executeData);
         vm.snapshotGasLastCall("Executor", "execute");
     }
 
@@ -728,6 +722,7 @@ contract ExecutingTest is ExecutorTest {
             IExecutor.StoredBatchInfo[] memory storedBatchInfos,
             PriorityOpsBatchInfo[] memory priorityOpsBatchInfos,
             InteropRoot[][] memory dependencyRoots,
+            ,
             ,
             ,
 

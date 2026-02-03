@@ -679,6 +679,25 @@
   },
   {
     "type": "event",
+    "name": "InteropFeeUpdateRequested",
+    "inputs": [
+      {
+        "name": "newFee",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "l2TxHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "IsPorterAvailableStatusUpdate",
     "inputs": [
       {

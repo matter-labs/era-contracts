@@ -79,6 +79,6 @@ contract AuthorizationTest is ExecutorTest {
             storedBatchInfoArray,
             Utils.emptyData()
         );
-        executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData, address(0));
+        executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData);
     }
 }
