@@ -9,16 +9,22 @@ import {Utils, ChainInfoFromBridgehub} from "./Utils.sol";
 import {console} from "forge-std/console.sol";
 
 contract DeployPrividiumTransactionFilterer is AdminFunctions {
+    /// @notice Returns the address to use as the deployer/owner for contracts.
+    /// @dev This is virtual so test scripts can override it. By default returns tx.origin.
+    function getDeployerAddress() public view virtual returns (address) {
+        return tx.origin;
+    }
+
     function run(address bridgehub, uint256 chainId, bool allowDeposits) external {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(bridgehub, chainId);
 
-        vm.startBroadcast(msg.sender);
+        vm.startBroadcast(getDeployerAddress());
         PrividiumTransactionFilterer impl = new PrividiumTransactionFilterer(chainInfo.l1AssetRouterProxy);
         address proxy = address(
             new TransparentUpgradeableProxy(
                 address(impl),
                 chainInfo.admin,
-                abi.encodeCall(PrividiumTransactionFilterer.initialize, (msg.sender))
+                abi.encodeCall(PrividiumTransactionFilterer.initialize, (getDeployerAddress()))
             )
         );
         vm.stopBroadcast();
@@ -26,7 +32,7 @@ contract DeployPrividiumTransactionFilterer is AdminFunctions {
         super.setTransactionFilterer(bridgehub, chainId, proxy, true);
         PrividiumTransactionFilterer filtererProxy = PrividiumTransactionFilterer(proxy);
 
-        vm.startBroadcast(msg.sender);
+        vm.startBroadcast(getDeployerAddress());
         filtererProxy.grantWhitelist(chainInfo.admin);
         filtererProxy.setDepositsAllowed(allowDeposits);
         vm.stopBroadcast();

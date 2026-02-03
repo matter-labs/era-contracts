@@ -60,7 +60,7 @@ contract RegisterCTM is Script, IRegisterCTM {
         address ctmDeploymentTrackerProxy = address(bridgehub.l1CtmDeployer());
         address l1AssetRouterProxy = address(bridgehub.assetRouter());
 
-        vm.startBroadcast(msg.sender);
+        vm.startBroadcast(getDeployerAddress());
         IGovernance governance = IGovernance(IOwnable(bridgehubProxy).owner());
         Call[] memory calls = new Call[](3);
         calls[0] = Call({
