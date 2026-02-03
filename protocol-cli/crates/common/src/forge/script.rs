@@ -49,6 +49,11 @@ impl ForgeScript {
         self
     }
 
+    pub fn with_unlocked(mut self) -> Self {
+        self.args.add_arg(ForgeScriptArg::Unlocked);
+        self
+    }
+
     /// Add the rpc-url flag to the forge script command.
     pub fn with_rpc_url(mut self, rpc_url: String) -> Self {
         self.args.add_arg(ForgeScriptArg::RpcUrl { url: rpc_url });
@@ -243,6 +248,7 @@ pub enum ForgeScriptArg {
     GasLimit {
         gas_limit: u64,
     },
+    Unlocked,
     Zksync,
     #[strum(to_string = "skip={skip_path}")]
     Skip {
