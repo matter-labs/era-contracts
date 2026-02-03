@@ -492,7 +492,13 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
 
         bytes memory l2Calldata = abi.encodeCall(
             IChainTypeManager.setNewVersionUpgrade,
-            (upgradeCutData, previousProtocolVersion, deadline, newProtocolVersion)
+            (
+                upgradeCutData,
+                previousProtocolVersion,
+                deadline,
+                newProtocolVersion,
+                gatewayConfig.gatewayStateTransition.verifiers.verifier
+            )
         );
 
         calls = _prepareL1ToGatewayCall(

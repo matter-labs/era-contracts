@@ -198,17 +198,14 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     }
 
     function getProposedPatchUpgrade(
-        StateTransitionDeployedAddresses memory stateTransition,
+        StateTransitionDeployedAddresses memory /* stateTransition */,
         uint256 newProtocolVersion
     ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
-        VerifierParams memory verifierParams = getVerifierParams();
         proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: emptyUpgradeTx(),
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
             evmEmulatorHash: bytes32(0),
-            verifier: stateTransition.verifiers.verifier,
-            verifierParams: verifierParams,
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: new bytes(0),
             upgradeTimestamp: 0,
@@ -225,8 +222,6 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         uint256 protocolUpgradeNonce,
         bool isZKsyncOS
     ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
-        VerifierParams memory verifierParams = getVerifierParams();
-
         IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
             .getBaseForceDeployments(l1ChainId, ownerAddress);
 
@@ -248,10 +243,8 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             bootloaderHash: chainCreationParams.bootloaderHash,
             defaultAccountHash: chainCreationParams.defaultAAHash,
             evmEmulatorHash: chainCreationParams.evmEmulatorHash,
-            verifierParams: verifierParams,
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
-            verifier: stateTransition.verifiers.verifier,
             upgradeTimestamp: 0,
             newProtocolVersion: chainCreationParams.latestProtocolVersion
         });

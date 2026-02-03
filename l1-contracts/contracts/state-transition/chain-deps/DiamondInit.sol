@@ -6,6 +6,8 @@ import {Diamond} from "../libraries/Diamond.sol";
 import {ZKChainBase} from "./facets/ZKChainBase.sol";
 import {DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_BATCH_OVERHEAD_L1_GAS, DEFAULT_MAX_PUBDATA_PER_BATCH, DEFAULT_MAX_L2_GAS_PER_BATCH, DEFAULT_PRIORITY_TX_MAX_PUBDATA, DEFAULT_MINIMAL_L2_GAS_PRICE, DEFAULT_PUBDATA_PRICING_MODE, DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT} from "../../common/Config.sol";
 import {IDiamondInit, InitializeData} from "../chain-interfaces/IDiamondInit.sol";
+import {IVerifier} from "../chain-interfaces/IVerifier.sol";
+import {IChainTypeManager} from "../IChainTypeManager.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
 import {EmptyAssetId, EmptyBytes32, ZeroAddress} from "../../common/L1ContractErrors.sol";
@@ -35,9 +37,6 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
     function initialize(
         InitializeData calldata _initializeData
     ) public virtual reentrancyGuardInitializer returns (bytes32) {
-        if (address(_initializeData.verifier) == address(0)) {
-            revert ZeroAddress();
-        }
         if (_initializeData.admin == address(0)) {
             revert ZeroAddress();
         }
@@ -84,7 +83,14 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.baseTokenAssetId = _initializeData.baseTokenAssetId;
         s.protocolVersion = _initializeData.protocolVersion;
 
-        s.verifier = _initializeData.verifier;
+        // Fetch verifier from CTM based on protocol version
+        address verifier = IChainTypeManager(_initializeData.chainTypeManager).protocolVersionVerifier(
+            _initializeData.protocolVersion
+        );
+        if (verifier == address(0)) {
+            revert ZeroAddress();
+        }
+        s.verifier = IVerifier(verifier);
         s.admin = _initializeData.admin;
         s.validators[_initializeData.validatorTimelock] = true;
 

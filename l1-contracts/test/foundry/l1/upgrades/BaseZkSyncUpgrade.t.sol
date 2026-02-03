@@ -18,6 +18,8 @@ contract DummyBaseZkSyncUpgrade is BaseZkSyncUpgrade, BaseUpgradeUtils {}
 
 contract BaseZkSyncUpgradeTest is BaseUpgrade {
     DummyBaseZkSyncUpgrade baseZkSyncUpgrade;
+    address mockChainTypeManager = makeAddr("mockChainTypeManager");
+    address mockVerifier = makeAddr("mockVerifier");
 
     function setUp() public {
         baseZkSyncUpgrade = new DummyBaseZkSyncUpgrade();
@@ -26,6 +28,10 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
         baseZkSyncUpgrade.setPriorityTxMaxGasLimit(1 ether);
         baseZkSyncUpgrade.setPriorityTxMaxPubdata(1000000);
+
+        // Set up CTM for verifier lookup
+        baseZkSyncUpgrade.setChainTypeManager(mockChainTypeManager);
+        baseZkSyncUpgrade.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
     }
 
     // Upgrade is not ready yet
@@ -124,8 +130,10 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
     // Patch upgrade can't set bootloader
     function test_revertWhen_PatchUpgradeCantSetBootloader() public {
+        uint256 newVersion = SemVer.packSemVer(0, 1, 1);
         baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, 1, 0));
-        proposedUpgrade.newProtocolVersion = SemVer.packSemVer(0, 1, 1);
+        baseZkSyncUpgrade.mockProtocolVersionVerifier(newVersion, mockVerifier);
+        proposedUpgrade.newProtocolVersion = newVersion;
 
         vm.expectRevert(abi.encodeWithSelector(PatchUpgradeCantSetBootloader.selector));
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
@@ -133,8 +141,10 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
     // Patch upgrade can't set default account
     function test_revertWhen_PatchUpgradeCantSetDefaultAccount() public {
+        uint256 newVersion = SemVer.packSemVer(0, 1, 1);
         baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, 1, 0));
-        proposedUpgrade.newProtocolVersion = SemVer.packSemVer(0, 1, 1);
+        baseZkSyncUpgrade.mockProtocolVersionVerifier(newVersion, mockVerifier);
+        proposedUpgrade.newProtocolVersion = newVersion;
         proposedUpgrade.bootloaderHash = bytes32(0);
 
         vm.expectRevert(abi.encodeWithSelector(PatchUpgradeCantSetDefaultAccount.selector));
@@ -157,8 +167,10 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         proposedUpgrade.defaultAccountHash = bytes32(0);
         proposedUpgrade.evmEmulatorHash = bytes32(0);
 
+        uint256 newVersion = SemVer.packSemVer(0, 1, 1);
         baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, 1, 0));
-        proposedUpgrade.newProtocolVersion = SemVer.packSemVer(0, 1, 1);
+        baseZkSyncUpgrade.mockProtocolVersionVerifier(newVersion, mockVerifier);
+        proposedUpgrade.newProtocolVersion = newVersion;
 
         vm.expectRevert(abi.encodeWithSelector(PatchCantSetUpgradeTxn.selector));
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
@@ -175,6 +187,7 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         uint256 semVerNewProtocolVersion = SemVer.packSemVer(0, newProtocolVersion, 0);
 
         baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, newProtocolVersion - 1, 0));
+        baseZkSyncUpgrade.mockProtocolVersionVerifier(semVerNewProtocolVersion, mockVerifier);
 
         proposedUpgrade.newProtocolVersion = semVerNewProtocolVersion;
         proposedUpgrade.l2ProtocolUpgradeTx.nonce = nonce;
@@ -207,30 +220,9 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
-    function test_SuccessWith_VerifierAddressIsZero() public {
-        proposedUpgrade.verifier = address(0);
-
-        baseZkSyncUpgrade.upgrade(proposedUpgrade);
-
-        assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
-        assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
-    }
-
-    function test_SuccessWith_NewVerifierParamsIsZero() public {
-        proposedUpgrade.verifierParams = VerifierParams({
-            recursionNodeLevelVkHash: bytes32(0),
-            recursionLeafLevelVkHash: bytes32(0),
-            recursionCircuitsSetVksHash: bytes32(0)
-        });
-
-        baseZkSyncUpgrade.upgrade(proposedUpgrade);
-
-        assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        assertEq(baseZkSyncUpgrade.getVerifier(), proposedUpgrade.verifier);
-        assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
-        assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
-    }
+    // Note: test_SuccessWith_VerifierAddressIsZero and test_SuccessWith_NewVerifierParamsIsZero
+    // were removed because verifier is now fetched from CTM mapping during upgrade,
+    // not from ProposedUpgrade struct
 
     function test_SuccessWith_L2BootloaderBytecodeHashIsZero() public {
         proposedUpgrade.bootloaderHash = bytes32(0);
@@ -238,7 +230,7 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        assertEq(baseZkSyncUpgrade.getVerifier(), proposedUpgrade.verifier);
+        // verifier is now fetched from CTM, not from proposedUpgrade
         assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
     }
 
@@ -248,7 +240,7 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        assertEq(baseZkSyncUpgrade.getVerifier(), proposedUpgrade.verifier);
+        // verifier is now fetched from CTM, not from proposedUpgrade
         assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }
 
@@ -258,7 +250,7 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        assertEq(baseZkSyncUpgrade.getVerifier(), proposedUpgrade.verifier);
+        // verifier is now fetched from CTM, not from proposedUpgrade
         assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
         assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }
@@ -267,7 +259,7 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        assertEq(baseZkSyncUpgrade.getVerifier(), proposedUpgrade.verifier);
+        // verifier is now fetched from CTM, not from proposedUpgrade
         assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
         assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }

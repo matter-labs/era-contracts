@@ -30,6 +30,8 @@ contract L1V29UpgradeTest is BaseUpgrade {
     address internal oldValidatorTimelock1;
     address internal oldValidatorTimelock2;
     address internal newValidatorTimelock;
+    address internal mockChainTypeManager = makeAddr("mockChainTypeManager");
+    address internal mockVerifier = makeAddr("mockVerifier");
 
     function setUp() public {
         oldValidatorTimelock1 = makeAddr("oldValidatorTimelock1");
@@ -51,6 +53,10 @@ contract L1V29UpgradeTest is BaseUpgrade {
 
         upgrade.setPriorityTxMaxGasLimit(1 ether);
         upgrade.setPriorityTxMaxPubdata(1000000);
+
+        // Set up CTM for verifier lookup
+        upgrade.setChainTypeManager(mockChainTypeManager);
+        upgrade.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
     }
 
     function test_SuccessUpgrade() public {

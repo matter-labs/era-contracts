@@ -5,7 +5,8 @@ pragma solidity 0.8.28;
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {ZKChainBase} from "../state-transition/chain-deps/facets/ZKChainBase.sol";
-import {IVerifier, VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
+import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
+import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS} from "../common/Config.sol";
@@ -20,8 +21,6 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 /// @param bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
 /// @param defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
 /// @param evmEmulatorHash The hash of the new EVM emulator bytecode. If zero, it will not be updated.
-/// @param verifier The address of the new verifier. If zero, the verifier will not be updated.
-/// @param verifierParams The new verifier params. If all of its fields are 0, the params will not be updated.
 /// @param l1ContractsUpgradeCalldata Custom calldata for L1 contracts upgrade, it may be interpreted differently
 /// in each upgrade. Usually empty.
 /// @param postUpgradeCalldata Custom calldata for post upgrade hook, it may be interpreted differently in each
@@ -34,8 +33,6 @@ struct ProposedUpgrade {
     bytes32 bootloaderHash;
     bytes32 defaultAccountHash;
     bytes32 evmEmulatorHash;
-    address verifier;
-    VerifierParams verifierParams;
     bytes l1ContractsUpgradeCalldata;
     bytes postUpgradeCalldata;
     uint256 upgradeTimestamp;
@@ -62,9 +59,6 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
 
     /// @notice Verifier address changed
     event NewVerifier(address indexed oldVerifier, address indexed newVerifier);
-
-    /// @notice Verifier parameters changed
-    event NewVerifierParams(VerifierParams oldVerifierParams, VerifierParams newVerifierParams);
 
     /// @notice Notifies about complete upgrade
     event UpgradeComplete(uint256 indexed newProtocolVersion, bytes32 indexed l2UpgradeTxHash, ProposedUpgrade upgrade);
@@ -101,7 +95,13 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
             isOnSettlementLayer
         );
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
-        _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
+        // Fetch verifier from CTM based on new protocol version
+        address ctmVerifier = IChainTypeManager(s.chainTypeManager).protocolVersionVerifier(
+            _proposedUpgrade.newProtocolVersion
+        );
+        if (ctmVerifier != address(0)) {
+            _setVerifier(IVerifier(ctmVerifier));
+        }
         _setBaseSystemContracts(
             _proposedUpgrade.bootloaderHash,
             _proposedUpgrade.defaultAccountHash,
@@ -188,7 +188,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
 
     /// @notice Change the address of the verifier smart contract
     /// @param _newVerifier Verifier smart contract address
-    function _setVerifier(IVerifier _newVerifier) private {
+    function _setVerifier(IVerifier _newVerifier) internal {
         // An upgrade to the verifier must be done carefully to ensure there aren't batches in the committed state
         // during the transition. If verifier is upgraded, it will immediately be used to prove all committed batches.
         // Batches committed expecting the old verifier will fail. Ensure all committed batches are finalized before the
@@ -200,34 +200,6 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         IVerifier oldVerifier = s.verifier;
         s.verifier = _newVerifier;
         emit NewVerifier(address(oldVerifier), address(_newVerifier));
-    }
-
-    /// @notice Change the verifier parameters
-    /// @param _newVerifierParams New parameters for the verifier
-    function _setVerifierParams(VerifierParams memory _newVerifierParams) private {
-        // An upgrade to the verifier params must be done carefully to ensure there aren't batches in the committed state
-        // during the transition. If verifier is upgraded, it will immediately be used to prove all committed batches.
-        // Batches committed expecting the old verifier params will fail. Ensure all committed batches are finalized before the
-        // verifier is upgraded.
-        if (
-            _newVerifierParams.recursionNodeLevelVkHash == bytes32(0) &&
-            _newVerifierParams.recursionLeafLevelVkHash == bytes32(0) &&
-            _newVerifierParams.recursionCircuitsSetVksHash == bytes32(0)
-        ) {
-            return;
-        }
-
-        VerifierParams memory oldVerifierParams = s.__DEPRECATED_verifierParams;
-        s.__DEPRECATED_verifierParams = _newVerifierParams;
-        emit NewVerifierParams(oldVerifierParams, _newVerifierParams);
-    }
-
-    /// @notice Updates the verifier and the verifier params
-    /// @param _newVerifier The address of the new verifier. If 0, the verifier will not be updated.
-    /// @param _verifierParams The new verifier params. If all of the fields are 0, the params will not be updated.
-    function _upgradeVerifier(address _newVerifier, VerifierParams memory _verifierParams) internal {
-        _setVerifier(IVerifier(_newVerifier));
-        _setVerifierParams(_verifierParams);
     }
 
     /// @notice Updates the bootloader hash and the hash of the default account

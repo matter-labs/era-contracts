@@ -567,6 +567,25 @@
   },
   {
     "type": "function",
+    "name": "protocolVersionVerifier",
+    "inputs": [
+      {
+        "name": "_protocolVersion",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "serverNotifierAddress",
     "inputs": [],
     "outputs": [
@@ -737,6 +756,11 @@
         "name": "_newProtocolVersion",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "_verifier",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -786,6 +810,24 @@
         "name": "_maxGasLimit",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setProtocolVersionVerifier",
+    "inputs": [
+      {
+        "name": "_protocolVersion",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_verifier",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -1294,6 +1336,25 @@
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "NewProtocolVersionVerifier",
+    "inputs": [
+      {
+        "name": "protocolVersion",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "verifier",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
       }
     ],
     "anonymous": false

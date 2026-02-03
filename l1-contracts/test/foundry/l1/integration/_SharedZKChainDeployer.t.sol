@@ -246,7 +246,7 @@ contract ZKChainDeployer is L1ContractDeployer {
                 bytes32(_chainId),
                 bytes32(uint256(uint160(address(_bridgehub)))),
                 bytes32(uint256(uint160(address(_interopCenter)))),
-                bytes32(uint256(uint160(address(this))))
+                bytes32(uint256(uint160(address(addresses.chainTypeManager))))
             );
         }
         {

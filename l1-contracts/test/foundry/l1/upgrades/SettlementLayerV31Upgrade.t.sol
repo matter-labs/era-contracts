@@ -56,6 +56,8 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
     address internal mockMessageRoot;
     address internal mockChainAssetHandler;
     address internal mockGWChain;
+    address internal mockChainTypeManager = makeAddr("mockChainTypeManager");
+    address internal mockVerifier = makeAddr("mockVerifier");
 
     uint256 internal testChainId = 123;
     uint256 internal gwChainId = 456;
@@ -79,6 +81,10 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
         upgrade.setPriorityTxMaxPubdata(1000000);
 
         _prepareEmptyProposedUpgrade();
+
+        // Set up CTM for verifier lookup
+        upgrade.setChainTypeManager(mockChainTypeManager);
+        upgrade.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
     }
 
     function _setupMocks() internal {

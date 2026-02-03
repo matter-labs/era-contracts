@@ -212,6 +212,12 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         );
         chainContractAddress = EraChainTypeManager(address(transparentUpgradeableProxy));
 
+        // Set verifier for protocol version 0 (used for chain creation)
+        vm.stopPrank();
+        vm.prank(governor);
+        chainContractAddress.setProtocolVersionVerifier(0, testnetVerifier);
+        vm.startPrank(address(bridgehub));
+
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
 
         vm.stopPrank();

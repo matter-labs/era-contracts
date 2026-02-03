@@ -77,6 +77,7 @@ contract ExecutorProofTest is UtilsCallMockerTest {
         bytes32 baseTokenAssetId = bytes32(uint256(uint160(makeAddr("baseTokenAssetId"))));
         dummyBridgehub = new DummyBridgehub();
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), baseTokenAssetId);
+        mockChainTypeManagerVerifier(testnetVerifier);
 
         address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, address(dummyBridgehub));
         executor = TestExecutorFacet(diamondProxy);

@@ -11,6 +11,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 contract ExecuteUpgradeTest is AdminTest {
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
@@ -34,23 +35,17 @@ contract ExecuteUpgradeTest is AdminTest {
         // Setting minor protocol version manually
         utilsFacet.util_setProtocolVersion(22);
 
-        VerifierParams memory verifierParams = VerifierParams({
-            recursionNodeLevelVkHash: bytes32(0),
-            recursionLeafLevelVkHash: bytes32(0),
-            recursionCircuitsSetVksHash: bytes32(0)
-        });
+        uint256 newProtocolVersion = SemVer.packSemVer(0, 22, 0);
 
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: Utils.makeEmptyL2CanonicalTransaction(),
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
             evmEmulatorHash: bytes32(0),
-            verifier: address(0),
-            verifierParams: verifierParams,
             l1ContractsUpgradeCalldata: hex"",
             postUpgradeCalldata: hex"",
             upgradeTimestamp: 0,
-            newProtocolVersion: SemVer.packSemVer(0, 22, 0)
+            newProtocolVersion: newProtocolVersion
         });
 
         DefaultUpgrade upgrade = new DefaultUpgrade();
@@ -62,6 +57,14 @@ contract ExecuteUpgradeTest is AdminTest {
         });
 
         address ctm = utilsFacet.util_getChainTypeManager();
+
+        // Mock the CTM to return a verifier for the new protocol version
+        vm.mockCall(
+            ctm,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, newProtocolVersion),
+            abi.encode(testnetVerifier)
+        );
+
         vm.startPrank(ctm);
 
         adminFacet.executeUpgrade(diamondCutData);

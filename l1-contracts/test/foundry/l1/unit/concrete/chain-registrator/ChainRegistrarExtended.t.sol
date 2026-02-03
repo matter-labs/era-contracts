@@ -84,7 +84,6 @@ contract ChainRegistrarExtendedTest is Test {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            verifier: IVerifier(makeAddr("verifier")),
             l2BootloaderBytecodeHash: bytes32(0),
             l2DefaultAccountBytecodeHash: bytes32(0),
             l2EvmEmulatorBytecodeHash: bytes32(0)

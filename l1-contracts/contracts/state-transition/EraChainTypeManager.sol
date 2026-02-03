@@ -40,18 +40,26 @@ contract EraChainTypeManager is ChainTypeManagerBase {
     /// @param _oldProtocolVersion the old protocol version
     /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
     /// @param _newProtocolVersion the new protocol version
+    /// @param _verifier the verifier address for the new protocol version
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
         uint256 _oldProtocolVersionDeadline,
-        uint256 _newProtocolVersion
+        uint256 _newProtocolVersion,
+        address _verifier
     ) external override onlyOwner {
         // Era chains require migrations to be paused
         if (!IChainAssetHandler(IL1Bridgehub(BRIDGE_HUB).chainAssetHandler()).migrationPaused()) {
             revert MigrationsNotPaused();
         }
 
-        _setNewVersionUpgrade(_cutData, _oldProtocolVersion, _oldProtocolVersionDeadline, _newProtocolVersion);
+        _setNewVersionUpgrade({
+            _cutData: _cutData,
+            _oldProtocolVersion: _oldProtocolVersion,
+            _oldProtocolVersionDeadline: _oldProtocolVersionDeadline,
+            _newProtocolVersion: _newProtocolVersion,
+            _verifier: _verifier
+        });
     }
 
     /// @notice Validates chain creation parameters common to all chain types

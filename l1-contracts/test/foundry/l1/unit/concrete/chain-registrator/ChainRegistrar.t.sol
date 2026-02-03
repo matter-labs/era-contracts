@@ -6,6 +6,8 @@ import {Test} from "forge-std/Test.sol";
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
@@ -52,6 +54,11 @@ contract ChainRegistrarTest is Test {
         interopCenter.initL2(block.chainid, makeAddr("admin"));
         messageRoot = new L1MessageRoot(address(bridgeHub), 1);
         ctm = new DummyChainTypeManagerWBH(address(bridgeHub));
+
+        // Set verifier for protocol version 0 (using testing function to bypass access control)
+        address testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+        ctm.setProtocolVersionVerifierForTesting(0, testnetVerifier);
+
         admin = makeAddr("admin");
         deployer = makeAddr("deployer");
         vm.prank(admin);
@@ -81,7 +88,6 @@ contract ChainRegistrarTest is Test {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            verifier: IVerifier(makeAddr("verifier")),
             l2BootloaderBytecodeHash: bytes32(0),
             l2DefaultAccountBytecodeHash: bytes32(0),
             l2EvmEmulatorBytecodeHash: bytes32(0)

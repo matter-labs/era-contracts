@@ -365,7 +365,8 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             cutData,
             oldProtocolVersion,
             oldProtocolVersionDeadline,
-            newProtocolVersion
+            newProtocolVersion,
+            testnetVerifier
         );
 
         // Verify that the protocol version deadline was set
@@ -396,7 +397,8 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             cutData,
             oldProtocolVersion,
             oldProtocolVersionDeadline,
-            newProtocolVersion
+            newProtocolVersion,
+            testnetVerifier
         );
     }
 

@@ -93,6 +93,9 @@ interface IChainTypeManager {
     /// @notice Updated ProtocolVersion deadline
     event UpdateProtocolVersionDeadline(uint256 indexed protocolVersion, uint256 deadline);
 
+    /// @notice Verifier address changed for a protocol version
+    event NewProtocolVersionVerifier(uint256 indexed protocolVersion, address indexed verifier);
+
     function BRIDGE_HUB() external view returns (address);
 
     function setPendingAdmin(address _newPendingAdmin) external;
@@ -118,6 +121,10 @@ interface IChainTypeManager {
     function protocolVersionDeadline(uint256 _protocolVersion) external view returns (uint256);
 
     function protocolVersionIsActive(uint256 _protocolVersion) external view returns (bool);
+
+    function protocolVersionVerifier(uint256 _protocolVersion) external view returns (address);
+
+    function setProtocolVersionVerifier(uint256 _protocolVersion, address _verifier) external;
 
     function getProtocolVersion(uint256 _chainId) external view returns (uint256);
 
@@ -149,7 +156,8 @@ interface IChainTypeManager {
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
         uint256 _oldProtocolVersionDeadline,
-        uint256 _newProtocolVersion
+        uint256 _newProtocolVersion,
+        address _verifier
     ) external;
 
     function setUpgradeDiamondCut(Diamond.DiamondCutData calldata _cutData, uint256 _oldProtocolVersion) external;

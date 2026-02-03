@@ -18,6 +18,7 @@ import {L2UtilsBase} from "./L2UtilsBase.sol";
 import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {L2UtilsBase} from "./L2UtilsBase.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegrationScript {
     using stdToml for string;
@@ -74,6 +75,14 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
             ctmAddresses.stateTransition.implementations.chainTypeManager,
             ctmAddresses.stateTransition.proxies.chainTypeManager
         ) = deployTuppWithContract(ctmContractName, true);
+
+        // Set the verifier for the protocol version on the CTM
+        // Need to prank as the owner (deployer) to have access
+        vm.prank(config.deployerAddress);
+        IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager).setProtocolVersionVerifier(
+            config.contracts.chainCreationParams.latestProtocolVersion,
+            ctmAddresses.stateTransition.verifiers.verifier
+        );
     }
 
     // add this to be excluded from coverage report

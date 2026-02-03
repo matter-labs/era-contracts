@@ -88,6 +88,9 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev It's used for easier tracking the upgrade cutData off-chain.
     mapping(uint256 protocolVersion => uint256) public newChainCreationParamsBlock;
 
+    /// @dev The verifier address per protocol version
+    mapping(uint256 protocolVersion => address) public protocolVersionVerifier;
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     /// @dev Note, that while the contract does not use `nonReentrant` modifier, we still keep the `reentrancyGuardInitializer`
@@ -282,17 +285,37 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         emit NewServerNotifier(oldServerNotifier, _serverNotifier);
     }
 
+    /// @notice Sets verifier address for a protocol version
+    /// @param _protocolVersion The protocol version
+    /// @param _verifier The verifier address
+    function setProtocolVersionVerifier(uint256 _protocolVersion, address _verifier) external onlyOwnerOrAdmin {
+        _setProtocolVersionVerifier(_protocolVersion, _verifier);
+    }
+
+    /// @dev Internal function to set verifier address for a protocol version
+    /// @param _protocolVersion The protocol version
+    /// @param _verifier The verifier address
+    function _setProtocolVersionVerifier(uint256 _protocolVersion, address _verifier) internal {
+        if (_verifier == address(0)) {
+            revert ZeroAddress();
+        }
+        protocolVersionVerifier[_protocolVersion] = _verifier;
+        emit NewProtocolVersionVerifier(_protocolVersion, _verifier);
+    }
+
     /// @dev set New Version with upgrade from old version
     /// @param _cutData the new diamond cut data
     /// @param _oldProtocolVersion the old protocol version
     /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
     /// @param _newProtocolVersion the new protocol version
+    /// @param _verifier the verifier address for the new protocol version
     /// @dev To be overridden in derived contracts for custom behavior
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
         uint256 _oldProtocolVersionDeadline,
-        uint256 _newProtocolVersion
+        uint256 _newProtocolVersion,
+        address _verifier
     ) external virtual;
 
     /// @dev Common logic for setting new version upgrade
@@ -300,11 +323,13 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @param _oldProtocolVersion the old protocol version
     /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
     /// @param _newProtocolVersion the new protocol version
+    /// @param _verifier the verifier address for the new protocol version
     function _setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
         uint256 _oldProtocolVersionDeadline,
-        uint256 _newProtocolVersion
+        uint256 _newProtocolVersion,
+        address _verifier
     ) internal {
         uint256 previousProtocolVersion = protocolVersion;
         _setProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
@@ -312,6 +337,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
         setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
+        _setProtocolVersionVerifier(_newProtocolVersion, _verifier);
         // Emit event with backward compatible hack.
         emit NewUpgradeCutData(_newProtocolVersion, _cutData);
     }
