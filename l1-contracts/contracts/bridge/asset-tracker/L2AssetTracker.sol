@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
-import {ConfirmBalanceMigrationData, TokenBalanceMigrationData} from "../../common/Messaging.sol";
+import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
 import {L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {Unauthorized, InvalidChainId} from "../../common/L1ContractErrors.sol";
@@ -306,9 +306,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// @notice Confirms a migration operation has been completed and updates the asset migration number.
     /// @dev This function is called by L1 after a migration has been processed to update local state.
-    /// @param data The migration confirmation data containing the asset ID and migration number.
-    function confirmMigrationOnL2(ConfirmBalanceMigrationData calldata data) external onlyServiceTransactionSender {
-        assetMigrationNumber[block.chainid][data.assetId] = data.migrationNumber;
+    /// @param _data The migration confirmation data containing the asset ID and migration number.
+    function confirmMigrationOnL2(TokenBalanceMigrationData calldata _data) external onlyServiceTransactionSender {
+        assetMigrationNumber[block.chainid][_data.assetId] = _data.assetMigrationNumber;
     }
 
     /*//////////////////////////////////////////////////////////////
