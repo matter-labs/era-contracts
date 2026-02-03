@@ -43,7 +43,7 @@ contract MigratorFacet is ZKChainBase, IMigrator {
     /// @notice The timestamp when deposits start being paused.
     uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_START;
 
-    /// @notice The timestamp when deposit pausing is no longer available.
+    /// @notice The timestamp when deposits stop being paused.
     uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_END;
 
     constructor(uint256 _l1ChainId, bool _isTestnet) {
