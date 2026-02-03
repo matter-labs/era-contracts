@@ -49,7 +49,8 @@ remappings = [
   "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
 ]
 optimizer = true
-optimizer_runs = 9999999
+# TODO: Revert to 9999999 once AdminFacet is split (to be done in Stage 1 PR).
+optimizer_runs = 200
 # TODO(X): the latest foundry disallows reverts that happen inside the internal calls and we should fix tests that rely
 # on such reverts
 allow_internal_expect_revert = true
