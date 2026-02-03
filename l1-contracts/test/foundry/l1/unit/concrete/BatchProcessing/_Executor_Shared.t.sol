@@ -298,8 +298,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             verifier: IVerifier(testnetVerifier), // verifier
             l2BootloaderBytecodeHash: dummyHash,
             l2DefaultAccountBytecodeHash: dummyHash,
-            l2EvmEmulatorBytecodeHash: dummyHash,
-            permissionlessValidator: address(permissionlessValidator)
+            l2EvmEmulatorBytecodeHash: dummyHash
         });
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), baseTokenAssetId);
 

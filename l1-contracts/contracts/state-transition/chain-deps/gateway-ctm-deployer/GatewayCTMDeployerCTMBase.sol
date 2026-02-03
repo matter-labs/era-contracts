@@ -134,8 +134,7 @@ abstract contract GatewayCTMDeployerCTMBase {
             verifier: IVerifier(_config.verifier),
             l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
             l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
-            l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash,
-            permissionlessValidator: baseConfig.permissionlessValidator
+            l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({

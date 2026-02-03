@@ -93,9 +93,8 @@ contract UpgradeLogicTest is DiamondCutTest {
             // zkPorterIsAvailable: false,
             l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
             l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-            l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+            l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
             // initialProtocolVersion: 0,
-            permissionlessValidator: address(permissionlessValidator)
         });
 
         bytes memory diamondInitCalldata = abi.encodeWithSelector(diamondInit.initialize.selector, params);

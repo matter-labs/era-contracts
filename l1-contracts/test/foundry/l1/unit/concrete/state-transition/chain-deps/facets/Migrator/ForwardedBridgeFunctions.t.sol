@@ -417,7 +417,7 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
     }
 
     function test_forwardedBridgeMint_RevertWhen_NotMigrated_OnL1_ContractAlreadyDeployed() public {
-        // Setup: on L1, historical root is valid but contract not deployed
+        // Setup: on L1, with _contractAlreadyDeployed=true but settlementLayer=address(0)
         address ctm = utilsFacet.util_getChainTypeManager();
         uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
         vm.mockCall(

@@ -14,6 +14,7 @@ import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FeeParams} from "../../state-transition/chain-deps/ZKChainStorage.sol";
+import {IChainTypeManager} from "../IChainTypeManager.sol";
 
 /// @author Matter Labs
 /// @dev The contract is used only once to initialize the diamond proxy.
@@ -93,7 +94,8 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.l2DefaultAccountBytecodeHash = _initializeData.l2DefaultAccountBytecodeHash;
         s.l2EvmEmulatorBytecodeHash = _initializeData.l2EvmEmulatorBytecodeHash;
         s.priorityTxMaxGasLimit = DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT;
-        s.priorityModeInfo.permissionlessValidator = _initializeData.permissionlessValidator;
+        s.priorityModeInfo.permissionlessValidator = IChainTypeManager(_initializeData.chainTypeManager)
+            .PERMISSIONLESS_VALIDATOR();
         s.feeParams = FeeParams({
             pubdataPricingMode: DEFAULT_PUBDATA_PRICING_MODE,
             batchOverheadL1Gas: DEFAULT_BATCH_OVERHEAD_L1_GAS,
