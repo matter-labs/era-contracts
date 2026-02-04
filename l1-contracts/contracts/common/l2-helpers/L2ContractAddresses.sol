@@ -38,6 +38,9 @@ address constant L1_MESSENGER_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x01);
 /// @dev The address of the system hook responsible for setting bytecode on address. Can only be called from L2_COMPLEX_UPGRADER address
 address constant SET_BYTECODE_ON_ADDRESS_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x02);
 
+/// @dev The address of the system hook responsible for minting base tokens. Can only be called from L2_BASE_TOKEN_SYSTEM_CONTRACT
+address constant MINT_BASE_TOKEN_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x03);
+
 ////////////////////////////////////////////////////////////
 // System contracts
 ////////////////////////////////////////////////////////////

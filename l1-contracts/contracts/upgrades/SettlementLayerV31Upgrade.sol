@@ -49,7 +49,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         address baseTokenOriginAddress = nativeTokenVault.originToken(baseTokenAssetId);
         bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
             IL2V31Upgrade.upgrade,
-            (baseTokenOriginChainId, baseTokenOriginAddress, s.zksyncOS)
+            (baseTokenOriginChainId, baseTokenOriginAddress)
         );
         bytes memory complexUpgraderCalldata = abi.encodeCall(
             IComplexUpgrader.upgrade,
