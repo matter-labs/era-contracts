@@ -19,7 +19,7 @@ import {L2ChainAssetHandler} from "../core/chain-asset-handler/L2ChainAssetHandl
 import {InteropHandler} from "../interop/InteropHandler.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL2SharedBridgeLegacy} from "../bridge/interfaces/IL2SharedBridgeLegacy.sol";
-import {DeployFailed, UnsupportedUpgradeType, ZKsyncOSNotForceDeployForExistingContract, ZKsyncOSNotForceDeployToPrecompileAddress} from "../common/L1ContractErrors.sol";
+import {DeployFailed, UnsupportedUpgradeType, ZKsyncOSNotForceDeployForExistingContract, ZKsyncOSNotForceDeployToPrecompileAddress, NonCanonicalRepresentation} from "../common/L1ContractErrors.sol";
 
 import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
@@ -90,6 +90,9 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     function unsafeForceDeployZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
+        // Validate canonical encoding for (bytes32, uint32, bytes32) = 32 + 32 + 32 = 96 bytes
+        require(_bytecodeInfo.length == 96, NonCanonicalRepresentation());
+
         emit ZKsyncOSForceDeployStarted(_newAddress);
 
         // Decode the bytecode info using the library
@@ -137,8 +140,17 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     function updateZKsyncOSContract(bytes memory _bytecodeInfo, address _newAddress) internal {
+        // Validate that _bytecodeInfo contains exactly the expected length for (bytes, bytes) encoding
+        // to prevent trailing bytes from affecting the hash calculation
+        require(_bytecodeInfo.length >= 64, NonCanonicalRepresentation());
+
         emit UpdateZKsyncOSContractStarted(_newAddress);
+
         (bytes memory bytecodeInfo, bytes memory bytecodeInfoSystemProxy) = abi.decode((_bytecodeInfo), (bytes, bytes));
+
+        / Verify canonical encoding by re-encoding and comparing
+        bytes memory canonicalEncoding = abi.encode(bytecodeInfo, bytecodeInfoSystemProxy);
+        require(keccak256(_bytecodeInfo) == keccak256(canonicalEncoding), NonCanonicalRepresentation());
 
         address implAddress = generateRandomAddress(bytecodeInfo);
         emit ImplementationAddressGenerated(implAddress);

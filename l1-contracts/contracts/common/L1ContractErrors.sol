@@ -260,6 +260,8 @@ error NoFunctionsForDiamondCut();
 error NoFundsTransferred();
 // 0xb20b58ce
 error NoLegacySharedBridge();
+// 0xc4dc2673
+error NonCanonicalRepresentation();
 // 0xc21b1ab7
 error NonEmptyCalldata();
 // 0x536ec84b
