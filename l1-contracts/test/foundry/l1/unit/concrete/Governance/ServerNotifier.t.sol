@@ -149,13 +149,23 @@ contract ServerNotifierTest is Test {
     }
 
     function test_initializeRevertsOnZeroAddress() public {
-        ServerNotifier newServerNotifier = new ServerNotifier();
+        // Create an uninitialized proxy to test the ZeroAddress check
+        ServerNotifier implementation = new ServerNotifier();
+        ProxyAdmin newProxyAdmin = new ProxyAdmin();
+        // Create proxy WITHOUT init data so it's not initialized yet
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+            address(implementation),
+            address(newProxyAdmin),
+            "" // No init data - proxy is not initialized
+        );
+        ServerNotifier uninitializedNotifier = ServerNotifier(address(proxy));
         vm.expectRevert(ZeroAddress.selector);
-        newServerNotifier.initialize(address(0));
+        uninitializedNotifier.initialize(address(0));
     }
 
     function test_initializeCannotBeCalledTwice() public {
-        vm.expectRevert(SlotOccupied.selector);
+        // OZ's initializer modifier runs before reentrancyGuardInitializer and rejects re-initialization
+        vm.expectRevert("Initializable: contract is already initialized");
         serverNotifier.initialize(owner);
     }
 }
