@@ -69,8 +69,6 @@ struct GatewayCTMDeployerConfig {
     bytes forceDeploymentsData;
     /// @notice The latest protocol version.
     uint256 protocolVersion;
-    /// @notice permissionlessValidator The address of permissionless validator contract
-    address permissionlessValidator;
 }
 
 /// @notice Addresses of state transition related contracts.

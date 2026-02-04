@@ -724,14 +724,14 @@ library GatewayCTMDeployerHelper {
             result.chainTypeManagerImplementation = _deployInternalWithParams(
                 "ZKsyncOSChainTypeManager",
                 "ZKsyncOSChainTypeManager.sol",
-                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), baseConfig.permissionlessValidator),
+                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0)),
                 innerConfig
             );
         } else {
             result.chainTypeManagerImplementation = _deployInternalWithParams(
                 "EraChainTypeManager",
                 "EraChainTypeManager.sol",
-                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), baseConfig.permissionlessValidator),
+                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0)),
                 innerConfig
             );
         }
@@ -851,7 +851,7 @@ library GatewayCTMDeployerHelper {
             result.chainTypeManagerImplementation = _deployInternalWithParamsWithMode(
                 "ZKsyncOSChainTypeManager",
                 "ZKsyncOSChainTypeManager.sol",
-                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), baseConfig.permissionlessValidator),
+                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0)),
                 innerConfig,
                 isZKsyncOS
             );
@@ -859,7 +859,7 @@ library GatewayCTMDeployerHelper {
             result.chainTypeManagerImplementation = _deployInternalWithParamsWithMode(
                 "EraChainTypeManager",
                 "EraChainTypeManager.sol",
-                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), baseConfig.permissionlessValidator),
+                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0)),
                 innerConfig,
                 isZKsyncOS
             );
@@ -1005,7 +1005,7 @@ library GatewayCTMDeployerHelper {
                 verifierFflonk: _deployedContracts.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: _deployedContracts.stateTransition.verifiers.verifierPlonk,
                 verifierOwner: _config.aliasedGovernanceAddress,
-                permissionlessValidator: _config.permissionlessValidator
+                permissionlessValidator: address(0)
             });
     }
 

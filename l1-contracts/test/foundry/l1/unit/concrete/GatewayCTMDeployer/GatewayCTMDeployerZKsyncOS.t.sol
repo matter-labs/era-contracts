@@ -117,8 +117,7 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
             // For ZKsyncOS mode, the genesis batch commitment must be equal to 1
             genesisBatchCommitment: bytes32(uint256(1)),
             forceDeploymentsData: hex"deadbeef",
-            protocolVersion: 1,
-            permissionlessValidator: address(0)
+            protocolVersion: 1
         });
 
         // Initialize selectors with sample function selectors

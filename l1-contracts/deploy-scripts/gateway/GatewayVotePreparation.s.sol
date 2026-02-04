@@ -114,8 +114,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             genesisRollupLeafIndex: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
             forceDeploymentsData: forceDeploymentsData,
-            protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
-            permissionlessValidator: addresses.stateTransition.permissionlessValidator
+            protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion
         });
     }
 
@@ -247,7 +246,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 eraDiamondProxy: address(0),
                 rollupDAManager: expectedGatewayContracts.daContracts.rollupDAManager,
                 rollupSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator,
-                permissionlessValidator: gatewayCTMDeployerConfig.permissionlessValidator
+                permissionlessValidator: address(0)
             }),
             multicall3: expectedGatewayContracts.multicall3,
             diamondCutData: expectedGatewayContracts.diamondCutData,
