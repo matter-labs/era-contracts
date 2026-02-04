@@ -7,7 +7,10 @@ import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainT
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
-import "contracts/bridgehub/L1Bridgehub.sol";
+import {InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
+import "contracts/core/bridgehub/L1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import "contracts/chain-registrar/ChainRegistrar.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -22,12 +25,15 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 
 contract ChainRegistrarTest is Test {
     DummyBridgehub private bridgeHub;
+    InteropCenter private interopCenter;
+    L1MessageRoot private messageRoot;
     DummyChainTypeManagerWBH private ctm;
     address private admin;
     address private deployer;
@@ -41,6 +47,10 @@ contract ChainRegistrarTest is Test {
 
     constructor() {
         bridgeHub = new DummyBridgehub();
+        interopCenter = new InteropCenter();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        interopCenter.initL2(block.chainid, makeAddr("admin"));
+        messageRoot = new L1MessageRoot(address(bridgeHub), 1);
         ctm = new DummyChainTypeManagerWBH(address(bridgeHub));
         admin = makeAddr("admin");
         deployer = makeAddr("deployer");
@@ -48,6 +58,8 @@ contract ChainRegistrarTest is Test {
 
         l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(address(bridgeHub)),
+            _messageRoot: IMessageRoot(address(messageRoot)),
+            _interopCenter: (interopCenter),
             _eraChainId: 270,
             _eraDiamondProxy: makeAddr("era")
         });
@@ -70,23 +82,9 @@ contract ChainRegistrarTest is Test {
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(makeAddr("verifier")),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            }),
             l2BootloaderBytecodeHash: bytes32(0),
             l2DefaultAccountBytecodeHash: bytes32(0),
-            l2EvmEmulatorBytecodeHash: bytes32(0),
-            priorityTxMaxGasLimit: 10,
-            feeParams: FeeParams({
-                pubdataPricingMode: PubdataPricingMode.Rollup,
-                batchOverheadL1Gas: 1_000_000,
-                maxPubdataPerBatch: 110_000,
-                maxL2GasPerBatch: 80_000_000,
-                priorityTxMaxPubdata: 99_000,
-                minimalL2GasPrice: 250_000_000
-            })
+            l2EvmEmulatorBytecodeHash: bytes32(0)
         });
         initCalldata = abi.encode(initializeData);
 
@@ -254,7 +252,7 @@ contract ChainRegistrarTest is Test {
 
     function registerChainAndVerify(address author, uint256 chainId) internal {
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
-        DummyZKChain zkChain = new DummyZKChain(address(bridgeHub), 270, 6, eip7702Checker);
+        DummyZKChain zkChain = new DummyZKChain(address(bridgeHub), 270, 6, address(0), eip7702Checker);
         vm.prank(admin);
         ctm.setZKChain(1, address(zkChain));
         vm.prank(admin);

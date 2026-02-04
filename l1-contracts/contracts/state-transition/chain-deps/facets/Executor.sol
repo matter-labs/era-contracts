@@ -3,24 +3,23 @@
 pragma solidity 0.8.28;
 
 import {ZKChainBase} from "./ZKChainBase.sol";
-import {IL1Bridgehub} from "../../../bridgehub/IL1Bridgehub.sol";
-import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
-import {L2MessageRoot} from "../../../bridgehub/L2MessageRoot.sol";
-import {COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAINNET_CHAIN_ID, MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, PACKED_L2_PRECOMMITMENT_LENGTH} from "../../../common/Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, LogProcessingOutput, MAX_LOG_KEY, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
+import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
+import {IMessageRoot} from "../../../core/message-root/IMessageRoot.sol";
+import {COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAINNET_CHAIN_ID, MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PACKED_L2_PRECOMMITMENT_LENGTH, PUBLIC_INPUT_SHIFT, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH} from "../../../common/Config.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, LogProcessingOutput, MAX_LOG_KEY, ProcessLogsInput, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {IncorrectBatchChainId, BatchHashMismatch, BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, HashMismatch, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches, InvalidBatchNumber, EmptyPrecommitData, PrecommitmentMismatch, InvalidPackedPrecommitmentLength, NonZeroBlobToVerifyZKsyncOS, InvalidBlockRange} from "../../../common/L1ContractErrors.sol";
-import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MessageRootIsZero, MismatchNumberOfLayer1Txs, MismatchL2DACommitmentScheme} from "../../L1StateTransitionErrors.sol";
+import {BatchHashMismatch, BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, EmptyPrecommitData, HashMismatch, IncorrectBatchChainId, InvalidBatchNumber, InvalidBlockRange, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidPackedPrecommitmentLength, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, NonZeroBlobToVerifyZKsyncOS, PrecommitmentMismatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches, ZKsyncOSPrecommitsNotSupported} from "../../../common/L1ContractErrors.sol";
+import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MessageRootIsZero, MismatchL2DACommitmentScheme, MismatchNumberOfLayer1Txs, SettlementLayerChainIdMismatch} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
-import {InteropRoot} from "../../../common/Messaging.sol";
+import {InteropRoot, L2Log} from "../../../common/Messaging.sol";
 
 /// @dev The version that is used for the `Executor` calldata used for relaying the
 /// stored batch info.
@@ -37,6 +36,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZKChainBase
+    // solhint-disable-next-line const-name-snakecase
     string public constant override getName = "ExecutorFacet";
 
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
@@ -304,7 +304,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         uint256 lastL2BlockTimestamp = _packedBatchAndL2BlockTimestamp & PACKED_L2_BLOCK_TIMESTAMP_MASK;
-
         // All L2 blocks have timestamps within the range of [batchTimestamp, lastL2BlockTimestamp].
         // So here we need to only double check that:
         // - The timestamp of the batch is not too small.
@@ -358,59 +357,43 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
             // Need to check that each log was sent by the correct address.
             if (logKey == uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)) {
-                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, logKey);
                 logOutput.l2LogsTreeRoot = logValue;
             } else if (logKey == uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)) {
-                if (logSender != L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, logKey);
                 logOutput.packedBatchAndL2BlockTimestamp = uint256(logValue);
             } else if (logKey == uint256(SystemLogKey.PREV_BATCH_HASH_KEY)) {
-                if (logSender != L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, logKey);
                 logOutput.previousBatchHash = logValue;
             } else if (logKey == uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY)) {
-                if (logSender != L2_BOOTLOADER_ADDRESS) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_BOOTLOADER_ADDRESS, logKey);
                 logOutput.chainedPriorityTxsHash = logValue;
             } else if (logKey == uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)) {
-                if (logSender != L2_BOOTLOADER_ADDRESS) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_BOOTLOADER_ADDRESS, logKey);
                 logOutput.numberOfLayer1Txs = uint256(logValue);
             } else if (logKey == uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)) {
-                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, logKey);
                 if (uint256(s.l2DACommitmentScheme) != uint256(logValue)) {
                     revert MismatchL2DACommitmentScheme(uint256(logValue), uint256(s.l2DACommitmentScheme));
                 }
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
-                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, logKey);
                 logOutput.l2DAValidatorOutputHash = logValue;
             } else if (logKey == uint256(SystemLogKey.L2_TXS_STATUS_ROLLING_HASH_KEY)) {
-                if (logSender != L2_BOOTLOADER_ADDRESS) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_BOOTLOADER_ADDRESS, logKey);
                 logOutput.l2TxsStatusRollingHash = logValue;
             } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
-                if (logSender != L2_BOOTLOADER_ADDRESS) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_BOOTLOADER_ADDRESS, logKey);
                 if (_expectedSystemContractUpgradeTxHash != logValue) {
                     revert TxHashMismatch();
                 }
             } else if (logKey == uint256(SystemLogKey.MESSAGE_ROOT_ROLLING_HASH_KEY)) {
-                if (logSender != L2_BOOTLOADER_ADDRESS) {
-                    revert InvalidLogSender(logSender, logKey);
-                }
+                _verifyLogSender(logSender, L2_BOOTLOADER_ADDRESS, logKey);
                 logOutput.dependencyRootsRollingHash = logValue;
+            } else if (logKey == uint256(SystemLogKey.SETTLEMENT_LAYER_CHAIN_ID_KEY)) {
+                _verifyLogSender(logSender, L2_BOOTLOADER_ADDRESS, logKey);
+                uint256 settlementLayerChainId = uint256(logValue);
+                require(settlementLayerChainId == block.chainid, SettlementLayerChainIdMismatch());
             } else if (logKey > MAX_LOG_KEY) {
                 revert UnexpectedSystemLog(logKey);
             }
@@ -423,12 +406,20 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
+    function _verifyLogSender(address _logSender, address _expected, uint256 _logKey) internal pure {
+        if (_logSender != _expected) {
+            revert InvalidLogSender(_logSender, _logKey);
+        }
+    }
+
     /// @inheritdoc IExecutor
     function precommitSharedBridge(
         address, // addr
         uint256 _batchNumber,
         bytes calldata _precommitData
     ) external nonReentrant onlyValidator onlySettlementLayer {
+        // Block precommitments for ZKsync OS as they are not supported
+        require(!s.zksyncOS, ZKsyncOSPrecommitsNotSupported());
         uint256 expectedBatchNumber = s.totalBatchesCommitted + 1;
         if (_batchNumber != expectedBatchNumber) {
             revert InvalidBatchNumber(_batchNumber, expectedBatchNumber);
@@ -498,6 +489,25 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
+    /// @dev Checks that the batch hash is correct and matches the expected hash.
+    /// @param _lastCommittedBatchData The last committed batch.
+    /// @param _batchNumber The batch number to check.
+    /// @param _checkLegacy Whether to check the legacy hash.
+    function _checkBatchHashMismatch(
+        StoredBatchInfo memory _lastCommittedBatchData,
+        uint256 _batchNumber,
+        bool _checkLegacy
+    ) internal view {
+        bytes32 cachedStoredBatchHashes = s.storedBatchHashes[_batchNumber];
+        if (
+            cachedStoredBatchHashes != _hashStoredBatchInfo(_lastCommittedBatchData) &&
+            (!_checkLegacy || cachedStoredBatchHashes != _hashLegacyStoredBatchInfo(_lastCommittedBatchData))
+        ) {
+            // incorrect previous batch data
+            revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(_lastCommittedBatchData));
+        }
+    }
+
     function _commitBatchesSharedBridgeEra(
         uint256 _processFrom,
         uint256 _processTo,
@@ -512,25 +522,27 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert CanOnlyProcessOneBatch();
         }
         // Check that we commit batches after last committed batch
-        bytes32 cachedStoredBatchHashes = s.storedBatchHashes[s.totalBatchesCommitted];
-        if (
-            cachedStoredBatchHashes != _hashStoredBatchInfo(lastCommittedBatchData) &&
-            cachedStoredBatchHashes != _hashLegacyStoredBatchInfo(lastCommittedBatchData)
-        ) {
-            // incorrect previous batch data
-            revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(lastCommittedBatchData));
-        }
+        _checkBatchHashMismatch(lastCommittedBatchData, s.totalBatchesCommitted, true);
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         // Upgrades are rarely done so we optimize a case with no active system contracts upgrade.
         if (systemContractsUpgradeTxHash == bytes32(0) || s.l2SystemContractsUpgradeBatchNumber != 0) {
-            _commitBatchesWithoutSystemContractsUpgrade(lastCommittedBatchData, newBatchesData);
+            _commitBatchesEra(lastCommittedBatchData, newBatchesData, bytes32(0));
         } else {
-            _commitBatchesWithSystemContractsUpgrade(
-                lastCommittedBatchData,
-                newBatchesData,
-                systemContractsUpgradeTxHash
-            );
+            // The system contract upgrade is designed to be executed atomically with the new bootloader, a default account,
+            // ZKP verifier, and other system parameters. Hence, we ensure that the upgrade transaction is
+            // carried out within the first batch committed after the upgrade.
+
+            // While the logic of the contract ensures that the s.l2SystemContractsUpgradeBatchNumber is 0 when this branch is entered,
+            // this check is added just in case. Since it is a hot read, it does not incur noticeable gas cost.
+            if (s.l2SystemContractsUpgradeBatchNumber != 0) {
+                revert UpgradeBatchNumberIsNotZero();
+            }
+
+            // Save the batch number where the upgrade transaction was executed.
+            s.l2SystemContractsUpgradeBatchNumber = newBatchesData[0].batchNumber;
+
+            _commitBatchesEra(lastCommittedBatchData, newBatchesData, systemContractsUpgradeTxHash);
         }
 
         s.totalBatchesCommitted = s.totalBatchesCommitted + newBatchesData.length;
@@ -550,13 +562,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert CanOnlyProcessOneBatch();
         }
         // Check that we commit batches after last committed batch
-        if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
-            // incorrect previous batch data
-            revert BatchHashMismatch(
-                s.storedBatchHashes[s.totalBatchesCommitted],
-                _hashStoredBatchInfo(lastCommittedBatchData)
-            );
-        }
+        _checkBatchHashMismatch(lastCommittedBatchData, s.totalBatchesCommitted, false);
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         bool processSystemUpgradeTx = systemContractsUpgradeTxHash != bytes32(0) &&
@@ -590,58 +596,22 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
-    /// @dev Commits new batches without any system contracts upgrade.
+    /// @dev Commits new batches, optionally handling a system contracts upgrade transaction.
     /// @param _lastCommittedBatchData The data of the last committed batch.
     /// @param _newBatchesData An array of batch data that needs to be committed.
-    function _commitBatchesWithoutSystemContractsUpgrade(
-        StoredBatchInfo memory _lastCommittedBatchData,
-        CommitBatchInfo[] memory _newBatchesData
-    ) internal {
-        // We disable this check because calldata array length is cheap.
-        // solhint-disable-next-line gas-length-in-loops
-        for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
-            _lastCommittedBatchData = _commitOneBatch(_lastCommittedBatchData, _newBatchesData[i], bytes32(0));
-
-            s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(_lastCommittedBatchData);
-            emit BlockCommit(
-                _lastCommittedBatchData.batchNumber,
-                _lastCommittedBatchData.batchHash,
-                _lastCommittedBatchData.commitment
-            );
-        }
-    }
-
-    /// @dev Commits new batches with a system contracts upgrade transaction.
-    /// @param _lastCommittedBatchData The data of the last committed batch.
-    /// @param _newBatchesData An array of batch data that needs to be committed.
-    /// @param _systemContractUpgradeTxHash The transaction hash of the system contract upgrade.
-    function _commitBatchesWithSystemContractsUpgrade(
+    /// @param _systemContractUpgradeTxHash The transaction hash of the system contract upgrade (bytes32(0) if none).
+    function _commitBatchesEra(
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] memory _newBatchesData,
         bytes32 _systemContractUpgradeTxHash
     ) internal {
-        // The system contract upgrade is designed to be executed atomically with the new bootloader, a default account,
-        // ZKP verifier, and other system parameters. Hence, we ensure that the upgrade transaction is
-        // carried out within the first batch committed after the upgrade.
-
-        // While the logic of the contract ensures that the s.l2SystemContractsUpgradeBatchNumber is 0 when this function is called,
-        // this check is added just in case. Since it is a hot read, it does not incur noticeable gas cost.
-        if (s.l2SystemContractsUpgradeBatchNumber != 0) {
-            revert UpgradeBatchNumberIsNotZero();
-        }
-
-        // Save the batch number where the upgrade transaction was executed.
-        s.l2SystemContractsUpgradeBatchNumber = _newBatchesData[0].batchNumber;
-
         // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
-            // The upgrade transaction must only be included in the first batch.
-            bytes32 expectedUpgradeTxHash = i == 0 ? _systemContractUpgradeTxHash : bytes32(0);
             _lastCommittedBatchData = _commitOneBatch(
                 _lastCommittedBatchData,
                 _newBatchesData[i],
-                expectedUpgradeTxHash
+                _systemContractUpgradeTxHash
             );
 
             s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(_lastCommittedBatchData);
@@ -650,6 +620,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 _lastCommittedBatchData.batchHash,
                 _lastCommittedBatchData.commitment
             );
+
+            if (i == 0) {
+                // The upgrade transaction must only be included in the first batch.
+                _systemContractUpgradeTxHash = bytes32(0);
+            }
         }
     }
 
@@ -715,9 +690,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (currentBatchNumber != s.totalBatchesExecuted + _executedBatchIdx + 1) {
             revert NonSequentialBatch();
         }
-        if (_hashStoredBatchInfo(_storedBatch) != s.storedBatchHashes[currentBatchNumber]) {
-            revert BatchHashMismatch(s.storedBatchHashes[currentBatchNumber], _hashStoredBatchInfo(_storedBatch));
-        }
+        _checkBatchHashMismatch(_storedBatch, currentBatchNumber, false);
         if (_priorityOperationsHash != _storedBatch.priorityOperationsHash) {
             revert PriorityOperationsRollingHashMismatch();
         }
@@ -751,7 +724,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
-        _appendMessageRoot(currentBatchNumber, _storedBatch.l2LogsTreeRoot);
     }
 
     /// @notice Verifies the dependency message roots that the chain relied on.
@@ -759,7 +731,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         InteropRoot[] memory _dependencyRoots
     ) internal view returns (bytes32 dependencyRootsRollingHash) {
         uint256 length = _dependencyRoots.length;
-        IMessageRoot messageRootContract = IL1Bridgehub(s.bridgehub).messageRoot();
+        IMessageRoot messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
 
         for (uint256 i = 0; i < length; i = i.uncheckedInc()) {
             InteropRoot memory interopRoot = _dependencyRoots[i];
@@ -792,17 +764,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @notice Appends the batch message root to the global message.
     /// @param _batchNumber The number of the batch
     /// @param _messageRoot The root of the merkle tree of the messages to L1.
-    /// @dev The logic of this function depends on the settlement layer as we support
-    /// message root aggregation only on non-L1 settlement layers for ease for migration.
+    /// @dev We only call this function on L1.
     function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
-        // During migration to the new protocol version, there will be a period when
-        // the bridgehub does not yet provide the `messageRoot` functionality.
-        // To ease up the migration, we never append messages to message root on L1.
-        if (block.chainid != L1_CHAIN_ID) {
-            // Once the batch is executed, we include its message to the message root.
-            L2MessageRoot messageRootContract = L2MessageRoot(address(IL1Bridgehub(s.bridgehub).messageRoot()));
-            messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
-        }
+        // Once the batch is executed, we include its message to the message root.
+        IMessageRoot messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
+        messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
     }
 
     /// @inheritdoc IExecutor
@@ -815,11 +781,47 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         (
             StoredBatchInfo[] memory batchesData,
             PriorityOpsBatchInfo[] memory priorityOpsData,
-            InteropRoot[][] memory dependencyRoots
+            InteropRoot[][] memory dependencyRoots,
+            L2Log[][] memory logs,
+            bytes[][] memory messages,
+            bytes32[] memory messageRoots
         ) = BatchDecoder.decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
         uint256 nBatches = batchesData.length;
         if (batchesData.length != priorityOpsData.length) {
             revert InvalidBatchesDataLength(batchesData.length, priorityOpsData.length);
+        }
+        if (block.chainid == L1_CHAIN_ID) {
+            require(logs.length == 0, InvalidBatchesDataLength(0, logs.length));
+            require(messages.length == 0, InvalidBatchesDataLength(0, messages.length));
+        } else {
+            require(batchesData.length == logs.length, InvalidBatchesDataLength(batchesData.length, logs.length));
+            require(
+                batchesData.length == messages.length,
+                InvalidBatchesDataLength(batchesData.length, messages.length)
+            );
+        }
+
+        // Interop is only allowed on GW currently, so we go through the Asset Tracker when on Gateway.
+        // When on L1, we append directly to the Message Root, though interop is not allowed there, it is only used for
+        // message verification.
+        if (block.chainid != L1_CHAIN_ID) {
+            uint256 messagesLength = messages.length;
+            for (uint256 i = 0; i < messagesLength; i = i.uncheckedInc()) {
+                ProcessLogsInput memory processLogsInput = ProcessLogsInput({
+                    logs: logs[i],
+                    messages: messages[i],
+                    chainId: s.chainId,
+                    batchNumber: batchesData[i].batchNumber,
+                    chainBatchRoot: batchesData[i].l2LogsTreeRoot,
+                    messageRoot: messageRoots[i]
+                });
+                GW_ASSET_TRACKER.processLogsAndMessages(processLogsInput);
+            }
+        } else {
+            uint256 batchesDataLength = batchesData.length;
+            for (uint256 i = 0; i < batchesDataLength; i = i.uncheckedInc()) {
+                _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
+            }
         }
 
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
@@ -861,39 +863,22 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256[] memory proofPublicInput = new uint256[](committedBatchesLength);
 
         // Check that the batch passed by the validator is indeed the first unverified batch
-        bytes32 cachedStoredBatchHashes = s.storedBatchHashes[currentTotalBatchesVerified];
-        if (
-            _hashStoredBatchInfo(prevBatch) != cachedStoredBatchHashes &&
-            _hashLegacyStoredBatchInfo(prevBatch) != cachedStoredBatchHashes
-        ) {
-            revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(prevBatch));
-        }
+        _checkBatchHashMismatch(prevBatch, currentTotalBatchesVerified, true);
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
         bytes32 prevBatchStateCommitment = prevBatch.batchHash;
         for (uint256 i = 0; i < committedBatchesLength; i = i.uncheckedInc()) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
-            if (_hashStoredBatchInfo(committedBatches[i]) != s.storedBatchHashes[currentTotalBatchesVerified]) {
-                revert BatchHashMismatch(
-                    s.storedBatchHashes[currentTotalBatchesVerified],
-                    _hashStoredBatchInfo(committedBatches[i])
-                );
-            }
+            _checkBatchHashMismatch(committedBatches[i], currentTotalBatchesVerified, false);
 
             bytes32 currentBatchCommitment = committedBatches[i].commitment;
             bytes32 currentBatchStateCommitment = committedBatches[i].batchHash;
             if (s.zksyncOS) {
-                proofPublicInput[i] =
-                    uint256(
-                        keccak256(
-                            abi.encodePacked(
-                                prevBatchStateCommitment,
-                                currentBatchStateCommitment,
-                                currentBatchCommitment
-                            )
-                        )
-                    ) >>
-                    PUBLIC_INPUT_SHIFT;
+                proofPublicInput[i] = _getBatchProofPublicInputZKsyncOS(
+                    prevBatchStateCommitment,
+                    currentBatchStateCommitment,
+                    currentBatchCommitment
+                );
             } else {
                 proofPublicInput[i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
             }
@@ -924,7 +909,21 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
-    /// @dev Gets zk proof public input
+    /// @dev Gets zk proof public input for ZKSync OS
+    function _getBatchProofPublicInputZKsyncOS(
+        bytes32 _prevBatchStateCommitment,
+        bytes32 _currentBatchStateCommitment,
+        bytes32 _currentBatchCommitment
+    ) internal pure returns (uint256) {
+        return
+            uint256(
+                keccak256(
+                    abi.encodePacked(_prevBatchStateCommitment, _currentBatchStateCommitment, _currentBatchCommitment)
+                )
+            ) >> PUBLIC_INPUT_SHIFT;
+    }
+
+    /// @dev Gets zk proof public input for Era
     function _getBatchProofPublicInput(
         bytes32 _prevBatchCommitment,
         bytes32 _currentBatchCommitment

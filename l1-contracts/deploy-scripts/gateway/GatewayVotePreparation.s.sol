@@ -3,18 +3,16 @@ pragma solidity 0.8.28;
 
 // solhint-disable no-console, gas-custom-errors, reason-string
 
-import {Script, console2 as console} from "forge-std/Script.sol";
-// import {Vm} from "forge-std/Vm.sol";
+import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
-import {L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
+import {Utils} from "../utils/Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
@@ -29,21 +27,28 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 
-import {DeployCTMScript} from "../DeployCTM.s.sol";
+import {DeployCTMScript} from "../ctm/DeployCTM.s.sol";
+import {StateTransitionDeployedAddresses, StateTransitionContracts, Verifiers, Facets} from "../utils/Types.sol";
+import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 
-import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
-import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
+import {GatewayCTMDeployerHelper, DeployerCreate2Calldata, DeployerAddresses, DirectDeployedAddresses, DirectCreate2Calldata} from "./GatewayCTMDeployerHelper.sol";
+import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {GatewayGovernanceUtils} from "./GatewayGovernanceUtils.s.sol";
+import {DeployCTMUtils} from "../ctm/DeployCTMUtils.s.sol";
+import {BridgehubAddresses, CTMDeployedAddresses} from "../utils/Types.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
-contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
+contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     using stdToml for string;
+
+    CTMDeployedAddresses internal addresses;
 
     struct GatewayCTMOutput {
         StateTransitionDeployedAddresses gatewayStateTransition;
@@ -65,22 +70,28 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
 
     address internal serverNotifier;
     address internal refundRecipient;
+    address ctm;
 
     GatewayCTMDeployerConfig internal gatewayCTMDeployerConfig;
 
-    function initializeConfig(string memory configPath, uint256 ctmRepresentativeChainId) internal virtual {
-        super.initializeConfig(configPath);
+    function initializeConfig(
+        string memory configPath,
+        string memory permanentValuesPath,
+        address bridgehubProxy,
+        uint256 ctmRepresentativeChainId
+    ) internal virtual {
+        super.initializeConfig(configPath, permanentValuesPath, bridgehubProxy);
         string memory toml = vm.readFile(configPath);
 
-        addresses.bridgehub.bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
         refundRecipient = toml.readAddress("$.refund_recipient");
-
-        eraChainId = toml.readUint("$.era_chain_id");
 
         gatewayChainId = toml.readUint("$.gateway_chain_id");
         forceDeploymentsData = toml.readBytes(".force_deployments_data");
 
-        setAddressesBasedOnBridgehub(ctmRepresentativeChainId);
+        setAddressesBasedOnBridgehub(ctmRepresentativeChainId, bridgehubProxy);
+        // Get eraChainId from AssetRouter
+        address assetRouter = address(IL1Bridgehub(bridgehubProxy).assetRouter());
+        eraChainId = AddressIntrospector.getEraChainId(assetRouter);
 
         address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
@@ -94,133 +105,145 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
             gettersSelectors: Utils.getAllSelectorsForFacet("Getters"),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: config.contracts.recursionNodeLevelVkHash,
-                recursionLeafLevelVkHash: config.contracts.recursionLeafLevelVkHash,
-                recursionCircuitsSetVksHash: config.contracts.recursionCircuitsSetVksHash
-            }),
-            feeParams: FeeParams({
-                pubdataPricingMode: config.contracts.diamondInitPubdataPricingMode,
-                batchOverheadL1Gas: uint32(config.contracts.diamondInitBatchOverheadL1Gas),
-                maxPubdataPerBatch: uint32(config.contracts.diamondInitMaxPubdataPerBatch),
-                maxL2GasPerBatch: uint32(config.contracts.diamondInitMaxL2GasPerBatch),
-                priorityTxMaxPubdata: uint32(config.contracts.diamondInitPriorityTxMaxPubdata),
-                minimalL2GasPrice: uint64(config.contracts.diamondInitMinimalL2GasPrice)
-            }),
-            bootloaderHash: config.contracts.bootloaderHash,
-            defaultAccountHash: config.contracts.defaultAAHash,
-            evmEmulatorHash: config.contracts.evmEmulatorHash,
-            priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
-            genesisRoot: config.contracts.genesisRoot,
-            genesisRollupLeafIndex: uint64(config.contracts.genesisRollupLeafIndex),
-            genesisBatchCommitment: config.contracts.genesisBatchCommitment,
+            bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
+            defaultAccountHash: config.contracts.chainCreationParams.defaultAAHash,
+            evmEmulatorHash: config.contracts.chainCreationParams.evmEmulatorHash,
+            genesisRoot: config.contracts.chainCreationParams.genesisRoot,
+            genesisRollupLeafIndex: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex),
+            genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
             forceDeploymentsData: forceDeploymentsData,
-            protocolVersion: config.contracts.latestProtocolVersion
+            protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion
         });
     }
 
-    function setAddressesBasedOnBridgehub(uint256 ctmRepresentativeChainId) internal {
-        config.ownerAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
-        address ctm;
+    function setAddressesBasedOnBridgehub(uint256 ctmRepresentativeChainId, address bridgehubProxy) internal {
+        coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubProxy);
+        config.ownerAddress = L1Bridgehub(bridgehubProxy).owner();
         if (ctmRepresentativeChainId != 0) {
-            ctm = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(ctmRepresentativeChainId);
+            ctm = IL1Bridgehub(bridgehubProxy).chainTypeManager(ctmRepresentativeChainId);
         } else {
-            ctm = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(gatewayChainId);
+            ctm = IL1Bridgehub(bridgehubProxy).chainTypeManager(gatewayChainId);
         }
-        addresses.stateTransition.chainTypeManagerProxy = ctm;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         require(
-            ctmProtocolVersion == config.contracts.latestProtocolVersion,
-            "The latest protocol version is not correct"
+            ctmProtocolVersion == config.contracts.chainCreationParams.latestProtocolVersion,
+            "CTM protocol version mismatch"
         );
-        serverNotifier = ChainTypeManagerBase(ctm).serverNotifierAddress();
-        addresses.bridges.l1AssetRouterProxy = L1Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
-
-        addresses.vaults.l1NativeTokenVaultProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).nativeTokenVault()
-        );
-        addresses.bridges.l1NullifierProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).L1_NULLIFIER()
-        );
-
-        addresses.bridgehub.ctmDeploymentTrackerProxy = address(
-            L1Bridgehub(addresses.bridgehub.bridgehubProxy).l1CtmDeployer()
-        );
-
-        addresses.bridgehub.messageRootProxy = address(L1Bridgehub(addresses.bridgehub.bridgehubProxy).messageRoot());
-
-        addresses.bridges.erc20BridgeProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
-        );
-        // It is used as the ecosystem admin inside the `DeployL1` contract
-        addresses.chainAdmin = L1Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
+        // Get full CTM addresses including stateTransition info
+        addresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
+        // Override chainAdmin with the bridgehub admin (ecosystem admin)
+        addresses.chainAdmin = L1Bridgehub(bridgehubProxy).admin();
     }
 
     function deployGatewayCTM() internal {
-        (DeployedContracts memory expectedGatewayContracts, bytes memory create2Calldata, ) = GatewayCTMDeployerHelper
-            .calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
+        (
+            DeployedContracts memory expectedGatewayContracts,
+            DeployerCreate2Calldata memory deployerCalldata,
+            ,
+            DirectCreate2Calldata memory directCalldata,
+            address create2FactoryAddress
+        ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
 
-        bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps();
+        // Deploy all factory dependencies
+        bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps(gatewayCTMDeployerConfig.isZKsyncOS);
+        address l1AssetRouter = address(IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).assetRouter());
 
         for (uint i = 0; i < deps.length; i++) {
             bytes[] memory localDeps = new bytes[](1);
             localDeps[0] = deps[i];
-            Utils.runL1L2Transaction({
-                l2Calldata: hex"",
-                l2GasLimit: 72_000_000,
-                l2Value: 0,
-                factoryDeps: localDeps,
-                dstAddress: address(0),
-                chainId: gatewayChainId,
-                bridgehubAddress: addresses.bridgehub.bridgehubProxy,
-                l1SharedBridgeProxy: addresses.bridges.l1AssetRouterProxy,
-                refundRecipient: msg.sender
-            });
+            runGatewayL1L2TransactionWithFactoryDeps(address(0), hex"", localDeps);
         }
 
-        Utils.runL1L2Transaction({
-            l2Calldata: create2Calldata,
-            l2GasLimit: 72_000_000,
-            l2Value: 0,
-            factoryDeps: new bytes[](0),
-            dstAddress: L2_CREATE2_FACTORY_ADDR,
-            chainId: gatewayChainId,
-            bridgehubAddress: addresses.bridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: addresses.bridges.l1AssetRouterProxy,
-            refundRecipient: msg.sender
-        });
+        // Deploy DA contracts (RollupDAManager, ValidiumL1DAValidator, RelayedSLDAValidator)
+        runGatewayL1L2Transaction(create2FactoryAddress, deployerCalldata.daCalldata);
+
+        // Deploy ProxyAdmin
+        runGatewayL1L2Transaction(create2FactoryAddress, deployerCalldata.proxyAdminCalldata);
+
+        // Deploy ValidatorTimelock (implementation + proxy)
+        runGatewayL1L2Transaction(create2FactoryAddress, deployerCalldata.validatorTimelockCalldata);
+
+        // Deploy Verifiers (Era or ZKsyncOS verifiers based on config)
+        runGatewayL1L2Transaction(create2FactoryAddress, deployerCalldata.verifiersCalldata);
+
+        // Deploy direct contracts (AdminFacet, MailboxFacet, ExecutorFacet, GettersFacet,
+        // DiamondInit, L1GenesisUpgrade, Multicall3)
+        _deployDirectContracts(directCalldata, create2FactoryAddress);
+
+        // Deploy CTM and ServerNotifier (Era or ZKsyncOS CTM based on config)
+        runGatewayL1L2Transaction(create2FactoryAddress, deployerCalldata.ctmCalldata);
 
         _saveExpectedGatewayContractsToOutput(expectedGatewayContracts);
+    }
+
+    function _deployDirectContracts(DirectCreate2Calldata memory directCalldata, address targetAddr) internal {
+        // Deploy AdminFacet
+        runGatewayL1L2Transaction(targetAddr, directCalldata.adminFacetCalldata);
+
+        // Deploy MailboxFacet
+        runGatewayL1L2Transaction(targetAddr, directCalldata.mailboxFacetCalldata);
+
+        // Deploy ExecutorFacet
+        runGatewayL1L2Transaction(targetAddr, directCalldata.executorFacetCalldata);
+
+        // Deploy GettersFacet
+        runGatewayL1L2Transaction(targetAddr, directCalldata.gettersFacetCalldata);
+
+        // Deploy DiamondInit
+        runGatewayL1L2Transaction(targetAddr, directCalldata.diamondInitCalldata);
+
+        // Deploy L1GenesisUpgrade
+        runGatewayL1L2Transaction(targetAddr, directCalldata.genesisUpgradeCalldata);
+
+        // Deploy Multicall3
+        runGatewayL1L2Transaction(targetAddr, directCalldata.multicall3Calldata);
+    }
+
+    function runGatewayL1L2TransactionWithFactoryDeps(
+        address to,
+        bytes memory data,
+        bytes[] memory factoryDeps
+    ) internal {
+        Utils.runL1L2Transaction({
+            l2Calldata: data,
+            l2GasLimit: 72_000_000,
+            l2Value: 0,
+            factoryDeps: factoryDeps,
+            dstAddress: to,
+            chainId: gatewayChainId,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
+            refundRecipient: msg.sender
+        });
+    }
+
+    function runGatewayL1L2Transaction(address to, bytes memory data) internal {
+        runGatewayL1L2TransactionWithFactoryDeps(to, data, new bytes[](0));
     }
 
     function _saveExpectedGatewayContractsToOutput(DeployedContracts memory expectedGatewayContracts) internal {
         output = GatewayCTMOutput({
             gatewayStateTransition: StateTransitionDeployedAddresses({
-                chainTypeManagerProxy: expectedGatewayContracts.stateTransition.chainTypeManagerProxy,
-                chainTypeManagerProxyAdmin: expectedGatewayContracts.stateTransition.chainTypeManagerProxyAdmin,
-                chainTypeManagerImplementation: expectedGatewayContracts.stateTransition.chainTypeManagerImplementation,
-                verifier: expectedGatewayContracts.stateTransition.verifier,
-                verifierFflonk: expectedGatewayContracts.stateTransition.verifierFflonk,
-                verifierPlonk: expectedGatewayContracts.stateTransition.verifierPlonk,
-                adminFacet: expectedGatewayContracts.stateTransition.adminFacet,
-                mailboxFacet: expectedGatewayContracts.stateTransition.mailboxFacet,
-                executorFacet: expectedGatewayContracts.stateTransition.executorFacet,
-                gettersFacet: expectedGatewayContracts.stateTransition.gettersFacet,
-                diamondInit: expectedGatewayContracts.stateTransition.diamondInit,
+                proxies: StateTransitionContracts({
+                    chainTypeManager: expectedGatewayContracts.stateTransition.chainTypeManagerProxy,
+                    serverNotifier: expectedGatewayContracts.stateTransition.serverNotifierProxy,
+                    validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelockProxy,
+                    bytecodesSupplier: address(0)
+                }),
+                implementations: StateTransitionContracts({
+                    chainTypeManager: expectedGatewayContracts.stateTransition.chainTypeManagerImplementation,
+                    serverNotifier: expectedGatewayContracts.stateTransition.serverNotifierImplementation,
+                    validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelockImplementation,
+                    bytecodesSupplier: address(0)
+                }),
+                verifiers: expectedGatewayContracts.stateTransition.verifiers,
+                facets: expectedGatewayContracts.stateTransition.facets,
                 genesisUpgrade: expectedGatewayContracts.stateTransition.genesisUpgrade,
-                validatorTimelockImplementation: expectedGatewayContracts
-                    .stateTransition
-                    .validatorTimelockImplementation,
-                validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelock,
-                serverNotifierProxy: expectedGatewayContracts.stateTransition.serverNotifierProxy,
-                serverNotifierImplementation: expectedGatewayContracts.stateTransition.serverNotifierImplementation,
-                rollupDAManager: expectedGatewayContracts.daContracts.rollupDAManager,
-                rollupSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator,
-                // No need for default upgrade on gateway
                 defaultUpgrade: address(0),
-                diamondProxy: address(0),
-                bytecodesSupplier: address(0),
-                isOnGateway: true
+                legacyValidatorTimelock: address(0),
+                eraDiamondProxy: address(0),
+                rollupDAManager: expectedGatewayContracts.daContracts.rollupDAManager,
+                rollupSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator
             }),
             multicall3: expectedGatewayContracts.multicall3,
             diamondCutData: expectedGatewayContracts.diamondCutData,
@@ -230,23 +253,31 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
         });
     }
 
-    function run() public override {
-        prepareForGWVoting(0);
+    function run(address bridgehubProxy, uint256 ctmRepresentativeChainId) public {
+        prepareForGWVoting(bridgehubProxy, ctmRepresentativeChainId);
     }
 
-    function prepareForGWVoting(uint256 ctmRepresentativeChainId) public {
+    function deployServerNotifier() internal returns (address implementation, address proxy) {
+        // We will not store the address of the ProxyAdmin as it is trivial to query if needed.
+        address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.chainAdmin, false);
+
+        (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin, false);
+    }
+
+    function prepareForGWVoting(address bridgehubProxy, uint256 ctmRepresentativeChainId) public {
         console.log("Setting up the Gateway script");
 
         string memory root = vm.projectRoot();
         string memory configPath = string.concat(root, vm.envString("GATEWAY_VOTE_PREPARATION_INPUT"));
+        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
 
-        initializeConfig(configPath, ctmRepresentativeChainId);
+        initializeConfig(configPath, permanentValuesPath, bridgehubProxy, ctmRepresentativeChainId);
         _initializeGatewayGovernanceConfig(
             GatewayGovernanceConfig({
-                bridgehubProxy: addresses.bridgehub.bridgehubProxy,
-                l1AssetRouterProxy: addresses.bridges.l1AssetRouterProxy,
-                chainTypeManagerProxy: addresses.stateTransition.chainTypeManagerProxy,
-                ctmDeploymentTrackerProxy: addresses.bridgehub.ctmDeploymentTrackerProxy,
+                bridgehubProxy: coreAddresses.bridgehub.proxies.bridgehub,
+                l1AssetRouterProxy: address(IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).assetRouter()),
+                chainTypeManagerProxy: ctm,
+                ctmDeploymentTrackerProxy: coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
                 gatewayChainId: gatewayChainId
             })
         );
@@ -257,15 +288,13 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
             (, serverNotifier) = deployServerNotifier();
 
             vm.startBroadcast();
-            ServerNotifier(serverNotifier).setChainTypeManager(
-                IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy)
-            );
+            ServerNotifier(serverNotifier).setChainTypeManager(IChainTypeManager(ctm));
             ServerNotifier(serverNotifier).transferOwnership(addresses.chainAdmin);
             vm.stopBroadcast();
 
             ecosystemAdminCalls = new Call[](2);
             ecosystemAdminCalls[0] = Call({
-                target: addresses.stateTransition.chainTypeManagerProxy,
+                target: addresses.stateTransition.proxies.chainTypeManager,
                 value: 0,
                 data: abi.encodeCall(ChainTypeManagerBase.setServerNotifier, (serverNotifier))
             });
@@ -282,10 +311,10 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
         Call[] memory governanceCalls = _prepareGatewayGovernanceCalls(
             PrepareGatewayGovernanceCalls({
                 _l1GasPrice: EXPECTED_MAX_L1_GAS_PRICE,
-                _gatewayCTMAddress: output.gatewayStateTransition.chainTypeManagerProxy,
+                _gatewayCTMAddress: output.gatewayStateTransition.proxies.chainTypeManager,
                 _gatewayRollupDAManager: output.rollupDAManager,
-                _gatewayValidatorTimelock: output.gatewayStateTransition.validatorTimelock,
-                _gatewayServerNotifier: output.gatewayStateTransition.serverNotifierProxy,
+                _gatewayValidatorTimelock: output.gatewayStateTransition.proxies.validatorTimelock,
+                _gatewayServerNotifier: output.gatewayStateTransition.proxies.serverNotifier,
                 _refundRecipient: refundRecipient,
                 _ctmRepresentativeChainId: ctmRepresentativeChainId
             })
@@ -298,31 +327,43 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
         vm.serializeAddress(
             "gateway_state_transition",
             "chain_type_manager_proxy_addr",
-            output.gatewayStateTransition.chainTypeManagerProxy
+            output.gatewayStateTransition.proxies.chainTypeManager
         );
         vm.serializeAddress(
             "gateway_state_transition",
             "chain_type_manager_implementation_addr",
-            output.gatewayStateTransition.chainTypeManagerImplementation
+            output.gatewayStateTransition.implementations.chainTypeManager
         );
-        vm.serializeAddress("gateway_state_transition", "verifier_addr", output.gatewayStateTransition.verifier);
-        vm.serializeAddress("gateway_state_transition", "admin_facet_addr", output.gatewayStateTransition.adminFacet);
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "verifier_addr",
+            output.gatewayStateTransition.verifiers.verifier
+        );
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "admin_facet_addr",
+            output.gatewayStateTransition.facets.adminFacet
+        );
         vm.serializeAddress(
             "gateway_state_transition",
             "mailbox_facet_addr",
-            output.gatewayStateTransition.mailboxFacet
+            output.gatewayStateTransition.facets.mailboxFacet
         );
         vm.serializeAddress(
             "gateway_state_transition",
             "executor_facet_addr",
-            output.gatewayStateTransition.executorFacet
+            output.gatewayStateTransition.facets.executorFacet
         );
         vm.serializeAddress(
             "gateway_state_transition",
             "getters_facet_addr",
-            output.gatewayStateTransition.gettersFacet
+            output.gatewayStateTransition.facets.gettersFacet
         );
-        vm.serializeAddress("gateway_state_transition", "diamond_init_addr", output.gatewayStateTransition.diamondInit);
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "diamond_init_addr",
+            output.gatewayStateTransition.facets.diamondInit
+        );
         vm.serializeAddress(
             "gateway_state_transition",
             "genesis_upgrade_addr",
@@ -336,13 +377,13 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
         vm.serializeAddress(
             "gateway_state_transition",
             "validator_timelock_addr",
-            output.gatewayStateTransition.validatorTimelock
+            output.gatewayStateTransition.proxies.validatorTimelock
         );
         vm.serializeAddress("gateway_state_transition", "rollup_da_manager_addr", output.rollupDAManager);
         string memory gatewayStateTransition = vm.serializeAddress(
             "gateway_state_transition",
             "diamond_proxy_addr",
-            output.gatewayStateTransition.diamondProxy
+            output.gatewayStateTransition.eraDiamondProxy
         );
         vm.serializeString("root", "gateway_state_transition", gatewayStateTransition);
         vm.serializeAddress("root", "multicall3_addr", output.multicall3);

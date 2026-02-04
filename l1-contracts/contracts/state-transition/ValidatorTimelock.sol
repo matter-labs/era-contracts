@@ -6,7 +6,7 @@ import {AccessControlEnumerablePerChainAddressUpgradeable} from "./AccessControl
 import {LibMap} from "./libraries/LibMap.sol";
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {NotAZKChain, TimeNotReached} from "../common/L1ContractErrors.sol";
-import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {IValidatorTimelock} from "./IValidatorTimelock.sol";
 
 /// @author Matter Labs
@@ -29,6 +29,7 @@ contract ValidatorTimelock is
     using LibMap for LibMap.Uint32Map;
 
     /// @inheritdoc IValidatorTimelock
+    // solhint-disable-next-line const-name-snakecase
     string public constant override getName = "ValidatorTimelock";
 
     /// @inheritdoc IValidatorTimelock

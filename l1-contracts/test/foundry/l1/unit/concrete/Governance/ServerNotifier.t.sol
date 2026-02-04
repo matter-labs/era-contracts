@@ -2,11 +2,13 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManagerForServerNotifier.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {InvalidProtocolVersion, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {InvalidProtocolVersion, SlotOccupied, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract ServerNotifierTest is Test {
     ServerNotifier internal serverNotifier;
@@ -29,8 +31,18 @@ contract ServerNotifierTest is Test {
 
         chainTypeManager.setChainAdmin(chainId, chainAdmin);
 
-        serverNotifier = new ServerNotifier();
-        serverNotifier.initialize(owner);
+        ServerNotifier implementation = new ServerNotifier();
+
+        ProxyAdmin proxyAdmin = new ProxyAdmin();
+
+        bytes memory initData = abi.encodeWithSelector(ServerNotifier.initialize.selector, owner);
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+            address(implementation),
+            address(proxyAdmin),
+            initData
+        );
+
+        serverNotifier = ServerNotifier(address(proxy));
 
         vm.startPrank(owner);
         serverNotifier.setChainTypeManager(IChainTypeManager(address(chainTypeManager)));
@@ -117,5 +129,33 @@ contract ServerNotifierTest is Test {
         vm.stopPrank();
 
         assertEq(address(serverNotifier.chainTypeManager()), address(newChainTypeManager));
+    }
+
+    function test_setChainTypeManagerRevertsOnZeroAddress() public {
+        vm.startPrank(owner);
+        vm.expectRevert(ZeroAddress.selector);
+        serverNotifier.setChainTypeManager(IChainTypeManager(address(0)));
+        vm.stopPrank();
+    }
+
+    function test_setChainTypeManagerRevertsIfNotOwner() public {
+        DummyChainTypeManager newChainTypeManager = new DummyChainTypeManager();
+        address alice = makeAddr("alice");
+
+        vm.startPrank(alice);
+        vm.expectRevert("Ownable: caller is not the owner");
+        serverNotifier.setChainTypeManager(IChainTypeManager(address(newChainTypeManager)));
+        vm.stopPrank();
+    }
+
+    function test_initializeRevertsOnZeroAddress() public {
+        ServerNotifier newServerNotifier = new ServerNotifier();
+        vm.expectRevert(ZeroAddress.selector);
+        newServerNotifier.initialize(address(0));
+    }
+
+    function test_initializeCannotBeCalledTwice() public {
+        vm.expectRevert(SlotOccupied.selector);
+        serverNotifier.initialize(owner);
     }
 }
