@@ -1,7 +1,7 @@
 use crate::consts::{
     ContractSource, EIP1967_ADMIN_SLOT, EIP1967_IMPLEMENTATION_SLOT, INITIAL_CONTRACTS,
-    L2_COMPLEX_UPGRADER_ADDR, L2_COMPLEX_UPGRADER_IMPL_ADDR, SYSTEM_CONTRACT_PROXY_ADMIN,
-    SYSTEM_PROXY_ADMIN_OWNER_SLOT,
+    L2_BASE_TOKEN_HOLDER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_COMPLEX_UPGRADER_IMPL_ADDR,
+    SYSTEM_CONTRACT_PROXY_ADMIN, SYSTEM_PROXY_ADMIN_OWNER_SLOT,
 };
 use crate::types::{InitialGenesisInput, LeafInfo, MAX_B256_VALUE, MERKLE_TREE_DEPTH};
 use crate::utils::{address_to_b256, da_contract_name_to_code, l1_contract_name_to_code};
@@ -10,7 +10,7 @@ use alloy::eips::eip1559::INITIAL_BASE_FEE;
 use alloy::primitives::{Address, Bloom, B256, B64, U256};
 use blake2::{Blake2s256, Digest};
 use std::collections::BTreeMap;
-use zk_os_api::helpers::{set_properties_code, set_properties_nonce};
+use zk_os_api::helpers::{set_properties_balance, set_properties_code, set_properties_nonce};
 use zk_os_basic_system::system_implementation::flat_storage_model::{
     AccountProperties, ACCOUNT_PROPERTIES_STORAGE_ADDRESS,
 };
@@ -170,11 +170,19 @@ pub fn build_genesis_root_hash(genesis_input: &InitialGenesisInput) -> anyhow::R
     // which is important for tree.
     let mut storage_logs: BTreeMap<B256, B256> = BTreeMap::new();
 
+    // INITIAL_BASE_TOKEN_HOLDER_BALANCE = 2^127 - 1
+    let initial_base_token_holder_balance = U256::from(1u128 << 127) - U256::from(1);
+
     for (address, deployed_code) in genesis_input.initial_contracts.iter() {
         let mut account_properties = AccountProperties::default();
         // When contracts are deployed, they have a nonce of 1.
         set_properties_nonce(&mut account_properties, 1);
         set_properties_code(&mut account_properties, &deployed_code);
+
+        // Set the initial balance for BaseTokenHolder
+        if *address == L2_BASE_TOKEN_HOLDER_ADDR {
+            set_properties_balance(&mut account_properties, initial_base_token_holder_balance);
+        }
 
         let flat_storage_key = account_properties_flat_key(*address);
         let account_properties_hash = account_properties.compute_hash();

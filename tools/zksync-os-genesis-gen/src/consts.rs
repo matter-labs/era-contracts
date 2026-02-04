@@ -64,6 +64,10 @@ pub const GW_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal:
     "0000000000000000000000000000000000010010"
 )));
 
+pub const L2_BASE_TOKEN_HOLDER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+    "0000000000000000000000000000000000010011"
+)));
+
 // Deterministic Create2 factory
 // https://github.com/Arachnid/deterministic-deployment-proxy
 pub const DETERMINISTIC_CREATE2_ADDRESS: Address = Address(FixedBytes::<20>(hex_literal::hex!(
@@ -104,7 +108,7 @@ const L2_INTEROP_ROOT_STORAGE: Address = Address(FixedBytes::<20>(hex_literal::h
 const L2_MESSAGE_VERIFICATION: Address = Address(FixedBytes::<20>(hex_literal::hex!("0000000000000000000000000000000000010009")));
 
 // FIXME: consider reducing the size of the genesis by deploying those inside L2GensisUpgrade
-pub const INITIAL_CONTRACTS: [(Address, ContractSource); 21] = [
+pub const INITIAL_CONTRACTS: [(Address, ContractSource); 22] = [
     (L2_COMPLEX_UPGRADER_ADDR, ContractSource::L1ContractName("SystemContractProxy")),
     (L2_GENESIS_UPGRADE, ContractSource::L1ContractName("L2GenesisUpgrade")),
     (L2_WRAPPED_BASE_TOKEN, ContractSource::L1ContractName("L2WrappedBaseToken")),
@@ -118,6 +122,7 @@ pub const INITIAL_CONTRACTS: [(Address, ContractSource); 21] = [
     (L2_CHAIN_ASSET_HANDLER_ADDR, ContractSource::L1ContractName("L2ChainAssetHandler")),
     (L2_ASSET_TRACKER_ADDR, ContractSource::L1ContractName("L2AssetTracker")),
     (GW_ASSET_TRACKER_ADDR, ContractSource::L1ContractName("GWAssetTracker")),
+    (L2_BASE_TOKEN_HOLDER_ADDR, ContractSource::L1ContractName("BaseTokenHolder")),
     (L2_INTEROP_CENTER_ADDR, ContractSource::L1ContractName("InteropCenter")),
     (L2_INTEROP_HANDLER_ADDR, ContractSource::L1ContractName("InteropHandler")),
     (L2_INTEROP_ROOT_STORAGE, ContractSource::L1ContractName("L2InteropRootStorage")),

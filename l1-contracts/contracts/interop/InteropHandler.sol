@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_VERIFICATION, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_HOLDER, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_VERIFICATION, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
 import {BUNDLE_IDENTIFIER, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, BundleStatus, CallStatus, InteropBundle, InteropCall, MessageInclusionProof} from "../common/Messaging.sol";
 import {IERC7786Recipient} from "./IERC7786Recipient.sol";
@@ -12,7 +12,6 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
 import {BundleAlreadyProcessed, BundleVerifiedAlready, CallAlreadyExecuted, CallNotExecutable, CanNotUnbundle, ExecutingNotAllowed, MessageNotIncluded, UnauthorizedMessageSender, UnbundlingNotAllowed, WrongCallStatusLength, WrongDestinationChainId, WrongSourceChainId, InvalidInteropBundleVersion, InvalidInteropCallVersion} from "./InteropErrors.sol";
 import {InvalidSelector, Unauthorized} from "../common/L1ContractErrors.sol";
-import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
 /// @title InteropHandler
 /// @author Matter Labs
@@ -40,6 +39,13 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// @notice Initializes the reentrancy guard.
     function initL2(uint256 _l1ChainId) public reentrancyGuardInitializer onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
+    }
+
+    /// @notice Allows the contract to receive native ETH from L2_BASE_TOKEN_HOLDER.
+    /// @dev This is required because L2_BASE_TOKEN_HOLDER.give() transfers ETH to this contract
+    ///      before forwarding it to the interop call recipient.
+    receive() external payable {
+        require(msg.sender == address(L2_BASE_TOKEN_HOLDER), Unauthorized(msg.sender));
     }
 
     /// @notice Executes a full bundle atomically.
@@ -293,7 +299,8 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             require(interopCall.version == INTEROP_CALL_VERSION, InvalidInteropCallVersion());
 
             if (interopCall.value > 0) {
-                L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(this), interopCall.value);
+                // Transfer base tokens from the BaseTokenHolder instead of minting.
+                L2_BASE_TOKEN_HOLDER.give(address(this), interopCall.value);
             }
             // slither-disable-next-line arbitrary-send-eth
             bytes4 selector = IERC7786Recipient(interopCall.to).receiveMessage{value: interopCall.value}({

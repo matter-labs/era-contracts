@@ -48,6 +48,7 @@ struct FixedForceDeploymentsData {
     bytes interopCenterBytecodeInfo;
     bytes interopHandlerBytecodeInfo;
     bytes assetTrackerBytecodeInfo;
+    bytes baseTokenHolderBytecodeInfo;
     bytes beaconDeployerInfo;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;

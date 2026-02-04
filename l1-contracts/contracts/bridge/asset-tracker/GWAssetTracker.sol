@@ -227,7 +227,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
                 if (log.key == bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
                     _handleInteropCenterMessage(_processLogsInputs.chainId, message);
-                } else if (log.key == bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR)))) {
+                } else if (log.key == bytes32(uint256(uint160(address(L2_INTEROP_HANDLER_ADDR))))) {
                     _handleInteropHandlerReceiveMessage(_processLogsInputs.chainId, message, baseTokenAssetId);
                 } else if (log.key == bytes32(uint256(uint160(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)))) {
                     _handleBaseTokenSystemContractMessage(_processLogsInputs.chainId, baseTokenAssetId, message);
