@@ -38,6 +38,11 @@
                     "name": "bytecodesSupplier",
                     "type": "address",
                     "internalType": "address"
+                  },
+                  {
+                    "name": "permissionlessValidator",
+                    "type": "address",
+                    "internalType": "address"
                   }
                 ]
               },
@@ -63,6 +68,11 @@
                   },
                   {
                     "name": "bytecodesSupplier",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "permissionlessValidator",
                     "type": "address",
                     "internalType": "address"
                   }
@@ -159,11 +169,6 @@
               },
               {
                 "name": "rollupSLDAValidator",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "permissionlessValidator",
                 "type": "address",
                 "internalType": "address"
               }

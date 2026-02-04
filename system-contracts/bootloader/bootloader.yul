@@ -1200,11 +1200,10 @@ object "Bootloader" {
                 }
                 default {
                     // If the transaction succeeds, the initial mint to the sender is assumed to have happened.
-                    // We mint back to the sender the part of the deposited amount not spent on execution gas:
-                    //   refund = reserved0 - (gasLimit * gasPrice).
+                    // We refund the unused gas (refundGas * gasPrice) to the refund recipient.
                     // The operator payment is handled separately.
                     let txInternalCost := safeMul(gasPrice, gasLimit, "poa")
-                    toRefundRecipient := safeSub(getReserved0(innerTxDataOffset), txInternalCost, "ysl")
+                    toRefundRecipient := safeSub(txInternalCost, payToOperator, "ysl")
                 }
 
                 if gt(toRefundRecipient, 0) {
