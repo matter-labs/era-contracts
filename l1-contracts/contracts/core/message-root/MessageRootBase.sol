@@ -12,6 +12,7 @@ import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, Ch
 import {GW_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
+import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
 
@@ -24,7 +25,7 @@ import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
 /// @dev From V31 onwards it is also used for L2->L1 message verification, this allows bypassing the Mailbox of individual chains.
 /// This is especially useful for chains settling on Gateway.
-abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerification {
+abstract contract MessageRootBase is IMessageRoot, ReentrancyGuard, Initializable, MessageVerification {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
