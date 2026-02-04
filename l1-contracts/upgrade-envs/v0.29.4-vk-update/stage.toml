@@ -16,7 +16,7 @@ max_expected_l1_gas_price = 50000000000
 governance_min_delay = 0
 
 max_number_of_chains = 100
-create2_factory_salt = "0x766740be7321f834f7007f6f9679b330b3880e83cf3da0abded1fe495eb2cd15"
+create2_factory_salt = "0xe04d0272289b8bb670e5a19ff7dff5a42527bf70d55fcbc74488d15d00da012c"
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 
 # === Unused, we read it from the old chain creation params
@@ -80,7 +80,7 @@ genesis_upgrade_addr = "0xE7b5f9f47A0Bb9Dd3C11bfD30fE251D50D04A2D6"
 getters_facet_addr = "0x00e4C7066107B6E5E81320793BCee38D2f85CC03"
 
 # Chain Creation Params for Verifier-Only Upgrade
-# Generated at: 2026-01-30T14:38:22.015Z
+# Generated at: 2026-02-04T08:51:20.677Z
 
 [old_chain_creation_params.l1]
 genesis_upgrade = "0x65dAd0914338b7b99bB70CD2c62A3BC7BcC26a81"

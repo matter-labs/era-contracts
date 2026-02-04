@@ -1,5 +1,5 @@
 # Chain Creation Params for Verifier-Only Upgrade
-# Generated at: 2026-01-30T14:38:22.015Z
+# Generated at: 2026-02-04T08:51:20.677Z
 
 [old_chain_creation_params.l1]
 genesis_upgrade = "0x65dAd0914338b7b99bB70CD2c62A3BC7BcC26a81"
