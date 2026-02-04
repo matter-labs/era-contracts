@@ -89,6 +89,14 @@ uint256 constant MAX_NEW_FACTORY_DEPS = 64;
 /// @dev The L2 gasPricePerPubdata required to be used in bridges.
 uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = 800;
 
+/// @dev Minimum interval between price updates (fee params or token multiplier).
+uint256 constant PRICE_UPDATE_INTERVAL = 1 days;
+/// @dev Max allowed price increase per update, as a ratio (e.g. 13/10 = 1.3x).
+uint256 constant MAX_PRICE_CHANGE_NUMERATOR = 13;
+uint256 constant MAX_PRICE_CHANGE_DENOMINATOR = 10;
+/// @dev Reference L1 gas price used for price-change bound calculations.
+uint256 constant PRICE_REFERENCE_L1_GAS = 1 gwei;
+
 /// @dev The native price for L1->L2 transactions in ZKsync OS.
 uint256 constant ZKSYNC_OS_L1_TX_NATIVE_PRICE = 10;
 

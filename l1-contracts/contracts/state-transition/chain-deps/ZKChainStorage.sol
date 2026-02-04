@@ -250,4 +250,10 @@ struct ZKChainStorage {
     /// @dev Timestamp when a priority tx request was made for the specified tx index from priorityTree.
     /// @dev STORAGE SLOT: 67
     mapping(uint256 => uint256) priorityOpsRequestTimestamp;
+    /// @dev Timestamp of the last fee params update (changeFeeParams).
+    /// @dev STORAGE SLOT: 68
+    uint256 lastFeeParamsUpdateTimestamp;
+    /// @dev Timestamp of the last base token gas price multiplier update (setTokenMultiplier).
+    /// @dev STORAGE SLOT: 69
+    uint256 lastTokenMultiplierUpdateTimestamp;
 }

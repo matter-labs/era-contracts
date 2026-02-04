@@ -5,13 +5,13 @@ pragma solidity 0.8.28;
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, PRIORITY_EXPIRATION} from "../../../common/Config.sol";
+import {L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, MAX_PRICE_CHANGE_DENOMINATOR, MAX_PRICE_CHANGE_NUMERATOR, PRICE_REFERENCE_L1_GAS, PRICE_UPDATE_INTERVAL, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {L1DAValidatorAddressIsZero, NotL1, PriorityModeAlreadyAllowed} from "../../L1StateTransitionErrors.sol";
-import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, PriorityModeActivationTooEarly, PriorityModeIsNotAllowed, PriorityModeRequiresPermanentRollup, PriorityOpsRequestTimestampMissing, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized, NotCompatibleWithPriorityMode} from "../../../common/L1ContractErrors.sol";
+import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, FeeParamsChangeTooFrequent, FeeParamsChangeTooLarge, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, PriorityModeActivationTooEarly, PriorityModeIsNotAllowed, PriorityModeRequiresPermanentRollup, PriorityOpsRequestTimestampMissing, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TokenMultiplierChangeTooFrequent, TooMuchGas, Unauthorized, NotCompatibleWithPriorityMode} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
@@ -104,6 +104,11 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function changeFeeParams(FeeParams calldata _newFeeParams) external onlyAdminOrChainTypeManager onlyL1 {
+        uint256 lastUpdateTimestamp = s.lastFeeParamsUpdateTimestamp;
+        if (lastUpdateTimestamp != 0 && block.timestamp < lastUpdateTimestamp + PRICE_UPDATE_INTERVAL) {
+            revert FeeParamsChangeTooFrequent(lastUpdateTimestamp + PRICE_UPDATE_INTERVAL);
+        }
+
         // Double checking that the new fee params are valid, i.e.
         // the maximal pubdata per batch is not less than the maximal pubdata per priority transaction.
         if (_newFeeParams.maxPubdataPerBatch < _newFeeParams.priorityTxMaxPubdata) {
@@ -117,7 +122,17 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert InvalidPubdataPricingMode();
         }
 
+        _enforcePriceIncreaseBound({
+            _oldFeeParams: oldFeeParams,
+            _newFeeParams: _newFeeParams,
+            _oldNominator: s.baseTokenGasPriceMultiplierNominator,
+            _oldDenominator: s.baseTokenGasPriceMultiplierDenominator,
+            _newNominator: s.baseTokenGasPriceMultiplierNominator,
+            _newDenominator: s.baseTokenGasPriceMultiplierDenominator
+        });
+
         s.feeParams = _newFeeParams;
+        s.lastFeeParamsUpdateTimestamp = block.timestamp;
 
         emit NewFeeParams(oldFeeParams, _newFeeParams);
     }
@@ -127,13 +142,69 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if (_denominator == 0) {
             revert DenominatorIsZero();
         }
+
+        uint256 lastUpdateTimestamp = s.lastTokenMultiplierUpdateTimestamp;
+        if (lastUpdateTimestamp != 0 && block.timestamp < lastUpdateTimestamp + PRICE_UPDATE_INTERVAL) {
+            revert TokenMultiplierChangeTooFrequent(lastUpdateTimestamp + PRICE_UPDATE_INTERVAL);
+        }
+
+        _enforcePriceIncreaseBound({
+            _oldFeeParams: s.feeParams,
+            _newFeeParams: s.feeParams,
+            _oldNominator: s.baseTokenGasPriceMultiplierNominator,
+            _oldDenominator: s.baseTokenGasPriceMultiplierDenominator,
+            _newNominator: _nominator,
+            _newDenominator: _denominator
+        });
+
         uint128 oldNominator = s.baseTokenGasPriceMultiplierNominator;
         uint128 oldDenominator = s.baseTokenGasPriceMultiplierDenominator;
 
         s.baseTokenGasPriceMultiplierNominator = _nominator;
         s.baseTokenGasPriceMultiplierDenominator = _denominator;
+        s.lastTokenMultiplierUpdateTimestamp = block.timestamp;
 
         emit NewBaseTokenMultiplier(oldNominator, oldDenominator, _nominator, _denominator);
+    }
+
+    function _enforcePriceIncreaseBound(
+        FeeParams memory _oldFeeParams,
+        FeeParams memory _newFeeParams,
+        uint128 _oldNominator,
+        uint128 _oldDenominator,
+        uint128 _newNominator,
+        uint128 _newDenominator
+    ) internal pure {
+        uint256 oldPrice = _safeDerivedL2GasPrice(_oldFeeParams, _oldNominator, _oldDenominator);
+        uint256 newPrice = _safeDerivedL2GasPrice(_newFeeParams, _newNominator, _newDenominator);
+
+        if (oldPrice == 0 || newPrice <= oldPrice) {
+            return;
+        }
+
+        uint256 maxAllowedPrice = (oldPrice * MAX_PRICE_CHANGE_NUMERATOR) / MAX_PRICE_CHANGE_DENOMINATOR;
+        if (newPrice > maxAllowedPrice) {
+            revert FeeParamsChangeTooLarge(oldPrice, newPrice, maxAllowedPrice);
+        }
+    }
+
+    function _safeDerivedL2GasPrice(
+        FeeParams memory _feeParams,
+        uint128 _multiplierNominator,
+        uint128 _multiplierDenominator
+    ) internal pure returns (uint256) {
+        if (_multiplierDenominator == 0 || _feeParams.maxPubdataPerBatch == 0 || _feeParams.maxL2GasPerBatch == 0) {
+            return 0;
+        }
+
+        return
+            _deriveL2GasPriceFromParams({
+                _feeParams: _feeParams,
+                _multiplierNominator: _multiplierNominator,
+                _multiplierDenominator: _multiplierDenominator,
+                _l1GasPrice: PRICE_REFERENCE_L1_GAS,
+                _gasPerPubdata: REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+            });
     }
 
     /// @inheritdoc IAdmin

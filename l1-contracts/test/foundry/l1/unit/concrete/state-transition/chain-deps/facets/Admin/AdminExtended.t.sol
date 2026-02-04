@@ -13,6 +13,19 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 contract AdminExtendedTest is AdminTest {
     function setUp() public override {
         super.setUp();
+
+        utilsFacet.util_setBaseTokenGasPriceMultiplierNominator(1);
+        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
+        utilsFacet.util_setFeeParams(
+            FeeParams({
+                pubdataPricingMode: PubdataPricingMode.Rollup,
+                batchOverheadL1Gas: 1_000_000,
+                maxPubdataPerBatch: 110_000,
+                maxL2GasPerBatch: 80_000_000,
+                priorityTxMaxPubdata: 99_000,
+                minimalL2GasPrice: 250_000_000
+            })
+        );
     }
 
     function test_SetTokenMultiplier_DenominatorIsZero() public {
@@ -107,10 +120,10 @@ contract AdminExtendedTest is AdminTest {
         utilsFacet.util_setChainTypeManager(address(this));
 
         vm.prank(address(this));
-        adminFacet.setTokenMultiplier(5, 3);
+        adminFacet.setTokenMultiplier(11, 10);
 
-        assertEq(utilsFacet.util_getBaseTokenGasPriceMultiplierNominator(), 5);
-        assertEq(utilsFacet.util_getBaseTokenGasPriceMultiplierDenominator(), 3);
+        assertEq(utilsFacet.util_getBaseTokenGasPriceMultiplierNominator(), 11);
+        assertEq(utilsFacet.util_getBaseTokenGasPriceMultiplierDenominator(), 10);
     }
 
     function test_AcceptAdmin_Unauthorized() public {
@@ -247,6 +260,7 @@ contract AdminExtendedTest is AdminTest {
 
     function testFuzz_SetTokenMultiplier(uint128 nominator, uint128 denominator) public {
         vm.assume(denominator != 0);
+        vm.assume(uint256(nominator) * 10 <= uint256(denominator) * 13);
 
         vm.prank(address(dummyBridgehub));
         utilsFacet.util_setChainTypeManager(address(this));

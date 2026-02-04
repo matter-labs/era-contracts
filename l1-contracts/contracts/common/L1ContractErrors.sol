@@ -121,6 +121,10 @@ error EVMBytecodeAlreadyPublished(bytes32 bytecodeHash);
 error ExecuteMessageFailed();
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
+// 0xa9972984
+error FeeParamsChangeTooFrequent(uint256 nextAllowedTimestamp);
+// 0x3fce21be
+error FeeParamsChangeTooLarge(uint256 oldPrice, uint256 newPrice, uint256 maxAllowedPrice);
 // 0xc91cf3b1
 error GasPerPubdataMismatch();
 // 0x5ca97564
@@ -384,6 +388,10 @@ error TimerAlreadyStarted();
 error TimestampError();
 // 0xa51fa558
 error TokenIsLegacy();
+// 0xb1e96bbd
+error TokenMultiplierChangeTooFrequent(uint256 nextAllowedTimestamp);
+// 0x31f144b3
+error TokenMultiplierChangeTooLarge(uint256 oldPrice, uint256 newPrice, uint256 maxAllowedPrice);
 // 0x1850b46b
 error TokenNotLegacy();
 // 0x06439c6b

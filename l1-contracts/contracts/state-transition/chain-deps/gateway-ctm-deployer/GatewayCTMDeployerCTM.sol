@@ -28,12 +28,7 @@ contract GatewayCTMDeployerCTM is GatewayCTMDeployerCTMBase {
         // PermissionlessValidator is address(0) since Priority Mode is L1-only
         return
             address(
-                new EraChainTypeManager{salt: _salt}(
-                    L2_BRIDGEHUB_ADDR,
-                    L2_INTEROP_CENTER_ADDR,
-                    address(0),
-                    address(0)
-                )
+                new EraChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0))
             );
     }
 }
