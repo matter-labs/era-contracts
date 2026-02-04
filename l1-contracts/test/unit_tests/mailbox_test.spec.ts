@@ -13,7 +13,9 @@ import {
 } from "../../typechain";
 import type { IMailbox } from "../../typechain/IMailbox";
 
-import { PubdataPricingMode, ethTestConfig } from "../../src.ts/utils";
+import { PubdataPricingMode } from "../../src.ts/utils";
+import { ethTestConfig } from "../../src.ts/constants";
+
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 import { Action, facetCut } from "../../src.ts/diamondCut";
 

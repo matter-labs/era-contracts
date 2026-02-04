@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {Utils as ScriptUtils} from "deploy-scripts/Utils.sol";
+import {Utils as ScriptUtils} from "deploy-scripts/utils/Utils.sol";
 
 contract ScriptUtilsTest is Test {
     function test_Blake2s256Hash() public {
