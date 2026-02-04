@@ -9,6 +9,7 @@ import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
+import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 
 struct BytecodeInfo {
     bytes messageRootBytecodeInfo;
@@ -133,6 +134,7 @@ contract L2GenesisUpgradeTestHelper {
 
     function setupMockCalls(
         Vm _vm,
+        address _nativeTokenVault,
         address _systemContext,
         address _bridgehub,
         address _assetRouter,
@@ -142,6 +144,7 @@ contract L2GenesisUpgradeTestHelper {
         address _proxyAdmin,
         address _complexUpgrader
     ) public {
+        _vm.mockCall(_nativeTokenVault, abi.encodeWithSelector(L2NativeTokenVault.initL2.selector), "");
         _vm.mockCall(_systemContext, abi.encodeWithSelector(ISystemContext.setChainId.selector), "");
         _vm.mockCall(_bridgehub, abi.encodeWithSelector(L2Bridgehub.initL2.selector), "");
         _vm.mockCall(_assetRouter, abi.encodeWithSelector(L2AssetRouter.initL2.selector), "");
