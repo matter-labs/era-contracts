@@ -1,0 +1,153 @@
+== Logs ==
+  L1 chain creation params verified successfully
+  Using configured Create2Factory address: 0x4e59b44847b379578588920cA78FbF26c0B4956C
+  VerifierFflonk has been deployed at 0xa38a0Df579F9eCA29fbA560b9885B1113b1Df442
+  forge verify-contract 0xa38a0Df579F9eCA29fbA560b9885B1113b1Df442 VerifierFflonk
+  VerifierPlonk has been deployed at 0x7f33D100f482093182111d69a4a457289e99f4ec
+  forge verify-contract 0x7f33D100f482093182111d69a4a457289e99f4ec VerifierPlonk
+  Verifier has been deployed at 0xCD279BD537c8e1A1acC46aC2205bebD8902F7A45
+  forge verify-contract 0xCD279BD537c8e1A1acC46aC2205bebD8902F7A45 Verifier --constructor-args 0x000000000000000000000000a38a0df579f9eca29fba560b9885b1113b1df4420000000000000000000000007f33d100f482093182111d69a4a457289e99f4ec
+  UpgradeStageValidator has been deployed at 0x0Fa939027796D5f7eF74f508758f91eD22c7EA7E
+  forge verify-contract 0x0Fa939027796D5f7eF74f508758f91eD22c7EA7E UpgradeStageValidator --constructor-args 0x000000000000000000000000c2ee6b6af7d616f6e27ce7f4a451aedc2b0f5f5c0000000000000000000000000000000000000000000000000000001d00000004
+  GovernanceUpgradeTimer has been deployed at 0xcf4f7f9BDAff01cCAf56b1DB551864B6b04C4F18
+  forge verify-contract 0xcf4f7f9BDAff01cCAf56b1DB551864B6b04C4F18 GovernanceUpgradeTimer --constructor-args 0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000127500000000000000000000000000e30dca3047b37dc7d88849de4a4dc07937ad5ab30000000000000000000000002cf3bd6a9056b39999f3883955e183f655345063
+  DefaultUpgrade has been deployed at 0xb9AdDe88eA7Bd1c0ba219A9CE2571B12f1eaC644
+  forge verify-contract 0xb9AdDe88eA7Bd1c0ba219A9CE2571B12f1eaC644 DefaultUpgrade
+  Verifier contracts deployed on L1!
+  Transaction executed succeassfully! Extracting logs...
+  L2 Transaction hash is 
+  0xa9941ebdd84d16e2d244fa0d51729262628cb803f1879ed24bd5443ed11e1912
+  VerifierFflonk has been deployed at 0xf1d42BaE33156A1CA242A2dD058A5E568Eb0C082
+  forge verify-contract 0xf1d42BaE33156A1CA242A2dD058A5E568Eb0C082 VerifierFflonk --verifier zksync
+  Transaction executed succeassfully! Extracting logs...
+  L2 Transaction hash is 
+  0x2386530ea7bdbf119e8c10702c44a5a77871661682664a0d9a89db8d2672536e
+  VerifierPlonk has been deployed at 0x61c647c39Ce37E58590171501d4445a567DbF763
+  forge verify-contract 0x61c647c39Ce37E58590171501d4445a567DbF763 VerifierPlonk --verifier zksync
+  Transaction executed succeassfully! Extracting logs...
+  L2 Transaction hash is 
+  0x6bff161436537a998597953ba9598b63a518ed99e66e252272b9d0464b871abf
+  Verifier has been deployed at 0x3F2E9d02C25C8639D3ad86546694AF7bf84d47f3
+  forge verify-contract 0x3F2E9d02C25C8639D3ad86546694AF7bf84d47f3 Verifier --constructor-args 0x000000000000000000000000f1d42bae33156a1ca242a2dd058a5e568eb0c08200000000000000000000000061c647c39ce37e58590171501d4445a567dbf763 --verifier zksync
+  Transaction executed succeassfully! Extracting logs...
+  L2 Transaction hash is 
+  0xb6091699928675ddf58e4b21990147792fd9c1179a13a4f9184bc87979cb5747
+  DefaultUpgrade has been deployed at 0x2B1C8bE0cfAD18AC46FeE965E272FBB53e850847
+  forge verify-contract 0x2B1C8bE0cfAD18AC46FeE965E272FBB53e850847 DefaultUpgrade --verifier zksync
+  Verifier contracts deployed on GW!
+  Upgrade cut generated
+  Old chain creation params saved to output
+  Upgrade data generated!
+  Base token not ETH, approving
+  Base token not ETH, approving
+  Base token not ETH, approving
+  Base token not ETH, approving
+
+## Setting up 1 EVM.
+
+==========================
+
+Chain 1
+
+Estimated gas price: 0.287467568 gwei
+
+Estimated total gas used for script: 22641363
+
+Estimated amount required: 0.006508657557815184 ETH
+
+==========================
+
+##### mainnet
+✅  [Success] Hash: 0xb47becfdcbdd87e84e840568d43472a54c6f6d559a4ca66ad9be1173a51c6e29
+Block: 24383641
+Paid: 0.000406969736650444 ETH (3233164 gas * 0.125873521 gwei)
+
+
+##### mainnet
+✅  [Success] Hash: 0x4f6e59fcc967f2b934947cba5f4be4944ffbf23e1abb72367f48748308fa9fd4
+Block: 24383644
+Paid: 0.00051478565429428 ETH (3780632 gas * 0.136163915 gwei)
+
+
+##### mainnet
+✅  [Success] Hash: 0xcfc1585951f41fbcf4235c6628942c50da36526e42336494172b196fdcb638c9
+Block: 24383655
+Paid: 0.000066319971600136 ETH (451448 gas * 0.146905007 gwei)
+
+
+##### mainnet
+✅  [Success] Hash: 0xa21f0e73160cb3d8f424d62215ca87896db202d69c334ea132815fc3ddc99ee3
+Block: 24383659
+Paid: 0.000050613543243172 ETH (305906 gas * 0.165454562 gwei)
+
+
+##### mainnet
+✅  [Success] Hash: 0xccad0e150e9ce4e0bcccba902f2f03ad2c14a9ecf82b9fbcfd8802e68957a5a2
+Block: 24383664
+Paid: 0.0000827664863998 ETH (513047 gas * 0.1613234 gwei)
+
+
+##### mainnet
+✅  [Success] Hash: 0x2857d72d57b8fbad9ed5c9816c2f5ff28b55dda8685873b857e1432a7bf7dc76
+Block: 24383669
+Paid: 0.0002276446797027 ETH (1518795 gas * 0.14988506 gwei)
+
+
+##### mainnet
+✅  [Success] Hash: 0xb7c8f259f33faee86dba7cf8ebfdd88e959ddd43313f3a541d2832ff0d6abe05
+Block: 24383675
+Paid: 0.00000565536907048 ETH (39280 gas * 0.143975791 gwei)
+
+
+##### mainnet
+✅  [Success] Hash: 0x9ba6c792b457b74ce5d74ac4901d85a84a70ae2f87f87edd73e67206c6e57d48
+Block: 24383679
+Paid: 0.00034038322833515 ETH (2152150 gas * 0.158159621 gwei)
+
+
+##### mainnet
+✅  [Success] Hash: 0x425cbc1f4868c720ff2f573610ae06846aaa228886606cb44d008230418ea2c2
+Block: 24383684
+Paid: 0.00000566253354432 ETH (36480 gas * 0.155222959 gwei)
+
+
+##### mainnet
+✅  [Success] Hash: 0xb00e9322284df219fcbff80914660bbbd10e36e74cb333ffe29645c3a2179e55
+Block: 24383689
+Paid: 0.00045280606313012 ETH (3015460 gas * 0.150161522 gwei)
+
+
+##### mainnet
+✅  [Success] Hash: 0xd9c57465800bb5028e77bd2ee46bfb3f9ac0c15d418b483d49bfad35500f2aa1
+Block: 24383694
+Paid: 0.00000475343815488 ETH (36480 gas * 0.130302581 gwei)
+
+
+##### mainnet
+✅  [Success] Hash: 0xe40615175cccfbef2475be50002471067a915be2df66d0353cb5ef07b52801b3
+Block: 24383696
+Paid: 0.00005397155347116 ETH (423670 gas * 0.127390548 gwei)
+
+
+##### mainnet
+✅  [Success] Hash: 0x5cd785586a5e1d229197977f272b44e15431a2768f382660c5d8746e9e893a50
+Block: 24383703
+Paid: 0.00000439011369792 ETH (36480 gas * 0.120343029 gwei)
+
+
+##### mainnet
+✅  [Success] Hash: 0xde3de8a6f7fc7bfef6a76ac946031d826df34ee3983affa843bc00724bfa1520
+Block: 24383704
+Paid: 0.000094824705821155 ETH (736811 gas * 0.128696105 gwei)
+
+✅ Sequence #1 on mainnet | Total Paid: 0.002311547077115717 ETH (16279803 gas * avg 0.142846972 gwei)
+                                                                                                                                                                           
+
+==========================
+
+ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.
+
+Transactions saved to: /Users/nikitastupin/github.com/kelemeno/era-contracts-private/l1-contracts/broadcast/VerifierOnlyUpgrade.s.sol/1/run-latest.json
+
+Sensitive values saved to: /Users/nikitastupin/github.com/kelemeno/era-contracts-private/l1-contracts/cache-forge/VerifierOnlyUpgrade.s.sol/1/run-latest.json
+
