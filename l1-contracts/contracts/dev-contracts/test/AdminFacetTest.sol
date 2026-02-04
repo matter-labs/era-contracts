@@ -9,7 +9,7 @@ contract AdminFacetTest is AdminFacet {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
-    constructor(uint256 _l1ChainId) AdminFacet(_l1ChainId, RollupDAManager(address(0))) {
+    constructor(uint256 _l1ChainId) AdminFacet(_l1ChainId, RollupDAManager(address(0)), false) {
         s.admin = msg.sender;
         s.chainTypeManager = msg.sender;
     }
