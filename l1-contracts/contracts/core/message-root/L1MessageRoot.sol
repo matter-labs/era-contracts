@@ -7,6 +7,7 @@ import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessageRoot.sol";
 import {CurrentBatchNumberAlreadySet, OnlyOnSettlementLayer, TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber, TotalBatchesExecutedZero, LocallyNoChainsAtGenesis, V31UpgradeChainBatchNumberAlreadySet, NotAllChainsOnL1} from "../bridgehub/L1BridgehubErrors.sol";
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
+import {ZeroAddress} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -42,6 +43,7 @@ contract L1MessageRoot is MessageRootBase {
     /// @param _bridgehub Address of the Bridgehub.
     /// @param _eraGatewayChainId Chain ID of the Gateway chain.
     constructor(address _bridgehub, uint256 _eraGatewayChainId) {
+        require(_bridgehub != address(0), ZeroAddress());
         BRIDGE_HUB = _bridgehub;
         ERA_GATEWAY_CHAIN_ID = _eraGatewayChainId;
         uint256[] memory allZKChains = IBridgehubBase(_bridgehub).getAllZKChainChainIDs();
