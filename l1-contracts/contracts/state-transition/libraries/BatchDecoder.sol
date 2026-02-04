@@ -84,9 +84,6 @@ library BatchDecoder {
     function decodeAndCheckPrecommitData(
         bytes calldata _precommitData
     ) internal pure returns (IExecutor.PrecommitInfo memory precommitInfo) {
-        if (_precommitData.length == 0) {
-            revert EmptyData();
-        }
         uint8 encodingVersion = uint8(_precommitData[0]);
         if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
             (precommitInfo) = abi.decode(_precommitData[1:], (IExecutor.PrecommitInfo));
@@ -183,9 +180,6 @@ library BatchDecoder {
             uint256[] memory proof
         )
     {
-        if (_proofData.length == 0) {
-            revert EmptyData();
-        }
         uint8 encodingVersion = uint8(_proofData[0]);
         if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
             (prevBatch, provedBatches, proof) = abi.decode(

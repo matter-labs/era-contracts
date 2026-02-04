@@ -2,8 +2,6 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManagerForServerNotifier.sol";
@@ -31,18 +29,8 @@ contract ServerNotifierTest is Test {
 
         chainTypeManager.setChainAdmin(chainId, chainAdmin);
 
-        ServerNotifier implementation = new ServerNotifier();
-
-        ProxyAdmin proxyAdmin = new ProxyAdmin();
-
-        bytes memory initData = abi.encodeWithSelector(ServerNotifier.initialize.selector, owner);
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(implementation),
-            address(proxyAdmin),
-            initData
-        );
-
-        serverNotifier = ServerNotifier(address(proxy));
+        serverNotifier = new ServerNotifier();
+        serverNotifier.initialize(owner);
 
         vm.startPrank(owner);
         serverNotifier.setChainTypeManager(IChainTypeManager(address(chainTypeManager)));
