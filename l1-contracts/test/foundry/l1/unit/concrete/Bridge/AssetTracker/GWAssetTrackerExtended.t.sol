@@ -19,6 +19,7 @@ import {Unauthorized, ChainIdNotRegistered, InvalidMessage, ReconstructionMismat
 import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
+import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -643,7 +644,7 @@ contract GWAssetTrackerExtendedTest is Test {
         );
 
         // Mock pauseDepositsOnGateway
-        vm.mockCall(mockZKChain, abi.encodeWithSelector(IMailboxImpl.pauseDepositsOnGateway.selector), abi.encode());
+        vm.mockCall(mockZKChain, abi.encodeWithSelector(IMigrator.pauseDepositsOnGateway.selector), abi.encode());
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
         gwAssetTracker.requestPauseDepositsForChain(CHAIN_ID);

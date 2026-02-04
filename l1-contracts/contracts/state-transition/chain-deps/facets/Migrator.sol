@@ -13,6 +13,7 @@ import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {AlreadyMigrated, PriorityQueueNotFullyProcessed, TotalPriorityTxsIsZero, ContractNotDeployed, DepositsAlreadyPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted, MigrationInProgress} from "../../L1StateTransitionErrors.sol";
 import {NotAZKChain, NotCompatibleWithPriorityMode} from "../../../common/L1ContractErrors.sol";
+import {OnlyGateway} from "../../../core/bridgehub/L1BridgehubErrors.sol";
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
 import {TxStatus} from "../../../common/Messaging.sol";
 
@@ -68,6 +69,13 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         _;
     }
 
+    modifier onlyGateway() {
+        if (block.chainid == L1_CHAIN_ID) {
+            revert OnlyGateway();
+        }
+        _;
+    }
+
     function _onlyL1() internal view {
         if (block.chainid != L1_CHAIN_ID) {
             revert NotL1(block.chainid);
@@ -112,6 +120,12 @@ contract MigratorFacet is ZKChainBase, IMigrator {
     function _unpauseDeposits() internal {
         s.pausedDepositsTimestamp = 0;
         emit DepositsUnpaused(s.chainId);
+    }
+
+    /// @inheritdoc IMigrator
+    function pauseDepositsOnGateway(uint256 _timestamp) external onlyGatewayAssetTracker onlyGateway {
+        s.pausedDepositsTimestamp = _timestamp;
+        emit DepositsPaused(s.chainId, _timestamp);
     }
 
     /// @inheritdoc IMigrator

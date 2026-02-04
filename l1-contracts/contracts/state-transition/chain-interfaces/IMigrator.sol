@@ -46,4 +46,7 @@ interface IMigrator is IZKChainBase {
 
     /// @notice Returns the commitment for a chain.
     function prepareChainCommitment() external view returns (ZKChainCommitment memory commitment);
+
+    /// @notice Pauses deposits on Gateway, needed as migration is only allowed with this timestamp.
+    function pauseDepositsOnGateway(uint256 _timestamp) external;
 }
