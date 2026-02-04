@@ -22,7 +22,8 @@ import { L2_BOOTLOADER_BYTECODE_HASH, L2_DEFAULT_ACCOUNT_BYTECODE_HASH } from ".
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
 import type { ProposedUpgrade, VerifierParams } from "../../src.ts/utils";
-import { ethTestConfig, EMPTY_STRING_KECCAK } from "../../src.ts/utils";
+import { ethTestConfig, EMPTY_STRING_KECCAK } from "../../src.ts/constants";
+
 import { diamondCut, Action, facetCut } from "../../src.ts/diamondCut";
 
 import type { CommitBatchInfo, StoredBatchInfo, CommitBatchInfoWithTimestamp } from "./utils";
@@ -41,7 +42,7 @@ import {
   makeExecutedEqualCommitted,
   getBatchStoredInfo,
   buildL2DARollupPubdataCommitment,
-  L2_TO_L1_MESSENGER,
+  L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
 } from "./utils";
 import { packSemver, unpackStringSemVer, addToProtocolVersion } from "../../scripts/utils";
 
@@ -921,7 +922,7 @@ async function buildCommitBatchInfoWithCustomLogs(
   );
   systemLogs[SYSTEM_LOG_KEYS.L2_DA_VALIDATOR_OUTPUT_HASH_KEY] = constructL2Log(
     true,
-    L2_TO_L1_MESSENGER,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
     SYSTEM_LOG_KEYS.L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
     l1DAOutputHash
   );
