@@ -148,7 +148,7 @@ library L2GenesisForceDeploymentsHelper {
 
         (bytes memory bytecodeInfo, bytes memory bytecodeInfoSystemProxy) = abi.decode((_bytecodeInfo), (bytes, bytes));
 
-        / Verify canonical encoding by re-encoding and comparing
+        // Verify canonical encoding by re-encoding and comparing
         bytes memory canonicalEncoding = abi.encode(bytecodeInfo, bytecodeInfoSystemProxy);
         require(keccak256(_bytecodeInfo) == keccak256(canonicalEncoding), NonCanonicalRepresentation());
 
