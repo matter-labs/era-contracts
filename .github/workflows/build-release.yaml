@@ -7,7 +7,7 @@ on:
         type: string
         description: tag to build from
         required: true
-  create:
+  push:
     tags:
       - "v*" # for main releases
       - "zkos*" # for zk releases
@@ -35,17 +35,12 @@ jobs:
           submodules: recursive
 
       - name: Install foundry-zksync
-        run: |
-          mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.30/foundry_zksync_v0.0.30_linux_amd64.tar.gz
-          tar zxf foundry_zksync_v0.0.30_linux_amd64.tar.gz -C ./foundry-zksync
-          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+        uses: ./.github/actions/install-zksync-foundry
 
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.18.0
+          node-version: 18.20.8
           cache: yarn
 
       - name: Init

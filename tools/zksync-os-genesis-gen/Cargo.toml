@@ -17,3 +17,6 @@ zk_os_basic_system = { package = "basic_system", git = "https://github.com/matte
 anyhow = "1"
 hex = "0.4"
 hex-literal = "1.0.0"
+
+# Use workspace to allow using the tool from other workspaces without conflicts
+[workspace]
