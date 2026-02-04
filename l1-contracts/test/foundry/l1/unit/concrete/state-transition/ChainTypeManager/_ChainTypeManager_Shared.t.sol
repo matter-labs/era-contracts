@@ -278,7 +278,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     }
 
     function createNewChainWithId(Diamond.DiamondCutData memory _diamondCut, uint256 id) internal {
-
         vm.mockCall(
             address(sharedBridge),
             abi.encodeWithSelector(IL1AssetRouter.L1_NULLIFIER.selector),
