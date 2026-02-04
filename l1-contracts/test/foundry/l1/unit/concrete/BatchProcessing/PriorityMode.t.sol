@@ -6,7 +6,7 @@ import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {IExecutor, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
-import {InvalidTxCountInPriorityMode, OnlyNormalMode, PriorityModeActivationTooEarly, PriorityModeIsNotAllowed, PriorityOpsRequestTimestampMissing, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {InvalidTxCountInPriorityMode, OnlyNormalMode, PriorityModeActivationTooEarly, PriorityModeIsNotAllowed, PriorityModeRequiresPermanentRollup, PriorityOpsRequestTimestampMissing, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 
 contract PriorityModeExecutorTest is ExecutorTest {
@@ -15,7 +15,17 @@ contract PriorityModeExecutorTest is ExecutorTest {
         admin.activatePriorityMode();
     }
 
+    function test_revertWhen_activatePriorityMode_notPermanentRollup() public {
+        vm.prank(owner);
+        admin.permanentlyAllowPriorityMode();
+
+        vm.expectRevert(PriorityModeRequiresPermanentRollup.selector);
+        admin.activatePriorityMode();
+    }
+
     function test_revertWhen_activatePriorityMode_missingTimestamp() public {
+        vm.prank(owner);
+        admin.makePermanentRollup();
         vm.prank(owner);
         admin.permanentlyAllowPriorityMode();
 
@@ -24,6 +34,8 @@ contract PriorityModeExecutorTest is ExecutorTest {
     }
 
     function test_revertWhen_activatePriorityMode_tooEarly() public {
+        vm.prank(owner);
+        admin.makePermanentRollup();
         vm.prank(owner);
         admin.permanentlyAllowPriorityMode();
 
@@ -135,6 +147,8 @@ contract PriorityModeExecutorTest is ExecutorTest {
     }
 
     function _activatePriorityMode() internal {
+        vm.prank(owner);
+        admin.makePermanentRollup();
         vm.prank(owner);
         admin.permanentlyAllowPriorityMode();
         _requestPriorityOp();

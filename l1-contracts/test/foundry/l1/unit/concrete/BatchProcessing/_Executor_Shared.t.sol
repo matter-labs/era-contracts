@@ -7,7 +7,7 @@ import {Test} from "forge-std/Test.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
-import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_DA_COMMITMENT_SCHEME} from "../Utils/Utils.sol";
+import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_DA_COMMITMENT_SCHEME, TEST_ROLLUP_DA_MANAGER_OWNER} from "../Utils/Utils.sol";
 import {TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
@@ -73,6 +73,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     L1MessageRoot internal messageRoot;
     DummyBridgehub dummyBridgehub;
     L1ChainAssetHandler internal chainAssetHandler;
+    RollupDAManager internal rollupDAManager;
     bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
 
     uint256 l2ChainId;
@@ -81,7 +82,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     uint256[] internal proofInput;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](14);
+        bytes4[] memory selectors = new bytes4[](15);
         uint256 i = 0;
         selectors[i++] = admin.setPendingAdmin.selector;
         selectors[i++] = admin.acceptAdmin.selector;
@@ -95,6 +96,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         selectors[i++] = admin.freezeDiamond.selector;
         selectors[i++] = admin.unfreezeDiamond.selector;
         selectors[i++] = admin.setDAValidatorPair.selector;
+        selectors[i++] = admin.makePermanentRollup.selector;
         selectors[i++] = admin.permanentlyAllowPriorityMode.selector;
         selectors[i++] = admin.activatePriorityMode.selector;
         return selectors;
@@ -260,7 +262,14 @@ contract ExecutorTest is UtilsCallMockerTest {
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
 
-        admin = new AdminFacet(block.chainid, RollupDAManager(address(0)));
+        // Deploy and configure RollupDAManager with the DA pair
+        rollupDAManager = new RollupDAManager();
+        rollupDAManager.updateDAPair(rollupL1DAValidator, L2_DA_COMMITMENT_SCHEME, true);
+        rollupDAManager.transferOwnership(TEST_ROLLUP_DA_MANAGER_OWNER);
+        vm.prank(TEST_ROLLUP_DA_MANAGER_OWNER);
+        rollupDAManager.acceptOwnership();
+
+        admin = new AdminFacet(block.chainid, rollupDAManager);
         getters = new GettersFacet();
         executor = new TestExecutor();
         committer = new TestCommitter();

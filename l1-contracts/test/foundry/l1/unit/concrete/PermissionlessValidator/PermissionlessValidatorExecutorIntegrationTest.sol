@@ -53,6 +53,8 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
 
     function _activatePriorityMode() internal {
         vm.prank(owner);
+        admin.makePermanentRollup();
+        vm.prank(owner);
         admin.permanentlyAllowPriorityMode();
         address prioritySender = makeAddr("prioritySender");
         uint256 l2GasLimit = 1_000_000;

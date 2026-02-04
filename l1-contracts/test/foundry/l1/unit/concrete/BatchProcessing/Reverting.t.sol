@@ -12,6 +12,8 @@ import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/IComm
 import {RevertedBatchNotAfterNewLastBatch} from "contracts/common/L1ContractErrors.sol";
 
 contract RevertingTest is ExecutorTest {
+    uint256 private constant MAX_REVERT_BATCHES_GAS = 300_000;
+
     bytes32 l2DAValidatorOutputHash;
     bytes32[] blobVersionedHashes;
     bytes operatorDAInput;
@@ -127,5 +129,14 @@ contract RevertingTest is ExecutorTest {
 
         uint256 totalBlocksVerified = getters.getTotalBlocksVerified();
         assertEq(totalBlocksVerified, 0, "totalBlocksVerified");
+    }
+
+    function test_RevertBatchesGasBound() public {
+        vm.prank(validator);
+        uint256 gasBefore = gasleft();
+        executor.revertBatchesSharedBridge(address(0), 0);
+        uint256 gasUsed = gasBefore - gasleft();
+
+        assertLt(gasUsed, MAX_REVERT_BATCHES_GAS, "revertBatchesSharedBridge gas too high");
     }
 }

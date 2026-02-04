@@ -35,6 +35,8 @@ address constant L2_KNOWN_CODE_STORAGE_ADDRESS = 0x00000000000000000000000000000
 address constant L2_TO_L1_MESSENGER = 0x0000000000000000000000000000000000008008;
 // constant in tests, but can be arbitrary address in real environments
 L2DACommitmentScheme constant L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.PUBDATA_KECCAK256;
+// Owner of the RollupDAManager in tests
+address constant TEST_ROLLUP_DA_MANAGER_OWNER = address(0x1234567890DEADBEEF);
 
 uint256 constant MAX_NUMBER_OF_BLOBS = 6;
 uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;

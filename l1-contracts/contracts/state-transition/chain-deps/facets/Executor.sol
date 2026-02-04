@@ -313,6 +313,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
+    // NOTE: Keep `_revertBatches` execution gas bounded so `activatePriorityMode`
+    // cannot be blocked by an unexpectedly expensive revert. A gas cap is enforced
+    // in tests via `RevertingTest.test_RevertBatchesGasBound`.
     function revertBatchesSharedBridge(
         address,
         uint256 _newLastBatch
