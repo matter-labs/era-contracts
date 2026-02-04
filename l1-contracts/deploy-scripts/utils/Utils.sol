@@ -1363,7 +1363,7 @@ library Utils {
         bytes32 observableBytecodeHash = keccak256(bytecode);
         bytecodeInfo = ZKSyncOSBytecodeInfo.encodeZKSyncOSBytecodeInfo(
             bytecodeBlakeHash,
-            bytecode.length,
+            uint32(bytecode.length),
             observableBytecodeHash
         );
     }

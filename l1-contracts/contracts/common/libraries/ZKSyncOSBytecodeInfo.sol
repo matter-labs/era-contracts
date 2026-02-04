@@ -30,7 +30,7 @@ library ZKSyncOSBytecodeInfo {
     /// @return The encoded bytecode info.
     function encodeZKSyncOSBytecodeInfo(
         bytes32 _bytecodeBlakeHash,
-        uint256 _bytecodeLength,
+        uint32 _bytecodeLength,
         bytes32 _observableBytecodeHash
     ) internal pure returns (bytes memory) {
         return abi.encode(_bytecodeBlakeHash, _bytecodeLength, _observableBytecodeHash);
@@ -43,10 +43,10 @@ library ZKSyncOSBytecodeInfo {
     /// @return observableBytecodeHash The observable hash of the bytecode (Keccak256).
     function decodeZKSyncOSBytecodeInfo(
         bytes memory _bytecodeInfo
-    ) internal pure returns (bytes32 bytecodeBlakeHash, uint256 bytecodeLength, bytes32 observableBytecodeHash) {
+    ) internal pure returns (bytes32 bytecodeBlakeHash, uint32 bytecodeLength, bytes32 observableBytecodeHash) {
         (bytecodeBlakeHash, bytecodeLength, observableBytecodeHash) = abi.decode(
             _bytecodeInfo,
-            (bytes32, uint256, bytes32)
+            (bytes32, uint32, bytes32)
         );
     }
 }
