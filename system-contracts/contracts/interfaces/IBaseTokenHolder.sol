@@ -11,7 +11,7 @@ pragma solidity ^0.8.20;
 /// This makes the system more compatible with standard EVM tooling like Foundry.
 interface IBaseTokenHolder {
     /// @notice Gives out base tokens from the holder to a recipient.
-    /// @dev Can only be called by authorized callers (bootloader, InteropHandler).
+    /// @dev Can only be called by authorized callers.
     /// @dev This replaces the mint operation - tokens are transferred instead of minted.
     /// @param _to The address to receive the base tokens.
     /// @param _amount The amount of base tokens to give out.

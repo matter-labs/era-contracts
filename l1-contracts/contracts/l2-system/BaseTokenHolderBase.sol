@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {IBaseTokenHolder} from "../common/l2-helpers/IBaseTokenHolder.sol";
+import {IBaseTokenHolder} from "./interfaces/IBaseTokenHolder.sol";
 import {L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER, L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {Unauthorized} from "../common/L1ContractErrors.sol";
 
@@ -16,17 +16,11 @@ import {Unauthorized} from "../common/L1ContractErrors.sol";
  * ## Design Rationale
  *
  * Instead of minting base tokens during deposits and interops, tokens are transferred from this holder contract.
- * This makes the system more compatible with standard EVM tooling like Foundry, as all tooling supports
- * that some contract receives "value" from another contract.
- *
- * ## Balance Invariant
- *
- * The total sum of balances across all contracts on the chain equals 2^127 - 1.
- * This holder's balance = 2^127 - 1 - <total deposited to chain>.
+ * This makes the system more compatible with standard EVM tooling like Foundry.
  *
  * ## Initial Balance
  *
- * During migration, this contract is initialized with 2^127 - 1 base tokens.
+ * During migration, this contract is initialized with 2^127 - 1 base tokens minus the existing total supply.
  * This is sufficient for any reasonable base token, as no token has a total supply greater than 2^127.
  *
  * ## Overflow/Underflow Prevention

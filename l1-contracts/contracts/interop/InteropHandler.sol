@@ -451,4 +451,13 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
         this.unbundleBundle(sourceChainId, bundle, providedCallStatus);
     }
+
+    /// @notice Allows the contract to receive native ETH from L2_BASE_TOKEN_HOLDER.
+    /// @dev This is required because L2_BASE_TOKEN_HOLDER.give() transfers ETH to this contract
+    ///      before forwarding it to the interop call recipient.
+    receive() external payable {
+        if (msg.sender != address(L2_BASE_TOKEN_HOLDER)) {
+            revert Unauthorized(msg.sender);
+        }
+    }
 }

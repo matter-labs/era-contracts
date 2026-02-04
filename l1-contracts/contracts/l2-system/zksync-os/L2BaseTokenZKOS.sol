@@ -18,14 +18,6 @@ import {Unauthorized, WithdrawFailed} from "../../common/L1ContractErrors.sol";
  * @dev On ZK OS chains, the native ETH is used directly, so balance management is handled natively.
  * @dev This contract only provides the withdrawal interface to bridge ETH back to L1.
  *
- * ## Withdrawal Flow
- *
- * 1. User calls withdraw() or withdrawWithMessage() with msg.value
- * 2. The contract notifies L2AssetTracker of the outgoing bridging operation
- * 3. The ETH is sent to BaseTokenHolder (effectively "burning" from circulation)
- * 4. A withdrawal message is sent to L1 via the L1Messenger
- * 5. User can claim funds on L1 via finalizeEthWithdrawal on the Mailbox
- *
  * ## Initialization (Genesis/Upgrade)
  *
  * During genesis or V31 upgrade, initializeBaseTokenHolderBalance() must be called to:
@@ -71,7 +63,7 @@ contract L2BaseTokenZKOS is IL2BaseTokenZKOS {
 
     /// @notice Initializes the BaseTokenHolder's balance during genesis or V31 upgrade.
     /// @dev This function mints 2^127 - 1 tokens to this contract via the mint hook,
-    /// @dev then transfers all tokens to BaseTokenHolder to establish the balance invariant.
+    /// @dev then transfers all tokens to BaseTokenHolder.
     /// @dev Can only be called by the ComplexUpgrader contract.
     /// @dev This function is idempotent - calling it when already initialized has no effect.
     function initializeBaseTokenHolderBalance() external {
@@ -86,7 +78,6 @@ contract L2BaseTokenZKOS is IL2BaseTokenZKOS {
         initialized = true;
 
         // Mint INITIAL_BASE_TOKEN_HOLDER_BALANCE tokens to this contract via the mint hook
-        // The mint hook expects 32 bytes of calldata containing the amount as U256 big-endian
         (bool mintSuccess, ) = MINT_BASE_TOKEN_HOOK.call(abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE));
         require(mintSuccess, "L2BaseTokenZKOS: mint failed");
 

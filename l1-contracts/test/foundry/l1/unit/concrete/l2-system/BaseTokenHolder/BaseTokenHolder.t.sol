@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {BaseTokenHolderEra} from "contracts/l2-system/era/BaseTokenHolderEra.sol";
 import {BaseTokenHolderZKOS} from "contracts/l2-system/zksync-os/BaseTokenHolderZKOS.sol";
-import {IBaseTokenHolder} from "contracts/common/l2-helpers/IBaseTokenHolder.sol";
+import {IBaseTokenHolder} from "contracts/l2-system/interfaces/IBaseTokenHolder.sol";
 import {L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 

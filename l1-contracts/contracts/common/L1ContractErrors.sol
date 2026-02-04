@@ -35,6 +35,8 @@ error AssetRouterAllowanceNotZero();
 error BadTransferDataLength();
 // 0x6ef9a972
 error BaseTokenGasPriceDenominatorNotSet();
+// 0x
+error BaseTokenTransferFailed();
 // 0x55ad3fd3
 error BatchHashMismatch(bytes32 expected, bytes32 actual);
 // 0x2078a6a0

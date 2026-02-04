@@ -150,12 +150,10 @@ library L2UtilsBase {
             address l2DummyBaseTokenHolder = address(new DummyL2BaseTokenHolder());
             vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, l2DummyBaseTokenHolder.code);
 
-            // Initialize the BaseTokenHolder's balance with 2^127 - 1 tokens
+            // Initialize the BaseTokenHolder's native ETH balance with 2^127 - 1 tokens
             // This mirrors the production setup where BaseTokenHolder starts with this balance
-            DummyL2BaseTokenSystemContract(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).setBalance(
-                L2_BASE_TOKEN_HOLDER_ADDR,
-                (2 ** 127) - 1
-            );
+            // Using vm.deal for ZKOS-style native ETH transfers
+            vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, (2 ** 127) - 1);
         }
 
         // DummyL2L1Messenger dummyL2L1Messenger = new DummyL2L1Messenger();

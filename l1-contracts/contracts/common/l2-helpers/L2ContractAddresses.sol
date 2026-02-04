@@ -6,7 +6,7 @@ import {IL2ToL1MessengerEra} from "./IL2ToL1MessengerEra.sol";
 import {IL2InteropRootStorage} from "../interfaces/IL2InteropRootStorage.sol";
 import {IMessageVerification} from "../interfaces/IMessageVerification.sol";
 import {IBaseToken} from "./IBaseToken.sol";
-import {IBaseTokenHolder} from "./IBaseTokenHolder.sol";
+import {IBaseTokenHolder} from "../../l2-system/interfaces/IBaseTokenHolder.sol";
 import {IL2ContractDeployer} from "../interfaces/IL2ContractDeployer.sol";
 import {IL2NativeTokenVault} from "../../bridge/ntv/IL2NativeTokenVault.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
@@ -158,7 +158,7 @@ address constant L2_INTEROP_CENTER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x
 IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(L2_INTEROP_CENTER_ADDR);
 
 /// @dev the address of the L2 interop handler
-address constant L2_INTEROP_HANDLER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0e);
+address payable constant L2_INTEROP_HANDLER_ADDR = payable(address(BUILT_IN_CONTRACTS_OFFSET + 0x0e));
 IInteropHandler constant L2_INTEROP_HANDLER = IInteropHandler(L2_INTEROP_HANDLER_ADDR);
 
 /// @dev the address of the L2 asset tracker
