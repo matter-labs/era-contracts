@@ -391,11 +391,6 @@ describe("L2 upgrade test", function () {
     const testnetVerifierFactory = await hardhat.ethers.getContractFactory("EraTestnetVerifier");
     const testnetVerifierContract = await testnetVerifierFactory.deploy();
     const newVerifier = testnetVerifierContract.address;
-    const newerVerifierParams = buildVerifierParams({
-      recursionNodeLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
-      recursionLeafLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
-      recursionCircuitsSetVksHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
-    });
 
     const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
     const myFactoryDepHash = hashBytecode(myFactoryDep);
@@ -404,12 +399,12 @@ describe("L2 upgrade test", function () {
       nonce: 5 + initialMinorProtocolVersion,
     });
 
+    // verifier is now set via setNewVersionUpgrade, not in ProposedUpgrade struct
     const upgrade = {
       bootloaderHash,
       defaultAccountHash,
       evmEmulatorHash,
       verifier: newVerifier,
-      verifierParams: newerVerifierParams,
       executeUpgradeTx: true,
       l2ProtocolUpgradeTx: upgradeTx,
       newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 5, 0),
@@ -442,10 +437,7 @@ describe("L2 upgrade test", function () {
     expect((await proxyGetters.getVerifier()).toLowerCase()).to.equal(newVerifier.toLowerCase());
     expect(await proxyGetters.getProtocolVersion()).to.equal(addToProtocolVersion(initialProtocolVersion, 5, 0));
 
-    const newVerifierParams = await proxyGetters.getVerifierParams();
-    expect(newVerifierParams.recursionNodeLevelVkHash).to.equal(newerVerifierParams.recursionNodeLevelVkHash);
-    expect(newVerifierParams.recursionLeafLevelVkHash).to.equal(newerVerifierParams.recursionLeafLevelVkHash);
-    expect(newVerifierParams.recursionCircuitsSetVksHash).to.equal(newerVerifierParams.recursionCircuitsSetVksHash);
+    // verifierParams no longer set during upgrade
 
     expect(upgradeEvents[0].name).to.eq("NewProtocolVersion");
     expect(upgradeEvents[0].args.previousProtocolVersion.toString()).to.eq(
@@ -459,27 +451,20 @@ describe("L2 upgrade test", function () {
     expect(upgradeEvents[1].args.oldVerifier.toLowerCase()).to.eq(verifier.toLowerCase());
     expect(upgradeEvents[1].args.newVerifier.toLowerCase()).to.eq(newVerifier.toLowerCase());
 
-    expect(upgradeEvents[2].name).to.eq("NewVerifierParams");
-    expect(upgradeEvents[2].args.oldVerifierParams[0]).to.eq(ethers.constants.HashZero);
-    expect(upgradeEvents[2].args.oldVerifierParams[1]).to.eq(ethers.constants.HashZero);
-    expect(upgradeEvents[2].args.oldVerifierParams[2]).to.eq(ethers.constants.HashZero);
-    expect(upgradeEvents[2].args.newVerifierParams[0]).to.eq(newerVerifierParams.recursionNodeLevelVkHash);
-    expect(upgradeEvents[2].args.newVerifierParams[1]).to.eq(newerVerifierParams.recursionLeafLevelVkHash);
-    expect(upgradeEvents[2].args.newVerifierParams[2]).to.eq(newerVerifierParams.recursionCircuitsSetVksHash);
+    // NewVerifierParams event removed - verifierParams no longer set during upgrade
 
-    expect(upgradeEvents[3].name).to.eq("NewL2BootloaderBytecodeHash");
-    expect(upgradeEvents[3].args.previousBytecodeHash).to.eq(L2_BOOTLOADER_BYTECODE_HASH);
-    expect(upgradeEvents[3].args.newBytecodeHash).to.eq(bootloaderHash);
+    expect(upgradeEvents[2].name).to.eq("NewL2BootloaderBytecodeHash");
+    expect(upgradeEvents[2].args.previousBytecodeHash).to.eq(L2_BOOTLOADER_BYTECODE_HASH);
+    expect(upgradeEvents[2].args.newBytecodeHash).to.eq(bootloaderHash);
 
-    expect(upgradeEvents[4].name).to.eq("NewL2DefaultAccountBytecodeHash");
+    expect(upgradeEvents[3].name).to.eq("NewL2DefaultAccountBytecodeHash");
 
-    expect(upgradeEvents[4].args.previousBytecodeHash).to.eq(L2_DEFAULT_ACCOUNT_BYTECODE_HASH);
-    expect(upgradeEvents[4].args.newBytecodeHash).to.eq(defaultAccountHash);
+    expect(upgradeEvents[3].args.previousBytecodeHash).to.eq(L2_DEFAULT_ACCOUNT_BYTECODE_HASH);
+    expect(upgradeEvents[3].args.newBytecodeHash).to.eq(defaultAccountHash);
   });
 
   it("Should successfully perform a patch upgrade even if there is a pending minor upgrade", async () => {
     const currentVerifier = await proxyGetters.getVerifier();
-    const currentVerifierParams = await proxyGetters.getVerifierParams();
     const currentBootloaderHash = await proxyGetters.getL2BootloaderBytecodeHash();
     const currentL2DefaultAccountBytecodeHash = await proxyGetters.getL2DefaultAccountBytecodeHash();
     const currentL2EvmEmulatorBytecodeHash = await proxyGetters.getL2EvmEmulatorBytecodeHash();
@@ -487,20 +472,15 @@ describe("L2 upgrade test", function () {
     const testnetVerifierFactory = await hardhat.ethers.getContractFactory("EraTestnetVerifier");
     const testnetVerifierContract = await testnetVerifierFactory.deploy();
     const newVerifier = testnetVerifierContract.address;
-    const newerVerifierParams = buildVerifierParams({
-      recursionNodeLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
-      recursionLeafLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
-      recursionCircuitsSetVksHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
-    });
 
     const emptyTx = buildL2CanonicalTransaction({
       txType: 0,
       nonce: 0,
     });
 
+    // verifier is now set via setNewVersionUpgrade, not in ProposedUpgrade struct
     const upgrade = {
       verifier: newVerifier,
-      verifierParams: newerVerifierParams,
       newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 5, 1),
       l2ProtocolUpgradeTx: emptyTx,
     };
@@ -531,10 +511,7 @@ describe("L2 upgrade test", function () {
     expect((await proxyGetters.getVerifier()).toLowerCase()).to.equal(newVerifier.toLowerCase());
     expect(await proxyGetters.getProtocolVersion()).to.equal(addToProtocolVersion(initialProtocolVersion, 5, 1));
 
-    const newVerifierParams = await proxyGetters.getVerifierParams();
-    expect(newVerifierParams.recursionNodeLevelVkHash).to.equal(newerVerifierParams.recursionNodeLevelVkHash);
-    expect(newVerifierParams.recursionLeafLevelVkHash).to.equal(newerVerifierParams.recursionLeafLevelVkHash);
-    expect(newVerifierParams.recursionCircuitsSetVksHash).to.equal(newerVerifierParams.recursionCircuitsSetVksHash);
+    // verifierParams no longer set during upgrade
 
     expect(upgradeEvents[0].name).to.eq("NewProtocolVersion");
     expect(upgradeEvents[0].args.previousProtocolVersion.toString()).to.eq(
@@ -548,24 +525,13 @@ describe("L2 upgrade test", function () {
     expect(upgradeEvents[1].args.oldVerifier.toLowerCase()).to.eq(currentVerifier.toLowerCase());
     expect(upgradeEvents[1].args.newVerifier.toLowerCase()).to.eq(newVerifier.toLowerCase());
 
-    expect(upgradeEvents[2].name).to.eq("NewVerifierParams");
-    expect(upgradeEvents[2].args.oldVerifierParams[0]).to.eq(currentVerifierParams.recursionNodeLevelVkHash);
-    expect(upgradeEvents[2].args.oldVerifierParams[1]).to.eq(currentVerifierParams.recursionLeafLevelVkHash);
-    expect(upgradeEvents[2].args.oldVerifierParams[2]).to.eq(currentVerifierParams.recursionCircuitsSetVksHash);
-    expect(upgradeEvents[2].args.newVerifierParams[0]).to.eq(newerVerifierParams.recursionNodeLevelVkHash);
-    expect(upgradeEvents[2].args.newVerifierParams[1]).to.eq(newerVerifierParams.recursionLeafLevelVkHash);
-    expect(upgradeEvents[2].args.newVerifierParams[2]).to.eq(newerVerifierParams.recursionCircuitsSetVksHash);
+    // NewVerifierParams event removed - verifierParams no longer set during upgrade
   });
 
   it("Should fail to upgrade when there is already a pending upgrade", async () => {
     const bootloaderHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
     const defaultAccountHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
-    const verifier = ethers.utils.hexlify(ethers.utils.randomBytes(20));
-    const verifierParams = buildVerifierParams({
-      recursionNodeLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
-      recursionLeafLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
-      recursionCircuitsSetVksHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
-    });
+    const upgradeVerifier = ethers.utils.hexlify(ethers.utils.randomBytes(20));
 
     const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
     const myFactoryDepHash = hashBytecode(myFactoryDep);
@@ -574,11 +540,11 @@ describe("L2 upgrade test", function () {
       nonce: 5 + 1 + initialMinorProtocolVersion,
     });
 
+    // verifier is now set via setNewVersionUpgrade, not in ProposedUpgrade struct
     const upgrade = {
       bootloaderHash,
       defaultAccountHash,
-      verifier: verifier,
-      verifierParams,
+      verifier: upgradeVerifier,
       executeUpgradeTx: true,
       l2ProtocolUpgradeTx: upgradeTx,
       factoryDeps: [myFactoryDep],
@@ -941,15 +907,6 @@ async function buildCommitBatchInfoWithCustomLogs(
   };
 }
 
-function buildVerifierParams(params: Partial<VerifierParams>): VerifierParams {
-  return {
-    recursionNodeLevelVkHash: ethers.constants.HashZero,
-    recursionLeafLevelVkHash: ethers.constants.HashZero,
-    recursionCircuitsSetVksHash: ethers.constants.HashZero,
-    ...params,
-  };
-}
-
 type PartialProposedUpgrade = Partial<ProposedUpgrade>;
 
 function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedUpgrade {
@@ -959,8 +916,6 @@ function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedU
     bootloaderHash: ethers.constants.HashZero,
     defaultAccountHash: ethers.constants.HashZero,
     evmEmulatorHash: ethers.constants.HashZero,
-    verifier: ethers.constants.AddressZero,
-    verifierParams: buildVerifierParams({}),
     l1ContractsUpgradeCalldata: "0x",
     postUpgradeCalldata: "0x",
     upgradeTimestamp: ethers.constants.Zero,
@@ -969,12 +924,17 @@ function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedU
   };
 }
 
+interface PartialProposedUpgradeWithVerifier extends Partial<ProposedUpgrade> {
+  verifier?: string;
+  verifierParams?: VerifierParams;
+}
+
 async function executeUpgrade(
   chainId: BigNumberish,
   proxyGetters: GettersFacet,
   chainTypeManager: ChainTypeManager,
   proxyAdmin: AdminFacet,
-  partialUpgrade: Partial<ProposedUpgrade>,
+  partialUpgrade: PartialProposedUpgradeWithVerifier,
   contractFactory?: ethers.ethers.ContractFactory
 ) {
   if (partialUpgrade.newProtocolVersion == null) {
@@ -996,13 +956,16 @@ async function executeUpgrade(
   const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
 
   const oldProtocolVersion = await proxyGetters.getProtocolVersion();
+  // Verifier is now set on CTM per protocol version, not in ProposedUpgrade
+  const verifierForVersion = partialUpgrade.verifier || ethers.constants.AddressZero;
   // This promise will be handled in the tests
   (
     await chainTypeManager.setNewVersionUpgrade(
       diamondCutData,
       oldProtocolVersion,
       999999999999,
-      partialUpgrade.newProtocolVersion
+      partialUpgrade.newProtocolVersion,
+      verifierForVersion
     )
   ).wait();
   return proxyAdmin.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
@@ -1012,7 +975,7 @@ async function executeUpgrade(
 async function rollBackToVersion(
   protocolVersion: string,
   stateTransition: ChainTypeManager,
-  partialUpgrade: Partial<ProposedUpgrade>
+  partialUpgrade: PartialProposedUpgradeWithVerifier
 ) {
   partialUpgrade.newProtocolVersion = protocolVersion;
 
@@ -1027,13 +990,16 @@ async function rollBackToVersion(
 
   const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
 
+  // Verifier is now set on CTM per protocol version
+  const verifierForVersion = partialUpgrade.verifier || ethers.constants.AddressZero;
   // This promise will be handled in the tests
   (
     await stateTransition.setNewVersionUpgrade(
       diamondCutData,
       (parseInt(protocolVersion) - 1).toString(),
       999999999999,
-      protocolVersion
+      protocolVersion,
+      verifierForVersion
     )
   ).wait();
 }
@@ -1043,7 +1009,7 @@ async function executeCustomUpgrade(
   proxyGetters: GettersFacet,
   proxyAdmin: AdminFacet,
   stateTransition: ChainTypeManager,
-  partialUpgrade: Partial<ProposedUpgrade>,
+  partialUpgrade: PartialProposedUpgradeWithVerifier,
   contractFactory?: ethers.ethers.ContractFactory
 ) {
   if (partialUpgrade.newProtocolVersion == null) {
@@ -1064,13 +1030,16 @@ async function executeCustomUpgrade(
   const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
   const oldProtocolVersion = await proxyGetters.getProtocolVersion();
 
+  // Verifier is now set on CTM per protocol version
+  const verifierForVersion = partialUpgrade.verifier || ethers.constants.AddressZero;
   // This promise will be handled in the tests
   (
     await stateTransition.setNewVersionUpgrade(
       diamondCutData,
       oldProtocolVersion,
       999999999999,
-      partialUpgrade.newProtocolVersion
+      partialUpgrade.newProtocolVersion,
+      verifierForVersion
     )
   ).wait();
   return proxyAdmin.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);

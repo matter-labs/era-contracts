@@ -152,8 +152,6 @@ export interface ProposedUpgrade {
   bootloaderHash: BytesLike;
   defaultAccountHash: BytesLike;
   evmEmulatorHash: BytesLike;
-  verifier: string;
-  verifierParams: VerifierParams;
   l1ContractsUpgradeCalldata: BytesLike;
   postUpgradeCalldata: BytesLike;
   upgradeTimestamp: ethers.BigNumber;

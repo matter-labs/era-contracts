@@ -371,6 +371,10 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
 
         // Verify that the protocol version deadline was set
         assertEq(chainContractAddress.protocolVersionDeadline(oldProtocolVersion), oldProtocolVersionDeadline);
+        // Verify that the new protocol version is set
+        assertEq(chainContractAddress.protocolVersion(), newProtocolVersion);
+        // Verify that the verifier is set for the new protocol version
+        assertEq(chainContractAddress.protocolVersionVerifier(newProtocolVersion), testnetVerifier);
     }
 
     function test_RevertWhen_setNewVersionUpgradeNotOwner() public {

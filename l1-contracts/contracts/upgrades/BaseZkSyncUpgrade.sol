@@ -99,9 +99,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         address ctmVerifier = IChainTypeManager(s.chainTypeManager).protocolVersionVerifier(
             _proposedUpgrade.newProtocolVersion
         );
-        if (ctmVerifier != address(0)) {
-            _setVerifier(IVerifier(ctmVerifier));
-        }
+        _setVerifier(IVerifier(ctmVerifier));
         _setBaseSystemContracts(
             _proposedUpgrade.bootloaderHash,
             _proposedUpgrade.defaultAccountHash,

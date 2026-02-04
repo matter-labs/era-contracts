@@ -23,6 +23,7 @@ contract setNewVersionUpgradeTest is ChainTypeManagerTest {
         Diamond.DiamondCutData memory newDiamondCutData = getDiamondCutData(address(randomDiamondInit));
         bytes32 newCutHash = keccak256(abi.encode(newDiamondCutData));
 
+        vm.prank(governor);
         chainContractAddress.setNewVersionUpgrade(newDiamondCutData, 0, 999999999999, 1, testnetVerifier);
 
         assertEq(chainContractAddress.upgradeCutHash(0), newCutHash, "Diamond cut upgrade was not successful");
@@ -33,5 +34,6 @@ contract setNewVersionUpgradeTest is ChainTypeManagerTest {
         assertEq(major, 0);
         assertEq(minor, 0);
         assertEq(patch, 1);
+        assertEq(chainContractAddress.protocolVersionVerifier(1), testnetVerifier, "Verifier was not set correctly");
     }
 }

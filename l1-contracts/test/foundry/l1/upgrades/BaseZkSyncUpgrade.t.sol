@@ -220,17 +220,12 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
-    // Note: test_SuccessWith_VerifierAddressIsZero and test_SuccessWith_NewVerifierParamsIsZero
-    // were removed because verifier is now fetched from CTM mapping during upgrade,
-    // not from ProposedUpgrade struct
-
     function test_SuccessWith_L2BootloaderBytecodeHashIsZero() public {
         proposedUpgrade.bootloaderHash = bytes32(0);
 
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        // verifier is now fetched from CTM, not from proposedUpgrade
         assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
     }
 
@@ -240,7 +235,6 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        // verifier is now fetched from CTM, not from proposedUpgrade
         assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }
 
@@ -250,7 +244,6 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        // verifier is now fetched from CTM, not from proposedUpgrade
         assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
         assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }
@@ -259,7 +252,6 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        // verifier is now fetched from CTM, not from proposedUpgrade
         assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
         assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }

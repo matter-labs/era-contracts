@@ -49,6 +49,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
         assertEq(newProtocolVersion, newProtocolVersionSemVer);
         assertEq(newProtocolVersionDeadline, type(uint256).max);
         assertEq(oldProtocolVersionDeadline, 1000);
+        assertEq(chainContractAddress.protocolVersionVerifier(newProtocolVersionSemVer), testnetVerifier);
     }
 
     // protocolVersionIsActive
@@ -99,7 +100,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
 
         _mockGetZKChainFromBridgehub(chainAddress);
 
-        vm.prank(governor); // In the ChainTypeManagerTest contract, governor is set as the owner of chainContractAddress
+        vm.prank(governor);
         chainContractAddress.executeUpgrade(chainId, getDiamondCutDataWithCustomFacets(address(0), customFacetCuts));
     }
 
