@@ -111,6 +111,33 @@
             "internalType": "bytes32"
           },
           {
+            "name": "verifier",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "verifierParams",
+            "type": "tuple",
+            "internalType": "struct VerifierParams",
+            "components": [
+              {
+                "name": "recursionNodeLevelVkHash",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "recursionLeafLevelVkHash",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "recursionCircuitsSetVksHash",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              }
+            ]
+          },
+          {
             "name": "l1ContractsUpgradeCalldata",
             "type": "bytes",
             "internalType": "bytes"
@@ -360,6 +387,33 @@
             "name": "evmEmulatorHash",
             "type": "bytes32",
             "internalType": "bytes32"
+          },
+          {
+            "name": "verifier",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "verifierParams",
+            "type": "tuple",
+            "internalType": "struct VerifierParams",
+            "components": [
+              {
+                "name": "recursionNodeLevelVkHash",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "recursionLeafLevelVkHash",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "recursionCircuitsSetVksHash",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              }
+            ]
           },
           {
             "name": "l1ContractsUpgradeCalldata",
