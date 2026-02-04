@@ -607,7 +607,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     ) internal {
         // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
-        for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < _newBatchesData.length; ++i) {
             _lastCommittedBatchData = _commitOneBatch(
                 _lastCommittedBatchData,
                 _newBatchesData[i],
@@ -648,7 +648,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
-        for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < _newBatchesData.length; ++i) {
             _lastCommittedBatchData = _commitOneBatchZKsyncOS(
                 _lastCommittedBatchData,
                 _newBatchesData[i],
@@ -672,7 +672,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     function _rollingHash(bytes32[] memory _hashes) internal pure returns (bytes32) {
         bytes32 hash = EMPTY_STRING_KECCAK;
         uint256 nHashes = _hashes.length;
-        for (uint256 i = 0; i < nHashes; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < nHashes; ++i) {
             hash = keccak256(abi.encode(hash, _hashes[i]));
         }
         return hash;
@@ -733,7 +733,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 length = _dependencyRoots.length;
         IMessageRoot messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
 
-        for (uint256 i = 0; i < length; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < length; ++i) {
             InteropRoot memory interopRoot = _dependencyRoots[i];
             bytes32 correctRootHash;
             if (interopRoot.chainId == block.chainid) {
@@ -806,7 +806,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // message verification.
         if (block.chainid != L1_CHAIN_ID) {
             uint256 messagesLength = messages.length;
-            for (uint256 i = 0; i < messagesLength; i = i.uncheckedInc()) {
+            for (uint256 i = 0; i < messagesLength; ++i) {
                 ProcessLogsInput memory processLogsInput = ProcessLogsInput({
                     logs: logs[i],
                     messages: messages[i],
@@ -819,12 +819,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             }
         } else {
             uint256 batchesDataLength = batchesData.length;
-            for (uint256 i = 0; i < batchesDataLength; i = i.uncheckedInc()) {
+            for (uint256 i = 0; i < batchesDataLength; ++i) {
                 _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
             }
         }
 
-        for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < nBatches; ++i) {
             _executeOneBatch(batchesData[i], priorityOpsData[i], dependencyRoots[i], i);
             emit BlockExecution(batchesData[i].batchNumber, batchesData[i].batchHash, batchesData[i].commitment);
         }
@@ -867,7 +867,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
         bytes32 prevBatchStateCommitment = prevBatch.batchHash;
-        for (uint256 i = 0; i < committedBatchesLength; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < committedBatchesLength; ++i) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
             _checkBatchHashMismatch(committedBatches[i], currentTotalBatchesVerified, false);
 

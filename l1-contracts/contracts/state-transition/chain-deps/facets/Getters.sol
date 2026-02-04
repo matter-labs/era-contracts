@@ -255,7 +255,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
         uint256 facetsLen = ds.facets.length;
         result = new Facet[](facetsLen);
 
-        for (uint256 i = 0; i < facetsLen; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < facetsLen; ++i) {
             address facetAddr = ds.facets[i];
             Diamond.FacetToSelectors memory facetToSelectors = ds.facetToSelectors[facetAddr];
 
