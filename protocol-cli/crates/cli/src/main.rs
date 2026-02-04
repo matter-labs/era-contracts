@@ -13,6 +13,7 @@ use xshell::Shell;
 pub mod abi;
 pub mod admin_functions;
 mod commands;
+pub mod forge_ctx;
 mod utils;
 
 #[derive(Parser, Debug)]
