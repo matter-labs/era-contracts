@@ -35,11 +35,11 @@ error AssetRouterAllowanceNotZero();
 error BadTransferDataLength();
 // 0x6ef9a972
 error BaseTokenGasPriceDenominatorNotSet();
-// 0x
+// 0xd3cd4bd2
 error BaseTokenHolderMintFailed();
-// 0x
+// 0x96c0b27c
 error BaseTokenHolderTransferFailed();
-// 0x
+// 0xe3ec2bc9
 error BaseTokenTransferFailed();
 // 0x55ad3fd3
 error BatchHashMismatch(bytes32 expected, bytes32 actual);
