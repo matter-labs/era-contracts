@@ -2,26 +2,16 @@
 
 pragma solidity 0.8.28;
 
-import {IL1Bridgehub} from "../../bridgehub/IL1Bridgehub.sol";
+import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
+import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
 import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
+import {FinalizeL1DepositParams, ConfirmTransferResultData} from "../../common/Messaging.sol";
 
-/// @param chainId The chain ID of the transaction to check.
-/// @param l2BatchNumber The L2 batch number where the withdrawal was processed.
-/// @param l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
-/// @param l2sender The address of the message sender on L2 (base token system contract address or asset handler)
-/// @param l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent.
-/// @param message The L2 withdraw data, stored in an L2 -> L1 message.
-/// @param merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization.
-struct FinalizeL1DepositParams {
-    uint256 chainId;
-    uint256 l2BatchNumber;
-    uint256 l2MessageIndex;
-    address l2Sender;
-    uint16 l2TxNumberInBatch;
-    bytes message;
-    bytes32[] merkleProof;
-}
+/// @dev Transient storage slot for storing the settlement layer chain ID during proof verification.
+/// @dev This slot is used to temporarily store which settlement layer is processing the current proof,
+/// @dev and is cleared at the end of each transaction.
+uint256 constant TRANSIENT_SETTLEMENT_LAYER_SLOT = uint256(keccak256("TRANSIENT_SETTLEMENT_LAYER_SLOT")) - 1;
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
@@ -32,6 +22,8 @@ interface IL1Nullifier {
         bytes32 indexed txDataHash,
         bytes32 indexed l2DepositTxHash
     );
+
+    event TransientSettlementLayerSet(uint256 indexed settlementLayerChainId);
 
     function isWithdrawalFinalized(
         uint256 _chainId,
@@ -66,6 +58,8 @@ interface IL1Nullifier {
 
     function BRIDGE_HUB() external view returns (IL1Bridgehub);
 
+    function l1AssetRouter() external view returns (IL1AssetRouter);
+
     function legacyBridge() external view returns (IL1ERC20Bridge);
 
     function depositHappened(uint256 _chainId, bytes32 _l2TxHash) external view returns (bytes32);
@@ -85,6 +79,11 @@ interface IL1Nullifier {
     function transferTokenToNTV(address _token) external;
 
     function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external;
+
+    /// @notice Confirms the result of a deposit, whether it was successful or not.
+    /// @dev This function is used to confirm the migration of a chain to Gateway.
+    /// @param _confirmTransferResultData The data to confirm the deposit result.
+    function bridgeConfirmTransferResult(ConfirmTransferResultData calldata _confirmTransferResultData) external;
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
     /// @param _chainId The ZK chain id to which deposit was initiated.
@@ -128,4 +127,13 @@ interface IL1Nullifier {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external;
+
+    /// @notice When verifying recursive proofs, we mark the transient settlement layer,
+    /// this function retrieves the currently stored transient settlement layer chain ID.
+    /// @dev The transient settlement layer is cleared at the end of each transaction.
+    /// @dev Note, that it is hard assumption that must be enforced by all the users of this function:
+    /// Any operations that reads this value, must be preceded by a successful invocation of L1Nullifier
+    /// that has set this value. Otherwise, it is possible that the same value is reused multiple times.
+    /// @return The chain ID of the settlement layer that processed the current proof, or 0 if none is set.
+    function getTransientSettlementLayer() external view returns (uint256, uint256);
 }

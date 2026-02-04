@@ -93,7 +93,10 @@ async function main() {
     "0x0000000000000000000000000000000000010004",
     "contracts/bridge/ntv/L2NativeTokenVault.sol:L2NativeTokenVault"
   );
-  await verifyContract("0x0000000000000000000000000000000000010005", "contracts/bridgehub/MessageRoot.sol:MessageRoot");
+  await verifyContract(
+    "0x0000000000000000000000000000000000010005",
+    "contracts/core/message-root/L2MessageRoot.sol:L2MessageRoot"
+  );
   await verifyContract(
     "0x0000000000000000000000000000000000010007",
     "contracts/bridge/L2WrappedBaseToken.sol:L2WrappedBaseToken"
