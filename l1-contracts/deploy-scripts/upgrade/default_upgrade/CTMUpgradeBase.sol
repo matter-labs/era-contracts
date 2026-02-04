@@ -206,6 +206,12 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
             evmEmulatorHash: bytes32(0),
+            verifier: address(0),
+            verifierParams: VerifierParams({
+                recursionNodeLevelVkHash: bytes32(0),
+                recursionLeafLevelVkHash: bytes32(0),
+                recursionCircuitsSetVksHash: bytes32(0)
+            }),
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: new bytes(0),
             upgradeTimestamp: 0,
@@ -243,6 +249,12 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             bootloaderHash: chainCreationParams.bootloaderHash,
             defaultAccountHash: chainCreationParams.defaultAAHash,
             evmEmulatorHash: chainCreationParams.evmEmulatorHash,
+            verifier: address(0),
+            verifierParams: VerifierParams({
+                recursionNodeLevelVkHash: bytes32(0),
+                recursionLeafLevelVkHash: bytes32(0),
+                recursionCircuitsSetVksHash: bytes32(0)
+            }),
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
             upgradeTimestamp: 0,

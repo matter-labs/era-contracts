@@ -7,6 +7,7 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgradeGenesis} from "./BaseZkSyncUpgradeGenesis.sol";
 import {ProposedUpgrade} from "./IDefaultUpgrade.sol";
+import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {IL2GenesisUpgrade} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL1GenesisUpgrade} from "./IL1GenesisUpgrade.sol";
@@ -92,6 +93,12 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
             evmEmulatorHash: bytes32(0),
+            verifier: address(0),
+            verifierParams: VerifierParams({
+                recursionNodeLevelVkHash: bytes32(0),
+                recursionLeafLevelVkHash: bytes32(0),
+                recursionCircuitsSetVksHash: bytes32(0)
+            }),
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: new bytes(0),
             upgradeTimestamp: 0,

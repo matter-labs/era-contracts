@@ -42,6 +42,12 @@ contract ExecuteUpgradeTest is AdminTest {
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
             evmEmulatorHash: bytes32(0),
+            verifier: address(0),
+            verifierParams: VerifierParams({
+                recursionNodeLevelVkHash: bytes32(0),
+                recursionLeafLevelVkHash: bytes32(0),
+                recursionCircuitsSetVksHash: bytes32(0)
+            }),
             l1ContractsUpgradeCalldata: hex"",
             postUpgradeCalldata: hex"",
             upgradeTimestamp: 0,

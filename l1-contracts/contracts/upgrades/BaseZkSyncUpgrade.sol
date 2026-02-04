@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {ZKChainBase} from "../state-transition/chain-deps/facets/ZKChainBase.sol";
-import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
+import {IVerifier, VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
@@ -21,6 +21,8 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 /// @param bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
 /// @param defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
 /// @param evmEmulatorHash The hash of the new EVM emulator bytecode. If zero, it will not be updated.
+/// @param verifier The address of the new verifier. If zero, the verifier will not be updated.
+/// @param verifierParams The new verifier params. If all of its fields are 0, the params will not be updated.
 /// @param l1ContractsUpgradeCalldata Custom calldata for L1 contracts upgrade, it may be interpreted differently
 /// in each upgrade. Usually empty.
 /// @param postUpgradeCalldata Custom calldata for post upgrade hook, it may be interpreted differently in each
@@ -33,6 +35,8 @@ struct ProposedUpgrade {
     bytes32 bootloaderHash;
     bytes32 defaultAccountHash;
     bytes32 evmEmulatorHash;
+    address verifier;
+    VerifierParams verifierParams;
     bytes l1ContractsUpgradeCalldata;
     bytes postUpgradeCalldata;
     uint256 upgradeTimestamp;
