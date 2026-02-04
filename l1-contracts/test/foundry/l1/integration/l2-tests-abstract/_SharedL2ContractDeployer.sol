@@ -149,7 +149,8 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
                 aliasedOwner: ownerWallet,
                 contractsDeployedAlready: false,
                 l1CtmDeployer: l1CTMDeployer,
-                maxNumberOfZKChains: 100
+                maxNumberOfZKChains: 100,
+                wethToken: address(weth)
             })
         );
         if (!_skip) {
