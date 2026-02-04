@@ -24,9 +24,21 @@ function getSelector(contractName: string, method: string): string {
     const artifact = hre.artifacts.readArtifactSync(contractName);
     contractInterface = new ethers.utils.Interface(artifact.abi);
   } catch (e) {
-    const artifact = JSON.parse(
-      fs.readFileSync(`zkout/${contractName}.sol/${contractName}.json`, { encoding: "utf-8" })
-    );
+    // Try to find the artifact in zkout (system-contracts) or l1-contracts zkout
+    const paths = [
+      `zkout/${contractName}.sol/${contractName}.json`,
+      `../l1-contracts/zkout/${contractName}.sol/${contractName}.json`,
+    ];
+    let artifact;
+    for (const path of paths) {
+      if (fs.existsSync(path)) {
+        artifact = JSON.parse(fs.readFileSync(path, { encoding: "utf-8" }));
+        break;
+      }
+    }
+    if (!artifact) {
+      throw new Error(`Artifact not found for ${contractName} in paths: ${paths.join(", ")}`);
+    }
     contractInterface = new ethers.utils.Interface(artifact.abi);
   }
   return contractInterface.getSighash(method);
@@ -108,6 +120,7 @@ const params = {
   ),
   RIGHT_PADDED_PUBLISH_TIMESTAMP_DATA_TO_L1_SELECTOR: getPaddedSelector("SystemContext", "publishTimestampDataToL1"),
   RIGHT_PADDED_SET_L2_INTEROP_ROOT_SELECTOR: getPaddedSelector("L2InteropRootStorage", "addInteropRoot"),
+  RIGHT_PADDED_SET_INTEROP_FEE_SELECTOR: getPaddedSelector("InteropCenter", "setInteropFee"),
   COMPRESSED_BYTECODES_SLOTS: 196608,
   ENSURE_RETURNED_MAGIC: 1,
   FORBID_ZERO_GAS_PER_PUBDATA: 1,

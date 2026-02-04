@@ -18,8 +18,7 @@ import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAs
 import {AlreadyMigrated, PriorityQueueNotFullyProcessed, TotalPriorityTxsIsZero, ContractNotDeployed, DepositsAlreadyPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted, MigrationInProgress} from "../../L1StateTransitionErrors.sol";
 import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, NotAZKChain, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
-import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
 
@@ -257,15 +256,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
             abi.encodeCall(IL2ContractDeployer.setAllowedBytecodeTypesToDeploy, AllowedBytecodeTypes.EraVmAndEVM)
         );
         emit EnableEvmEmulator();
-    }
-
-    /// @inheritdoc IAdmin
-    function setInteropFee(uint256 _fee) external onlyAdmin onlyL1 returns (bytes32 canonicalTxHash) {
-        canonicalTxHash = IMailbox(address(this)).requestL2ServiceTransaction(
-            L2_INTEROP_CENTER_ADDR,
-            abi.encodeCall(IInteropCenter.setInteropFee, (_fee))
-        );
-        emit InteropFeeUpdateRequested(_fee, canonicalTxHash);
     }
 
     /*//////////////////////////////////////////////////////////////

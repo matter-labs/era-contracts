@@ -19,8 +19,7 @@ import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {ZKTokenNotAvailable, FeeWithdrawalFailed} from "contracts/interop/InteropErrors.sol";
-import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
-import {L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_BRIDGEHUB_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_BRIDGEHUB_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -53,7 +52,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
     function test_setInteropFee_Success() public {
         uint256 newFee = 0.01 ether;
 
-        vm.prank(SERVICE_TRANSACTION_SENDER);
+        vm.prank(L2_BOOTLOADER_ADDRESS);
         l2InteropCenter.setInteropFee(newFee);
 
         assertEq(l2InteropCenter.interopProtocolFee(), newFee);
@@ -75,17 +74,17 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         vm.expectEmit(true, true, false, false);
         emit InteropFeeUpdated(oldFee, newFee);
 
-        vm.prank(SERVICE_TRANSACTION_SENDER);
+        vm.prank(L2_BOOTLOADER_ADDRESS);
         l2InteropCenter.setInteropFee(newFee);
     }
 
     function test_setInteropFee_ZeroFee() public {
         // First set a non-zero fee
-        vm.prank(SERVICE_TRANSACTION_SENDER);
+        vm.prank(L2_BOOTLOADER_ADDRESS);
         l2InteropCenter.setInteropFee(0.01 ether);
 
         // Then set to zero
-        vm.prank(SERVICE_TRANSACTION_SENDER);
+        vm.prank(L2_BOOTLOADER_ADDRESS);
         l2InteropCenter.setInteropFee(0);
 
         assertEq(l2InteropCenter.interopProtocolFee(), 0);
@@ -121,7 +120,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
     function test_interopProtocolFee_UpdatedBySetInteropFee() public {
         uint256 newFee = 0.05 ether;
 
-        vm.prank(SERVICE_TRANSACTION_SENDER);
+        vm.prank(L2_BOOTLOADER_ADDRESS);
         l2InteropCenter.setInteropFee(newFee);
 
         assertEq(l2InteropCenter.interopProtocolFee(), newFee);
@@ -159,7 +158,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
         // Set a protocol fee
         uint256 protocolFee = 0.01 ether;
-        vm.prank(SERVICE_TRANSACTION_SENDER);
+        vm.prank(L2_BOOTLOADER_ADDRESS);
         l2InteropCenter.setInteropFee(protocolFee);
 
         // Prepare sender with enough ETH
@@ -199,7 +198,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
         // Set a protocol fee
         uint256 protocolFee = 0.01 ether;
-        vm.prank(SERVICE_TRANSACTION_SENDER);
+        vm.prank(L2_BOOTLOADER_ADDRESS);
         l2InteropCenter.setInteropFee(protocolFee);
 
         // Prepare sender
@@ -271,7 +270,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         _setupGatewayMode();
 
         uint256 protocolFee = 0.02 ether;
-        vm.prank(SERVICE_TRANSACTION_SENDER);
+        vm.prank(L2_BOOTLOADER_ADDRESS);
         l2InteropCenter.setInteropFee(protocolFee);
 
         address sender = makeAddr("feeSender");
@@ -456,7 +455,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
         // Set a non-zero protocol fee
         uint256 protocolFee = 0.01 ether;
-        vm.prank(SERVICE_TRANSACTION_SENDER);
+        vm.prank(L2_BOOTLOADER_ADDRESS);
         l2InteropCenter.setInteropFee(protocolFee);
 
         // Set up ZK token
@@ -540,7 +539,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
         // Set a protocol fee
         uint256 protocolFee = 0.01 ether;
-        vm.prank(SERVICE_TRANSACTION_SENDER);
+        vm.prank(L2_BOOTLOADER_ADDRESS);
         l2InteropCenter.setInteropFee(protocolFee);
 
         // Create a reverting contract as coinbase
@@ -581,7 +580,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         _setupGatewayMode();
 
         uint256 protocolFee = 0.01 ether;
-        vm.prank(SERVICE_TRANSACTION_SENDER);
+        vm.prank(L2_BOOTLOADER_ADDRESS);
         l2InteropCenter.setInteropFee(protocolFee);
 
         // Create a reverting contract as coinbase
@@ -788,7 +787,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         _setupGatewayMode();
 
         uint256 protocolFee = 0.01 ether;
-        vm.prank(SERVICE_TRANSACTION_SENDER);
+        vm.prank(L2_BOOTLOADER_ADDRESS);
         l2InteropCenter.setInteropFee(protocolFee);
 
         RevertingReceiver revertingCoinbase = new RevertingReceiver();

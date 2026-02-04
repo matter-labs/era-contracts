@@ -51,10 +51,6 @@ interface IAdmin is IZKChainBase {
     /// @notice Allow EVM emulation on chain
     function allowEvmEmulation() external returns (bytes32 canonicalTxHash);
 
-    /// @notice Set the interop protocol fee on L2 InteropCenter
-    /// @param _fee New fee amount in base token wei
-    function setInteropFee(uint256 _fee) external returns (bytes32 canonicalTxHash);
-
     /// @notice Perform the upgrade from the current protocol version with the corresponding upgrade data
     /// @param _protocolVersion The current protocol version from which upgrade is executed
     /// @param _cutData The diamond cut parameters that is executed in the upgrade
@@ -116,9 +112,6 @@ interface IAdmin is IZKChainBase {
 
     /// @notice Fee params for L1->L2 transactions changed
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
-
-    /// @notice Interop fee update requested on L2
-    event InteropFeeUpdateRequested(uint256 newFee, bytes32 l2TxHash);
 
     /// @notice Validium mode status changed
     event PubdataPricingModeUpdate(PubdataPricingMode validiumMode);
