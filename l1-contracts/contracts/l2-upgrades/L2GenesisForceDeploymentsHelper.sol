@@ -19,7 +19,7 @@ import {L2ChainAssetHandler} from "../core/chain-asset-handler/L2ChainAssetHandl
 import {InteropHandler} from "../interop/InteropHandler.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL2SharedBridgeLegacy} from "../bridge/interfaces/IL2SharedBridgeLegacy.sol";
-import {DeployFailed, UnsupportedUpgradeType, ZKsyncOSNotForceDeployForExistingContract} from "../common/L1ContractErrors.sol";
+import {DeployFailed, UnsupportedUpgradeType, ZKsyncOSNotForceDeployForExistingContract, ZKsyncOSNotForceDeployToPrecompileAddress} from "../common/L1ContractErrors.sol";
 
 import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
@@ -121,6 +121,11 @@ library L2GenesisForceDeploymentsHelper {
 
     function forceDeployOnAddressZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
         require(_newAddress.code.length == 0, ZKsyncOSNotForceDeployForExistingContract(_newAddress));
+
+        // Block deployment to precompile addresses (0x01-0xFF) and zero address.
+        uint160 addr = uint160(_newAddress);
+        require(addr > 0xFF, ZKsyncOSNotForceDeployToPrecompileAddress(_newAddress));
+
         unsafeForceDeployZKsyncOS(_bytecodeInfo, _newAddress);
     }
 
