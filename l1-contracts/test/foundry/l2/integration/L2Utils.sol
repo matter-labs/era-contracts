@@ -149,7 +149,11 @@ library L2Utils {
         forceDeployWithoutConstructor("InteropCenter", L2_INTEROP_CENTER_ADDR);
         InteropCenter interopCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner);
+        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
+            _args.l1ChainId,
+            _args.aliasedOwner,
+            DataEncoding.encodeNTVAssetId(324, address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E))
+        );
     }
 
     function forceDeployInteropHandler(SystemContractsArgs memory _args) internal {

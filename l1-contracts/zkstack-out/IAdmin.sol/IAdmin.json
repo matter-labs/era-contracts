@@ -373,6 +373,25 @@
   },
   {
     "type": "function",
+    "name": "setInteropFee",
+    "inputs": [
+      {
+        "name": "_fee",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "canonicalTxHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setPendingAdmin",
     "inputs": [
       {
@@ -656,6 +675,25 @@
     "type": "event",
     "name": "Freeze",
     "inputs": [],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "InteropFeeUpdateRequested",
+    "inputs": [
+      {
+        "name": "newFee",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "l2TxHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      }
+    ],
     "anonymous": false
   },
   {

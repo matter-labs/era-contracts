@@ -271,18 +271,28 @@ library Utils {
         IExecutor.StoredBatchInfo[] memory _batchesData,
         PriorityOpsBatchInfo[] memory _priorityOpsData
     ) internal pure returns (uint256, uint256, bytes memory) {
-        InteropRoot[][] memory dependencyRoots = new InteropRoot[][](_batchesData.length);
-        L2Log[] memory l2Logs = new L2Log[](_batchesData.length);
-        bytes[] memory messages = new bytes[](_batchesData.length);
-        bytes32[] memory messageRoots = new bytes32[](_batchesData.length);
+        return encodeExecuteBatchesData(_batchesData, _priorityOpsData, address(0));
+    }
 
+    function encodeExecuteBatchesData(
+        IExecutor.StoredBatchInfo[] memory _batchesData,
+        PriorityOpsBatchInfo[] memory _priorityOpsData,
+        address _settlementFeePayer
+    ) internal pure returns (uint256, uint256, bytes memory) {
+        uint256 len = _batchesData.length;
+        bytes memory encoded = abi.encode(
+            _batchesData,
+            _priorityOpsData,
+            new InteropRoot[][](len),
+            new L2Log[](len),
+            new bytes[](len),
+            new bytes32[](len),
+            _settlementFeePayer
+        );
         return (
             _batchesData[0].batchNumber,
-            _batchesData[_batchesData.length - 1].batchNumber,
-            bytes.concat(
-                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
-                abi.encode(_batchesData, _priorityOpsData, dependencyRoots, l2Logs, messages, messageRoots)
-            )
+            _batchesData[len - 1].batchNumber,
+            bytes.concat(bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION), encoded)
         );
     }
 
@@ -290,18 +300,28 @@ library Utils {
         IExecutor.StoredBatchInfo[] memory _batchesData,
         PriorityOpsBatchInfo[] memory _priorityOpsData
     ) internal pure returns (uint256, uint256, bytes memory) {
-        InteropRoot[][] memory dependencyRoots = new InteropRoot[][](_batchesData.length);
-        L2Log[] memory l2Logs = new L2Log[](0);
-        bytes[] memory messages = new bytes[](0);
-        bytes32[] memory messageRoots = new bytes32[](0);
+        return encodeExecuteBatchesDataZeroLogs(_batchesData, _priorityOpsData, address(0));
+    }
 
+    function encodeExecuteBatchesDataZeroLogs(
+        IExecutor.StoredBatchInfo[] memory _batchesData,
+        PriorityOpsBatchInfo[] memory _priorityOpsData,
+        address _settlementFeePayer
+    ) internal pure returns (uint256, uint256, bytes memory) {
+        uint256 len = _batchesData.length;
+        bytes memory encoded = abi.encode(
+            _batchesData,
+            _priorityOpsData,
+            new InteropRoot[][](len),
+            new L2Log[](0),
+            new bytes[](0),
+            new bytes32[](0),
+            _settlementFeePayer
+        );
         return (
             _batchesData[0].batchNumber,
-            _batchesData[_batchesData.length - 1].batchNumber,
-            bytes.concat(
-                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
-                abi.encode(_batchesData, _priorityOpsData, dependencyRoots, l2Logs, messages, messageRoots)
-            )
+            _batchesData[len - 1].batchNumber,
+            bytes.concat(bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION), encoded)
         );
     }
 

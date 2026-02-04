@@ -10,6 +10,8 @@ import "forge-std/console.sol";
 import "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 import "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {TokenBridgingData} from "contracts/common/Messaging.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import "contracts/core/message-root/IMessageRoot.sol";
 import "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
@@ -247,6 +249,8 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
             data.beaconDeployerInfo = "";
         }
 
+        data.zkTokenAssetId = DataEncoding.encodeNTVAssetId(324, address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E));
+
         return data;
     }
 
@@ -268,6 +272,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         data.interopHandlerBytecodeInfo = abi.encode(keccak256("interopHandler"));
         data.assetTrackerBytecodeInfo = abi.encode(keccak256("assetTracker"));
         data.beaconDeployerInfo = abi.encode(keccak256("beaconDeployer"));
+        data.zkTokenAssetId = DataEncoding.encodeNTVAssetId(324, address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E));
 
         return data;
     }

@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 import {Vm} from "forge-std/Vm.sol";
 
 import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
-import {console2 as console} from "forge-std/Script.sol";
 
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
@@ -22,6 +21,7 @@ import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -41,6 +41,7 @@ import {DummyL2InteropAccount} from "../../../../../contracts/dev-contracts/test
 import {SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {TokenMetadata, TokenBridgingData} from "contracts/common/Messaging.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 library L2UtilsBase {
     using stdToml for string;
@@ -67,9 +68,12 @@ library L2UtilsBase {
             vm.etch(L2_BRIDGEHUB_ADDR, bridgehub.code);
             address interopCenter = address(new InteropCenter());
             vm.etch(L2_INTEROP_CENTER_ADDR, interopCenter.code);
-
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner);
+            InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
+                _args.l1ChainId,
+                _args.aliasedOwner,
+                DataEncoding.encodeNTVAssetId(324, address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E))
+            );
         }
 
         {
@@ -118,12 +122,9 @@ library L2UtilsBase {
         {
             address interopHandler = address(new InteropHandler());
             vm.etch(L2_INTEROP_HANDLER_ADDR, interopHandler.code);
-            /// storing the reentrancy guard as the constructor is not called.
-            vm.store(
-                L2_INTEROP_HANDLER_ADDR,
-                bytes32(0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4),
-                bytes32(uint256(1))
-            );
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(_args.l1ChainId);
+
             address l2AssetTrackerAddress = address(new L2AssetTracker());
             vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
@@ -131,8 +132,8 @@ library L2UtilsBase {
 
             address gwAssetTrackerAddress = address(new GWAssetTracker());
             vm.etch(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAddress.code);
-            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            GWAssetTracker(GW_ASSET_TRACKER_ADDR).setAddresses(_args.l1ChainId);
+            // Note: GWAssetTracker.setAddresses is called later, after NTV is deployed,
+            // because it fetches wrappedZKToken from NTV.WETH_TOKEN()
         }
         {
             address l2StandardTriggerAccount = address(new DummyL2StandardTriggerAccount());
@@ -198,6 +199,58 @@ library L2UtilsBase {
                 bytes32(uint256(_args.l2TokenProxyBytecodeHash))
             );
             L2NativeTokenVaultDev(L2_NATIVE_TOKEN_VAULT_ADDR).deployBridgedStandardERC20(_args.aliasedOwner);
+        }
+
+        // Initialize GWAssetTracker after NTV is deployed (needs WETH_TOKEN)
+        {
+            // Deploy a real ERC20 token for the wrapped ZK token BEFORE setting up GWAssetTracker
+            TestnetERC20Token wrappedZKToken = new TestnetERC20Token("Wrapped ZK", "WZK", 18);
+            address wrappedZKTokenAddr = address(wrappedZKToken);
+
+            // Mock L2_NATIVE_TOKEN_VAULT.WETH_TOKEN() to return our token BEFORE setAddresses
+            vm.mockCall(
+                L2_NATIVE_TOKEN_VAULT_ADDR,
+                abi.encodeWithSelector(IL2NativeTokenVault.WETH_TOKEN.selector),
+                abi.encode(wrappedZKTokenAddr)
+            );
+
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            GWAssetTracker(GW_ASSET_TRACKER_ADDR).setAddresses(_args.l1ChainId);
+
+            // Set a small settlement fee for testing fee collection logic
+            uint256 settlementFee = 0.001 ether; // Small fee for testing
+            vm.prank(GWAssetTracker(GW_ASSET_TRACKER_ADDR).owner());
+            GWAssetTracker(GW_ASSET_TRACKER_ADDR).setGatewaySettlementFee(settlementFee);
+        }
+    }
+
+    /// @notice Sets up token balances and approvals for chain operators to pay settlement fees
+    /// @param chainIds Array of chain IDs whose operators need token balances
+    function setupTokenBalancesForChainOperators(uint256[] memory chainIds) internal {
+        // Get the wrapped ZK token address directly from the GWAssetTracker
+        address wrappedZKTokenAddr = address(GWAssetTracker(GW_ASSET_TRACKER_ADDR).wrappedZKToken());
+
+        if (wrappedZKTokenAddr == address(0)) {
+            return; // No token set up, skip
+        }
+
+        TestnetERC20Token wrappedZKToken = TestnetERC20Token(wrappedZKTokenAddr);
+        uint256 tokenAmount = 1000 ether; // Plenty of tokens for testing
+
+        for (uint256 i = 0; i < chainIds.length; i++) {
+            address chainOperator = L2Bridgehub(L2_BRIDGEHUB_ADDR).getZKChain(chainIds[i]);
+            if (chainOperator != address(0)) {
+                // Mint tokens to the chain operator
+                wrappedZKToken.mint(chainOperator, tokenAmount);
+
+                // Approve GWAssetTracker to spend tokens on behalf of the chain operator
+                vm.prank(chainOperator);
+                wrappedZKToken.approve(GW_ASSET_TRACKER_ADDR, type(uint256).max);
+
+                // Agree to pay settlement fees for this chain
+                vm.prank(chainOperator);
+                GWAssetTracker(GW_ASSET_TRACKER_ADDR).agreeToPaySettlementFees(chainIds[i]);
+            }
         }
     }
 }

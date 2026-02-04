@@ -17,7 +17,7 @@ abstract contract L2InteropLibraryBasicTestAbstract is L2InteropTestUtils {
         vm.deal(address(this), 1000 ether);
         vm.recordLogs();
 
-        InteropLibrary.sendToken(destinationChainId, l2TokenAddress, 100, address(this), UNBUNDLER_ADDRESS);
+        InteropLibrary.sendToken(destinationChainId, l2TokenAddress, 100, address(this), UNBUNDLER_ADDRESS, false);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         // Verify bundle was emitted

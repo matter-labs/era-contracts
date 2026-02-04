@@ -8,7 +8,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRA
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AssetRouterBase} from "../asset-router/AssetRouterBase.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
-import {ChainIdNotRegistered, InvalidInteropCalldata, InvalidMessage, ReconstructionMismatch, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {ChainIdNotRegistered, InvalidInteropCalldata, InvalidMessage, ReconstructionMismatch, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH} from "../../core/message-root/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
@@ -16,7 +16,7 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {InvalidAssetMigrationNumber, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed, InvalidInteropBalanceChange} from "./AssetTrackerErrors.sol";
+import {InvalidAssetMigrationNumber, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed, InvalidInteropBalanceChange, InvalidFeeRecipient, SettlementFeePayerNotAgreed} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
@@ -26,10 +26,19 @@ import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {LegacySharedBridgeAddresses, SharedBridgeOnChainId} from "./LegacySharedBridgeAddresses.sol";
 import {InteropDataEncoding} from "../../interop/InteropDataEncoding.sol";
 import {IInteropHandler} from "../../interop/IInteropHandler.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
+/// @dev IMPORTANT - Settlement Fee Payer Setup:
+///      To pay settlement fees for a chain, you must:
+///      1. Call `agreeToPaySettlementFees(chainId)` to opt-in for that specific chain
+///      2. Approve this contract to spend your wrapped ZK tokens
+///      The agreement mechanism prevents front-running attacks where malicious operators
+///      could make you pay for other chains' settlements.
 contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     using FullMerkleMemory for FullMerkleMemory.FullTree;
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
+    using SafeERC20 for IERC20;
 
     uint256 public L1_CHAIN_ID;
 
@@ -66,6 +75,21 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     mapping(uint256 receivingChainId => mapping(bytes32 bundleHash => InteropBalanceChange interopBalanceChange))
         internal interopBalanceChange;
 
+    /// @notice Gateway settlement fee per interop operation in ZK tokens.
+    /// @dev Set by gateway governance, paid by chain operators during settlement.
+    /// @dev On Gateway, ZK is the base token, fees are paid using Wrapped ZK token.
+    uint256 public gatewaySettlementFee;
+
+    /// @notice Wrapped ZK token contract used for settlement fee collection.
+    /// @dev Since ZK is the base token on Gateway, we use the wrapped version for transfers.
+    /// @dev This is fetched from L2NativeTokenVault.WETH_TOKEN on initialization.
+    IERC20 public wrappedZKToken;
+
+    /// @notice Tracks whether a fee payer has agreed to pay settlement fees for a specific chain.
+    /// @dev This prevents front-running attacks where a malicious operator could make another chain's
+    /// fee payer pay for their settlement by specifying their address as settlementFeePayer.
+    mapping(address payer => mapping(uint256 chainId => bool)) public settlementFeePayerAgreement;
+
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert Unauthorized(msg.sender);
@@ -96,6 +120,50 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     function setAddresses(uint256 _l1ChainId) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
+
+        // Fetch wrapped ZK token from Native Token Vault
+        // On Gateway, ZK is the base token, so WETH_TOKEN is actually the wrapped ZK token
+        address wrappedZK = L2_NATIVE_TOKEN_VAULT.WETH_TOKEN();
+        require(wrappedZK != address(0), ZeroAddress());
+        wrappedZKToken = IERC20(wrappedZK);
+    }
+
+    /// @notice Sets the gateway settlement fee per interop call.
+    /// @dev Only callable by owner.
+    /// @param _fee New fee amount in ZK tokens
+    function setGatewaySettlementFee(uint256 _fee) external onlyOwner {
+        uint256 oldFee = gatewaySettlementFee;
+        gatewaySettlementFee = _fee;
+        emit GatewaySettlementFeeUpdated(oldFee, _fee);
+    }
+
+    /// @notice Withdraws collected gateway fees to specified recipient
+    /// @dev Only callable by owner. Withdraws Wrapped ZK tokens collected as settlement fees.
+    /// @param _recipient Address to receive the collected fees
+    // vg todo. Only withdrawable by governance now. TBD by BD who has control over this.
+    function withdrawGatewayFees(address _recipient) external onlyOwner {
+        if (_recipient == address(0)) {
+            revert InvalidFeeRecipient();
+        }
+        uint256 balance = wrappedZKToken.balanceOf(address(this));
+        if (balance > 0) {
+            wrappedZKToken.safeTransfer(_recipient, balance);
+        }
+    }
+
+    /// @notice Opt-in to pay settlement fees for a specific chain.
+    /// @dev The fee payer must also approve wrapped ZK tokens for this contract.
+    /// @param _chainId Chain ID to agree to pay fees for.
+    function agreeToPaySettlementFees(uint256 _chainId) external {
+        settlementFeePayerAgreement[msg.sender][_chainId] = true;
+        emit SettlementFeePayerAgreementUpdated(msg.sender, _chainId, true);
+    }
+
+    /// @notice Revoke agreement to pay settlement fees for a specific chain.
+    /// @param _chainId Chain ID to revoke agreement for.
+    function revokeSettlementFeePayerAgreement(uint256 _chainId) external {
+        settlementFeePayerAgreement[msg.sender][_chainId] = false;
+        emit SettlementFeePayerAgreementUpdated(msg.sender, _chainId, false);
     }
 
     /// @notice Sets legacy shared bridge addresses for chains that used the old bridging system.
@@ -221,6 +289,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         uint256 msgCount = 0;
         uint256 logsLength = _processLogsInputs.logs.length;
         bytes32 baseTokenAssetId = _bridgehub().baseTokenAssetId(_processLogsInputs.chainId);
+
+        // Count chargeable interop messages during processing
+        uint256 chargeableInteropCount = 0;
         for (uint256 logCount = 0; logCount < logsLength; ++logCount) {
             L2Log memory log = _processLogsInputs.logs[logCount];
             {
@@ -241,7 +312,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 require(log.isService, InvalidServiceLog());
 
                 if (log.key == bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
-                    _handleInteropCenterMessage(_processLogsInputs.chainId, message);
+                    // Handle interop message and get count of chargeable calls for settlement fees
+                    chargeableInteropCount += _handleInteropCenterMessage(_processLogsInputs.chainId, message);
                 } else if (log.key == bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR)))) {
                     _handleInteropHandlerReceiveMessage(_processLogsInputs.chainId, message, baseTokenAssetId);
                 } else if (log.key == bytes32(uint256(uint160(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)))) {
@@ -287,6 +359,50 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             _processLogsInputs.batchNumber,
             chainBatchRootHash
         );
+
+        _collectInteropSettlementFee(
+            _processLogsInputs.chainId,
+            _processLogsInputs.settlementFeePayer,
+            chargeableInteropCount
+        );
+    }
+
+    /// @notice Collects interop settlement fees from the designated fee payer using Wrapped ZK token.
+    /// @dev Fee Collection Security Model:
+    /// - Fee payers must explicitly opt-in via `agreeToPaySettlementFees(chainId)` before they can be charged
+    /// - This prevents front-running attacks where a malicious operator could specify another chain's
+    ///   fee payer address to make them pay for unrelated settlements
+    /// - Fee payers must also approve wrapped ZK tokens for this contract
+    ///
+    /// Failure Behavior:
+    /// - If fee collection fails (payer not agreed, insufficient balance, or no approval), batch execution reverts
+    /// - This ensures fees are always paid atomically with settlement
+    /// - Operators must ensure their fee payer has agreed and maintains sufficient balance/approval
+    /// @param _chainId The chain ID for which fees are being collected
+    /// @param _settlementFeePayer The address paying the settlement fees
+    /// @param _chargeableInteropCount The number of chargeable interop messages
+    function _collectInteropSettlementFee(
+        uint256 _chainId,
+        address _settlementFeePayer,
+        uint256 _chargeableInteropCount
+    ) internal {
+        uint256 cachedSettlementFee = gatewaySettlementFee;
+        if (_chargeableInteropCount == 0 || cachedSettlementFee == 0) {
+            return;
+        }
+
+        if (!settlementFeePayerAgreement[_settlementFeePayer][_chainId]) {
+            revert SettlementFeePayerNotAgreed(_settlementFeePayer, _chainId);
+        }
+
+        uint256 totalFee = cachedSettlementFee * _chargeableInteropCount;
+
+        // Transfer Wrapped ZK tokens from the settlement fee payer to this contract.
+        // The fee payer must have pre-approved this contract to spend wrapped ZK tokens.
+        // slither-disable-next-line arbitrary-send-erc20
+        wrappedZKToken.safeTransferFrom(_settlementFeePayer, address(this), totalFee);
+
+        emit GatewaySettlementFeesCollected(_chainId, _settlementFeePayer, totalFee, _chargeableInteropCount);
     }
 
     function _getEmptyMessageRoot(uint256 _chainId) internal returns (bytes32) {
@@ -338,10 +454,17 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
     }
 
-    function _handleInteropCenterMessage(uint256 _chainId, bytes calldata _message) internal {
+    /// @notice Handles an interop center message and returns the number of chargeable calls for settlement fees.
+    /// @param _chainId The source chain ID.
+    /// @param _message The message data from InteropCenter.
+    /// @return chargeableCallCount Number of calls that should incur gateway settlement fees.
+    function _handleInteropCenterMessage(
+        uint256 _chainId,
+        bytes calldata _message
+    ) internal returns (uint256 chargeableCallCount) {
         if (_message[0] != BUNDLE_IDENTIFIER) {
             // This should not be possible in V31. In V31 this will be a trigger.
-            return;
+            return 0;
         }
 
         InteropBundle memory interopBundle = abi.decode(_message[1:], (InteropBundle));
@@ -374,6 +497,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes32 destinationChainBaseTokenAssetId = _bridgehub().baseTokenAssetId(interopBundle.destinationChainId);
         _decreaseChainBalance(_chainId, destinationChainBaseTokenAssetId, totalBaseTokenAmount);
         interopBalanceChange[interopBundle.destinationChainId][bundleHash].baseTokenAmount = totalBaseTokenAmount;
+
+        // Return chargeable call count for settlement fee calculation.
+        return interopBundle.calls.length;
     }
 
     function _processInteropCall(

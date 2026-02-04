@@ -782,7 +782,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             InteropRoot[][] memory dependencyRoots,
             L2Log[][] memory logs,
             bytes[][] memory messages,
-            bytes32[] memory messageRoots
+            bytes32[] memory messageRoots,
+            address settlementFeePayer
         ) = BatchDecoder.decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
         uint256 nBatches = batchesData.length;
         if (batchesData.length != priorityOpsData.length) {
@@ -811,7 +812,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     chainId: s.chainId,
                     batchNumber: batchesData[i].batchNumber,
                     chainBatchRoot: batchesData[i].l2LogsTreeRoot,
-                    messageRoot: messageRoots[i]
+                    messageRoot: messageRoots[i],
+                    settlementFeePayer: settlementFeePayer
                 });
                 GW_ASSET_TRACKER.processLogsAndMessages(processLogsInput);
             }

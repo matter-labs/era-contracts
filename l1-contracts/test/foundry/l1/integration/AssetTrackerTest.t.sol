@@ -38,6 +38,7 @@ import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {InvalidChainId} from "contracts/common/L1ContractErrors.sol";
 import {GWAssetTrackerTestHelper} from "../unit/concrete/Bridge/AssetTracker/GWAssetTracker.t.sol";
 
@@ -104,6 +105,14 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         address l2AssetTrackerAddress = address(new L2AssetTracker());
         vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
         l2AssetTracker = IL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        // Mock Native Token Vault's WETH_TOKEN function
+        address mockWrappedZKToken = makeAddr("mockWrappedZKToken");
+        vm.mockCall(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            abi.encodeWithSelector(IL2NativeTokenVault.WETH_TOKEN.selector),
+            abi.encode(mockWrappedZKToken)
+        );
+
         address gwAssetTrackerAddress = address(new GWAssetTrackerTestHelper());
         vm.etch(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAddress.code);
         gwAssetTracker = GWAssetTrackerTestHelper(GW_ASSET_TRACKER_ADDR);

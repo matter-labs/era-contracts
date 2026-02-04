@@ -38,6 +38,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     }
 
     /// @notice Initializes the reentrancy guard.
+    /// @param _l1ChainId The chain ID of L1
     function initL2(uint256 _l1ChainId) public reentrancyGuardInitializer onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
     }

@@ -236,6 +236,11 @@ library BatchDecoder {
     /// @param _executeData The calldata byte array containing the execution data to decode.
     /// @return executeData An array containing the stored batch information for execution.
     /// @return priorityOpsData Merkle proofs of the priority operations for each batch.
+    /// @return dependencyRoots Interop dependency roots for each batch.
+    /// @return logs L2 logs for each batch.
+    /// @return messages L2 messages for each batch.
+    /// @return messageRoots Message roots for each batch.
+    /// @return settlementFeePayer Address that pays gateway settlement fees.
     function _decodeExecuteData(
         bytes calldata _executeData
     )
@@ -247,7 +252,8 @@ library BatchDecoder {
             InteropRoot[][] memory dependencyRoots,
             L2Log[][] memory logs,
             bytes[][] memory messages,
-            bytes32[] memory messageRoots
+            bytes32[] memory messageRoots,
+            address settlementFeePayer
         )
     {
         if (_executeData.length == 0) {
@@ -256,10 +262,19 @@ library BatchDecoder {
 
         uint8 encodingVersion = uint8(_executeData[0]);
         if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
-            (executeData, priorityOpsData, dependencyRoots, logs, messages, messageRoots) = abi.decode(
-                _executeData[1:],
-                (IExecutor.StoredBatchInfo[], PriorityOpsBatchInfo[], InteropRoot[][], L2Log[][], bytes[][], bytes32[])
-            );
+            (executeData, priorityOpsData, dependencyRoots, logs, messages, messageRoots, settlementFeePayer) = abi
+                .decode(
+                    _executeData[1:],
+                    (
+                        IExecutor.StoredBatchInfo[],
+                        PriorityOpsBatchInfo[],
+                        InteropRoot[][],
+                        L2Log[][],
+                        bytes[][],
+                        bytes32[],
+                        address
+                    )
+                );
         } else {
             revert UnsupportedExecuteBatchEncoding(encodingVersion);
         }
@@ -273,6 +288,11 @@ library BatchDecoder {
     /// @param _processBatchTo The expected batch number of the last batch in the array.
     /// @return executeData An array containing the stored batch information for execution.
     /// @return priorityOpsData Merkle proofs of the priority operations for each batch.
+    /// @return dependencyRoots Interop dependency roots for each batch.
+    /// @return logs L2 logs for each batch.
+    /// @return messages L2 messages for each batch.
+    /// @return messageRoots Message roots for each batch.
+    /// @return settlementFeePayer Address that pays gateway settlement fees.
     function decodeAndCheckExecuteData(
         bytes calldata _executeData,
         uint256 _processBatchFrom,
@@ -286,12 +306,19 @@ library BatchDecoder {
             InteropRoot[][] memory dependencyRoots,
             L2Log[][] memory logs,
             bytes[][] memory messages,
-            bytes32[] memory messageRoots
+            bytes32[] memory messageRoots,
+            address settlementFeePayer
         )
     {
-        (executeData, priorityOpsData, dependencyRoots, logs, messages, messageRoots) = _decodeExecuteData(
-            _executeData
-        );
+        (
+            executeData,
+            priorityOpsData,
+            dependencyRoots,
+            logs,
+            messages,
+            messageRoots,
+            settlementFeePayer
+        ) = _decodeExecuteData(_executeData);
 
         if (executeData.length == 0) {
             revert EmptyData();

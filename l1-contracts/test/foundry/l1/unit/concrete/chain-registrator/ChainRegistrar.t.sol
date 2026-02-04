@@ -8,6 +8,7 @@ import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interf
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -49,7 +50,11 @@ contract ChainRegistrarTest is Test {
         bridgeHub = new DummyBridgehub();
         interopCenter = new InteropCenter();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        interopCenter.initL2(block.chainid, makeAddr("admin"));
+        interopCenter.initL2(
+            block.chainid,
+            makeAddr("admin"),
+            DataEncoding.encodeNTVAssetId(324, address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E))
+        );
         messageRoot = new L1MessageRoot(address(bridgeHub), 1);
         ctm = new DummyChainTypeManagerWBH(address(bridgeHub));
         admin = makeAddr("admin");

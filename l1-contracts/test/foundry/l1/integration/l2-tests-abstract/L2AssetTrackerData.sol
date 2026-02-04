@@ -94,7 +94,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 5,
                 chainBatchRoot: computeChainBatchRoot(logs_batch5, messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -113,7 +114,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 2,
                 chainBatchRoot: computeChainBatchRoot(logs_batch2, messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -133,7 +135,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 7,
                 chainBatchRoot: computeChainBatchRoot(logs_batch4, messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -152,7 +155,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 6,
                 chainBatchRoot: computeChainBatchRoot(logs_batch6, messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -171,7 +175,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 14,
                 chainBatchRoot: computeChainBatchRoot(logs_batch14, messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -194,7 +199,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 25,
                 chainBatchRoot: computeChainBatchRoot(logs_batch25, messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -271,7 +277,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 1,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -299,7 +306,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 3,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -319,7 +327,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 4,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -339,7 +348,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 21,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -371,7 +381,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 12,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -391,7 +402,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 8,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -411,7 +423,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 13,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
 
@@ -436,7 +449,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 19,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -461,7 +475,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 23,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -486,7 +501,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 11,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -506,7 +522,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 16,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -526,7 +543,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 28,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -546,7 +564,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 29,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -571,7 +590,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 24,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -591,7 +611,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 39,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -611,7 +632,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 36,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -636,7 +658,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 37,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -656,7 +679,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 38,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -676,7 +700,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 40,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -701,7 +726,8 @@ library L2AssetTrackerData {
                 chainId: 260,
                 batchNumber: 35,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260
+                messageRoot: messageRoot_260,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -726,7 +752,8 @@ library L2AssetTrackerData {
                 chainId: 271,
                 batchNumber: 7,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271
+                messageRoot: messageRoot_271,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -749,7 +776,8 @@ library L2AssetTrackerData {
                 chainId: 271,
                 batchNumber: 16,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271
+                messageRoot: messageRoot_271,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -774,7 +802,8 @@ library L2AssetTrackerData {
                 chainId: 271,
                 batchNumber: 8,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271
+                messageRoot: messageRoot_271,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -797,7 +826,8 @@ library L2AssetTrackerData {
                 chainId: 271,
                 batchNumber: 17,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271
+                messageRoot: messageRoot_271,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -817,7 +847,8 @@ library L2AssetTrackerData {
                 chainId: 271,
                 batchNumber: 10,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271
+                messageRoot: messageRoot_271,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -853,7 +884,8 @@ library L2AssetTrackerData {
                 chainId: 271,
                 batchNumber: 9,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271
+                messageRoot: messageRoot_271,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -873,7 +905,8 @@ library L2AssetTrackerData {
                 chainId: 271,
                 batchNumber: 5,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271
+                messageRoot: messageRoot_271,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -898,7 +931,8 @@ library L2AssetTrackerData {
                 chainId: 271,
                 batchNumber: 15,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271
+                messageRoot: messageRoot_271,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -923,7 +957,8 @@ library L2AssetTrackerData {
                 chainId: 271,
                 batchNumber: 6,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271
+                messageRoot: messageRoot_271,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -943,7 +978,8 @@ library L2AssetTrackerData {
                 chainId: 271,
                 batchNumber: 14,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271
+                messageRoot: messageRoot_271,
+                settlementFeePayer: address(0)
             });
         }
         {
@@ -1019,7 +1055,8 @@ library L2AssetTrackerData {
                 chainId: 271,
                 batchNumber: 100,
                 chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271
+                messageRoot: messageRoot_271,
+                settlementFeePayer: address(0)
             });
         }
         return logsInput;

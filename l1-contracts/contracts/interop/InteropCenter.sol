@@ -4,20 +4,22 @@ pragma solidity ^0.8.24;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IInteropCenter} from "./IInteropCenter.sol";
 
-import {GW_ASSET_TRACKER, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_COMPLEX_UPGRADER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
-import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BUNDLE_IDENTIFIER, BalanceChange, BundleAttributes, CallAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal} from "../common/Messaging.sol";
 import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
-import {AttributeAlreadySet, AttributeViolatesRestriction, DestinationChainNotRegistered, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty} from "./InteropErrors.sol";
+import {AttributeAlreadySet, AttributeViolatesRestriction, DestinationChainNotRegistered, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty, UseFixedFeeRequired, FeeWithdrawalFailed, ZKTokenNotAvailable} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
@@ -39,6 +41,8 @@ contract InteropCenter is
     Ownable2StepUpgradeable,
     PausableUpgradeable
 {
+    using SafeERC20 for IERC20;
+
     /// @notice The chain ID of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
     uint256 public L1_CHAIN_ID;
@@ -50,6 +54,31 @@ contract InteropCenter is
     ///         It's being used to derive interopBundleSalt in InteropBundle struct, whose role
     ///         is to ensure that each bundle has a unique hash.
     mapping(address sender => uint256 numberOfBundlesSent) public interopBundleNonce;
+
+    /// @notice Operator-set fee in base token per interop call (when useFixedFee=false).
+    uint256 public interopProtocolFee;
+
+    /// @notice Fixed fee amount in ZK tokens per interop call (when useFixedFee=true).
+    /// @dev This is intentionally set to be the more expensive option compared to dynamic base token fees.
+    ///      The fixed ZK fee provides Stage 1 protection - it allows users to pay fees independent of chain
+    ///      operator settings, ensuring interop works even if the operator sets arbitrary dynamic fees.
+    ///      Note, that it's not changeable throughout the code. It's not constant to make it possible to change
+    ///      the exact value with protocol upgrade without redeploying contract.
+    uint256 public ZK_INTEROP_FEE;
+
+    /// @notice ZK token asset ID for resolving token address via native token vault.
+    bytes32 public ZK_TOKEN_ASSET_ID;
+
+    /// @notice Cached ZK token contract address (resolved from asset ID).
+    IERC20 private zkToken;
+
+    /// @notice Accumulated protocol fees (base token) per coinbase.
+    /// @dev Coinbase addresses can claim their accumulated fees via claimProtocolFees().
+    mapping(address coinbase => uint256 amount) public accumulatedProtocolFees;
+
+    /// @notice Accumulated ZK fees per coinbase.
+    /// @dev Coinbase addresses can claim their accumulated fees via claimZKFees().
+    mapping(address coinbase => uint256 amount) public accumulatedZKFees;
 
     modifier onlyL1() {
         require(L1_CHAIN_ID == block.chainid, NotL1(L1_CHAIN_ID, block.chainid));
@@ -74,11 +103,53 @@ contract InteropCenter is
         _;
     }
 
+    /// @dev Only allows calls from the service transaction sender (L1 Admin.sol via requestL2ServiceTransaction).
+    modifier onlyServiceTransactionSender() {
+        require(msg.sender == SERVICE_TRANSACTION_SENDER, Unauthorized(msg.sender));
+        _;
+    }
+
+    /// @notice Returns ZK token address if available, zero address otherwise.
+    /// @dev View function to check ZK token availability without modifying state.
+    /// @return The ZK token address or zero address if not available.
+    function getZKTokenAddress() public view returns (address) {
+        // Check cached token first
+        if (address(zkToken) != address(0)) {
+            return address(zkToken);
+        }
+
+        // Try to resolve from asset ID
+        return L2_NATIVE_TOKEN_VAULT.tokenAddress(ZK_TOKEN_ASSET_ID);
+    }
+
+    /// @notice Resolves ZK token address from asset ID with caching.
+    /// @dev Uses native token vault to resolve asset ID to token address.
+    /// @dev Reverts with ZKTokenNotAvailable() if ZK token hasn't been bridged to this chain yet.
+    ///      This means useFixedFee=true is only available after ZK token is bridged to the source chain.
+    /// @return The ZK token contract interface.
+    function _getZKToken() internal returns (IERC20) {
+        address tokenAddress = getZKTokenAddress();
+        require(tokenAddress != address(0), ZKTokenNotAvailable());
+
+        // Cache the resolved token if not already cached
+        if (address(zkToken) == address(0)) {
+            zkToken = IERC20(tokenAddress);
+        }
+        return IERC20(tokenAddress);
+    }
+
     /// @notice To avoid parity hack
-    function initL2(uint256 _l1ChainId, address _owner) public reentrancyGuardInitializer onlyUpgrader {
+    function initL2(
+        uint256 _l1ChainId,
+        address _owner,
+        bytes32 _zkTokenAssetId
+    ) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
         L1_CHAIN_ID = _l1ChainId;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+        ZK_TOKEN_ASSET_ID = _zkTokenAssetId;
+        /// TODO: Decide on the exact value for fixed fee.
+        ZK_INTEROP_FEE = 1e18;
 
         _transferOwnership(_owner);
     }
@@ -96,7 +167,7 @@ contract InteropCenter is
         bytes calldata recipient,
         bytes calldata payload,
         bytes[] calldata attributes
-    ) external payable whenNotPaused returns (bytes32 sendId) {
+    ) public payable whenNotPaused returns (bytes32 sendId) {
         (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(recipient);
 
         _ensureL2ToL2(recipientChainId);
@@ -252,28 +323,44 @@ contract InteropCenter is
         );
     }
 
-    /// @notice Ensures the received base token value matches expected for the destination chain.
+    /// @notice Ensures the received base token value matches expected for the destination chain
+    /// @dev Handles fee collection based on useFixedFee flag. When useFixedFee is true, no base token fee is charged.
+    /// @dev When useFixedFee is false, interopProtocolFee is charged in base tokens.
     /// @param _destinationChainId Destination chain ID.
     /// @param _totalBurnedCallsValue Sum of requested interop call values.
     /// @param _totalIndirectCallsValue Sum of requested indirect call values.
+    /// @param _useFixedFee Whether fixed ZK fees were used (true) or base token fees required (false).
+    /// @param _callCount Number of calls in the bundle for per-call fee calculation.
     function _ensureCorrectTotalValue(
         uint256 _destinationChainId,
         uint256 _totalBurnedCallsValue,
-        uint256 _totalIndirectCallsValue
+        uint256 _totalIndirectCallsValue,
+        bool _useFixedFee,
+        uint256 _callCount
     ) internal {
         bytes32 destinationChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
         require(destinationChainBaseTokenAssetId != bytes32(0), DestinationChainNotRegistered(_destinationChainId));
         // We burn the value that is passed along the bundle here, on source chain.
         bytes32 thisChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(block.chainid);
+
+        // Calculate protocol fee - only charge base token fee if not using fixed ZK fees.
+        // Fee is charged per-call.
+        uint256 protocolFee = _useFixedFee ? 0 : interopProtocolFee * _callCount;
+
         if (destinationChainBaseTokenAssetId == thisChainBaseTokenAssetId) {
-            require(
-                msg.value == _totalBurnedCallsValue + _totalIndirectCallsValue,
-                MsgValueMismatch(_totalBurnedCallsValue + _totalIndirectCallsValue, msg.value)
-            );
-            // slither-disable-next-line arbitrary-send-eth
-            L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalBurnedCallsValue}();
+            uint256 expectedValue = _totalBurnedCallsValue + _totalIndirectCallsValue + protocolFee;
+            require(msg.value == expectedValue, MsgValueMismatch(expectedValue, msg.value));
+
+            // Burn user value for interop calls.
+            if (_totalBurnedCallsValue > 0) {
+                // slither-disable-next-line arbitrary-send-eth
+                L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalBurnedCallsValue}();
+            }
         } else {
-            require(msg.value == _totalIndirectCallsValue, MsgValueMismatch(_totalIndirectCallsValue, msg.value));
+            uint256 expectedValue = _totalIndirectCallsValue + protocolFee;
+            require(msg.value == expectedValue, MsgValueMismatch(expectedValue, msg.value));
+
+            // Handle cross-chain token deposit for different base tokens
             if (_totalBurnedCallsValue > 0) {
                 IAssetRouterShared(L2_ASSET_ROUTER_ADDR).bridgehubDepositBaseToken(
                     _destinationChainId,
@@ -281,6 +368,18 @@ contract InteropCenter is
                     msg.sender,
                     _totalBurnedCallsValue
                 );
+            }
+        }
+        // Send protocol fee to block.coinbase. If transfer fails (e.g., coinbase is a reverting contract),
+        // accumulate the fee for later withdrawal via claimProtocolFees().
+        // This is handled to not allow malicious operator to fail sending bundles by providing faulty coinbase.
+        if (protocolFee > 0) {
+            (bool success, ) = block.coinbase.call{value: protocolFee}("");
+            if (success) {
+                emit ProtocolFeesCollected(block.coinbase, protocolFee);
+            } else {
+                accumulatedProtocolFees[block.coinbase] += protocolFee;
+                emit ProtocolFeesAccumulated(block.coinbase, protocolFee);
             }
         }
     }
@@ -328,8 +427,37 @@ contract InteropCenter is
             }
         }
 
+        // If using fixed fees, collect ZK tokens per-call and send to block.coinbase.
+        // If transfer to coinbase fails, accumulate for later withdrawal via claimZKFees().
+        // This is handled to not allow malicious operator to fail sending bundles by providing malicious coinbase.
+        if (_bundleAttributes.useFixedFee) {
+            uint256 totalZKFee = ZK_INTEROP_FEE * callStartersLength;
+            IERC20 token = _getZKToken();
+            // First transfer from user to this contract
+            token.safeTransferFrom(msg.sender, address(this), totalZKFee);
+            // Then try to forward to coinbase
+            // Using low-level call to handle potential reverts from coinbase
+            (bool success, ) = address(token).call(
+                abi.encodeWithSelector(IERC20.transfer.selector, block.coinbase, totalZKFee)
+            );
+            if (success) {
+                emit FixedZKFeesCollected(msg.sender, block.coinbase, totalZKFee);
+            } else {
+                // solhint-disable-next-line reentrancy
+                accumulatedZKFees[block.coinbase] += totalZKFee;
+                emit FixedZKFeesAccumulated(msg.sender, block.coinbase, totalZKFee);
+            }
+        }
+
         // Ensure that tokens required for bundle execution were received.
-        _ensureCorrectTotalValue(bundle.destinationChainId, totalBurnedCallsValue, totalIndirectCallsValue);
+        // solhint-disable-next-line
+        _ensureCorrectTotalValue(
+            bundle.destinationChainId,
+            totalBurnedCallsValue,
+            totalIndirectCallsValue,
+            _bundleAttributes.useFixedFee,
+            callStartersLength
+        );
 
         bytes32 msgHash;
         /// To avoid stack too deep error
@@ -452,7 +580,7 @@ contract InteropCenter is
         // Default value is direct call.
         callAttributes.indirectCall = false;
 
-        bytes4[4] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
+        bytes4[5] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
         // We can only pass each attribute once.
         bool[] memory attributeUsed = new bool[](ATTRIBUTE_SELECTORS.length);
 
@@ -498,17 +626,41 @@ contract InteropCenter is
                 );
                 attributeUsed[3] = true;
                 bundleAttributes.unbundlerAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
+            } else if (selector == IERC7786Attributes.useFixedFee.selector) {
+                require(!attributeUsed[4], AttributeAlreadySet(selector));
+                require(
+                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
+                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
+                    AttributeViolatesRestriction(selector, uint256(_restriction))
+                );
+                attributeUsed[4] = true;
+
+                // Decode the boolean parameter using AttributesDecoder
+                bool useFixed = AttributesDecoder.decodeBool(_attributes[i]);
+                bundleAttributes.useFixedFee = useFixed;
             } else {
                 revert IERC7786GatewaySource.UnsupportedAttribute(selector);
             }
+        }
+
+        // Enforce useFixedFee attribute as required for all interop calls. This ensures that interop fee is being paid in one way or another.
+        // Only enforce this requirement when parsing bundle attributes.
+        if (
+            !attributeUsed[4] &&
+            (_restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
+                _restriction == AttributeParsingRestrictions.CallAndBundleAttributes)
+        ) {
+            revert UseFixedFeeRequired();
         }
     }
 
     /// @notice Checks if the attribute selector is supported by the InteropCenter.
     /// @param _attributeSelector The attribute selector to check.
     /// @return True if the attribute selector is supported, false otherwise.
-    function supportsAttribute(bytes4 _attributeSelector) external pure returns (bool) {
-        bytes4[4] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
+    function supportsAttribute(
+        bytes4 _attributeSelector
+    ) external pure override(IERC7786GatewaySource, IInteropCenter) returns (bool) {
+        bytes4[5] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
         uint256 attributeSelectorsLength = ATTRIBUTE_SELECTORS.length;
         for (uint256 i = 0; i < attributeSelectorsLength; ++i) {
             if (_attributeSelector == ATTRIBUTE_SELECTORS[i]) {
@@ -520,12 +672,13 @@ contract InteropCenter is
 
     /// @notice Returns the attribute selectors supported by the InteropCenter.
     /// @return The attribute selectors supported by the InteropCenter.
-    function _getERC7786AttributeSelectors() internal pure returns (bytes4[4] memory) {
+    function _getERC7786AttributeSelectors() internal pure returns (bytes4[5] memory) {
         return [
             IERC7786Attributes.interopCallValue.selector,
             IERC7786Attributes.indirectCall.selector,
             IERC7786Attributes.executionAddress.selector,
-            IERC7786Attributes.unbundlerAddress.selector
+            IERC7786Attributes.unbundlerAddress.selector,
+            IERC7786Attributes.useFixedFee.selector
         ];
     }
 
@@ -541,5 +694,52 @@ contract InteropCenter is
     /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Fee Management
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Sets the base token fee per interop call (used when useFixedFee=false).
+    /// @dev Can be set to 0 to disable base token fees for users.
+    /// @param _fee New fee amount in base token wei.
+    /// @dev Only callable via L1 Admin.sol service transaction (chain admin calls Admin.setInteropFee on L1).
+    function setInteropFee(uint256 _fee) external onlyServiceTransactionSender {
+        uint256 oldFee = interopProtocolFee;
+        interopProtocolFee = _fee;
+        emit InteropFeeUpdated(oldFee, _fee);
+    }
+
+    /// @notice Allows a coinbase to claim their accumulated protocol fees (base token).
+    /// @dev Transfers all accumulated base token fees to the specified receiver.
+    /// @param _receiver Address to receive the fees.
+    function claimProtocolFees(address _receiver) external nonReentrant {
+        uint256 amount = accumulatedProtocolFees[msg.sender];
+        if (amount == 0) {
+            return;
+        }
+
+        accumulatedProtocolFees[msg.sender] = 0;
+
+        // slither-disable-next-line arbitrary-send-eth
+        (bool success, ) = _receiver.call{value: amount}("");
+        require(success, FeeWithdrawalFailed());
+
+        emit ProtocolFeesClaimed(msg.sender, _receiver, amount);
+    }
+
+    /// @notice Allows a coinbase to claim their accumulated ZK fees.
+    /// @dev Transfers all accumulated ZK token fees to the specified receiver.
+    /// @param _receiver Address to receive the fees.
+    function claimZKFees(address _receiver) external nonReentrant {
+        uint256 amount = accumulatedZKFees[msg.sender];
+        if (amount == 0) {
+            return;
+        }
+
+        accumulatedZKFees[msg.sender] = 0;
+        _getZKToken().safeTransfer(_receiver, amount);
+
+        emit ZKFeesClaimed(msg.sender, _receiver, amount);
     }
 }

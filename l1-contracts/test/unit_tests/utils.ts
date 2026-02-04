@@ -524,7 +524,11 @@ export async function makeExecutedEqualCommitted(
 
   const dummyMerkleProofs = batchesToExecute.map(() => ({ leftPath: [], rightPath: [], itemHashes: [] }));
   await (
-    await proxyExecutor.executeBatchesSharedBridge(0, ...encodeExecuteBatchesData(batchesToExecute, dummyMerkleProofs))
+    await proxyExecutor.executeBatchesSharedBridge(
+      0,
+      ...encodeExecuteBatchesData(batchesToExecute, dummyMerkleProofs),
+      ethers.constants.AddressZero
+    )
   ).wait();
 }
 

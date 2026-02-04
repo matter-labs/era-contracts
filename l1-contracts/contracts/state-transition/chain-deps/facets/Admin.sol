@@ -18,7 +18,8 @@ import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAs
 import {AlreadyMigrated, PriorityQueueNotFullyProcessed, TotalPriorityTxsIsZero, ContractNotDeployed, DepositsAlreadyPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted, MigrationInProgress} from "../../L1StateTransitionErrors.sol";
 import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, NotAZKChain, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
 import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
 
@@ -78,6 +79,29 @@ contract AdminFacet is ZKChainBase, IAdmin {
     function _onlyL1() internal {
         if (block.chainid != L1_CHAIN_ID) {
             revert NotL1(block.chainid);
+        }
+    }
+
+    /// @dev Validates batch count consistency: executed <= verified <= committed
+    function _validateBatchConsistency(uint256 _executed, uint256 _verified, uint256 _committed) internal pure {
+        if (_executed > _verified) {
+            revert ExecutedIsNotConsistentWithVerified(_executed, _verified);
+        }
+        if (_verified > _committed) {
+            revert VerifiedIsNotConsistentWithCommitted(_verified, _committed);
+        }
+    }
+
+    /// @dev Performs diamond cut and emits ExecuteUpgrade event
+    function _executeDiamondCut(Diamond.DiamondCutData memory _diamondCut) internal {
+        Diamond.diamondCut(_diamondCut);
+        emit ExecuteUpgrade(_diamondCut);
+    }
+
+    /// @dev Requires the chain to be currently migrated (settlement layer != 0)
+    function _requireMigrated() internal view {
+        if (s.settlementLayer == address(0)) {
+            revert NotMigrated();
         }
     }
 
@@ -235,6 +259,15 @@ contract AdminFacet is ZKChainBase, IAdmin {
         emit EnableEvmEmulator();
     }
 
+    /// @inheritdoc IAdmin
+    function setInteropFee(uint256 _fee) external onlyAdmin onlyL1 returns (bytes32 canonicalTxHash) {
+        canonicalTxHash = IMailbox(address(this)).requestL2ServiceTransaction(
+            L2_INTEROP_CENTER_ADDR,
+            abi.encodeCall(IInteropCenter.setInteropFee, (_fee))
+        );
+        emit InteropFeeUpdateRequested(_fee, canonicalTxHash);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             UPGRADE EXECUTION
     //////////////////////////////////////////////////////////////*/
@@ -253,8 +286,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if (s.protocolVersion != _oldProtocolVersion) {
             revert ProtocolIdMismatch(s.protocolVersion, _oldProtocolVersion);
         }
-        Diamond.diamondCut(_diamondCut);
-        emit ExecuteUpgrade(_diamondCut);
+        _executeDiamondCut(_diamondCut);
         if (s.protocolVersion <= _oldProtocolVersion) {
             revert ProtocolIdNotGreater();
         }
@@ -262,8 +294,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external onlyChainTypeManager {
-        Diamond.diamondCut(_diamondCut);
-        emit ExecuteUpgrade(_diamondCut);
+        _executeDiamondCut(_diamondCut);
     }
 
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
@@ -283,8 +314,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
             )
         });
 
-        Diamond.diamondCut(cutData);
-        emit ExecuteUpgrade(cutData);
+        _executeDiamondCut(cutData);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -442,12 +472,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         s.precommitmentForTheLatestBatch = _commitment.precommitmentForTheLatestBatch;
 
         // Some consistency checks just in case.
-        if (batchesExecuted > batchesVerified) {
-            revert ExecutedIsNotConsistentWithVerified(batchesExecuted, batchesVerified);
-        }
-        if (batchesVerified > batchesCommitted) {
-            revert VerifiedIsNotConsistentWithCommitted(batchesVerified, batchesCommitted);
-        }
+        _validateBatchConsistency(batchesExecuted, batchesVerified, batchesCommitted);
 
         // In the worst case, we may need to revert all the committed batches that were not executed.
         // This means that the stored batch hashes should be stored for [batchesExecuted; batchesCommitted] batches, i.e.
@@ -475,14 +500,10 @@ contract AdminFacet is ZKChainBase, IAdmin {
             if (!_contractAlreadyDeployed) {
                 revert ContractNotDeployed();
             }
-            if (s.settlementLayer == address(0)) {
-                revert NotMigrated();
-            }
+            _requireMigrated();
             s.priorityTree.l1Reinit(_commitment.priorityTree);
         } else if (_contractAlreadyDeployed) {
-            if (s.settlementLayer == address(0)) {
-                revert NotMigrated();
-            }
+            _requireMigrated();
             s.priorityTree.checkGWReinit(_commitment.priorityTree);
             s.priorityTree.initFromCommitment(_commitment.priorityTree);
         } else {
@@ -518,9 +539,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
         uint256 protocolVersion = abi.decode(_chainData, (uint256));
 
-        if (s.settlementLayer == address(0)) {
-            revert NotMigrated();
-        }
+        _requireMigrated();
         uint256 currentProtocolVersion = s.protocolVersion;
         if (currentProtocolVersion != protocolVersion) {
             revert OutdatedProtocolVersion(protocolVersion, currentProtocolVersion);
@@ -543,18 +562,11 @@ contract AdminFacet is ZKChainBase, IAdmin {
         commitment.precommitmentForTheLatestBatch = s.precommitmentForTheLatestBatch;
 
         // just in case
-        if (commitment.totalBatchesExecuted > commitment.totalBatchesVerified) {
-            revert ExecutedIsNotConsistentWithVerified(
-                commitment.totalBatchesExecuted,
-                commitment.totalBatchesVerified
-            );
-        }
-        if (commitment.totalBatchesVerified > commitment.totalBatchesCommitted) {
-            revert VerifiedIsNotConsistentWithCommitted(
-                commitment.totalBatchesVerified,
-                commitment.totalBatchesCommitted
-            );
-        }
+        _validateBatchConsistency(
+            commitment.totalBatchesExecuted,
+            commitment.totalBatchesVerified,
+            commitment.totalBatchesCommitted
+        );
 
         uint256 blocksToRemember = commitment.totalBatchesCommitted - commitment.totalBatchesExecuted + 1;
 

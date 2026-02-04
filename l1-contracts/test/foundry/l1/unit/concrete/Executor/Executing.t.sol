@@ -724,6 +724,7 @@ contract ExecutingTest is ExecutorTest {
             InteropRoot[][] memory dependencyRoots,
             ,
             ,
+            ,
 
         ) = BatchDecoder.decodeAndCheckExecuteData(data, from, from);
         return (storedBatchInfos, priorityOpsBatchInfos, dependencyRoots);

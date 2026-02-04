@@ -59,6 +59,8 @@ error CantExecuteUnprovenBatches();
 error CantRevertExecutedBatch();
 // 0x78d2ed02
 error ChainAlreadyLive();
+// 0xfcd46323
+error ChainAlreadyRegistered(uint256 chainId);
 // 0x24591d89
 error ChainIdAlreadyExists();
 // 0x717a1656

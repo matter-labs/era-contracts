@@ -126,7 +126,8 @@ contract L2GenesisUpgradeTestHelper {
                     l2SharedBridgeLegacyImpl: address(0),
                     l2BridgedStandardERC20Impl: address(0),
                     aliasedChainRegistrationSender: address(1),
-                    dangerousTestOnlyForcedBeacon: address(0)
+                    dangerousTestOnlyForcedBeacon: address(0),
+                    zkTokenAssetId: bytes32(0)
                 })
             );
     }

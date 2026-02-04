@@ -40,7 +40,27 @@ struct LogProcessingOutput {
 /// @dev Maximal value that SystemLogKey variable can have.
 uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max);
 
-/// @notice The struct passed to the assetTracker.
+/// @notice The struct passed to the assetTracker for processing L2 logs and collecting settlement fees.
+/// @param logs The L2 logs from the batch.
+/// @param messages The L2 messages corresponding to the logs. Note: there can be fewer messages than logs,
+///        as not all logs have corresponding messages.
+/// @param chainId The chain ID of the settling chain.
+/// @param batchNumber The batch number being processed.
+/// @param chainBatchRoot The batch root hash for verification.
+/// @param messageRoot The message root hash for verification.
+/// @param settlementFeePayer Address that pays gateway settlement fees for interop calls in this batch.
+///
+/// @dev Settlement Fee Payer Requirements:
+///      1. Must have called `agreeToPaySettlementFees(chainId)` on GWAssetTracker to opt-in for this specific chain
+///      2. Must have sufficient wrapped ZK token balance to cover: gatewaySettlementFee * chargeableInteropCount
+///      3. Must have approved GWAssetTracker to spend wrapped ZK tokens
+///      The opt-in mechanism prevents front-running attacks where a malicious operator could
+///      make another address pay for their chain's settlements by specifying it as settlementFeePayer.
+///
+/// @dev Failure Behavior:
+///      - If fee collection fails (payer not agreed, insufficient balance, or no approval), batch execution reverts
+///      - This ensures fees are always paid atomically with settlement
+///      - Operators must ensure their fee payer has agreed and maintains sufficient balance/approval
 struct ProcessLogsInput {
     L2Log[] logs;
     bytes[] messages;
@@ -48,6 +68,7 @@ struct ProcessLogsInput {
     uint256 batchNumber;
     bytes32 chainBatchRoot;
     bytes32 messageRoot;
+    address settlementFeePayer;
 }
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch)
@@ -224,7 +245,7 @@ interface IExecutor is IZKChainBase {
     /// `ValidatorTimelock` and `Executor` for easier and cheaper implementation of the timelock.
     /// @param _processFrom The batch number from which the execution starts.
     /// @param _processTo The batch number at which the execution ends.
-    /// @param _executeData The encoded data of the new batches to be executed.
+    /// @param _executeData The encoded data of the new batches to be executed. Contains settlement fee payer address.
     function executeBatchesSharedBridge(
         address _chainAddress,
         uint256 _processFrom,

@@ -337,7 +337,8 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             calls: calls,
             bundleAttributes: BundleAttributes({
                 executionAddress: InteroperableAddress.formatEvmV1(EXECUTION_ADDRESS),
-                unbundlerAddress: InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS)
+                unbundlerAddress: InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS),
+                useFixedFee: false
             })
         });
         return interopBundle;
