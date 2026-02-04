@@ -30,6 +30,7 @@ import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAsset
 import {IL2AssetTracker, L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {IL1AssetTracker, L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
+import {IGWAssetTracker} from "contracts/bridge/asset-tracker/IGWAssetTracker.sol";
 import {IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
 
 import {IAssetTrackerDataEncoding} from "contracts/bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
@@ -317,7 +318,26 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             );
         }
 
+        // Record logs to capture the event
+        vm.recordLogs();
+
         gwAssetTracker.initiateGatewayToL1MigrationOnGateway(eraZKChainId, assetId);
+
+        // Verify the GatewayToL1MigrationInitiated event was emitted
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertTrue(logs.length > 0, "Should emit GatewayToL1MigrationInitiated event");
+
+        bool foundEvent = false;
+        bytes32 eventSignature = IGWAssetTracker.GatewayToL1MigrationInitiated.selector;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == eventSignature) {
+                foundEvent = true;
+                // Verify the indexed assetId matches
+                assertEq(logs[i].topics[1], assetId, "Event assetId should match");
+                break;
+            }
+        }
+        assertTrue(foundEvent, "GatewayToL1MigrationInitiated event should be emitted");
 
         TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
