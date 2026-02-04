@@ -134,6 +134,14 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
                 initCalldata
             )
         );
+
+        // Set the verifier for the protocol version on the CTM
+        // Need to prank as the owner (deployer) to have access
+        vm.prank(config.deployerAddress);
+        IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager).setProtocolVersionVerifier(
+            config.contracts.chainCreationParams.latestProtocolVersion,
+            ctmAddresses.stateTransition.verifiers.verifier
+        );
     }
 
     function deployViaCreate2(
