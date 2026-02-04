@@ -7,7 +7,7 @@ import {IL2ToL1MessengerZKSyncOS} from "../../common/l2-helpers/IL2ToL1Messenger
 import {L2_ASSET_TRACKER, L2_BASE_TOKEN_HOLDER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MINT_BASE_TOKEN_HOOK} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "../../common/Config.sol";
 import {IMailboxImpl} from "../../state-transition/chain-interfaces/IMailboxImpl.sol";
-import {Unauthorized, WithdrawFailed} from "../../common/L1ContractErrors.sol";
+import {BaseTokenHolderMintFailed, BaseTokenHolderTransferFailed, Unauthorized, WithdrawFailed} from "../../common/L1ContractErrors.sol";
 
 /**
  * @title L2BaseTokenZKOS
@@ -79,12 +79,16 @@ contract L2BaseTokenZKOS is IL2BaseTokenZKOS {
 
         // Mint INITIAL_BASE_TOKEN_HOLDER_BALANCE tokens to this contract via the mint hook
         (bool mintSuccess, ) = MINT_BASE_TOKEN_HOOK.call(abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE));
-        require(mintSuccess, "L2BaseTokenZKOS: mint failed");
+        if (!mintSuccess) {
+            revert BaseTokenHolderMintFailed();
+        }
 
         // Transfer all minted tokens to BaseTokenHolder
         // slither-disable-next-line arbitrary-send-eth
         (bool transferSuccess, ) = L2_BASE_TOKEN_HOLDER_ADDR.call{value: INITIAL_BASE_TOKEN_HOLDER_BALANCE}("");
-        require(transferSuccess, "L2BaseTokenZKOS: transfer to holder failed");
+        if (!transferSuccess) {
+            revert BaseTokenHolderTransferFailed();
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -102,7 +106,9 @@ contract L2BaseTokenZKOS is IL2BaseTokenZKOS {
         // Send the ETH to BaseTokenHolder (effectively "burning" from circulation)
         // slither-disable-next-line arbitrary-send-eth
         (bool success, ) = L2_BASE_TOKEN_HOLDER_ADDR.call{value: amount}("");
-        require(success, WithdrawFailed());
+        if (!success) {
+            revert WithdrawFailed();
+        }
     }
 
     /// @dev Get the message to be sent to L1 to initiate a withdrawal.

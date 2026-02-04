@@ -10,7 +10,7 @@ import {IL2ToL1MessengerZKSyncOS} from "contracts/common/l2-helpers/IL2ToL1Messe
 import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_HOLDER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MINT_BASE_TOKEN_HOOK} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
-import {Unauthorized, WithdrawFailed} from "contracts/common/L1ContractErrors.sol";
+import {BaseTokenHolderMintFailed, BaseTokenHolderTransferFailed, Unauthorized, WithdrawFailed} from "contracts/common/L1ContractErrors.sol";
 
 /// @title L2BaseTokenZKOSTest
 /// @notice Unit tests for L2BaseTokenZKOS contract
@@ -316,7 +316,7 @@ contract L2BaseTokenZKOSTest is Test {
         vm.mockCallRevert(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), "Mint failed");
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        vm.expectRevert("L2BaseTokenZKOS: mint failed");
+        vm.expectRevert(BaseTokenHolderMintFailed.selector);
         l2BaseToken.initializeBaseTokenHolderBalance();
     }
 
@@ -332,7 +332,7 @@ contract L2BaseTokenZKOSTest is Test {
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(rejecting).code);
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        vm.expectRevert("L2BaseTokenZKOS: transfer to holder failed");
+        vm.expectRevert(BaseTokenHolderTransferFailed.selector);
         l2BaseToken.initializeBaseTokenHolderBalance();
     }
 

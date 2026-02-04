@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {BaseTokenHolderBase} from "../BaseTokenHolderBase.sol";
+import {BaseTokenTransferFailed} from "../../common/L1ContractErrors.sol";
 
 /**
  * @title BaseTokenHolderZKOS
@@ -17,6 +18,8 @@ contract BaseTokenHolderZKOS is BaseTokenHolderBase {
         // Transfer base tokens using native ETH transfer
         // slither-disable-next-line arbitrary-send-eth
         (bool success, ) = _to.call{value: _amount}("");
-        require(success, "BaseTokenHolder: transfer failed");
+        if (!success) {
+            revert BaseTokenTransferFailed();
+        }
     }
 }
