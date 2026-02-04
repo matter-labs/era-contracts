@@ -50,7 +50,7 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable {
 
     /// @notice Initializes the contract by setting the initial owner.
     /// @param _initialOwner The address that will be set as the contract owner.
-    function initialize(address _initialOwner) public initializer reentrancyGuardInitializer {
+    function initialize(address _initialOwner) public reentrancyGuardInitializer {
         if (_initialOwner == address(0)) {
             revert ZeroAddress();
         }
