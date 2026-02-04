@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {L1Bridgehub} from "../../bridgehub/L1Bridgehub.sol";
+import {L1Bridgehub} from "../../core/bridgehub/L1Bridgehub.sol";
 
 contract DummyBridgehubSetter is L1Bridgehub {
     // add this to be excluded from coverage report

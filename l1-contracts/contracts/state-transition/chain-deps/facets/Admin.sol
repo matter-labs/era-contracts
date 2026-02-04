@@ -5,24 +5,26 @@ pragma solidity 0.8.28;
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {MAX_GAS_PER_TRANSACTION, ZKChainCommitment, L2DACommitmentScheme} from "../../../common/Config.sol";
+import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, ZKChainCommitment, CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {IZKChain} from "../../../state-transition/chain-interfaces/IZKChain.sol";
-import {IL1Bridgehub} from "../../../bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidPubdataPricingMode, PriorityTxPubdataExceedsMaxPubDataPerBatch, NotAZKChain, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized, InvalidL2DACommitmentScheme} from "../../../common/L1ContractErrors.sol";
-import {AlreadyMigrated, ContractNotDeployed, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
+import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAssetHandler.sol";
+import {AlreadyMigrated, PriorityQueueNotFullyProcessed, TotalPriorityTxsIsZero, ContractNotDeployed, DepositsAlreadyPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted, MigrationInProgress} from "../../L1StateTransitionErrors.sol";
+import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, NotAZKChain, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
-import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../../../common/Config.sol";
+import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
+import {TxStatus} from "../../../common/Messaging.sol";
 
 /// @title Admin Contract controls access rights for contract management.
 /// @author Matter Labs
@@ -32,6 +34,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     using PriorityQueue for PriorityQueue.Queue;
 
     /// @inheritdoc IZKChainBase
+    // solhint-disable-next-line const-name-snakecase
     string public constant override getName = "AdminFacet";
 
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
@@ -39,18 +42,43 @@ contract AdminFacet is ZKChainBase, IAdmin {
     uint256 internal immutable L1_CHAIN_ID;
 
     /// @notice The address that is responsible for determining whether a certain DA pair is allowed for rollups.
-    RollupDAManager internal immutable ROLLUP_DA_MANAGER;
+    RollupDAManager public immutable ROLLUP_DA_MANAGER;
 
-    constructor(uint256 _l1ChainId, RollupDAManager _rollupDAManager) {
+    uint256 internal immutable CHAIN_MIGRATION_TIME_WINDOW_START;
+
+    uint256 internal immutable CHAIN_MIGRATION_TIME_WINDOW_END;
+
+    uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_START;
+
+    uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_END;
+
+    constructor(uint256 _l1ChainId, RollupDAManager _rollupDAManager, bool _isTestnet) {
         L1_CHAIN_ID = _l1ChainId;
         ROLLUP_DA_MANAGER = _rollupDAManager;
+
+        CHAIN_MIGRATION_TIME_WINDOW_START = _isTestnet
+            ? CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET
+            : CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET;
+        CHAIN_MIGRATION_TIME_WINDOW_END = _isTestnet
+            ? CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET
+            : CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET;
+        PAUSE_DEPOSITS_TIME_WINDOW_START = _isTestnet
+            ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET
+            : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET;
+        PAUSE_DEPOSITS_TIME_WINDOW_END = _isTestnet
+            ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
+            : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET;
     }
 
     modifier onlyL1() {
+        _onlyL1();
+        _;
+    }
+
+    function _onlyL1() internal {
         if (block.chainid != L1_CHAIN_ID) {
             revert NotL1(block.chainid);
         }
-        _;
     }
 
     /// @inheritdoc IAdmin
@@ -174,7 +202,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         }
 
         if (_l2DACommitmentScheme == L2DACommitmentScheme.NONE) {
-            revert InvalidL2DACommitmentScheme(uint8(_l2DACommitmentScheme));
+            revert InvalidL2DACommitmentScheme(_l2DACommitmentScheme);
         }
 
         if (s.isPermanentRollup && !ROLLUP_DA_MANAGER.isPairAllowed(_l1DAValidator, _l2DACommitmentScheme)) {
@@ -294,6 +322,46 @@ contract AdminFacet is ZKChainBase, IAdmin {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAdmin
+    function pauseDepositsBeforeInitiatingMigration() external onlyAdminOrChainTypeManager onlyL1 {
+        require(s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_END < block.timestamp, DepositsAlreadyPaused());
+        uint256 timestamp;
+        // Note, if the chain is new (total number of priority transactions is 0) we allow admin to pause the deposits with immediate effect.
+        // This is in place to allow for faster migration for newly spawned chains.
+        uint256 totalPriorityTxs = s.priorityTree.getTotalPriorityTxs();
+        if (totalPriorityTxs == 0) {
+            // We mark the start of pausedDeposits window as current timestamp - PAUSE_DEPOSITS_TIME_WINDOW_START,
+            // meaning that starting from this point in time the deposits are immediately paused.
+            timestamp = block.timestamp - PAUSE_DEPOSITS_TIME_WINDOW_START;
+        } else {
+            timestamp = block.timestamp;
+        }
+        s.pausedDepositsTimestamp = timestamp;
+        if (s.settlementLayer != address(0)) {
+            require(totalPriorityTxs != 0, TotalPriorityTxsIsZero());
+            IL1AssetTracker(s.assetTracker).requestPauseDepositsForChainOnGateway(s.chainId);
+        }
+        emit DepositsPaused(s.chainId, timestamp);
+    }
+
+    /// @inheritdoc IAdmin
+    function unpauseDeposits() external onlyAdmin onlyL1 {
+        uint256 timestamp = s.pausedDepositsTimestamp;
+        bool inPausedWindow = timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START <= block.timestamp &&
+            block.timestamp < timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END;
+        require(inPausedWindow, DepositsNotPaused());
+        require(
+            !IL1ChainAssetHandler(IL1Bridgehub(s.bridgehub).chainAssetHandler()).isMigrationInProgress(s.chainId),
+            MigrationInProgress()
+        );
+        _unpauseDeposits();
+    }
+
+    function _unpauseDeposits() internal {
+        s.pausedDepositsTimestamp = 0;
+        emit DepositsUnpaused(s.chainId);
+    }
+
+    /// @inheritdoc IAdmin
     function forwardedBridgeBurn(
         address _settlementLayer,
         address _originalCaller,
@@ -305,6 +373,16 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if (_originalCaller != s.admin) {
             revert NotChainAdmin(_originalCaller, s.admin);
         }
+
+        /// We require that all the priority transactions are processed.
+        require(s.priorityTree.getSize() == 0, PriorityQueueNotFullyProcessed());
+
+        uint256 timestamp = s.pausedDepositsTimestamp;
+        require(
+            timestamp + CHAIN_MIGRATION_TIME_WINDOW_START < block.timestamp &&
+                block.timestamp < timestamp + CHAIN_MIGRATION_TIME_WINDOW_END,
+            DepositsNotPaused()
+        );
 
         // We want to trust interop messages coming from Era chains which implies they can use only trusted settlement layers,
         // ie, controlled by the governance, which is currently Era Gateways and Ethereum.
@@ -328,12 +406,11 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert ProtocolVersionNotUpToDate(currentProtocolVersion, protocolVersion);
         }
 
-        if (block.chainid != L1_CHAIN_ID) {
-            // We assume that GW -> L1 transactions can never fail and provide no recovery mechanism from it.
-            // That's why we need to bound the gas that can be consumed during such a migration.
-            if (s.totalBatchesCommitted != s.totalBatchesExecuted) {
-                revert NotAllBatchesExecuted();
-            }
+        // We require all committed batches to be executed, since each batch has a predefined settlement layer.
+        // Also we assume that GW -> L1 transactions can never fail and provide no recovery mechanism from it.
+        // That's why we need to bound the gas that can be consumed during a GW->L1 migration.
+        if (s.totalBatchesCommitted != s.totalBatchesExecuted) {
+            revert NotAllBatchesExecuted();
         }
 
         s.settlementLayer = _settlementLayer;
@@ -420,17 +497,24 @@ contract AdminFacet is ZKChainBase, IAdmin {
         s.settlementLayer = address(0);
 
         _setDAValidatorPair(address(0), L2DACommitmentScheme.NONE);
+        _unpauseDeposits();
 
         emit MigrationComplete();
     }
 
     /// @inheritdoc IAdmin
-    function forwardedBridgeRecoverFailedTransfer(
+    function forwardedBridgeConfirmTransferResult(
         uint256 /* _chainId */,
+        TxStatus _txStatus,
         bytes32 /* _assetInfo */,
         address /* _depositSender */,
         bytes calldata _chainData
     ) external payable override onlyChainAssetHandler {
+        _unpauseDeposits();
+
+        if (_txStatus == TxStatus.Success) {
+            return;
+        }
         // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
         uint256 protocolVersion = abi.decode(_chainData, (uint256));
 
