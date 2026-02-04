@@ -62,7 +62,7 @@ fn execute_internal_bootloader_test() {
 
     let bytecode = repo.read_sys_contract_bytecode(
         artifacts_location,
-        "proved_batch",
+        "bootloader_test",
         Some("Bootloader"),
         ContractLanguage::Yul,
     );
@@ -139,8 +139,7 @@ fn execute_internal_bootloader_test() {
         let mut tracer_dispatcher = TracerDispatcher::from(custom_tracers);
         vm.inspect(&mut tracer_dispatcher, InspectExecutionMode::Bootloader);
 
-        // With proved_batch bootloader (no test hooks), fall back to 1 test.
-        test_count.get().copied().unwrap_or(1)
+        test_count.get().unwrap().clone()
     };
     println!(" ==== Running {} tests ====", test_count);
 
