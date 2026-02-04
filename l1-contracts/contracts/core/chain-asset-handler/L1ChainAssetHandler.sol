@@ -16,7 +16,8 @@ import {IMessageRoot} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IChainAssetHandlerShared} from "./IChainAssetHandlerShared.sol";
 import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
-import {ChainIdMismatch} from "../../common/L1ContractErrors.sol";
+import {ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
+import {ChainIdMismatch, CTMNotRegistered} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -117,6 +118,9 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
             bridgehubBurnData.chainId,
             _txStatus
         );
+
+        require(zkChain != address(0), ZKChainNotRegistered());
+        require(ctm != address(0), CTMNotRegistered());
 
         IChainTypeManager(ctm).forwardedBridgeConfirmTransferResult({
             _chainId: bridgehubBurnData.chainId,
