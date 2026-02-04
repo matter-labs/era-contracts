@@ -19,6 +19,7 @@
 pragma solidity ^0.8.21;
 
 library AddressAliasHelper {
+    // solhint-disable-next-line const-name-snakecase
     uint160 private constant offset = uint160(0x1111000000000000000000000000000000001111);
 
     /// @notice Utility function converts the address that submitted a tx

@@ -6,6 +6,8 @@ pragma solidity ^0.8.20;
 error CallerMustBeBootloader();
 // 0xbe4bf9e4
 error CallerMustBeEvmContract();
+// 0x95ae848f
+error CallerMustBeInteropCenterOrNTV();
 // 0x9eedbd2b
 error CallerMustBeSystemContract();
 // 0xee455381
@@ -108,6 +110,12 @@ error L2BlockNumberZero();
 error LegacyBridgeNotProxy();
 // 0x43e266b0
 error MalformedBytecode(BytecodeError);
+// 0x9bb54c35
+error MerkleIndexOutOfBounds();
+// 0x8e23ac1a
+error MerklePathEmpty();
+// 0x1c500385
+error MerklePathOutOfBounds();
 // 0xe90aded4
 error NonceAlreadyUsed(address account, uint256 nonce);
 // 0xbac091ee
@@ -134,8 +142,7 @@ error PreviousBytecodeUnknown();
 error PreviousL2BlockHashIsIncorrect(bytes32 correctPrevBlockHash, bytes32 expectedPrevL2BlockHash);
 // 0x33cb1485
 error ProvidedBatchNumberIsNotCorrect(uint128 previousBatchNumber, uint128 _expectedNewNumber);
-// Note: enum should be encoded as uint8 to calculate selector!
-// skip-errors-lint 0x7f7b0cf7
+// 0x7f7b0cf7
 error ReconstructionMismatch(PubdataField, bytes32 expected, bytes32 actual);
 // 0x26772295
 error ReturnedBytecodeDoesNotMatchExpectedHash(bytes32 returnedBytecode, bytes32 expectedBytecodeHash);
@@ -153,6 +160,8 @@ error SystemCallFlagRequired();
 error ThirdCallShouldHaveSameGasCostAsSecondCall(uint256 thirdCallCost, uint256 secondCallCost);
 // 0x09c63320
 error TimestampsShouldBeIncremental(uint128 newTimestamp, uint128 previousBatchTimestamp);
+// 0xa0b522e3
+error TooManyL2ToL1Logs();
 // 0xf0b4e88f
 error TooMuchGas();
 // 0xe0456dfe
@@ -173,6 +182,8 @@ error UnsupportedTxType(uint256);
 error UpgradeTransactionMustBeFirst();
 // 0x626ade30
 error ValueMismatch(uint256 expected, uint256 actual);
+// Note: enum should be encoded as uint8 to calculate selector!
+// skip-errors-lint 0x7f7b0cf7
 
 enum CodeHashReason {
     NotContractOnConstructor,
