@@ -103,7 +103,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         address _wethToken,
         TokenBridgingData calldata _baseTokenBridgingData,
         TokenMetadata calldata _baseTokenMetadata
-    ) public onlyUpgrader {
+    ) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
         // solhint-disable-next-line func-named-parameters
         updateL2(

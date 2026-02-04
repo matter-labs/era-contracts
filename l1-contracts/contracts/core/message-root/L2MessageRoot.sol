@@ -75,7 +75,7 @@ contract L2MessageRoot is MessageRootBase {
     /// @notice Initializes the contract.
     /// @dev This function is used to initialize the contract with the initial values.
     /// @param _l1ChainId The chain id of L1.
-    function initL2(uint256 _l1ChainId, uint256 _eraGatewayChainId) public onlyUpgrader {
+    function initL2(uint256 _l1ChainId, uint256 _eraGatewayChainId) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
         ERA_GATEWAY_CHAIN_ID = _eraGatewayChainId;
         l1ChainId = _l1ChainId;
