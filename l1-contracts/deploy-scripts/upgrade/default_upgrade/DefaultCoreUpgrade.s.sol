@@ -104,8 +104,9 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     }
 
     function getOldProtocolDeadline() public virtual returns (uint256) {
-        // Note, that it is this way by design, on stage2 it
-        // will be set to 0
+        // Returns max deadline initially. After the upgrade is complete (stage2),
+        // governance should call setNewVersionUpgrade with deadline=0 to force
+        // all chains to upgrade immediately.
         return type(uint256).max;
     }
 
@@ -119,7 +120,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
         (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesInputPath);
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
-        //        config.supportL2LegacySharedBridgeTest = permanentValuesToml.readBool("$.support_l2_legacy_shared_bridge_test");
 
         // Read isZKsyncOS flag from permanent values
         if (permanentValuesToml.keyExists("$.is_zk_sync_os")) {

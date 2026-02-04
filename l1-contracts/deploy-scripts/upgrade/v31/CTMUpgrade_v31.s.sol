@@ -112,7 +112,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
     ) internal view virtual override returns (address, bytes memory) {
         bytes32 ethAssetId = IL1AssetRouter(address(bridgehub.assetRouter())).ETH_TOKEN_ASSET_ID();
-        bytes memory v29UpgradeCalldata = abi.encodeCall(
+        bytes memory l2UpgradeCalldata = abi.encodeCall(
             IL2V29Upgrade.upgrade,
             (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), ethAssetId)
         );
@@ -120,7 +120,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
             address(L2_COMPLEX_UPGRADER_ADDR),
             abi.encodeCall(
                 IComplexUpgrader.forceDeployAndUpgrade,
-                (_forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, v29UpgradeCalldata)
+                (_forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2UpgradeCalldata)
             )
         );
     }

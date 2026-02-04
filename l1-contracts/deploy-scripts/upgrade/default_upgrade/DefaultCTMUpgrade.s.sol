@@ -94,7 +94,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         bytes32 create2FactorySalt;
         address ctmProxy;
         address bytecodesSupplier;
-        // address rollupDAManager;
         bool isZKsyncOS;
     }
 
@@ -151,8 +150,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         // Pass bytecodesSupplier to introspection - will overwrite incorrect V29 value
         setAddressesBasedOnCTM(permanentConfig.bytecodesSupplier);
-        // We will not need this in V31, and it will not be part of permanentConfig with V31 onwards.
-        // ctmAddresses.stateTransition.rollupDAManager = permanentConfig.rollupDAManager;
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
         config.contracts.chainCreationParams = chainCreationParams;
 
@@ -184,7 +181,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         address ctm = permanentValuesToml.readAddress("$.ctm_contracts.ctm_proxy_addr");
         address bytecodesSupplier = permanentValuesToml.readAddress("$.ctm_contracts.l1_bytecodes_supplier_addr");
-        // address rollupDAManager = permanentValuesToml.readAddress("$.ctm_contracts.rollup_da_manager");
 
         // TODO can we discover it?. Try to get it from the chain
         bool isZKsyncOS;
@@ -195,7 +191,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         permanentConfig = PermanentCTMConfig({
             ctmProxy: ctm,
             bytecodesSupplier: bytecodesSupplier,
-            // rollupDAManager: address(0),
             isZKsyncOS: isZKsyncOS,
             create2FactoryAddr: create2FactoryAddr,
             create2FactorySalt: create2FactorySalt
