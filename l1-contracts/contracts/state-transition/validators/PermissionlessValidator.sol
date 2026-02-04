@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IExecutor} from "../chain-interfaces/IExecutor.sol";
 import {ICommitter} from "../chain-interfaces/ICommitter.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable-v4/proxy/utils/Initializable.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -14,8 +15,15 @@ import {ICommitter} from "../chain-interfaces/ICommitter.sol";
 /// fail to process priority transactions and priority mode is activated.
 /// The chain contract is responsible for enforcing proper access control
 /// (i.e., ensuring that only this contract can settle batches after Priority Mode is entered).
-contract PermissionlessValidator is ReentrancyGuard {
-    constructor() reentrancyGuardInitializer {}
+/// @dev Expected to be deployed as a TransparentUpgradeableProxy.
+contract PermissionlessValidator is ReentrancyGuard, Initializable {
+    constructor() {
+        // Disable initialization to prevent Parity hack.
+        _disableInitializers();
+    }
+
+    /// @notice Initializes the contract.
+    function initialize() external initializer reentrancyGuardInitializer {}
 
     /// @notice Commit, prove, and execute the same batch range atomically.
     /// @param _chainAddress The ZKsync chain contract address where to settle batches.

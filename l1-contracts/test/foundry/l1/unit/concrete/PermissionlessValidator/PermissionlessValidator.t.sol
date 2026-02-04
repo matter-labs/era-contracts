@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 import {Reentrancy} from "contracts/common/L1ContractErrors.sol";
 import {ExecutorMock} from "./ExecutorMock.sol";
@@ -10,9 +11,16 @@ import {ReentrantExecutorMock} from "./ReentrantExecutorMock.sol";
 contract PermissionlessValidatorTest is Test {
     PermissionlessValidator internal validator;
     ExecutorMock internal executor;
+    address internal proxyAdmin = makeAddr("proxyAdmin");
 
     function setUp() public {
-        validator = new PermissionlessValidator();
+        PermissionlessValidator implementation = new PermissionlessValidator();
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+            address(implementation),
+            proxyAdmin,
+            abi.encodeCall(PermissionlessValidator.initialize, ())
+        );
+        validator = PermissionlessValidator(address(proxy));
         executor = new ExecutorMock();
     }
 

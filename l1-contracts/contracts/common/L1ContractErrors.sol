@@ -318,6 +318,8 @@ error PreviousOperationNotExecuted();
 error PriorityModeActivationTooEarly(uint256 earliestActivationTimestamp, uint256 currentTimestamp);
 // 0xdbfcbbef
 error PriorityModeIsNotAllowed();
+// 0x2b9d9c4c
+error PriorityModeRequiresPermanentRollup();
 // 0xd5a99014
 error PriorityOperationsRollingHashMismatch();
 // 0xbeda0935

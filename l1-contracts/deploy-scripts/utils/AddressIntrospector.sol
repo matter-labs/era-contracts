@@ -194,13 +194,15 @@ library AddressIntrospector {
                     validatorTimelock: validatorTimelockPostV29 != address(0)
                         ? validatorTimelockPostV29
                         : _ctm.validatorTimelock(),
-                    bytecodesSupplier: _ctm.L1_BYTECODES_SUPPLIER()
+                    bytecodesSupplier: _ctm.L1_BYTECODES_SUPPLIER(),
+                    permissionlessValidator: _ctm.PERMISSIONLESS_VALIDATOR()
                 }),
                 implementations: StateTransitionContracts({
                     chainTypeManager: Utils.getImplementation(ctmAddr),
                     serverNotifier: address(0), // Not available from CTM directly
                     validatorTimelock: address(0), // Not available from CTM directly
-                    bytecodesSupplier: address(0) // Not available from CTM directly
+                    bytecodesSupplier: address(0), // Not available from CTM directly
+                    permissionlessValidator: address(0) // Not available from CTM directly
                 }),
                 verifiers: Verifiers({
                     verifier: verifier,
@@ -213,8 +215,7 @@ library AddressIntrospector {
                 legacyValidatorTimelock: _ctm.validatorTimelock(),
                 eraDiamondProxy: address(0), // Not available from CTM directly
                 rollupDAManager: address(0), // Not available from CTM directly
-                rollupSLDAValidator: address(0), // Not available from CTM directly
-                permissionlessValidator: address(0) // Not available from CTM directly
+                rollupSLDAValidator: address(0) // Not available from CTM directly
             }),
             daAddresses: DataAvailabilityDeployedAddresses({
                 rollupDAManager: address(0), // Not available from CTM directly

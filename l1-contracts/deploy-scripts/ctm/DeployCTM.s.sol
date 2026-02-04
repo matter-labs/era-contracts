@@ -168,6 +168,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         (, ctmAddresses.stateTransition.proxies.validatorTimelock) = deployTuppWithContract("ValidatorTimelock", false);
 
         (
+            ctmAddresses.stateTransition.implementations.permissionlessValidator,
+            ctmAddresses.stateTransition.proxies.permissionlessValidator
+        ) = deployTuppWithContract("PermissionlessValidator", false);
+
+        (
             ctmAddresses.stateTransition.implementations.serverNotifier,
             ctmAddresses.stateTransition.proxies.serverNotifier
         ) = deployServerNotifier();

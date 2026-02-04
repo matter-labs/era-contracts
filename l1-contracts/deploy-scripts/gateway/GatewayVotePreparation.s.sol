@@ -230,13 +230,15 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                     chainTypeManager: expectedGatewayContracts.stateTransition.chainTypeManagerProxy,
                     serverNotifier: expectedGatewayContracts.stateTransition.serverNotifierProxy,
                     validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelockProxy,
-                    bytecodesSupplier: address(0)
+                    bytecodesSupplier: address(0),
+                    permissionlessValidator: address(0)
                 }),
                 implementations: StateTransitionContracts({
                     chainTypeManager: expectedGatewayContracts.stateTransition.chainTypeManagerImplementation,
                     serverNotifier: expectedGatewayContracts.stateTransition.serverNotifierImplementation,
                     validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelockImplementation,
-                    bytecodesSupplier: address(0)
+                    bytecodesSupplier: address(0),
+                    permissionlessValidator: address(0)
                 }),
                 verifiers: expectedGatewayContracts.stateTransition.verifiers,
                 facets: expectedGatewayContracts.stateTransition.facets,
@@ -245,8 +247,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 legacyValidatorTimelock: address(0),
                 eraDiamondProxy: address(0),
                 rollupDAManager: expectedGatewayContracts.daContracts.rollupDAManager,
-                rollupSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator,
-                permissionlessValidator: address(0)
+                rollupSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator
             }),
             multicall3: expectedGatewayContracts.multicall3,
             diamondCutData: expectedGatewayContracts.diamondCutData,

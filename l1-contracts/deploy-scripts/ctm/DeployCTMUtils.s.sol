@@ -48,6 +48,7 @@ import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interf
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
+import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -358,6 +359,8 @@ abstract contract DeployCTMUtils is DeployUtils {
                 return type(L1GenesisUpgrade).creationCode;
             } else if (compareStrings(contractName, "ValidatorTimelock")) {
                 return type(ValidatorTimelock).creationCode;
+            } else if (compareStrings(contractName, "PermissionlessValidator")) {
+                return type(PermissionlessValidator).creationCode;
             } else if (compareStrings(contractName, "EraChainTypeManager")) {
                 return type(EraChainTypeManager).creationCode;
             } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
@@ -444,6 +447,8 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode(restrictions);
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "PermissionlessValidator")) {
+            return abi.encode();
         } else if (compareStrings(contractName, "ProxyAdmin")) {
             return abi.encode();
         } else if (compareStrings(contractName, "GettersFacet")) {
@@ -487,7 +492,7 @@ abstract contract DeployCTMUtils is DeployUtils {
                 // For L1 deployment we need to use the deployer as the owner of the verifier,
                 // because we set the dual verifier later
                 verifierOwner: msg.sender,
-                permissionlessValidator: ctmAddresses.stateTransition.permissionlessValidator
+                permissionlessValidator: ctmAddresses.stateTransition.proxies.permissionlessValidator
             });
     }
 
@@ -525,6 +530,8 @@ abstract contract DeployCTMUtils is DeployUtils {
                 );
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
             return abi.encodeCall(BytecodesSupplier.initialize, ());
+        } else if (compareStrings(contractName, "PermissionlessValidator")) {
+            return abi.encodeCall(PermissionlessValidator.initialize, ());
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }
