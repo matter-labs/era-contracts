@@ -22,7 +22,7 @@ Upgrade information is composed in the form of a [DiamondCutData](../../l1-contr
 1. [BaseZkSyncUpgrade](../../l1-contracts/contracts/upgrades/BaseZkSyncUpgrade.sol) - Generic template with function that can be useful for upgrades
 2. [DefaultUpgrade](../../l1-contracts/contracts/upgrades/DefaultUpgrade.sol) - Default implementation of the `BaseZkSyncUpgrade`, contract that is most often planned to be used as diamond initialization when doing upgrades.
 
-> Note, that the Gateway upgrade will be more complex than the usual ones and so a similar, but separate [process](<../upgrade_history/gateway_preparation_upgrade/upgrade_process_(no_gateway_chain).md>) will be used for it. It will also use its own custom implementation of the `BaseZkSyncUpgrade`: [GatewayUpgrade](../../l1-contracts/contracts/upgrades/GatewayUpgrade.sol).
+> Note, that the Gateway upgrade was more complex than the usual ones and so a similar, but separate [process](<../upgrade_history/gateway_preparation_upgrade/upgrade_process_(no_gateway_chain).md>) was used for it. It was done using its own custom implementation of the `BaseZkSyncUpgrade`: [GatewayUpgrade](https://github.com/matter-labs/era-contracts/blob/14961f1efecac1030139c4cf0655b14135197772/l1-contracts/contracts/upgrades/GatewayUpgrade.sol).
 
 ### Protocol version
 
