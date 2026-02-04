@@ -116,6 +116,9 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         if (_aliasedOwner == address(0)) {
             revert EmptyAddress();
         }
+        if (_bridgedTokenBeacon == address(0)) {
+            revert EmptyAddress();
+        }
         _transferOwnership(_aliasedOwner);
         bridgedTokenBeacon = IBeacon(_bridgedTokenBeacon);
         emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), _l2TokenProxyBytecodeHash);

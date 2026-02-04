@@ -16,6 +16,7 @@ import {IMessageRoot} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IChainAssetHandlerShared} from "./IChainAssetHandlerShared.sol";
 import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
+import {ChainIdMismatch} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -100,13 +101,17 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     /// @param _depositSender the address of the entity that initiated the deposit.
     // slither-disable-next-line locked-ether
     function bridgeConfirmTransferResult(
-        uint256,
+        uint256 _chainId,
         TxStatus _txStatus,
         bytes32 _assetId,
         address _depositSender,
         bytes calldata _data
     ) external payable requireZeroValue(msg.value) onlyAssetRouter {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
+
+        if (_chainId != bridgehubBurnData.chainId) {
+            revert ChainIdMismatch();
+        }
 
         (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeConfirmTransferResult(
             bridgehubBurnData.chainId,
