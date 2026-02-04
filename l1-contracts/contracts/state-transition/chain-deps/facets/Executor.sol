@@ -872,17 +872,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             bytes32 currentBatchCommitment = committedBatches[i].commitment;
             bytes32 currentBatchStateCommitment = committedBatches[i].batchHash;
             if (s.zksyncOS) {
-                proofPublicInput[i] =
-                    uint256(
-                        keccak256(
-                            abi.encodePacked(
-                                prevBatchStateCommitment,
-                                currentBatchStateCommitment,
-                                currentBatchCommitment
-                            )
-                        )
-                    ) >>
-                    PUBLIC_INPUT_SHIFT;
+                proofPublicInput[i] = _getBatchProofPublicInputZKsyncOS(
+                    prevBatchStateCommitment,
+                    currentBatchStateCommitment,
+                    currentBatchCommitment
+                );
             } else {
                 proofPublicInput[i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
             }
@@ -913,7 +907,21 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
-    /// @dev Gets zk proof public input
+    /// @dev Gets zk proof public input for ZKSync OS
+    function _getBatchProofPublicInputZKsyncOS(
+        bytes32 _prevBatchStateCommitment,
+        bytes32 _currentBatchStateCommitment,
+        bytes32 _currentBatchCommitment
+    ) internal pure returns (uint256) {
+        return
+            uint256(
+                keccak256(
+                    abi.encodePacked(_prevBatchStateCommitment, _currentBatchStateCommitment, _currentBatchCommitment)
+                )
+            ) >> PUBLIC_INPUT_SHIFT;
+    }
+
+    /// @dev Gets zk proof public input for Era
     function _getBatchProofPublicInput(
         bytes32 _prevBatchCommitment,
         bytes32 _currentBatchCommitment
