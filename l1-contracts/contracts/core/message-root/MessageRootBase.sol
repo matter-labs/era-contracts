@@ -261,10 +261,15 @@ abstract contract MessageRootBase is IMessageRoot, ReentrancyGuard, Initializabl
         // slither-disable-next-line unused-return
         bytes32 initialHash = chainTree[_chainId].setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
 
-        // slither-disable-next-line unused-return
-        sharedTree.pushNewLeaf(MessageHashing.chainIdLeafHash(initialHash, _chainId));
+        bytes32 sharedTreeRoot = sharedTree.pushNewLeaf(MessageHashing.chainIdLeafHash(initialHash, _chainId));
 
         emit AddedChain(_chainId, cachedChainCount);
+
+        // Emit NewInteropRoot event and update historicalRoot to maintain consistency with other shared tree updates
+        bytes32[] memory _sides = new bytes32[](1);
+        _sides[0] = sharedTreeRoot;
+        emit NewInteropRoot(block.chainid, block.number, 0, _sides);
+        historicalRoot[block.number] = sharedTreeRoot;
     }
 
     //////////////////////////////
