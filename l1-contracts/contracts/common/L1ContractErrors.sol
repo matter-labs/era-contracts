@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
+import {L2DACommitmentScheme} from "./Config.sol";
+
 // 0x5ecf2d7a
 error AccessToFallbackDenied(address target, address invoker);
 // 0x3995f750
@@ -31,6 +33,8 @@ error AssetIdMismatch(bytes32 expected, bytes32 supplied);
 error AssetIdNotSupported(bytes32 assetId);
 // 0x11832de8
 error AssetRouterAllowanceNotZero();
+// 0x9b821ed7
+error BadTransferDataLength();
 // 0x6ef9a972
 error BaseTokenGasPriceDenominatorNotSet();
 // 0x55ad3fd3
@@ -45,8 +49,6 @@ error BridgeHubAlreadyRegistered();
 error BridgeMintNotImplemented();
 // 0xaa5f6180
 error BurningNativeWETHNotSupported();
-// 0xccdd18d2
-error BytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0x25d8333c
 error CallerNotTimerAdmin();
 // 0x3331e9c0
@@ -69,6 +71,8 @@ error ChainIdMismatch();
 error ChainIdNotRegistered(uint256 chainId);
 // 0x8f620a06
 error ChainIdTooBig();
+// 0x5e361ef9
+error ChainRequiresValidatorsSignaturesForCommit();
 // 0x8746f42f
 error ConstructorsNotSupported();
 // 0xec273439
@@ -87,8 +91,8 @@ error DenominatorIsZero();
 error DeployFailed();
 // 0x138ee1a3
 error DeployingBridgedTokenForNativeToken();
-// 0xc7c9660f
-error DepositDoesNotExist();
+// 0x42bce528
+error DepositDoesNotExist(bytes32, bytes32);
 // 0xad2fa98e
 error DepositExists();
 // 0x0e7ee319
@@ -109,12 +113,20 @@ error EmptyDeposit();
 error EmptyPrecommitData(uint256 batchNumber);
 // 0x456f8f7a
 error EmptyProofLength();
+// 0x876e8b23
+error EraBytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0x627e0872
 error ETHDepositNotSupported();
+// 0x61733a89
+error EVMBytecodeAlreadyPublished(bytes32 bytecodeHash);
+// 0xf4072616
+error ExecuteMessageFailed();
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
 // 0xc91cf3b1
 error GasPerPubdataMismatch();
+// 0x5ca97564
+error GenesisBatchCommitmentIncorrect();
 // 0x6d4a7df8
 error GenesisBatchCommitmentZero();
 // 0x7940c83f
@@ -140,10 +152,10 @@ error IncorrectBatchChainId(uint256, uint256);
 error IncorrectBridgeHubAddress(address bridgehub);
 // 0x1929b7de
 error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
-// 0x826fb11e
-error InsufficientChainBalance();
 // 0x9bf8b9aa
 error InvalidBatchNumber(uint256 provided, uint256 expected);
+// 0xd438e1fa
+error InvalidBlockRange(uint64 batchNumber, uint64 from, uint64 to);
 // 0xcbd9d2e0
 error InvalidCaller(address);
 // 0x7a47c9a2
@@ -152,10 +164,14 @@ error InvalidChainId();
 error InvalidDAForPermanentRollup();
 // 0x4fbe5dba
 error InvalidDelay();
+// 0x075aaa80
+error InvalidInteropCalldata(bytes4);
 // 0x3f98a77e
-error InvalidL2DACommitmentScheme(uint8);
+error InvalidL2DACommitmentScheme(L2DACommitmentScheme);
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
+// 0x6eca2e4b
+error InvalidMessage();
 // 0xa1ec1876
 error InvalidMessageRoot(bytes32 expectedMessageRoot, bytes32 providedMessageRoot);
 // 0xd08a97e6
@@ -168,6 +184,8 @@ error InvalidNumberOfBlobs(uint256 expected, uint256 numCommitments, uint256 num
 error InvalidPackedPrecommitmentLength(uint256 length);
 // 0x09bde339
 error InvalidProof();
+// 0x5a1c353a
+error InvalidProofFormat();
 // 0x48c5fa28
 error InvalidProofLengthForFinalNode();
 // 0x5428eae7
@@ -178,6 +196,8 @@ error InvalidPubdataPricingMode();
 error InvalidSelector(bytes4 func);
 // 0xbe7193d4
 error InvalidSystemLogsLength();
+// 0x7b7a98f1
+error InvalidThreshold(uint256 max, uint256 got);
 // 0x5f1aa154
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xfb5c22e6
@@ -256,10 +276,20 @@ error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32
 error NotAllowed(address addr);
 // 0x64846fe4
 error NotARestriction(address addr);
+// 0xf306a770
+error NotAssetRouter(address _sender, address _assetRouter);
 // 0xb49df1f2
 error NotAZKChain(address addr);
+// 0x5e67e793
+error NotCurrentSettlementLayer();
+// 0x230f9d11
+error NotEnoughSigners(uint256 provided, uint256 expected);
 // 0xdd7e3621
 error NotInitializedReentrancyGuard();
+// 0xecb34449
+error NotL1(uint256 l1ChainId, uint256 blockChainId);
+// 0xc5441a63
+error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
 // 0xdf17e316
 error NotWhitelisted(address);
 // 0xf3ed9dfa
@@ -274,6 +304,8 @@ error OperationMustBePending();
 error OperationMustBeReady();
 // 0xb926450e
 error OriginChainIdNotFound();
+// 0x97da9c1c
+error PayloadTooShort();
 // 0x688c63e5
 error PrecommitmentMismatch(uint256 batchNumber, bytes32 expected, bytes32 found);
 // 0x9b48e060
@@ -290,6 +322,8 @@ error ProtocolIdNotGreater();
 error PubdataGreaterThanLimit(uint256 limit, uint256 length);
 // 0x63c36549
 error QueueIsEmpty();
+// 0x0a6c1a5c
+error ReconstructionMismatch(bytes32, bytes32);
 // 0xab143c06
 error Reentrancy();
 // 0x667d17de
@@ -316,6 +350,14 @@ error SettlementLayersMustSettleOnL1();
 error SharedBridgeNotSet();
 // 0x7774d2f9
 error SharedBridgeValueNotSet(SharedBridgeKey);
+// 0xabdc734e
+error SignatureNotValid(address signer);
+// 0xa665a34d
+error SignaturesLengthMismatch(uint256 expected, uint256 actual);
+// 0x3b94fe24
+error SignerNotAuthorized(address signer);
+// 0xa7781cbb
+error SignersNotSorted();
 // 0xdf3a8fdd
 error SlotOccupied();
 // 0xcc0f168b
@@ -382,14 +424,14 @@ error WithdrawalAlreadyFinalized();
 error WithdrawFailed();
 // 0xf20c5c2a
 error WrappedBaseTokenAlreadyRegistered();
+// 0xf1ff6cf6
+error WrongCTMDeployerVariant();
 // 0x15e8e429
 error WrongMagicValue(uint256 expectedMagicValue, uint256 providedMagicValue);
 // 0xd92e233d
 error ZeroAddress();
 // 0xc84885d4
 error ZeroChainId();
-// 0xdb60e600
-error ZeroGasPriceL1TxZKsyncOS();
 // 0x601b6882
 error ZKChainLimitReached();
 // 0x646ac57e

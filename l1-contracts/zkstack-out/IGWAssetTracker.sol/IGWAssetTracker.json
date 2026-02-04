@@ -1,0 +1,291 @@
+[
+  {
+    "type": "function",
+    "name": "confirmMigrationOnGateway",
+    "inputs": [
+      {
+        "name": "_tokenBalanceMigrationData",
+        "type": "tuple",
+        "internalType": "struct TokenBalanceMigrationData",
+        "components": [
+          {
+            "name": "version",
+            "type": "bytes1",
+            "internalType": "bytes1"
+          },
+          {
+            "name": "isL1ToGateway",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "originToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "chainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "assetId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "tokenOriginChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "amount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "chainMigrationNumber",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "assetMigrationNumber",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "handleChainBalanceIncreaseOnGateway",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_canonicalTxHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_balanceChange",
+        "type": "tuple",
+        "internalType": "struct BalanceChange",
+        "components": [
+          {
+            "name": "version",
+            "type": "bytes1",
+            "internalType": "bytes1"
+          },
+          {
+            "name": "originToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "baseTokenAssetId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "baseTokenAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "assetId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "amount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "tokenOriginChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "initiateGatewayToL1MigrationOnGateway",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "processLogsAndMessages",
+    "inputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct ProcessLogsInput",
+        "components": [
+          {
+            "name": "logs",
+            "type": "tuple[]",
+            "internalType": "struct L2Log[]",
+            "components": [
+              {
+                "name": "l2ShardId",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "isService",
+                "type": "bool",
+                "internalType": "bool"
+              },
+              {
+                "name": "txNumberInBatch",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "sender",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "key",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "value",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              }
+            ]
+          },
+          {
+            "name": "messages",
+            "type": "bytes[]",
+            "internalType": "bytes[]"
+          },
+          {
+            "name": "chainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "batchNumber",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "chainBatchRoot",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "messageRoot",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "registerBaseTokenOnGateway",
+    "inputs": [
+      {
+        "name": "_baseTokenBridgingData",
+        "type": "tuple",
+        "internalType": "struct TokenBridgingData",
+        "components": [
+          {
+            "name": "assetId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "originChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "originToken",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "requestPauseDepositsForChain",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setAddresses",
+    "inputs": [
+      {
+        "name": "_l1ChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setLegacySharedBridgeAddress",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_legacySharedBridgeAddress",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  }
+]
