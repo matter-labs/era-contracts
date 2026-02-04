@@ -158,7 +158,11 @@ contract BaseTokenHolderZKOSTest is Test {
         (bool success, ) = address(baseTokenHolder).call{value: amount}("");
 
         assertTrue(success, "Transfer should succeed from trusted sender");
-        assertEq(address(baseTokenHolder).balance, holderBalanceBefore + amount, "Holder should receive correct amount");
+        assertEq(
+            address(baseTokenHolder).balance,
+            holderBalanceBefore + amount,
+            "Holder should receive correct amount"
+        );
     }
 
     /*//////////////////////////////////////////////////////////////

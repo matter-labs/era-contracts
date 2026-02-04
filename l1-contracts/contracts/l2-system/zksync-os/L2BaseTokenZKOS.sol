@@ -39,6 +39,7 @@ contract L2BaseTokenZKOS is IL2BaseTokenZKOS {
 
         // Send the L2 log, a user could use it as proof of the withdrawal
         bytes memory message = _getL1WithdrawMessage(_l1Receiver, amount);
+        // slither-disable-next-line unused-return
         L1_MESSENGER.sendToL1(message);
 
         emit Withdrawal(msg.sender, _l1Receiver, amount);
@@ -52,6 +53,7 @@ contract L2BaseTokenZKOS is IL2BaseTokenZKOS {
 
         // Send the L2 log, a user could use it as proof of the withdrawal
         bytes memory message = _getExtendedWithdrawMessage(_l1Receiver, amount, msg.sender, _additionalData);
+        // slither-disable-next-line unused-return
         L1_MESSENGER.sendToL1(message);
 
         emit WithdrawalWithMessage(msg.sender, _l1Receiver, amount, _additionalData);

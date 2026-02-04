@@ -102,7 +102,10 @@ contract L2BaseTokenZKOSTest is Test {
         );
 
         // Expect the L1Messenger call
-        vm.expectCall(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, abi.encodeWithSignature("sendToL1(bytes)", expectedMessage));
+        vm.expectCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSignature("sendToL1(bytes)", expectedMessage)
+        );
 
         vm.prank(sender);
         l2BaseToken.withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
@@ -195,7 +198,10 @@ contract L2BaseTokenZKOSTest is Test {
         );
 
         // Expect the L1Messenger call
-        vm.expectCall(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, abi.encodeWithSignature("sendToL1(bytes)", expectedMessage));
+        vm.expectCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSignature("sendToL1(bytes)", expectedMessage)
+        );
 
         vm.prank(sender);
         l2BaseToken.withdrawWithMessage{value: WITHDRAW_AMOUNT}(l1Receiver, additionalData);
