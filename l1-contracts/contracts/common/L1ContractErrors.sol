@@ -390,8 +390,6 @@ error TimestampError();
 error TokenIsLegacy();
 // 0xb1e96bbd
 error TokenMultiplierChangeTooFrequent(uint256 nextAllowedTimestamp);
-// 0x31f144b3
-error TokenMultiplierChangeTooLarge(uint256 oldPrice, uint256 newPrice, uint256 maxAllowedPrice);
 // 0x1850b46b
 error TokenNotLegacy();
 // 0x06439c6b
