@@ -25,7 +25,6 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy, IL1CrossCha
 
     event ClaimedFailedDepositAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
-
     event LegacyDepositInitiated(
         uint256 indexed chainId,
         bytes32 indexed l2DepositTxHash,

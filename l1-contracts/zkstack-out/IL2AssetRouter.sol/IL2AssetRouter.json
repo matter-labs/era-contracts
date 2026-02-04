@@ -218,7 +218,7 @@
   },
   {
     "type": "event",
-    "name": "AssetDeploymentTrackerRegistered",
+    "name": "AssetDeploymentTrackerSet",
     "inputs": [
       {
         "name": "assetId",
@@ -227,16 +227,16 @@
         "internalType": "bytes32"
       },
       {
+        "name": "assetDeploymentTracker",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
         "name": "additionalData",
         "type": "bytes32",
         "indexed": true,
         "internalType": "bytes32"
-      },
-      {
-        "name": "assetDeploymentTracker",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
       }
     ],
     "anonymous": false

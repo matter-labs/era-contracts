@@ -463,31 +463,6 @@
   },
   {
     "type": "event",
-    "name": "AssetDeploymentTrackerRegistered",
-    "inputs": [
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "additionalData",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "assetDeploymentTracker",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "AssetDeploymentTrackerSet",
     "inputs": [
       {
