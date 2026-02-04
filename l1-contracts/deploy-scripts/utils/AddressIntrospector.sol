@@ -481,7 +481,6 @@ library AddressIntrospector {
             useV29Introspection = protocolVersion < v30Version;
         } else {
             // No chains exist yet - this can happen during initial upgrade script generation
-            // Default to v29 introspection for backwards compatibility
             useV29Introspection = false;
         }
     }

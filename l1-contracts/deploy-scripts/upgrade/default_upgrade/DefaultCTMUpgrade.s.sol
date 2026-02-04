@@ -214,6 +214,18 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         );
 
         initializeConfig(chainCreationParams, permanentConfig, address(0));
+
+        // Read governance upgrade timer initial delay from config
+        if (toml.keyExists("$.governance_upgrade_timer_initial_delay")) {
+            newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
+        }
+
+        // Read rollup DA manager from permanent config if it exists
+        if (permanentValuesToml.keyExists("$.ctm_contracts.rollup_da_manager")) {
+            ctmAddresses.stateTransition.rollupDAManager = permanentValuesToml.readAddress(
+                "$.ctm_contracts.rollup_da_manager"
+            );
+        }
     }
 
     /// @notice Full default upgrade preparation flow

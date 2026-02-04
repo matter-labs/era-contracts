@@ -141,14 +141,13 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         L1Bridgehub bridgehub = L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
         Governance governance = Governance(payable(coreAddresses.shared.governance));
         config.l1ChainId = block.chainid;
-        config.deployerAddress = msg.sender;
+        config.deployerAddress = tx.origin;
         config.eraChainId = assetRouter.ERA_CHAIN_ID();
         config.eraDiamondProxyAddress = bridgehub.getZKChain(assetRouter.ERA_CHAIN_ID());
 
         config.ownerAddress = assetRouter.owner();
 
         config.contracts.governanceSecurityCouncilAddress = governance.securityCouncil();
-        // config.contracts.governanceMinDelay = governance.minDelay();
 
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
 
@@ -408,8 +407,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridgehub.proxies.chainAssetHandler,
             coreAddresses.bridgehub.implementations.chainAssetHandler
         );
-
-        // calls[7] = _buildCallProxyUpgrade(coreAddresses.bridges.proxies.erc20Bridge, coreAddresses.bridges.implementations.erc20Bridge);
     }
 
     function _buildCallProxyUpgrade(
