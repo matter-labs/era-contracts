@@ -8,7 +8,7 @@ on:
         required: true
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: read
 
 jobs:
@@ -19,7 +19,8 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # we need full history to fetch PR branch
+          fetch-depth: 0 # We need full history to fetch PR branch
+          token: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Get PR branch info
         id: pr
@@ -34,6 +35,11 @@ jobs:
             core.setOutput("head_ref", pr.data.head.ref);
             core.setOutput("head_repo", pr.data.head.repo.full_name);
 
+            // We only want to allow updating PRs from this repo, not from forks
+            if (pr.data.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              core.setFailed(`PR head repo is ${pr.data.head.repo.full_name}, expected ${context.repo.owner}/${context.repo.repo}`);
+            }
+
       - name: Checkout PR branch
         run: |
           git fetch origin "${{ steps.pr.outputs.head_ref }}"
@@ -42,22 +48,18 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.18.0
+          node-version: 18.20.8
           cache: yarn
 
       - name: Install foundry-zksync
-        run: |
-          mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
-          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+        uses: ./.github/actions/install-zksync-foundry
 
       - name: Install dependencies
         run: yarn
 
       - name: Run command
         run: |
+          set -euo pipefail
           echo "Updating PR #${{ github.event.inputs.pr_number }} on branch ${{ steps.pr.outputs.head_ref }}"
           git submodule update --init --recursive
 
@@ -72,10 +74,13 @@ jobs:
 
       - name: Commit and push changes
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          set -euo pipefail
+          git config user.name "zksync[bot]"
+          git config user.email "zksync[bot]@users.noreply.github.com"
 
-
-          git add AllContractsHashes.json || echo "No changes to add"
-          git commit -m "chore: Updated hashes from CI" || echo "No changes to commit"
+          git add AllContractsHashes.json
+          # Check if there are any changes to commit
+          git diff --cached --quiet && { echo "No hash changes to commit"; exit 0; }
+          # Push changes otherwise
+          git commit -m "chore: Updated hashes from CI"
           git push origin HEAD
