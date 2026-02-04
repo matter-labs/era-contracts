@@ -71,7 +71,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         require(senderIsNTV || msg.sender == assetDeploymentTracker[assetId], Unauthorized(msg.sender));
         _setAssetHandler(assetId, _assetHandlerAddress);
         assetDeploymentTracker[assetId] = msg.sender;
-        emit AssetDeploymentTrackerRegistered(assetId, _assetRegistrationData, msg.sender);
+        emit AssetDeploymentTrackerSet(assetId, msg.sender, _assetRegistrationData);
     }
 
     /*//////////////////////////////////////////////////////////////
