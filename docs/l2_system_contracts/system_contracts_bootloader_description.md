@@ -216,7 +216,7 @@ A call to a contract with invalid bytecode can not be proven. That is why it is 
 
 ## Account abstraction
 
-One of the other important features of ZKsync is the support of account abstraction. It is highly recommended to read the documentation on our AA protocol here: [https://docs.zksync.io/zksync-network/zksync-era/unique-features#native-account-abstraction](https://docs.zksync.io/zksync-network/zksync-era/unique-features#native-account-abstraction)
+One of the other important features of ZKsync is the support of account abstraction. It is highly recommended to read the documentation on our AA protocol here: [https://docs.zksync.io/zk-stack/concepts/account-abstraction](https://docs.zksync.io/zksync-protocol/era-vm/account-abstraction)
 
 #### Account versioning
 

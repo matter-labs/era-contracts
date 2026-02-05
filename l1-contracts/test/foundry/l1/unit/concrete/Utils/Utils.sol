@@ -12,17 +12,18 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+
 import {FeeParams, IVerifier, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {InteropRoot, L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {InteropRoot, L2CanonicalTransaction, L2Log} from "contracts/common/Messaging.sol";
+
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundry/L1TestsErrors.sol";
-import {Utils as DeployUtils} from "deploy-scripts/Utils.sol";
+import {Utils as DeployUtils} from "deploy-scripts/utils/Utils.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
-import {ContractsBytecodesLib} from "deploy-scripts/ContractsBytecodesLib.sol";
+import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -34,6 +35,8 @@ L2DACommitmentScheme constant L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.PUB
 
 uint256 constant MAX_NUMBER_OF_BLOBS = 6;
 uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
+
+uint256 constant EVENT_INDEX = 0;
 
 library Utils {
     function packBatchTimestampAndBlockTimestamp(
@@ -64,7 +67,7 @@ library Utils {
     }
 
     function createSystemLogs(bytes32 _outputHash) public returns (bytes[] memory) {
-        bytes[] memory logs = new bytes[](9);
+        bytes[] memory logs = new bytes[](10);
         logs[0] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -104,7 +107,7 @@ library Utils {
         logs[6] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+            uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY),
             bytes32(uint256(L2_DA_COMMITMENT_SCHEME))
         );
         logs[7] = constructL2Log(
@@ -119,16 +122,22 @@ library Utils {
             uint256(SystemLogKey.L2_TXS_STATUS_ROLLING_HASH_KEY),
             bytes32("")
         );
+        logs[9] = constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(SystemLogKey.SETTLEMENT_LAYER_CHAIN_ID_KEY),
+            bytes32(uint256(uint160(block.chainid)))
+        );
 
         return logs;
     }
 
     function createSystemLogsWithNoneDAValidator() public returns (bytes[] memory) {
         bytes[] memory systemLogs = createSystemLogs(bytes32(0));
-        systemLogs[uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)] = constructL2Log(
+        systemLogs[uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY)] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+            uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY),
             bytes32(uint256(L2DACommitmentScheme.NONE))
         );
 
@@ -263,18 +272,41 @@ library Utils {
         PriorityOpsBatchInfo[] memory _priorityOpsData
     ) internal pure returns (uint256, uint256, bytes memory) {
         InteropRoot[][] memory dependencyRoots = new InteropRoot[][](_batchesData.length);
+        L2Log[] memory l2Logs = new L2Log[](_batchesData.length);
+        bytes[] memory messages = new bytes[](_batchesData.length);
+        bytes32[] memory messageRoots = new bytes32[](_batchesData.length);
+
         return (
             _batchesData[0].batchNumber,
             _batchesData[_batchesData.length - 1].batchNumber,
             bytes.concat(
                 bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
-                abi.encode(_batchesData, _priorityOpsData, dependencyRoots)
+                abi.encode(_batchesData, _priorityOpsData, dependencyRoots, l2Logs, messages, messageRoots)
+            )
+        );
+    }
+
+    function encodeExecuteBatchesDataZeroLogs(
+        IExecutor.StoredBatchInfo[] memory _batchesData,
+        PriorityOpsBatchInfo[] memory _priorityOpsData
+    ) internal pure returns (uint256, uint256, bytes memory) {
+        InteropRoot[][] memory dependencyRoots = new InteropRoot[][](_batchesData.length);
+        L2Log[] memory l2Logs = new L2Log[](0);
+        bytes[] memory messages = new bytes[](0);
+        bytes32[] memory messageRoots = new bytes32[](0);
+
+        return (
+            _batchesData[0].batchNumber,
+            _batchesData[_batchesData.length - 1].batchNumber,
+            bytes.concat(
+                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
+                abi.encode(_batchesData, _priorityOpsData, dependencyRoots, l2Logs, messages, messageRoots)
             )
         );
     }
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](13);
+        bytes4[] memory selectors = new bytes4[](14);
         uint256 i = 0;
         selectors[i++] = AdminFacet.setPendingAdmin.selector;
         selectors[i++] = AdminFacet.acceptAdmin.selector;
@@ -289,6 +321,7 @@ library Utils {
         selectors[i++] = AdminFacet.unfreezeDiamond.selector;
         selectors[i++] = AdminFacet.genesisUpgrade.selector;
         selectors[i++] = AdminFacet.setDAValidatorPair.selector;
+        selectors[i++] = AdminFacet.pauseDepositsBeforeInitiatingMigration.selector;
         return selectors;
     }
 
@@ -344,7 +377,7 @@ library Utils {
     }
 
     function getMailboxSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](8);
+        bytes4[] memory selectors = new bytes4[](9);
         uint256 i = 0;
         selectors[i++] = MailboxFacet.proveL2MessageInclusion.selector;
         selectors[i++] = MailboxFacet.proveL2LogInclusion.selector;
@@ -354,11 +387,12 @@ library Utils {
         selectors[i++] = MailboxFacet.bridgehubRequestL2Transaction.selector;
         selectors[i++] = MailboxFacet.l2TransactionBaseCost.selector;
         selectors[i++] = MailboxFacet.proveL2LeafInclusion.selector;
+        selectors[i++] = MailboxFacet.requestL2ServiceTransaction.selector;
         return selectors;
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](45);
+        bytes4[] memory selectors = new bytes4[](59);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
@@ -406,6 +440,20 @@ library Utils {
         selectors[i++] = UtilsFacet.util_getBaseTokenGasPriceMultiplierDenominator.selector;
         selectors[i++] = UtilsFacet.util_getBaseTokenGasPriceMultiplierNominator.selector;
         selectors[i++] = UtilsFacet.util_getL2DACommimentScheme.selector;
+        selectors[i++] = UtilsFacet.util_setSettlementLayer.selector;
+        selectors[i++] = UtilsFacet.util_getSettlementLayer.selector;
+        selectors[i++] = UtilsFacet.util_setPausedDepositsTimestamp.selector;
+        selectors[i++] = UtilsFacet.util_getPausedDepositsTimestamp.selector;
+        selectors[i++] = UtilsFacet.util_setAssetTracker.selector;
+        selectors[i++] = UtilsFacet.util_setNativeTokenVault.selector;
+        selectors[i++] = UtilsFacet.util_setTotalBatchesVerified.selector;
+        selectors[i++] = UtilsFacet.util_getTotalBatchesVerified.selector;
+        selectors[i++] = UtilsFacet.util_getTotalBatchesExecuted.selector;
+        selectors[i++] = UtilsFacet.util_getTotalBatchesCommitted.selector;
+        selectors[i++] = UtilsFacet.util_setL2SystemContractsUpgradeBatchNumber.selector;
+        selectors[i++] = UtilsFacet.util_getL2SystemContractsUpgradeBatchNumber.selector;
+        selectors[i++] = UtilsFacet.util_setL2SystemContractsUpgradeTxHash.selector;
+        selectors[i++] = UtilsFacet.util_getL2SystemContractsUpgradeTxHash.selector;
 
         return selectors;
     }
@@ -414,43 +462,22 @@ library Utils {
         return IVerifier(testnetVerifier);
     }
 
-    function makeVerifierParams() public pure returns (VerifierParams memory) {
-        return
-            VerifierParams({recursionNodeLevelVkHash: 0, recursionLeafLevelVkHash: 0, recursionCircuitsSetVksHash: 0});
-    }
-
-    function makeFeeParams() public pure returns (FeeParams memory) {
-        return
-            FeeParams({
-                pubdataPricingMode: PubdataPricingMode.Rollup,
-                batchOverheadL1Gas: 1_000_000,
-                maxPubdataPerBatch: 110_000,
-                maxL2GasPerBatch: 80_000_000,
-                priorityTxMaxPubdata: 99_000,
-                minimalL2GasPrice: 250_000_000
-            });
-    }
-
-    function makeInitializeData(address testnetVerifier) public returns (InitializeData memory) {
-        DummyBridgehub dummyBridgehub = new DummyBridgehub();
-
+    function makeInitializeData(address testnetVerifier, address bridgehub) public returns (InitializeData memory) {
         return
             InitializeData({
                 chainId: 1,
-                bridgehub: address(dummyBridgehub),
+                bridgehub: bridgehub,
                 chainTypeManager: address(0x1234567890876543567890),
+                interopCenter: address(0x1234567890876543567890),
                 protocolVersion: 0,
                 admin: address(0x32149872498357874258787),
                 validatorTimelock: address(0x85430237648403822345345),
                 baseTokenAssetId: bytes32(uint256(0x923645439232223445)),
                 storedBatchZero: bytes32(0),
                 verifier: makeVerifier(testnetVerifier),
-                verifierParams: makeVerifierParams(),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                priorityTxMaxGasLimit: 500000,
-                feeParams: makeFeeParams()
+                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
             });
     }
 
@@ -460,20 +487,21 @@ library Utils {
         return
             InitializeDataNewChain({
                 verifier: makeVerifier(testnetVerifier),
-                verifierParams: makeVerifierParams(),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                priorityTxMaxGasLimit: 80000000,
-                feeParams: makeFeeParams()
+                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
             });
     }
 
-    function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address testnetVerifier) public returns (address) {
+    function makeDiamondProxy(
+        Diamond.FacetCut[] memory facetCuts,
+        address testnetVerifier,
+        address bridgehub
+    ) public returns (address) {
         DiamondInit diamondInit = new DiamondInit(false);
         bytes memory diamondInitData = abi.encodeWithSelector(
             diamondInit.initialize.selector,
-            makeInitializeData(testnetVerifier)
+            makeInitializeData(testnetVerifier, bridgehub)
         );
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({

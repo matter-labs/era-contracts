@@ -3,24 +3,9 @@
 pragma solidity ^0.8.21;
 
 import {IZKChainBase} from "./IZKChainBase.sol";
+import {L2Log} from "../../common/Messaging.sol";
 import {L2DACommitmentScheme} from "../../common/Config.sol";
-
-/// @dev Enum used by L2 System Contracts to differentiate logs.
-enum SystemLogKey {
-    L2_TO_L1_LOGS_TREE_ROOT_KEY,
-    PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-    CHAINED_PRIORITY_TXN_HASH_KEY,
-    NUMBER_OF_LAYER_1_TXS_KEY,
-    // Note, that it is important that `PREV_BATCH_HASH_KEY` has position
-    // `4` since it is the same as it was in the previous protocol version and
-    // it is the only one that is emitted before the system contracts are upgraded.
-    PREV_BATCH_HASH_KEY,
-    L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
-    USED_L2_DA_VALIDATOR_ADDRESS_KEY,
-    MESSAGE_ROOT_ROLLING_HASH_KEY,
-    L2_TXS_STATUS_ROLLING_HASH_KEY,
-    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
-}
+import {SystemLogKey} from "system-contracts/contracts/Constants.sol";
 
 struct LogProcessingOutput {
     uint256 numberOfLayer1Txs;
@@ -37,6 +22,16 @@ struct LogProcessingOutput {
 
 /// @dev Maximal value that SystemLogKey variable can have.
 uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max);
+
+/// @notice The struct passed to the assetTracker.
+struct ProcessLogsInput {
+    L2Log[] logs;
+    bytes[] messages;
+    uint256 chainId;
+    uint256 batchNumber;
+    bytes32 chainBatchRoot;
+    bytes32 messageRoot;
+}
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch)
 uint256 constant L2_LOG_ADDRESS_OFFSET = 4;
@@ -148,7 +143,9 @@ interface IExecutor is IZKChainBase {
         L2DACommitmentScheme daCommitmentScheme;
         bytes32 daCommitment;
         uint64 firstBlockTimestamp;
+        uint64 firstBlockNumber;
         uint64 lastBlockTimestamp;
+        uint64 lastBlockNumber;
         uint256 chainId;
         bytes operatorDAInput;
     }
@@ -263,5 +260,13 @@ interface IExecutor is IZKChainBase {
         uint256 indexed batchNumber,
         uint256 indexed untrustedLastL2BlockNumberHint,
         bytes32 precommitment
+    );
+
+    /// @notice Reports the block range for a zksync os batch.
+    /// @dev IMPORTANT: in this release this range is not trusted and provided by the operator while not being included to the proof.
+    event ReportCommittedBatchRangeZKsyncOS(
+        uint64 indexed batchNumber,
+        uint64 indexed firstBlockNumber,
+        uint64 indexed lastBlockNumber
     );
 }
