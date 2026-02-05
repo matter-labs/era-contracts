@@ -16,15 +16,7 @@ import {TxStatus} from "../../common/Messaging.sol";
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy, IL1CrossChainSender {
-    event BridgehubMintData(bytes bridgeMintData);
-
-    event BridgehubDepositFinalized(
-        uint256 indexed chainId,
-        bytes32 indexed txDataHash,
-        bytes32 indexed l2DepositTxHash
-    );
-
+interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
     event ClaimedFailedDepositAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
     event LegacyDepositInitiated(

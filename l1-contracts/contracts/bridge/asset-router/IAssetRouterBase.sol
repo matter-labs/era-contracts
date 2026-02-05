@@ -30,13 +30,6 @@ interface IAssetRouterBase {
         bytes bridgeMintCalldata
     );
 
-    event BridgehubWithdrawalInitiated(
-        uint256 chainId,
-        address indexed sender,
-        bytes32 indexed assetId,
-        bytes32 assetDataHash // Todo: What's the point of emitting hash?
-    );
-
     event AssetDeploymentTrackerSet(
         bytes32 indexed assetId,
         address indexed assetDeploymentTracker,
