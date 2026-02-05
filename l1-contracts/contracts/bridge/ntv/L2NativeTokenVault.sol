@@ -64,6 +64,11 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// the old version where it was an immutable.
     IAssetRouterBase public ASSET_ROUTER;
 
+    /// @dev Returns the L2 asset router for internal use.
+    function _assetRouter() internal pure override returns (IAssetRouterBase) {
+        return IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
+    }
+    
     /// @dev The address of the base token on its origin chain
     address public BASE_TOKEN_ORIGIN_TOKEN;
 

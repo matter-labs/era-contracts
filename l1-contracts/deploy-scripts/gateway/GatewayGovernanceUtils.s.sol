@@ -70,7 +70,7 @@ abstract contract GatewayGovernanceUtils is Script {
 
     function _prepareGatewayGovernanceCalls(
         PrepareGatewayGovernanceCalls memory prepareGWGovCallsStruct
-    ) internal returns (Call[] memory calls) {
+    ) internal view returns (Call[] memory calls) {
         {
             if (prepareGWGovCallsStruct._ctmRepresentativeChainId == _gatewayGovernanceConfig.gatewayChainId) {
                 calls = _getSetSettlementLayerCalls();

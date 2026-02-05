@@ -293,7 +293,7 @@ abstract contract NativeTokenVaultBase is
     function _decodeBurnAndCheckAssetId(
         bytes calldata _data,
         bytes32 _suppliedAssetId
-    ) internal returns (uint256 amount, address receiver, address parsedTokenAddress) {
+    ) internal view returns (uint256 amount, address receiver, address parsedTokenAddress) {
         (amount, receiver, parsedTokenAddress) = DataEncoding.decodeBridgeBurnData(_data);
 
         if (parsedTokenAddress == address(0)) {

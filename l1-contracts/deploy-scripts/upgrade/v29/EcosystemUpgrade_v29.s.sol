@@ -145,7 +145,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
         );
     }
 
-    function getForceDeploymentNames() internal override returns (string[] memory) {
+    function getForceDeploymentNames() internal pure override returns (string[] memory) {
         string[] memory forceDeploymentNames = new string[](1);
         forceDeploymentNames[0] = "L2V29Upgrade";
         return forceDeploymentNames;

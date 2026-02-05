@@ -16,7 +16,7 @@ contract ZKsyncOSTestnetVerifier is ZKsyncOSDualVerifier {
     }
 
     /// @dev Verifies the correctness of public input, doesn't check the validity of proof itself.
-    function mockVerify(uint256[] memory _publicInputs, uint256[] memory _proof) public view override returns (bool) {
+    function mockVerify(uint256[] memory _publicInputs, uint256[] memory _proof) public pure override returns (bool) {
         if (_proof.length != 2) {
             revert InvalidMockProofLength();
         }
