@@ -9,6 +9,20 @@ pragma solidity 0.8.28;
  * used for force deployments.
  */
 library ZKSyncOSBytecodeInfo {
+    /// @notice Hashes EVM bytecode using keccak256.
+    /// @param _bytecode The EVM bytecode to hash.
+    /// @return The keccak256 hash of the bytecode.
+    function hashEVMBytecode(bytes memory _bytecode) internal pure returns (bytes32) {
+        return keccak256(_bytecode);
+    }
+
+    /// @notice Hashes EVM bytecode using keccak256 (calldata version).
+    /// @param _bytecode The EVM bytecode to hash.
+    /// @return The keccak256 hash of the bytecode.
+    function hashEVMBytecodeCalldata(bytes calldata _bytecode) internal pure returns (bytes32) {
+        return keccak256(_bytecode);
+    }
+
     /// @notice Encodes the ZKSync OS bytecode info.
     /// @param _bytecodeBlakeHash The Blake2b hash of the bytecode.
     /// @param _bytecodeLength The length of the bytecode (used for both bytecode_length and observable_bytecode_length).

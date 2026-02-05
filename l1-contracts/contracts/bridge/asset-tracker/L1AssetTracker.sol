@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {ConfirmBalanceMigrationData, TokenBalanceMigrationData} from "../../common/Messaging.sol";
+import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {InvalidProof, ZeroAddress, InvalidChainId, Unauthorized} from "../../common/L1ContractErrors.sol";
@@ -330,18 +330,13 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         assetMigrationNumber[data.chainId][data.assetId] = data.chainMigrationNumber;
 
-        ConfirmBalanceMigrationData memory confirmBalanceMigrationData = ConfirmBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
-            isL1ToGateway: data.isL1ToGateway,
-            chainId: data.chainId,
-            assetId: data.assetId,
-            migrationNumber: data.chainMigrationNumber,
-            amount: data.amount
-        });
+        TokenBalanceMigrationData memory tokenBalanceMigrationData = data;
+        tokenBalanceMigrationData.assetMigrationNumber = data.chainMigrationNumber;
+        tokenBalanceMigrationData.chainMigrationNumber = 0;
 
         _sendConfirmationToChains(
             data.isL1ToGateway ? currentSettlementLayer : _finalizeWithdrawalParams.chainId,
-            confirmBalanceMigrationData
+            tokenBalanceMigrationData
         );
     }
 
@@ -354,23 +349,24 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             GW_ASSET_TRACKER_ADDR,
             abi.encodeCall(IGWAssetTracker.requestPauseDepositsForChain, (_chainId))
         );
+        emit IL1AssetTracker.PauseDepositsForChainRequested(_chainId, settlementLayer);
     }
 
     function _sendConfirmationToChains(
         uint256 _settlementLayerChainId,
-        ConfirmBalanceMigrationData memory _confirmBalanceMigrationData
+        TokenBalanceMigrationData memory _tokenBalanceMigrationData
     ) internal {
         // We send the confirmMigrationOnGateway first, so that withdrawals are definitely paused until the migration is confirmed on GW.
         // Note: the confirmMigrationOnL2 is a L1->GW->L2 txs if the chain is settling on Gateway.
         _sendToChain(
             _settlementLayerChainId,
             GW_ASSET_TRACKER_ADDR,
-            abi.encodeCall(IGWAssetTracker.confirmMigrationOnGateway, (_confirmBalanceMigrationData))
+            abi.encodeCall(IGWAssetTracker.confirmMigrationOnGateway, (_tokenBalanceMigrationData))
         );
         _sendToChain(
-            _confirmBalanceMigrationData.chainId,
+            _tokenBalanceMigrationData.chainId,
             L2_ASSET_TRACKER_ADDR,
-            abi.encodeCall(IL2AssetTracker.confirmMigrationOnL2, (_confirmBalanceMigrationData))
+            abi.encodeCall(IL2AssetTracker.confirmMigrationOnL2, (_tokenBalanceMigrationData))
         );
     }
 

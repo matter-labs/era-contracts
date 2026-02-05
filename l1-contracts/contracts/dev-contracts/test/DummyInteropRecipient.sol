@@ -6,6 +6,10 @@ import {IERC7786Recipient} from "../../interop/IERC7786Recipient.sol";
 
 contract DummyInteropRecipient is IERC7786Recipient {
     bytes4 public selector;
+
+    // Allow the contract to receive ETH
+    receive() external payable {}
+
     function receiveMessage(
         bytes32 receiveId, // Unique identifier
         bytes calldata sender, // ERC-7930 address

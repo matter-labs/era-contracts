@@ -3,10 +3,17 @@
 pragma solidity ^0.8.21;
 
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
-import {BalanceChange, ConfirmBalanceMigrationData} from "../../common/Messaging.sol";
+import {BalanceChange, TokenBalanceMigrationData, TokenBridgingData} from "../../common/Messaging.sol";
 
 interface IGWAssetTracker {
+    /// @notice Emitted when Gateway to L1 migration is initiated for an asset
+    /// @param assetId The asset ID being migrated
+    /// @param amount The amount being migrated
+    event GatewayToL1MigrationInitiated(bytes32 indexed assetId, uint256 amount);
+
     function setAddresses(uint256 _l1ChainId) external;
+
+    function registerBaseTokenOnGateway(TokenBridgingData calldata _baseTokenBridgingData) external;
 
     function handleChainBalanceIncreaseOnGateway(
         uint256 _chainId,
@@ -18,7 +25,7 @@ interface IGWAssetTracker {
 
     function initiateGatewayToL1MigrationOnGateway(uint256 _chainId, bytes32 _assetId) external;
 
-    function confirmMigrationOnGateway(ConfirmBalanceMigrationData calldata _tokenBalanceMigrationData) external;
+    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
 
     function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external;
 

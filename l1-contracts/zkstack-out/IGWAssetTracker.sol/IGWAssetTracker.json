@@ -6,7 +6,7 @@
       {
         "name": "_tokenBalanceMigrationData",
         "type": "tuple",
-        "internalType": "struct ConfirmBalanceMigrationData",
+        "internalType": "struct TokenBalanceMigrationData",
         "components": [
           {
             "name": "version",
@@ -19,6 +19,11 @@
             "internalType": "bool"
           },
           {
+            "name": "originToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
             "name": "chainId",
             "type": "uint256",
             "internalType": "uint256"
@@ -29,12 +34,22 @@
             "internalType": "bytes32"
           },
           {
-            "name": "migrationNumber",
+            "name": "tokenOriginChainId",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
             "name": "amount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "chainMigrationNumber",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "assetMigrationNumber",
             "type": "uint256",
             "internalType": "uint256"
           }
@@ -201,6 +216,36 @@
   },
   {
     "type": "function",
+    "name": "registerBaseTokenOnGateway",
+    "inputs": [
+      {
+        "name": "_baseTokenBridgingData",
+        "type": "tuple",
+        "internalType": "struct TokenBridgingData",
+        "components": [
+          {
+            "name": "assetId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "originChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "originToken",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "requestPauseDepositsForChain",
     "inputs": [
       {
@@ -242,5 +287,24 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "GatewayToL1MigrationInitiated",
+    "inputs": [
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
   }
 ]

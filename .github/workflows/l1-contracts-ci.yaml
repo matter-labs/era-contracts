@@ -234,6 +234,7 @@ jobs:
       #   working-directory: ./l1-contracts
       #   run: forge test --match-test MeasureGas --gas-snapshot-check=true
 
+  # FIXME: uncomment once fixed.
   test-foundry-zksync:
     needs: [build, lint]
     runs-on: ubuntu-latest

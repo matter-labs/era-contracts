@@ -175,6 +175,25 @@
   },
   {
     "type": "function",
+    "name": "chainTree",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "_nextLeafIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "currentChainBatchNumber",
     "inputs": [
       {
@@ -220,6 +239,25 @@
         "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getMerklePathForChain",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
       }
     ],
     "stateMutability": "view"
@@ -677,6 +715,19 @@
   },
   {
     "type": "function",
+    "name": "totalPublishedInteropRoots",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "updateFullTree",
     "inputs": [],
     "outputs": [],
@@ -844,6 +895,11 @@
   {
     "type": "error",
     "name": "MerkleIndexOutOfBounds",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MerkleNothingToProve",
     "inputs": []
   },
   {

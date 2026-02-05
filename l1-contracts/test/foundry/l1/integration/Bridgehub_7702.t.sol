@@ -92,16 +92,35 @@ contract Bridgehub_7702 is BridgehubInvariantTests {
         SimpleExecutor(randomCaller).execute(address(addresses.bridgehub), mintValue, calldataForExecutor);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
+        // Verify logs were emitted
+        assertTrue(logs.length > 0, "Deposit should emit at least one log event");
+
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
-        assertEq(currentUser, address(uint160(request.transaction.from)));
-        assertNotEq(request.txHash, bytes32(0));
+        // Verify the transaction was created correctly
+        assertEq(
+            currentUser,
+            address(uint160(request.transaction.from)),
+            "Transaction sender should be the current user"
+        );
+        assertNotEq(request.txHash, bytes32(0), "Transaction hash should not be zero");
+        assertTrue(request.transaction.to != 0, "Transaction recipient should not be zero");
+        assertEq(request.transaction.value, l2Value, "Transaction value should match l2Value");
+
         _handleRequestByMockL2Contract(request, RequestType.DIRECT);
 
+        // Update tracking variables and verify they were updated
         depositsUsers[currentUser][ETH_TOKEN_ADDRESS] += mintValue;
         depositsBridge[currentChainAddress][ETH_TOKEN_ADDRESS] += mintValue;
         tokenSumDeposit[ETH_TOKEN_ADDRESS] += mintValue;
         l2ValuesSum[ETH_TOKEN_ADDRESS] += l2Value;
+
+        // Verify tracking variables are consistent
+        assertTrue(
+            depositsUsers[currentUser][ETH_TOKEN_ADDRESS] >= mintValue,
+            "User deposit tracking should be updated"
+        );
+        assertTrue(tokenSumDeposit[ETH_TOKEN_ADDRESS] >= mintValue, "Token sum deposit should be updated");
     }
 
     function depositEthSuccess(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 l2Value) public {

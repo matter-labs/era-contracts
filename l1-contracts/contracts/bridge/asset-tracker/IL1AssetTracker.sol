@@ -6,6 +6,8 @@ import {FinalizeL1DepositParams} from "../../common/Messaging.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 
 interface IL1AssetTracker {
+    event PauseDepositsForChainRequested(uint256 indexed chainId, uint256 indexed settlementLayer);
+
     function BRIDGE_HUB() external view returns (IBridgehubBase);
 
     function handleChainBalanceIncreaseOnL1(
