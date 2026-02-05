@@ -243,7 +243,7 @@ abstract contract ChainAssetHandlerBase is
         });
         bridgehubMintData = abi.encode(bridgeMintStruct);
 
-        emit MigrationStarted(bridgehubBurnData.chainId, _assetId, _settlementChainId);
+        emit MigrationStarted(bridgehubBurnData.chainId, migrationNumber[bridgehubBurnData.chainId], _assetId, _settlementChainId);
     }
 
     function _setMigrationInProgressOnL1(uint256 _chainId) internal virtual {}
@@ -300,7 +300,7 @@ abstract contract ChainAssetHandlerBase is
 
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);
 
-        emit MigrationFinalized(bridgehubMintData.chainId, _assetId, zkChain);
+        emit MigrationFinalized(bridgehubMintData.chainId, bridgehubMintData.migrationNumber, _assetId, zkChain);
     }
 
     /*//////////////////////////////////////////////////////////////
