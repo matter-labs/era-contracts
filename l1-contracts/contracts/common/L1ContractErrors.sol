@@ -113,6 +113,8 @@ error EmptyDeposit();
 error EmptyPrecommitData(uint256 batchNumber);
 // 0x456f8f7a
 error EmptyProofLength();
+// 0x05410cbc
+error EmptyPublicInputsLength();
 // 0x876e8b23
 error EraBytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0x627e0872
