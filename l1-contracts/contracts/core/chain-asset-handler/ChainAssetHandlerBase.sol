@@ -13,7 +13,7 @@ import {TokenBridgingData} from "../../common/Messaging.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
-import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol";
@@ -24,7 +24,7 @@ import {ChainIdNotRegistered, MigrationPaused, NotAssetRouter} from "../../commo
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetHandlerModifiers} from "../../bridge/interfaces/AssetHandlerModifiers.sol";
-import {IChainAssetHandler} from "./IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "./IChainAssetHandler.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -45,18 +45,23 @@ abstract contract ChainAssetHandlerBase is
     //////////////////////////////////////////////////////////////*/
 
     /// @notice The asset ID of ETH token
+    // solhint-disable-next-line func-name-mixedcase
     function ETH_TOKEN_ASSET_ID() external view virtual returns (bytes32);
 
     /// @notice The chain ID of L1
+    // solhint-disable-next-line func-name-mixedcase
     function L1_CHAIN_ID() external view virtual returns (uint256);
 
     /// @notice The bridgehub contract
+    // solhint-disable-next-line func-name-mixedcase
     function BRIDGEHUB() external view virtual returns (IL1Bridgehub);
 
     /// @notice The message root contract
+    // solhint-disable-next-line func-name-mixedcase
     function MESSAGE_ROOT() external view virtual returns (IMessageRootBase);
 
     /// @notice The asset router contract
+    // solhint-disable-next-line func-name-mixedcase
     function ASSET_ROUTER() external view virtual returns (IAssetRouterBase);
 
     /*//////////////////////////////////////////////////////////////
@@ -235,7 +240,7 @@ abstract contract ChainAssetHandlerBase is
         require(migrationNumber[bridgehubBurnData.chainId] < 2, IteratedMigrationsNotSupported());
         ++migrationNumber[bridgehubBurnData.chainId];
 
-        uint256 batchNumber = IMessageRoot(_messageRoot()).currentChainBatchNumber(bridgehubBurnData.chainId);
+        uint256 batchNumber = _messageRoot().currentChainBatchNumber(bridgehubBurnData.chainId);
 
         bytes32 assetId = IBridgehubBase(_bridgehub()).baseTokenAssetId(bridgehubBurnData.chainId);
         TokenBridgingData memory baseTokenBridgingData = TokenBridgingData({
@@ -305,16 +310,13 @@ abstract contract ChainAssetHandlerBase is
             }
             // We want to allow any chain to be migrated,
             IBridgehubBase(_bridgehub()).registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
-            IMessageRoot(_messageRoot()).addNewChain(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
+            _messageRoot().addNewChain(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
         } else {
             // Note, that here we rely on the correctness of the provided data.
             // A malicious settlement layer could provide invalid values here.
             // To support untrusted CTMs, we would need to at the very least enforce
             // that the `v31UpgradeChainBatchNumber` is not in conflict with the existing values.
-            IMessageRoot(_messageRoot()).setMigratingChainBatchRoot(
-                bridgehubMintData.chainId,
-                bridgehubMintData.batchNumber
-            );
+            _messageRoot().setMigratingChainBatchRoot(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
         }
 
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);

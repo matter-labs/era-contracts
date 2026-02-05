@@ -3,7 +3,7 @@
 pragma solidity ^0.8.24;
 
 import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
-import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 
 /// @author Matter Labs
@@ -24,7 +24,7 @@ interface IChainAssetHandlerShared {
     function BRIDGEHUB() external view returns (IL1Bridgehub);
 
     /// @notice The message root contract
-    function MESSAGE_ROOT() external view returns (IMessageRoot);
+    function MESSAGE_ROOT() external view returns (IMessageRootBase);
 
     /// @notice The asset router contract
     function ASSET_ROUTER() external view returns (IAssetRouterBase);

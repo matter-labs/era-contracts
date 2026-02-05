@@ -44,9 +44,9 @@ import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
-import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
-import {IMessageRoot, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
 import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 import {NotMigrated} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
@@ -110,7 +110,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.proxies.messageRoot),
-            abi.encodeWithSelector(IMessageRoot.getProofData.selector),
+            abi.encodeWithSelector(IMessageRootBase.getProofData.selector),
             abi.encode(
                 ProofData({
                     settlementLayerChainId: 0,
@@ -276,7 +276,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         // Verify migration number was reset
         assertEq(
-            IChainAssetHandler(chainAssetHandler).migrationNumber(migratingChainId),
+            IChainAssetHandlerBase(chainAssetHandler).migrationNumber(migratingChainId),
             0,
             "Migration number should be 0 after failed migration"
         );
@@ -378,7 +378,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             batchNumber: 0,
             ctmData: ctmData,
             chainData: chainData,
-            migrationNumber: IChainAssetHandler(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
+            migrationNumber: IChainAssetHandlerBase(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
                 .migrationNumber(migratingChainId)
         });
         bytes memory bridgehubMintData = abi.encode(data);
@@ -664,7 +664,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         // Sanity check before
         assertNotEq(addresses.l1Nullifier.depositHappened(migratingChainId, merkleProofData.l2TxHash), 0x00);
-        assertEq(IChainAssetHandler(chainAssetHandler).migrationNumber(migratingChainId), 1);
+        assertEq(IChainAssetHandlerBase(chainAssetHandler).migrationNumber(migratingChainId), 1);
 
         vm.recordLogs();
         addresses.l1Nullifier.bridgeConfirmTransferResult(transferResultData);
@@ -684,7 +684,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             assertEq(isMigrationInProgress, false);
         }
 
-        uint256 migrationNumber = IChainAssetHandler(chainAssetHandler).migrationNumber(migratingChainId);
+        uint256 migrationNumber = IChainAssetHandlerBase(chainAssetHandler).migrationNumber(migratingChainId);
         uint256 settlementLayer = bridgehub.settlementLayer(migratingChainId);
         if (txStatus == TxStatus.Success) {
             assertEq(migrationNumber, 1);

@@ -16,7 +16,7 @@ import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifier
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
@@ -67,7 +67,7 @@ contract MailboxOnGatewayTest is UtilsCallMockerTest {
         );
         vm.mockCall(
             address(chainAssetHandler),
-            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
+            abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
             abi.encode(1)
         );
 

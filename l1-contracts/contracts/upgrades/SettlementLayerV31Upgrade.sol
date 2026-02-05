@@ -6,9 +6,9 @@ import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {L2_GENESIS_UPGRADE_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {IMessageRoot} from "../core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
-import {IChainAssetHandler} from "../core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHandler.sol";
 import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 import {IL2V31Upgrade} from "./IL2V31Upgrade.sol";
@@ -58,8 +58,8 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
         proposedUpgrade.l2ProtocolUpgradeTx.data = complexUpgraderCalldata;
         super.upgrade(proposedUpgrade);
-        IChainAssetHandler chainAssetHandler = IChainAssetHandler(bridgehub.chainAssetHandler());
-        IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());
+        IChainAssetHandlerBase chainAssetHandler = IChainAssetHandlerBase(bridgehub.chainAssetHandler());
+        IMessageRootBase messageRoot = bridgehub.messageRoot();
 
         // The lines below ensure that chains can only upgrade once the ZK Gateway itself is upgraded,
         // i.e. its minor protocol version is at least 30. Note, we use The tuple of (major, minor, patch)

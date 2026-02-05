@@ -15,7 +15,7 @@ import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 import {SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
 import {SettlementLayersMustSettleOnL1} from "../../common/L1ContractErrors.sol";
@@ -85,7 +85,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             revert SettlementLayersMustSettleOnL1();
         }
         whitelistedSettlementLayers[_settlementLayerChainId] = _isWhitelisted;
-        emit SettlementLayerStatusSet(_settlementLayerChainId, _isWhitelisted);
+        emit SettlementLayerRegistered(_settlementLayerChainId, _isWhitelisted);
     }
 
     /// @notice Register new chain. New chains can be only registered on Bridgehub deployed on L1. Later they can be moved to any other layer.
@@ -258,7 +258,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     function setAddresses(
         address _assetRouter,
         ICTMDeploymentTracker _l1CtmDeployer,
-        IMessageRoot _messageRoot,
+        IMessageRootBase _messageRoot,
         address _chainAssetHandler,
         address _chainRegistrationSender
     ) external override onlyOwnerOrUpgrader {

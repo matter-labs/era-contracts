@@ -10,7 +10,6 @@ import {IL1SharedBridgeLegacy} from "../interfaces/IL1SharedBridgeLegacy.sol";
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
-import {IL1CrossChainSender} from "../interfaces/IL1CrossChainSender.sol";
 import {TxStatus} from "../../common/Messaging.sol";
 
 /// @title L1 Bridge contract interface

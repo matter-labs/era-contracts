@@ -78,7 +78,7 @@ contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier {
         if (_proof[0] >> 40 != 0) {
             revert InvalidProofFormat();
         }
-        
+
         if (plonkVerifiers[verifierVersion] == IVerifier(address(0))) {
             revert UnknownVerifierVersion();
         }

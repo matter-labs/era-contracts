@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
-import {IMessageRoot} from "../../../core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../../../core/message-root/IMessageRoot.sol";
 import {COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAINNET_CHAIN_ID, MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PACKED_L2_PRECOMMITMENT_LENGTH, PUBLIC_INPUT_SHIFT, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH} from "../../../common/Config.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, LogProcessingOutput, MAX_LOG_KEY, ProcessLogsInput, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
@@ -731,7 +731,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         InteropRoot[] memory _dependencyRoots
     ) internal view returns (bytes32 dependencyRootsRollingHash) {
         uint256 length = _dependencyRoots.length;
-        IMessageRoot messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
+        IMessageRootBase messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
 
         for (uint256 i = 0; i < length; ++i) {
             InteropRoot memory interopRoot = _dependencyRoots[i];
@@ -767,7 +767,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @dev We only call this function on L1.
     function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
         // Once the batch is executed, we include its message to the message root.
-        IMessageRoot messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
+        IMessageRootBase messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
         messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
     }
 

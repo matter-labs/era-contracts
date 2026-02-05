@@ -220,7 +220,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             vm.startBroadcast(msg.sender);
             ZKsyncOSDualVerifier(ctmAddresses.stateTransition.verifiers.verifier).addVerifier(
                 DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
-                IVerifierV2(ctmAddresses.stateTransition.verifiers.verifierFflonk),
                 IVerifier(ctmAddresses.stateTransition.verifiers.verifierPlonk)
             );
             ZKsyncOSDualVerifier(ctmAddresses.stateTransition.verifiers.verifier).transferOwnership(

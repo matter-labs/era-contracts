@@ -8,7 +8,6 @@ import {ZKsyncOSDualVerifier} from "../../verifiers/ZKsyncOSDualVerifier.sol";
 import {ZKsyncOSTestnetVerifier} from "../../verifiers/ZKsyncOSTestnetVerifier.sol";
 
 import {IVerifier} from "../../chain-interfaces/IVerifier.sol";
-import {IVerifierV2} from "../../chain-interfaces/IVerifierV2.sol";
 
 import {WrongCTMDeployerVariant} from "../../../common/L1ContractErrors.sol";
 
@@ -52,10 +51,7 @@ contract GatewayCTMDeployerVerifiersZKsyncOS {
             );
         } else {
             result.verifier = address(
-                new ZKsyncOSDualVerifier{salt: salt}(
-                    IVerifier(result.verifierPlonk),
-                    _config.aliasedGovernanceAddress
-                )
+                new ZKsyncOSDualVerifier{salt: salt}(IVerifier(result.verifierPlonk), _config.aliasedGovernanceAddress)
             );
         }
 

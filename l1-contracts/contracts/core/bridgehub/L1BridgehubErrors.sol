@@ -46,8 +46,6 @@ error NotChainAssetHandler(address sender, address chainAssetHandler);
 error NotCurrentSettlementLayer(uint256 currentSettlementLayer, uint256 newSettlementLayer);
 // 0x472477e2
 error NotInGatewayMode();
-// 0x8eb4fc01
-error NotL2();
 // 0x23295f0e
 error NotOwner(address sender, address owner);
 // 0x693cd3dc

@@ -99,18 +99,18 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         );
 
         address serverNotifierProxyAdmin = address(new ProxyAdmin());
-        addresses.stateTransition.serverNotifierImplementation = address(new ServerNotifier());
-        addresses.stateTransition.serverNotifierProxy = address(
+        ctmAddresses.stateTransition.implementations.serverNotifier = address(new ServerNotifier());
+        ctmAddresses.stateTransition.proxies.serverNotifier = address(
             new TransparentUpgradeableProxy(
-                addresses.stateTransition.serverNotifierImplementation,
+                ctmAddresses.stateTransition.implementations.serverNotifier,
                 serverNotifierProxyAdmin,
-                abi.encodeCall(ServerNotifier.initialize, (addresses.chainAdmin))
+                abi.encodeCall(ServerNotifier.initialize, (ctmAddresses.chainAdmin))
             )
         );
 
-        addresses.stateTransition.executorFacet = address(new ExecutorFacet(config.l1ChainId));
-        addresses.stateTransition.adminFacet = address(
-            new AdminFacet(config.l1ChainId, RollupDAManager(addresses.daAddresses.rollupDAManager), true)
+        ctmAddresses.stateTransition.facets.executorFacet = address(new ExecutorFacet(config.l1ChainId));
+        ctmAddresses.stateTransition.facets.adminFacet = address(
+            new AdminFacet(config.l1ChainId, RollupDAManager(ctmAddresses.daAddresses.rollupDAManager), true)
         );
         ctmAddresses.stateTransition.facets.mailboxFacet = address(
             new MailboxFacet(

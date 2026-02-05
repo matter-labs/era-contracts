@@ -8,7 +8,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {InvalidCaller} from "../../common/L1ContractErrors.sol";
 import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
-import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IChainAssetHandlerShared} from "./IChainAssetHandlerShared.sol";
 
@@ -22,27 +22,27 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase, IChainAssetHandlerShared 
     /// @dev The assetId of the ETH.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    bytes32 public override ETH_TOKEN_ASSET_ID;
+    bytes32 public override(ChainAssetHandlerBase, IChainAssetHandlerShared) ETH_TOKEN_ASSET_ID;
 
     /// @dev The chain ID of L1.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    uint256 public override L1_CHAIN_ID;
+    uint256 public override(ChainAssetHandlerBase, IChainAssetHandlerShared) L1_CHAIN_ID;
 
     /// @dev The bridgehub contract.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    IL1Bridgehub public override BRIDGEHUB;
+    IL1Bridgehub public override(ChainAssetHandlerBase, IChainAssetHandlerShared) BRIDGEHUB;
 
     /// @dev The message root contract.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    IMessageRootBase public override MESSAGE_ROOT;
+    IMessageRootBase public override(ChainAssetHandlerBase, IChainAssetHandlerShared) MESSAGE_ROOT;
 
     /// @dev The asset router contract.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    IAssetRouterBase public override ASSET_ROUTER;
+    IAssetRouterBase public override(ChainAssetHandlerBase, IChainAssetHandlerShared) ASSET_ROUTER;
 
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS

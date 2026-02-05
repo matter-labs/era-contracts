@@ -6,7 +6,7 @@ import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializabl
 
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 
-import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH} from "./IMessageRoot.sol";
+import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRootBase, SHARED_ROOT_TREE_EMPTY_HASH} from "./IMessageRoot.sol";
 import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, DepthMoreThanOneForRecursiveMerkleProof, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyChain, OnlyL1} from "../bridgehub/L1BridgehubErrors.sol";
 
 import {GW_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
@@ -25,7 +25,7 @@ import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
 /// @dev From V31 onwards it is also used for L2->L1 message verification, this allows bypassing the Mailbox of individual chains.
 /// This is especially useful for chains settling on Gateway.
-abstract contract MessageRootBase is IMessageRoot, ReentrancyGuard, Initializable, MessageVerification {
+abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initializable, MessageVerification {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 

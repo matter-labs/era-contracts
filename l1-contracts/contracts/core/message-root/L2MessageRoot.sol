@@ -41,6 +41,7 @@ contract L2MessageRoot is MessageRootBase {
     }
 
     // A method for backwards compatibility with the old implementation
+    // solhint-disable-next-line func-name-mixedcase
     function BRIDGE_HUB() public pure returns (address) {
         return L2_BRIDGEHUB_ADDR;
     }

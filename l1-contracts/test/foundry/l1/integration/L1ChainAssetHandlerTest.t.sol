@@ -9,7 +9,7 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
-import {IMessageRoot, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
@@ -20,7 +20,7 @@ import {L2Message} from "contracts/common/Messaging.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
@@ -95,7 +95,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler),
-            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
+            abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
             abi.encode(0)
         );
         vm.mockCall(
@@ -133,17 +133,17 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         assertTrue(eraChain != address(0), "Era chain address should be valid");
 
         // Get migration number before the call
-        uint256 migrationNumberBefore = IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler)
+        uint256 migrationNumberBefore = IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler)
             .migrationNumber(eraZKChainId);
 
         // Call the function as the ZK chain
         vm.prank(eraChain);
-        IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).setMigrationNumberForV31(
+        IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).setMigrationNumberForV31(
             eraZKChainId
         );
 
         // Verify migration number was set (should be incremented or set to a specific value)
-        uint256 migrationNumberAfter = IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler)
+        uint256 migrationNumberAfter = IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler)
             .migrationNumber(eraZKChainId);
         assertTrue(
             migrationNumberAfter >= migrationNumberBefore,
@@ -154,7 +154,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
     function test_setMigrationNumberForV31_NotChain() public {
         address eraChain = IBridgehubBase(ecosystemAddresses.bridgehub.proxies.bridgehub).getZKChain(eraZKChainId);
         vm.expectRevert();
-        IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).setMigrationNumberForV31(
+        IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).setMigrationNumberForV31(
             eraZKChainId
         );
     }
@@ -167,11 +167,11 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         assertTrue(owner != address(0), "Owner should be a valid address");
 
         vm.prank(owner);
-        IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).pauseMigration();
+        IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).pauseMigration();
 
         // Verify migration is paused
         assertTrue(
-            IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
+            IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
             "Migration should be paused after calling pauseMigration"
         );
     }
@@ -182,21 +182,21 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         // First pause migration
         vm.prank(owner);
-        IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).pauseMigration();
+        IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).pauseMigration();
 
         // Verify migration is paused
         assertTrue(
-            IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
+            IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
             "Migration should be paused before unpause"
         );
 
         // Now unpause migration
         vm.prank(owner);
-        IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).unpauseMigration();
+        IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).unpauseMigration();
 
         // Verify migration is no longer paused
         assertFalse(
-            IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
+            IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
             "Migration should not be paused after calling unpauseMigration"
         );
     }
@@ -237,16 +237,16 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
 
     function test_bridgeBurn_Failed() public {
         vm.expectRevert();
-        IChainAssetHandler(address(l2ChainAssetHandler)).bridgeBurn(eraZKChainId, 0, 0, address(0), "");
+        IChainAssetHandlerBase(address(l2ChainAssetHandler)).bridgeBurn(eraZKChainId, 0, 0, address(0), "");
 
         address owner = Ownable2StepUpgradeable(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
             .owner();
         vm.prank(address(0));
-        IChainAssetHandler(address(l2ChainAssetHandler)).pauseMigration();
+        IChainAssetHandlerBase(address(l2ChainAssetHandler)).pauseMigration();
 
         vm.expectRevert();
         vm.prank(address(0));
-        IChainAssetHandler(address(l2ChainAssetHandler)).bridgeBurn(eraZKChainId, 0, 0, address(0), "");
+        IChainAssetHandlerBase(address(l2ChainAssetHandler)).bridgeBurn(eraZKChainId, 0, 0, address(0), "");
     }
 
     function test_setSettlementLayerChainId_Success() public {
@@ -256,14 +256,16 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         assertTrue(systemContext != address(0), "System context address should be valid");
 
         // Get migration number before the call
-        uint256 migrationNumBefore = IChainAssetHandler(address(l2ChainAssetHandler)).migrationNumber(block.chainid);
+        uint256 migrationNumBefore = IChainAssetHandlerBase(address(l2ChainAssetHandler)).migrationNumber(
+            block.chainid
+        );
 
         // Set the settlement layer chain ID (same chain ID = no migration increment)
         vm.prank(systemContext);
         l2ChainAssetHandler.setSettlementLayerChainId(eraZKChainId, eraZKChainId);
 
         // When previous and current are the same, migration number should not change
-        uint256 migrationNumAfter = IChainAssetHandler(address(l2ChainAssetHandler)).migrationNumber(block.chainid);
+        uint256 migrationNumAfter = IChainAssetHandlerBase(address(l2ChainAssetHandler)).migrationNumber(block.chainid);
         assertEq(
             migrationNumAfter,
             migrationNumBefore,

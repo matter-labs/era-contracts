@@ -34,7 +34,6 @@ contract L2WETH is ReentrancyGuard, ERC20PermitUpgradeable, IL2WETH, IL2Standard
     /// @param symbol_ The symbol of the token.
     /// Note: The decimals are hardcoded to 18, the same as on Ether.
     function initL2(string memory name_, string memory symbol_) external onlyUpgrader initializer {
-
         // Set decoded values for name and symbol.
         __ERC20_init_unchained(name_, symbol_);
 

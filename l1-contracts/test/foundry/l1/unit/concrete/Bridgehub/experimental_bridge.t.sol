@@ -30,7 +30,7 @@ import {Utils} from "../Utils/Utils.sol";
 
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, MAX_NEW_FACTORY_DEPS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
 
@@ -478,7 +478,7 @@ contract ExperimentalBridgeTest is Test {
         bridgehub.setAddresses(
             address(mockSharedBridge),
             ICTMDeploymentTracker(address(0)),
-            IMessageRoot(address(0)),
+            IMessageRootBase(address(0)),
             address(0),
             address(0)
         );
@@ -518,7 +518,7 @@ contract ExperimentalBridgeTest is Test {
         bridgehub.setAddresses(
             address(mockSharedBridge),
             ICTMDeploymentTracker(address(0)),
-            IMessageRoot(address(0)),
+            IMessageRootBase(address(0)),
             address(0),
             address(0)
         );
@@ -553,13 +553,13 @@ contract ExperimentalBridgeTest is Test {
     function test_setAddresses(address randomAssetRouter, address randomCTMDeployer, address randomMessageRoot) public {
         assertTrue(address(bridgehub.assetRouter()) == address(0), "Shared bridge is already there");
         assertTrue(bridgehub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
-        assertTrue(bridgehub.messageRoot() == IMessageRoot(address(0)), "Message root is already there");
+        assertTrue(bridgehub.messageRoot() == IMessageRootBase(address(0)), "Message root is already there");
 
         vm.prank(bridgeOwner);
         bridgehub.setAddresses(
             randomAssetRouter,
             ICTMDeploymentTracker(randomCTMDeployer),
-            IMessageRoot(randomMessageRoot),
+            IMessageRootBase(randomMessageRoot),
             address(0),
             address(0)
         );
@@ -569,7 +569,7 @@ contract ExperimentalBridgeTest is Test {
             bridgehub.l1CtmDeployer() == ICTMDeploymentTracker(randomCTMDeployer),
             "L1 CTM deployer is already there"
         );
-        assertTrue(bridgehub.messageRoot() == IMessageRoot(randomMessageRoot), "Message root is already there");
+        assertTrue(bridgehub.messageRoot() == IMessageRootBase(randomMessageRoot), "Message root is already there");
     }
 
     function test_setAddresses_cannotBeCalledByRandomAddress(
@@ -585,14 +585,14 @@ contract ExperimentalBridgeTest is Test {
         bridgehub.setAddresses(
             randomAssetRouter,
             ICTMDeploymentTracker(randomCTMDeployer),
-            IMessageRoot(randomMessageRoot),
+            IMessageRootBase(randomMessageRoot),
             address(0),
             address(0)
         );
 
         assertTrue(address(bridgehub.assetRouter()) == address(0), "Shared bridge is already there");
         assertTrue(bridgehub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
-        assertTrue(bridgehub.messageRoot() == IMessageRoot(address(0)), "Message root is already there");
+        assertTrue(bridgehub.messageRoot() == IMessageRootBase(address(0)), "Message root is already there");
     }
 
     uint256 newChainId;

@@ -12,7 +12,7 @@ import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1AssetHandler} from "../../bridge/interfaces/IL1AssetHandler.sol";
 import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
-import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IChainAssetHandlerShared} from "./IChainAssetHandlerShared.sol";
 import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
@@ -27,19 +27,19 @@ import {ChainIdMismatch, CTMNotRegistered} from "../../common/L1ContractErrors.s
 /// @dev L1 version – keeps the cheap immutables set in the constructor.
 contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1ChainAssetHandler, IChainAssetHandlerShared {
     /// @dev The assetId of the ETH.
-    bytes32 public immutable override ETH_TOKEN_ASSET_ID;
+    bytes32 public immutable override(ChainAssetHandlerBase, IChainAssetHandlerShared) ETH_TOKEN_ASSET_ID;
 
     /// @dev The chain ID of L1.
-    uint256 public immutable override L1_CHAIN_ID;
+    uint256 public immutable override(ChainAssetHandlerBase, IChainAssetHandlerShared) L1_CHAIN_ID;
 
     /// @dev The bridgehub contract.
-    IL1Bridgehub public immutable override BRIDGEHUB;
+    IL1Bridgehub public immutable override(ChainAssetHandlerBase, IChainAssetHandlerShared) BRIDGEHUB;
 
     /// @dev The message root contract.
-    IMessageRootBase public immutable override MESSAGE_ROOT;
+    IMessageRootBase public immutable override(ChainAssetHandlerBase, IChainAssetHandlerShared) MESSAGE_ROOT;
 
     /// @dev The asset router contract.
-    IAssetRouterBase public immutable override ASSET_ROUTER;
+    IAssetRouterBase public immutable override(ChainAssetHandlerBase, IChainAssetHandlerShared) ASSET_ROUTER;
 
     /// @dev The asset tracker contract.
     address internal immutable ASSET_TRACKER;

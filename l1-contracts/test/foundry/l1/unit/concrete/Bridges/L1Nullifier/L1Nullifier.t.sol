@@ -11,7 +11,7 @@ import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
@@ -70,7 +70,7 @@ contract L1NullifierTest is Test {
 
         l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehub),
-            _messageRoot: IMessageRoot(messageRoot),
+            _messageRoot: IMessageRootBase(messageRoot),
             _interopCenter: IInteropCenter(interopCenter),
             _eraChainId: ERA_CHAIN_ID,
             _eraDiamondProxy: eraDiamondProxy
@@ -96,7 +96,7 @@ contract L1NullifierTest is Test {
     function test_Initialize_RevertWhen_OwnerIsZeroAddress() public {
         L1NullifierDev impl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehub),
-            _messageRoot: IMessageRoot(messageRoot),
+            _messageRoot: IMessageRootBase(messageRoot),
             _interopCenter: IInteropCenter(interopCenter),
             _eraChainId: ERA_CHAIN_ID,
             _eraDiamondProxy: eraDiamondProxy

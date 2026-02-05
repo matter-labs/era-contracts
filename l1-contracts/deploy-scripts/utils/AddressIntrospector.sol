@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";

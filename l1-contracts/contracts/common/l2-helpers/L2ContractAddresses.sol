@@ -9,14 +9,14 @@ import {IBaseToken} from "./IBaseToken.sol";
 import {IL2ContractDeployer} from "../interfaces/IL2ContractDeployer.sol";
 import {IL2NativeTokenVault} from "../../bridge/ntv/IL2NativeTokenVault.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
-import {IChainAssetHandler} from "../../core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "../../core/chain-asset-handler/IChainAssetHandler.sol";
 import {IInteropCenter} from "../../interop/IInteropCenter.sol";
 import {IInteropHandler} from "../../interop/IInteropHandler.sol";
 import {IL2AssetRouter} from "../../bridge/asset-router/IL2AssetRouter.sol";
 import {IL2AssetTracker} from "../../bridge/asset-tracker/IL2AssetTracker.sol";
 import {IGWAssetTracker} from "../../bridge/asset-tracker/IGWAssetTracker.sol";
 import {ISystemContext} from "../interfaces/ISystemContext.sol";
-import {IMessageRoot} from "../../core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
 
 /// @dev the offset for the system hooks for ZKsync OS
 uint160 constant SYSTEM_HOOKS_OFFSET = 0x7000;
@@ -121,7 +121,7 @@ IL2NativeTokenVault constant L2_NATIVE_TOKEN_VAULT = IL2NativeTokenVault(L2_NATI
 
 /// @dev the address of the l2 asset router.
 address constant L2_MESSAGE_ROOT_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x05);
-IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(L2_MESSAGE_ROOT_ADDR);
+IMessageRootBase constant L2_MESSAGE_ROOT = IMessageRootBase(L2_MESSAGE_ROOT_ADDR);
 
 /// @dev The address of the SloadContract system contract, which provides a method to read values from arbitrary storage slots
 address constant SLOAD_CONTRACT_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x06);
@@ -139,7 +139,7 @@ IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(add
 
 /// @dev The address of the L2 chain handler system contract
 address constant L2_CHAIN_ASSET_HANDLER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0a);
-IChainAssetHandler constant L2_CHAIN_ASSET_HANDLER = IChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR);
+IChainAssetHandlerBase constant L2_CHAIN_ASSET_HANDLER = IChainAssetHandlerBase(L2_CHAIN_ASSET_HANDLER_ADDR);
 
 /// @dev UpgradeableBeaconDeployer that's responsible for deploying the upgradeable beacons for the bridged standard ERC20 tokens
 /// @dev Besides separation of concerns, we need it as a separate contract to ensure that L2NativeTokenVaultZKOS

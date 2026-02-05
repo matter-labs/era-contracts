@@ -14,7 +14,7 @@ import {BatchHashMismatch, CantExecuteUnprovenBatches, NonSequentialBatch, Prior
 import {PriorityOpsBatchInfo, PriorityTree} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InteropRoot} from "contracts/common/Messaging.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 
 contract ExecutingTest is ExecutorTest {
     using stdStorage for StdStorage;
@@ -178,7 +178,7 @@ contract ExecutingTest is ExecutorTest {
             );
         vm.mockCall(
             address(messageRoot),
-            abi.encodeWithSelector(IMessageRoot.addChainBatchRoot.selector, 9, 10, bytes32(0)),
+            abi.encodeWithSelector(IMessageRootBase.addChainBatchRoot.selector, 9, 10, bytes32(0)),
             abi.encode()
         );
 

@@ -4,28 +4,9 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {EmptyProofLength, UnknownVerifierType, MockVerifierNotSupported} from "contracts/common/L1ContractErrors.sol";
 import {UnknownVerifierVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
-
-/// @notice Mock FFLONK verifier for testing
-contract MockFflonkVerifierOS is IVerifierV2 {
-    bytes32 public constant VK_HASH = keccak256("fflonk_os_vk");
-    bool public shouldVerify = true;
-
-    function verify(uint256[] calldata, uint256[] calldata) external view override returns (bool) {
-        return shouldVerify;
-    }
-
-    function verificationKeyHash() external pure override returns (bytes32) {
-        return VK_HASH;
-    }
-
-    function setShouldVerify(bool _value) external {
-        shouldVerify = _value;
-    }
-}
 
 /// @notice Mock PLONK verifier for testing
 contract MockPlonkVerifierOS is IVerifier {
@@ -48,7 +29,6 @@ contract MockPlonkVerifierOS is IVerifier {
 /// @notice Unit tests for ZKsyncOSDualVerifier contract
 contract ZKsyncOSDualVerifierTest is Test {
     ZKsyncOSDualVerifier public verifier;
-    MockFflonkVerifierOS public fflonkVerifier;
     MockPlonkVerifierOS public plonkVerifier;
     address public owner;
 
@@ -57,19 +37,13 @@ contract ZKsyncOSDualVerifierTest is Test {
 
     function setUp() public {
         owner = makeAddr("owner");
-        fflonkVerifier = new MockFflonkVerifierOS();
         plonkVerifier = new MockPlonkVerifierOS();
-        verifier = new ZKsyncOSDualVerifier(
-            IVerifierV2(address(fflonkVerifier)),
-            IVerifier(address(plonkVerifier)),
-            owner
-        );
+        verifier = new ZKsyncOSDualVerifier(IVerifier(address(plonkVerifier)), owner);
     }
 
     // ============ Constructor Tests ============
 
     function test_constructor_setsVerifiersAtVersion0() public view {
-        assertEq(address(verifier.fflonkVerifiers(0)), address(fflonkVerifier));
         assertEq(address(verifier.plonkVerifiers(0)), address(plonkVerifier));
     }
 
@@ -80,40 +54,35 @@ contract ZKsyncOSDualVerifierTest is Test {
     // ============ addVerifier Tests ============
 
     function test_addVerifier_ownerCanAdd() public {
-        MockFflonkVerifierOS newFflonk = new MockFflonkVerifierOS();
         MockPlonkVerifierOS newPlonk = new MockPlonkVerifierOS();
 
         vm.prank(owner);
-        verifier.addVerifier(1, IVerifierV2(address(newFflonk)), IVerifier(address(newPlonk)));
+        verifier.addVerifier(1, IVerifier(address(newPlonk)));
 
-        assertEq(address(verifier.fflonkVerifiers(1)), address(newFflonk));
         assertEq(address(verifier.plonkVerifiers(1)), address(newPlonk));
     }
 
     function test_addVerifier_revertsIfNotOwner() public {
-        MockFflonkVerifierOS newFflonk = new MockFflonkVerifierOS();
         MockPlonkVerifierOS newPlonk = new MockPlonkVerifierOS();
 
         vm.prank(makeAddr("notOwner"));
         vm.expectRevert("Ownable: caller is not the owner");
-        verifier.addVerifier(1, IVerifierV2(address(newFflonk)), IVerifier(address(newPlonk)));
+        verifier.addVerifier(1, IVerifier(address(newPlonk)));
     }
 
     // ============ removeVerifier Tests ============
 
     function test_removeVerifier_ownerCanRemove() public {
         // First add a verifier
-        MockFflonkVerifierOS newFflonk = new MockFflonkVerifierOS();
         MockPlonkVerifierOS newPlonk = new MockPlonkVerifierOS();
 
         vm.prank(owner);
-        verifier.addVerifier(1, IVerifierV2(address(newFflonk)), IVerifier(address(newPlonk)));
+        verifier.addVerifier(1, IVerifier(address(newPlonk)));
 
         // Then remove it
         vm.prank(owner);
         verifier.removeVerifier(1);
 
-        assertEq(address(verifier.fflonkVerifiers(1)), address(0));
         assertEq(address(verifier.plonkVerifiers(1)), address(0));
     }
 
@@ -219,11 +188,10 @@ contract ZKsyncOSDualVerifierTest is Test {
 
     function test_verify_withDifferentVersion() public {
         // Add verifier at version 1
-        MockFflonkVerifierOS newFflonk = new MockFflonkVerifierOS();
         MockPlonkVerifierOS newPlonk = new MockPlonkVerifierOS();
 
         vm.prank(owner);
-        verifier.addVerifier(1, IVerifierV2(address(newFflonk)), IVerifier(address(newPlonk)));
+        verifier.addVerifier(1, IVerifier(address(newPlonk)));
 
         uint256[] memory publicInputs = new uint256[](2);
         publicInputs[0] = 123;

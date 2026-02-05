@@ -6,10 +6,10 @@ import {Test} from "forge-std/Test.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {ChainExists, MessageRootNotRegistered, NotL2, OnlyChain, OnlyGateway, OnlyOnSettlementLayer, TotalBatchesExecutedZero, V31UpgradeChainBatchNumberNotSet} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {ChainExists, MessageRootNotRegistered, OnlyChain, OnlyGateway, OnlyOnSettlementLayer, TotalBatchesExecutedZero, V31UpgradeChainBatchNumberNotSet} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {Unauthorized, InvalidCaller} from "contracts/common/L1ContractErrors.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -94,7 +94,7 @@ contract MessageRoot_Extended_Test is Test {
 
         vm.prank(chainAssetHandler);
         vm.expectEmit(true, false, false, false);
-        emit IMessageRoot.AddedChain(chainId, 0);
+        emit IMessageRootBase.AddedChain(chainId, 0);
         messageRoot.addNewChain(chainId, 0);
 
         assertTrue(messageRoot.chainRegistered(chainId));
