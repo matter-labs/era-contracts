@@ -338,4 +338,132 @@ contract CommittingTest is ExecutorTest {
         vm.expectRevert(BlobNotPublished.selector);
         executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
+
+    function test_RevertWhen_BatchNumberMismatch() public {
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
+        bytes32 daCommitment = bytes32(0);
+
+        IExecutor.CommitBatchInfoZKsyncOS memory wrongBatchInfo = newCommitBatchInfoZKsyncOS;
+        wrongBatchInfo.operatorDAInput = operatorDAInput;
+        wrongBatchInfo.daCommitment = daCommitment;
+        wrongBatchInfo.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+        wrongBatchInfo.batchNumber = 5; // Wrong batch number, should be 1
+
+        IExecutor.CommitBatchInfoZKsyncOS[] memory batchArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = wrongBatchInfo;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batchArray);
+
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+
+        vm.prank(validator);
+        vm.expectRevert(abi.encodeWithSignature("BatchNumberMismatch(uint256,uint256)", 1, 5));
+        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_RevertWhen_IncorrectBatchChainId() public {
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
+        bytes32 daCommitment = bytes32(0);
+
+        IExecutor.CommitBatchInfoZKsyncOS memory wrongChainBatch = newCommitBatchInfoZKsyncOS;
+        wrongChainBatch.operatorDAInput = operatorDAInput;
+        wrongChainBatch.daCommitment = daCommitment;
+        wrongChainBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+        wrongChainBatch.chainId = 999; // Wrong chain ID
+
+        IExecutor.CommitBatchInfoZKsyncOS[] memory batchArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = wrongChainBatch;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batchArray);
+
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+
+        vm.prank(validator);
+        vm.expectRevert(abi.encodeWithSignature("IncorrectBatchChainId(uint256,uint256)", 999, l2ChainId));
+        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_RevertWhen_InvalidBlockRange() public {
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
+        bytes32 daCommitment = bytes32(0);
+
+        IExecutor.CommitBatchInfoZKsyncOS memory invalidBlockBatch = newCommitBatchInfoZKsyncOS;
+        invalidBlockBatch.operatorDAInput = operatorDAInput;
+        invalidBlockBatch.daCommitment = daCommitment;
+        invalidBlockBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+        invalidBlockBatch.firstBlockNumber = 10; // firstBlockNumber > lastBlockNumber
+        invalidBlockBatch.lastBlockNumber = 5;
+
+        IExecutor.CommitBatchInfoZKsyncOS[] memory batchArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = invalidBlockBatch;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batchArray);
+
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+
+        vm.prank(validator);
+        vm.expectRevert(abi.encodeWithSignature("InvalidBlockRange(uint64,uint64,uint64)", 1, 10, 5));
+        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_RevertWhen_L2TimestampTooBig() public {
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
+        bytes32 daCommitment = bytes32(0);
+
+        IExecutor.CommitBatchInfoZKsyncOS memory futureTimestampBatch = newCommitBatchInfoZKsyncOS;
+        futureTimestampBatch.operatorDAInput = operatorDAInput;
+        futureTimestampBatch.daCommitment = daCommitment;
+        futureTimestampBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+        // Set lastBlockTimestamp far in the future
+        futureTimestampBatch.lastBlockTimestamp = uint64(block.timestamp + 365 days);
+
+        IExecutor.CommitBatchInfoZKsyncOS[] memory batchArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = futureTimestampBatch;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batchArray);
+
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+
+        vm.prank(validator);
+        vm.expectRevert(abi.encodeWithSignature("L2TimestampTooBig()"));
+        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_RevertWhen_TimeNotReached() public {
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
+        bytes32 daCommitment = bytes32(0);
+
+        IExecutor.CommitBatchInfoZKsyncOS memory pastTimestampBatch = newCommitBatchInfoZKsyncOS;
+        pastTimestampBatch.operatorDAInput = operatorDAInput;
+        pastTimestampBatch.daCommitment = daCommitment;
+        pastTimestampBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+        // Set firstBlockTimestamp far in the past
+        pastTimestampBatch.firstBlockTimestamp = 1;
+
+        IExecutor.CommitBatchInfoZKsyncOS[] memory batchArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = pastTimestampBatch;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batchArray);
+
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+
+        vm.prank(validator);
+        vm.expectRevert(); // TimeNotReached error
+        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
 }
