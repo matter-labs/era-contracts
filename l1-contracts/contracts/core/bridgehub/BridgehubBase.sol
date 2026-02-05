@@ -17,7 +17,7 @@ import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 
 import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus, TokenBridgingData} from "../../common/Messaging.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
-import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {AlreadyCurrentSL, NotChainAssetHandler, SLNotWhitelisted} from "./L1BridgehubErrors.sol";
 import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdCantBeCurrentChain, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, NoCTMForAssetId, NotCurrentSettlementLayer, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../../common/L1ContractErrors.sol";
@@ -69,7 +69,7 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     /// @notice The contract that stores the cross-chain message root for each chain and the aggregated root.
     /// @dev Note that the message root does not contain messages from the chain it is deployed on. It may
     /// be added later on if needed.
-    IMessageRoot public override messageRoot;
+    IMessageRootBase public override messageRoot;
 
     /// @notice Mapping from chain id to encoding of the base token used for deposits / withdrawals
     mapping(uint256 chainId => bytes32) public baseTokenAssetId;
@@ -189,7 +189,7 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     function setAddresses(
         address _assetRouter,
         ICTMDeploymentTracker _l1CtmDeployer,
-        IMessageRoot _messageRoot,
+        IMessageRootBase _messageRoot,
         address _chainAssetHandler,
         address _chainRegistrationSender
     ) external virtual;

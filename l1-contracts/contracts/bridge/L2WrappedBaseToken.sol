@@ -89,7 +89,7 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
     /// Always reverts instead of minting anything!
     /// Note: Use `deposit`/`depositTo` methods instead.
     // solhint-disable-next-line no-unused-vars
-    function bridgeMint(address _to, uint256 _amount) external override onlyBridge {
+    function bridgeMint(address _to, uint256 _amount) external view override onlyBridge {
         revert BridgeMintNotImplemented();
     }
 

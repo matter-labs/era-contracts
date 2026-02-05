@@ -182,7 +182,7 @@ abstract contract Create2FactoryUtils is Script {
         string memory contractName,
         bytes memory constructorParams,
         bool isZKBytecode
-    ) internal {
+    ) internal view {
         notifyAboutDeployment(contractAddr, contractName, constructorParams, contractName, isZKBytecode);
     }
 
@@ -198,7 +198,7 @@ abstract contract Create2FactoryUtils is Script {
         bytes memory constructorParams,
         string memory displayName,
         bool isZKBytecode
-    ) internal {
+    ) internal view {
         string memory basicMessage = string.concat(displayName, " has been deployed at ", vm.toString(contractAddr));
         console.log(basicMessage);
 

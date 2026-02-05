@@ -1,66 +1,6 @@
 [
   {
     "type": "function",
-    "name": "confirmMigrationOnL2",
-    "inputs": [
-      {
-        "name": "_tokenBalanceMigrationData",
-        "type": "tuple",
-        "internalType": "struct TokenBalanceMigrationData",
-        "components": [
-          {
-            "name": "version",
-            "type": "bytes1",
-            "internalType": "bytes1"
-          },
-          {
-            "name": "isL1ToGateway",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "originToken",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "chainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "assetId",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "tokenOriginChainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "chainMigrationNumber",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "assetMigrationNumber",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "handleFinalizeBaseTokenBridgingOnL2",
     "inputs": [
       {
@@ -74,102 +14,12 @@
   },
   {
     "type": "function",
-    "name": "handleFinalizeBridgingOnL2",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "_amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_tokenOriginChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_tokenAddress",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "handleInitiateBaseTokenBridgingOnL2",
     "inputs": [
       {
         "name": "_amount",
         "type": "uint256",
         "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "handleInitiateBridgingOnL2",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "_amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_tokenOriginChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "initiateL1ToGatewayMigrationOnL2",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "migrateTokenBalanceFromNTVV31",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "registerLegacyTokenOnChain",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
       }
     ],
     "outputs": [],
@@ -194,28 +44,21 @@
     "stateMutability": "nonpayable"
   },
   {
-    "type": "event",
-    "name": "L1ToGatewayMigrationInitiated",
+    "type": "function",
+    "name": "setLegacySharedBridgeAddress",
     "inputs": [
       {
-        "name": "assetId",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "chainId",
+        "name": "_chainId",
         "type": "uint256",
-        "indexed": false,
         "internalType": "uint256"
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        "name": "_legacySharedBridgeAddress",
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    "anonymous": false
+    "outputs": [],
+    "stateMutability": "nonpayable"
   }
 ]

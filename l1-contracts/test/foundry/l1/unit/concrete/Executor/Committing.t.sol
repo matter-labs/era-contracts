@@ -6,7 +6,8 @@ import {Vm} from "forge-std/Test.sol";
 import {EVENT_INDEX, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, Utils} from "../Utils/Utils.sol";
 import {EMPTY_PREPUBLISHED_COMMITMENT, ExecutorTest, POINT_EVALUATION_PRECOMPILE_RESULT} from "./_Executor_Shared.t.sol";
 
-import {IExecutor, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {SystemLogKey} from "system-contracts/contracts/Constants.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 
 import {BLOB_DATA_OFFSET} from "../../../da-contracts-imports/CalldataDA.sol";

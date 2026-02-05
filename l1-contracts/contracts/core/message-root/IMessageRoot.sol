@@ -30,11 +30,11 @@ uint256 constant V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1 = uint2
  * @notice MessageRoot contract is responsible for storing and aggregating the roots of the batches from different chains into the MessageRoot.
  * @custom:security-contact security@matterlabs.dev
  */
-interface IMessageRoot is IMessageVerification {
+interface IMessageRootBase is IMessageVerification {
     /// @notice Emitted when a new chain is added to the MessageRoot.
     /// @param chainId The ID of the chain that is being added to the MessageRoot.
     /// @param chainIndex The index of the chain that is being added. Note, that chain where
-    /// the MessageRoot contract was deployed has chainIndex of 0, and this event is not emitted for it.
+    /// the MessageRoot contract was deployed has chainIndex of 0, and this event is being emitted for it.
     event AddedChain(uint256 indexed chainId, uint256 indexed chainIndex);
 
     /// @notice Emitted when a new chain batch root is appended to the chainTree.
@@ -46,7 +46,7 @@ interface IMessageRoot is IMessageVerification {
     /// @notice Emitted when a new chainTree root is produced and its corresponding leaf in sharedTree is updated.
     /// @param chainId The ID of the chain whose chainTree root is being updated.
     /// @param chainRoot The updated Merkle root of the chainTree after appending the latest batch root.
-    /// @param chainIdLeafHash The Merkle leaf value computed from `chainRoot` and the chain’s ID, used to update the shared tree.
+    /// @param chainIdLeafHash The Merkle leaf value computed from `chainRoot` and the chain's ID, used to update the shared tree.
     event NewChainRoot(uint256 indexed chainId, bytes32 chainRoot, bytes32 chainIdLeafHash);
 
     /// @notice Emitted whenever the sharedTree is updated, and the new InteropRoot (root of the sharedTree) is generated.

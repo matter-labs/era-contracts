@@ -15,7 +15,7 @@ import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 import {SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
 import {SettlementLayersMustSettleOnL1} from "../../common/L1ContractErrors.sol";
@@ -62,11 +62,6 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         _initializeInner();
     }
 
-    /// @notice Used to initialize the contract on L1
-    function initializeV2() external initializer {
-        _initializeInner();
-    }
-
     /// @dev Returns the asset ID of ETH token for internal use.
     function _ethTokenAssetId() internal view override returns (bytes32) {
         return ETH_TOKEN_ASSET_ID;
@@ -82,15 +77,15 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         return L1_CHAIN_ID;
     }
 
-    /// @notice Used to register a chain as a settlement layer.
-    /// @param _newSettlementLayerChainId the chainId of the chain
-    /// @param _isWhitelisted whether the chain is a whitelisted settlement layer
-    function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external onlyOwner {
-        if (settlementLayer[_newSettlementLayerChainId] != block.chainid) {
+    /// @notice Sets the whitelist status of a settlement layer.
+    /// @param _settlementLayerChainId the chainId of the settlement layer
+    /// @param _isWhitelisted whether the settlement layer should be whitelisted
+    function setSettlementLayerStatus(uint256 _settlementLayerChainId, bool _isWhitelisted) external onlyOwner {
+        if (settlementLayer[_settlementLayerChainId] != block.chainid) {
             revert SettlementLayersMustSettleOnL1();
         }
-        whitelistedSettlementLayers[_newSettlementLayerChainId] = _isWhitelisted;
-        emit SettlementLayerRegistered(_newSettlementLayerChainId, _isWhitelisted);
+        whitelistedSettlementLayers[_settlementLayerChainId] = _isWhitelisted;
+        emit SettlementLayerRegistered(_settlementLayerChainId, _isWhitelisted);
     }
 
     /// @notice Register new chain. New chains can be only registered on Bridgehub deployed on L1. Later they can be moved to any other layer.
@@ -111,7 +106,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         address _admin,
         bytes calldata _initData,
         bytes[] calldata _factoryDeps
-    ) external onlyOwnerOrAdmin nonReentrant whenNotPaused returns (uint256) {
+    ) external onlyOwnerOrAdmin nonReentrant whenNotPaused returns (uint256 chainId) {
         _validateChainParams({_chainId: _chainId, _assetId: _baseTokenAssetId, _chainTypeManager: _chainTypeManager});
 
         chainTypeManager[_chainId] = _chainTypeManager;
@@ -263,7 +258,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     function setAddresses(
         address _assetRouter,
         ICTMDeploymentTracker _l1CtmDeployer,
-        IMessageRoot _messageRoot,
+        IMessageRootBase _messageRoot,
         address _chainAssetHandler,
         address _chainRegistrationSender
     ) external override onlyOwnerOrUpgrader {

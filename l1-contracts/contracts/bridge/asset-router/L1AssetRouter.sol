@@ -9,9 +9,9 @@ import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IL2AssetRouter} from "./IL2AssetRouter.sol";
 import {LEGACY_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
-import {IL1CrossChainSender} from "../interfaces/IL1CrossChainSender.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
+import {IL1CrossChainSender} from "../interfaces/IL1CrossChainSender.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
@@ -268,7 +268,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             });
     }
 
-    /// @inheritdoc IL1AssetRouter
+    /// @inheritdoc IL1CrossChainSender
     function bridgehubConfirmL2Transaction(
         uint256 _chainId,
         bytes32 _txDataHash,

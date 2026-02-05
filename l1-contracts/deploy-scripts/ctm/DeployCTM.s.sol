@@ -22,7 +22,6 @@ import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IRollupDAManager} from "../interfaces/IRollupDAManager.sol";
-import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
 import {L2LegacySharedBridgeTestHelper} from "../dev/L2LegacySharedBridgeTestHelper.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
@@ -221,7 +220,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             vm.startBroadcast(msg.sender);
             ZKsyncOSDualVerifier(ctmAddresses.stateTransition.verifiers.verifier).addVerifier(
                 DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
-                IVerifierV2(ctmAddresses.stateTransition.verifiers.verifierFflonk),
                 IVerifier(ctmAddresses.stateTransition.verifiers.verifierPlonk)
             );
             ZKsyncOSDualVerifier(ctmAddresses.stateTransition.verifiers.verifier).transferOwnership(

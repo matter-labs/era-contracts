@@ -9,8 +9,8 @@ import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
-import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
@@ -141,7 +141,7 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
         // Mock messageRoot.ERA_GATEWAY_CHAIN_ID
         vm.mockCall(
             mockMessageRoot,
-            abi.encodeWithSelector(IMessageRoot.ERA_GATEWAY_CHAIN_ID.selector),
+            abi.encodeWithSelector(IMessageRootBase.ERA_GATEWAY_CHAIN_ID.selector),
             abi.encode(gwChainId)
         );
 
@@ -162,7 +162,7 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
         // Mock chainAssetHandler.setMigrationNumberForV31
         vm.mockCall(
             mockChainAssetHandler,
-            abi.encodeWithSelector(IChainAssetHandler.setMigrationNumberForV31.selector, testChainId),
+            abi.encodeWithSelector(IChainAssetHandlerBase.setMigrationNumberForV31.selector, testChainId),
             abi.encode()
         );
 

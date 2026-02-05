@@ -202,7 +202,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         }
 
         if (_l2DACommitmentScheme == L2DACommitmentScheme.NONE) {
-            revert InvalidL2DACommitmentScheme(uint8(_l2DACommitmentScheme));
+            revert InvalidL2DACommitmentScheme(_l2DACommitmentScheme);
         }
 
         if (s.isPermanentRollup && !ROLLUP_DA_MANAGER.isPairAllowed(_l1DAValidator, _l2DACommitmentScheme)) {

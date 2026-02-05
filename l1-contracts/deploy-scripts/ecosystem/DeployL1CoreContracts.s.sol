@@ -15,7 +15,7 @@ import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
@@ -149,14 +149,14 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
 
     function setBridgehubParams() internal {
         IL1Bridgehub bridgehub = IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
-        IMessageRoot messageRoot = IMessageRoot(coreAddresses.bridgehub.proxies.messageRoot);
+        IMessageRootBase messageRoot = IMessageRootBase(coreAddresses.bridgehub.proxies.messageRoot);
         IL1AssetTracker assetTracker = L1AssetTracker(coreAddresses.bridgehub.proxies.assetTracker);
         vm.startBroadcast(msg.sender);
         bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
         BridgehubBase(address(bridgehub)).setAddresses(
             coreAddresses.bridges.proxies.l1AssetRouter,
             ICTMDeploymentTracker(coreAddresses.bridgehub.proxies.ctmDeploymentTracker),
-            IMessageRoot(coreAddresses.bridgehub.proxies.messageRoot),
+            IMessageRootBase(coreAddresses.bridgehub.proxies.messageRoot),
             coreAddresses.bridgehub.proxies.chainAssetHandler,
             coreAddresses.bridgehub.proxies.chainRegistrationSender
         );

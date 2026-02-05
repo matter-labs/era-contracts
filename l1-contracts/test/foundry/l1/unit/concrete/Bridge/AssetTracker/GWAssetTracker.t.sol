@@ -16,7 +16,7 @@ import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
 import {InvalidCanonicalTxHash, RegisterNewTokenNotAllowed} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {Unauthorized, ChainIdNotRegistered} from "contracts/common/L1ContractErrors.sol";
-import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -104,7 +104,7 @@ contract GWAssetTrackerTest is Test {
 
         vm.mockCall(
             L2_CHAIN_ASSET_HANDLER_ADDR,
-            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
+            abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
             abi.encode(1)
         );
     }

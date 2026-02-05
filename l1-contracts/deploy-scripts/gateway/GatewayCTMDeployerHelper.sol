@@ -566,7 +566,7 @@ library GatewayCTMDeployerHelper {
                 result.verifier = _deployInternalWithParams(
                     "ZKsyncOSTestnetVerifier",
                     "ZKsyncOSTestnetVerifier.sol",
-                    abi.encode(result.verifierFflonk, result.verifierPlonk, config.aliasedGovernanceAddress),
+                    abi.encode(result.verifierPlonk, config.aliasedGovernanceAddress),
                     innerConfig
                 );
             } else {
@@ -582,7 +582,7 @@ library GatewayCTMDeployerHelper {
                 result.verifier = _deployInternalWithParams(
                     "ZKsyncOSDualVerifier",
                     "ZKsyncOSDualVerifier.sol",
-                    abi.encode(result.verifierFflonk, result.verifierPlonk, config.aliasedGovernanceAddress),
+                    abi.encode(result.verifierPlonk, config.aliasedGovernanceAddress),
                     innerConfig
                 );
             } else {
@@ -638,7 +638,7 @@ library GatewayCTMDeployerHelper {
                 result.verifier = _deployInternalWithParamsWithMode(
                     "ZKsyncOSTestnetVerifier",
                     "ZKsyncOSTestnetVerifier.sol",
-                    abi.encode(result.verifierFflonk, result.verifierPlonk, config.aliasedGovernanceAddress),
+                    abi.encode(result.verifierPlonk, config.aliasedGovernanceAddress),
                     innerConfig,
                     isZKsyncOS
                 );
@@ -656,7 +656,7 @@ library GatewayCTMDeployerHelper {
                 result.verifier = _deployInternalWithParamsWithMode(
                     "ZKsyncOSDualVerifier",
                     "ZKsyncOSDualVerifier.sol",
-                    abi.encode(result.verifierFflonk, result.verifierPlonk, config.aliasedGovernanceAddress),
+                    abi.encode(result.verifierPlonk, config.aliasedGovernanceAddress),
                     innerConfig,
                     isZKsyncOS
                 );
@@ -1016,7 +1016,7 @@ library GatewayCTMDeployerHelper {
         string memory fileName,
         bytes memory params,
         InnerDeployConfig memory config
-    ) private returns (address) {
+    ) private view returns (address) {
         bytes memory bytecode = Utils.readZKFoundryBytecodeL1(fileName, contractName);
 
         return

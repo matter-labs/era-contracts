@@ -27,8 +27,8 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
-import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 
 contract L1AssetRouterTest is Test {
@@ -146,7 +146,7 @@ contract L1AssetRouterTest is Test {
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
         l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehubAddress),
-            _messageRoot: IMessageRoot(messageRootAddress),
+            _messageRoot: IMessageRootBase(messageRootAddress),
             _interopCenter: IInteropCenter(interopCenterAddress),
             _eraChainId: eraChainId,
             _eraDiamondProxy: eraDiamondProxy
@@ -192,7 +192,7 @@ contract L1AssetRouterTest is Test {
         );
         vm.mockCall(
             chainAssetHandler,
-            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
+            abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
             abi.encode(0)
         );
         l1AssetTracker = new L1AssetTracker(bridgehubAddress, address(nativeTokenVault), messageRootAddress);
@@ -328,7 +328,7 @@ contract L1AssetRouterTest is Test {
         );
         vm.mockCall(
             address(messageRootAddress),
-            abi.encodeWithSelector(IMessageRoot.getProofData.selector),
+            abi.encodeWithSelector(IMessageRootBase.getProofData.selector),
             abi.encode(
                 ProofData({
                     settlementLayerChainId: 0,

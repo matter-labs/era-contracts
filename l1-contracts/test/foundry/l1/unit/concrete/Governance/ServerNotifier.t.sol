@@ -2,6 +2,8 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManagerForServerNotifier.sol";
@@ -29,8 +31,18 @@ contract ServerNotifierTest is Test {
 
         chainTypeManager.setChainAdmin(chainId, chainAdmin);
 
-        serverNotifier = new ServerNotifier();
-        serverNotifier.initialize(owner);
+        ServerNotifier implementation = new ServerNotifier();
+
+        ProxyAdmin proxyAdmin = new ProxyAdmin();
+
+        bytes memory initData = abi.encodeWithSelector(ServerNotifier.initialize.selector, owner);
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+            address(implementation),
+            address(proxyAdmin),
+            initData
+        );
+
+        serverNotifier = ServerNotifier(address(proxy));
 
         vm.startPrank(owner);
         serverNotifier.setChainTypeManager(IChainTypeManager(address(chainTypeManager)));
@@ -137,13 +149,23 @@ contract ServerNotifierTest is Test {
     }
 
     function test_initializeRevertsOnZeroAddress() public {
-        ServerNotifier newServerNotifier = new ServerNotifier();
+        // Create an uninitialized proxy to test the ZeroAddress check
+        ServerNotifier implementation = new ServerNotifier();
+        ProxyAdmin newProxyAdmin = new ProxyAdmin();
+        // Create proxy WITHOUT init data so it's not initialized yet
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+            address(implementation),
+            address(newProxyAdmin),
+            "" // No init data - proxy is not initialized
+        );
+        ServerNotifier uninitializedNotifier = ServerNotifier(address(proxy));
         vm.expectRevert(ZeroAddress.selector);
-        newServerNotifier.initialize(address(0));
+        uninitializedNotifier.initialize(address(0));
     }
 
     function test_initializeCannotBeCalledTwice() public {
-        vm.expectRevert(SlotOccupied.selector);
+        // OZ's initializer modifier runs before reentrancyGuardInitializer and rejects re-initialization
+        vm.expectRevert("Initializable: contract is already initialized");
         serverNotifier.initialize(owner);
     }
 }

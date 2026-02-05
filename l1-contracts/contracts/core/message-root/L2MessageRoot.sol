@@ -32,7 +32,7 @@ contract L2MessageRoot is MessageRootBase {
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _bridgehub() internal view override returns (address) {
+    function _bridgehub() internal pure override returns (address) {
         return L2_BRIDGEHUB_ADDR;
     }
 
@@ -42,7 +42,7 @@ contract L2MessageRoot is MessageRootBase {
 
     // A method for backwards compatibility with the old implementation
     // solhint-disable-next-line func-name-mixedcase
-    function BRIDGE_HUB() public view returns (address) {
+    function BRIDGE_HUB() public pure returns (address) {
         return L2_BRIDGEHUB_ADDR;
     }
 
@@ -75,7 +75,7 @@ contract L2MessageRoot is MessageRootBase {
     /// @notice Initializes the contract.
     /// @dev This function is used to initialize the contract with the initial values.
     /// @param _l1ChainId The chain id of L1.
-    function initL2(uint256 _l1ChainId, uint256 _eraGatewayChainId) public onlyUpgrader {
+    function initL2(uint256 _l1ChainId, uint256 _eraGatewayChainId) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
         ERA_GATEWAY_CHAIN_ID = _eraGatewayChainId;
         l1ChainId = _l1ChainId;

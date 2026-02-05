@@ -217,7 +217,7 @@ contract GatewayPreparation is Script {
         if (bridgehub.whitelistedSettlementLayers(config.gatewayChainId)) {
             console.log("Chain already whitelisted as settlement layer");
         } else {
-            bytes memory data = abi.encodeCall(bridgehub.registerSettlementLayer, (config.gatewayChainId, true));
+            bytes memory data = abi.encodeCall(bridgehub.setSettlementLayerStatus, (config.gatewayChainId, true));
             Utils.executeUpgrade({
                 _governor: config.governance,
                 _salt: bytes32(0),

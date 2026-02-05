@@ -38,7 +38,6 @@ contract DeployL2Script is Script, IDeployL2Contracts {
         address bridgehubAddress;
         address governance;
         address erc20BridgeProxy;
-        address chainRegistrar;
         address proposalAuthor;
         DAValidatorType validatorType;
         // The owner of the contract sets the validator/attester weights.

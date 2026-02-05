@@ -12,10 +12,11 @@ import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1AssetHandler} from "../../bridge/interfaces/IL1AssetHandler.sol";
 import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
-import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
-import {IChainAssetHandlerShared} from "./IChainAssetHandlerShared.sol";
 import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
+import {ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
+import {ChainIdMismatch, CTMNotRegistered} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -23,7 +24,7 @@ import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
 /// it is the IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
 /// @dev L1 version – keeps the cheap immutables set in the constructor.
-contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1ChainAssetHandler, IChainAssetHandlerShared {
+contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1ChainAssetHandler {
     /// @dev The assetId of the ETH.
     bytes32 public immutable override ETH_TOKEN_ASSET_ID;
 
@@ -34,7 +35,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     IL1Bridgehub public immutable override BRIDGEHUB;
 
     /// @dev The message root contract.
-    IMessageRoot public immutable override MESSAGE_ROOT;
+    IMessageRootBase public immutable override MESSAGE_ROOT;
 
     /// @dev The asset router contract.
     IAssetRouterBase public immutable override ASSET_ROUTER;
@@ -58,7 +59,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     function _bridgehub() internal view override returns (IL1Bridgehub) {
         return BRIDGEHUB;
     }
-    function _messageRoot() internal view override returns (IMessageRoot) {
+    function _messageRoot() internal view override returns (IMessageRootBase) {
         return MESSAGE_ROOT;
     }
     function _assetRouter() internal view override returns (IAssetRouterBase) {
@@ -80,7 +81,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         _disableInitializers();
         BRIDGEHUB = IL1Bridgehub(_bridgehub);
         ASSET_ROUTER = IAssetRouterBase(_assetRouter);
-        MESSAGE_ROOT = IMessageRoot(_messageRoot);
+        MESSAGE_ROOT = IMessageRootBase(_messageRoot);
         L1_CHAIN_ID = block.chainid;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         ASSET_TRACKER = _assetTracker;
@@ -100,7 +101,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     /// @param _depositSender the address of the entity that initiated the deposit.
     // slither-disable-next-line locked-ether
     function bridgeConfirmTransferResult(
-        uint256,
+        uint256 _chainId,
         TxStatus _txStatus,
         bytes32 _assetId,
         address _depositSender,
@@ -108,10 +109,17 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     ) external payable requireZeroValue(msg.value) onlyAssetRouter {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
 
+        if (_chainId != bridgehubBurnData.chainId) {
+            revert ChainIdMismatch();
+        }
+
         (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeConfirmTransferResult(
             bridgehubBurnData.chainId,
             _txStatus
         );
+
+        require(zkChain != address(0), ZKChainNotRegistered());
+        require(ctm != address(0), CTMNotRegistered());
 
         IChainTypeManager(ctm).forwardedBridgeConfirmTransferResult({
             _chainId: bridgehubBurnData.chainId,

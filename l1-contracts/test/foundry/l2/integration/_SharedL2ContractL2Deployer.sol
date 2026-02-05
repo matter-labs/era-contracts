@@ -26,6 +26,8 @@ import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.so
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 // import {DeployCTMIntegrationScript} from "../../l1/integration/deploy-scripts/DeployCTMIntegration.s.sol";
 
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
@@ -95,6 +97,17 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
                 abi.encodeCall(ValidatorTimelock.initialize, (config.deployerAddress, executionDelay))
             )
         );
+
+        address serverNotifierProxyAdmin = address(new ProxyAdmin());
+        ctmAddresses.stateTransition.implementations.serverNotifier = address(new ServerNotifier());
+        ctmAddresses.stateTransition.proxies.serverNotifier = address(
+            new TransparentUpgradeableProxy(
+                ctmAddresses.stateTransition.implementations.serverNotifier,
+                serverNotifierProxyAdmin,
+                abi.encodeCall(ServerNotifier.initialize, (ctmAddresses.chainAdmin))
+            )
+        );
+
         ctmAddresses.stateTransition.facets.executorFacet = address(new ExecutorFacet(config.l1ChainId));
         ctmAddresses.stateTransition.facets.adminFacet = address(
             new AdminFacet(config.l1ChainId, RollupDAManager(ctmAddresses.daAddresses.rollupDAManager), true)

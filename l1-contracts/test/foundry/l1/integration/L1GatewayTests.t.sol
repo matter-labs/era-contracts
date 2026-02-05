@@ -44,9 +44,9 @@ import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
-import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
-import {IMessageRoot, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
 import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 import {NotMigrated} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
@@ -110,7 +110,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.proxies.messageRoot),
-            abi.encodeWithSelector(IMessageRoot.getProofData.selector),
+            abi.encodeWithSelector(IMessageRootBase.getProofData.selector),
             abi.encode(
                 ProofData({
                     settlementLayerChainId: 0,
@@ -276,7 +276,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         // Verify migration number was reset
         assertEq(
-            IChainAssetHandler(chainAssetHandler).migrationNumber(migratingChainId),
+            IChainAssetHandlerBase(chainAssetHandler).migrationNumber(migratingChainId),
             0,
             "Migration number should be 0 after failed migration"
         );
@@ -325,7 +325,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         bytes32 assetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
 
         vm.startBroadcast(Ownable(address(addresses.bridgehub)).owner());
-        addresses.bridgehub.registerSettlementLayer(gatewayChainId, true);
+        addresses.bridgehub.setSettlementLayerStatus(gatewayChainId, true);
         vm.stopBroadcast();
 
         bytes32 baseTokenAssetId = eraConfig.baseTokenAssetId;
@@ -378,7 +378,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             batchNumber: 0,
             ctmData: ctmData,
             chainData: chainData,
-            migrationNumber: IChainAssetHandler(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
+            migrationNumber: IChainAssetHandlerBase(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
                 .migrationNumber(migratingChainId)
         });
         bytes memory bridgehubMintData = abi.encode(data);
@@ -636,7 +636,8 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     // Used for both successful and failed migrations.
     function _confirmMigration(TxStatus txStatus) internal {
         MerkleProofData memory merkleProofData = _getMerkleProofData();
-        _mockMessageInclusion(gatewayChainId, merkleProofData, txStatus);
+        // Use migratingChainId for message inclusion since that's the chain being migrated
+        _mockMessageInclusion(migratingChainId, merkleProofData, txStatus);
 
         IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
         address chainAssetHandler = address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler);
@@ -646,14 +647,14 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         bytes memory transferData = _getTransferData();
 
-        // Set Deposit Happened
+        // Set Deposit Happened - use migratingChainId since that's the chain being confirmed
         bytes32 txDataHash = keccak256(
             bytes.concat(NEW_ENCODING_VERSION, abi.encode(chainAdmin, assetId, transferData))
         );
-        _setDepositHappened(gatewayChainId, merkleProofData.l2TxHash, txDataHash);
+        _setDepositHappened(migratingChainId, merkleProofData.l2TxHash, txDataHash);
 
         ConfirmTransferResultData memory transferResultData = _getConfirmTransferResultData(
-            gatewayChainId,
+            migratingChainId,
             merkleProofData,
             chainAdmin,
             assetId,
@@ -662,22 +663,17 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
 
         // Sanity check before
-        assertNotEq(addresses.l1Nullifier.depositHappened(gatewayChainId, merkleProofData.l2TxHash), 0x00);
-        assertEq(IChainAssetHandler(chainAssetHandler).migrationNumber(migratingChainId), 1);
+        assertNotEq(addresses.l1Nullifier.depositHappened(migratingChainId, merkleProofData.l2TxHash), 0x00);
+        assertEq(IChainAssetHandlerBase(chainAssetHandler).migrationNumber(migratingChainId), 1);
 
-        if (txStatus == TxStatus.Success) {
-            vm.expectEmit();
-            emit IAdmin.DepositsUnpaused(migratingChainId);
-        } else {
-            vm.expectEmit();
-            emit IL1AssetRouter.ClaimedFailedDepositAssetRouter(gatewayChainId, assetId, transferData);
-        }
+        vm.recordLogs();
         addresses.l1Nullifier.bridgeConfirmTransferResult(transferResultData);
+        _verifyMigrationEvents(txStatus);
 
         {
             // Avoid stack-too-deep
             // Check that value in `depositHappened` mapping was cleared
-            assertEq(addresses.l1Nullifier.depositHappened(gatewayChainId, merkleProofData.l2TxHash), 0x00);
+            assertEq(addresses.l1Nullifier.depositHappened(migratingChainId, merkleProofData.l2TxHash), 0x00);
             // Read storage to check that the recorded timestamp is reset to 0, ie, deposits were unpaused
             uint256 pausedDepositsTimestamp = uint256(vm.load(address(zkChain), pausedDepositsTimestampSlot));
             assertEq(pausedDepositsTimestamp, 0);
@@ -688,7 +684,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             assertEq(isMigrationInProgress, false);
         }
 
-        uint256 migrationNumber = IChainAssetHandler(chainAssetHandler).migrationNumber(migratingChainId);
+        uint256 migrationNumber = IChainAssetHandlerBase(chainAssetHandler).migrationNumber(migratingChainId);
         uint256 settlementLayer = bridgehub.settlementLayer(migratingChainId);
         if (txStatus == TxStatus.Success) {
             assertEq(migrationNumber, 1);
@@ -697,6 +693,51 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             assertEq(migrationNumber, 0);
             assertEq(settlementLayer, block.chainid);
             assertEq(IGetters(address(zkChain)).getSettlementLayer(), address(0));
+        }
+    }
+
+    // Helper to verify migration events in correct order without stack-too-deep issues
+    function _verifyMigrationEvents(TxStatus txStatus) internal {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        uint256 transientSettlementLayerSetIndex = type(uint256).max;
+        uint256 depositsUnpausedIndex = type(uint256).max;
+        uint256 claimedFailedDepositIndex = type(uint256).max;
+
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == IL1Nullifier.TransientSettlementLayerSet.selector) {
+                transientSettlementLayerSetIndex = i;
+            }
+            if (logs[i].topics[0] == IAdmin.DepositsUnpaused.selector) {
+                depositsUnpausedIndex = i;
+            }
+            if (logs[i].topics[0] == IL1AssetRouter.ClaimedFailedDepositAssetRouter.selector) {
+                claimedFailedDepositIndex = i;
+            }
+        }
+
+        // Verify events are present
+        assertTrue(
+            transientSettlementLayerSetIndex != type(uint256).max,
+            "TransientSettlementLayerSet event not found"
+        );
+        assertTrue(depositsUnpausedIndex != type(uint256).max, "DepositsUnpaused event not found");
+
+        // Verify order: TransientSettlementLayerSet must come before DepositsUnpaused
+        assertTrue(
+            transientSettlementLayerSetIndex < depositsUnpausedIndex,
+            "TransientSettlementLayerSet must be emitted before DepositsUnpaused"
+        );
+
+        if (txStatus == TxStatus.Failure) {
+            assertTrue(
+                claimedFailedDepositIndex != type(uint256).max,
+                "ClaimedFailedDepositAssetRouter event not found"
+            );
+            // Verify order: DepositsUnpaused must come before ClaimedFailedDepositAssetRouter
+            assertTrue(
+                depositsUnpausedIndex < claimedFailedDepositIndex,
+                "DepositsUnpaused must be emitted before ClaimedFailedDepositAssetRouter"
+            );
         }
     }
 

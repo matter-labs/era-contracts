@@ -229,7 +229,7 @@ library MessageHashing {
         uint256 _right
     ) internal pure returns (bytes32[] memory slice) {
         slice = new bytes32[](_right - _left);
-        for (uint256 i = _left; i < _right; i = i.uncheckedInc()) {
+        for (uint256 i = _left; i < _right; ++i) {
             slice[i - _left] = _proof[i];
         }
     }
