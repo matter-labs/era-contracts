@@ -7,6 +7,8 @@ import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
 import {IL1SharedBridgeLegacy} from "../interfaces/IL1SharedBridgeLegacy.sol";
+import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
+import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IL1CrossChainSender} from "../interfaces/IL1CrossChainSender.sol";
 import {TxStatus} from "../../common/Messaging.sol";
@@ -72,8 +74,6 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy, IL1CrossCha
     function L1_NULLIFIER() external view returns (IL1Nullifier);
 
     function L1_WETH_TOKEN() external view returns (address);
-
-    function ERA_CHAIN_ID() external view returns (uint256);
 
     function ETH_TOKEN_ASSET_ID() external view returns (bytes32);
 
