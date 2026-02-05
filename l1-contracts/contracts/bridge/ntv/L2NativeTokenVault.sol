@@ -21,7 +21,8 @@ import {IContractDeployer, L2ContractHelper} from "../../common/l2-helpers/L2Con
 import {SystemContractsCaller} from "../../common/l2-helpers/SystemContractsCaller.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {AddressMismatch, AssetIdAlreadyRegistered, AssetIdNotSupported, DeployFailed, EmptyAddress, EmptyBytes32, InvalidCaller, NoLegacySharedBridge, TokenIsLegacy, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
+import {AddressMismatch, AssetIdAlreadyRegistered, AssetIdNotSupported, ChainIdMismatch, DeployFailed, EmptyAddress, EmptyBytes32, InvalidCaller, NoLegacySharedBridge, TokenIsLegacy, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
+
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {TokenMetadata, TokenBridgingData} from "../../common/Messaging.sol";
 
@@ -102,7 +103,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         address _wethToken,
         TokenBridgingData calldata _baseTokenBridgingData,
         TokenMetadata calldata _baseTokenMetadata
-    ) public onlyUpgrader {
+    ) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
         // solhint-disable-next-line func-named-parameters
         updateL2(
@@ -141,6 +142,15 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         TokenBridgingData calldata _baseTokenBridgingData,
         TokenMetadata calldata _baseTokenMetadata
     ) public onlyUpgrader {
+        // Ensure _wethToken is not zero address to maintain WETH security guards
+        require(_wethToken != address(0), EmptyAddress());
+
+        // Prevent changing WETH_TOKEN if already set to a different non-zero value
+        require(WETH_TOKEN == address(0) || WETH_TOKEN == _wethToken, AddressMismatch(_wethToken, WETH_TOKEN));
+
+        // Prevent changing L1_CHAIN_ID if already set to a different value
+        require(L1_CHAIN_ID == 0 || L1_CHAIN_ID == _l1ChainId, ChainIdMismatch());
+
         WETH_TOKEN = _wethToken;
         BASE_TOKEN_ASSET_ID = _baseTokenBridgingData.assetId;
         L1_CHAIN_ID = _l1ChainId;

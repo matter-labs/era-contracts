@@ -34,8 +34,8 @@ library ContractsBytecodesLib {
             "EIP7702Checker"
         ];
 
-        uint256 DA_CONTRACT_IDENTIFIERS_LENGTH = EVM_CONTRACT_IDENTIFIERS.length;
-        for (uint i = 0; i < DA_CONTRACT_IDENTIFIERS_LENGTH; i++) {
+        uint256 EVM_CONTRACT_IDENTIFIERS_LENGTH = EVM_CONTRACT_IDENTIFIERS.length;
+        for (uint i = 0; i < EVM_CONTRACT_IDENTIFIERS_LENGTH; i++) {
             if (Utils.compareStrings(EVM_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
                 return Utils.readDAContractBytecode(contractIdentifier);
             }
@@ -50,7 +50,7 @@ library ContractsBytecodesLib {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCode.
-        string[47] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[46] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction", /// ??
             "L2AssetTracker",
             "BeaconProxy",
@@ -63,7 +63,6 @@ library ContractsBytecodesLib {
             "ChainAdminOwnable",
             "L1ChainAssetHandler",
             "L2ChainAssetHandler",
-            "ChainRegistrar",
             "EraChainTypeManager",
             "ZKsyncOSChainTypeManager",
             "CTMDeploymentTracker",

@@ -72,7 +72,7 @@ interface IBridgehubBase {
         address sender
     );
 
-    event SettlementLayerRegistered(uint256 indexed chainId, bool indexed isWhitelisted);
+    event SettlementLayerRegistered(uint256 indexed chainId, bool isWhitelisted);
 
     event NewChain(uint256 indexed chainId, address chainTypeManager, address indexed chainGovernance);
 

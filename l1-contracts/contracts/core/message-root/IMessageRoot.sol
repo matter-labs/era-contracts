@@ -34,7 +34,7 @@ interface IMessageRoot is IMessageVerification {
     /// @notice Emitted when a new chain is added to the MessageRoot.
     /// @param chainId The ID of the chain that is being added to the MessageRoot.
     /// @param chainIndex The index of the chain that is being added. Note, that chain where
-    /// the MessageRoot contract was deployed has chainIndex of 0, and this event is not emitted for it.
+    /// the MessageRoot contract was deployed has chainIndex of 0, and this event is being emitted for it.
     event AddedChain(uint256 indexed chainId, uint256 indexed chainIndex);
 
     /// @notice Emitted when a new chain batch root is appended to the chainTree.

@@ -209,7 +209,7 @@ library L2Utils {
             _args.l2TokenProxyBytecodeHash,
             _args.legacySharedBridge,
             _args.l2TokenBeacon,
-            address(0),
+            _args.wethToken,
             TokenBridgingData({assetId: ethAssetId, originChainId: _args.l1ChainId, originToken: ETH_TOKEN_ADDRESS}),
             TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18})
         );

@@ -19,7 +19,7 @@ import {L2ChainAssetHandler} from "../core/chain-asset-handler/L2ChainAssetHandl
 import {InteropHandler} from "../interop/InteropHandler.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL2SharedBridgeLegacy} from "../bridge/interfaces/IL2SharedBridgeLegacy.sol";
-import {DeployFailed, UnsupportedUpgradeType, ZKsyncOSNotForceDeployForExistingContract} from "../common/L1ContractErrors.sol";
+import {DeployFailed, UnsupportedUpgradeType, ZKsyncOSNotForceDeployForExistingContract, ZKsyncOSNotForceDeployToPrecompileAddress, NonCanonicalRepresentation} from "../common/L1ContractErrors.sol";
 
 import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
@@ -85,11 +85,19 @@ library L2GenesisForceDeploymentsHelper {
             input: hex""
         });
 
-        IL2ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(forceDeployments);
+        bytes memory data = abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (forceDeployments));
+
+        (bool success, ) = L2_DEPLOYER_SYSTEM_CONTRACT_ADDR.call(data);
+        if (!success) {
+            revert DeployFailed();
+        }
         emit ForceDeployEraCompleted(_newAddress);
     }
 
     function unsafeForceDeployZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
+        // Validate canonical encoding for (bytes32, uint32, bytes32) = 32 + 32 + 32 = 96 bytes
+        require(_bytecodeInfo.length == 96, NonCanonicalRepresentation());
+
         emit ZKsyncOSForceDeployStarted(_newAddress);
 
         // Decode the bytecode info using the library
@@ -121,6 +129,11 @@ library L2GenesisForceDeploymentsHelper {
 
     function forceDeployOnAddressZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
         require(_newAddress.code.length == 0, ZKsyncOSNotForceDeployForExistingContract(_newAddress));
+
+        // Block deployment to precompile addresses (0x01-0xFF) and zero address.
+        uint160 addr = uint160(_newAddress);
+        require(addr > 0xFF, ZKsyncOSNotForceDeployToPrecompileAddress(_newAddress));
+
         unsafeForceDeployZKsyncOS(_bytecodeInfo, _newAddress);
     }
 
@@ -132,8 +145,17 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     function updateZKsyncOSContract(bytes memory _bytecodeInfo, address _newAddress) internal {
+        // Validate that _bytecodeInfo contains exactly the expected length for (bytes, bytes) encoding
+        // to prevent trailing bytes from affecting the hash calculation
+        require(_bytecodeInfo.length >= 64, NonCanonicalRepresentation());
+
         emit UpdateZKsyncOSContractStarted(_newAddress);
+
         (bytes memory bytecodeInfo, bytes memory bytecodeInfoSystemProxy) = abi.decode((_bytecodeInfo), (bytes, bytes));
+
+        // Verify canonical encoding by re-encoding and comparing
+        bytes memory canonicalEncoding = abi.encode(bytecodeInfo, bytecodeInfoSystemProxy);
+        require(keccak256(_bytecodeInfo) == keccak256(canonicalEncoding), NonCanonicalRepresentation());
 
         address implAddress = generateRandomAddress(bytecodeInfo);
         emit ImplementationAddressGenerated(implAddress);
@@ -158,9 +180,10 @@ library L2GenesisForceDeploymentsHelper {
             }
         }
 
-        // If the address does not have any bytecode, we expect that it is a proxy
+        // If the address does not have any bytecode, we expect that it is a proxy.
         if (_newAddress.code.length == 0) {
-            forceDeployOnAddressZKsyncOS(bytecodeInfoSystemProxy, _newAddress);
+            // We can call unsafe directly, since the code length is checked to be 0 already.
+            unsafeForceDeployZKsyncOS(bytecodeInfoSystemProxy, _newAddress);
             ISystemContractProxy(_newAddress).forceInitAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR);
         }
 

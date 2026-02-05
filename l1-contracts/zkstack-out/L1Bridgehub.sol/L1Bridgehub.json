@@ -535,13 +535,6 @@
   },
   {
     "type": "function",
-    "name": "initializeV2",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "l1CtmDeployer",
     "inputs": [],
     "outputs": [

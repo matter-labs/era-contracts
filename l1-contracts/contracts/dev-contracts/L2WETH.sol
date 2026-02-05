@@ -7,6 +7,7 @@ import "./IL2WETH.sol";
 import "./IL2StandardToken.sol";
 import {InvalidCaller} from "../common/L1ContractErrors.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
 /// @author Matter Labs
 /// @notice The canonical implementation of the WETH token.
@@ -18,7 +19,7 @@ import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses
 ///
 /// Note: This is an upgradeable contract. In the future, we will remove upgradeability to make it trustless.
 /// But for now, when the Rollup has instant upgradability, we leave the possibility of upgrading to improve the contract if needed.
-contract L2WETH is ERC20PermitUpgradeable, IL2WETH, IL2StandardToken {
+contract L2WETH is ReentrancyGuard, ERC20PermitUpgradeable, IL2WETH, IL2StandardToken {
     /// @dev Only allows calls from the complex upgrader contract on L2.
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -32,7 +33,9 @@ contract L2WETH is ERC20PermitUpgradeable, IL2WETH, IL2StandardToken {
     /// @param name_ The name of the token.
     /// @param symbol_ The symbol of the token.
     /// Note: The decimals are hardcoded to 18, the same as on Ether.
-    function initL2(string memory name_, string memory symbol_) external onlyUpgrader initializer {
+    function initL2(string memory name_, string memory symbol_) external reentrancyGuardInitializer onlyUpgrader {
+        _disableInitializers();
+
         // Set decoded values for name and symbol.
         __ERC20_init_unchained(name_, symbol_);
 

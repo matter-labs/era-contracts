@@ -368,15 +368,14 @@ jobs:
           ref: v1.16
 
       # To ignore coverage for certain directories modify the paths in this step as needed. The
-      # below default ignores coverage results for the test and script directories. It also ignores
-      # the ChainRegistrar contract since it is unused. Alternatively, to include coverage in all
-      # directories, comment out this step. Note that because this filtering applies to the lcov
-      # file, the summary table generated in the previous step will still include all files and
-      # directories. The `--rc branch_coverage=1` part keeps branch info in the filtered report,
-      # since lcov defaults to removing branch info.
+      # below default ignores coverage results for the test and script directories. Alternatively,
+      # to include coverage in all directories, comment out this step. Note that because this
+      # filtering applies to the lcov file, the summary table generated in the previous step will
+      # still include all files and directories. The `--rc branch_coverage=1` part keeps branch info
+      # in the filtered report, since lcov defaults to removing branch info.
       - name: Filter directories
         run: |
-          lcov --ignore-errors unused --remove lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' 'contracts/chain-registrar/ChainRegistrar.sol' --output-file lcov.info --rc branch_coverage=1
+          lcov --ignore-errors unused --remove lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' --output-file lcov.info --rc branch_coverage=1
 
       # This step posts a detailed coverage report as a comment and deletes previous comments on
       # each push. The below step is used to fail coverage if the specified coverage threshold is

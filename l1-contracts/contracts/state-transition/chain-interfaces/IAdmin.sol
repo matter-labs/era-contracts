@@ -161,14 +161,14 @@ interface IAdmin is IZKChainBase {
     /// @notice Unpauses deposits, used after the chain is initialized
     function unpauseDeposits() external;
 
-    /// @dev Similar to IL1AssetHandler interface, used to send chains.
+    /// @dev Used to send chains to another settlement layer.
     function forwardedBridgeBurn(
         address _settlementLayer,
         address _originalCaller,
         bytes calldata _data
     ) external payable returns (bytes memory _bridgeMintData);
 
-    /// @dev Similar to IL1AssetHandler interface, used to claim failed chain transfers.
+    /// @dev Used to claim failed chain transfers.
     function forwardedBridgeConfirmTransferResult(
         uint256 _chainId,
         TxStatus _txStatus,
@@ -177,7 +177,7 @@ interface IAdmin is IZKChainBase {
         bytes calldata _chainData
     ) external payable;
 
-    /// @dev Similar to IL1AssetHandler interface, used to receive chains.
+    /// @dev Used to receive chains from another settlement layer.
     function forwardedBridgeMint(bytes calldata _data, bool _contractAlreadyDeployed) external payable;
 
     function prepareChainCommitment() external view returns (ZKChainCommitment memory commitment);

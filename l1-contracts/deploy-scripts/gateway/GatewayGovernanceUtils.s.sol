@@ -59,12 +59,12 @@ abstract contract GatewayGovernanceUtils is Script {
         _gatewayGovernanceConfig = config;
     }
 
-    function _getRegisterSettlementLayerCalls() internal view returns (Call[] memory calls) {
+    function _getSetSettlementLayerCalls() internal view returns (Call[] memory calls) {
         calls = new Call[](1);
         calls[0] = Call({
             target: _gatewayGovernanceConfig.bridgehubProxy,
             value: 0,
-            data: abi.encodeCall(IL1Bridgehub.registerSettlementLayer, (_gatewayGovernanceConfig.gatewayChainId, true))
+            data: abi.encodeCall(IL1Bridgehub.setSettlementLayerStatus, (_gatewayGovernanceConfig.gatewayChainId, true))
         });
     }
 
@@ -73,7 +73,7 @@ abstract contract GatewayGovernanceUtils is Script {
     ) internal returns (Call[] memory calls) {
         {
             if (prepareGWGovCallsStruct._ctmRepresentativeChainId == _gatewayGovernanceConfig.gatewayChainId) {
-                calls = _getRegisterSettlementLayerCalls();
+                calls = _getSetSettlementLayerCalls();
             }
         }
 

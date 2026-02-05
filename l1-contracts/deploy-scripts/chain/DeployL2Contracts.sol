@@ -22,7 +22,7 @@ contract DeployL2Script is Script, IDeployL2Contracts {
     using stdToml for string;
 
     Config internal config;
-    DeployedContrats internal deployed;
+    DeployedContracts internal deployed;
 
     enum DAValidatorType {
         Rollup,
@@ -38,7 +38,6 @@ contract DeployL2Script is Script, IDeployL2Contracts {
         address bridgehubAddress;
         address governance;
         address erc20BridgeProxy;
-        address chainRegistrar;
         address proposalAuthor;
         DAValidatorType validatorType;
         // The owner of the contract sets the validator/attester weights.
@@ -46,7 +45,7 @@ contract DeployL2Script is Script, IDeployL2Contracts {
         address consensusRegistryOwner;
     }
 
-    struct DeployedContrats {
+    struct DeployedContracts {
         address forceDeployUpgraderAddress;
         address consensusRegistryImplementation;
         address consensusRegistryProxy;

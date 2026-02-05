@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {UnknownVerifierVersion} from "../L1StateTransitionErrors.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {EmptyProofLength, UnknownVerifierType, MockVerifierNotSupported, InvalidProofFormat, ZeroAddress, AddressAlreadySet} from "../../common/L1ContractErrors.sol";
+import {EmptyProofLength, UnknownVerifierType, MockVerifierNotSupported, InvalidProofFormat, ZeroAddress, AddressAlreadySet, EmptyPublicInputsLength} from "../../common/L1ContractErrors.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 /// @title Dual Verifier
@@ -63,6 +63,11 @@ contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier {
         // for the proof system differentiator).
         if (_proof.length == 0) {
             revert EmptyProofLength();
+        }
+
+        // Ensure public inputs are not empty for clarity.
+        if (_publicInputs.length == 0) {
+            revert EmptyPublicInputsLength();
         }
 
         // The first element of `_proof` determines the verifier type.
