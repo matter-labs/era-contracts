@@ -6,7 +6,7 @@ import {IAssetHandler} from "../../bridge/interfaces/IAssetHandler.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IChainAssetHandler is IAssetHandler {
+interface IChainAssetHandlerBase is IAssetHandler {
     /// @notice Emitted when the bridging to the chain is started.
     /// @param chainId Chain ID of the ZK chain
     /// @param assetId Asset ID of the token for the zkChain's CTM

@@ -32,13 +32,32 @@ import {IChainAssetHandler} from "./IChainAssetHandler.sol";
 /// it is the IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
 abstract contract ChainAssetHandlerBase is
-    IChainAssetHandler,
+    IChainAssetHandlerBase,
     ReentrancyGuard,
     Ownable2StepUpgradeable,
     PausableUpgradeable,
     AssetHandlerModifiers
 {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
+
+    /*//////////////////////////////////////////////////////////////
+                            EXTERNAL GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice The asset ID of ETH token
+    function ETH_TOKEN_ASSET_ID() external view virtual returns (bytes32);
+
+    /// @notice The chain ID of L1
+    function L1_CHAIN_ID() external view virtual returns (uint256);
+
+    /// @notice The bridgehub contract
+    function BRIDGEHUB() external view virtual returns (IL1Bridgehub);
+
+    /// @notice The message root contract
+    function MESSAGE_ROOT() external view virtual returns (IMessageRootBase);
+
+    /// @notice The asset router contract
+    function ASSET_ROUTER() external view virtual returns (IAssetRouterBase);
 
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
@@ -48,7 +67,7 @@ abstract contract ChainAssetHandlerBase is
 
     function _bridgehub() internal view virtual returns (IL1Bridgehub);
 
-    function _messageRoot() internal view virtual returns (IMessageRoot);
+    function _messageRoot() internal view virtual returns (IMessageRootBase);
 
     function _assetRouter() internal view virtual returns (IAssetRouterBase);
 
@@ -69,7 +88,7 @@ abstract contract ChainAssetHandlerBase is
 
     /// @dev The message root contract.
     /// @dev Kept here for storage layout compatibility with previous versions.
-    IMessageRoot internal DEPRECATED_MESSAGE_ROOT;
+    IMessageRootBase internal DEPRECATED_MESSAGE_ROOT;
 
     /// @dev The asset router contract.
     /// @dev Kept here for storage layout compatibility with previous versions.

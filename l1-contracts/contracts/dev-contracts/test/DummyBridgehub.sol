@@ -11,7 +11,7 @@ import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 /// @title DummyBridgehub
 /// @notice A test smart contract that allows to set State Transition Manager for a given chain
 contract DummyBridgehub {
-    IMessageRoot public messageRoot;
+    IMessageRootBase public messageRoot;
 
     address public zkChain;
 
@@ -35,7 +35,7 @@ contract DummyBridgehub {
     }
 
     function setMessageRoot(address _messageRoot) public {
-        messageRoot = IMessageRoot(_messageRoot);
+        messageRoot = IMessageRootBase(_messageRoot);
     }
 
     function setZKChain(uint256, address _zkChain) external {

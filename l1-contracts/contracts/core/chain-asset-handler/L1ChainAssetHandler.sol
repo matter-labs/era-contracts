@@ -36,7 +36,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     IL1Bridgehub public immutable override BRIDGEHUB;
 
     /// @dev The message root contract.
-    IMessageRoot public immutable override MESSAGE_ROOT;
+    IMessageRootBase public immutable override MESSAGE_ROOT;
 
     /// @dev The asset router contract.
     IAssetRouterBase public immutable override ASSET_ROUTER;
@@ -60,7 +60,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     function _bridgehub() internal view override returns (IL1Bridgehub) {
         return BRIDGEHUB;
     }
-    function _messageRoot() internal view override returns (IMessageRoot) {
+    function _messageRoot() internal view override returns (IMessageRootBase) {
         return MESSAGE_ROOT;
     }
     function _assetRouter() internal view override returns (IAssetRouterBase) {
@@ -82,7 +82,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         _disableInitializers();
         BRIDGEHUB = IL1Bridgehub(_bridgehub);
         ASSET_ROUTER = IAssetRouterBase(_assetRouter);
-        MESSAGE_ROOT = IMessageRoot(_messageRoot);
+        MESSAGE_ROOT = IMessageRootBase(_messageRoot);
         L1_CHAIN_ID = block.chainid;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         ASSET_TRACKER = _assetTracker;

@@ -62,7 +62,7 @@ contract ExperimentalBridgeTest is Test {
     L1AssetRouter secondBridge;
     TestnetERC20Token testToken;
     L1NativeTokenVault ntv;
-    IMessageRoot messageRoot;
+    IMessageRootBase messageRoot;
     L1Nullifier l1Nullifier;
     L1AssetTracker assetTracker;
     SimpleExecutor simpleExecutor;

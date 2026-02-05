@@ -101,7 +101,7 @@ interface IBridgehubBase {
 
     function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 
-    function messageRoot() external view returns (IMessageRoot);
+    function messageRoot() external view returns (IMessageRootBase);
 
     function getZKChain(uint256 _chainId) external view returns (address);
 
