@@ -77,15 +77,15 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         return L1_CHAIN_ID;
     }
 
-    /// @notice Used to register a chain as a settlement layer.
-    /// @param _newSettlementLayerChainId the chainId of the chain
-    /// @param _isWhitelisted whether the chain is a whitelisted settlement layer
-    function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external onlyOwner {
-        if (settlementLayer[_newSettlementLayerChainId] != block.chainid) {
+    /// @notice Sets the whitelist status of a settlement layer.
+    /// @param _settlementLayerChainId the chainId of the settlement layer
+    /// @param _isWhitelisted whether the settlement layer should be whitelisted
+    function setSettlementLayerStatus(uint256 _settlementLayerChainId, bool _isWhitelisted) external onlyOwner {
+        if (settlementLayer[_settlementLayerChainId] != block.chainid) {
             revert SettlementLayersMustSettleOnL1();
         }
-        whitelistedSettlementLayers[_newSettlementLayerChainId] = _isWhitelisted;
-        emit SettlementLayerRegistered(_newSettlementLayerChainId, _isWhitelisted);
+        whitelistedSettlementLayers[_settlementLayerChainId] = _isWhitelisted;
+        emit SettlementLayerStatusSet(_settlementLayerChainId, _isWhitelisted);
     }
 
     /// @notice Register new chain. New chains can be only registered on Bridgehub deployed on L1. Later they can be moved to any other layer.
