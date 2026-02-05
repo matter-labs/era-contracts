@@ -106,7 +106,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         address _admin,
         bytes calldata _initData,
         bytes[] calldata _factoryDeps
-    ) external onlyOwnerOrAdmin nonReentrant whenNotPaused returns (uint256) {
+    ) external onlyOwnerOrAdmin nonReentrant whenNotPaused returns (uint256 chainId) {
         _validateChainParams({_chainId: _chainId, _assetId: _baseTokenAssetId, _chainTypeManager: _chainTypeManager});
 
         chainTypeManager[_chainId] = _chainTypeManager;
