@@ -7,7 +7,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {AlreadyWhitelisted, InvalidSelector, NotWhitelisted, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
-import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {AssetRouterBase} from "../bridge/asset-router/AssetRouterBase.sol";
 import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
 
