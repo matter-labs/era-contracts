@@ -94,7 +94,7 @@ abstract contract MessageRootBase is IMessageRoot, ReentrancyGuard, Initializabl
         if (msg.sender != _bridgehub() && msg.sender != address(IBridgehubBase(_bridgehub()).chainAssetHandler())) {
             revert OnlyBridgehubOrChainAssetHandler(
                 msg.sender,
-                address(_bridgehub()),
+                _bridgehub(),
                 address(IBridgehubBase(_bridgehub()).chainAssetHandler())
             );
         }
