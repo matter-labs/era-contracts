@@ -19,6 +19,7 @@ import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.
 import {DummyBridgehubSetter} from "contracts/dev-contracts/test/DummyBridgehubSetter.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL1CrossChainSender} from "contracts/bridge/interfaces/IL1CrossChainSender.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -1363,7 +1364,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.mockCall(
             secondBridgeAddress,
-            abi.encodeWithSelector(IL1AssetRouter.bridgehubDeposit.selector),
+            abi.encodeWithSelector(IL1CrossChainSender.bridgehubDeposit.selector),
             abi.encode(request)
         );
 
@@ -1435,7 +1436,7 @@ contract ExperimentalBridgeTest is Test {
             address(secondBridgeAddressValue),
             l2TxnReq2BridgeOut.secondBridgeValue,
             abi.encodeWithSelector(
-                IL1AssetRouter.bridgehubDeposit.selector,
+                IL1CrossChainSender.bridgehubDeposit.selector,
                 l2TxnReq2BridgeOut.chainId,
                 randomCaller,
                 l2TxnReq2BridgeOut.l2Value,

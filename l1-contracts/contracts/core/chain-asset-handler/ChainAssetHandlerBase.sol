@@ -25,6 +25,7 @@ import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2
 
 import {AssetHandlerModifiers} from "../../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandlerBase} from "./IChainAssetHandler.sol";
+import {IChainAssetHandlerShared} from "./IChainAssetHandlerShared.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -33,36 +34,13 @@ import {IChainAssetHandlerBase} from "./IChainAssetHandler.sol";
 /// between different settlement layers (for example from L1 to Gateway).
 abstract contract ChainAssetHandlerBase is
     IChainAssetHandlerBase,
+    IChainAssetHandlerShared,
     ReentrancyGuard,
     Ownable2StepUpgradeable,
     PausableUpgradeable,
     AssetHandlerModifiers
 {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
-
-    /*//////////////////////////////////////////////////////////////
-                            EXTERNAL GETTERS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice The asset ID of ETH token
-    // solhint-disable-next-line func-name-mixedcase
-    function ETH_TOKEN_ASSET_ID() external view virtual returns (bytes32);
-
-    /// @notice The chain ID of L1
-    // solhint-disable-next-line func-name-mixedcase
-    function L1_CHAIN_ID() external view virtual returns (uint256);
-
-    /// @notice The bridgehub contract
-    // solhint-disable-next-line func-name-mixedcase
-    function BRIDGEHUB() external view virtual returns (IL1Bridgehub);
-
-    /// @notice The message root contract
-    // solhint-disable-next-line func-name-mixedcase
-    function MESSAGE_ROOT() external view virtual returns (IMessageRootBase);
-
-    /// @notice The asset router contract
-    // solhint-disable-next-line func-name-mixedcase
-    function ASSET_ROUTER() external view virtual returns (IAssetRouterBase);
 
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
