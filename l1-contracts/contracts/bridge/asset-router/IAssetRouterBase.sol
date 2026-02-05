@@ -30,10 +30,10 @@ interface IAssetRouterBase {
         bytes bridgeMintCalldata
     );
 
-    event AssetDeploymentTrackerRegistered(
+    event AssetDeploymentTrackerSet(
         bytes32 indexed assetId,
-        bytes32 indexed additionalData,
-        address assetDeploymentTracker
+        address indexed assetDeploymentTracker,
+        bytes32 indexed additionalData
     );
 
     event AssetHandlerRegistered(bytes32 indexed assetId, address indexed _assetHandlerAddress);

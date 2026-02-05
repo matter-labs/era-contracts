@@ -4,9 +4,13 @@ pragma solidity 0.8.28;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
-import {BaseTokenGasPriceDenominatorNotSet} from "contracts/common/L1ContractErrors.sol";
+import {BaseTokenGasPriceDenominatorNotSet, InvalidChainId} from "contracts/common/L1ContractErrors.sol";
+import {L2Message, L2Log} from "contracts/common/Messaging.sol";
+import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
+import {IMessageVerification} from "contracts/common/MessageVerification.sol";
+import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 
 contract MailboxBaseTests is MailboxTest {
     function setUp() public virtual {
@@ -16,7 +20,7 @@ contract MailboxBaseTests is MailboxTest {
     }
 
     function test_mailboxConstructor() public {
-        DummyZKChain h = new DummyZKChain(address(0), eraChainId, block.chainid, eip7702Checker);
+        DummyZKChain h = new DummyZKChain(address(0), eraChainId, block.chainid, address(0), eip7702Checker);
         assertEq(h.getEraChainId(), eraChainId);
     }
 

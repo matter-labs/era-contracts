@@ -1,0 +1,13 @@
+[permanent_contracts]
+create2_factory_addr = "0xf1Ebfaa992854ECcB01Ac1F60e5b5279095cca7F"
+# this salt can be changed from run to run to. Todo: move this to input of script.
+create2_factory_salt = "0x0000000000000000000000000000000000000000000000000000000000000000"
+
+[core_contracts]
+bridgehub_proxy_addr = "0x303a465B659cBB0ab36eE643eA362c509EEb5213"
+
+[ctm_contracts]
+ctm_proxy_addr = "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C"
+l1_bytecodes_supplier_addr = "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
+rollup_da_manager = "0xE689e79a06D3D09f99C21E534cCF6a8b7C9b3C45"
+
