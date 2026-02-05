@@ -371,7 +371,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             } else if (logKey == uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)) {
                 _verifyLogSender(logSender, L2_BOOTLOADER_ADDRESS, logKey);
                 logOutput.numberOfLayer1Txs = uint256(logValue);
-            } else if (logKey == uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)) {
+            } else if (logKey == uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY)) {
                 _verifyLogSender(logSender, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, logKey);
                 if (uint256(s.l2DACommitmentScheme) != uint256(logValue)) {
                     revert MismatchL2DACommitmentScheme(uint256(logValue), uint256(s.l2DACommitmentScheme));

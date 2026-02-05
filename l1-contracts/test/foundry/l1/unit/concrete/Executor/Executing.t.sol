@@ -8,7 +8,8 @@ import {EMPTY_PREPUBLISHED_COMMITMENT, ExecutorTest, POINT_EVALUATION_PRECOMPILE
 
 import {POINT_EVALUATION_PRECOMPILE_ADDR, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {SystemLogKey} from "system-contracts/contracts/Constants.sol";
 import {BatchHashMismatch, CantExecuteUnprovenBatches, NonSequentialBatch, PriorityOperationsRollingHashMismatch, QueueIsEmpty} from "contracts/common/L1ContractErrors.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
