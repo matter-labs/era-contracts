@@ -1,0 +1,838 @@
+[
+  {
+    "type": "function",
+    "name": "addL2WethToStore",
+    "inputs": [
+      {
+        "name": "storeAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "ecosystemAdmin",
+        "type": "address",
+        "internalType": "contract ChainAdmin"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "l2WBaseToken",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "adminEncodeMulticall",
+    "inputs": [
+      {
+        "name": "callsToExecute",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "adminExecuteUpgrade",
+    "inputs": [
+      {
+        "name": "diamondCut",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "adminAddr",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "accessControlRestriction",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "chainDiamondProxy",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "adminL1L2Tx",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "l1GasPrice",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "to",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "value",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "data",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "refundRecipient",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "shouldSend",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "adminScheduleUpgrade",
+    "inputs": [
+      {
+        "name": "adminAddr",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "accessControlRestriction",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "newProtocolVersion",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "timestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "chainAdminAcceptAdmin",
+    "inputs": [
+      {
+        "name": "chainAdmin",
+        "type": "address",
+        "internalType": "contract ChainAdmin"
+      },
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "chainSetTokenMultiplierSetter",
+    "inputs": [
+      {
+        "name": "chainAdmin",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "accessControlRestriction",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "diamondProxyAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "setter",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "ecosystemAdminExecuteCalls",
+    "inputs": [
+      {
+        "name": "callsToExecute",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "ecosystemAdminAddr",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "enableValidator",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "l2ChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "validatorAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "validatorTimelock",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "shouldSend",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "enableValidatorViaGateway",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "l1GasPrice",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "l2ChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "gatewayChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "validatorAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "gatewayValidatorTimelock",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "refundRecipient",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "shouldSend",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "governanceAcceptAdmin",
+    "inputs": [
+      {
+        "name": "governor",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "governanceAcceptOwner",
+    "inputs": [
+      {
+        "name": "governor",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "governanceExecuteCalls",
+    "inputs": [
+      {
+        "name": "callsToExecute",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "governanceAddr",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "grantGatewayWhitelist",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "grantees",
+        "type": "address[]",
+        "internalType": "address[]"
+      },
+      {
+        "name": "shouldSend",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "initConfig",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "makePermanentRollup",
+    "inputs": [
+      {
+        "name": "chainAdmin",
+        "type": "address",
+        "internalType": "contract ChainAdmin"
+      },
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "migrateChainToGateway",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "l1GasPrice",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "l2ChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "gatewayChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "gatewayDiamondCutData",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "refundRecipient",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "shouldSend",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "notifyServerMigrationFromGateway",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "shouldSend",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "notifyServerMigrationToGateway",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "shouldSend",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "pauseDepositsBeforeInitiatingMigration",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "shouldSend",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "prepareUpgradeZKChainOnGateway",
+    "inputs": [
+      {
+        "name": "l1GasPrice",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "oldProtocolVersion",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "upgradeCutData",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "chainDiamondProxyOnGateway",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "gatewayChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "l1AssetRouterProxy",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "refundRecipient",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "shouldSend",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "revokeGatewayWhitelist",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "toRevoke",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "shouldSend",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setDAValidatorPair",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "l1DaValidator",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "l2DaCommitmentScheme",
+        "type": "uint8",
+        "internalType": "enum L2DACommitmentScheme"
+      },
+      {
+        "name": "shouldSend",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setDAValidatorPairWithGateway",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "l1GasPrice",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "l2ChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "gatewayChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "l1DAValidator",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "l2DACommitmentScheme",
+        "type": "uint8",
+        "internalType": "enum L2DACommitmentScheme"
+      },
+      {
+        "name": "chainDiamondProxyOnGateway",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "refundRecipient",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "shouldSend",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setPubdataPricingMode",
+    "inputs": [
+      {
+        "name": "chainAdmin",
+        "type": "address",
+        "internalType": "contract ChainAdmin"
+      },
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "pricingMode",
+        "type": "uint8",
+        "internalType": "enum PubdataPricingMode"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setTransactionFilterer",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "transactionFiltererAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "shouldSend",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "startMigrateChainFromGateway",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "l1GasPrice",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "l2ChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "gatewayChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "l1DiamondCutData",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "refundRecipient",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "shouldSend",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "unpauseDeposits",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "shouldSend",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "updateValidator",
+    "inputs": [
+      {
+        "name": "adminAddr",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "accessControlRestriction",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "validatorTimelock",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "validatorAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "addValidator",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  }
+]

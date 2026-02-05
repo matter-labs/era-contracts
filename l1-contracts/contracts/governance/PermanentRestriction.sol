@@ -4,8 +4,8 @@ pragma solidity 0.8.28;
 
 import {AlreadyWhitelisted, CallNotAllowed, NotAllowed, RemovingPermanentRestriction, TooHighDeploymentNonce, UnallowedImplementation, ZeroAddress} from "../common/L1ContractErrors.sol";
 
-import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
-import {BridgehubBurnCTMAssetData, L2TransactionRequestTwoBridgesOuter} from "../bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
+import {BridgehubBurnCTMAssetData, L2TransactionRequestTwoBridgesOuter} from "../core/bridgehub/IBridgehubBase.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {IAssetRouterBase, NEW_ENCODING_VERSION} from "../bridge/asset-router/IAssetRouterBase.sol";
