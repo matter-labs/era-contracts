@@ -6,7 +6,8 @@ import {IZKChainBase} from "../chain-interfaces/IZKChainBase.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
-import {ZKChainCommitment, L2DACommitmentScheme} from "../../common/Config.sol";
+import {L2DACommitmentScheme, ZKChainCommitment} from "../../common/Config.sol";
+import {TxStatus} from "../../common/Messaging.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
@@ -150,6 +151,16 @@ interface IAdmin is IZKChainBase {
 
     event BridgeMint(address indexed _account, uint256 _amount);
 
+    event DepositsPaused(uint256 chainId, uint256 pausedDepositsTimestamp);
+
+    event DepositsUnpaused(uint256 chainId);
+
+    /// @notice Pauses deposits before initiating migration to the Gateway.
+    function pauseDepositsBeforeInitiatingMigration() external;
+
+    /// @notice Unpauses deposits, used after the chain is initialized
+    function unpauseDeposits() external;
+
     /// @dev Used to send chains to another settlement layer.
     function forwardedBridgeBurn(
         address _settlementLayer,
@@ -158,8 +169,9 @@ interface IAdmin is IZKChainBase {
     ) external payable returns (bytes memory _bridgeMintData);
 
     /// @dev Used to claim failed chain transfers.
-    function forwardedBridgeRecoverFailedTransfer(
+    function forwardedBridgeConfirmTransferResult(
         uint256 _chainId,
+        TxStatus _txStatus,
         bytes32 _assetInfo,
         address _originalCaller,
         bytes calldata _chainData

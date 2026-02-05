@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L2AdminFactory} from "contracts/governance/L2AdminFactory.sol";
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
