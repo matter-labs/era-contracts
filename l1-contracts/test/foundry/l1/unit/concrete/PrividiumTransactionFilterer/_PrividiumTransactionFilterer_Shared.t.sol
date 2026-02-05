@@ -26,6 +26,9 @@ contract PrividiumTransactionFiltererTest is Test {
                 )
             )
         );
+
+        vm.prank(owner);
+        transactionFiltererProxy.setDepositsAllowed(true);
     }
 
     // add this to be excluded from coverage report

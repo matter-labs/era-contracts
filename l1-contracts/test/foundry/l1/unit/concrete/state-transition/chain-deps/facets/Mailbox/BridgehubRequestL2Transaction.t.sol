@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
-import {MAX_NEW_FACTORY_DEPS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {TransactionFiltererTrue} from "contracts/dev-contracts/test/DummyTransactionFiltererTrue.sol";
 import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransactionFiltererFalse.sol";
 import {TransactionNotAllowed, Unauthorized} from "contracts/common/L1ContractErrors.sol";
@@ -23,7 +23,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
 
         BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
 
-        vm.deal(bridgehub, 100 ether);
+        vm.deal(interopCenter, 100 ether);
         vm.prank(address(bridgehub));
         bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
@@ -40,7 +40,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
 
         BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
 
-        vm.deal(bridgehub, 100 ether);
+        vm.deal(interopCenter, 100 ether);
         vm.prank(address(bridgehub));
         bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
@@ -57,7 +57,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
 
         BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
 
-        vm.deal(bridgehub, 100 ether);
+        vm.deal(interopCenter, 100 ether);
         vm.prank(address(bridgehub));
         vm.expectRevert(TransactionNotAllowed.selector);
         mailboxFacet.bridgehubRequestL2Transaction(req);
@@ -94,6 +94,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         bytes32 oldRootHash = gettersFacet.getPriorityTreeRoot();
         assertEq(oldRootHash, bytes32(0), "root hash should be 0");
 
+        address oldBridgehub = address(bridgehub);
         address bridgehub = makeAddr("bridgehub");
 
         utilsFacet.util_setBridgehub(bridgehub);
@@ -102,8 +103,8 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
 
         BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
 
-        vm.deal(bridgehub, 100 ether);
-        vm.prank(address(bridgehub));
+        vm.deal(interopCenter, 100 ether);
+        vm.prank(address(oldBridgehub));
         bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
 

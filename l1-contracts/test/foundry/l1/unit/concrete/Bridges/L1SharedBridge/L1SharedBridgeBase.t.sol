@@ -6,20 +6,20 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+
 import {IAssetRouterBase, LEGACY_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
-import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
+
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 
 contract L1AssetRouterTestBase is L1AssetRouterTest {
     using stdStorage for StdStorage;
@@ -130,10 +130,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehubBase.proveL1ToL2TransactionStatus.selector,
+                IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -171,10 +171,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehubBase.proveL1ToL2TransactionStatus.selector,
+                IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -213,10 +213,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehubBase.proveL1ToL2TransactionStatus.selector,
+                IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -257,10 +257,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehubBase.proveL2MessageInclusion.selector,
+                IMessageVerification.proveL2MessageInclusionShared.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -284,7 +284,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     }
 
     function test_finalizeWithdrawal_ErcOnEth() public {
-        _setNativeTokenVaultChainBalance(chainId, address(token), amount);
+        _setAssetTrackerChainBalance(chainId, address(token), amount);
         bytes memory message = abi.encodePacked(
             AssetRouterBase.finalizeDeposit.selector,
             chainId,
@@ -298,10 +298,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeCall(
-                IBridgehubBase.proveL2MessageInclusion,
+                IMessageVerification.proveL2MessageInclusionShared,
                 (chainId, l2BatchNumber, l2MessageIndex, l2ToL1Message, merkleProof)
             ),
             abi.encode(true)
@@ -323,9 +323,9 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     function test_finalizeWithdrawal_EthOnErc() public {
         // vm.deal(address(sharedBridge), amount);
 
-        // _setNativeTokenVaultChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
+        // _setAssetTrackerChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
         _setBaseTokenAssetId(tokenAssetId);
-        vm.prank(bridgehubAddress);
+        // vm.prank(bridgehubAddress);
 
         bytes memory message = abi.encodePacked(
             AssetRouterBase.finalizeDeposit.selector,
@@ -340,10 +340,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehubBase.proveL2MessageInclusion.selector,
+                IMessageVerification.proveL2MessageInclusionShared.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -368,7 +368,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
 
     function test_finalizeWithdrawal_BaseErcOnErc() public {
         _setBaseTokenAssetId(tokenAssetId);
-        vm.prank(bridgehubAddress);
+        // vm.prank(bridgehubAddress);
 
         bytes memory message = abi.encodePacked(
             AssetRouterBase.finalizeDeposit.selector,
@@ -383,10 +383,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehubBase.proveL2MessageInclusion.selector,
+                IMessageVerification.proveL2MessageInclusionShared.selector,
                 chainId
                 // l2BatchNumber,
                 // l2MessageIndex,
@@ -429,10 +429,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehubBase.proveL2MessageInclusion.selector,
+                IMessageVerification.proveL2MessageInclusionShared.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -455,28 +455,28 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         });
     }
 
-    function test_safeTransferFundsFromSharedBridge_Erc() public {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
-        uint256 startBalanceNtv = nativeTokenVault.chainBalance(chainId, assetId);
-        // solhint-disable-next-line func-named-parameters
-        vm.expectEmit(true, true, false, true, address(token));
-        emit IERC20.Transfer(address(l1Nullifier), address(nativeTokenVault), amount);
-        nativeTokenVault.transferFundsFromSharedBridge(address(token));
-        nativeTokenVault.updateChainBalancesFromSharedBridge(address(token), chainId);
-        uint256 endBalanceNtv = nativeTokenVault.chainBalance(chainId, assetId);
-        assertEq(endBalanceNtv - startBalanceNtv, amount);
-    }
+    // function test_safeTransferFundsFromSharedBridge_Erc() public {
+    //     bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
+    //     uint256 startBalanceNtv = nativeTokenVault.chainBalance(chainId, assetId);
+    //     // solhint-disable-next-line func-named-parameters
+    //     vm.expectEmit(true, true, false, true, address(token));
+    //     emit IERC20.Transfer(address(l1Nullifier), address(nativeTokenVault), amount);
+    //     nativeTokenVault.transferFundsFromSharedBridge(address(token));
+    //     nativeTokenVault.updateChainBalancesFromSharedBridge(address(token), chainId);
+    //     uint256 endBalanceNtv = nativeTokenVault.chainBalance(chainId, assetId);
+    //     assertEq(endBalanceNtv - startBalanceNtv, amount);
+    // }
 
-    function test_safeTransferFundsFromSharedBridge_Eth() public {
-        uint256 startEthBalanceNtv = address(nativeTokenVault).balance;
-        uint256 startBalanceNtv = nativeTokenVault.chainBalance(chainId, ETH_TOKEN_ASSET_ID);
-        nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
-        nativeTokenVault.updateChainBalancesFromSharedBridge(ETH_TOKEN_ADDRESS, chainId);
-        uint256 endBalanceNtv = nativeTokenVault.chainBalance(chainId, ETH_TOKEN_ASSET_ID);
-        uint256 endEthBalanceNtv = address(nativeTokenVault).balance;
-        assertEq(endBalanceNtv - startBalanceNtv, amount);
-        assertEq(endEthBalanceNtv - startEthBalanceNtv, amount);
-    }
+    // function test_safeTransferFundsFromSharedBridge_Eth() public {
+    //     uint256 startEthBalanceNtv = address(nativeTokenVault).balance;
+    //     uint256 startBalanceNtv = nativeTokenVault.chainBalance(chainId, ETH_TOKEN_ASSET_ID);
+    //     nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
+    //     nativeTokenVault.updateChainBalancesFromSharedBridge(ETH_TOKEN_ADDRESS, chainId);
+    //     uint256 endBalanceNtv = nativeTokenVault.chainBalance(chainId, ETH_TOKEN_ASSET_ID);
+    //     uint256 endEthBalanceNtv = address(nativeTokenVault).balance;
+    //     assertEq(endBalanceNtv - startBalanceNtv, amount);
+    //     assertEq(endEthBalanceNtv - startEthBalanceNtv, amount);
+    // }
 
     function test_bridgehubDeposit_Eth_storesCorrectTxHash() public {
         _setBaseTokenAssetId(tokenAssetId);

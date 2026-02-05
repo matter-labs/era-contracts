@@ -6,8 +6,6 @@ pragma solidity 0.8.28;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 // Note that the `ProtocolUpgradeHandler` uses `OpenZeppeling v5`.
 interface ProxyAdminV5 {
@@ -16,17 +14,6 @@ interface ProxyAdminV5 {
 
 contract AppendProtocolUpgradeHandlerUpgrade is Script {
     using stdToml for string;
-
-    function getProxyAdmin(address _proxyAddr) internal view returns (address proxyAdmin) {
-        // the constant is the proxy admin storage slot
-        proxyAdmin = address(
-            uint160(
-                uint256(
-                    vm.load(_proxyAddr, bytes32(0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103))
-                )
-            )
-        );
-    }
 
     function run() public {
         string memory root = vm.projectRoot();
@@ -37,7 +24,7 @@ contract AppendProtocolUpgradeHandlerUpgrade is Script {
         string memory toml = vm.readFile(configPath);
 
         address protocolUpgradeHandlerProxyAddress = toml.readAddress("$.protocol_upgrade_handler_proxy_address");
-        address transparentProxyAdmin = getProxyAdmin(protocolUpgradeHandlerProxyAddress);
+        address transparentProxyAdmin = Utils.getProxyAdminAddress(protocolUpgradeHandlerProxyAddress);
         address protocolUpgradeHandlerImplAddress = toml.readAddress("$.protocol_upgrade_handler_impl_address");
 
         bytes memory stage2CallsRaw = toml.readBytes("$.governance_stage2_calls");

@@ -50,18 +50,5 @@ interface IComplexUpgrader {
         bytes calldata _calldata
     ) external payable;
 
-    /// @notice Executes an upgrade process by delegating calls to another contract.
-    /// @dev Similar to `forceDeployAndUpgrade`, but allows for universal force deployments, that
-    /// work for both ZKsyncOS and Era.
-    /// @param _forceDeployments the list of initial deployments that should be performed before the upgrade.
-    /// They would typically, though not necessarily include the deployment of the upgrade implementation itself.
-    /// @param _delegateTo the address of the contract to which the calls will be delegated
-    /// @param _calldata the calldata to be delegate called in the `_delegateTo` contract
-    function forceDeployAndUpgradeUniversal(
-        UniversalContractUpgradeInfo[] calldata _forceDeployments,
-        address _delegateTo,
-        bytes calldata _calldata
-    ) external payable;
-
     function upgrade(address _delegateTo, bytes calldata _calldata) external payable;
 }
