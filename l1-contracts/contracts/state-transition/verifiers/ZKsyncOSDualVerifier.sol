@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {UnknownVerifierVersion} from "../L1StateTransitionErrors.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {EmptyProofLength, UnknownVerifierType, MockVerifierNotSupported} from "../../common/L1ContractErrors.sol";
+import {EmptyProofLength, UnknownVerifierType, MockVerifierNotSupported, InvalidProofFormat, ZeroAddress, AddressAlreadySet, EmptyPublicInputsLength} from "../../common/L1ContractErrors.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 /// @title ZKsync OS Dual Verifier
@@ -40,6 +40,8 @@ contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier {
     /// @param _plonkVerifier The address of the PLONK verifier contract.
     /// @dev Only PLONK verifiers are supported. FFLONK has been deprecated for ZKsync OS.
     function addVerifier(uint32 version, IVerifier _plonkVerifier) external onlyOwner {
+        require(address(_plonkVerifier) != address(0), ZeroAddress());
+        require(plonkVerifiers[version] == IVerifier(address(0)), AddressAlreadySet(address(plonkVerifiers[version])));
         plonkVerifiers[version] = _plonkVerifier;
     }
 
@@ -63,9 +65,20 @@ contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier {
             revert EmptyProofLength();
         }
 
+        // Ensure public inputs are not empty for clarity.
+        if (_publicInputs.length == 0) {
+            revert EmptyPublicInputsLength();
+        }
+
         // The first element of `_proof` determines the verifier type.
         uint256 verifierType = _proof[0] & 255;
         uint32 verifierVersion = uint32(_proof[0] >> 8);
+
+        // Validate that unused bits (40-255) are zero.
+        if (_proof[0] >> 40 != 0) {
+            revert InvalidProofFormat();
+        }
+        
         if (plonkVerifiers[verifierVersion] == IVerifier(address(0))) {
             revert UnknownVerifierVersion();
         }
@@ -103,6 +116,11 @@ contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier {
     function verificationKeyHash(uint256 _verifierType) external view returns (bytes32) {
         uint256 verifierType = _verifierType & 255;
         uint32 verifierVersion = uint32(_verifierType >> 8);
+
+        // Validate that unused bits (40-255) are zero.
+        if (_verifierType >> 40 != 0) {
+            revert InvalidProofFormat();
+        }
 
         if (plonkVerifiers[verifierVersion] == IVerifier(address(0))) {
             revert UnknownVerifierVersion();

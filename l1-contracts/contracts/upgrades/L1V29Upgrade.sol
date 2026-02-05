@@ -25,7 +25,7 @@ contract L1V29Upgrade is BaseZkSyncUpgrade {
 
     /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
-    function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
+    function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
         if (IGetters(address(this)).isPriorityQueueActive() == true) {
             revert PriorityQueueNotReady();
         }
@@ -35,7 +35,7 @@ contract L1V29Upgrade is BaseZkSyncUpgrade {
     }
 
     /// @inheritdoc BaseZkSyncUpgrade
-    function _postUpgrade(bytes calldata _postUpgradeCalldata) internal override {
+    function _postUpgrade(bytes memory _postUpgradeCalldata) internal override {
         V29UpgradeParams memory params = abi.decode(_postUpgradeCalldata, (V29UpgradeParams));
 
         uint256 cachedLength = params.oldValidatorTimelocks.length;

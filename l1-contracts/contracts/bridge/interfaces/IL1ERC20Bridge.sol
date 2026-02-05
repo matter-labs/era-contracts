@@ -72,6 +72,10 @@ interface IL1ERC20Bridge {
 
     function l2Bridge() external view returns (address);
 
+    function ERA_CHAIN_ID() external view returns (uint256);
+
+    function l2TokenProxyBytecodeHash() external view returns (bytes32);
+
     function depositAmount(
         address _account,
         address _l1Token,

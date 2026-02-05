@@ -16,11 +16,12 @@ import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE} from "../common/Config.sol";
 import {AdminZero, InitialForceDeploymentMismatch, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
-import {ChainAlreadyLive, GenesisBatchCommitmentZero, GenesisBatchHashZero, GenesisUpgradeZero, HashMismatch, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {ChainAlreadyLive, HashMismatch, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
-import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+import {TxStatus} from "../common/Messaging.sol";
 
 /// @title Chain Type Manager Base contract
 /// @author Matter Labs
@@ -31,6 +32,12 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
 
     /// @notice Address of the bridgehub
     address public immutable BRIDGE_HUB;
+
+    /// @notice Address of the interop center
+    address public immutable INTEROP_CENTER;
+
+    /// @notice Address of the L1 bytecodes supplier used for upgrades
+    address public immutable L1_BYTECODES_SUPPLIER;
 
     /// @notice The map from chainId => zkChain contract
     EnumerableMap.UintToAddressMap internal __DEPRECATED_zkChainMap;
@@ -73,6 +80,14 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev Both validatorTimelock and validatorTimelockPostV29 getters are available for backward compatibility of nodes that rely on the validatorTimelock address being available.
     address public validatorTimelockPostV29;
 
+    /// @dev The block number when upgradeCutHash was saved for some protocolVersion.
+    /// @dev It's used for easier tracking the upgrade cutData off-chain.
+    mapping(uint256 protocolVersion => uint256) public upgradeCutDataBlock;
+
+    /// @dev The block number when newChainCreationParams was saved for some protocolVersion.
+    /// @dev It's used for easier tracking the upgrade cutData off-chain.
+    mapping(uint256 protocolVersion => uint256) public newChainCreationParamsBlock;
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     /// @dev Note, that while the contract does not use `nonReentrant` modifier, we still keep the `reentrancyGuardInitializer`
@@ -80,8 +95,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// - It prevents the function from being called twice (including in the proxy impl).
     /// - It makes the local version consistent with the one in production, which already had the reentrancy guard
     /// initialized.
-    constructor(address _bridgehub) reentrancyGuardInitializer {
+    constructor(address _bridgehub, address _interopCenter, address _l1BytecodesSupplier) reentrancyGuardInitializer {
         BRIDGE_HUB = _bridgehub;
+        INTEROP_CENTER = _interopCenter;
+        L1_BYTECODES_SUPPLIER = _l1BytecodesSupplier;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
@@ -149,6 +166,12 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         if (_initializeData.owner == address(0)) {
             revert ZeroAddress();
         }
+        if (_initializeData.validatorTimelock == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_initializeData.serverNotifier == address(0)) {
+            revert ZeroAddress();
+        }
         _transferOwnership(_initializeData.owner);
 
         protocolVersion = _initializeData.protocolVersion;
@@ -172,17 +195,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
 
     /// @notice Validates chain creation parameters common to all chain types
     /// @param _chainCreationParams The chain creation parameters to validate
-    function _validateChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal pure {
-        if (_chainCreationParams.genesisUpgrade == address(0)) {
-            revert GenesisUpgradeZero();
-        }
-        if (_chainCreationParams.genesisBatchHash == bytes32(0)) {
-            revert GenesisBatchHashZero();
-        }
-        if (_chainCreationParams.genesisBatchCommitment == bytes32(0)) {
-            revert GenesisBatchCommitmentZero();
-        }
-    }
+    function _validateChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal pure virtual;
 
     /// @notice Sets chain creation parameters after validation
     /// @param _chainCreationParams The chain creation parameters
@@ -206,6 +219,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         initialCutHash = newInitialCutHash;
         bytes32 forceDeploymentHash = keccak256(abi.encode(_chainCreationParams.forceDeploymentsData));
         initialForceDeploymentHash = forceDeploymentHash;
+        newChainCreationParamsBlock[protocolVersion] = block.number;
 
         emit NewChainCreationParams({
             genesisUpgrade: _chainCreationParams.genesisUpgrade,
@@ -234,18 +248,17 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
 
     /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
     function acceptAdmin() external {
-        address currentPendingAdmin = pendingAdmin;
         // Only proposed by current admin address can claim the admin rights
-        if (msg.sender != currentPendingAdmin) {
+        if (msg.sender != pendingAdmin) {
             revert Unauthorized(msg.sender);
         }
 
         address previousAdmin = admin;
-        admin = currentPendingAdmin;
+        admin = msg.sender;
         delete pendingAdmin;
 
-        emit NewPendingAdmin(currentPendingAdmin, address(0));
-        emit NewAdmin(previousAdmin, currentPendingAdmin);
+        emit NewPendingAdmin(msg.sender, address(0));
+        emit NewAdmin(previousAdmin, msg.sender);
     }
 
     /// @dev Used to set legacy validatorTimelock.
@@ -298,14 +311,13 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion
     ) internal {
-        bytes32 newCutHash = keccak256(abi.encode(_cutData));
         uint256 previousProtocolVersion = protocolVersion;
-        upgradeCutHash[_oldProtocolVersion] = newCutHash;
         _setProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
         _setProtocolVersionDeadline(_newProtocolVersion, type(uint256).max);
         protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
-        emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
+        setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
+        // Emit event with backward compatible hack.
         emit NewUpgradeCutData(_newProtocolVersion, _cutData);
     }
 
@@ -329,9 +341,18 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion
     ) external onlyOwner {
+        setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
+    }
+
+    /// @dev set upgrade for some protocolVersion
+    /// @param _cutData the new diamond cut data
+    /// @param _oldProtocolVersion the old protocol version
+    function setUpgradeDiamondCutInner(Diamond.DiamondCutData calldata _cutData, uint256 _oldProtocolVersion) internal {
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
         upgradeCutHash[_oldProtocolVersion] = newCutHash;
+        upgradeCutDataBlock[_oldProtocolVersion] = block.number;
         emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
+        emit NewUpgradeCutData(_oldProtocolVersion, _cutData);
     }
 
     /// @dev freezes the specified chain
@@ -444,6 +465,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             IDiamondInit.initialize.selector,
             bytes32(_chainId),
             bytes32(uint256(uint160(BRIDGE_HUB))),
+            bytes32(uint256(uint160(INTEROP_CENTER))),
             bytes32(uint256(uint160(address(this)))),
             bytes32(protocolVersion),
             bytes32(uint256(uint160(_admin))),
@@ -495,6 +517,9 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             _forceDeploymentData,
             _factoryDeps
         );
+        // Deposits start paused by default to allow immediate Gateway migration.
+        // Otherwise, any deposit would trigger the PAUSE_DEPOSITS_TIME_WINDOW_START delay.
+        IAdmin(zkChainAddress).pauseDepositsBeforeInitiatingMigration();
     }
 
     /// @param _chainId the chainId of the chain
@@ -562,8 +587,9 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// param _assetInfo the assetInfo of the chain
     /// param _depositSender the address of that sent the deposit
     /// param _ctmData the data of the migration
-    function forwardedBridgeRecoverFailedTransfer(
+    function forwardedBridgeConfirmTransferResult(
         uint256 /* _chainId */,
+        TxStatus /* _txStatus */,
         bytes32 /* _assetInfo */,
         address /* _depositSender */,
         bytes calldata /* _ctmData */
