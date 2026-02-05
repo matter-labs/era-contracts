@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
 
 contract IsFunctionFreezableTest is GettersFacetTest {
-    function test_when_facetAddressIzZero() public {
+    function test_when_facetAddressIsZero() public {
         bytes4 selector = bytes4(keccak256("asdfghfjtyhrewd"));
         gettersFacetWrapper.util_setIsFunctionFreezable(selector, true);
 
