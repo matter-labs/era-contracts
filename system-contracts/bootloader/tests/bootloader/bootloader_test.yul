@@ -188,7 +188,7 @@ function TEST_systemLogKeys() {
      let protocolUpgradeTxHashKey := protocolUpgradeTxHashKey()
      testing_assertEq(chainedPriorityTxnHashLogKey, 2, "Invalid priority txn hash log key")
      testing_assertEq(numberOfLayer1TxsLogKey, 3, "Invalid num layer 1 txns log key")
-     testing_assertEq(protocolUpgradeTxHashKey, 9, "Invalid protocol upgrade txn hash log key")
+     testing_assertEq(protocolUpgradeTxHashKey, 10, "Invalid protocol upgrade txn hash log key")
  }
 
 function TEST_safeAdd() {

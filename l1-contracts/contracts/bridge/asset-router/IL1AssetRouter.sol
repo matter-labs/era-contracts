@@ -5,16 +5,16 @@ pragma solidity ^0.8.21;
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
-import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
+import {L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
 import {IL1SharedBridgeLegacy} from "../interfaces/IL1SharedBridgeLegacy.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
-import {IL1Bridgehub} from "../../bridgehub/IL1Bridgehub.sol";
-import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
+import {IL1CrossChainSender} from "../interfaces/IL1CrossChainSender.sol";
+import {TxStatus} from "../../common/Messaging.sol";
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
+interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy, IL1CrossChainSender {
     event BridgehubMintData(bytes bridgeMintData);
 
     event BridgehubDepositFinalized(
@@ -24,12 +24,6 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
     );
 
     event ClaimedFailedDepositAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
-
-    event AssetDeploymentTrackerSet(
-        bytes32 indexed assetId,
-        address indexed assetDeploymentTracker,
-        bytes32 indexed additionalData
-    );
 
     event LegacyDepositInitiated(
         uint256 indexed chainId,
@@ -79,6 +73,8 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
 
     function L1_WETH_TOKEN() external view returns (address);
 
+    function ERA_CHAIN_ID() external view returns (uint256);
+
     function ETH_TOKEN_ASSET_ID() external view returns (bytes32);
 
     function BRIDGE_HUB() external view returns (IL1Bridgehub);
@@ -103,8 +99,9 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
     /// @param _assetId The unique identifier of the deposited L1 token.
     /// @param _assetData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver. Might include extra information.
     /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
-    function bridgeRecoverFailedTransfer(
+    function bridgeConfirmTransferResult(
         uint256 _chainId,
+        TxStatus _txStatus,
         address _depositSender,
         bytes32 _assetId,
         bytes calldata _assetData
@@ -156,9 +153,9 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
     ) external;
 
     /// @notice Initiates a transfer transaction within Bridgehub, used by `requestL2TransactionTwoBridges`.
-    /// @param _chainId The chain ID of the ZK chain to which deposit.
+    /// @param _chainId Destination chain ID.
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
-    /// @param _value The `msg.value` on the target chain tx.
+    /// @param _value The `msg.value` to be deposited on the target chain.
     /// @param _data The calldata for the second bridge deposit.
     /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
     /// @dev Data has the following abi encoding for legacy deposits:
@@ -175,35 +172,10 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
         bytes calldata _data
     ) external payable returns (L2TransactionRequestTwoBridgesInner memory request);
 
-    /// @notice Generates a calldata for calling the deposit finalization on the L2 native token contract.
-    // / @param _chainId The chain ID of the ZK chain to which deposit.
-    /// @param _sender The address of the deposit initiator.
-    /// @param _assetId The deposited asset ID.
-    /// @param _assetData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
-    /// @return Returns calldata used on ZK chain.
-    function getDepositCalldata(
-        address _sender,
-        bytes32 _assetId,
-        bytes memory _assetData
-    ) external view returns (bytes memory);
-
-    /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
-    /// @dev If the corresponding L2 transaction fails, refunds are issued to a refund recipient on L2.
-    /// @param _chainId The chain ID of the ZK chain to which deposit.
-    /// @param _assetId The deposited asset ID.
-    /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
-    /// @param _amount The total amount of tokens to be bridged.
-    function bridgehubDepositBaseToken(
-        uint256 _chainId,
-        bytes32 _assetId,
-        address _originalCaller,
-        uint256 _amount
-    ) external payable;
-
     /// @notice Routes the confirmation to nullifier for backward compatibility.
     /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
     /// This function is utilized by `requestL2TransactionTwoBridges` to validate the execution of a transaction.
-    /// @param _chainId The chain ID of the ZK chain to which confirm the deposit.
+    /// @param _chainId Destination chain ID.
     /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
     /// @param _txHash The hash of the L1->L2 transaction to confirm the deposit.
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
