@@ -11,4 +11,6 @@ interface IMessageRoot {
     /// @notice The aggregated root of the batches from different chains.
     /// @return aggregatedRoot of the batches from different chains.
     function getAggregatedRoot() external view returns (bytes32 aggregatedRoot);
+
+    function setAddresses(address _assetTracker) external;
 }
