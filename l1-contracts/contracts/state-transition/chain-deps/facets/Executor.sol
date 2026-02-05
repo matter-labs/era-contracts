@@ -605,7 +605,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         CommitBatchInfo[] memory _newBatchesData,
         bytes32 _systemContractUpgradeTxHash
     ) internal {
-        // We disable this check because calldata array length is cheap.
+        // We disable this check because memory array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _newBatchesData.length; ++i) {
             _lastCommittedBatchData = _commitOneBatch(
@@ -646,7 +646,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             upgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         }
 
-        // We disable this check because calldata array length is cheap.
+        // We disable this check because memory array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _newBatchesData.length; ++i) {
             _lastCommittedBatchData = _commitOneBatchZKsyncOS(
