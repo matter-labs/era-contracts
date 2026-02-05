@@ -100,7 +100,7 @@ library Diamond {
         address initAddress = _diamondCut.initAddress;
         bytes memory initCalldata = _diamondCut.initCalldata;
         uint256 facetCutsLength = facetCuts.length;
-        for (uint256 i = 0; i < facetCutsLength; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < facetCutsLength; ++i) {
             Action action = facetCuts[i].action;
             address facet = facetCuts[i].facet;
             bool isFacetFreezable = facetCuts[i].isFreezable;
@@ -141,7 +141,7 @@ library Diamond {
         _saveFacetIfNew(_facet);
 
         uint256 selectorsLength = _selectors.length;
-        for (uint256 i = 0; i < selectorsLength; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < selectorsLength; ++i) {
             bytes4 selector = _selectors[i];
             SelectorToFacet memory oldFacet = ds.selectorToFacet[selector];
             if (oldFacet.facetAddress != address(0)) {
@@ -165,7 +165,7 @@ library Diamond {
         }
 
         uint256 selectorsLength = _selectors.length;
-        for (uint256 i = 0; i < selectorsLength; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < selectorsLength; ++i) {
             bytes4 selector = _selectors[i];
             SelectorToFacet memory oldFacet = ds.selectorToFacet[selector];
             // it is impossible to replace the facet with zero address
@@ -191,7 +191,7 @@ library Diamond {
         }
 
         uint256 selectorsLength = _selectors.length;
-        for (uint256 i = 0; i < selectorsLength; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < selectorsLength; ++i) {
             bytes4 selector = _selectors[i];
             SelectorToFacet memory oldFacet = ds.selectorToFacet[selector];
             // Can't delete a non-existent facet

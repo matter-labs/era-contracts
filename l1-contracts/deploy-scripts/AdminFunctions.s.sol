@@ -3,6 +3,7 @@ pragma solidity ^0.8.21;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 
+import {IAdminFunctions} from "contracts/script-interfaces/IAdminFunctions.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
@@ -12,7 +13,7 @@ import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {ChainInfoFromBridgehub, Utils} from "./Utils.sol";
+import {ChainInfoFromBridgehub, Utils} from "./utils/Utils.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -22,17 +23,18 @@ import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainS
 
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehubBase.sol";
+import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {BridgehubBurnCTMAssetData} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
+import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
-contract AdminFunctions is Script {
+contract AdminFunctions is Script, IAdminFunctions {
     using stdToml for string;
 
     struct Config {
@@ -147,7 +149,7 @@ contract AdminFunctions is Script {
         saveAndSendAdminTx(ecosystemAdminAddr, calls, true);
     }
 
-    function adminEncodeMulticall(bytes memory callsToExecute) external {
+    function adminEncodeMulticall(bytes memory callsToExecute) external pure {
         Call[] memory calls = abi.decode(callsToExecute, (Call[]));
 
         bytes memory result = abi.encodeCall(ChainAdmin.multicall, (calls, true));
@@ -412,7 +414,7 @@ contract AdminFunctions is Script {
         uint256 _chainId,
         address _transactionFiltererAddress,
         bool _shouldSend
-    ) external {
+    ) public {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
         Call[] memory calls = new Call[](1);
@@ -421,6 +423,28 @@ contract AdminFunctions is Script {
             value: 0,
             data: abi.encodeCall(IAdmin.setTransactionFilterer, (_transactionFiltererAddress))
         });
+
+        saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
+    }
+
+    function pauseDepositsBeforeInitiatingMigration(address _bridgehub, uint256 _chainId, bool _shouldSend) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IAdmin.pauseDepositsBeforeInitiatingMigration, ())
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
+    }
+
+    function unpauseDeposits(address _bridgehub, uint256 _chainId, bool _shouldSend) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: chainInfo.diamondProxy, value: 0, data: abi.encodeCall(IAdmin.unpauseDeposits, ())});
 
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
@@ -492,8 +516,7 @@ contract AdminFunctions is Script {
                 })
             );
 
-            // TODO: use constant for the 0x01
-            secondBridgeData = abi.encodePacked(bytes1(0x01), abi.encode(chainAssetId, bridgehubData));
+            secondBridgeData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
         }
 
         calls = Utils.prepareAdminL1L2TwoBridgesTransaction(

@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {IMessageRootBase} from "../../bridgehub/IMessageRootBase.sol";
+import {IMessageRoot} from "../../core/message-root/IMessageRoot.sol";
 
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 
@@ -16,6 +16,8 @@ contract DummyBridgehub {
     address public zkChain;
 
     address public sharedBridge;
+
+    address public chainAssetHandler;
 
     // add this to be excluded from coverage report
     function test() internal virtual {}
@@ -44,11 +46,21 @@ contract DummyBridgehub {
         return zkChain;
     }
 
+    function getAllZKChainChainIDs() external view returns (uint256[] memory) {
+        uint256[] memory allZKChainChainIDs = new uint256[](0);
+        // allZKChainChainIDs[0] = 271;
+        return allZKChainChainIDs;
+    }
+
     function setSharedBridge(address addr) external {
         sharedBridge = addr;
     }
 
     function assetRouter() external view returns (address) {
         return sharedBridge;
+    }
+
+    function settlementLayer(uint256) external view returns (uint256) {
+        return 0;
     }
 }

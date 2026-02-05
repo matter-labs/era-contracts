@@ -3,10 +3,11 @@ pragma solidity 0.8.28;
 
 import "forge-std/console.sol";
 import {Vm} from "forge-std/Test.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, Utils} from "../Utils/Utils.sol";
+import {EVENT_INDEX, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, Utils} from "../Utils/Utils.sol";
 import {EMPTY_PREPUBLISHED_COMMITMENT, ExecutorTest, POINT_EVALUATION_PRECOMPILE_RESULT} from "./_Executor_Shared.t.sol";
 
-import {IExecutor, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {SystemLogKey} from "system-contracts/contracts/Constants.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 
 import {BLOB_DATA_OFFSET} from "../../../da-contracts-imports/CalldataDA.sol";
@@ -225,7 +226,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
         vm.blobhashes(defaultBlobVersionedHashes);
 
-        vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, 511, 509));
+        vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, 1023, 1021));
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
@@ -423,7 +424,7 @@ contract CommittingTest is ExecutorTest {
 
             vm.prank(validator);
 
-            uint256 allLogsProcessed = uint256(511);
+            uint256 allLogsProcessed = uint256(1023);
             vm.expectRevert(
                 abi.encodeWithSelector(MissingSystemLogs.selector, allLogsProcessed, allLogsProcessed ^ (1 << i))
             );
@@ -504,11 +505,11 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        assertEq(entries.length, 1);
-        assertEq(entries[0].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
-        assertEq(entries[0].topics[1], bytes32(uint256(1))); // batchNumber
-        assertEq(entries[0].topics[2], correctNewCommitBatchInfo.newStateRoot); // batchHash
-        assertEq(entries[0].topics[3], expectedBatchCommitment); // commitment
+        assertEq(entries.length, 1 + EVENT_INDEX);
+        assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
+        assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
+        assertEq(entries[EVENT_INDEX].topics[2], correctNewCommitBatchInfo.newStateRoot); // batchHash
+        assertEq(entries[EVENT_INDEX].topics[3], expectedBatchCommitment); // commitment
 
         uint256 totalBatchesCommitted = getters.getTotalBatchesCommitted();
         assertEq(totalBatchesCommitted, 1);
@@ -544,9 +545,9 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        assertEq(entries.length, 1);
-        assertEq(entries[0].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
-        assertEq(entries[0].topics[1], bytes32(uint256(1))); // batchNumber
+        assertEq(entries.length, 1 + EVENT_INDEX);
+        assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
+        assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
 
         uint256 totalBatchesCommitted = getters.getTotalBatchesCommitted();
         assertEq(totalBatchesCommitted, 1);
@@ -613,9 +614,9 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        assertEq(entries.length, 1);
-        assertEq(entries[0].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
-        assertEq(entries[0].topics[1], bytes32(uint256(1))); // batchNumber
+        assertEq(entries.length, 1 + EVENT_INDEX);
+        assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
+        assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
 
         uint256 totalBatchesCommitted = getters.getTotalBatchesCommitted();
         assertEq(totalBatchesCommitted, 1);
@@ -1025,25 +1026,25 @@ contract CommittingTest is ExecutorTest {
         );
     }
 
-    struct MessageRoot {
+    struct InteropRoot {
         uint256 chainId;
         uint256 blockNumber;
         // We double overloading this. The sides normally contain the root, as well as the sides.
-        // Second overloading: if the length is 1, we are importing a chainBatchRoot/messageRoot instead of sides.
+        // Second overloading: if the length is 1, we are importing a chainBatchRoot/InteropRoot instead of sides.
         bytes32[] sides;
     }
 
     function test_recalculateinteropRootRollingHash() public {
-        MessageRoot[] memory interopRoots = new MessageRoot[](2);
-        MessageRoot memory interopRoot1 = MessageRoot({chainId: 260, blockNumber: 1, sides: new bytes32[](1)});
+        InteropRoot[] memory interopRoots = new InteropRoot[](2);
+        InteropRoot memory interopRoot1 = InteropRoot({chainId: 260, blockNumber: 1, sides: new bytes32[](1)});
         interopRoot1.sides[0] = 0xfb2eb93318710c98f501f6ff6b11c373baccd0ffcaefe15f97debe09cb7939e1;
         interopRoots[0] = interopRoot1;
-        MessageRoot memory interopRoot2 = MessageRoot({chainId: 506, blockNumber: 17, sides: new bytes32[](1)});
+        InteropRoot memory interopRoot2 = InteropRoot({chainId: 506, blockNumber: 17, sides: new bytes32[](1)});
         interopRoot2.sides[0] = 0xf83b13aa476ef3253e6acff5779276da7924fabaec9a8c39274cf021efe1255a;
         interopRoots[1] = interopRoot2;
         bytes32 rollingHash = 0x0000000000000000000000000000000000000000000000000000000000000000;
         for (uint256 i = 0; i < interopRoots.length; i++) {
-            MessageRoot memory interopRoot = interopRoots[i];
+            InteropRoot memory interopRoot = interopRoots[i];
             console.logBytes(
                 abi.encodePacked(
                     rollingHash,

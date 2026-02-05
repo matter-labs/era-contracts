@@ -4,23 +4,23 @@ pragma solidity ^0.8.0;
 // solhint-disable no-console, gas-custom-errors, reason-string
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-//
+
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {Utils} from "../Utils.sol";
+import {Utils} from "../utils/Utils.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {IAssetRouterBase, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION} from "contracts/bridgehub/CTMDeploymentTracker.sol";
+import {IAssetRouterBase, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
 import {IL2AssetRouter, L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
@@ -30,7 +30,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {Call} from "contracts/governance/Common.sol";
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
@@ -59,21 +59,21 @@ abstract contract GatewayGovernanceUtils is Script {
         _gatewayGovernanceConfig = config;
     }
 
-    function _getRegisterSettlementLayerCalls() internal view returns (Call[] memory calls) {
+    function _getSetSettlementLayerCalls() internal view returns (Call[] memory calls) {
         calls = new Call[](1);
         calls[0] = Call({
             target: _gatewayGovernanceConfig.bridgehubProxy,
             value: 0,
-            data: abi.encodeCall(IL1Bridgehub.registerSettlementLayer, (_gatewayGovernanceConfig.gatewayChainId, true))
+            data: abi.encodeCall(IL1Bridgehub.setSettlementLayerStatus, (_gatewayGovernanceConfig.gatewayChainId, true))
         });
     }
 
     function _prepareGatewayGovernanceCalls(
         PrepareGatewayGovernanceCalls memory prepareGWGovCallsStruct
-    ) internal returns (Call[] memory calls) {
+    ) internal view returns (Call[] memory calls) {
         {
             if (prepareGWGovCallsStruct._ctmRepresentativeChainId == _gatewayGovernanceConfig.gatewayChainId) {
-                calls = _getRegisterSettlementLayerCalls();
+                calls = _getSetSettlementLayerCalls();
             }
         }
 
@@ -165,7 +165,7 @@ abstract contract GatewayGovernanceUtils is Script {
         // chains that migrate from L1.
         {
             bytes memory secondBridgeData = abi.encodePacked(
-                bytes1(0x01),
+                NEW_ENCODING_VERSION,
                 abi.encode(_gatewayGovernanceConfig.chainTypeManagerProxy, prepareGWGovCallsStruct._gatewayCTMAddress)
             );
 
@@ -203,20 +203,21 @@ abstract contract GatewayGovernanceUtils is Script {
                     prepareGWGovCallsStruct._refundRecipient
                 )
             );
-            calls = Utils.mergeCalls(
-                calls,
-                Utils.prepareGovernanceL1L2DirectTransaction(
-                    prepareGWGovCallsStruct._l1GasPrice,
-                    data,
-                    Utils.MAX_PRIORITY_TX_GAS,
-                    new bytes[](0),
-                    prepareGWGovCallsStruct._gatewayValidatorTimelock,
-                    _gatewayGovernanceConfig.gatewayChainId,
-                    _gatewayGovernanceConfig.bridgehubProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    prepareGWGovCallsStruct._refundRecipient
-                )
-            );
+            // Todo: can probably delete since ValidatorTimelock is now TUPP.
+            // calls = Utils.mergeCalls(
+            //     calls,
+            //     Utils.prepareGovernanceL1L2DirectTransaction(
+            //         prepareGWGovCallsStruct._l1GasPrice,
+            //         data,
+            //         Utils.MAX_PRIORITY_TX_GAS,
+            //         new bytes[](0),
+            //         prepareGWGovCallsStruct._gatewayValidatorTimelock,
+            //         _gatewayGovernanceConfig.gatewayChainId,
+            //         _gatewayGovernanceConfig.bridgehubProxy,
+            //         _gatewayGovernanceConfig.l1AssetRouterProxy,
+            //         prepareGWGovCallsStruct._refundRecipient
+            //     )
+            // );
             calls = Utils.mergeCalls(
                 calls,
                 Utils.prepareGovernanceL1L2DirectTransaction(

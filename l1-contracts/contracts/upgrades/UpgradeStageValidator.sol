@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
-import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {MigrationPaused, MigrationsNotPaused, ProtocolIdMismatch, ZeroAddress} from "../common/L1ContractErrors.sol";
-import {IChainAssetHandlerBase} from "../bridgehub/IChainAssetHandlerBase.sol";
+import {IChainAssetHandler} from "../core/chain-asset-handler/IChainAssetHandler.sol";
 
 /// @title Rules to validate that different upgrade stages have passed.
 /// @author Matter Labs
@@ -36,21 +36,21 @@ contract UpgradeStageValidator {
     }
 
     /// @notice Check if migrations are paused
-    function checkMigrationsPaused() external {
-        if (!IChainAssetHandlerBase(BRIDGEHUB.chainAssetHandler()).migrationPaused()) {
+    function checkMigrationsPaused() external view {
+        if (!IChainAssetHandler(BRIDGEHUB.chainAssetHandler()).migrationPaused()) {
             revert MigrationsNotPaused();
         }
     }
 
     /// @notice Check if migrations are unpaused
-    function checkMigrationsUnpaused() external {
-        if (IChainAssetHandlerBase(BRIDGEHUB.chainAssetHandler()).migrationPaused()) {
+    function checkMigrationsUnpaused() external view {
+        if (IChainAssetHandler(BRIDGEHUB.chainAssetHandler()).migrationPaused()) {
             revert MigrationPaused();
         }
     }
 
     /// @notice Check if the upgrade data was sent to the CTM.
-    function checkProtocolUpgradePresence() external {
+    function checkProtocolUpgradePresence() external view {
         uint256 protocolVersion = CHAIN_TYPE_MANAGER.protocolVersion();
 
         if (protocolVersion != NEW_PROTOCOL_VERSION) {

@@ -19,6 +19,7 @@
 pragma solidity ^0.8.21;
 
 library AddressAliasHelper {
+    // solhint-disable-next-line const-name-snakecase
     uint160 private constant offset = uint160(0x1111000000000000000000000000000000001111);
 
     /// @notice Utility function converts the address that submitted a tx
@@ -48,7 +49,7 @@ library AddressAliasHelper {
     function actualRefundRecipient(
         address _refundRecipient,
         address _originalCaller
-    ) internal view returns (address _recipient) {
+    ) internal pure returns (address _recipient) {
         if (_refundRecipient == address(0)) {
             // If the `_refundRecipient` is not provided, we use the `_originalCaller` as the recipient.
             // solhint-disable avoid-tx-origin

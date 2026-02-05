@@ -19,8 +19,6 @@ interface IL1ERC20Bridge {
         uint256 amount
     );
 
-    event WithdrawalFinalized(address indexed to, address indexed l1Token, uint256 amount);
-
     event ClaimedFailedDeposit(address indexed to, address indexed l1Token, uint256 amount);
 
     function isWithdrawalFinalized(uint256 _l2BatchNumber, uint256 _l2MessageIndex) external view returns (bool);
@@ -71,6 +69,10 @@ interface IL1ERC20Bridge {
     function l2TokenBeacon() external view returns (address);
 
     function l2Bridge() external view returns (address);
+
+    function ERA_CHAIN_ID() external view returns (uint256);
+
+    function l2TokenProxyBytecodeHash() external view returns (bytes32);
 
     function depositAmount(
         address _account,
