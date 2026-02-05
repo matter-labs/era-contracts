@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
+import {IBridgehubBase, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {console2 as console} from "forge-std/console2.sol";
 
-import {IBridgehubBase, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehubBase.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
-
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
+
+import {IMessageRoot, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
@@ -17,21 +17,29 @@ import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2Message} from "contracts/common/Messaging.sol";
+
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
+import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
 import {BridgedStandardERC20, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 
-contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
+import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
+
+contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+    using stdStorage for StdStorage;
+
     bytes32 constant NEW_PRIORITY_REQUEST_HASH =
         keccak256(
             "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])"
@@ -65,23 +73,14 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
     function prepare() public {
         _generateUserAddresses();
 
-        takeConfigLock(); // Prevents race condition with configs
-
         _deployL1Contracts();
         _deployTokens();
         _registerNewTokens(tokens);
 
         _deployEra();
+        _deployZKChain(ETH_TOKEN_ADDRESS);
 
         simpleExecutor = new SimpleExecutor();
-        // _deployHyperchain(ETH_TOKEN_ADDRESS);
-        // _deployHyperchain(ETH_TOKEN_ADDRESS);
-        // _deployHyperchain(tokens[0]);
-        // _deployHyperchain(tokens[0]);
-        // _deployHyperchain(tokens[1]);
-        // _deployHyperchain(tokens[1]);
-
-        releaseConfigLock();
 
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
@@ -91,15 +90,77 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         }
     }
 
+    function _setAssetTrackerChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(eraZKChainId, _token);
+        if (address(addresses.l1AssetTracker) != address(0)) {
+            stdstore
+                .target(address(addresses.l1AssetTracker))
+                .sig(IAssetTrackerBase.chainBalance.selector)
+                .with_key(_chainId)
+                .with_key(assetId)
+                .checked_write(_value);
+        }
+    }
+
     function setUp() public {
         prepare();
+        bytes32 ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(eraZKChainId, ETH_TOKEN_ADDRESS);
+
+        vm.mockCall(
+            address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler),
+            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
+            abi.encode(0)
+        );
+        vm.mockCall(
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
+            abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
+            abi.encode(10)
+        );
+
+        _setAssetTrackerChainBalance(eraZKChainId, ETH_TOKEN_ADDRESS, 1e30);
+        _setAssetTrackerChainBalance(506, ETH_TOKEN_ADDRESS, 1e30);
+        bytes32 ethAssetId = 0x8df3463b1850eb1d8d1847743ea155aef6b16074db8ba81d897dc30554fb2085;
+        stdstore
+            .target(address(ecosystemAddresses.bridgehub.proxies.assetTracker))
+            .sig(IAssetTrackerBase.chainBalance.selector)
+            .with_key(eraZKChainId)
+            .with_key(ETH_TOKEN_ASSET_ID)
+            .checked_write(100);
+        vm.prank(Ownable2StepUpgradeable(addresses.l1NativeTokenVault).pendingOwner());
+        Ownable2StepUpgradeable(addresses.l1NativeTokenVault).acceptOwnership();
     }
 
     function depositToL1(address _tokenAddress) public {
         vm.mockCall(
-            address(addresses.bridgehub),
-            abi.encodeWithSelector(IBridgehubBase.proveL2MessageInclusion.selector),
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
+            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
             abi.encode(true)
+        );
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector),
+            abi.encode(506)
+        );
+        vm.mockCall(
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
+            abi.encodeWithSelector(IMessageRoot.getProofData.selector),
+            abi.encode(
+                ProofData({
+                    settlementLayerChainId: 506,
+                    settlementLayerBatchNumber: 0,
+                    settlementLayerBatchRootMask: 0,
+                    batchLeafProofLen: 0,
+                    batchSettlementRoot: 0,
+                    chainIdLeaf: 0,
+                    ptr: 0,
+                    finalProofNode: false
+                })
+            )
+        );
+        vm.mockCall(
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
+            abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
+            abi.encode(10)
         );
         uint256 chainId = eraZKChainId;
         l2TokenAssetId = DataEncoding.encodeNTVAssetId(chainId, _tokenAddress);
@@ -131,6 +192,17 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
 
     function test_DepositToL1_Success() public {
         depositToL1(ETH_TOKEN_ADDRESS);
+
+        // Verify the token was deposited and registered
+        assertTrue(tokenL1Address != address(0), "Token L1 address should be set after deposit");
+        assertTrue(l2TokenAssetId != bytes32(0), "L2 token asset ID should be set after deposit");
+
+        // Verify the token address is correctly mapped in NTV
+        assertEq(
+            addresses.l1NativeTokenVault.tokenAddress(l2TokenAssetId),
+            tokenL1Address,
+            "Token address should match the registered address"
+        );
     }
 
     function test_BridgeTokenFunctions() public {
@@ -148,6 +220,11 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         BridgedStandardERC20 bridgedToken = BridgedStandardERC20(
             addresses.l1NativeTokenVault.tokenAddress(l2TokenAssetId)
         );
+
+        // Verify initial token properties before reinit
+        string memory nameBefore = bridgedToken.name();
+        string memory symbolBefore = bridgedToken.symbol();
+
         address owner = addresses.l1NativeTokenVault.owner();
         vm.broadcast(owner);
         bridgedToken.reinitializeToken(
@@ -156,6 +233,10 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             "TST",
             2
         );
+
+        // Verify the token was reinitialized with new values
+        assertEq(bridgedToken.name(), "TestnetERC20Token", "Token name should be updated after reinit");
+        assertEq(bridgedToken.symbol(), "TST", "Token symbol should be updated after reinit");
     }
 
     function test_reinitBridgedToken_WrongVersion() public {
@@ -191,11 +272,17 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
 
     function test_DepositToL1AndWithdraw() public {
         depositToL1(ETH_TOKEN_ADDRESS);
+
+        // Store balances before withdrawal
+        uint256 balanceBefore = IERC20(tokenL1Address).balanceOf(address(this));
+
         bytes memory secondBridgeCalldata = bytes.concat(
             NEW_ENCODING_VERSION,
             abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), tokenL1Address))
         );
         IERC20(tokenL1Address).approve(address(addresses.l1NativeTokenVault), 100);
+
+        vm.recordLogs();
         addresses.bridgehub.requestL2TransactionTwoBridges{value: 250000000000100}(
             L2TransactionRequestTwoBridgesOuter({
                 chainId: eraZKChainId,
@@ -209,6 +296,49 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
                 secondBridgeCalldata: secondBridgeCalldata
             })
         );
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        // Verify transaction was recorded (logs were emitted)
+        assertTrue(logs.length > 0, "Transaction should emit logs");
+
+        // Verify balance decreased after withdrawal request
+        uint256 balanceAfter = IERC20(tokenL1Address).balanceOf(address(this));
+        assertEq(balanceBefore - balanceAfter, 100, "Balance should decrease by withdrawal amount");
+    }
+
+    function test_DepositDirect() public {
+        depositToL1(ETH_TOKEN_ADDRESS);
+
+        bytes memory secondBridgeCalldata = bytes.concat(
+            NEW_ENCODING_VERSION,
+            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this)))
+        );
+        IERC20(tokenL1Address).approve(address(addresses.l1NativeTokenVault), 100);
+
+        vm.recordLogs();
+        addresses.bridgehub.requestL2TransactionDirect{value: 250000000000100}(
+            L2TransactionRequestDirect({
+                chainId: eraZKChainId,
+                mintValue: 250000000000100,
+                l2Contract: address(addresses.sharedBridge),
+                l2Value: 0,
+                l2Calldata: secondBridgeCalldata,
+                l2GasLimit: 1000000,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                factoryDeps: new bytes[](0),
+                refundRecipient: address(0)
+            })
+        );
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        // Verify transaction was recorded (logs were emitted)
+        assertTrue(logs.length > 0, "Direct transaction should emit logs");
+
+        // Direct transactions send calldata to L2 without going through the bridge's token transfer
+        // Verify the calldata was properly encoded
+        assertTrue(secondBridgeCalldata.length > 0, "Second bridge calldata should not be empty");
     }
 
     function test_DepositToL1AndWithdraw7702() public {

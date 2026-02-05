@@ -1,0 +1,45 @@
+era_chain_id = 271
+owner_address = "0x624c41d3a2f76bb06fd363ae050d39f08557cba7"
+testnet_verifier = true
+governance_upgrade_timer_initial_delay = 0
+support_l2_legacy_shared_bridge_test = false
+old_protocol_version = "0x1c00000000"
+priority_txs_l2_gas_limit = 800
+max_expected_l1_gas_price = 10000000000
+
+[contracts]
+governance_min_delay = 0
+max_number_of_chains = 100
+create2_factory_salt = "0x5449093bca2c6304d500f9189bf24b3a1aae8b2a2306bda4c6efa7d039849abc"
+validator_timelock_execution_delay = 0
+genesis_root = "0x05f6e3d0cc018903f23c9248a75c20d4fa09e9d84ae51ba22248faa7c7774f6b"
+genesis_rollup_leaf_index = 84
+genesis_batch_commitment = "0xa1bade3051deb55ed9d7bf3df8ee0ddd26c51bfe4a232fda946418d21ef82e13"
+recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+priority_tx_max_gas_limit = 72000000
+diamond_init_pubdata_pricing_mode = 0
+diamond_init_batch_overhead_l1_gas = 1000000
+diamond_init_max_pubdata_per_batch = 120000
+diamond_init_max_l2_gas_per_batch = 80000000
+diamond_init_priority_tx_max_pubdata = 99000
+diamond_init_minimal_l2_gas_price = 250000000
+bootloader_hash = "0x01000911c4db4fe62c98e180cfa7e9b3a22fb15f505905d4bf36192f481551e6"
+default_aa_hash = "0x010005f734dec9a66e4471535311709ef26982c3546408de7c25d41a9d4ed09d"
+bridgehub_proxy_address = "0xe29869b28d889e35e8ad3c0cd5e7a493cf90a0b7"
+shared_bridge_proxy_address = "0x2393d86c739fff0f6f47d5f00b0a4fb510b17c11"
+state_transition_manager_address = "0xb5444869bf72bdf72f3379fabef489d13c22ae3c"
+transparent_proxy_admin = "0xd4afd3efa4f896cb132fd6b83d1abead79db32db"
+era_diamond_proxy = "0x7df08b6fc21eb19f7ef24f6fc4dd3e41da9ee1c2"
+legacy_erc20_bridge_address = "0x34dc73c47f23b6f2dd1f7499e7f5ec0a5727a523"
+old_validator_timelock = "0x8871fe8c7a212920545f331600e948d574def243"
+governance_security_council_address = "0x0000000000000000000000000000000000000000"
+latest_protocol_version = "0x1d00000000"
+evm_emulator_hash = "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63"
+l1_bytecodes_supplier_addr = "0xcb2c06150a790cfea773053b6d65110c9e398220"
+protocol_upgrade_handler_proxy_address = "0x0000000000000000000000000000000000000000"
+rollup_da_manager = "0x0000000000000000000000000000000000000000"
+
+[tokens]
+token_weth_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
