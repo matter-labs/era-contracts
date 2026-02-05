@@ -5,7 +5,7 @@ import {Vm} from "forge-std/Test.sol";
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
-import {L2_DA_COMMITMENT_SCHEME, L2_SYSTEM_CONTEXT_ADDRESS, Utils} from "../../Utils/Utils.sol";
+import {EVENT_INDEX, L2_DA_COMMITMENT_SCHEME, L2_SYSTEM_CONTEXT_ADDRESS, Utils} from "../../Utils/Utils.sol";
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, POINT_EVALUATION_PRECOMPILE_ADDR, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
@@ -19,9 +19,9 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {IL2GenesisUpgrade} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
-contract revertBatchesTest is ChainTypeManagerTest {
+contract RevertBatchesTest is ChainTypeManagerTest {
     // Items for logs & commits
     uint256 internal currentTimestamp;
     IExecutor.CommitBatchInfo internal newCommitBatchInfo;
@@ -100,6 +100,8 @@ contract revertBatchesTest is ChainTypeManagerTest {
             // slither-disable-next-line unused-return
             (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(0));
         }
+
+        mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge, baseTokenAssetId);
 
         newChainAddress = createNewChain(getDiamondCutData(diamondInit));
         vm.mockCall(
@@ -196,24 +198,24 @@ contract revertBatchesTest is ChainTypeManagerTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        assertEq(entries.length, 1);
-        assertEq(entries[0].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
-        assertEq(entries[0].topics[1], bytes32(uint256(1))); // batchNumber
-        assertEq(entries[0].topics[2], correctNewCommitBatchInfo.newStateRoot); // batchHash
+        assertEq(entries.length, 1 + EVENT_INDEX);
+        assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
+        assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
+        assertEq(entries[EVENT_INDEX].topics[2], correctNewCommitBatchInfo.newStateRoot); // batchHash
 
         uint256 totalBatchesCommitted = gettersFacet.getTotalBatchesCommitted();
         assertEq(totalBatchesCommitted, 1);
 
         newStoredBatchInfo = IExecutor.StoredBatchInfo({
             batchNumber: 1,
-            batchHash: entries[0].topics[2],
+            batchHash: entries[EVENT_INDEX].topics[2],
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             dependencyRootsRollingHash: bytes32(0),
             timestamp: currentTimestamp,
-            commitment: entries[0].topics[3]
+            commitment: entries[EVENT_INDEX].topics[3]
         });
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
