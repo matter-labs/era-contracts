@@ -6,6 +6,8 @@ import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializabl
 import {InvalidProtocolVersion, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
+import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
+import {IChainAssetHandler} from "../core/chain-asset-handler/IChainAssetHandler.sol";
 
 /// @title ServerNotifier
 /// @author Matter Labs
@@ -18,11 +20,13 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable {
 
     /// @notice Emitted to notify the server before a chain migrates to the ZK gateway.
     /// @param chainId The identifier for the chain initiating migration to the ZK gateway.
-    event MigrateToGateway(uint256 indexed chainId);
+    /// @param migrationNumber The migration number for this migration.
+    event MigrateToGateway(uint256 indexed chainId, uint256 migrationNumber);
 
     /// @notice Emitted to notify the server before a chain migrates from the ZK gateway.
     /// @param chainId The identifier for the chain initiating migration from the ZK gateway.
-    event MigrateFromGateway(uint256 indexed chainId);
+    /// @param migrationNumber The migration number for this migration.
+    event MigrateFromGateway(uint256 indexed chainId, uint256 migrationNumber);
 
     /// @notice Emitted whenever an upgrade timestamp is set.
     /// @param chainId The ID of the chain where the upgrade is scheduled.
@@ -71,14 +75,25 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable {
     /// @param _chainId The identifier of the chain that is migrating.
     /// @dev Restricted to the chain administrator.
     function migrateToGateway(uint256 _chainId) external onlyChainAdmin(_chainId) {
-        emit MigrateToGateway(_chainId);
+        uint256 migrationNumber = _getMigrationNumber(_chainId);
+        emit MigrateToGateway(_chainId, migrationNumber);
     }
 
     /// @notice Emits an event to signal that the chain is migrating from a gateway.
     /// @param _chainId The identifier of the chain that is migrating.
     /// @dev Restricted to the chain administrator.
     function migrateFromGateway(uint256 _chainId) external onlyChainAdmin(_chainId) {
-        emit MigrateFromGateway(_chainId);
+        uint256 migrationNumber = _getMigrationNumber(_chainId);
+        emit MigrateFromGateway(_chainId, migrationNumber);
+    }
+
+    /// @notice Gets the migration number for a chain from the ChainAssetHandler.
+    /// @param _chainId The identifier of the chain.
+    /// @return The current migration number for the chain.
+    function _getMigrationNumber(uint256 _chainId) internal view returns (uint256) {
+        address bridgehub = chainTypeManager.BRIDGE_HUB();
+        address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
+        return IChainAssetHandler(chainAssetHandler).migrationNumber(_chainId);
     }
 
     /// @notice Set the expected upgrade timestamp for a specific protocol version. Only allowed to be called by ChainAdmin.
