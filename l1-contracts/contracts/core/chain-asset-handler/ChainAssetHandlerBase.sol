@@ -243,7 +243,12 @@ abstract contract ChainAssetHandlerBase is
         });
         bridgehubMintData = abi.encode(bridgeMintStruct);
 
-        emit MigrationStarted(bridgehubBurnData.chainId, migrationNumber[bridgehubBurnData.chainId], _assetId, _settlementChainId);
+        emit MigrationStarted(
+            bridgehubBurnData.chainId,
+            migrationNumber[bridgehubBurnData.chainId],
+            _assetId,
+            _settlementChainId
+        );
     }
 
     function _setMigrationInProgressOnL1(uint256 _chainId) internal virtual {}
