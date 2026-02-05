@@ -32,6 +32,38 @@
   },
   {
     "type": "function",
+    "name": "getLegacyGwChainId",
+    "inputs": [
+      {
+        "name": "permanentValuesPath",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "legacyGwChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getLegacyGwChainId",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "legacyGwChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getPermanentValues",
     "inputs": [],
     "outputs": [

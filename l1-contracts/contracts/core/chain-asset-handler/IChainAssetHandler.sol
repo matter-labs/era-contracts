@@ -8,10 +8,12 @@ import {IAssetHandler} from "../../bridge/interfaces/IAssetHandler.sol";
 /// @param migrateToSLBatchNumber The last batch executed on L1 before migrating TO the settlement layer.
 /// @param migrateFromSLBatchNumber The last batch executed on SL before migrating back to L1.
 /// @param settlementLayerChainId The chain ID of the settlement layer where migration happened.
+/// @param isSet Whether this migration interval has been set (to distinguish from uninitialized state).
 struct MigrationInterval {
     uint256 migrateToSLBatchNumber;
     uint256 migrateFromSLBatchNumber;
     uint256 settlementLayerChainId;
+    bool isSet;
 }
 
 /// @author Matter Labs
@@ -37,25 +39,25 @@ interface IChainAssetHandler is IAssetHandler {
     // solhint-disable-next-line func-name-mixedcase
     function LEGACY_GW_CHAIN_ID() external view returns (uint256);
 
-    /// @notice Returns the first batch number in the legacy GW range.
-    // solhint-disable-next-line func-name-mixedcase
-    function LEGACY_GW_BATCH_FROM() external view returns (uint256);
-
-    /// @notice Returns the last batch number in the legacy GW range.
-    // solhint-disable-next-line func-name-mixedcase
-    function LEGACY_GW_BATCH_TO() external view returns (uint256);
-
-    /// @notice Returns the migration interval for a chain.
+    /// @notice Returns the migration interval for a chain at a specific migration number.
     /// @param _chainId The ID of the chain.
-    /// @return migrateToSLBatchNumber The last batch executed on L1 before migrating TO settlement layer.
-    /// @return migrateFromSLBatchNumber The last batch executed on SL before migrating back to L1.
-    /// @return settlementLayerChainId The chain ID of the settlement layer.
+    /// @param _migrationNumber The migration number (0 for legacy GW, 1+ for regular migrations).
+    /// @return interval The migration interval data.
     function migrationInterval(
-        uint256 _chainId
-    )
-        external
-        view
-        returns (uint256 migrateToSLBatchNumber, uint256 migrateFromSLBatchNumber, uint256 settlementLayerChainId);
+        uint256 _chainId,
+        uint256 _migrationNumber
+    ) external view returns (MigrationInterval memory interval);
+
+    /// @notice Sets a historical migration interval for a chain.
+    /// @dev Only callable by owner. Used to set legacy GW migration data for chains that used the old GW.
+    /// @param _chainId The ID of the chain.
+    /// @param _migrationNumber The migration number to set.
+    /// @param _interval The migration interval data.
+    function setHistoricalMigrationInterval(
+        uint256 _chainId,
+        uint256 _migrationNumber,
+        MigrationInterval calldata _interval
+    ) external;
 
     /// @notice Validates if a claimed settlement layer is valid for a given chain and batch number.
     /// @param _chainId The ID of the chain.

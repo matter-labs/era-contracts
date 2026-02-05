@@ -223,7 +223,8 @@ contract ExecutorTest is UtilsCallMockerTest {
             address(sharedBridge),
             address(messageRoot),
             address(assetTracker),
-            IL1Nullifier(address(0))
+            IL1Nullifier(address(0)),
+            0 // legacyGwChainId - not used in tests
         );
         // dummyBridgehub.setChainAssetHandler(address(chainAssetHandler));
 

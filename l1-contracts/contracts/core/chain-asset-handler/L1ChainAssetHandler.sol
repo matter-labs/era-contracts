@@ -45,6 +45,9 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     /// @dev The L1 nullifier contract.
     IL1Nullifier internal immutable L1_NULLIFIER;
 
+    /// @dev The chain ID of the legacy Gateway for settlement layer validation.
+    uint256 internal immutable LEGACY_GATEWAY_CHAIN_ID;
+
     /// @dev The mapping showing for each chain if migration is in progress or not, used for freezing deposits.abi
     mapping(uint256 chainId => bool isMigrationInProgress) public isMigrationInProgress;
 
@@ -69,13 +72,18 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         return ASSET_TRACKER;
     }
 
+    function _legacyGwChainId() internal view override returns (uint256) {
+        return LEGACY_GATEWAY_CHAIN_ID;
+    }
+
     constructor(
         address _owner,
         address _bridgehub,
         address _assetRouter,
         address _messageRoot,
         address _assetTracker,
-        IL1Nullifier _l1Nullifier
+        IL1Nullifier _l1Nullifier,
+        uint256 _legacyGwChainId
     ) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGEHUB = IL1Bridgehub(_bridgehub);
@@ -85,6 +93,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         ASSET_TRACKER = _assetTracker;
         L1_NULLIFIER = _l1Nullifier;
+        LEGACY_GATEWAY_CHAIN_ID = _legacyGwChainId;
         _transferOwnership(_owner);
     }
 
@@ -122,10 +131,11 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         });
 
         if (_txStatus == TxStatus.Failure) {
+            uint256 failedMigrationNum = migrationNumber[bridgehubBurnData.chainId];
             --migrationNumber[bridgehubBurnData.chainId];
             // Reset migration interval since the L1 -> SL migration failed.
             // This prevents stale migrateToSLBatchNumber from affecting settlement layer validation.
-            delete migrationInterval[bridgehubBurnData.chainId];
+            delete _migrationInterval[bridgehubBurnData.chainId][failedMigrationNum];
         }
 
         isMigrationInProgress[bridgehubBurnData.chainId] = false;

@@ -108,4 +108,8 @@ contract L1MessageRoot is MessageRootBase {
     function _eraGatewayChainId() internal view override returns (uint256) {
         return ERA_GATEWAY_CHAIN_ID;
     }
+
+    function _chainAssetHandler() internal view override returns (address) {
+        return IBridgehubBase(BRIDGE_HUB).chainAssetHandler();
+    }
 }

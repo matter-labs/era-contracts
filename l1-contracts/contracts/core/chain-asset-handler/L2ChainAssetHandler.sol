@@ -44,6 +44,10 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase, IChainAssetHandlerShared 
     /// the old version where it was an immutable.
     IAssetRouterBase public override ASSET_ROUTER;
 
+    /// @dev The chain ID of the legacy Gateway for settlement layer validation.
+    /// @dev Note: Settlement layer validation only happens on L1, so this is not used on L2 but required for interface.
+    uint256 internal legacyGwChainId;
+
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -62,6 +66,10 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase, IChainAssetHandlerShared 
 
     function _assetRouter() internal view override returns (IAssetRouterBase) {
         return ASSET_ROUTER;
+    }
+
+    function _legacyGwChainId() internal view override returns (uint256) {
+        return legacyGwChainId;
     }
 
     /// @dev Only allows calls from the complex upgrader contract on L2.

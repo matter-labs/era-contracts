@@ -95,7 +95,8 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             address(0),
             address(messageroot),
             address(0),
-            IL1Nullifier(address(0))
+            IL1Nullifier(address(0)),
+            0 // legacyGwChainId - not used in tests
         );
 
         stdstore
