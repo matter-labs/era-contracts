@@ -7,7 +7,7 @@ use protocol_cli_types::{L2ChainId, DAValidatorType, VMOption};
 use crate::{forge_interface::Create2Addresses, traits::FileConfigTrait, CoreContractsConfig};
 
 /// Chain parameters
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NewChainParams {
     pub chain_id: L2ChainId,
     pub base_token_addr: Address,

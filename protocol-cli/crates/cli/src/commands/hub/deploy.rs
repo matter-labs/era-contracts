@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use clap::Parser;
 use ethers::types::{Address, H256};
 use protocol_cli_common::{
@@ -17,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use xshell::Shell;
 
-use crate::forge_ctx::{resolve_sender, ForgeContext};
+use crate::forge_ctx::{resolve_execution, ExecutionMode, ForgeContext};
 use crate::utils::paths;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
@@ -28,10 +26,12 @@ pub struct HubDeployArgs {
     // Common flags
     #[clap(long, help = "L1 RPC URL", default_value = "http://localhost:8545")]
     pub l1_rpc_url: String,
-    #[clap(long, help = "Private key for the sender")]
+    #[clap(long, visible_alias = "pk", help = "Sender private key")]
     pub private_key: Option<H256>,
-    #[clap(long, help = "Sender address (unlocked account mode if no private key)")]
+    #[clap(long, help = "Sender address")]
     pub sender: Option<Address>,
+    #[clap(long, help = "Simulate against anvil fork (no on-chain changes)")]
+    pub simulate: bool,
     #[clap(flatten)]
     #[serde(flatten)]
     pub forge_args: ForgeArgs,
@@ -45,10 +45,44 @@ pub struct HubDeployArgs {
     pub era_chain_id: u64,
 }
 
+/// Input parameters for deploying hub contracts.
+#[derive(Debug, Clone)]
+pub struct DeployInput {
+    pub owner: Address,
+    pub era_chain_id: u64,
+    pub with_legacy_bridge: bool,
+}
+
+/// Deploy hub contracts and return the output.
+pub fn deploy(ctx: &mut ForgeContext, input: &DeployInput) -> anyhow::Result<DeployL1CoreContractsOutput> {
+    let deploy_config = DeployL1Config::new(
+        input.owner,
+        &InitialDeploymentConfig::default(),
+        input.era_chain_id,
+        input.with_legacy_bridge,
+    );
+
+    logger::info("Deploying hub contracts...");
+    ctx.run(&DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS, &deploy_config)
+}
+
 pub async fn run(args: HubDeployArgs, shell: &Shell) -> anyhow::Result<()> {
     let foundry_scripts_path = paths::path_from_root("l1-contracts");
-    let (auth, sender) = resolve_sender(args.private_key, args.sender, args.dev)?;
+
+    let (auth, sender, execution_mode) =
+        resolve_execution(args.private_key, args.sender, args.dev, args.simulate, &args.l1_rpc_url)?;
     let owner = args.owner.unwrap_or(sender);
+
+    let is_simulation = matches!(execution_mode, ExecutionMode::Simulate(_));
+    if is_simulation {
+        logger::info(format!(
+            "Simulation mode: forking {} via anvil",
+            args.l1_rpc_url
+        ));
+    }
+
+    // In simulation mode, forge targets the anvil fork instead of the original RPC.
+    let effective_rpc = execution_mode.rpc_url(&args.l1_rpc_url);
 
     let mut runner = ForgeRunner::new(args.forge_args.runner.clone());
     let mut ctx = ForgeContext {
@@ -56,22 +90,17 @@ pub async fn run(args: HubDeployArgs, shell: &Shell) -> anyhow::Result<()> {
         foundry_scripts_path: foundry_scripts_path.as_path(),
         runner: &mut runner,
         forge_args: &args.forge_args.script,
-        l1_rpc_url: &args.l1_rpc_url,
+        l1_rpc_url: effective_rpc,
         auth: &auth,
     };
 
-    let deploy_config = DeployL1Config::new(
+    let input = DeployInput {
         owner,
-        &InitialDeploymentConfig::default(),
-        args.era_chain_id,
-        args.with_legacy_bridge,
-    );
+        era_chain_id: args.era_chain_id,
+        with_legacy_bridge: args.with_legacy_bridge,
+    };
 
-    logger::info("Deploying hub contracts...");
-    let output: DeployL1CoreContractsOutput = ctx.run(
-        &DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS,
-        &deploy_config,
-    )?;
+    let output = deploy(&mut ctx, &input)?;
 
     let plan = build_plan(&output, ctx.runner);
     let plan_json = serde_json::to_string_pretty(&plan)?;
@@ -82,7 +111,14 @@ pub async fn run(args: HubDeployArgs, shell: &Shell) -> anyhow::Result<()> {
         println!("{}", plan_json);
     }
 
-    logger::outro("Hub contracts deployed");
+    if is_simulation {
+        logger::outro("Hub deploy simulation complete (no on-chain changes)");
+    } else {
+        logger::outro("Hub contracts deployed");
+    }
+
+    drop(execution_mode);
+
     Ok(())
 }
 
