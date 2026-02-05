@@ -584,7 +584,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         });
         _sendMigrationDataToL1(tokenBalanceMigrationData);
 
-        emit GatewayToL1MigrationInitiated(_assetId, amount);
+        emit GatewayToL1MigrationInitiated(_assetId, _chainId, amount);
     }
 
     function _calculatePreviousChainMigrationNumber(uint256 _chainId) internal view returns (uint256) {
