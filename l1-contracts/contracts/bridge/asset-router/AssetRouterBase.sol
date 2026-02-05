@@ -8,14 +8,17 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-import {IAssetRouterBase} from "./IAssetRouterBase.sol";
+import {IAssetRouterBase, NEW_ENCODING_VERSION} from "./IAssetRouterBase.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {Unauthorized} from "../../common/L1ContractErrors.sol";
+import {L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
+import {AssetHandlerDoesNotExist, AssetIdNotSupported, Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
+import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -43,9 +46,11 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
      */
     uint256[48] private __gap;
 
+    function _bridgehub() internal view virtual returns (IBridgehubBase);
+
     /// @notice Sets the asset handler address for a specified asset ID on the chain of the asset deployment tracker.
     /// @dev The caller of this function is encoded within the `assetId`, therefore, it should be invoked by the asset deployment tracker contract.
-    /// @dev No access control on the caller, as msg.sender is encoded in the assetId.
+    /// @dev Access control restricts the caller to either the NTV or the asset deployment tracker for the specific asset.
     /// @dev Typically, for most tokens, ADT is the native token vault. However, custom tokens may have their own specific asset deployment trackers.
     /// @dev `setAssetHandlerAddressOnCounterpart` should be called on L1 to set asset handlers on L2 chains for a specific asset ID.
     /// @param _assetRegistrationData The asset data which may include the asset address and any additional required data or encodings.
@@ -63,12 +68,123 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bool senderIsNTV = msg.sender == _nativeTokenVault;
         address sender = senderIsNTV ? L2_NATIVE_TOKEN_VAULT_ADDR : msg.sender;
         bytes32 assetId = DataEncoding.encodeAssetId(block.chainid, _assetRegistrationData, sender);
-        if (!senderIsNTV && msg.sender != assetDeploymentTracker[assetId]) {
-            revert Unauthorized(msg.sender);
-        }
+        require(senderIsNTV || msg.sender == assetDeploymentTracker[assetId], Unauthorized(msg.sender));
         _setAssetHandler(assetId, _assetHandlerAddress);
         assetDeploymentTracker[assetId] = msg.sender;
-        emit AssetDeploymentTrackerRegistered(assetId, _assetRegistrationData, msg.sender);
+        emit AssetDeploymentTrackerSet(assetId, msg.sender, _assetRegistrationData);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            INITIATE DEPOSIT Functions
+    //////////////////////////////////////////////////////////////*/
+
+    function bridgehubDepositBaseToken(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _originalCaller,
+        uint256 _amount
+    ) external payable virtual;
+
+    function _bridgehubDepositBaseToken(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _originalCaller,
+        uint256 _amount
+    ) internal virtual {
+        address assetHandler = assetHandlerAddress[_assetId];
+        require(assetHandler != address(0), AssetHandlerDoesNotExist(_assetId));
+
+        // slither-disable-next-line unused-return
+        IAssetHandler(assetHandler).bridgeBurn{value: msg.value}({
+            _chainId: _chainId,
+            _msgValue: 0,
+            _assetId: _assetId,
+            _originalCaller: _originalCaller,
+            _data: DataEncoding.encodeBridgeBurnData(_amount, address(0), address(0))
+        });
+
+        // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
+        emit BridgehubDepositBaseTokenInitiated(_chainId, _originalCaller, _assetId, _amount);
+    }
+
+    function _bridgehubDeposit(
+        uint256 _chainId,
+        address _originalCaller,
+        uint256 _value,
+        bytes calldata _data,
+        address _nativeTokenVault
+    ) internal virtual whenNotPaused returns (L2TransactionRequestTwoBridgesInner memory request) {
+        bytes1 encodingVersion = _data[0];
+        if (encodingVersion == NEW_ENCODING_VERSION) {
+            return
+                _bridgehubDepositNonBaseTokenAsset({
+                    _chainId: _chainId,
+                    _originalCaller: _originalCaller,
+                    _value: _value,
+                    _data: _data,
+                    _nativeTokenVault: _nativeTokenVault
+                });
+        } else {
+            revert UnsupportedEncodingVersion();
+        }
+    }
+
+    function _bridgehubDepositNonBaseTokenAsset(
+        uint256 _chainId,
+        address _originalCaller,
+        uint256 _value,
+        bytes calldata _data,
+        address _nativeTokenVault
+    ) internal returns (L2TransactionRequestTwoBridgesInner memory request) {
+        bytes1 encodingVersion = _data[0];
+
+        (bytes32 assetId, bytes memory transferData) = _getTransferData(encodingVersion, _originalCaller, _data);
+        require(_bridgehub().baseTokenAssetId(_chainId) != assetId, AssetIdNotSupported(assetId));
+
+        bytes memory bridgeMintCalldata = _burn({
+            _chainId: _chainId,
+            _nextMsgValue: _value,
+            _assetId: assetId,
+            _originalCaller: _originalCaller,
+            _transferData: transferData,
+            _passValue: true,
+            _nativeTokenVault: _nativeTokenVault
+        });
+
+        bytes32 txDataHash = DataEncoding.encodeTxDataHash({
+            _nativeTokenVault: _nativeTokenVault,
+            _encodingVersion: encodingVersion,
+            _originalCaller: _originalCaller,
+            _assetId: assetId,
+            _transferData: transferData
+        });
+
+        request = _requestToBridge({
+            _originalCaller: _originalCaller,
+            _assetId: assetId,
+            _bridgeMintCalldata: bridgeMintCalldata,
+            _txDataHash: txDataHash
+        });
+
+        emit BridgehubDepositInitiated({
+            chainId: _chainId,
+            txDataHash: txDataHash,
+            from: _originalCaller,
+            assetId: assetId,
+            bridgeMintCalldata: bridgeMintCalldata
+        });
+    }
+
+    function _getTransferData(
+        bytes1 _encodingVersion,
+        address,
+        bytes calldata _data
+    ) internal virtual returns (bytes32 assetId, bytes memory transferData) {
+        if (_encodingVersion == NEW_ENCODING_VERSION) {
+            (assetId, transferData) = DataEncoding.decodeAssetRouterBridgehubDepositData(_data);
+        } else {
+            revert UnsupportedEncodingVersion();
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -154,6 +270,37 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
             _originalCaller: _originalCaller,
             _data: _transferData
         });
+    }
+
+    /// @dev The request data that is passed to the bridgehub.
+    /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
+    /// @param _assetId The deposited asset ID.
+    /// @param _bridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
+    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
+    /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
+    function _requestToBridge(
+        address _originalCaller,
+        bytes32 _assetId,
+        bytes memory _bridgeMintCalldata,
+        bytes32 _txDataHash
+    ) internal view virtual returns (L2TransactionRequestTwoBridgesInner memory request) {
+        bytes memory l2TxCalldata = getDepositCalldata(_originalCaller, _assetId, _bridgeMintCalldata);
+
+        request = L2TransactionRequestTwoBridgesInner({
+            magicValue: TWO_BRIDGES_MAGIC_VALUE,
+            l2Contract: L2_ASSET_ROUTER_ADDR,
+            l2Calldata: l2TxCalldata,
+            factoryDeps: new bytes[](0),
+            txDataHash: _txDataHash
+        });
+    }
+
+    function getDepositCalldata(
+        address,
+        bytes32 _assetId,
+        bytes memory _assetData
+    ) public view virtual returns (bytes memory) {
+        return abi.encodeCall(AssetRouterBase.finalizeDeposit, (block.chainid, _assetId, _assetData));
     }
 
     /// @notice Ensures that token is registered with native token vault.
