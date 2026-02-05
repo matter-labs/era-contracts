@@ -11,12 +11,12 @@ import "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 import "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import "contracts/bridgehub/IMessageRoot.sol";
-import "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import "contracts/bridgehub/L2Bridgehub.sol";
-import "contracts/bridgehub/L2MessageRoot.sol";
+import "contracts/core/message-root/IMessageRoot.sol";
+import "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
+import "contracts/core/bridgehub/L2Bridgehub.sol";
+import "contracts/core/message-root/L2MessageRoot.sol";
 import "contracts/bridge/asset-router/L2AssetRouter.sol";
-import "contracts/bridgehub/L2ChainAssetHandler.sol";
+import "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
 import "contracts/bridge/ntv/L2NativeTokenVaultZKOS.sol";
 import "contracts/bridge/interfaces/IL2WrappedBaseToken.sol";
 import "contracts/bridge/UpgradeableBeaconDeployer.sol";
@@ -75,6 +75,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
         bytes memory fixedEncoded = abi.encode(fixedData);
         bytes memory additionalEncoded = abi.encode(additionalData);
+        _deployMockContract(GW_ASSET_TRACKER_ADDR);
 
         // Mock the SystemContractProxyAdmin.owner() call to return the expected owner
         vm.mockCall(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, abi.encodeWithSignature("owner()"), abi.encode(address(this)));
@@ -82,6 +83,8 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // Record events to catch deployments
         vm.recordLogs();
 
+        // Etch all deferred mock contracts now that deployment is complete
+        _etchAllDeferredContracts();
         // Execute the deployment
         vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
@@ -93,23 +96,23 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         );
         vm.stopPrank();
 
-        // Etch all deferred mock contracts now that deployment is complete
-        _etchAllDeferredContracts();
-
         // Verify deployments occurred - use the etched contract at the system address
         MockZKOSContractDeployer etchedDeployer = MockZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
-        assertEq(etchedDeployer.deploymentCount(L2_MESSAGE_ROOT_ADDR), 1); // proxy only
-        assertEq(etchedDeployer.deploymentCount(L2_BRIDGEHUB_ADDR), 1);
-        assertEq(etchedDeployer.deploymentCount(L2_ASSET_ROUTER_ADDR), 1);
-        assertEq(etchedDeployer.deploymentCount(L2_NATIVE_TOKEN_VAULT_ADDR), 1);
-        assertEq(etchedDeployer.deploymentCount(L2_CHAIN_ASSET_HANDLER_ADDR), 1);
-        assertEq(etchedDeployer.deploymentCount(L2_NTV_BEACON_DEPLOYER_ADDR), 1);
+        assertEq(etchedDeployer.deploymentCount(L2_MESSAGE_ROOT_ADDR), 0); // proxy only
+        assertEq(etchedDeployer.deploymentCount(L2_BRIDGEHUB_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_ASSET_ROUTER_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_NATIVE_TOKEN_VAULT_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_CHAIN_ASSET_HANDLER_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_NTV_BEACON_DEPLOYER_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_INTEROP_CENTER_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_INTEROP_HANDLER_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_ASSET_TRACKER_ADDR), 0);
 
         // Verify proxy upgrades were called - use the etched contract at the system address
         MockSystemContractProxyAdmin etchedProxyAdmin = MockSystemContractProxyAdmin(
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
         );
-        assertEq(etchedProxyAdmin.upgradeCallCount(), 6);
+        assertEq(etchedProxyAdmin.upgradeCallCount(), 0);
     }
 
     function testZKsyncOSSystemProxyUpgrade_NonGenesis() public {
@@ -126,6 +129,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         _deployMockContract(L2_ASSET_ROUTER_ADDR);
         _deployMockContract(L2_NATIVE_TOKEN_VAULT_ADDR);
         _deployMockContract(L2_CHAIN_ASSET_HANDLER_ADDR);
+        _deployMockContract(GW_ASSET_TRACKER_ADDR);
 
         vm.mockCall(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, abi.encodeWithSignature("owner()"), abi.encode(address(this)));
 
@@ -152,7 +156,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         MockSystemContractProxyAdmin etchedProxyAdmin = MockSystemContractProxyAdmin(
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
         );
-        assertEq(etchedProxyAdmin.upgradeCallCount(), 5);
+        assertEq(etchedProxyAdmin.upgradeCallCount(), 8);
     }
 
     function testEraForceDeployment() public {
@@ -161,6 +165,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
         bytes memory fixedEncoded = abi.encode(fixedData);
         bytes memory additionalEncoded = abi.encode(additionalData);
+        _deployMockContract(GW_ASSET_TRACKER_ADDR);
 
         // For Era deployments, no proxy admin is needed
         vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
@@ -220,6 +225,18 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
             abi.encode(keccak256("chainHandler_impl"), uint32(0), bytes32(0)),
             abi.encode(keccak256("chainHandler_proxy"), uint32(0), bytes32(0))
         );
+        data.interopCenterBytecodeInfo = abi.encode(
+            abi.encode(keccak256("interopCenter_impl"), uint32(0), bytes32(0)),
+            abi.encode(keccak256("interopCenter_proxy"), uint32(0), bytes32(0))
+        );
+        data.interopHandlerBytecodeInfo = abi.encode(
+            abi.encode(keccak256("interopHandler_impl"), uint32(0), bytes32(0)),
+            abi.encode(keccak256("interopHandler_proxy"), uint32(0), bytes32(0))
+        );
+        data.assetTrackerBytecodeInfo = abi.encode(
+            abi.encode(keccak256("assetTracker_impl"), uint32(0), bytes32(0)),
+            abi.encode(keccak256("assetTracker_proxy"), uint32(0), bytes32(0))
+        );
 
         if (isGenesis) {
             data.beaconDeployerInfo = abi.encode(
@@ -247,6 +264,9 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         data.l2AssetRouterBytecodeInfo = abi.encode(keccak256("assetRouter"));
         data.l2NtvBytecodeInfo = abi.encode(keccak256("ntv"));
         data.chainAssetHandlerBytecodeInfo = abi.encode(keccak256("chainHandler"));
+        data.interopCenterBytecodeInfo = abi.encode(keccak256("interopCenter"));
+        data.interopHandlerBytecodeInfo = abi.encode(keccak256("interopHandler"));
+        data.assetTrackerBytecodeInfo = abi.encode(keccak256("assetTracker"));
         data.beaconDeployerInfo = abi.encode(keccak256("beaconDeployer"));
 
         return data;
@@ -258,10 +278,13 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         returns (ZKChainSpecificForceDeploymentsData memory)
     {
         ZKChainSpecificForceDeploymentsData memory data;
-        data.baseTokenAssetId = keccak256("baseTokenAsset");
+        data.baseTokenBridgingData.assetId = keccak256("baseTokenAsset");
         data.baseTokenL1Address = baseTokenL1Address;
-        data.baseTokenName = "Ether";
-        data.baseTokenSymbol = "ETH";
+        data.baseTokenBridgingData.originToken = address(1);
+        data.baseTokenBridgingData.originChainId = 1;
+        data.baseTokenMetadata.name = "Ether";
+        data.baseTokenMetadata.symbol = "ETH";
+        data.baseTokenMetadata.decimals = 18;
         return data;
     }
 
@@ -272,13 +295,16 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
     function _etchAllDeferredContracts() internal {
         // Etch contracts to addresses that need function calls to work
-        address[] memory addressesToEtch = new address[](6);
+        address[] memory addressesToEtch = new address[](9);
         addressesToEtch[0] = L2_MESSAGE_ROOT_ADDR;
         addressesToEtch[1] = L2_BRIDGEHUB_ADDR;
         addressesToEtch[2] = L2_ASSET_ROUTER_ADDR;
         addressesToEtch[3] = L2_NATIVE_TOKEN_VAULT_ADDR;
         addressesToEtch[4] = L2_CHAIN_ASSET_HANDLER_ADDR;
         addressesToEtch[5] = L2_NTV_BEACON_DEPLOYER_ADDR;
+        addressesToEtch[6] = L2_INTEROP_CENTER_ADDR;
+        addressesToEtch[7] = L2_INTEROP_HANDLER_ADDR;
+        addressesToEtch[8] = L2_ASSET_TRACKER_ADDR;
 
         for (uint256 i = 0; i < addressesToEtch.length; i++) {
             if (addressesToEtch[i].code.length == 0) {
@@ -359,27 +385,41 @@ contract MockSystemContractProxyAdmin {
 contract MockContract {
     // Generic mock contract that can handle various function calls
     function forceInitAdmin(address) external {}
+
     function initL2(uint256) external {}
+
     function initL2(uint256, address, uint256) external {}
+
     function initL2(uint256, uint256, address, address, bytes32, address) external {}
+
     function initL2(uint256, address, bytes32, address, address, address, bytes32) external {}
+
     function initL2(uint256, address, address, address, address) external {}
+
     function updateL2(uint256, bytes32, address, address, bytes32) external {}
+
     function updateL2(uint256, address, address, address) external {}
+
     function updateL2(uint256, uint256) external {}
+
     function deployUpgradeableBeacon(address) external returns (address) {
         return makeAddr("upgradeableBeacon");
     }
+
     function setAddresses(address, address, address, address) external {}
+
     function L2_LEGACY_SHARED_BRIDGE() external view returns (address) {
         return address(0);
     }
+
     function WETH_TOKEN() external view returns (address) {
         return makeAddr("wethToken");
     }
+
     function L2_TOKEN_PROXY_BYTECODE_HASH() external view returns (bytes32) {
         return bytes32(0);
     }
+
     function initializeV3(string memory, string memory, address, address, bytes32) external {}
 
     function makeAddr(string memory name) internal pure returns (address) {

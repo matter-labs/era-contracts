@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Proxy} from "@openzeppelin/contracts-v4/proxy/Proxy.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {ConstructorsNotSupported, SystemContractProxyInitialized} from "../common/L1ContractErrors.sol";
+import {ConstructorsNotSupported, SystemContractProxyInitialized, NonEmptyMsgValue} from "../common/L1ContractErrors.sol";
 import {ISystemContractProxy} from "./ISystemContractProxy.sol";
 
 /// @notice Proxy contract for system contracts on L2.
@@ -22,6 +22,7 @@ contract SystemContractProxy is TransparentUpgradeableProxy {
     /// The contract does not inherit the interface for the reasons of implementing the
     /// transparent proxy pattern correctly.
     function _dispatchForceInitAdmin() internal {
+        require(msg.value == 0, NonEmptyMsgValue());
         address newAdmin = abi.decode(msg.data[4:], (address));
         _changeAdmin(newAdmin);
     }

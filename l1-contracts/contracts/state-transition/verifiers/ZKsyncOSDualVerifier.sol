@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {UnknownVerifierVersion} from "../L1StateTransitionErrors.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {EmptyProofLength, UnknownVerifierType, MockVerifierNotSupported, EmptyPublicInputsLength} from "../../common/L1ContractErrors.sol";
+import {EmptyProofLength, UnknownVerifierType, MockVerifierNotSupported, InvalidProofFormat, ZeroAddress, AddressAlreadySet, EmptyPublicInputsLength} from "../../common/L1ContractErrors.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 /// @title Dual Verifier
@@ -35,6 +35,13 @@ contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier {
     }
 
     function addVerifier(uint32 version, IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) external onlyOwner {
+        require(address(_fflonkVerifier) != address(0), ZeroAddress());
+        require(address(_plonkVerifier) != address(0), ZeroAddress());
+        require(
+            fflonkVerifiers[version] == IVerifierV2(address(0)),
+            AddressAlreadySet(address(fflonkVerifiers[version]))
+        );
+        require(plonkVerifiers[version] == IVerifier(address(0)), AddressAlreadySet(address(plonkVerifiers[version])));
         fflonkVerifiers[version] = _fflonkVerifier;
         plonkVerifiers[version] = _plonkVerifier;
     }
@@ -66,6 +73,11 @@ contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier {
         // The first element of `_proof` determines the verifier type.
         uint256 verifierType = _proof[0] & 255;
         uint32 verifierVersion = uint32(_proof[0] >> 8);
+
+        // Validate that unused bits (40-255) are zero.
+        if (_proof[0] >> 40 != 0) {
+            revert InvalidProofFormat();
+        }
         if (
             fflonkVerifiers[verifierVersion] == IVerifierV2(address(0)) &&
             plonkVerifiers[verifierVersion] == IVerifier(address(0))
@@ -106,6 +118,11 @@ contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier {
     function verificationKeyHash(uint256 _verifierType) external view returns (bytes32) {
         uint256 verifierType = _verifierType & 255;
         uint32 verifierVersion = uint32(_verifierType >> 8);
+
+        // Validate that unused bits (40-255) are zero.
+        if (_verifierType >> 40 != 0) {
+            revert InvalidProofFormat();
+        }
 
         if (
             fflonkVerifiers[verifierVersion] == IVerifierV2(address(0)) &&

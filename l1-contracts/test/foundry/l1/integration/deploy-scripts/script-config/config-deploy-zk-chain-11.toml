@@ -1,0 +1,16 @@
+owner_address = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+
+[chain]
+allow_evm_emulator = false
+base_token_addr = "0x0000000000000000000000000000000000000001"
+base_token_gas_price_multiplier_denominator = 1
+base_token_gas_price_multiplier_nominator = 1
+bridgehub_create_new_chain_salt = 11
+chain_chain_id = 11
+governance_min_delay = 0
+governance_security_council_address = "0x0000000000000000000000000000000000000000"
+validator_sender_operator_blobs_eth = "0x0000000000000000000000000000000000000001"
+validator_sender_operator_eth = "0x0000000000000000000000000000000000000000"
+validator_sender_operator_execute = "0x0000000000000000000000000000000000000003"
+validator_sender_operator_prove = "0x0000000000000000000000000000000000000002"
+validium_mode = 0
