@@ -1,7 +1,10 @@
 use clap::Subcommand;
 use xshell::Shell;
 
-use crate::{commands::chain::init::ChainInitArgs, commands::chain::upgrade::ChainUpgradeArgs};
+use crate::commands::chain::{
+    init::ChainInitArgs,
+    upgrade::ChainUpgradeArgs,
+};
 
 pub(crate) mod admin_call_builder;
 pub(crate) mod init;

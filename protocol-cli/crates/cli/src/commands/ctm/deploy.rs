@@ -1,347 +1,234 @@
-use std::path::{Path, PathBuf};
-
-use anyhow::Result;
 use clap::Parser;
-use ethers::{contract::BaseContract, types::Address};
+use ethers::{contract::BaseContract, types::{Address, H256}};
 use lazy_static::lazy_static;
 use protocol_cli_common::{
+    forge::{Forge, ForgeArgs, ForgeRunner},
     logger,
-    forge::{Forge, ForgeArgs, ForgeRunner, ForgeScriptArgs},
 };
 use protocol_cli_config::{
     forge_interface::{
-        deploy_ecosystem::input::InitialDeploymentConfig,
         deploy_ctm::{input::DeployCTMConfig, output::DeployCTMOutput},
-        script_params::{
-            DEPLOY_CTM_SCRIPT_PARAMS,
-            REGISTER_CTM_SCRIPT_PARAMS,
-        },
+        deploy_ecosystem::input::InitialDeploymentConfig,
+        script_params::DEPLOY_CTM_SCRIPT_PARAMS,
     },
-    traits::{ReadConfig, SaveConfig, get_or_create_config},
-    CoreContractsConfig, WalletsConfig,
+    traits::{ReadConfig, SaveConfig},
 };
 use protocol_cli_types::{L1Network, VMOption};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use xshell::Shell;
 
-use crate::abi::{IDEPLOYCTMABI_ABI, IREGISTERCTMABI_ABI};
-use crate::admin_functions::{accept_admin, accept_owner, AdminScriptOutputInner, AdminScriptOutput};
-use crate::utils::{forge::{fill_forge_private_key, WalletOwner}, runlog};
+use crate::abi::IDEPLOYCTMABI_ABI;
+use crate::forge_ctx::{resolve_execution, ExecutionMode, ForgeContext, SenderAuth};
+use crate::utils::paths;
 
 lazy_static! {
     static ref DEPLOY_CTM_FUNCTIONS: BaseContract = BaseContract::from(IDEPLOYCTMABI_ABI.clone());
 }
 
-lazy_static! {
-    static ref REGISTER_CTM_FUNCTIONS: BaseContract =
-        BaseContract::from(IREGISTERCTMABI_ABI.clone());
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct CtmDeployArgs {
+    /// Bridgehub proxy address
+    #[clap(long)]
+    pub bridgehub: Address,
+
+    /// Owner address for the deployed contracts (default: sender)
+    #[clap(long)]
+    pub owner: Option<Address>,
+
+    // Common flags
     #[clap(long, help = "L1 RPC URL", default_value = "http://localhost:8545")]
     pub l1_rpc_url: String,
-
-    #[clap(long, default_value_t = false)]
-    pub legacy_bridge: bool,
-
-    #[clap(long, default_value = "ZKSyncOsVM")]
-    pub vm_option: String,
-
-    #[clap(long, default_value_t = true)]
-    pub reuse_gov_and_admin: bool,
-
-    #[clap(long)]
-    pub contracts_path: PathBuf,
-    #[clap(long)]
-    pub wallets_path: PathBuf,
-
-    #[clap(long)]
-    pub foundry_contracts_path: PathBuf,
-
-    #[clap(long, default_value_t = false)]
-    pub plan: bool,
-    #[clap(long)]
-    pub out_plan: Option<PathBuf>,
-
+    #[clap(long, visible_alias = "pk", help = "Sender private key")]
+    pub private_key: Option<H256>,
+    #[clap(long, help = "Sender address")]
+    pub sender: Option<Address>,
+    #[clap(long, help = "Simulate against anvil fork (no on-chain changes)")]
+    pub simulate: bool,
     #[clap(flatten)]
     #[serde(flatten)]
     pub forge_args: ForgeArgs,
+
+    // Dev options
+    #[clap(long, help = "Use dev defaults", default_value_t = false, help_heading = "Dev options")]
+    pub dev: bool,
+    /// VM type: zksyncos (default) or eravm
+    #[clap(long, default_value = "zksyncos", help_heading = "Dev options")]
+    pub vm_type: String,
+    /// Reuse governance and admin contracts from hub (default: true)
+    #[clap(long, default_value_t = true, help_heading = "Dev options")]
+    pub reuse_gov_and_admin: bool,
+    /// Use testnet verifier (default: true)
+    #[clap(long, default_value_t = true, help_heading = "Dev options")]
+    pub with_testnet_verifier: bool,
+    /// Enable support for legacy bridge testing (default: false)
+    #[clap(long, default_value_t = false, help_heading = "Dev options")]
+    pub with_legacy_bridge: bool,
+}
+
+/// Input parameters for deploying CTM contracts.
+#[derive(Debug, Clone)]
+pub struct CtmDeployInput {
+    pub bridgehub: Address,
+    pub owner: Address,
+    pub vm_type: VMOption,
+    pub reuse_gov_and_admin: bool,
+    pub with_testnet_verifier: bool,
+    pub with_legacy_bridge: bool,
+}
+
+/// Deploy CTM contracts and return the output.
+pub fn deploy(ctx: &mut ForgeContext, input: &CtmDeployInput) -> anyhow::Result<DeployCTMOutput> {
+    let l1_network = L1Network::Localhost;
+    let initial_deployment_config = InitialDeploymentConfig::default();
+
+    let deploy_config = DeployCTMConfig::new(
+        input.owner,
+        &initial_deployment_config,
+        input.with_testnet_verifier,
+        l1_network,
+        input.with_legacy_bridge,
+        input.vm_type,
+    );
+
+    // Write input config
+    let input_path = DEPLOY_CTM_SCRIPT_PARAMS.input(ctx.foundry_scripts_path);
+    deploy_config.save(ctx.shell, input_path)?;
+
+    // Encode calldata for runWithBridgehub
+    let calldata = DEPLOY_CTM_FUNCTIONS
+        .encode("runWithBridgehub", (input.bridgehub, input.reuse_gov_and_admin))
+        .map_err(|e| anyhow::anyhow!("Failed to encode calldata: {}", e))?;
+
+    // Build forge command
+    let mut forge = Forge::new(ctx.foundry_scripts_path)
+        .script(&DEPLOY_CTM_SCRIPT_PARAMS.script(), ctx.forge_args.clone())
+        .with_ffi()
+        .with_calldata(&calldata)
+        .with_rpc_url(ctx.l1_rpc_url.to_string())
+        .with_broadcast()
+        .with_slow();
+
+    match ctx.auth {
+        SenderAuth::PrivateKey(pk) => {
+            forge = forge.with_private_key(*pk);
+        }
+        SenderAuth::Unlocked(addr) => {
+            forge = forge.with_sender(format!("{:#x}", addr)).with_unlocked();
+        }
+    }
+
+    logger::info("Deploying CTM contracts...");
+    ctx.runner.run(ctx.shell, forge)?;
+
+    // Read output
+    let output_path = DEPLOY_CTM_SCRIPT_PARAMS.output(ctx.foundry_scripts_path);
+    DeployCTMOutput::read(ctx.shell, output_path)
 }
 
 pub async fn run(args: CtmDeployArgs, shell: &Shell) -> anyhow::Result<()> {
-    let foundry_scripts_path = args.foundry_contracts_path.as_path();
-    let vm_option = match args.vm_option.as_str() {
-        "EraVM" => VMOption::EraVM,
-        "ZKSyncOsVM" => VMOption::ZKSyncOsVM,
-        _ => anyhow::bail!("Invalid VM option"),
+    let foundry_scripts_path = paths::path_from_root("l1-contracts");
+
+    let vm_type = match args.vm_type.to_lowercase().as_str() {
+        "eravm" | "era" => VMOption::EraVM,
+        "zksyncos" | "zksync" | "zksync-os" => VMOption::ZKSyncOsVM,
+        _ => anyhow::bail!("Invalid VM type '{}'. Use 'zksyncos' or 'eravm'", args.vm_type),
     };
 
-    let mut contracts: CoreContractsConfig = get_or_create_config(
-        shell,
-        args.contracts_path.clone(),
-        CoreContractsConfig::default,
-    )?;
-    let wallets = WalletsConfig::read(shell, args.wallets_path.clone())?;
+    let (auth, sender, execution_mode) =
+        resolve_execution(args.private_key, args.sender, args.dev, args.simulate, &args.l1_rpc_url)?;
+    let owner = args.owner.unwrap_or(sender);
+
+    let is_simulation = matches!(execution_mode, ExecutionMode::Simulate(_));
+    if is_simulation {
+        logger::info(format!(
+            "Simulation mode: forking {} via anvil",
+            args.l1_rpc_url
+        ));
+    }
+
+    // In simulation mode, forge targets the anvil fork instead of the original RPC.
+    let effective_rpc = execution_mode.rpc_url(&args.l1_rpc_url);
 
     let mut runner = ForgeRunner::new(args.forge_args.runner.clone());
-    let initial_deployment_config = InitialDeploymentConfig::default();
-
-    let reuse_gov_and_admin = args.reuse_gov_and_admin;
-
-    // Deploy CTM
-    logger::info("Deploying CTM...");
-    let bridgehub_proxy_addr = contracts.bridgehub_proxy_addr();
-    init_ctm(
+    let mut ctx = ForgeContext {
         shell,
-        foundry_scripts_path,
-        &mut contracts,
-        &wallets,
-        &mut runner,
-        args.forge_args.script.clone(),
-        args.l1_rpc_url.clone(),
-        bridgehub_proxy_addr,
-        &initial_deployment_config,
-        args.legacy_bridge,
-        vm_option,
-        reuse_gov_and_admin,
-    )
-    .await?;
-    contracts.save(shell, args.contracts_path.clone())?;
+        foundry_scripts_path: foundry_scripts_path.as_path(),
+        runner: &mut runner,
+        forge_args: &args.forge_args.script,
+        l1_rpc_url: effective_rpc,
+        auth: &auth,
+    };
 
-    logger::outro("CTM deployed");
-    if let Ok(dir) = runlog::persist_runner_session(&runner, "ctm-deploy") {
-        logger::info(format!("Runs saved to: {}", dir.display()));
-    }
-    Ok(())
-}
+    let input = CtmDeployInput {
+        bridgehub: args.bridgehub,
+        owner,
+        vm_type,
+        reuse_gov_and_admin: args.reuse_gov_and_admin,
+        with_testnet_verifier: args.with_testnet_verifier,
+        with_legacy_bridge: args.with_legacy_bridge,
+    };
 
-#[allow(clippy::too_many_arguments)]
-async fn init_ctm(
-    shell: &Shell,
-    foundry_scripts_path: &Path,
-    contracts: &mut CoreContractsConfig,
-    wallets: &WalletsConfig,
-    runner: &mut ForgeRunner,
-    forge_args: ForgeScriptArgs,
-    l1_rpc_url: String,
-    bridgehub_proxy_addr: Address,
-    initial_deployment_config: &InitialDeploymentConfig,
-    support_l2_legacy_shared_bridge_test: bool,
-    vm_option: VMOption,
-    reuse_gov_and_admin: bool,
-) -> anyhow::Result<()> {
-    deploy_new_ctm_and_accept_admin(
-        shell,
-        foundry_scripts_path,
-        contracts,
-        wallets,
-        runner,
-        &forge_args,
-        l1_rpc_url.clone(),
-        bridgehub_proxy_addr,
-        initial_deployment_config,
-        support_l2_legacy_shared_bridge_test,
-        vm_option,
-        reuse_gov_and_admin,
-        None,
-        true,
-    )
-    .await?;
+    let output = deploy(&mut ctx, &input)?;
 
-    logger::step("Registering CTM on Bridgehub...");
-    register_ctm_on_existing_bh(
-        shell,
-        foundry_scripts_path,
-        wallets,
-        runner,
-        &forge_args,
-        l1_rpc_url.clone(),
-        bridgehub_proxy_addr,
-        contracts.ctm(vm_option).state_transition_proxy_addr,
-        None,
-        true,
-    )
-    .await?;
-    Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-pub async fn deploy_new_ctm_and_accept_admin(
-    shell: &Shell,
-    foundry_scripts_path: &Path,
-    contracts: &mut CoreContractsConfig,
-    wallets: &WalletsConfig,
-    runner: &mut ForgeRunner,
-    forge_args: &ForgeScriptArgs,
-    l1_rpc_url: String,
-    bridgehub_proxy_addr: Address,
-    initial_deployment_config: &InitialDeploymentConfig,
-    support_l2_legacy_shared_bridge_test: bool,
-    vm_option: VMOption,
-    reuse_gov_and_admin: bool,
-    sender: Option<String>,
-    broadcast: bool,
-) -> anyhow::Result<()> {
-    logger::step("Deploying new CTM...");
-    deploy_new_ctm(
-        shell,
-        foundry_scripts_path,
-        contracts,
-        wallets,
-        runner,
-        forge_args,
-        l1_rpc_url.clone(),
-        bridgehub_proxy_addr,
-        initial_deployment_config,
-        support_l2_legacy_shared_bridge_test,
-        vm_option,
-        reuse_gov_and_admin,
-        sender,
-        broadcast,
-    )
-    .await?;
-
-    logger::step("Accepting ownership of CTM...");
-    // Accept owner and admin roles
-    let ctm = contracts.ctm(vm_option);
-    accept_owner(
-        shell,
-        runner,
-        foundry_scripts_path,
-        contracts.l1.governance_addr,
-        &wallets.governor,
-        ctm.state_transition_proxy_addr,
-        &forge_args,
-        l1_rpc_url.clone(),
-    )
-    .await?;
-
-    accept_admin(
-        shell,
-        runner,
-        foundry_scripts_path,
-        contracts.l1.chain_admin_addr,
-        &wallets.governor,
-        ctm.state_transition_proxy_addr,
-        &forge_args,
-        l1_rpc_url.clone(),
-    )
-    .await?;
-
-    Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-pub async fn deploy_new_ctm(
-    shell: &Shell,
-    foundry_scripts_path: &Path,
-    contracts: &mut CoreContractsConfig,
-    wallets: &WalletsConfig,
-    runner: &mut ForgeRunner,
-    forge_args: &ForgeScriptArgs,
-    l1_rpc_url: String,
-    bridgehub_proxy_addr: Address,
-    initial_deployment_config: &InitialDeploymentConfig,
-    support_l2_legacy_shared_bridge_test: bool,
-    vm_option: VMOption,
-    reuse_gov_and_admin: bool,
-    sender: Option<String>,
-    broadcast: bool,
-) -> anyhow::Result<()> {
-    let deploy_config_path: PathBuf = DEPLOY_CTM_SCRIPT_PARAMS.input(&foundry_scripts_path);
-    let l1_network = L1Network::Localhost;
-
-    let deploy_config = DeployCTMConfig::new(
-        wallets.governor.address,
-        initial_deployment_config,
-        false, // testnet_verifier - not used in zkstack_cli pattern
-        l1_network,
-        support_l2_legacy_shared_bridge_test,
-        vm_option,
-    );
-    deploy_config.save(shell, deploy_config_path)?;
-
-    let calldata = DEPLOY_CTM_FUNCTIONS
-        .encode("runWithBridgehub", (bridgehub_proxy_addr, reuse_gov_and_admin))
-        .unwrap();
-
-    let mut forge = Forge::new(foundry_scripts_path)
-        .script(&DEPLOY_CTM_SCRIPT_PARAMS.script(), forge_args.clone())
-        .with_ffi()
-        .with_calldata(&calldata)
-        .with_rpc_url(l1_rpc_url.to_string())
-        .with_slow();
-
-    if let Some(address) = sender {
-        forge = forge.with_sender(address);
+    let plan = build_plan(&output, ctx.runner, &input);
+    let plan_json = serde_json::to_string_pretty(&plan)?;
+    if let Some(out_path) = &args.forge_args.runner.out {
+        std::fs::write(out_path, &plan_json)?;
+        logger::info(format!("Plan written to: {}", out_path.display()));
     } else {
-        forge = fill_forge_private_key(
-            forge,
-            wallets.deployer.as_ref(),
-            WalletOwner::Deployer,
-        )?;
+        println!("{}", plan_json);
     }
 
-    if broadcast {
-        forge = forge.with_broadcast();
+    if is_simulation {
+        logger::outro("CTM deploy simulation complete (no on-chain changes)");
+    } else {
+        logger::outro("CTM contracts deployed");
     }
 
-    runner.run(shell, forge)?;
+    drop(execution_mode);
 
-    let script_output = DeployCTMOutput::read(
-        shell,
-        DEPLOY_CTM_SCRIPT_PARAMS.output(&foundry_scripts_path),
-    )?;
-    contracts.update_from_ctm_output(&script_output, vm_option);
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
-pub async fn register_ctm_on_existing_bh(
-    shell: &Shell,
-    foundry_scripts_path: &Path,
-    wallets: &WalletsConfig,
-    runner: &mut ForgeRunner,
-    forge_args: &ForgeScriptArgs,
-    l1_rpc_url: String,
-    bridgehub_proxy_addr: Address,
-    ctm_address: Address,
-    sender: Option<String>,
-    broadcast: bool,
-) -> anyhow::Result<AdminScriptOutput> {
-    let calldata = REGISTER_CTM_FUNCTIONS
-        .encode(
-            "registerCTM",
-            (bridgehub_proxy_addr, ctm_address, broadcast),
-        )
-        .unwrap();
+fn build_plan(output: &DeployCTMOutput, runner: &ForgeRunner, input: &CtmDeployInput) -> serde_json::Value {
+    let deployed = &output.deployed_addresses;
 
-    let mut forge = Forge::new(&foundry_scripts_path)
-        .script(&REGISTER_CTM_SCRIPT_PARAMS.script(), forge_args.clone())
-        .with_ffi()
-        .with_calldata(&calldata)
-        .with_rpc_url(l1_rpc_url.to_string())
-        .with_slow();
-
-    if let Some(address) = sender {
-        forge = forge.with_sender(address);
-    } else {
-        forge = fill_forge_private_key(
-            forge,
-            Some(&wallets.governor),
-            WalletOwner::Governor,
-        )?;
+    let mut transactions = Vec::new();
+    for run in runner.runs() {
+        if let Some(txs) = run.transactions() {
+            for tx in txs {
+                transactions.push(tx.clone());
+            }
+        }
     }
 
-    if broadcast {
-        forge = forge.with_broadcast();
-    }
-    runner.run(shell, forge)?;
-
-    let script_output = AdminScriptOutputInner::read(
-        shell,
-        REGISTER_CTM_SCRIPT_PARAMS.output(&foundry_scripts_path),
-    )?;
-    Ok(script_output.into())
+    json!({
+        "command": "ctm.deploy",
+        "config": {
+            "bridgehub": format!("{:#x}", input.bridgehub),
+            "vm_type": format!("{:?}", input.vm_type),
+            "reuse_gov_and_admin": input.reuse_gov_and_admin,
+            "with_testnet_verifier": input.with_testnet_verifier,
+            "with_legacy_bridge": input.with_legacy_bridge,
+        },
+        "transactions": transactions,
+        "artifacts": {
+            "state_transition": {
+                "proxy_addr": format!("{:#x}", deployed.state_transition.state_transition_proxy_addr),
+                "verifier_addr": format!("{:#x}", deployed.state_transition.verifier_addr),
+                "genesis_upgrade_addr": format!("{:#x}", deployed.state_transition.genesis_upgrade_addr),
+                "default_upgrade_addr": format!("{:#x}", deployed.state_transition.default_upgrade_addr),
+                "bytecodes_supplier_addr": format!("{:#x}", deployed.state_transition.bytecodes_supplier_addr),
+            },
+            "governance_addr": format!("{:#x}", deployed.governance_addr),
+            "chain_admin_addr": format!("{:#x}", deployed.chain_admin),
+            "validator_timelock_addr": format!("{:#x}", deployed.validator_timelock_addr),
+            "rollup_l1_da_validator_addr": format!("{:#x}", deployed.rollup_l1_da_validator_addr),
+            "no_da_validium_l1_validator_addr": format!("{:#x}", deployed.no_da_validium_l1_validator_addr),
+            "blobs_zksync_os_l1_da_validator_addr": format!("{:#x}", deployed.blobs_zksync_os_l1_da_validator_addr.unwrap_or(Address::zero())),
+            "server_notifier_proxy_addr": format!("{:#x}", deployed.server_notifier_proxy_addr),
+            "diamond_cut_data": output.contracts_config.diamond_cut_data.clone(),
+        },
+    })
 }
