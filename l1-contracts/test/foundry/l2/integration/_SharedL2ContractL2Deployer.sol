@@ -26,6 +26,8 @@ import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.so
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 // import {DeployCTMIntegrationScript} from "../../l1/integration/deploy-scripts/DeployCTMIntegration.s.sol";
 
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
@@ -95,9 +97,20 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
                 abi.encodeCall(ValidatorTimelock.initialize, (config.deployerAddress, executionDelay))
             )
         );
-        ctmAddresses.stateTransition.facets.executorFacet = address(new ExecutorFacet(config.l1ChainId));
-        ctmAddresses.stateTransition.facets.adminFacet = address(
-            new AdminFacet(config.l1ChainId, RollupDAManager(ctmAddresses.daAddresses.rollupDAManager), true)
+
+        address serverNotifierProxyAdmin = address(new ProxyAdmin());
+        addresses.stateTransition.serverNotifierImplementation = address(new ServerNotifier());
+        addresses.stateTransition.serverNotifierProxy = address(
+            new TransparentUpgradeableProxy(
+                addresses.stateTransition.serverNotifierImplementation,
+                serverNotifierProxyAdmin,
+                abi.encodeCall(ServerNotifier.initialize, (addresses.chainAdmin))
+            )
+        );
+
+        addresses.stateTransition.executorFacet = address(new ExecutorFacet(config.l1ChainId));
+        addresses.stateTransition.adminFacet = address(
+            new AdminFacet(config.l1ChainId, RollupDAManager(addresses.daAddresses.rollupDAManager), true)
         );
         ctmAddresses.stateTransition.facets.mailboxFacet = address(
             new MailboxFacet(

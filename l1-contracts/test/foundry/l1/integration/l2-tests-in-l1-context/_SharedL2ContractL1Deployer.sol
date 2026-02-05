@@ -66,6 +66,10 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         ctmAddresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
         ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract("Verifier", true);
         ctmAddresses.stateTransition.proxies.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
+        (
+            addresses.stateTransition.serverNotifierImplementation,
+            addresses.stateTransition.serverNotifierProxy
+        ) = deployServerNotifier();
         ctmAddresses.admin.eip7702Checker = address(0);
         initializeGeneratedData();
         deployStateTransitionDiamondFacets();

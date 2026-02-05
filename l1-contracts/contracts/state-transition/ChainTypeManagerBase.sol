@@ -166,6 +166,12 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         if (_initializeData.owner == address(0)) {
             revert ZeroAddress();
         }
+        if (_initializeData.validatorTimelock == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_initializeData.serverNotifier == address(0)) {
+            revert ZeroAddress();
+        }
         _transferOwnership(_initializeData.owner);
 
         protocolVersion = _initializeData.protocolVersion;
