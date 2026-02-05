@@ -85,7 +85,12 @@ library L2GenesisForceDeploymentsHelper {
             input: hex""
         });
 
-        IL2ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(forceDeployments);
+        bytes memory data = abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (forceDeployments));
+
+        (bool success, ) = L2_DEPLOYER_SYSTEM_CONTRACT_ADDR.call(data);
+        if (!success) {
+            revert DeployFailed();
+        }
         emit ForceDeployEraCompleted(_newAddress);
     }
 
