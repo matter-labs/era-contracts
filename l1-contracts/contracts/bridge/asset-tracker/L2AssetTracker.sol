@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
 import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {Unauthorized, InvalidChainId} from "../../common/L1ContractErrors.sol";
 
@@ -33,6 +33,13 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     modifier onlyL2NativeTokenVault() {
         if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    modifier onlyBaseTokenHolder() {
+        if (msg.sender != L2_BASE_TOKEN_HOLDER_ADDR) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -160,7 +167,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @notice Handles the initiation of base token bridging operations on L2.
     /// @dev This function is specifically for the chain's native base token used for gas payments.
     /// @param _amount The amount of base tokens being bridged out.
-    function handleInitiateBaseTokenBridgingOnL2(uint256 _amount) external onlyL2BaseTokenSystemContract {
+    function handleInitiateBaseTokenBridgingOnL2(uint256 _amount) external onlyBaseTokenHolder {
         bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
         uint256 baseTokenOriginChainId = L2_NATIVE_TOKEN_VAULT.originChainId(baseTokenAssetId);
         _handleInitiateBridgingOnL2Inner(baseTokenAssetId, _amount, baseTokenOriginChainId);

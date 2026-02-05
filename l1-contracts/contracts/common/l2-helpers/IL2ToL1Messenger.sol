@@ -1,10 +1,12 @@
+// SPDX-License-Identifier: MIT
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice Smart contract for sending arbitrary length messages to L1
+ * @notice Interface for sending arbitrary length messages to L1.
+ * @dev Shared interface between Era and ZK OS L1Messenger contracts.
  * @dev by default ZkSync can send fixed-length messages on L1.
  * A fixed length message has 4 parameters `senderAddress`, `isService`, `key`, `value`,
  * the first one is taken from the context, the other three are chosen by the sender.
@@ -14,7 +16,7 @@ pragma solidity ^0.8.20;
  * - The contract on L1 accepts all sent messages and if the message came from this system contract
  * it requires that the preimage of `value` be provided.
  */
-interface IL2ToL1MessengerZKSyncOS {
+interface IL2ToL1Messenger {
     /// @notice L2 event emitted to track L1 messages.
     event L1MessageSent(address indexed _sender, bytes32 indexed _hash, bytes _message);
 

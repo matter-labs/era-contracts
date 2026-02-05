@@ -11,4 +11,8 @@ interface IBaseTokenHolder {
     /// @param _to The address to receive the base tokens.
     /// @param _amount The amount of base tokens to give out.
     function give(address _to, uint256 _amount) external;
+
+    /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.
+    /// @dev Called by InteropHandler, InteropCenter, NativeTokenVault, and L2BaseToken during bridging operations.
+    function burnAndStartBridging() external payable;
 }

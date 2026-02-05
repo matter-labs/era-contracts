@@ -5,12 +5,13 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {L2BaseTokenZKOS} from "contracts/l2-system/zksync-os/L2BaseTokenZKOS.sol";
-import {IL2BaseTokenZKOS} from "contracts/l2-system/zksync-os/interfaces/IL2BaseTokenZKOS.sol";
-import {IL2ToL1MessengerZKSyncOS} from "contracts/common/l2-helpers/IL2ToL1MessengerZKSyncOS.sol";
-import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_HOLDER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MINT_BASE_TOKEN_HOOK} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IL2BaseTokenBase} from "contracts/l2-system/interfaces/IL2BaseTokenBase.sol";
+import {IL2ToL1Messenger} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
+import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_HOLDER, L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MINT_BASE_TOKEN_HOOK} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
-import {BaseTokenHolderMintFailed, BaseTokenHolderTransferFailed, Unauthorized, WithdrawFailed} from "contracts/common/L1ContractErrors.sol";
+import {BaseTokenHolderMintFailed, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 
 /// @title L2BaseTokenZKOSTest
 /// @notice Unit tests for L2BaseTokenZKOS contract
@@ -77,6 +78,14 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     function test_withdraw_callsAssetTracker() public {
+        // Use actual BaseTokenHolder to verify AssetTracker is called
+        BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
+
+        // Deploy L2BaseTokenZKOS at the expected system contract address so it passes onlyBridgingCaller check
+        L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
+        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
+
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
 
@@ -87,7 +96,7 @@ contract L2BaseTokenZKOSTest is Test {
         );
 
         vm.prank(sender);
-        l2BaseToken.withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
+        L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
     }
 
     function test_withdraw_callsL1Messenger() public {
@@ -115,12 +124,12 @@ contract L2BaseTokenZKOSTest is Test {
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
 
-        // Deploy a contract that rejects ETH at BaseTokenHolder address
-        RejectingContract rejecting = new RejectingContract();
+        // Deploy a contract that rejects burnAndStartBridging at BaseTokenHolder address
+        RejectingBurnAndStartBridgingContract rejecting = new RejectingBurnAndStartBridgingContract();
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(rejecting).code);
 
         vm.prank(sender);
-        vm.expectRevert(WithdrawFailed.selector);
+        vm.expectRevert("Rejected");
         l2BaseToken.withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
     }
 
@@ -169,6 +178,14 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     function test_withdrawWithMessage_callsAssetTracker() public {
+        // Use actual BaseTokenHolder to verify AssetTracker is called
+        BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
+
+        // Deploy L2BaseTokenZKOS at the expected system contract address so it passes onlyBridgingCaller check
+        L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
+        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
+
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
         bytes memory additionalData = "test message";
@@ -180,7 +197,10 @@ contract L2BaseTokenZKOSTest is Test {
         );
 
         vm.prank(sender);
-        l2BaseToken.withdrawWithMessage{value: WITHDRAW_AMOUNT}(l1Receiver, additionalData);
+        L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).withdrawWithMessage{value: WITHDRAW_AMOUNT}(
+            l1Receiver,
+            additionalData
+        );
     }
 
     function test_withdrawWithMessage_callsL1MessengerWithExtendedMessage() public {
@@ -229,12 +249,12 @@ contract L2BaseTokenZKOSTest is Test {
         vm.deal(sender, WITHDRAW_AMOUNT);
         bytes memory additionalData = "test message";
 
-        // Deploy a contract that rejects ETH at BaseTokenHolder address
-        RejectingContract rejecting = new RejectingContract();
+        // Deploy a contract that rejects burnAndStartBridging at BaseTokenHolder address
+        RejectingBurnAndStartBridgingContract rejecting = new RejectingBurnAndStartBridgingContract();
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(rejecting).code);
 
         vm.prank(sender);
-        vm.expectRevert(WithdrawFailed.selector);
+        vm.expectRevert("Rejected");
         l2BaseToken.withdrawWithMessage{value: WITHDRAW_AMOUNT}(l1Receiver, additionalData);
     }
 
@@ -273,9 +293,6 @@ contract L2BaseTokenZKOSTest is Test {
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2BaseToken.initializeBaseTokenHolderBalance();
 
-        // Verify initialized flag is set
-        assertTrue(l2BaseToken.initialized(), "Should be initialized");
-
         // Verify BaseTokenHolder received the tokens
         assertEq(
             L2_BASE_TOKEN_HOLDER_ADDR.balance,
@@ -292,29 +309,21 @@ contract L2BaseTokenZKOSTest is Test {
         l2BaseToken.initializeBaseTokenHolderBalance();
     }
 
-    function test_initializeBaseTokenHolderBalance_idempotent() public {
+    function test_initializeBaseTokenHolderBalance_revertsOnSecondCall() public {
         // Mock the mint hook to succeed
         vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
 
         // Give the L2BaseToken contract the minted balance
         vm.deal(address(l2BaseToken), INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
-        // First call
+        // First call succeeds
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2BaseToken.initializeBaseTokenHolderBalance();
 
-        uint256 holderBalanceAfterFirst = L2_BASE_TOKEN_HOLDER_ADDR.balance;
-
-        // Second call should be a no-op
+        // Second call should revert (OpenZeppelin Initializable)
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        vm.expectRevert("Initializable: contract is already initialized");
         l2BaseToken.initializeBaseTokenHolderBalance();
-
-        // Balance should not change
-        assertEq(
-            L2_BASE_TOKEN_HOLDER_ADDR.balance,
-            holderBalanceAfterFirst,
-            "Balance should not change on second call"
-        );
     }
 
     function test_initializeBaseTokenHolderBalance_revertIfMintFails() public {
@@ -338,21 +347,225 @@ contract L2BaseTokenZKOSTest is Test {
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(rejecting).code);
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        vm.expectRevert(BaseTokenHolderTransferFailed.selector);
+        vm.expectRevert("Address: unable to send value, recipient may have reverted");
         l2BaseToken.initializeBaseTokenHolderBalance();
     }
 
-    function test_initializedFlag_defaultFalse() public view {
-        assertFalse(l2BaseToken.initialized(), "Should not be initialized by default");
+    /// @notice Verifies that initializeBaseTokenHolderBalance works with actual BaseTokenHolder
+    /// @dev This test ensures L2BaseToken is in the trusted sender list of BaseTokenHolder
+    /// @dev CRITICAL: This test validates that BaseTokenHolder can receive ETH from L2BaseToken
+    function test_initializeBaseTokenHolderBalance_withActualBaseTokenHolder() public {
+        // Deploy actual BaseTokenHolder at the expected address
+        BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
+
+        // Deploy L2BaseTokenZKOS at the expected system contract address
+        L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
+        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
+
+        // Mock the mint hook to succeed
+        vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
+
+        // Give the L2BaseToken contract the minted balance (simulating what mint hook does)
+        vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
+
+        // Call from ComplexUpgrader - this should succeed because L2BaseToken is a trusted sender
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initializeBaseTokenHolderBalance();
+
+        // Verify BaseTokenHolder received the tokens
+        assertEq(
+            L2_BASE_TOKEN_HOLDER_ADDR.balance,
+            INITIAL_BASE_TOKEN_HOLDER_BALANCE,
+            "BaseTokenHolder should receive initial balance from L2BaseToken"
+        );
+    }
+
+    /// @notice Verifies that BaseTokenHolder rejects ETH from untrusted senders via receive()
+    /// @dev This test ensures that only L2BaseToken can send ETH via receive()
+    function test_baseTokenHolder_rejectsUntrustedSenders_receive() public {
+        // Deploy actual BaseTokenHolder at the expected address
+        BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
+
+        // Try to send ETH from an untrusted address via receive()
+        address untrustedSender = makeAddr("untrustedSender");
+        vm.deal(untrustedSender, 1 ether);
+
+        vm.prank(untrustedSender);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, untrustedSender));
+        (bool success, ) = L2_BASE_TOKEN_HOLDER_ADDR.call{value: 1 ether}("");
+        // Note: expectRevert handles the revert, success will be true after expectRevert
+        assertTrue(success);
+    }
+
+    /// @notice Verifies that BaseTokenHolder rejects burnAndStartBridging from untrusted senders
+    /// @dev This test ensures that only bridging callers can use burnAndStartBridging
+    function test_baseTokenHolder_rejectsUntrustedSenders_burnAndStartBridging() public {
+        // Deploy actual BaseTokenHolder at the expected address
+        BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
+
+        // Try to call burnAndStartBridging from an untrusted address
+        address untrustedSender = makeAddr("untrustedSender");
+        vm.deal(untrustedSender, 1 ether);
+
+        vm.prank(untrustedSender);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, untrustedSender));
+        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: 1 ether}();
+    }
+
+    /// @notice Verifies that BaseTokenHolder notifies L2AssetTracker when receiving ETH via burnAndStartBridging from InteropCenter
+    /// @dev This test ensures bridging operations are properly tracked
+    function test_baseTokenHolder_notifiesAssetTrackerOnBridging() public {
+        // Deploy actual BaseTokenHolder at the expected address
+        BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
+
+        // Mock L2AssetTracker to accept calls
+        vm.mockCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256)"),
+            abi.encode()
+        );
+
+        uint256 burnAmount = 1 ether;
+
+        // Expect the AssetTracker call when InteropCenter calls burnAndStartBridging
+        vm.expectCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256)", burnAmount)
+        );
+
+        // InteropCenter calls burnAndStartBridging (simulating a bridging burn)
+        vm.deal(L2_INTEROP_CENTER_ADDR, burnAmount);
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}();
+    }
+
+    /// @notice Verifies that BaseTokenHolder notifies L2AssetTracker when receiving ETH via burnAndStartBridging from NativeTokenVault
+    /// @dev This test ensures bridging operations are properly tracked
+    function test_baseTokenHolder_notifiesAssetTrackerFromNTV() public {
+        // Deploy actual BaseTokenHolder at the expected address
+        BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
+
+        // Mock L2AssetTracker to accept calls
+        vm.mockCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256)"),
+            abi.encode()
+        );
+
+        uint256 burnAmount = 2 ether;
+
+        // Expect the AssetTracker call when NativeTokenVault calls burnAndStartBridging
+        vm.expectCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256)", burnAmount)
+        );
+
+        // NativeTokenVault calls burnAndStartBridging (simulating a bridging burn)
+        vm.deal(L2_NATIVE_TOKEN_VAULT_ADDR, burnAmount);
+        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
+        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}();
+    }
+
+    /// @notice Verifies that L2BaseToken can call burnAndStartBridging for withdrawals
+    /// @dev This test ensures L2BaseToken is a valid bridging caller
+    function test_baseTokenHolder_notifiesAssetTrackerFromL2BaseToken_burnAndStartBridging() public {
+        // Deploy actual BaseTokenHolder at the expected address
+        BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
+
+        // Mock L2AssetTracker to accept calls
+        vm.mockCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256)"),
+            abi.encode()
+        );
+
+        uint256 burnAmount = 1 ether;
+
+        // Expect the AssetTracker call when L2BaseToken calls burnAndStartBridging
+        vm.expectCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256)", burnAmount)
+        );
+
+        // L2BaseToken calls burnAndStartBridging (simulating a withdrawal)
+        vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, burnAmount);
+        vm.prank(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}();
+    }
+
+    /// @notice Verifies that BaseTokenHolder does NOT notify L2AssetTracker when receiving ETH via receive() from L2BaseToken
+    /// @dev L2BaseToken sends via receive() during initialization, which is not a bridging operation
+    function test_baseTokenHolder_doesNotNotifyAssetTrackerFromL2BaseToken() public {
+        // Deploy actual BaseTokenHolder at the expected address
+        BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
+
+        uint256 initAmount = 1 ether;
+
+        // Expect the AssetTracker to NOT be called (count = 0)
+        vm.expectCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256)", initAmount),
+            0 // count = 0 means we expect it NOT to be called
+        );
+
+        // L2BaseToken sends ETH to BaseTokenHolder via receive() (during initialization)
+        // We should NOT see a call to L2AssetTracker
+        vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, initAmount);
+        vm.prank(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        (bool success, ) = L2_BASE_TOKEN_HOLDER_ADDR.call{value: initAmount}("");
+        assertTrue(success, "Transfer should succeed");
+    }
+
+    /// @notice Verifies that initializeBaseTokenHolderBalance does NOT trigger L2AssetTracker
+    /// @dev This tests the full initialization flow to ensure asset tracker is not notified
+    function test_initializeBaseTokenHolderBalance_doesNotTriggerAssetTracker() public {
+        // Deploy actual BaseTokenHolder at the expected address
+        BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
+
+        // Deploy L2BaseTokenZKOS at the expected system contract address
+        L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
+        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
+
+        // Mock the mint hook to succeed
+        vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
+
+        // Give the L2BaseToken contract the minted balance
+        vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
+
+        // Expect the AssetTracker to NOT be called during initialization
+        vm.expectCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256)", INITIAL_BASE_TOKEN_HOLDER_BALANCE),
+            0 // count = 0 means we expect it NOT to be called
+        );
+
+        // Call initializeBaseTokenHolderBalance
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initializeBaseTokenHolderBalance();
+
+        // Verify BaseTokenHolder received the initial balance
+        assertEq(
+            L2_BASE_TOKEN_HOLDER_ADDR.balance,
+            INITIAL_BASE_TOKEN_HOLDER_BALANCE,
+            "BaseTokenHolder should have received initial balance"
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
                         INTERFACE COMPLIANCE
     //////////////////////////////////////////////////////////////*/
 
-    function test_implementsIL2BaseTokenZKOS() public view {
+    function test_implementsIL2BaseTokenBase() public view {
         // Verify the contract implements the interface
-        IL2BaseTokenZKOS token = IL2BaseTokenZKOS(address(l2BaseToken));
+        IL2BaseTokenBase token = IL2BaseTokenBase(address(l2BaseToken));
         assert(address(token) == address(l2BaseToken));
     }
 
@@ -399,8 +612,19 @@ contract L2BaseTokenZKOSTest is Test {
     }
 }
 
-/// @notice Helper contract that rejects ETH transfers
+/// @notice Helper contract that rejects ETH transfers via receive()
 contract RejectingContract {
+    receive() external payable {
+        revert("Rejected");
+    }
+}
+
+/// @notice Helper contract that rejects burnAndStartBridging calls
+contract RejectingBurnAndStartBridgingContract {
+    function burnAndStartBridging() external payable {
+        revert("Rejected");
+    }
+
     receive() external payable {
         revert("Rejected");
     }

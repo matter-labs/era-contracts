@@ -8,11 +8,6 @@ contract DummyL2BaseTokenSystemContract {
     /// @notice Emitted during token transfers
     event Transfer(address indexed from, address indexed to, uint256 value);
 
-    function burnMsgValue() external payable returns (bytes memory) {
-        // In test context, just return empty bytes like the real implementation
-        return "";
-    }
-
     /// @notice Returns ETH balance of an account (uses native balance)
     function balanceOf(uint256 _account) external view returns (uint256) {
         return address(uint160(_account)).balance;

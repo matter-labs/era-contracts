@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import "forge-std/Test.sol";
 import {L1_MESSENGER_HOOK} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import "contracts/l2-system/zksync-os/L1Messenger.sol";
-import {IL2ToL1MessengerZKSyncOS} from "contracts/common/l2-helpers/IL2ToL1MessengerZKSyncOS.sol";
+import {IL2ToL1Messenger} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
 
 contract L1MessengerTest is Test {
     L1Messenger messenger;
@@ -31,7 +31,7 @@ contract L1MessengerTest is Test {
         // expectEmit(checkTopic1, checkTopic2, checkTopic3, checkData)
         // Only `sender` is indexed; `hash` and `message` are in data.
         vm.expectEmit(true, false, false, true);
-        emit IL2ToL1MessengerZKSyncOS.L1MessageSent(address(this), expectedHash, message);
+        emit IL2ToL1Messenger.L1MessageSent(address(this), expectedHash, message);
 
         uint256 gasBefore = gasleft();
         bytes32 retHash = messenger.sendToL1(message);

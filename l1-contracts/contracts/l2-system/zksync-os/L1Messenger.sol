@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {L1_MESSENGER_HOOK} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IL2ToL1MessengerZKSyncOS} from "contracts/common/l2-helpers/IL2ToL1MessengerZKSyncOS.sol";
+import {IL2ToL1Messenger} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
 import {L1MessengerHookFailed, NotEnoughGasSupplied, NotSelfCall} from "./errors/ZKOSContractErrors.sol";
 import {L1MessageGasLib} from "./L1MessageGasLib.sol";
 
@@ -20,7 +20,7 @@ import {L1MessageGasLib} from "./L1MessageGasLib.sol";
  * - The contract on L1 accepts all sent messages and if the message came from this system contract
  * it requires that the preimage of `value` be provided.
  */
-contract L1Messenger is IL2ToL1MessengerZKSyncOS {
+contract L1Messenger is IL2ToL1Messenger {
     function burnGas(bytes calldata _message) internal {
         uint256 gasToBurn = L1MessageGasLib.estimateL1MessageGas(_message.length);
 

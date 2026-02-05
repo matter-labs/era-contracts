@@ -2,13 +2,12 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-/// @title IL2BaseTokenZKOS
+/// @title IL2BaseTokenBase
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Interface for the L2BaseToken contract on ZK OS chains.
-/// @dev This is a minimal interface that only exposes withdrawal functionality.
-/// @dev Unlike Era, ZK OS uses native ETH transfers and doesn't need balance management functions.
-interface IL2BaseTokenZKOS {
+/// @notice Base interface for L2 Base Token contracts (shared between Era and ZK OS).
+/// @dev This interface defines the common withdrawal functionality.
+interface IL2BaseTokenBase {
     /// @notice Emitted when a withdrawal is initiated
     event Withdrawal(address indexed _l2Sender, address indexed _l1Receiver, uint256 _amount);
 
@@ -32,6 +31,6 @@ interface IL2BaseTokenZKOS {
     function withdrawWithMessage(address _l1Receiver, bytes calldata _additionalData) external payable;
 
     /// @notice Initializes the BaseTokenHolder's balance during genesis or V31 upgrade.
-    /// @dev Mints 2^127 - 1 tokens and transfers them to BaseTokenHolder.
+    /// @dev The implementation varies between Era and ZK OS but both require this initialization.
     function initializeBaseTokenHolderBalance() external;
 }
