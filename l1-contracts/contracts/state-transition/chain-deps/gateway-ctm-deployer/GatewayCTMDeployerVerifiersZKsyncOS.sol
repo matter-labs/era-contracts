@@ -46,7 +46,6 @@ contract GatewayCTMDeployerVerifiersZKsyncOS {
         if (_config.testnetVerifier) {
             result.verifier = address(
                 new ZKsyncOSTestnetVerifier{salt: salt}(
-                    IVerifierV2(result.verifierFflonk),
                     IVerifier(result.verifierPlonk),
                     _config.aliasedGovernanceAddress
                 )
@@ -54,7 +53,6 @@ contract GatewayCTMDeployerVerifiersZKsyncOS {
         } else {
             result.verifier = address(
                 new ZKsyncOSDualVerifier{salt: salt}(
-                    IVerifierV2(result.verifierFflonk),
                     IVerifier(result.verifierPlonk),
                     _config.aliasedGovernanceAddress
                 )
