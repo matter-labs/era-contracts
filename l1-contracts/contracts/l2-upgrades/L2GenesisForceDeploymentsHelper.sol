@@ -243,7 +243,12 @@ library L2GenesisForceDeploymentsHelper {
             _isGenesisUpgrade: _isGenesisUpgrade,
             _isZKsyncOS: _isZKsyncOS
         });
-        _finalizeDeployments(_ctmDeployer, fixedForceDeploymentsData, additionalForceDeploymentsData, _isGenesisUpgrade);
+        _finalizeDeployments(
+            _ctmDeployer,
+            fixedForceDeploymentsData,
+            additionalForceDeploymentsData,
+            _isGenesisUpgrade
+        );
     }
 
     function _setupProxyAdmin() private {
