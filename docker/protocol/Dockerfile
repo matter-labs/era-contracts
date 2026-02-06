@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.6
 
 ARG FOUNDRY_ARCH=linux_amd64
-ARG FOUNDRY_TAG=nightly-ae913af65381734ad46c044a9495b67310bc77c4
+ARG FOUNDRY_TAG=nightly-807f47ace7cdd90eed7190dc4481952cfaa25938
 ARG NODE_MAJOR=18
 ARG NODE_VERSION=18.18.0
 ARG RUST_TARGET=x86_64-unknown-linux-gnu
@@ -39,7 +39,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
  && rm -rf /var/lib/apt/lists/*
 
 # Foundry
-RUN curl -L -o /tmp/foundry.tgz https://github.com/matter-labs/foundry-zksync/releases/download/${FOUNDRY_TAG}/foundry_nightly_${FOUNDRY_ARCH}.tar.gz \
+RUN curl -L -o /tmp/foundry.tgz https://github.com/matter-labs/foundry-zksync/releases/download/${FOUNDRY_TAG}/foundry_zksync_nightly_${FOUNDRY_ARCH}.tar.gz \
  && tar zxf /tmp/foundry.tgz -C /usr/local/bin/ \
  && chmod +x /usr/local/bin/forge /usr/local/bin/cast \
  && rm /tmp/foundry.tgz
