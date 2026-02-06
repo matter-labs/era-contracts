@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
+import {Diamond} from "./libraries/Diamond.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -151,6 +152,6 @@ interface IValidatorTimelock is IExecutor {
     function upgradeChainFromVersion(
         address _chainAddress,
         uint256 _oldProtocolVersion,
-        bytes calldata _diamondCut
+        Diamond.DiamondCutData calldata _diamondCut
     ) external;
 }
