@@ -25,84 +25,144 @@ contract ZKChainBase is ReentrancyGuard {
 
     /// @notice Checks that the message sender is an active admin
     modifier onlyAdmin() {
+        _onlyAdmin();
+        _;
+    }
+
+    function _onlyAdmin() internal view {
         if (msg.sender != s.admin) {
             revert Unauthorized(msg.sender);
         }
-        _;
     }
 
     /// @notice Checks if validator is active
     modifier onlyValidator() {
+        _onlyValidator();
+        _;
+    }
+
+    function _onlyValidator() internal view {
         if (!s.validators[msg.sender]) {
             revert Unauthorized(msg.sender);
         }
-        _;
     }
 
     modifier onlyChainTypeManager() {
+        _onlyChainTypeManager();
+        _;
+    }
+
+    function _onlyChainTypeManager() internal view {
         if (msg.sender != s.chainTypeManager) {
             revert Unauthorized(msg.sender);
         }
-        _;
     }
 
     modifier onlyBridgehub() {
+        _onlyBridgehub();
+        _;
+    }
+
+    function _onlyBridgehub() internal view {
         if (msg.sender != s.bridgehub) {
             revert Unauthorized(msg.sender);
         }
-        _;
     }
 
     modifier onlyBridgehubOrInteropCenter() {
+        _onlyBridgehubOrInteropCenter();
+        _;
+    }
+
+    function _onlyBridgehubOrInteropCenter() internal view {
         if ((msg.sender != s.bridgehub) && (msg.sender != L2_INTEROP_CENTER_ADDR)) {
             revert Unauthorized(msg.sender);
         }
-        _;
     }
 
     modifier onlyGatewayAssetTracker() {
+        _onlyGatewayAssetTracker();
+        _;
+    }
+
+    function _onlyGatewayAssetTracker() internal view {
         if (msg.sender != GW_ASSET_TRACKER_ADDR) {
             revert Unauthorized(msg.sender);
         }
-        _;
     }
 
     modifier onlyChainAssetHandler() {
+        _onlyChainAssetHandler();
+        _;
+    }
+
+    function _onlyChainAssetHandler() internal view {
         if (msg.sender != IL1Bridgehub(s.bridgehub).chainAssetHandler()) {
             revert Unauthorized(msg.sender);
         }
-        _;
     }
 
     modifier onlyAdminOrChainTypeManager() {
+        _onlyAdminOrChainTypeManager();
+        _;
+    }
+
+    function _onlyAdminOrChainTypeManager() internal view {
         if (msg.sender != s.admin && msg.sender != s.chainTypeManager) {
             revert Unauthorized(msg.sender);
         }
+    }
+
+    modifier onlyAdminOrChainTypeManagerOrValidator() {
+        _onlyAdminOrChainTypeManagerOrValidator();
         _;
+    }
+
+    function _onlyAdminOrChainTypeManagerOrValidator() internal view {
+        if (msg.sender != s.admin && msg.sender != s.chainTypeManager && !s.validators[msg.sender]) {
+            revert Unauthorized(msg.sender);
+        }
     }
 
     modifier onlyValidatorOrChainTypeManager() {
+        _onlyValidatorOrChainTypeManager();
+        _;
+    }
+
+    function _onlyValidatorOrChainTypeManager() internal view {
         if (!s.validators[msg.sender] && msg.sender != s.chainTypeManager) {
             revert Unauthorized(msg.sender);
         }
-        _;
     }
 
     modifier onlySettlementLayer() {
+        _onlySettlementLayer();
+        _;
+    }
+
+    function _onlySettlementLayer() internal view {
         if (s.settlementLayer != address(0)) {
             revert NotSettlementLayer();
         }
-        _;
     }
 
     modifier onlySelf() {
-        if (msg.sender != address(this)) {
-            revert Unauthorized(msg.sender);
-        }
+        _onlySelf();
         _;
     }
 
+    function _onlySelf() internal view {
+        if (msg.sender != address(this)) {
+            revert Unauthorized(msg.sender);
+        }
+    }
+
     modifier onlyServiceTransaction() {
+        _onlyServiceTransaction();
+        _;
+    }
+
+    function _onlyServiceTransaction() internal view {
         IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
         if (
             /// Purposes.
@@ -119,7 +179,6 @@ contract ZKChainBase is ReentrancyGuard {
         ) {
             revert Unauthorized(msg.sender);
         }
-        _;
     }
 
     /// @notice Returns whether the priority queue is still active, i.e.

@@ -2022,6 +2022,11 @@
     "name": "upgradeChainFromVersion",
     "inputs": [
       {
+        "name": "_chainAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "_protocolVersion",
         "type": "uint256",
         "internalType": "uint256"

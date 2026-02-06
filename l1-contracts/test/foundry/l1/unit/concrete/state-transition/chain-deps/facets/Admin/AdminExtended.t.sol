@@ -214,7 +214,7 @@ contract AdminExtendedTest is AdminTest {
 
         vm.prank(address(this));
         vm.expectRevert(abi.encodeWithSelector(HashMismatch.selector, expectedHash, inputHash));
-        adminFacet.upgradeChainFromVersion(oldProtocolVersion, diamondCut);
+        adminFacet.upgradeChainFromVersion(address(adminFacet), oldProtocolVersion, diamondCut);
     }
 
     function test_UpgradeChainFromVersion_ProtocolIdMismatch() public {
@@ -242,7 +242,7 @@ contract AdminExtendedTest is AdminTest {
 
         vm.prank(address(this));
         vm.expectRevert(abi.encodeWithSelector(ProtocolIdMismatch.selector, currentVersion, wrongOldVersion));
-        adminFacet.upgradeChainFromVersion(wrongOldVersion, diamondCut);
+        adminFacet.upgradeChainFromVersion(address(adminFacet), wrongOldVersion, diamondCut);
     }
 
     function testFuzz_SetTokenMultiplier(uint128 nominator, uint128 denominator) public {

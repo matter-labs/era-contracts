@@ -23,6 +23,11 @@ interface IChainAdmin {
     /// @notice The EVM emulator has been enabled
     event EnableEvmEmulator();
 
+    /// @notice Returns the upgrade timestamp for a specific protocol version.
+    /// @param _protocolVersion The protocol version to query.
+    /// @return The timestamp at which the upgrade is expected.
+    function protocolVersionToUpgradeTimestamp(uint256 _protocolVersion) external view returns (uint256);
+
     /// @notice Returns the list of active restrictions.
     function getRestrictions() external view returns (address[] memory);
 

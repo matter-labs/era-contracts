@@ -169,7 +169,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             adminAddr,
             accessControlRestriction,
             chainDiamondProxy,
-            abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
+            abi.encodeCall(IAdmin.upgradeChainFromVersion, (chainDiamondProxy, oldProtocolVersion, upgradeCutData)),
             0
         );
     }
@@ -312,7 +312,10 @@ contract AdminFunctions is Script, IAdminFunctions {
 
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
-            abi.encodeCall(IAdmin.upgradeChainFromVersion, (data.oldProtocolVersion, upgradeCutData)),
+            abi.encodeCall(
+                IAdmin.upgradeChainFromVersion,
+                (data.chainDiamondProxyOnGateway, data.oldProtocolVersion, upgradeCutData)
+            ),
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),
             data.chainDiamondProxyOnGateway,

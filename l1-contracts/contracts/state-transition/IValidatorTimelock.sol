@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
+import {Diamond} from "./libraries/Diamond.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -13,12 +14,14 @@ interface IValidatorTimelock is IExecutor {
     /// @param rotateReverterRole Whether to rotate the REVERTER_ROLE.
     /// @param rotateProverRole Whether to rotate the PROVER_ROLE.
     /// @param rotateExecutorRole Whether to rotate the EXECUTOR_ROLE.
+    /// @param rotateUpgraderRole Whether to rotate the UPGRADER_ROLE.
     struct ValidatorRotationParams {
         bool rotatePrecommitterRole;
         bool rotateCommitterRole;
         bool rotateReverterRole;
         bool rotateProverRole;
         bool rotateExecutorRole;
+        bool rotateUpgraderRole;
     }
 
     /// @notice The delay between committing and executing batches is changed.
@@ -34,6 +37,8 @@ interface IValidatorTimelock is IExecutor {
     function PROVER_ROLE() external view returns (bytes32);
     /// @notice Role hash for addresses allowed to execute batches on a chain.
     function EXECUTOR_ROLE() external view returns (bytes32);
+    /// @notice Role hash for addresses allowed to upgrade chains.
+    function UPGRADER_ROLE() external view returns (bytes32);
     /// @notice Optional admin role hash for managing PRECOMMITTER_ROLE assignments.
     /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
     function OPTIONAL_PRECOMMITTER_ADMIN_ROLE() external view returns (bytes32);
@@ -49,6 +54,9 @@ interface IValidatorTimelock is IExecutor {
     /// @notice Optional admin role hash for managing EXECUTOR_ROLE assignments.
     /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
     function OPTIONAL_EXECUTOR_ADMIN_ROLE() external view returns (bytes32);
+    /// @notice Optional admin role hash for managing UPGRADER_ROLE assignments.
+    /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
+    function OPTIONAL_UPGRADER_ADMIN_ROLE() external view returns (bytes32);
 
     /// @notice The address of the bridgehub
     function BRIDGE_HUB() external view returns (IL1Bridgehub);
@@ -139,5 +147,11 @@ interface IValidatorTimelock is IExecutor {
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _batchData
+    ) external;
+    /// @dev Make a call to the zkChain diamond contract to upgrade from a specific protocol version.
+    function upgradeChainFromVersion(
+        address _chainAddress,
+        uint256 _oldProtocolVersion,
+        Diamond.DiamondCutData calldata _diamondCut
     ) external;
 }

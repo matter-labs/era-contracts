@@ -811,7 +811,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         calls = new Call[](1);
         calls[0] = Call({
             target: chainDiamondProxyAddress,
-            data: abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
+            data: abi.encodeCall(
+                IAdmin.upgradeChainFromVersion,
+                (chainDiamondProxyAddress, oldProtocolVersion, upgradeCutData)
+            ),
             value: 0
         });
     }

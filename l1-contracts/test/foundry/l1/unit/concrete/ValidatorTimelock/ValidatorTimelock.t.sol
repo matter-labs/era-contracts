@@ -6,6 +6,8 @@ import {Utils} from "../Utils/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
@@ -265,6 +267,24 @@ contract ValidatorTimelockTest is Test {
         validator.proveBatchesSharedBridge(zkSync, proveBatchFrom, proveBatchTo, proveData);
     }
 
+    function test_upgradeChainFromVersion_PropagatesToDiamondProxy() public {
+        uint256 oldProtocolVersion = 1;
+        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
+            facetCuts: new Diamond.FacetCut[](0),
+            initAddress: address(0),
+            initCalldata: bytes("")
+        });
+
+        vm.mockCall(
+            zkSync,
+            abi.encodeCall(IAdmin.upgradeChainFromVersion, (zkSync, oldProtocolVersion, diamondCut)),
+            ""
+        );
+
+        vm.prank(alice);
+        validator.upgradeChainFromVersion(zkSync, oldProtocolVersion, diamondCut);
+    }
+
     function test_executeBatchesSharedBridge() public {
         uint64 timestamp = 123456;
         uint64 batchNumber = 123;
@@ -436,7 +456,8 @@ contract ValidatorTimelockTest is Test {
             rotateCommitterRole: true,
             rotateReverterRole: false,
             rotateProverRole: false,
-            rotateExecutorRole: false
+            rotateExecutorRole: false,
+            rotateUpgraderRole: false
         });
 
         // Bob should not have any roles initially
@@ -469,7 +490,8 @@ contract ValidatorTimelockTest is Test {
             rotateCommitterRole: false,
             rotateReverterRole: true,
             rotateProverRole: true,
-            rotateExecutorRole: false
+            rotateExecutorRole: false,
+            rotateUpgraderRole: false
         });
 
         vm.prank(owner);
@@ -489,7 +511,8 @@ contract ValidatorTimelockTest is Test {
             rotateCommitterRole: false,
             rotateReverterRole: false,
             rotateProverRole: false,
-            rotateExecutorRole: true
+            rotateExecutorRole: true,
+            rotateUpgraderRole: false
         });
 
         vm.prank(owner);
@@ -531,7 +554,8 @@ contract ValidatorTimelockTest is Test {
             rotateCommitterRole: false,
             rotateReverterRole: false,
             rotateProverRole: false,
-            rotateExecutorRole: false
+            rotateExecutorRole: false,
+            rotateUpgraderRole: false
         });
 
         vm.expectRevert(abi.encodeWithSelector(NotAZKChain.selector, fakeChain));
