@@ -19,6 +19,118 @@ use crate::commands::hub::register_ctm::{register_ctm, RegisterCtmInput};
 use crate::forge_ctx::{resolve_execution, ExecutionMode, ForgeContext, SenderAuth};
 use crate::utils::paths;
 
+/// Input parameters for ctm init.
+#[derive(Debug, Clone)]
+pub struct CtmInitInput {
+    pub bridgehub: Address,
+    pub owner: Address,
+    pub vm_type: VMOption,
+    pub reuse_gov_and_admin: bool,
+    pub with_testnet_verifier: bool,
+    pub with_legacy_bridge: bool,
+}
+
+/// Output from ctm init.
+#[derive(Debug, Clone)]
+pub struct CtmInitOutput {
+    pub deploy_output: DeployCTMOutput,
+    pub ctm_proxy: Address,
+    pub governance: Address,
+    pub chain_admin: Address,
+}
+
+/// Initialize CTM: deploy contracts, accept ownership, and register on bridgehub.
+///
+/// This function takes three auth contexts:
+/// - `deploy_ctx`: ForgeContext for deployment (uses sender auth)
+/// - `owner_auth`: Auth for accepting ownership
+/// - `admin_auth`: Auth for registering CTM on bridgehub
+pub async fn ctm_init(
+    shell: &Shell,
+    foundry_scripts_path: &std::path::Path,
+    runner: &mut ForgeRunner,
+    forge_args: &protocol_cli_common::forge::ForgeScriptArgs,
+    l1_rpc_url: &str,
+    input: &CtmInitInput,
+    deploy_auth: &SenderAuth,
+    owner_auth: &SenderAuth,
+    admin_auth: &SenderAuth,
+) -> anyhow::Result<CtmInitOutput> {
+    // Step 1: Deploy CTM contracts
+    logger::info("Deploying CTM contracts...");
+    let deploy_input = CtmDeployInput {
+        bridgehub: input.bridgehub,
+        owner: input.owner,
+        vm_type: input.vm_type,
+        reuse_gov_and_admin: input.reuse_gov_and_admin,
+        with_testnet_verifier: input.with_testnet_verifier,
+        with_legacy_bridge: input.with_legacy_bridge,
+    };
+
+    let deploy_output = {
+        let mut ctx = ForgeContext {
+            shell,
+            foundry_scripts_path,
+            runner,
+            forge_args,
+            l1_rpc_url,
+            auth: deploy_auth,
+        };
+        deploy(&mut ctx, &deploy_input)?
+    };
+
+    let deployed = &deploy_output.deployed_addresses;
+    let ctm_proxy = deployed.state_transition.state_transition_proxy_addr;
+    let governance = deployed.governance_addr;
+    let chain_admin = deployed.chain_admin;
+
+    // Step 2: Accept ownership of deployed CTM contracts
+    logger::info("Accepting ownership of CTM...");
+    let accept_input = CtmAcceptOwnershipInput {
+        ctm_proxy,
+        governance,
+        chain_admin,
+    };
+
+    {
+        let mut ctx = ForgeContext {
+            shell,
+            foundry_scripts_path,
+            runner,
+            forge_args,
+            l1_rpc_url,
+            auth: owner_auth,
+        };
+        accept_ownership(&mut ctx, &accept_input).await?;
+    }
+
+    // Step 3: Register CTM on Bridgehub
+    logger::info("Registering CTM on Bridgehub...");
+    let register_input = RegisterCtmInput {
+        bridgehub: input.bridgehub,
+        ctm_proxy,
+    };
+
+    {
+        let mut ctx = ForgeContext {
+            shell,
+            foundry_scripts_path,
+            runner,
+            forge_args,
+            l1_rpc_url,
+            auth: admin_auth,
+        };
+        register_ctm(&mut ctx, &register_input)?;
+    }
+
+    Ok(CtmInitOutput {
+        deploy_output,
+        ctm_proxy,
+        governance,
+        chain_admin,
+    })
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct CtmInitArgs {
     /// Bridgehub proxy address
