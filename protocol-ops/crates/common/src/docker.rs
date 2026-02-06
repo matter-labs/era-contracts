@@ -1,0 +1,23 @@
+use url::Url;
+use xshell::{cmd, Shell};
+
+use crate::cmd::Cmd;
+
+pub fn run(shell: &Shell, docker_image: &str, docker_args: Vec<String>) -> anyhow::Result<()> {
+    Ok(Cmd::new(cmd!(shell, "docker run {docker_args...} {docker_image}")).run()?)
+}
+
+pub fn get_image_with_tag(docker_image: &str, image_tag: &str) -> String {
+    format!("{docker_image}:{image_tag}")
+}
+
+pub fn adjust_localhost_for_docker(mut url: Url) -> anyhow::Result<Url> {
+    if let Some(host) = url.host_str() {
+        if host == "localhost" || host == "127.0.0.1" {
+            url.set_host(Some("host.docker.internal"))?;
+        }
+    } else {
+        anyhow::bail!("Failed to parse: no host");
+    }
+    Ok(url)
+}
