@@ -9,6 +9,9 @@ contract DummyChainTypeManager {
 
     mapping(uint256 _protocolVersion => uint256) public protocolVersionDeadline;
 
+    // solhint-disable-next-line var-name-mixedcase
+    address public BRIDGE_HUB;
+
     constructor() {}
 
     function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external {
@@ -25,6 +28,10 @@ contract DummyChainTypeManager {
 
     function setChainAdmin(uint256 _chainId, address _chainAdmin) external {
         chainAdmin[_chainId] = _chainAdmin;
+    }
+
+    function setBridgeHub(address _bridgeHub) external {
+        BRIDGE_HUB = _bridgeHub;
     }
 
     // add this to be excluded from coverage report

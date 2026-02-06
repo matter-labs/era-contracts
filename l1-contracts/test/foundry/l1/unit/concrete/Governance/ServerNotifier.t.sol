@@ -5,19 +5,23 @@ import {Test} from "forge-std/Test.sol";
 
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManagerForServerNotifier.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {DummyChainAssetHandler} from "contracts/dev-contracts/test/DummyChainAssetHandler.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {InvalidProtocolVersion, SlotOccupied, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract ServerNotifierTest is Test {
     ServerNotifier internal serverNotifier;
     DummyChainTypeManager internal chainTypeManager;
+    DummyBridgehub internal bridgehub;
+    DummyChainAssetHandler internal chainAssetHandler;
 
     address internal owner;
     address internal chainAdmin;
     uint256 internal chainId;
 
-    event MigrateToGateway(uint256 indexed chainId);
-    event MigrateFromGateway(uint256 indexed chainId);
+    event MigrateToGateway(uint256 indexed chainId, uint256 migrationNumber);
+    event MigrateFromGateway(uint256 indexed chainId, uint256 migrationNumber);
     event UpgradeTimestampUpdated(uint256 indexed chainId, uint256 indexed protocolVersion, uint256 upgradeTimestamp);
 
     function setUp() public {
@@ -25,7 +29,13 @@ contract ServerNotifierTest is Test {
         owner = makeAddr("owner");
         chainAdmin = makeAddr("chainAdmin");
 
+        // Set up mock bridgehub and chain asset handler
+        bridgehub = new DummyBridgehub();
+        chainAssetHandler = new DummyChainAssetHandler();
+        bridgehub.setChainAssetHandler(address(chainAssetHandler));
+
         chainTypeManager = new DummyChainTypeManager();
+        chainTypeManager.setBridgeHub(address(bridgehub));
 
         chainTypeManager.setChainAdmin(chainId, chainAdmin);
 
@@ -75,8 +85,8 @@ contract ServerNotifierTest is Test {
         chainTypeManager.setChainAdmin(chainId, chainAdmin);
 
         vm.startPrank(chainAdmin);
-        vm.expectEmit(true, false, false, false);
-        emit MigrateToGateway(chainId);
+        vm.expectEmit(true, false, false, true);
+        emit MigrateToGateway(chainId, 0);
         serverNotifier.migrateToGateway(chainId);
         vm.stopPrank();
     }
@@ -94,8 +104,8 @@ contract ServerNotifierTest is Test {
         chainTypeManager.setChainAdmin(chainId, chainAdmin);
 
         vm.startPrank(chainAdmin);
-        vm.expectEmit(true, false, false, false);
-        emit MigrateFromGateway(chainId);
+        vm.expectEmit(true, false, false, true);
+        emit MigrateFromGateway(chainId, 0);
         serverNotifier.migrateFromGateway(chainId);
         vm.stopPrank();
     }
