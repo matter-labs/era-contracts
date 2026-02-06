@@ -338,9 +338,13 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     ) external onlyOwner {
         // Validate this is a patch upgrade (major and minor versions must be the same)
         {
-            (uint32 oldMajor, uint32 oldMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_oldProtocolVersion));
-            (uint32 newMajor, uint32 newMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_newProtocolVersion));
-            if (oldMajor != newMajor || oldMinor != newMinor) {
+            (uint32 oldMajor, uint32 oldMinor, uint32 oldPatch) = SemVer.unpackSemVer(
+                SafeCast.toUint96(_oldProtocolVersion)
+            );
+            (uint32 newMajor, uint32 newMinor, uint32 newPatch) = SemVer.unpackSemVer(
+                SafeCast.toUint96(_newProtocolVersion)
+            );
+            if (oldMajor != newMajor || oldMinor != newMinor || newPatch <= oldPatch) {
                 revert NotAPatchUpgrade(_oldProtocolVersion, _newProtocolVersion);
             }
         }
@@ -369,7 +373,11 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             defaultAccountHash: bytes32(0),
             evmEmulatorHash: bytes32(0),
             verifier: address(0),
-            verifierParams: VerifierParams({recursionNodeLevelVkHash: bytes32(0), recursionLeafLevelVkHash: bytes32(0), recursionCircuitsSetVksHash: bytes32(0)}),
+            verifierParams: VerifierParams({
+                recursionNodeLevelVkHash: bytes32(0),
+                recursionLeafLevelVkHash: bytes32(0),
+                recursionCircuitsSetVksHash: bytes32(0)
+            }),
             l1ContractsUpgradeCalldata: "",
             postUpgradeCalldata: "",
             upgradeTimestamp: 0,
