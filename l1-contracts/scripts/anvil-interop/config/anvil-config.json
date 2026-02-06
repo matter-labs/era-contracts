@@ -1,0 +1,29 @@
+{
+  "chains": [
+    {
+      "chainId": 31337,
+      "port": 9545,
+      "isL1": true
+    },
+    {
+      "chainId": 10,
+      "port": 4050,
+      "isL1": false
+    },
+    {
+      "chainId": 11,
+      "port": 4051,
+      "isL1": false,
+      "isGateway": true
+    },
+    {
+      "chainId": 12,
+      "port": 4052,
+      "isL1": false
+    }
+  ],
+  "batchSettler": {
+    "pollingIntervalMs": 5000,
+    "batchSizeLimit": 10
+  }
+}
