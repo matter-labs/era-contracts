@@ -334,6 +334,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
                 foundEvent = true;
                 // Verify the indexed assetId matches
                 assertEq(logs[i].topics[1], assetId, "Event assetId should match");
+                // Verify the indexed chainId matches
+                assertEq(uint256(logs[i].topics[2]), eraZKChainId, "Event chainId should match");
                 break;
             }
         }
