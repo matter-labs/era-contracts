@@ -129,7 +129,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     function updateL2(
         uint256 _l1ChainId,
         bytes32 _l2TokenProxyBytecodeHash,
-        address _legacySharedBridge, //TODO remove after SDK changes
+        address, //TODO remove after SDK changes
         address _wethToken,
         bytes32 _baseTokenAssetId
     ) public onlyUpgrader {
@@ -183,7 +183,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// @return proxy The beacon proxy, i.e. L2 bridged token.
     function _deployBeaconProxy(
         bytes32 _salt,
-        uint256 _tokenOriginChainId //TODO remove after SDK changes
+        uint256 //TODO remove after SDK changes
     ) internal virtual override returns (BeaconProxy proxy) {
         // Deploy the beacon proxy for the L2 token
         (bool success, bytes memory returndata) = SystemContractsCaller.systemCallWithReturndata(
