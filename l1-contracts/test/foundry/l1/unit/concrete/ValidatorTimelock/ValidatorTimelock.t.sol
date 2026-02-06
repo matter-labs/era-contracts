@@ -6,6 +6,8 @@ import {Utils} from "../Utils/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
@@ -263,6 +265,24 @@ contract ValidatorTimelockTest is Test {
             proof
         );
         validator.proveBatchesSharedBridge(zkSync, proveBatchFrom, proveBatchTo, proveData);
+    }
+
+    function test_upgradeChainFromVersion_PropagatesToDiamondProxy() public {
+        uint256 oldProtocolVersion = 1;
+        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
+            facetCuts: new Diamond.FacetCut[](0),
+            initAddress: address(0),
+            initCalldata: bytes("")
+        });
+
+        vm.mockCall(
+            zkSync,
+            abi.encodeCall(IAdmin.upgradeChainFromVersion, (zkSync, oldProtocolVersion, diamondCut)),
+            ""
+        );
+
+        vm.prank(alice);
+        validator.upgradeChainFromVersion(zkSync, oldProtocolVersion, diamondCut);
     }
 
     function test_executeBatchesSharedBridge() public {
