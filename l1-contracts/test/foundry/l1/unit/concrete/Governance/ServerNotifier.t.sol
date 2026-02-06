@@ -4,7 +4,9 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {DummyChainTypeManager, DummyBridgehub, DummyChainAssetHandler} from "contracts/dev-contracts/test/DummyChainTypeManagerForServerNotifier.sol";
+import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManagerForServerNotifier.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {DummyChainAssetHandler} from "contracts/dev-contracts/test/DummyChainAssetHandler.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {InvalidProtocolVersion, SlotOccupied, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 

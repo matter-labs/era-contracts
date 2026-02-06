@@ -2,32 +2,6 @@
 
 pragma solidity 0.8.28;
 
-/// @title DummyBridgehub
-/// @notice A mock bridgehub for testing.
-contract DummyBridgehub {
-    address public chainAssetHandler;
-
-    function setChainAssetHandler(address _handler) external {
-        chainAssetHandler = _handler;
-    }
-
-    // add this to be excluded from coverage report
-    function test() internal virtual {}
-}
-
-/// @title DummyChainAssetHandler
-/// @notice A mock chain asset handler for testing.
-contract DummyChainAssetHandler {
-    mapping(uint256 => uint256) public migrationNumber;
-
-    function setMigrationNumber(uint256 _chainId, uint256 _number) external {
-        migrationNumber[_chainId] = _number;
-    }
-
-    // add this to be excluded from coverage report
-    function test() internal virtual {}
-}
-
 /// @title DummyChainTypeManagerForServerNotifier
 /// @notice A test smart contract implementing the subset of ChainTypeManager functionality for testing purposes.
 contract DummyChainTypeManager {
