@@ -200,6 +200,7 @@ export class L2ToL2Relayer {
 
     let targetChainId: number;
     let calls: Array<{ target: string; value: bigint; data: string }>;
+    let interopBundle: any;
 
     try {
       // The third parameter (index 2) in the event is the InteropBundle struct
@@ -213,7 +214,7 @@ export class L2ToL2Relayer {
         interopEventLog.data
       );
 
-      const interopBundle = decodedData[2];
+      interopBundle = decodedData[2];
       targetChainId = Number(interopBundle[2]); // bytes32 destination
       const rawCalls = interopBundle[4]; // InteropCallStarter[] calls (as arrays)
 
@@ -246,25 +247,54 @@ export class L2ToL2Relayer {
       return;
     }
 
-    console.log(`      Executing ${calls.length} call(s) on target L2 chain...`);
+    console.log(`      Executing bundle on target L2 chain via L2InteropHandler...`);
 
-    // Direct execution on target L2 (bypassing L1 for Anvil testing)
+    // For Anvil testing, we directly call L2InteropHandler.executeBundle()
+    // In production, this would go through L1 settlement
     const targetWallet = new Wallet(this.l1Wallet.privateKey, targetProvider);
 
-    // Execute each call in the bundle
-    for (let i = 0; i < calls.length; i++) {
-      const call = calls[i];
-      const tx = await targetWallet.sendTransaction({
-        to: call.target,
-        value: call.value,
-        data: call.data,
-        gasLimit: 1000000,
+    const L2_INTEROP_HANDLER_ADDR = "0x000000000000000000000000000000000001000e";
+
+    // Encode the executeBundle call
+    // For Anvil testing, we use an empty/mock proof since we're not doing full L1 settlement
+    const mockProof = {
+      chainId: sourceChainId,
+      l1BatchNumber: 0,
+      l2MessageIndex: 0,
+      message: {
+        txNumberInBatch: 0,
+        sender: "0x000000000000000000000000000000000001000d", // InteropCenter
+        data: "0x"
+      },
+      proof: []
+    };
+
+    const interopHandlerAbi = [
+      "function executeBundle(bytes memory _bundle, tuple(uint256 chainId, uint256 l1BatchNumber, uint256 l2MessageIndex, tuple(uint16 txNumberInBatch, address sender, bytes data) message, bytes32[] proof) memory _proof) public"
+    ];
+
+    const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbi, targetWallet);
+
+    // Extract just the InteropBundle from the event data
+    // The event emits (l2l1MsgHash, interopBundleHash, InteropBundle)
+    // We need to extract and re-encode just the InteropBundle for executeBundle
+    const bundleData = abiCoder.encode(
+      ["tuple(bytes1,uint256,uint256,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes))"],
+      [interopBundle]
+    );
+
+    try {
+      const tx = await interopHandler.getFunction("executeBundle")(bundleData, mockProof, {
+        gasLimit: 5000000,
       });
 
-      console.log(`      L2 Target Tx ${i + 1}: ${tx.hash}`);
+      console.log(`      L2 Target Tx: ${tx.hash}`);
 
       const receipt = await tx.wait();
       console.log(`      Confirmed in L2 block ${receipt?.blockNumber}`);
+      console.log(`      Gas used: ${receipt?.gasUsed.toString()}`);
+    } catch (error: any) {
+      throw new Error(`Failed to execute bundle: ${error.message}`);
     }
   }
 

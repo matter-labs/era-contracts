@@ -99,19 +99,22 @@ export class SystemContractsDeployer {
     // 5. InteropCenter at 0x1000d
     await this.deployInteropCenter();
 
-    // 6. L2AssetRouter at 0x010003
+    // 6. L2InteropHandler at 0x1000e
+    await this.deployL2InteropHandler();
+
+    // 7. L2AssetRouter at 0x010003
     await this.deployL2AssetRouter();
 
-    // 7. L2ChainAssetHandler at 0x1000a
+    // 8. L2ChainAssetHandler at 0x1000a
     await this.deployL2ChainAssetHandler();
 
-    // 8. L2AssetTracker at 0x1000f
+    // 9. L2AssetTracker at 0x1000f
     await this.deployL2AssetTracker(chainId);
 
-    // 9. L2NativeTokenVault at 0x010004
+    // 10. L2NativeTokenVault at 0x010004
     await this.deployL2NativeTokenVault();
 
-    // 9. Register asset handlers for test tokens
+    // 11. Register asset handlers for test tokens
     await this.registerAssetHandlers(chainId);
 
     console.log(`✅ All system contracts deployed for chain ${chainId}`);
@@ -350,6 +353,49 @@ export class SystemContractsDeployer {
       console.log(`   ✅ InteropCenter unpaused`);
     } else {
       console.log(`   ✅ InteropCenter already unpaused`);
+    }
+  }
+
+  /**
+   * Deploy and initialize L2InteropHandler
+   */
+  private async deployL2InteropHandler(): Promise<void> {
+    const L2_INTEROP_HANDLER_ADDR = "0x000000000000000000000000000000000001000e";
+    const L2_COMPLEX_UPGRADER_ADDR = "0x000000000000000000000000000000000000800f";
+
+    await this.deploySystemContract(
+      L2_INTEROP_HANDLER_ADDR,
+      "l1-contracts/out/InteropHandler.sol/InteropHandler.json",
+      "L2InteropHandler"
+    );
+
+    // Initialize L2InteropHandler
+    const interopHandlerAbi = [
+      "function initL2(uint256 _l1ChainId) public",
+      "function L1_CHAIN_ID() external view returns (uint256)"
+    ];
+
+    const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbi, this.l2Provider);
+
+    // Check if already initialized
+    let isInitialized = false;
+    try {
+      const l1ChainId = await interopHandler.L1_CHAIN_ID();
+      if (l1ChainId === 1n) {
+        console.log(`   ✅ L2InteropHandler already initialized`);
+        isInitialized = true;
+      }
+    } catch {}
+
+    if (!isInitialized) {
+      await this.initializeContract(
+        L2_INTEROP_HANDLER_ADDR,
+        interopHandlerAbi,
+        "initL2",
+        [1], // L1 chain ID = 1
+        L2_COMPLEX_UPGRADER_ADDR,
+        "L2InteropHandler"
+      );
     }
   }
 
@@ -613,6 +659,14 @@ export class SystemContractsDeployer {
     const registeredAssetId = await l2NativeTokenVault.assetId(tokenAddress);
     if (registeredAssetId !== "0x0000000000000000000000000000000000000000000000000000000000000000") {
       console.log(`   ✅ Token already registered in L2NativeTokenVault`);
+      return;
+    }
+
+    // Check if token contract exists on this L2 chain
+    const tokenCode = await this.l2Provider.getCode(tokenAddress);
+    if (tokenCode === "0x" || tokenCode === "0x0") {
+      console.log(`   ⚠️  Token ${tokenAddress} not deployed on chain ${chainId}, skipping registration`);
+      console.log(`      (Deploy test tokens with 'yarn deploy:test-token' if needed)`);
       return;
     }
 
