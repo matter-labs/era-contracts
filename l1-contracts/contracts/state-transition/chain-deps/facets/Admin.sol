@@ -242,6 +242,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function upgradeChainFromVersion(
+        address _chainAddress,
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
     ) external onlyAdminOrChainTypeManagerOrValidator {

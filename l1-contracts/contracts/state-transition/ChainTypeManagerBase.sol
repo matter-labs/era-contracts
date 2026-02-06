@@ -379,7 +379,8 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
     ) external onlyOwner {
-        IZKChain(getZKChain(_chainId)).upgradeChainFromVersion(_oldProtocolVersion, _diamondCut);
+        address chainAddress = getZKChain(_chainId);
+        IZKChain(chainAddress).upgradeChainFromVersion(chainAddress, _oldProtocolVersion, _diamondCut);
     }
 
     /// @dev executes upgrade on chain

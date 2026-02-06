@@ -22,7 +22,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
 
         vm.startPrank(nonAdminOrChainTypeManager);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonAdminOrChainTypeManager));
-        adminFacet.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
+        adminFacet.upgradeChainFromVersion(address(adminFacet), oldProtocolVersion, diamondCutData);
     }
 
     function test_revertWhen_cutHashMismatch() public {
@@ -49,7 +49,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
         vm.expectRevert(
             abi.encodeWithSelector(HashMismatch.selector, cutHashInput, keccak256(abi.encode(diamondCutData)))
         );
-        adminFacet.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
+        adminFacet.upgradeChainFromVersion(address(adminFacet), oldProtocolVersion, diamondCutData);
     }
 
     function test_revertWhen_ProtocolVersionMismatchWhenUpgrading() public {
@@ -75,7 +75,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
 
         vm.startPrank(admin);
         vm.expectRevert(abi.encodeWithSelector(ProtocolIdMismatch.selector, uint256(2), oldProtocolVersion));
-        adminFacet.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
+        adminFacet.upgradeChainFromVersion(address(adminFacet), oldProtocolVersion, diamondCutData);
     }
 
     function test_revertWhen_ProtocolVersionMismatchAfterUpgrading() public {
@@ -105,6 +105,6 @@ contract UpgradeChainFromVersionTest is AdminTest {
         emit ExecuteUpgrade(diamondCutData);
 
         vm.startPrank(admin);
-        adminFacet.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
+        adminFacet.upgradeChainFromVersion(address(adminFacet), oldProtocolVersion, diamondCutData);
     }
 }

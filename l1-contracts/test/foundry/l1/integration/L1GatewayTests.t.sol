@@ -458,7 +458,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
 
         vm.startBroadcast(migratingChain.getAdmin());
-        migratingChain.upgradeChainFromVersion(currentProtocolVersion, diamondCut);
+        migratingChain.upgradeChainFromVersion(address(migratingChain), currentProtocolVersion, diamondCut);
         vm.stopBroadcast();
     }
 

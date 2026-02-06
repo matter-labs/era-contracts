@@ -52,9 +52,14 @@ interface IAdmin is IZKChainBase {
     function allowEvmEmulation() external returns (bytes32 canonicalTxHash);
 
     /// @notice Perform the upgrade from the current protocol version with the corresponding upgrade data
+    /// @param _chainAddress The address of the chain being upgraded
     /// @param _protocolVersion The current protocol version from which upgrade is executed
     /// @param _cutData The diamond cut parameters that is executed in the upgrade
-    function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
+    function upgradeChainFromVersion(
+        address _chainAddress,
+        uint256 _protocolVersion,
+        Diamond.DiamondCutData calldata _cutData
+    ) external;
 
     /// @notice Executes a proposed governor upgrade
     /// @dev Only the ChainTypeManager contract can execute the upgrade
