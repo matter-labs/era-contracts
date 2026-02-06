@@ -16,6 +16,7 @@ const REQUIRED_CONTRACTS = [
   "IChainAssetHandler.sol",
   "IChainTypeManager.sol",
   "IAdmin.sol",
+  "IDiamondCut.sol",
   "IChainAdminOwnable.sol",
   "IRegisterZKChain.sol",
   "IDeployL2Contracts.sol",

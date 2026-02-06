@@ -67,11 +67,13 @@ import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
 import {StateTransitionDeployedAddresses, DataAvailabilityDeployedAddresses, ChainCreationParamsConfig, BridgehubAddresses, CoreDeployedAddresses} from "../utils/Types.sol";
+import {ChainCreationParamsLib} from "./ChainCreationParamsLib.sol";
 
 import {DeployCTML1OrGateway, CTMCoreDeploymentConfig, CTMContract} from "./DeployCTML1OrGateway.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
 import {CTMDeployedAddresses, BridgesDeployedAddresses} from "../utils/Types.sol";
+import {SettlementLayerV31Upgrade} from "contracts/upgrades/SettlementLayerV31Upgrade.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -142,7 +144,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         string memory toml = vm.readFile(configPath);
 
         config.l1ChainId = block.chainid;
-        config.deployerAddress = msg.sender;
+        config.deployerAddress = Utils.getBroadcasterAddress();
 
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
@@ -248,7 +250,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         ChainCreationParams memory chainCreationParams = getChainCreationParams(stateTransition);
         return
             ChainTypeManagerInitializeData({
-                owner: msg.sender,
+                owner: Utils.getBroadcasterAddress(),
                 validatorTimelock: stateTransition.proxies.validatorTimelock,
                 chainCreationParams: chainCreationParams,
                 protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
@@ -360,6 +362,8 @@ abstract contract DeployCTMUtils is DeployUtils {
                 return type(DiamondInit).creationCode;
             } else if (compareStrings(contractName, "ServerNotifier")) {
                 return type(ServerNotifier).creationCode;
+            } else if (compareStrings(contractName, "SettlementLayerV31Upgrade")) {
+                return type(SettlementLayerV31Upgrade).creationCode;
             }
         } else {
             if (compareStrings(contractName, "Verifier")) {
@@ -406,6 +410,8 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "SettlementLayerV31Upgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Governance")) {
             return
@@ -465,8 +471,9 @@ abstract contract DeployCTMUtils is DeployUtils {
                 verifierFflonk: ctmAddresses.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: ctmAddresses.stateTransition.verifiers.verifierPlonk,
                 // For L1 deployment we need to use the deployer as the owner of the verifier,
-                // because we set the dual verifier later
-                verifierOwner: msg.sender
+                // because we set the dual verifier later. Use Utils.getBroadcasterAddress() to get
+                // the actual EOA when this is called from a contract created via `new` during the script.
+                verifierOwner: Utils.getBroadcasterAddress()
             });
     }
 
@@ -514,32 +521,4 @@ abstract contract DeployCTMUtils is DeployUtils {
     }
 
     function test() internal virtual {}
-}
-
-library ChainCreationParamsLib {
-    using stdJson for string;
-    address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
-    Vm internal constant vm = Vm(VM_ADDRESS);
-
-    function getChainCreationParams(
-        string memory _config,
-        bool isZKsyncOs
-    ) public returns (ChainCreationParamsConfig memory chainCreationParams) {
-        string memory json = vm.readFile(_config);
-        uint32 major = uint32(json.readUint("$.protocol_semantic_version.major"));
-        uint32 minor = uint32(json.readUint("$.protocol_semantic_version.minor"));
-        uint32 patch = uint32(json.readUint("$.protocol_semantic_version.patch"));
-        chainCreationParams.latestProtocolVersion = SemVer.packSemVer(major, minor, patch);
-        chainCreationParams.genesisRoot = json.readBytes32("$.genesis_root");
-        if (isZKsyncOs) {
-            chainCreationParams.genesisBatchCommitment = bytes32(uint256(1));
-        } else {
-            // These fields are used only for zksync era
-            chainCreationParams.genesisRollupLeafIndex = json.readUint("$.genesis_rollup_leaf_index");
-            chainCreationParams.genesisBatchCommitment = json.readBytes32("$.genesis_batch_commitment");
-            chainCreationParams.defaultAAHash = json.readBytes32("$.default_aa_hash");
-            chainCreationParams.bootloaderHash = json.readBytes32("$.bootloader_hash");
-            chainCreationParams.evmEmulatorHash = json.readBytes32("$.evm_emulator_hash");
-        }
-    }
 }

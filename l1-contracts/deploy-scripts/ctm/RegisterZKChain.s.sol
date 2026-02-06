@@ -50,6 +50,12 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
 
     bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewZKChain(uint256,address)");
 
+    /// @notice Returns the address to use as the deployer/owner for contracts.
+    /// @dev This is virtual so test scripts can override it. By default returns tx.origin.
+    function getDeployerAddress() public view virtual returns (address) {
+        return tx.origin;
+    }
+
     struct LegacySharedBridgeParams {
         bytes implementationConstructorParams;
         address implementationAddress;
@@ -123,7 +129,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         // Grab config from output of l1 deployment
         string memory toml = vm.readFile(path);
 
-        config.deployerAddress = msg.sender;
+        config.deployerAddress = getDeployerAddress();
 
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
@@ -363,7 +369,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
                     ctmAddresses.stateTransition.proxies.chainTypeManager,
                     config.baseTokenAssetId,
                     config.bridgehubCreateNewChainSalt,
-                    msg.sender,
+                    getDeployerAddress(),
                     abi.encode(config.diamondCutData, config.forceDeploymentsData),
                     getFactoryDeps()
                 )
@@ -386,7 +392,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(ctmAddresses.stateTransition.proxies.validatorTimelock);
         address chainAddress = IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).getZKChain(config.chainChainId);
 
-        vm.startBroadcast(msg.sender);
+        vm.startBroadcast(getDeployerAddress());
 
         // Add committer role to the first two addresses (commit operators)
 
@@ -454,7 +460,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
     function configureZkSyncStateTransition() internal {
         IZKChain zkChain = IZKChain(output.diamondProxy);
 
-        vm.startBroadcast(msg.sender);
+        vm.startBroadcast(getDeployerAddress());
         zkChain.setTokenMultiplier(
             config.baseTokenGasPriceMultiplierNominator,
             config.baseTokenGasPriceMultiplierDenominator
@@ -471,7 +477,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
     function setPendingAdmin() internal {
         IZKChain zkChain = IZKChain(output.diamondProxy);
 
-        vm.startBroadcast(msg.sender);
+        vm.startBroadcast(getDeployerAddress());
         zkChain.setPendingAdmin(output.chainAdmin);
         vm.stopBroadcast();
         console.log("Owner for ", output.diamondProxy, "set to", output.chainAdmin);

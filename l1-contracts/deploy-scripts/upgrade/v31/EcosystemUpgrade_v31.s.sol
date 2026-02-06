@@ -8,159 +8,219 @@ import {stdToml} from "forge-std/StdToml.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
-import {Governance} from "contracts/governance/Governance.sol";
-
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
-
-import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
-
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
-
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-
-import {Call} from "contracts/governance/Common.sol";
-
-import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
+import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
 
 import {DefaultEcosystemUpgrade} from "../default_upgrade/DefaultEcosystemUpgrade.s.sol";
+import {DefaultCoreUpgrade} from "../default_upgrade/DefaultCoreUpgrade.s.sol";
 import {DefaultCTMUpgrade} from "../default_upgrade/DefaultCTMUpgrade.s.sol";
+import {CoreUpgrade_v31} from "./CoreUpgrade_v31.s.sol";
+import {CTMUpgrade_v31} from "./CTMUpgrade_v31.s.sol";
+import {GatewayUpgrade_v31} from "./GatewayUpgrade_v31.s.sol";
+import {Utils} from "../../utils/Utils.sol";
 
-import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
-import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
-import {DefaultGatewayUpgrade} from "../default_upgrade/DefaultGatewayUpgrade.s.sol";
-import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
-
-/// @notice Script used for v31 upgrade flow
-contract EcosystemUpgrade_v31 is Script, DefaultEcosystemUpgrade {
+/// @notice Script used for v31 ecosystem upgrade flow (core + CTM)
+contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
     using stdToml for string;
 
+    /// @notice Create v31-specific core upgrade instance
+    function createCoreUpgrade() internal virtual override returns (DefaultCoreUpgrade) {
+        return new CoreUpgrade_v31();
+    }
+
+    /// @notice Create v31-specific CTM upgrade instance
+    function createCTMUpgrade() internal virtual override returns (DefaultCTMUpgrade) {
+        return new CTMUpgrade_v31();
+    }
+
+    /// @notice Override to set core output path
+    function getCoreOutputPath(string memory _ecosystemOutputPath) internal virtual override returns (string memory) {
+        // Use hardcoded path for v31 core output
+        return "/script-out/v31-upgrade-core.toml";
+    }
+
+    /// @notice Override to set CTM output path
+    function getCTMOutputPath() internal virtual override returns (string memory) {
+        // Use hardcoded path for v31 CTM output
+        return "/script-out/v31-upgrade-ctm.toml";
+    }
+
+    /// @notice Initialize with v31-specific permanent values preparation
+    function initialize(
+        string memory permanentValuesInputPath,
+        string memory upgradeInputPath,
+        string memory _ecosystemOutputPath
+    ) public override {
+        string memory root = vm.projectRoot();
+        ecosystemOutputPath = string.concat(root, _ecosystemOutputPath);
+
+        // Get output paths (these return relative paths)
+        string memory _coreOutputPath = getCoreOutputPath(_ecosystemOutputPath);
+        string memory _ctmOutputPath = getCTMOutputPath();
+
+        // Store full paths for later use
+        coreOutputPath = string.concat(root, _coreOutputPath);
+        ctmOutputPath = string.concat(root, _ctmOutputPath);
+
+        // Create v31 core upgrade and prepare permanent values BEFORE initialization
+        coreUpgrade = createCoreUpgrade();
+        // CoreUpgrade_v31(address(coreUpgrade)).preparePermanentValues();
+        coreUpgrade.initialize(permanentValuesInputPath, upgradeInputPath, _coreOutputPath);
+        _coreInitialized = true;
+
+        // Initialize CTM upgrade with its own output path
+        ctmUpgrade = createCTMUpgrade();
+        ctmUpgrade.initialize(permanentValuesInputPath, upgradeInputPath, _ctmOutputPath);
+        _ctmInitialized = true;
+
+        // Allow subclasses to override protocol version for local testing
+        overrideProtocolVersionForLocalTesting(upgradeInputPath);
+    }
+
     /// @notice E2e upgrade generation
-    function run() public virtual override {
-        preparePermanentValues();
+    function run() public override {
         initialize(
             "/upgrade-envs/permanent-values/local.toml",
             "/upgrade-envs/v0.31.0-interopB/local.toml",
-            vm.envString("V31_UPGRADE_ECOSYSTEM_INPUT"),
-            vm.envString("V31_UPGRADE_ECOSYSTEM_OUTPUT")
+            "/script-out/v31-upgrade-ecosystem.toml"
         );
 
         prepareEcosystemUpgrade();
         prepareDefaultGovernanceCalls();
     }
 
-    /// todo create in deploy scripts instead of here.
-    function preparePermanentValues() internal {
+    /// @notice Stage 3: Post-governance migration tasks
+    /// @dev This should be called after stage 0, 1, and 2 governance calls are executed
+    /// @dev Can be called with any private key (doesn't need to be governance)
+    function stage3() public {
+        console.log("Starting v31 stage3 post-governance migration...");
+
+        // Read the permanent values to get contract addresses
         string memory root = vm.projectRoot();
-        string memory permanentValuesInputPath = string.concat(root, "/upgrade-envs/permanent-values/local.toml");
-        string memory outputDeployL1Toml = vm.readFile(string.concat(root, "/script-out/output-deploy-l1.toml"));
-        string memory outputDeployCTMToml = vm.readFile(string.concat(root, "/script-out/output-deploy-ctm.toml"));
+        string memory permanentValuesPath = string.concat(root, "/upgrade-envs/permanent-values/local.toml");
+        string memory permanentValues = vm.readFile(permanentValuesPath);
 
-        bytes32 create2FactorySalt = outputDeployL1Toml.readBytes32("$.permanent_contracts.create2_factory_salt");
-        address create2FactoryAddr;
-        if (vm.keyExistsToml(outputDeployL1Toml, "$.permanent_contracts.create2_factory_addr")) {
-            create2FactoryAddr = outputDeployL1Toml.readAddress("$.permanent_contracts.create2_factory_addr");
+        address bridgehubProxy = permanentValues.readAddress("$.core_contracts.bridgehub_proxy_addr");
+        console.log("Bridgehub proxy:", bridgehubProxy);
+
+        // Get contract addresses
+        IBridgehubBase bridgehub = IBridgehubBase(bridgehubProxy);
+        IL1AssetRouter assetRouter = IL1AssetRouter(address(bridgehub.assetRouter()));
+        L1NativeTokenVault ntv = L1NativeTokenVault(payable(address(assetRouter.nativeTokenVault())));
+        IL1AssetTracker assetTracker = ntv.l1AssetTracker();
+
+        console.log("AssetRouter:", address(assetRouter));
+        console.log("NativeTokenVault:", address(ntv));
+        console.log("AssetTracker:", address(assetTracker));
+
+        require(address(assetTracker) != address(0), "AssetTracker not set");
+
+        // Migrate token balances from NTV to AssetTracker
+        registerBridgedTokensInNTV(address(bridgehub));
+        migrateTokenBalances(address(ntv), address(assetTracker), bridgehub);
+
+        console.log("v31 stage3 migration complete!");
+    }
+
+    /// @notice Migrate token balances for a specific chain
+    function migrateTokenBalancesForChain(
+        uint256 chainId,
+        L1NativeTokenVault ntv,
+        IL1AssetTracker assetTracker
+    ) internal {
+        console.log("Processing chain:", chainId);
+
+        uint256 tokenCount = ntv.bridgedTokensCount();
+
+        for (uint256 j = 0; j < tokenCount; ++j) {
+            bytes32 assetId = ntv.bridgedTokens(j);
+
+            // Check if there's a balance to migrate
+            uint256 balance = ntv.chainBalance(chainId, assetId);
+            if (balance > 0) {
+                address tokenAddress = ntv.tokenAddress(assetId);
+                console.log("  Migrating token:", tokenAddress);
+                console.log("  AssetId:", vm.toString(assetId));
+                console.log("  Balance:", balance);
+
+                // Call AssetTracker to migrate the balance
+                vm.broadcast(Utils.getBroadcasterAddress());
+                assetTracker.migrateTokenBalanceFromNTVV31(chainId, assetId);
+
+                console.log("  Migration successful");
+            }
         }
-        address ctm = outputDeployCTMToml.readAddress(
-            "$.deployed_addresses.state_transition.state_transition_proxy_addr"
+    }
+
+    /// @notice Migrate token balances from DEPRECATED_chainBalance to AssetTracker
+    function migrateTokenBalances(address _ntv, address _assetTracker, IBridgehubBase _bridgehub) internal {
+        console.log("Migrating token balances...");
+
+        L1NativeTokenVault ntv = L1NativeTokenVault(payable(_ntv));
+        IL1AssetTracker assetTracker = IL1AssetTracker(_assetTracker);
+
+        // Get bridged token count
+        uint256 tokenCount = ntv.bridgedTokensCount();
+        console.log("Number of bridged tokens:", tokenCount);
+
+        // First, migrate balances for the L1 chain itself
+        uint256 l1ChainId = block.chainid;
+        console.log("Migrating L1 chain balances (chainId:", l1ChainId, ")");
+        migrateTokenBalancesForChain(l1ChainId, ntv, assetTracker);
+
+        // Get list of registered L2 chains
+        uint256[] memory chainIds = _bridgehub.getAllZKChainChainIDs();
+        console.log("Number of L2 chains:", chainIds.length);
+
+        // For each L2 chain and each token, migrate the balance
+        for (uint256 i = 0; i < chainIds.length; ++i) {
+            migrateTokenBalancesForChain(chainIds[i], ntv, assetTracker);
+        }
+
+        console.log("Token balance migration complete");
+    }
+
+    /// @notice Register legacy bridged tokens (if needed)
+    function registerBridgedTokensInNTV(address _bridgehub) public {
+        console.log("Registering bridged tokens in NTV...");
+
+        NativeTokenVaultBase ntv = NativeTokenVaultBase(
+            address(IL1AssetRouter(address(IBridgehubBase(_bridgehub).assetRouter())).nativeTokenVault())
         );
-        address bytecodesSupplier = outputDeployCTMToml.readAddress(
-            "$.deployed_addresses.state_transition.bytecodes_supplier_addr"
-        );
-        address l1Bridgehub = outputDeployL1Toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
-        address rollupDAManager = outputDeployCTMToml.readAddress("$.deployed_addresses.l1_rollup_da_manager");
-        uint256 eraChainId = outputDeployL1Toml.readUint("$.era_chain_id");
 
-        // Serialize permanent_contracts section
-        {
-            vm.serializeString("permanent_contracts", "create2_factory_salt", vm.toString(create2FactorySalt));
-            string memory permanent_contracts = vm.serializeAddress(
-                "permanent_contracts",
-                "create2_factory_addr",
-                create2FactoryAddr
-            );
-            vm.serializeString("root", "permanent_contracts", permanent_contracts);
+        // For fresh deployments, register the ETH base token
+        // ETH token address is 0x0000000000000000000000000000000000000001
+        address ethTokenAddress = address(0x0000000000000000000000000000000000000001);
+
+        // Get the assetId for ETH from NTV
+        bytes32 ethAssetId = ntv.assetId(ethTokenAddress);
+        console.log("ETH token address:", ethTokenAddress);
+        console.log("ETH assetId:", vm.toString(ethAssetId));
+
+        // Create array with ETH assetId
+        bytes32[] memory savedBridgedTokens = new bytes32[](1);
+        savedBridgedTokens[0] = ethAssetId;
+
+        console.log("Registering tokens, count:", savedBridgedTokens.length);
+
+        /// Register tokens in the bridged token list
+        for (uint256 i = 0; i < savedBridgedTokens.length; ++i) {
+            bytes32 assetId = savedBridgedTokens[i];
+            address tokenAddress = ntv.tokenAddress(assetId);
+            console.log("  Registering assetId:", vm.toString(assetId));
+            console.log("  Token address:", tokenAddress);
+
+            vm.broadcast(Utils.getBroadcasterAddress());
+            ntv.addLegacyTokenToBridgedTokensList(tokenAddress);
+
+            console.log("  Token registered successfully");
         }
 
-        // Serialize ctm_contracts section
-        {
-            vm.serializeAddress("ctm_contracts", "ctm_proxy_addr", ctm);
-            vm.serializeAddress("ctm_contracts", "rollup_da_manager", rollupDAManager);
-            string memory ctm_contracts = vm.serializeAddress(
-                "ctm_contracts",
-                "l1_bytecodes_supplier_addr",
-                bytecodesSupplier
-            );
-            vm.serializeString("root", "ctm_contracts", ctm_contracts);
-        }
-
-        // Serialize core_contracts section
-        {
-            string memory core_contracts = vm.serializeAddress("core_contracts", "bridgehub_proxy_addr", l1Bridgehub);
-            vm.serializeString("root", "core_contracts", core_contracts);
-        }
-
-        // Write the final TOML
-        string memory permanentValuesToml = vm.serializeUint("root", "era_chain_id", eraChainId);
-        vm.writeToml(permanentValuesToml, permanentValuesInputPath);
-    }
-
-    function deployNewEcosystemContractsL1() public virtual override {
-        coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub", false);
-        coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot", false);
-        coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier", false);
-        coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter", false);
-        coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault", false);
-        (
-            coreAddresses.bridgehub.implementations.assetTracker,
-            coreAddresses.bridgehub.proxies.assetTracker
-        ) = deployTuppWithContract("L1AssetTracker", false);
-        coreAddresses.bridgehub.implementations.ctmDeploymentTracker = deploySimpleContract(
-            "CTMDeploymentTracker",
-            false
-        );
-        coreAddresses.bridgehub.implementations.chainAssetHandler = deploySimpleContract("L1ChainAssetHandler", false);
-        coreAddresses.bridgehub.implementations.chainRegistrationSender = deploySimpleContract(
-            "ChainRegistrationSender",
-            false
-        );
-        // deploySimpleContract("L1ChainTypeManager", false);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                          Internal functions
-    //////////////////////////////////////////////////////////////*/
-
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        return super.getCreationCode(contractName, isZKBytecode);
-    }
-
-    function getCreationCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view override returns (bytes memory) {
-        return super.getCreationCalldata(contractName, isZKBytecode);
-    }
-
-    function deployUsedUpgradeContract() internal returns (address) {
-        return deploySimpleContract("L1V31Upgrade", false);
-    }
-
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZkBytecode
-    ) internal virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "L1MessageRoot")) {
-            return abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ());
-        }
-        return super.getInitializeCalldata(contractName, isZkBytecode);
+        console.log("Bridged tokens registration complete");
     }
 }

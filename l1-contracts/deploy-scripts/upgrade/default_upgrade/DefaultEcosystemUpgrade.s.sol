@@ -4,422 +4,324 @@ pragma solidity 0.8.28;
 // solhint-disable no-console, gas-custom-errors
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-
 import {stdToml} from "forge-std/StdToml.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-
-import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
-import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
-import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
-import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
-import {Governance} from "contracts/governance/Governance.sol";
-import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
-import {BridgehubAddresses, BridgesDeployedAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
-import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
-
-import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
+import {DefaultCoreUpgrade} from "./DefaultCoreUpgrade.s.sol";
+import {DefaultCTMUpgrade} from "./DefaultCTMUpgrade.s.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
+import {BridgehubAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 
-/// @notice Script used for default ecosystem upgrade flow should be run as a first for the upgrade.
-/// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
+/// @notice Unified script that runs both ecosystem core upgrade and CTM upgrade
+/// @dev This script combines DefaultCoreUpgrade and DefaultCTMUpgrade, running them in sequence
+///      and merging their governance calls.
+contract DefaultEcosystemUpgrade is Script {
     using stdToml for string;
 
-    /// @notice Internal state of the upgrade script
-    struct EcosystemUpgradeConfig {
-        bool initialized;
-        string outputPath;
+    DefaultCoreUpgrade internal coreUpgrade;
+    DefaultCTMUpgrade internal ctmUpgrade;
+
+    bool internal _coreInitialized;
+    bool internal _ctmInitialized;
+
+    string internal ecosystemOutputPath;
+    string internal coreOutputPath;
+    string internal ctmOutputPath;
+
+    /// @notice Create core upgrade instance - can be overridden for version-specific instances
+    function createCoreUpgrade() internal virtual returns (DefaultCoreUpgrade) {
+        return new DefaultCoreUpgrade();
     }
 
-    struct AdditionalConfigParams {
-        uint256 newProtocolVersion;
+    /// @notice Create CTM upgrade instance - can be overridden for version-specific instances
+    function createCTMUpgrade() internal virtual returns (DefaultCTMUpgrade) {
+        return new DefaultCTMUpgrade();
     }
-    AdditionalConfigParams internal additionalConfig;
 
-    EcosystemUpgradeConfig internal upgradeConfig;
+    /// @notice Get core output path - can be overridden for version-specific paths
+    /// @dev Returns relative path (without project root), as it will be concatenated in initialize()
+    function getCoreOutputPath(string memory _ecosystemOutputPath) internal virtual returns (string memory) {
+        // Default: use environment variable if set, otherwise derive from ecosystem path
+        try vm.envString("UPGRADE_CORE_OUTPUT") returns (string memory coreOutputEnv) {
+            return coreOutputEnv;
+        } catch {
+            // Fallback: same as ecosystem output (passed as parameter, already relative)
+            return _ecosystemOutputPath;
+        }
+    }
 
+    /// @notice Get CTM output path - can be overridden for version-specific paths
+    /// @dev Returns relative path (without project root), as it will be concatenated in initialize()
+    function getCTMOutputPath() internal virtual returns (string memory) {
+        // Default: use environment variable if set, otherwise extract from ecosystem output path
+        try vm.envString("UPGRADE_CTM_OUTPUT") returns (string memory ctmOutputEnv) {
+            return ctmOutputEnv;
+        } catch {
+            revert("UPGRADE_CTM_OUTPUT environment variable is not set");
+        }
+    }
+
+    /// @notice Initialize both core and CTM upgrades
     function initialize(
         string memory permanentValuesInputPath,
         string memory upgradeInputPath,
-        string memory newConfigPath,
-        string memory _outputPath
+        string memory _ecosystemOutputPath
     ) public virtual {
         string memory root = vm.projectRoot();
-        newConfigPath = string.concat(root, newConfigPath);
-        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
-        upgradeInputPath = string.concat(root, upgradeInputPath);
-        console.log("permanentValuesInputPath", permanentValuesInputPath);
-        console.log("root", root);
+        ecosystemOutputPath = string.concat(root, _ecosystemOutputPath);
 
-        initializeConfig(permanentValuesInputPath, upgradeInputPath, newConfigPath);
-        instantiateCreate2Factory();
+        // Get output paths (these return relative paths)
+        string memory _coreOutputPath = getCoreOutputPath(_ecosystemOutputPath);
+        string memory _ctmOutputPath = getCTMOutputPath();
 
-        console.log("Initialized config from %s", newConfigPath);
-        upgradeConfig.outputPath = string.concat(root, _outputPath);
-        upgradeConfig.initialized = true;
+        // Store full paths for later use
+        coreOutputPath = string.concat(root, _coreOutputPath);
+        ctmOutputPath = string.concat(root, _ctmOutputPath);
+
+        // Initialize core upgrade with its own output path
+        coreUpgrade = createCoreUpgrade();
+        coreUpgrade.initialize(permanentValuesInputPath, upgradeInputPath, _coreOutputPath);
+        _coreInitialized = true;
+
+        // Initialize CTM upgrade with its own output path
+        ctmUpgrade = createCTMUpgrade();
+        ctmUpgrade.initialize(permanentValuesInputPath, upgradeInputPath, _ctmOutputPath);
+        _ctmInitialized = true;
+
+        // Allow subclasses to override protocol version for local testing
+        overrideProtocolVersionForLocalTesting(upgradeInputPath);
     }
 
-    /// @notice Full default upgrade preparation flow
-    function prepareEcosystemUpgrade() public virtual {
-        deployNewEcosystemContractsL1();
-        console.log("Ecosystem contracts are deployed!");
+    /// @notice Override this in test environments to set protocol version from config instead of genesis
+    /// @dev By default, does nothing - CTM reads protocol version from genesis config
+    function overrideProtocolVersionForLocalTesting(string memory upgradeInputPath) internal virtual {
+        // Default: no override, use genesis protocol version
     }
 
-    /// @notice Deploy everything that should be deployed
-    function deployNewEcosystemContractsL1() public virtual {}
-
-    /// @notice E2e upgrade generation
-    function run() public virtual {
-        initialize(
-            vm.envString("PERMANENT_VALUES_INPUT"),
-            vm.envString("UPGRADE_INPUT"),
-            vm.envString("UPGRADE_ECOSYSTEM_INPUT"),
-            vm.envString("UPGRADE_ECOSYSTEM_OUTPUT")
-        );
-        prepareEcosystemUpgrade();
-        prepareDefaultGovernanceCalls();
+    /// @notice Deploy new ecosystem contracts (delegates to core upgrade)
+    function deployNewEcosystemContractsL1() public virtual {
+        require(_coreInitialized, "Core upgrade not initialized");
+        coreUpgrade.deployNewEcosystemContractsL1();
     }
 
+    /// @notice Get owner address (delegates to core upgrade)
     function getOwnerAddress() public virtual returns (address) {
-        return config.ownerAddress;
+        require(_coreInitialized, "Core upgrade not initialized");
+        return coreUpgrade.getOwnerAddress();
     }
 
-    function setOwners(address owner) public virtual {
-        config.ownerAddress = owner;
+    /// @notice Get discovered bridgehub (delegates to core upgrade)
+    function getDiscoveredBridgehub() public virtual returns (BridgehubAddresses memory) {
+        require(_coreInitialized, "Core upgrade not initialized");
+        return coreUpgrade.getDiscoveredBridgehub();
     }
 
-    function getNewProtocolVersion() public virtual returns (uint256) {
-        return additionalConfig.newProtocolVersion;
+    /// @notice Get CTM upgrade instance (for test access)
+    function getCTMUpgrade() public virtual returns (DefaultCTMUpgrade) {
+        require(_ctmInitialized, "CTM upgrade not initialized");
+        return ctmUpgrade;
     }
 
-    function getProtocolUpgradeNonce() public virtual returns (uint256) {
-        return (getNewProtocolVersion() >> 32);
+    /// @notice Run full ecosystem upgrade (core + CTM)
+    function prepareEcosystemUpgrade() public virtual {
+        require(_coreInitialized && _ctmInitialized, "Not initialized");
+
+        console.log("Starting unified ecosystem upgrade...");
+
+        // Step 1: Deploy new ecosystem contracts (core)
+        console.log("Step 1: Deploying new ecosystem contracts...");
+        coreUpgrade.prepareEcosystemUpgrade();
+
+        // Step 2: Prepare CTM upgrade (includes generating upgrade cut data)
+        console.log("Step 2: Preparing CTM upgrade...");
+        ctmUpgrade.prepareCTMUpgrade();
+
+        // Step 3: Save combined output including diamond cut data from CTM upgrade
+        console.log("Step 3: Saving combined output...");
+        saveCombinedOutput();
+
+        console.log("Ecosystem upgrade preparation complete!");
     }
 
-    function getOldProtocolDeadline() public virtual returns (uint256) {
-        // Note, that it is this way by design, on stage2 it
-        // will be set to 0
-        return type(uint256).max;
+    /// @notice Save combined output including CTM diamond cut data to ecosystem output
+    function saveCombinedOutput() internal virtual {
+        // Read the CTM output to get the diamond cut data (ctmOutputPath is already full path)
+        string memory ctmOutputToml = vm.readFile(ctmOutputPath);
+        bytes memory upgradeCutData = ctmOutputToml.readBytes("$.chain_upgrade_diamond_cut");
+
+        // Write the diamond cut data to the ecosystem output (create initial file with just diamond cut)
+        // Note: Governance calls will be appended later
+        string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", upgradeCutData);
+        vm.writeToml(toml, ecosystemOutputPath);
+
+        // Copy the state_transition section from CTM output to ecosystem output
+        // This is needed for zkstack CLI which reads these fields from the ecosystem output
+        copyStateTransitionSection(ctmOutputToml);
+
+        // Copy the upgrade_addresses section from CTM output to ecosystem output
+        copyUpgradeAddressesSection(ctmOutputToml);
+
+        console.log("Diamond cut data saved to ecosystem output!");
     }
 
-    function getDiscoveredBridgehub() public view returns (BridgehubAddresses memory) {
-        return coreAddresses.bridgehub;
+    /// @notice Copy state_transition section from CTM output to ecosystem output
+    function copyStateTransitionSection(string memory ctmOutputToml) internal virtual {
+        // Read all state_transition fields from CTM output
+        vm.serializeAddress(
+            "state_transition",
+            "chain_type_manager_implementation_addr",
+            ctmOutputToml.readAddress("$.state_transition.chain_type_manager_implementation_addr")
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "state_transition_implementation_addr",
+            ctmOutputToml.readAddress("$.state_transition.state_transition_implementation_addr")
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "verifier_addr",
+            ctmOutputToml.readAddress("$.state_transition.verifier_addr")
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "admin_facet_addr",
+            ctmOutputToml.readAddress("$.state_transition.admin_facet_addr")
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "mailbox_facet_addr",
+            ctmOutputToml.readAddress("$.state_transition.mailbox_facet_addr")
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "executor_facet_addr",
+            ctmOutputToml.readAddress("$.state_transition.executor_facet_addr")
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "getters_facet_addr",
+            ctmOutputToml.readAddress("$.state_transition.getters_facet_addr")
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "diamond_init_addr",
+            ctmOutputToml.readAddress("$.state_transition.diamond_init_addr")
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "genesis_upgrade_addr",
+            ctmOutputToml.readAddress("$.state_transition.genesis_upgrade_addr")
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "verifier_fflonk_addr",
+            ctmOutputToml.readAddress("$.state_transition.verifier_fflonk_addr")
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "verifier_plonk_addr",
+            ctmOutputToml.readAddress("$.state_transition.verifier_plonk_addr")
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "validator_timelock_implementation_addr",
+            ctmOutputToml.readAddress("$.state_transition.validator_timelock_implementation_addr")
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "validator_timelock_addr",
+            ctmOutputToml.readAddress("$.state_transition.validator_timelock_addr")
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "bytecodes_supplier_addr",
+            ctmOutputToml.readAddress("$.state_transition.bytecodes_supplier_addr")
+        );
+        string memory stateTransition = vm.serializeAddress(
+            "state_transition",
+            "default_upgrade_addr",
+            ctmOutputToml.readAddress("$.state_transition.default_upgrade_addr")
+        );
+
+        vm.writeToml(stateTransition, ecosystemOutputPath, ".state_transition");
     }
 
-    function initializeConfig(
-        string memory permanentValuesInputPath,
-        string memory upgradeInputPath,
-        string memory newConfigPath
-    ) public virtual {
-        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
-        string memory upgradeToml = vm.readFile(upgradeInputPath);
-        string memory toml = vm.readFile(newConfigPath);
-
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesInputPath);
-        _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
-        //        config.supportL2LegacySharedBridgeTest = permanentValuesToml.readBool("$.support_l2_legacy_shared_bridge_test");
-        additionalConfig.newProtocolVersion = upgradeToml.readUint("$.contracts.new_protocol_version");
-
-        coreAddresses.bridgehub.proxies.bridgehub = permanentValuesToml.readAddress(
-            "$.core_contracts.bridgehub_proxy_addr"
-        );
-        setAddressesBasedOnBridgehub();
-        initializeL1CoreUtilsConfig();
-    }
-
-    function initializeL1CoreUtilsConfig() internal virtual {
-        L1AssetRouter assetRouter = L1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
-        L1Bridgehub bridgehub = L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
-        Governance governance = Governance(payable(coreAddresses.shared.governance));
-        config.l1ChainId = block.chainid;
-        config.deployerAddress = msg.sender;
-        config.eraChainId = assetRouter.ERA_CHAIN_ID();
-        config.eraDiamondProxyAddress = bridgehub.getZKChain(assetRouter.ERA_CHAIN_ID());
-
-        config.ownerAddress = assetRouter.owner();
-
-        config.contracts.governanceSecurityCouncilAddress = governance.securityCouncil();
-        // config.contracts.governanceMinDelay = governance.minDelay();
-
-        config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
-
-        config.tokens.tokenWethAddress = assetRouter.L1_WETH_TOKEN();
-    }
-
-    function setAddressesBasedOnBridgehub() internal virtual {
-        coreAddresses = AddressIntrospector.getCoreDeployedAddresses(coreAddresses.bridgehub.proxies.bridgehub);
-    }
-
-    function saveOutput(string memory outputPath) internal virtual {
-        // Serialize bridgehub addresses
-        vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", coreAddresses.bridgehub.proxies.bridgehub);
+    /// @notice Copy upgrade_addresses section from CTM output to ecosystem output
+    function copyUpgradeAddressesSection(string memory ctmOutputToml) internal virtual {
+        // Read upgrade_addresses fields from CTM output
         vm.serializeAddress(
-            "bridgehub",
-            "bridgehub_implementation_addr",
-            coreAddresses.bridgehub.implementations.bridgehub
-        );
-        vm.serializeAddress(
-            "bridgehub",
-            "ctm_deployment_tracker_implementation_addr",
-            coreAddresses.bridgehub.implementations.ctmDeploymentTracker
-        );
-        vm.serializeAddress(
-            "bridgehub",
-            "ctm_deployment_tracker_proxy_addr",
-            coreAddresses.bridgehub.proxies.ctmDeploymentTracker
-        );
-        vm.serializeAddress(
-            "bridgehub",
-            "chain_asset_handler_implementation_addr",
-            coreAddresses.bridgehub.implementations.chainAssetHandler
-        );
-        vm.serializeAddress(
-            "bridgehub",
-            "chain_asset_handler_proxy_addr",
-            coreAddresses.bridgehub.proxies.chainAssetHandler
-        );
-        vm.serializeAddress("bridgehub", "message_root_proxy_addr", coreAddresses.bridgehub.proxies.messageRoot);
-        string memory bridgehubSerialized = vm.serializeAddress(
-            "bridgehub",
-            "message_root_implementation_addr",
-            coreAddresses.bridgehub.implementations.messageRoot
-        );
-
-        // Serialize bridges addresses
-        vm.serializeAddress(
-            "bridges",
-            "erc20_bridge_implementation_addr",
-            coreAddresses.bridges.implementations.erc20Bridge
-        );
-        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", coreAddresses.bridges.proxies.erc20Bridge);
-        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", coreAddresses.bridges.proxies.l1Nullifier);
-        vm.serializeAddress(
-            "bridges",
-            "l1_nullifier_implementation_addr",
-            coreAddresses.bridges.implementations.l1Nullifier
-        );
-        vm.serializeAddress(
-            "bridges",
-            "l1_asset_router_implementation_addr",
-            coreAddresses.bridges.implementations.l1AssetRouter
-        );
-        vm.serializeAddress("bridges", "l1_asset_router_proxy_addr", coreAddresses.bridges.proxies.l1AssetRouter);
-        // TODO: legacy name
-        vm.serializeAddress(
-            "bridges",
-            "shared_bridge_implementation_addr",
-            coreAddresses.bridges.implementations.l1AssetRouter
-        );
-        vm.serializeAddress(
-            "bridges",
-            "bridged_standard_erc20_impl",
-            coreAddresses.bridges.bridgedStandardERC20Implementation
-        );
-
-        string memory bridgesSerialized = vm.serializeAddress(
-            "bridges",
-            "bridged_token_beacon",
-            coreAddresses.bridges.bridgedTokenBeacon
-        );
-
-        vm.serializeString("deployed_addresses", "bridgehub", bridgehubSerialized);
-        vm.serializeString("deployed_addresses", "bridges", bridgesSerialized);
-        vm.serializeAddress(
-            "deployed_addresses",
+            "upgrade_addresses",
             "native_token_vault_addr",
-            coreAddresses.bridges.proxies.l1NativeTokenVault
+            ctmOutputToml.readAddress("$.upgrade_addresses.native_token_vault_addr")
         );
-        string memory deployedAddresses = vm.serializeAddress(
-            "deployed_addresses",
+        string memory upgradeAddresses = vm.serializeAddress(
+            "upgrade_addresses",
             "native_token_vault_implementation_addr",
-            coreAddresses.bridges.implementations.l1NativeTokenVault
+            ctmOutputToml.readAddress("$.upgrade_addresses.native_token_vault_implementation_addr")
         );
 
-        string memory toml = vm.serializeString("root", "upgrade_addresses", deployedAddresses);
-
-        vm.writeToml(toml, outputPath);
-
-        saveOutputVersionSpecific();
+        vm.writeToml(upgradeAddresses, ecosystemOutputPath, ".upgrade_addresses");
     }
 
-    function saveOutputVersionSpecific() public virtual {}
-
-    ////////////////////////////// Preparing calls /////////////////////////////////
-
+    /// @notice Combine governance calls from both core and CTM upgrades
     function prepareDefaultGovernanceCalls()
         public
         virtual
         returns (Call[] memory stage0Calls, Call[] memory stage1Calls, Call[] memory stage2Calls)
     {
-        // Default upgrade is done it 3 stages:
-        // 0. Pause migration to/from Gateway
-        // 1. Perform upgrade
-        // 2. Unpause migration to/from Gateway
-        stage0Calls = prepareStage0GovernanceCalls();
-        vm.serializeBytes("governance_calls", "stage0_calls", abi.encode(stage0Calls));
-        stage1Calls = prepareStage1GovernanceCalls();
-        vm.serializeBytes("governance_calls", "stage1_calls", abi.encode(stage1Calls));
-        stage2Calls = prepareStage2GovernanceCalls();
+        console.log("Preparing combined governance calls...");
 
+        // Get governance calls from core upgrade
+        (Call[] memory coreStage0, Call[] memory coreStage1, Call[] memory coreStage2) = coreUpgrade
+            .prepareDefaultGovernanceCalls();
+
+        // Get governance calls from CTM upgrade
+        (Call[] memory ctmStage0, Call[] memory ctmStage1, Call[] memory ctmStage2) = ctmUpgrade
+            .prepareDefaultGovernanceCalls();
+
+        // Merge stage 0 calls
+        Call[][] memory stage0Array = new Call[][](2);
+        stage0Array[0] = coreStage0;
+        stage0Array[1] = ctmStage0;
+        stage0Calls = UpgradeUtils.mergeCallsArray(stage0Array);
+
+        // Merge stage 1 calls
+        Call[][] memory stage1Array = new Call[][](2);
+        stage1Array[0] = coreStage1;
+        stage1Array[1] = ctmStage1;
+        stage1Calls = UpgradeUtils.mergeCallsArray(stage1Array);
+
+        // Merge stage 2 calls
+        Call[][] memory stage2Array = new Call[][](2);
+        stage2Array[0] = coreStage2;
+        stage2Array[1] = ctmStage2;
+        stage2Calls = UpgradeUtils.mergeCallsArray(stage2Array);
+
+        // Save combined governance calls to ecosystem output
+        vm.serializeBytes("governance_calls", "stage0_calls", abi.encode(stage0Calls));
+        vm.serializeBytes("governance_calls", "stage1_calls", abi.encode(stage1Calls));
         string memory governanceCallsSerialized = vm.serializeBytes(
             "governance_calls",
             "stage2_calls",
             abi.encode(stage2Calls)
         );
 
-        vm.writeToml(governanceCallsSerialized, upgradeConfig.outputPath, ".governance_calls");
+        vm.writeToml(governanceCallsSerialized, ecosystemOutputPath, ".governance_calls");
+
+        console.log("Combined governance calls prepared!");
+        console.log("Stage 0 calls:", stage0Calls.length);
+        console.log("Stage 1 calls:", stage1Calls.length);
+        console.log("Stage 2 calls:", stage2Calls.length);
     }
 
-    function prepareDefaultEcosystemAdminCalls() public virtual returns (Call[] memory calls) {
-        // Empty by default.
-        return calls;
-    }
-
-    function prepareUnpauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
-        require(coreAddresses.bridgehub.proxies.bridgehub != address(0), "bridgehubProxyAddress is zero in newConfig");
-
-        result = new Call[](1);
-        result[0] = Call({
-            target: coreAddresses.bridgehub.proxies.chainAssetHandler,
-            value: 0,
-            data: abi.encodeCall(IChainAssetHandler.unpauseMigration, ())
-        });
-    }
-
-    /// @notice The zeroth step of upgrade. By default it just stops gateway migrations
-    function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](3);
-
-        allCalls[0] = preparePauseGatewayMigrationsCall();
-        allCalls[1] = prepareVersionSpecificStage0GovernanceCallsL1();
-        allCalls[2] = prepareDefaultEcosystemAdminCalls();
-
-        calls = UpgradeUtils.mergeCallsArray(allCalls);
-    }
-
-    /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
-    function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](3);
-
-        console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
-        allCalls[0] = prepareUpgradeProxiesCalls();
-        allCalls[1] = provideSetNewVersionUpgradeCall();
-        console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
-        allCalls[2] = prepareVersionSpecificStage1GovernanceCallsL1();
-
-        calls = UpgradeUtils.mergeCallsArray(allCalls);
-    }
-
-    /// @notice The second step of upgrade. By default it unpauses migrations.
-    function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](2);
-
-        allCalls[0] = prepareVersionSpecificStage2GovernanceCallsL1();
-        allCalls[1] = prepareUnpauseGatewayMigrationsCall();
-
-        calls = UpgradeUtils.mergeCallsArray(allCalls);
-    }
-
-    function prepareVersionSpecificStage0GovernanceCallsL1() public virtual returns (Call[] memory calls) {
-        // Empty by default.
-        return calls;
-    }
-
-    function prepareVersionSpecificStage1GovernanceCallsL1() public virtual returns (Call[] memory calls) {
-        // Empty by default.
-        return calls;
-    }
-
-    function prepareVersionSpecificStage2GovernanceCallsL1() public virtual returns (Call[] memory calls) {
-        // Empty by default.
-        return calls;
-    }
-
-    // TODO looks like we have to set it for bridgehub too
-    function provideSetNewVersionUpgradeCall() public virtual returns (Call[] memory calls) {}
-
-    function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
-        require(coreAddresses.bridgehub.proxies.chainAssetHandler != address(0), "chainAssetHandlerProxy is zero");
-
-        result = new Call[](1);
-        result[0] = Call({
-            target: coreAddresses.bridgehub.proxies.chainAssetHandler,
-            value: 0,
-            data: abi.encodeCall(IChainAssetHandler.pauseMigration, ())
-        });
-    }
-
-    /// @notice Update implementations in proxies
-    function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
-        calls = new Call[](7);
-
-        calls[0] = _buildCallProxyUpgrade(
-            coreAddresses.bridgehub.proxies.bridgehub,
-            coreAddresses.bridgehub.implementations.bridgehub
+    /// @notice E2e upgrade generation
+    function run() public virtual {
+        initialize(
+            vm.envString("PERMANENT_VALUES_INPUT"),
+            vm.envString("UPGRADE_INPUT"),
+            vm.envString("UPGRADE_ECOSYSTEM_OUTPUT")
         );
-
-        // Note, that we do not need to run the initializer
-        calls[1] = _buildCallProxyUpgrade(
-            coreAddresses.bridges.proxies.l1Nullifier,
-            coreAddresses.bridges.implementations.l1Nullifier
-        );
-
-        calls[2] = _buildCallProxyUpgrade(
-            coreAddresses.bridges.proxies.l1AssetRouter,
-            coreAddresses.bridges.implementations.l1AssetRouter
-        );
-
-        calls[3] = _buildCallProxyUpgrade(
-            coreAddresses.bridges.proxies.l1NativeTokenVault,
-            coreAddresses.bridges.implementations.l1NativeTokenVault
-        );
-
-        calls[4] = _buildCallProxyUpgrade(
-            coreAddresses.bridgehub.proxies.messageRoot,
-            coreAddresses.bridgehub.implementations.messageRoot
-        );
-
-        calls[5] = _buildCallProxyUpgrade(
-            coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
-            coreAddresses.bridgehub.implementations.ctmDeploymentTracker
-        );
-
-        // calls[6] = _buildCallProxyUpgrade(coreAddresses.bridges.proxies.erc20Bridge, coreAddresses.bridges.implementations.erc20Bridge);
+        prepareEcosystemUpgrade();
+        prepareDefaultGovernanceCalls();
     }
-
-    function _buildCallProxyUpgrade(
-        address proxyAddress,
-        address newImplementationAddress
-    ) internal virtual returns (Call memory call) {
-        require(coreAddresses.shared.transparentProxyAdmin != address(0), "transparentProxyAdmin not newConfigured");
-
-        call = Call({
-            target: coreAddresses.shared.transparentProxyAdmin,
-            data: abi.encodeCall(
-                ProxyAdmin.upgrade,
-                (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress)
-            ),
-            value: 0
-        });
-    }
-
-    function _buildCallBeaconProxyUpgrade(
-        address proxyAddress,
-        address newImplementationAddress
-    ) internal virtual returns (Call memory call) {
-        call = Call({
-            target: proxyAddress,
-            data: abi.encodeCall(UpgradeableBeacon.upgradeTo, (newImplementationAddress)),
-            value: 0
-        });
-    }
-
-    // add this to be excluded from coverage report
-    function test() internal override {}
 }

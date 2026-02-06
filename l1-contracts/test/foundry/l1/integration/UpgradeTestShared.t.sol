@@ -21,6 +21,8 @@ import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {GetDiamondCutData} from "../../../../deploy-scripts/utils/GetDiamondCutData.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
 contract UpgradeIntegrationTestBase is Test {
     using stdToml for string;
@@ -41,61 +43,61 @@ contract UpgradeIntegrationTestBase is Test {
     string public CHAIN_INPUT;
     string public CHAIN_OUTPUT;
 
-    function setupUpgrade(bool skipFactoryDepsCheck) public {
-        ecosystemUpgrade = new EcosystemUpgrade_v31();
-        ecosystemUpgrade.initialize(PERMANENT_VALUES_INPUT, ECOSYSTEM_UPGRADE_INPUT, ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT);
+    function setupUpgrade(bool skipFactoryDepsCheck) public virtual {
+        console.log("setupUpgrade: Creating EcosystemUpgrade_v31");
+        ecosystemUpgrade = createEcosystemUpgrade();
+        console.log("setupUpgrade: Initializing ecosystem upgrade");
+        ecosystemUpgrade.initialize(PERMANENT_VALUES_INPUT, ECOSYSTEM_UPGRADE_INPUT, ECOSYSTEM_OUTPUT);
+        console.log("setupUpgrade: Deploying new ecosystem contracts");
         ecosystemUpgrade.deployNewEcosystemContractsL1();
+        console.log("setupUpgrade: Creating ChainUpgrade_v31");
         chainUpgrade = new ChainUpgrade_v31();
-        ctmUpgrade = new CTMUpgrade_v31();
-        ctmUpgrade.setSkipFactoryDepsCheck_TestOnly(skipFactoryDepsCheck);
-        ctmUpgrade.initialize(PERMANENT_VALUES_INPUT, CTM_INPUT, CTM_OUTPUT);
-        ctmUpgrade.setNewProtocolVersion(SemVer.packSemVer(0, 32, 0));
 
         console.log("Preparing ecosystem upgrade");
         ecosystemUpgrade.prepareEcosystemUpgrade();
 
-        console.log("Preparing ctm upgrade");
-        ctmUpgrade.prepareCTMUpgrade();
-
         console.log("Preparing chain for the upgrade");
         chainUpgrade.prepareChain(chainId, PERMANENT_VALUES_INPUT);
+        console.log("setupUpgrade: Complete");
     }
 
-    function internalTest() internal {
+    /// @notice Override this in child classes to use mocked versions
+    function createEcosystemUpgrade() internal virtual returns (EcosystemUpgrade_v31) {
+        return new EcosystemUpgrade_v31();
+    }
+
+    /// @notice Override this in child classes to use mocked versions (deprecated - use createEcosystemUpgrade instead)
+    function createCTMUpgrade() internal virtual returns (CTMUpgrade_v31) {
+        return new CTMUpgrade_v31();
+    }
+
+    /// @notice Hook for test-specific setup before chain upgrade
+    /// @dev Override in child classes to set up storage or other test-specific state
+    function beforeChainUpgrade() internal virtual {}
+
+    function internalTest() internal virtual {
+        console.log("internalTest: Starting");
         vm.recordLogs();
+        console.log("internalTest: Getting CTM upgrade from ecosystem upgrade");
+        ctmUpgrade = CTMUpgrade_v31(address(ecosystemUpgrade.getCTMUpgrade()));
+        console.log("internalTest: Preparing combined ecosystem governance calls (includes CTM)");
         (
-            Call[] memory upgradeGovernanceStage0Calls,
-            Call[] memory upgradeGovernanceStage1Calls,
-            Call[] memory upgradeGovernanceStage2Calls
+            Call[] memory upgradeStage0Calls,
+            Call[] memory upgradeStage1Calls,
+            Call[] memory upgradeStage2Calls
         ) = ecosystemUpgrade.prepareDefaultGovernanceCalls();
 
-        (
-            Call[] memory upgradeCTMStage0Calls,
-            Call[] memory upgradeCTMStage1Calls,
-            Call[] memory upgradeCTMStage2Calls
-        ) = ctmUpgrade.prepareDefaultGovernanceCalls();
+        // Note: ecosystemUpgrade.prepareDefaultGovernanceCalls() already combines both
+        // core and CTM governance calls, so we don't need to call ctmUpgrade separately
 
-        // kl todo add GW calls here.
+        console.log("Starting upgrade stage 0 (combined ecosystem + CTM)!");
+        governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeStage0Calls);
 
-        console.log("Starting ecosystem upgrade stage 0!");
-        governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage0Calls);
+        console.log("Starting upgrade stage 1 (combined ecosystem + CTM)!");
+        governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeStage1Calls);
 
-        console.log("Starting ctm upgrade stage 0!");
-        governanceMulticall(ctmUpgrade.getOwnerAddress(), upgradeCTMStage0Calls);
-
-        // console.log("proxy admin owner", IOwnable(ecosystemUpgrade.getDiscoveredBridgehub().transparentProxyAdmin).owner());
-
-        console.log("Starting ecosystem upgrade stage 1!");
-        governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage1Calls);
-
-        console.log("Starting ctm upgrade stage 1!");
-        governanceMulticall(ctmUpgrade.getOwnerAddress(), upgradeCTMStage1Calls);
-
-        console.log("Starting ecosystem upgrade stage 2!");
-        governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage2Calls);
-
-        console.log("Starting ctm upgrade stage 2!");
-        governanceMulticall(ctmUpgrade.getOwnerAddress(), upgradeCTMStage2Calls);
+        console.log("Starting upgrade stage 2 (combined ecosystem + CTM)!");
+        governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeStage2Calls);
 
         console.log("Ecosystem upgrade is prepared, now all the chains have to upgrade to the new version");
 
@@ -106,6 +108,9 @@ contract UpgradeIntegrationTestBase is Test {
             logs,
             ctmUpgrade.getCTMAddress()
         );
+
+        // Hook for test-specific setup before chain upgrade
+        beforeChainUpgrade();
 
         // Now, the admin of the Era needs to call the upgrade function.
         // TODO: We do not include calls that ensure that the server is ready for the sake of brevity.
@@ -207,6 +212,9 @@ contract UpgradeIntegrationTestBase is Test {
             string memory chain2 = vm.serializeUint("chain2", "chain_id", eraChainId);
             vm.serializeString("root2", "chain2", chain2);
         }
+
+        // Serialize is_zk_sync_os at root level
+        vm.serializeBool("root2", "is_zk_sync_os", isZKsyncOs);
 
         // Write the final TOML
         string memory permanentValuesToml2 = vm.serializeUint("root2", "era_chain_id", eraChainId);

@@ -71,12 +71,28 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         deployUpgradeStageValidator();
         deployGovernanceUpgradeTimer();
 
-        ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(
-            "EraChainTypeManager",
-            false
-        );
+        // Deploy BytecodesSupplier as TUPP (was a simple contract in old version)
+        // This creates both implementation and proxy
+        (
+            ctmAddresses.stateTransition.implementations.bytecodesSupplier,
+            ctmAddresses.stateTransition.proxies.bytecodesSupplier
+        ) = deployTuppWithContract("BytecodesSupplier", false);
+
+        // Deploy new ChainTypeManager implementation
+        // The constructor will receive the new BytecodesSupplier proxy address
+        // Select the correct ChainTypeManager based on chain type (Era vs ZKsyncOS)
+        string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
+        console.log("Deploying ChainTypeManager:", ctmContractName);
+        ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName, false);
 
         deployStateTransitionDiamondFacets();
+    }
+
+    /// @notice Override to deploy v31-specific upgrade contract
+    /// @dev SettlementLayerV31Upgrade contains the setMigrationNumberForV31() call
+    function deployUsedUpgradeContract() internal virtual override returns (address) {
+        console.log("Deploying SettlementLayerV31Upgrade as the chain upgrade contract");
+        return deploySimpleContract("SettlementLayerV31Upgrade", false);
     }
 
     function getForceDeploymentNames() internal override returns (string[] memory forceDeploymentNames) {
@@ -96,7 +112,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
     ) internal view virtual override returns (address, bytes memory) {
         bytes32 ethAssetId = IL1AssetRouter(address(bridgehub.assetRouter())).ETH_TOKEN_ASSET_ID();
-        bytes memory v29UpgradeCalldata = abi.encodeCall(
+        bytes memory l2UpgradeCalldata = abi.encodeCall(
             IL2V29Upgrade.upgrade,
             (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), ethAssetId)
         );
@@ -104,7 +120,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
             address(L2_COMPLEX_UPGRADER_ADDR),
             abi.encodeCall(
                 IComplexUpgrader.forceDeployAndUpgrade,
-                (_forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, v29UpgradeCalldata)
+                (_forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2UpgradeCalldata)
             )
         );
     }

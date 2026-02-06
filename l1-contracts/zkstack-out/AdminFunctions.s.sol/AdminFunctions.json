@@ -847,5 +847,33 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "upgradeChainFromCTM",
+    "inputs": [
+      {
+        "name": "chainAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "ctmAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "adminAddr",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "accessControlRestriction",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   }
 ]
