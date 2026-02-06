@@ -770,6 +770,7 @@ library GatewayCTMDeployerHelper {
             validatorTimelock: config.validatorTimelockProxy,
             chainCreationParams: chainCreationParams,
             protocolVersion: baseConfig.protocolVersion,
+            verifier: config.verifier,
             serverNotifier: result.serverNotifierProxy
         });
 
@@ -886,6 +887,7 @@ library GatewayCTMDeployerHelper {
             validatorTimelock: config.validatorTimelockProxy,
             chainCreationParams: chainCreationParams,
             protocolVersion: baseConfig.protocolVersion,
+            verifier: config.verifier,
             serverNotifier: result.serverNotifierProxy
         });
 

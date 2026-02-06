@@ -12,6 +12,7 @@ import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 /// @param validatorTimelock The address that serves as consensus, i.e. can submit blocks to be processed
 /// @param chainCreationParams The struct that contains the fields that define how a new chain should be created
 /// @param protocolVersion The initial protocol version on the newly deployed chain
+/// @param verifier The verifier address for the initial protocol version
 /// @param serverNotifier The address that serves as server notifier
 // solhint-disable-next-line gas-struct-packing
 struct ChainTypeManagerInitializeData {
@@ -19,6 +20,7 @@ struct ChainTypeManagerInitializeData {
     address validatorTimelock;
     ChainCreationParams chainCreationParams;
     uint256 protocolVersion;
+    address verifier;
     address serverNotifier;
 }
 

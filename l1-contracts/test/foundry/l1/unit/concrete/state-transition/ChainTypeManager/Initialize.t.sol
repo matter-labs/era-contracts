@@ -25,6 +25,7 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             validatorTimelock: validator,
             chainCreationParams: params,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 

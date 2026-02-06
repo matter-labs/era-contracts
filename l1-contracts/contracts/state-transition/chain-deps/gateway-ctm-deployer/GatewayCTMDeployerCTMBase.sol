@@ -139,6 +139,7 @@ abstract contract GatewayCTMDeployerCTMBase {
             validatorTimelock: _config.validatorTimelockProxy,
             chainCreationParams: chainCreationParams,
             protocolVersion: baseConfig.protocolVersion,
+            verifier: _config.verifier,
             serverNotifier: _result.serverNotifierProxy
         });
 

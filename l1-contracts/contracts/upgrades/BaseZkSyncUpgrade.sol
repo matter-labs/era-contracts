@@ -99,7 +99,8 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
             isOnSettlementLayer
         );
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
-        // Fetch verifier from CTM based on new protocol version
+        // Fetch verifier from CTM based on new protocol version.
+        // In production it must be set for every protocol version; zero is only expected in tests.
         address ctmVerifier = IChainTypeManager(s.chainTypeManager).protocolVersionVerifier(
             _proposedUpgrade.newProtocolVersion
         );
