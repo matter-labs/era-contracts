@@ -4,6 +4,8 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "../../upgrades/BaseZkSyncUpgrade.sol";
+import {IVerifier} from "../../state-transition/chain-interfaces/IVerifier.sol";
+import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 
 contract CustomUpgradeTest is BaseZkSyncUpgrade {
     // add this to be excluded from coverage report
@@ -30,7 +32,13 @@ contract CustomUpgradeTest is BaseZkSyncUpgrade {
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
         (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion, true);
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
-        _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
+        // Fetch verifier from CTM based on new protocol version
+        address ctmVerifier = IChainTypeManager(s.chainTypeManager).protocolVersionVerifier(
+            _proposedUpgrade.newProtocolVersion
+        );
+        if (ctmVerifier != address(0)) {
+            _setVerifier(IVerifier(ctmVerifier));
+        }
         _setBaseSystemContracts(
             _proposedUpgrade.bootloaderHash,
             _proposedUpgrade.defaultAccountHash,

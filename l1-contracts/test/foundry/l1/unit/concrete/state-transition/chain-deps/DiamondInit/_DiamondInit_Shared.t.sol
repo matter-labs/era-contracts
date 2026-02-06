@@ -30,7 +30,7 @@ contract DiamondInitTest is UtilsCallMockerTest {
             })
         );
         dummyBridgehub = new DummyBridgehub();
-        initializeData = Utils.makeInitializeData(testnetVerifier, address(dummyBridgehub));
+        initializeData = Utils.makeInitializeData(address(dummyBridgehub));
 
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), bytes32(0));
     }

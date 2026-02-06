@@ -8,7 +8,6 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "../../chain-interfaces/IDiamondInit.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "../../IChainTypeManager.sol";
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
-import {IVerifier} from "../../chain-interfaces/IVerifier.sol";
 
 import {Facets, GatewayCTMDeployerConfig, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "./GatewayCTMDeployer.sol";
 
@@ -111,8 +110,8 @@ abstract contract GatewayCTMDeployerCTMBase {
             selectors: baseConfig.executorSelectors
         });
 
+        // Only system contract hashes are initialized here; verifier is fetched from CTM on-chain.
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            verifier: IVerifier(_config.verifier),
             l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
             l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
             l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
@@ -140,6 +139,7 @@ abstract contract GatewayCTMDeployerCTMBase {
             validatorTimelock: _config.validatorTimelockProxy,
             chainCreationParams: chainCreationParams,
             protocolVersion: baseConfig.protocolVersion,
+            verifier: _config.verifier,
             serverNotifier: _result.serverNotifierProxy
         });
 

@@ -16,6 +16,8 @@ contract setValidatorTimelockTest is ChainTypeManagerTest {
         );
 
         address newValidatorTimelock = makeAddr("newValidatorTimelock");
+
+        vm.prank(governor);
         chainContractAddress.setValidatorTimelockPostV29(newValidatorTimelock);
 
         assertEq(
@@ -26,9 +28,6 @@ contract setValidatorTimelockTest is ChainTypeManagerTest {
     }
 
     function test_RevertWhen_NotOwner() public {
-        // Need this because in shared setup we start a prank as the governor
-        vm.stopPrank();
-
         address notOwner = makeAddr("notOwner");
         assertEq(
             chainContractAddress.validatorTimelockPostV29(),
@@ -36,9 +35,10 @@ contract setValidatorTimelockTest is ChainTypeManagerTest {
             "Initial validator timelock address is not correct"
         );
 
+        address newValidatorTimelock = makeAddr("newValidatorTimelock");
+
         vm.prank(notOwner);
         vm.expectRevert("Ownable: caller is not the owner");
-        address newValidatorTimelock = makeAddr("newValidatorTimelock");
         chainContractAddress.setValidatorTimelockPostV29(newValidatorTimelock);
 
         assertEq(chainContractAddress.validatorTimelockPostV29(), validator, "Validator should not have been updated");

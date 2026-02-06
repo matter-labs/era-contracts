@@ -178,6 +178,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.stateTransition.implementations.chainTypeManager,
             ctmAddresses.stateTransition.proxies.chainTypeManager
         ) = deployTuppWithContract(ctmContractName, false);
+
+        // Set the verifier for the protocol version on the CTM
+        setProtocolVersionVerifierForLatestProtocolVersion();
+
         setChainTypeManagerInServerNotifier();
 
         updateOwners();
@@ -236,6 +240,15 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.broadcast(msg.sender);
         serverNotifier.setChainTypeManager(IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager));
         console.log("ChainTypeManager set in ServerNotifier");
+    }
+
+    function setProtocolVersionVerifierForLatestProtocolVersion() internal {
+        vm.broadcast(msg.sender);
+        IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager).setProtocolVersionVerifier(
+            config.contracts.chainCreationParams.latestProtocolVersion,
+            ctmAddresses.stateTransition.verifiers.verifier
+        );
+        console.log("Verifier set for latest protocol version");
     }
 
     function deployEIP7702Checker() internal {

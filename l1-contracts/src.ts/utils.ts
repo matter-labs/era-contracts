@@ -152,6 +152,7 @@ export interface ProposedUpgrade {
   bootloaderHash: BytesLike;
   defaultAccountHash: BytesLike;
   evmEmulatorHash: BytesLike;
+  // Deprecated, kept for calldata compatibility with Solidity struct
   verifier: string;
   verifierParams: VerifierParams;
   l1ContractsUpgradeCalldata: BytesLike;

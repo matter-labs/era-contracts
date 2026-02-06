@@ -743,7 +743,6 @@ library GatewayCTMDeployerHelper {
         });
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            verifier: IVerifier(config.verifier),
             l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
             l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
             l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
@@ -771,6 +770,7 @@ library GatewayCTMDeployerHelper {
             validatorTimelock: config.validatorTimelockProxy,
             chainCreationParams: chainCreationParams,
             protocolVersion: baseConfig.protocolVersion,
+            verifier: config.verifier,
             serverNotifier: result.serverNotifierProxy
         });
 
@@ -860,7 +860,6 @@ library GatewayCTMDeployerHelper {
         });
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            verifier: IVerifier(config.verifier),
             l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
             l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
             l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
@@ -888,6 +887,7 @@ library GatewayCTMDeployerHelper {
             validatorTimelock: config.validatorTimelockProxy,
             chainCreationParams: chainCreationParams,
             protocolVersion: baseConfig.protocolVersion,
+            verifier: config.verifier,
             serverNotifier: result.serverNotifierProxy
         });
 

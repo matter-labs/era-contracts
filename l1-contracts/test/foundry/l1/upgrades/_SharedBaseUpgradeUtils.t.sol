@@ -4,8 +4,20 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {FeeParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 contract BaseUpgradeUtils is Test, ZKChainBase {
+    function setChainTypeManager(address _chainTypeManager) public {
+        s.chainTypeManager = _chainTypeManager;
+    }
+
+    function mockProtocolVersionVerifier(uint256 _protocolVersion, address _verifier) public {
+        vm.mockCall(
+            s.chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, _protocolVersion),
+            abi.encode(_verifier)
+        );
+    }
     function setL2SystemContractsUpgradeTxHash(bytes32 _l2SystemContractsUpgradeTxHash) public {
         s.l2SystemContractsUpgradeTxHash = _l2SystemContractsUpgradeTxHash;
     }

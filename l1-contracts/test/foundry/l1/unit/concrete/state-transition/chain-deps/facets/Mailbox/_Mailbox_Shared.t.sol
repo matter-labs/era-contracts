@@ -80,6 +80,7 @@ contract MailboxTest is UtilsCallMockerTest {
             abi.encodeWithSelector(IL1ChainAssetHandler.isMigrationInProgress.selector),
             abi.encode(false)
         );
+        mockChainTypeManagerVerifier(testnetVerifier);
         proxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, bridgehub);
         utilsFacet = UtilsFacet(proxy);
         utilsFacet.util_setBridgehub(bridgehub);

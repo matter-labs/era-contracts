@@ -62,6 +62,8 @@ error MismatchL2DACommitmentScheme(uint256 operatorProvidedScheme, uint256 expec
 error MismatchNumberOfLayer1Txs(uint256 numberOfLayer1Txs, uint256 expectedLength);
 // 0xf9ba09d6
 error NotAllBatchesExecuted();
+// 0x
+error NotAPatchUpgrade(uint256 oldProtocolVersion, uint256 newProtocolVersion);
 // 0xf05c64c6
 error NotChainAdmin(address prevMsgSender, address admin);
 // 0x8fd63d21

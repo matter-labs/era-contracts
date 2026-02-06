@@ -35,6 +35,7 @@ contract SetChainCreationParamsTest is ChainTypeManagerTest {
             forceDeploymentsData: bytes("")
         });
 
+        vm.prank(governor);
         chainContractAddress.setChainCreationParams(newChainCreationParams);
 
         assertEq(chainContractAddress.initialCutHash(), newCutHash, "Initial cut hash update was not successful");

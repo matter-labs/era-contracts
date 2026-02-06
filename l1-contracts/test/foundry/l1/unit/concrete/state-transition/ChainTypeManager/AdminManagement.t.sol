@@ -12,7 +12,6 @@ contract AdminManagement is ChainTypeManagerTest {
     function test_RevertWhen_IsNotAdminOrOwner() public {
         address newAdmin = makeAddr("newAdmin");
 
-        vm.stopPrank();
         vm.prank(newAdmin);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, newAdmin));
         chainContractAddress.setPendingAdmin(newAdmin);
@@ -21,6 +20,7 @@ contract AdminManagement is ChainTypeManagerTest {
     function test_SuccessfulSetPendingAdmin() public {
         address newAdmin = makeAddr("newAdmin");
 
+        vm.prank(governor);
         chainContractAddress.setPendingAdmin(newAdmin);
     }
 
@@ -28,11 +28,10 @@ contract AdminManagement is ChainTypeManagerTest {
         address newAdmin = makeAddr("newAdmin");
         address random = makeAddr("random");
 
+        vm.prank(governor);
         chainContractAddress.setPendingAdmin(newAdmin);
 
-        vm.stopPrank();
         vm.prank(random);
-
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, random));
         chainContractAddress.acceptAdmin();
     }
@@ -40,7 +39,6 @@ contract AdminManagement is ChainTypeManagerTest {
     function test_RevertWhen_PendingAdminNotExists() public {
         address random = makeAddr("random");
 
-        vm.stopPrank();
         vm.prank(random);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, random));
         chainContractAddress.acceptAdmin();
@@ -49,9 +47,9 @@ contract AdminManagement is ChainTypeManagerTest {
     function test_SuccessfulAcceptPendingAdmin() public {
         address newAdmin = makeAddr("newAdmin");
 
+        vm.prank(governor);
         chainContractAddress.setPendingAdmin(newAdmin);
 
-        vm.stopPrank();
         vm.prank(newAdmin);
         chainContractAddress.acceptAdmin();
 

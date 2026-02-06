@@ -44,6 +44,7 @@ const REQUIRED_CONTRACTS = [
   "IGWAssetTracker.sol",
   "IChainAdmin.sol",
   "ISetupLegacyBridge.sol",
+  "DefaultUpgrade.sol",
 ];
 
 async function copyContractAbi(src: string, dest: string): Promise<void> {

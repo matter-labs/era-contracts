@@ -27,6 +27,7 @@ contract initializingCTMOwnerZeroTest is ChainTypeManagerTest {
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 

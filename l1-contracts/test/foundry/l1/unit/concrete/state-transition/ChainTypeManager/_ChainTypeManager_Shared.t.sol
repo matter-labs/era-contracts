@@ -187,6 +187,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -202,6 +203,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -212,10 +214,15 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         );
         chainContractAddress = EraChainTypeManager(address(transparentUpgradeableProxy));
 
+        // Set verifier for protocol version 0 (used for chain creation)
+        vm.stopPrank();
+        vm.prank(governor);
+        chainContractAddress.setProtocolVersionVerifier(0, testnetVerifier);
+        vm.startPrank(address(bridgehub));
+
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
 
         vm.stopPrank();
-        vm.startPrank(governor);
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
@@ -238,9 +245,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     }
 
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal returns (address) {
-        vm.stopPrank();
-        vm.prank(address(bridgehub));
-
         vm.mockCall(
             address(sharedBridge),
             abi.encodeWithSelector(IL1AssetRouter.L1_NULLIFIER.selector),
@@ -263,6 +267,8 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(18));
 
         mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge, baseTokenAssetId);
+
+        vm.prank(address(bridgehub));
         return
             chainContractAddress.createNewChain({
                 _chainId: chainId,
@@ -271,14 +277,9 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
                 _initData: abi.encode(abi.encode(_diamondCut), bytes("")),
                 _factoryDeps: new bytes[](0)
             });
-
-        vm.startPrank(governor);
     }
 
     function createNewChainWithId(Diamond.DiamondCutData memory _diamondCut, uint256 id) internal {
-        vm.stopPrank();
-        vm.prank(address(bridgehub));
-
         vm.mockCall(
             address(sharedBridge),
             abi.encodeWithSelector(IL1AssetRouter.L1_NULLIFIER.selector),
@@ -300,6 +301,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(18));
 
+        vm.prank(address(bridgehub));
         chainContractAddress.createNewChain({
             _chainId: id,
             _baseTokenAssetId: DataEncoding.encodeNTVAssetId(id, baseToken),
@@ -307,8 +309,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             _initData: abi.encode(abi.encode(_diamondCut), bytes("")),
             _factoryDeps: new bytes[](0)
         });
-
-        vm.startPrank(governor);
     }
 
     function _mockGetZKChainFromBridgehub(address _chainAddress) internal {

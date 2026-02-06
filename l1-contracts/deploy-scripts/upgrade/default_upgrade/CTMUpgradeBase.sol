@@ -23,6 +23,15 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 abstract contract CTMUpgradeBase is DeployCTMScript {
     function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual returns (bool);
 
+    function getEmptyVerifierParams() internal pure returns (VerifierParams memory) {
+        return
+            VerifierParams({
+                recursionNodeLevelVkHash: bytes32(0),
+                recursionLeafLevelVkHash: bytes32(0),
+                recursionCircuitsSetVksHash: bytes32(0)
+            });
+    }
+
     /// @notice Get protocol upgrade nonce from protocol version
     function getProtocolUpgradeNonce(uint256 protocolVersion) internal pure returns (uint256) {
         return (protocolVersion >> 32);
@@ -198,17 +207,17 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     }
 
     function getProposedPatchUpgrade(
-        StateTransitionDeployedAddresses memory stateTransition,
+        StateTransitionDeployedAddresses memory /* stateTransition */,
         uint256 newProtocolVersion
     ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
-        VerifierParams memory verifierParams = getVerifierParams();
         proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: emptyUpgradeTx(),
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
             evmEmulatorHash: bytes32(0),
-            verifier: stateTransition.verifiers.verifier,
-            verifierParams: verifierParams,
+            // Verifier is resolved from CTM; keep zeroed fields for calldata compatibility.
+            verifier: address(0),
+            verifierParams: getEmptyVerifierParams(),
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: new bytes(0),
             upgradeTimestamp: 0,
@@ -225,8 +234,6 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         uint256 protocolUpgradeNonce,
         bool isZKsyncOS
     ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
-        VerifierParams memory verifierParams = getVerifierParams();
-
         IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
             .getBaseForceDeployments(l1ChainId, ownerAddress);
 
@@ -248,10 +255,11 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             bootloaderHash: chainCreationParams.bootloaderHash,
             defaultAccountHash: chainCreationParams.defaultAAHash,
             evmEmulatorHash: chainCreationParams.evmEmulatorHash,
-            verifierParams: verifierParams,
+            // Verifier is resolved from CTM; keep zeroed fields for calldata compatibility.
+            verifier: address(0),
+            verifierParams: getEmptyVerifierParams(),
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
-            verifier: stateTransition.verifiers.verifier,
             upgradeTimestamp: 0,
             newProtocolVersion: chainCreationParams.latestProtocolVersion
         });
