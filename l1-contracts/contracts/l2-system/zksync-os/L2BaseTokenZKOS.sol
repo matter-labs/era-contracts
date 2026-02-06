@@ -21,9 +21,14 @@ import {BaseTokenHolderMintFailed, Unauthorized} from "../../common/L1ContractEr
  *
  * ## Initialization (Genesis/Upgrade)
  *
- * During genesis or V31 upgrade, initializeBaseTokenHolderBalance() must be called to:
- * 1. Mint 2^127 - 1 tokens to this contract via the mint hook
+ * During genesis or V31 upgrade, `initializeBaseTokenHolderBalance()` must be called to:
+ * 1. Mint 2^127 - 1 tokens to this contract via the MINT_BASE_TOKEN_HOOK
  * 2. Transfer all tokens to BaseTokenHolder to establish the balance invariant
+ *
+ * This function must be called via the ComplexUpgrader contract using delegatecall.
+ * The ComplexUpgrader (at L2_COMPLEX_UPGRADER_ADDR) is the only authorized caller.
+ *
+ * This is done in `L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit()`.
  */
 contract L2BaseTokenZKOS is L2BaseTokenBase, Initializable {
     /// @notice Initializes the BaseTokenHolder's balance during genesis or V31 upgrade.

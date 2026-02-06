@@ -167,6 +167,9 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         bytes memory additionalEncoded = abi.encode(additionalData);
         _deployMockContract(GW_ASSET_TRACKER_ADDR);
 
+        // Etch L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR for initializeBaseTokenHolderBalance call during genesis
+        _deployMockContract(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+
         // For Era deployments, no proxy admin is needed
         vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
@@ -295,7 +298,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
     function _etchAllDeferredContracts() internal {
         // Etch contracts to addresses that need function calls to work
-        address[] memory addressesToEtch = new address[](9);
+        address[] memory addressesToEtch = new address[](10);
         addressesToEtch[0] = L2_MESSAGE_ROOT_ADDR;
         addressesToEtch[1] = L2_BRIDGEHUB_ADDR;
         addressesToEtch[2] = L2_ASSET_ROUTER_ADDR;
@@ -305,6 +308,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         addressesToEtch[6] = L2_INTEROP_CENTER_ADDR;
         addressesToEtch[7] = L2_INTEROP_HANDLER_ADDR;
         addressesToEtch[8] = L2_ASSET_TRACKER_ADDR;
+        addressesToEtch[9] = L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
 
         for (uint256 i = 0; i < addressesToEtch.length; i++) {
             if (addressesToEtch[i].code.length == 0) {
@@ -421,6 +425,8 @@ contract MockContract {
     }
 
     function initializeV3(string memory, string memory, address, address, bytes32) external {}
+
+    function initializeBaseTokenHolderBalance() external {}
 
     function makeAddr(string memory name) internal pure returns (address) {
         return address(uint160(uint256(keccak256(abi.encodePacked(name)))));

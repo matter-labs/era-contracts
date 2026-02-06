@@ -25,6 +25,7 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
     /// @dev This variable is kept to preserve storage layout. It is only read during the V31 upgrade
     /// @dev to initialize the BaseTokenHolder balance correctly. After V31, totalSupply is computed
     /// @dev dynamically from the BaseTokenHolder's balance.
+    // slither-disable-next-line uninitialized-state
     uint256 internal __DEPRECATED_totalSupply;
 
     /// @notice Modifier that makes sure that the method can only be called from the bootloader or InteropHandler.

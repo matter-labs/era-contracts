@@ -58,10 +58,7 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         vm.deal(L2_ASSET_ROUTER_ADDR, depositAmount);
 
         // After the change: tokens are sent to BaseTokenHolder via burnAndStartBridging
-        // Mock the burnAndStartBridging function to accept ETH
-        vm.mockCall(L2_BASE_TOKEN_HOLDER_ADDR, abi.encodeWithSignature("burnAndStartBridging()"), abi.encode());
-        // Etch minimal contract that accepts ETH for the mock to work
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, hex"00");
+        // The DummyL2BaseTokenHolder deployed in test setup already has burnAndStartBridging()
 
         // Record the BaseTokenHolder balance before
         uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
@@ -187,10 +184,7 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
 
         vm.deal(L2_ASSET_ROUTER_ADDR, depositAmount);
 
-        // Mock the burnAndStartBridging function to accept ETH
-        vm.mockCall(L2_BASE_TOKEN_HOLDER_ADDR, abi.encodeWithSignature("burnAndStartBridging()"), abi.encode());
-        // Etch minimal contract that accepts ETH for the mock to work
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, hex"00");
+        // The DummyL2BaseTokenHolder deployed in test setup already has burnAndStartBridging()
 
         uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
 

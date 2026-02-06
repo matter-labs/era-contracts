@@ -24,6 +24,13 @@ contract DummyL2BaseTokenHolder {
         }
     }
 
+    /// @notice Burns ETH by accepting it into this contract and notifies the asset tracker.
+    /// @dev In production, this would also notify L2AssetTracker. For testing, we just accept the ETH.
+    function burnAndStartBridging() external payable {
+        // Just accept the ETH - in tests this simulates the burn
+        // The ETH stays in this contract, effectively "burning" it from circulation
+    }
+
     /// @notice Fallback to accept base token transfers.
     receive() external payable {}
 }
