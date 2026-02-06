@@ -286,7 +286,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             validatorTimelock: address(validatorTimelock),
             baseTokenAssetId: baseTokenAssetId,
             storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
-            // verifier is now fetched from CTM
+            // verifier is fetched from CTM
             l2BootloaderBytecodeHash: dummyHash,
             l2DefaultAccountBytecodeHash: dummyHash,
             l2EvmEmulatorBytecodeHash: dummyHash
