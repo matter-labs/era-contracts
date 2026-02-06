@@ -1,6 +1,19 @@
 [
   {
     "type": "function",
+    "name": "LEGACY_GW_CHAIN_ID",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "bridgeBurn",
     "inputs": [
       {
@@ -63,6 +76,81 @@
   },
   {
     "type": "function",
+    "name": "isValidSettlementLayer",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_batchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_claimedSettlementLayer",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "migrationInterval",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_migrationNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "interval",
+        "type": "tuple",
+        "internalType": "struct MigrationInterval",
+        "components": [
+          {
+            "name": "migrateToSLBatchNumber",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "migrateFromSLBatchNumber",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "settlementLayerChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "isSet",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "migrationNumber",
     "inputs": [
       {
@@ -97,6 +185,51 @@
     "type": "function",
     "name": "pauseMigration",
     "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setHistoricalMigrationInterval",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_migrationNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_interval",
+        "type": "tuple",
+        "internalType": "struct MigrationInterval",
+        "components": [
+          {
+            "name": "migrateToSLBatchNumber",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "migrateFromSLBatchNumber",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "settlementLayerChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "isSet",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ]
+      }
+    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },

@@ -265,4 +265,21 @@ abstract contract Create2FactoryUtils is Script {
             create2FactoryAddr = permanentValuesToml.readAddress("$.permanent_contracts.create2_factory_addr");
         }
     }
+
+    /// @notice Reads the legacy Gateway chain ID from the permanent values TOML file
+    /// @return legacyGwChainId The legacy Gateway chain ID (0 if not configured)
+    function getLegacyGwChainId() public view returns (uint256 legacyGwChainId) {
+        string memory permanentValuesPath = string.concat(vm.projectRoot(), vm.envString("PERMANENT_VALUES_INPUT"));
+        return getLegacyGwChainId(permanentValuesPath);
+    }
+
+    /// @notice Reads the legacy Gateway chain ID from the permanent values TOML file
+    /// @param permanentValuesPath The path to the permanent values file
+    /// @return legacyGwChainId The legacy Gateway chain ID (0 if not configured)
+    function getLegacyGwChainId(string memory permanentValuesPath) public view returns (uint256 legacyGwChainId) {
+        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
+        if (vm.keyExistsToml(permanentValuesToml, "$.legacy_gateway.chain_id")) {
+            legacyGwChainId = permanentValuesToml.readUint("$.legacy_gateway.chain_id");
+        }
+    }
 }

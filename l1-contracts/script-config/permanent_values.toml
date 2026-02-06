@@ -7,3 +7,20 @@ create2_factory_addr = "0x0000000000FFe8B47B3e2130213B802212439497"
 ctm_proxy_address = "0x0000000000FFe8B47B3e2130213B802212439497"
 l1_bytecodes_supplier_address = "0x0000000000FFe8B47B3e2130213B802212439497"
 rollup_da_manager = "0x0000000000FFe8B47B3e2130213B802212439497"
+
+# Legacy Gateway configuration for settlement layer validation
+# This section contains historical data about chains that settled on the legacy Gateway
+[legacy_gateway]
+# The chain ID of the legacy Gateway (9075 for mainnet)
+chain_id = 9075
+
+# Historical migration intervals for chains that used the legacy GW
+# Each entry represents a chain that settled on the legacy GW before V31
+# Format: chain_id, migrate_to_sl_batch, migrate_from_sl_batch
+# Note: migrate_from_sl_batch = 0 means the chain hasn't migrated back yet
+# These values should be filled in before V31 deployment based on actual historical data
+# Example for Era on mainnet (chain_id = 270):
+# [[legacy_gateway.chain_intervals]]
+# chain_id = 270
+# migrate_to_sl_batch = 0  # Set to actual batch number when Era migrated to legacy GW
+# migrate_from_sl_batch = 0  # Set to actual batch number when Era migrated back (0 if still on GW)

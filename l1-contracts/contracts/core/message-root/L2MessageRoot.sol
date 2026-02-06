@@ -11,7 +11,7 @@ import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
 
 import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
-import {InvalidCaller, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {InvalidCaller, NotL1, Unauthorized} from "../../common/L1ContractErrors.sol";
 import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 
 /// @author Matter Labs
@@ -49,6 +49,12 @@ contract L2MessageRoot is MessageRootBase {
     // solhint-disable-next-line func-name-mixedcase
     function L1_CHAIN_ID() public view override returns (uint256) {
         return l1ChainId;
+    }
+
+    /// @notice Returns the chain asset handler address for settlement layer validation.
+    /// @dev On L2, settlement layer validation doesn't happen, so this should never be called.
+    function _chainAssetHandler() internal view override returns (address) {
+        revert NotL1(l1ChainId, block.chainid);
     }
 
     /// @dev Only allows calls from the complex upgrader contract on L2.

@@ -21,6 +21,7 @@ import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol"
 import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../../common/Config.sol";
 import {IncorrectChainAssetId, IncorrectSender, MigrationNotToL1, MigrationNumberAlreadySet, MigrationNumberMismatch, NotSystemContext, OnlyChain, SLHasDifferentCTM, ZKChainNotRegistered, IteratedMigrationsNotSupported} from "../bridgehub/L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused, NotAssetRouter} from "../../common/L1ContractErrors.sol";
+import {MigrationInterval} from "./IChainAssetHandler.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetHandlerModifiers} from "../../bridge/interfaces/AssetHandlerModifiers.sol";
@@ -52,6 +53,10 @@ abstract contract ChainAssetHandlerBase is
 
     function _assetRouter() internal view virtual returns (IAssetRouterBase);
 
+    /// @notice Returns the chain ID of the legacy Gateway for settlement layer validation.
+    /// @dev This is ecosystem-dependent and set via constructor in L1ChainAssetHandler.
+    function _legacyGwChainId() internal view virtual returns (uint256);
+
     /// @notice Used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
 
@@ -79,12 +84,18 @@ abstract contract ChainAssetHandlerBase is
     /// NOTE: this mapping may be deprecated in the future, don't rely on it!
     mapping(uint256 chainId => uint256 migrationNumber) public migrationNumber;
 
+    /// @notice Tracks migration batch numbers for chains that migrated to Gateway.
+    /// @dev Used to validate that settlement layer claims match the batch number.
+    /// @dev Migration number 0 is reserved for legacy GW historical data.
+    /// @dev Migration numbers 1+ are for regular L1 <-> SL migrations.
+    mapping(uint256 chainId => mapping(uint256 migrationNum => MigrationInterval interval)) internal _migrationInterval;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[43] private __gap;
+    uint256[42] private __gap;
 
     /// @notice Only the asset router can call.
     modifier onlyAssetRouter() {
@@ -218,6 +229,18 @@ abstract contract ChainAssetHandlerBase is
 
         uint256 batchNumber = IMessageRoot(_messageRoot()).currentChainBatchNumber(bridgehubBurnData.chainId);
 
+        // Track migration interval for settlement layer validation.
+        // When migrating FROM L1 TO a settlement layer, record the last L1 batch number and the SL chain ID.
+        if (block.chainid == _l1ChainId() && _settlementChainId != _l1ChainId()) {
+            uint256 currentMigrationNum = migrationNumber[bridgehubBurnData.chainId];
+            _migrationInterval[bridgehubBurnData.chainId][currentMigrationNum] = MigrationInterval({
+                migrateToSLBatchNumber: batchNumber,
+                migrateFromSLBatchNumber: 0,
+                settlementLayerChainId: _settlementChainId,
+                isSet: true
+            });
+        }
+
         bytes32 assetId = IBridgehubBase(_bridgehub()).baseTokenAssetId(bridgehubBurnData.chainId);
         TokenBridgingData memory baseTokenBridgingData = TokenBridgingData({
             assetId: assetId,
@@ -272,6 +295,14 @@ abstract contract ChainAssetHandlerBase is
         }
         migrationNumber[bridgehubMintData.chainId] = bridgehubMintData.migrationNumber;
 
+        // Track migration interval for settlement layer validation.
+        // When migrating FROM settlement layer BACK TO L1, record the last SL batch number.
+        // This happens when migrationNumber is 2 (first migration was L1->SL, second is SL->L1).
+        if (block.chainid == _l1ChainId() && bridgehubMintData.migrationNumber == 2) {
+            // The interval was created during migration 1 (L1->SL), now we complete it with the return batch
+            _migrationInterval[bridgehubMintData.chainId][1].migrateFromSLBatchNumber = bridgehubMintData.batchNumber;
+        }
+
         (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeMint(
             _assetId,
             bridgehubMintData.chainId,
@@ -301,6 +332,82 @@ abstract contract ChainAssetHandlerBase is
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);
 
         emit MigrationFinalized(bridgehubMintData.chainId, _assetId, zkChain);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    SETTLEMENT LAYER VALIDATION
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Validates if a claimed settlement layer is valid for a given chain and batch number.
+    /// @dev Used by MessageRoot to validate that proofs claim the correct settlement layer.
+    /// @dev Checks all migration intervals for the chain, including legacy GW data (migration number 0).
+    /// @param _chainId The ID of the chain.
+    /// @param _batchNumber The batch number to check.
+    /// @param _claimedSettlementLayer The settlement layer chain ID claimed in the proof.
+    /// @return True if the claimed settlement layer is valid for this chain and batch.
+    function isValidSettlementLayer(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        uint256 _claimedSettlementLayer
+    ) external view returns (bool) {
+        // Check all migration intervals for this chain (including legacy GW at index 0)
+        // We iterate from 0 to current migration number to find which interval contains this batch
+        uint256 currentMigrationNum = migrationNumber[_chainId];
+
+        for (uint256 i = 0; i <= currentMigrationNum; ++i) {
+            MigrationInterval memory interval = _migrationInterval[_chainId][i];
+
+            // Skip intervals that haven't been set
+            if (!interval.isSet) {
+                continue;
+            }
+
+            // Check if this batch falls within the SL range of this interval
+            if (_batchNumber > interval.migrateToSLBatchNumber) {
+                // Batch is after migration to SL
+                if (interval.migrateFromSLBatchNumber == 0 || _batchNumber <= interval.migrateFromSLBatchNumber) {
+                    // Batch is in the SL range: (migrateToSL, migrateFromSL] or chain hasn't returned
+                    return _claimedSettlementLayer == interval.settlementLayerChainId;
+                }
+                // Batch is after migration back from SL, continue to check next interval
+            }
+            // If batch <= migrateToSLBatchNumber, it was on L1 before this migration
+            // Continue to check if there's a previous interval that covers it
+        }
+
+        // Default: batch was on L1 (no matching SL interval found)
+        return _claimedSettlementLayer == _l1ChainId();
+    }
+
+    /// @notice Sets a historical migration interval for a chain.
+    /// @dev Only callable by owner. Used to set legacy GW migration data for chains that used the old GW.
+    /// @param _chainId The ID of the chain.
+    /// @param _migrationNumber The migration number to set (0 for legacy GW data).
+    /// @param _interval The migration interval data.
+    function setHistoricalMigrationInterval(
+        uint256 _chainId,
+        uint256 _migrationNumber,
+        MigrationInterval calldata _interval
+    ) external onlyOwner {
+        _migrationInterval[_chainId][_migrationNumber] = _interval;
+    }
+
+    /// @notice Returns the migration interval for a chain at a specific migration number.
+    /// @param _chainId The ID of the chain.
+    /// @param _migrationNumber The migration number (0 for legacy GW, 1+ for regular migrations).
+    /// @return interval The migration interval data.
+    function migrationInterval(
+        uint256 _chainId,
+        uint256 _migrationNumber
+    ) external view returns (MigrationInterval memory interval) {
+        return _migrationInterval[_chainId][_migrationNumber];
+    }
+
+    /// @notice Returns the legacy Gateway chain ID.
+    /// @dev Exposed for external access to the immutable value.
+    // solhint-disable-next-line func-name-mixedcase
+    function LEGACY_GW_CHAIN_ID() external view returns (uint256) {
+        return _legacyGwChainId();
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -28,7 +28,8 @@ import {IAssetRouterShared} from "../../../bridge/asset-router/IAssetRouterShare
 
 import {AddressNotZero, BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, NotAssetRouter, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {DepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
-import {DepthMoreThanOneForRecursiveMerkleProof} from "../../../core/bridgehub/L1BridgehubErrors.sol";
+import {DepthMoreThanOneForRecursiveMerkleProof, InvalidSettlementLayerForBatch} from "../../../core/bridgehub/L1BridgehubErrors.sol";
+import {IChainAssetHandler} from "../../../core/chain-asset-handler/IChainAssetHandler.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -293,6 +294,20 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (!IBridgehubBase(s.bridgehub).whitelistedSettlementLayers(proofData.settlementLayerChainId)) {
             revert NotSettlementLayer();
         }
+
+        // Validate that the claimed settlement layer is correct for this chain and batch number.
+        // This prevents a malicious settlement layer from claiming batches that were not actually
+        // committed on it (e.g., GW claiming batches after chain migrated back to L1).
+        // Only validate on L1 where migration interval data is available.
+        if (block.chainid == L1_CHAIN_ID) {
+            bool isValid = IChainAssetHandler(CHAIN_ASSET_HANDLER).isValidSettlementLayer(
+                _chainId,
+                _batchNumber,
+                proofData.settlementLayerChainId
+            );
+            require(isValid, InvalidSettlementLayerForBatch(_chainId, _batchNumber, proofData.settlementLayerChainId));
+        }
+
         address settlementLayerAddress = IBridgehubBase(s.bridgehub).getZKChain(proofData.settlementLayerChainId);
 
         return
