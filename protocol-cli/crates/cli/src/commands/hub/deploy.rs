@@ -53,19 +53,6 @@ pub struct DeployInput {
     pub with_legacy_bridge: bool,
 }
 
-/// Deploy hub contracts and return the output.
-pub fn deploy(ctx: &mut ForgeContext, input: &DeployInput) -> anyhow::Result<DeployL1CoreContractsOutput> {
-    let deploy_config = DeployL1Config::new(
-        input.owner,
-        &InitialDeploymentConfig::default(),
-        input.era_chain_id,
-        input.with_legacy_bridge,
-    );
-
-    logger::info("Deploying hub contracts...");
-    ctx.run(&DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS, &deploy_config)
-}
-
 pub async fn run(args: HubDeployArgs, shell: &Shell) -> anyhow::Result<()> {
     let foundry_scripts_path = paths::path_from_root("l1-contracts");
 
@@ -120,6 +107,19 @@ pub async fn run(args: HubDeployArgs, shell: &Shell) -> anyhow::Result<()> {
     drop(execution_mode);
 
     Ok(())
+}
+
+/// Deploy hub contracts and return the output.
+pub fn deploy(ctx: &mut ForgeContext, input: &DeployInput) -> anyhow::Result<DeployL1CoreContractsOutput> {
+    let deploy_config = DeployL1Config::new(
+        input.owner,
+        &InitialDeploymentConfig::default(),
+        input.era_chain_id,
+        input.with_legacy_bridge,
+    );
+
+    logger::info("Deploying hub contracts...");
+    ctx.run(&DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS, &deploy_config)
 }
 
 fn build_plan(output: &DeployL1CoreContractsOutput, runner: &ForgeRunner) -> serde_json::Value {
