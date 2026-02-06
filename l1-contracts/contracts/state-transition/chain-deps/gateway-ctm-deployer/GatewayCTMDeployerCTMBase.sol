@@ -110,6 +110,7 @@ abstract contract GatewayCTMDeployerCTMBase {
             selectors: baseConfig.executorSelectors
         });
 
+        // Only system contract hashes are initialized here; verifier is fetched from CTM on-chain.
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
             l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,

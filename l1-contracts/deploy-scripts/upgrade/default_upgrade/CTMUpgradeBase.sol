@@ -23,6 +23,15 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 abstract contract CTMUpgradeBase is DeployCTMScript {
     function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual returns (bool);
 
+    function getEmptyVerifierParams() internal pure returns (VerifierParams memory) {
+        return
+            VerifierParams({
+                recursionNodeLevelVkHash: bytes32(0),
+                recursionLeafLevelVkHash: bytes32(0),
+                recursionCircuitsSetVksHash: bytes32(0)
+            });
+    }
+
     /// @notice Get protocol upgrade nonce from protocol version
     function getProtocolUpgradeNonce(uint256 protocolVersion) internal pure returns (uint256) {
         return (protocolVersion >> 32);
@@ -206,12 +215,9 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
             evmEmulatorHash: bytes32(0),
+            // Verifier is resolved from CTM; keep zeroed fields for calldata compatibility.
             verifier: address(0),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            }),
+            verifierParams: getEmptyVerifierParams(),
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: new bytes(0),
             upgradeTimestamp: 0,
@@ -249,12 +255,9 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             bootloaderHash: chainCreationParams.bootloaderHash,
             defaultAccountHash: chainCreationParams.defaultAAHash,
             evmEmulatorHash: chainCreationParams.evmEmulatorHash,
+            // Verifier is resolved from CTM; keep zeroed fields for calldata compatibility.
             verifier: address(0),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            }),
+            verifierParams: getEmptyVerifierParams(),
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
             upgradeTimestamp: 0,

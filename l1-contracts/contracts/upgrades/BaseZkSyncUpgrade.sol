@@ -21,8 +21,8 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 /// @param bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
 /// @param defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
 /// @param evmEmulatorHash The hash of the new EVM emulator bytecode. If zero, it will not be updated.
-/// @param verifier The address of the new verifier. If zero, the verifier will not be updated.
-/// @param verifierParams The new verifier params. If all of its fields are 0, the params will not be updated.
+/// @param verifier Deprecated. Verifier is fetched from CTM based on protocol version.
+/// @param verifierParams Deprecated. Verifier params are kept for backward compatibility.
 /// @param l1ContractsUpgradeCalldata Custom calldata for L1 contracts upgrade, it may be interpreted differently
 /// in each upgrade. Usually empty.
 /// @param postUpgradeCalldata Custom calldata for post upgrade hook, it may be interpreted differently in each

@@ -89,9 +89,12 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
 
     /// @dev The block number when newChainCreationParams was saved for some protocolVersion.
     /// @dev It's used for easier tracking the upgrade cutData off-chain.
+    /// @dev Populated starting from v31.
     mapping(uint256 protocolVersion => uint256) public newChainCreationParamsBlock;
 
-    /// @dev The verifier address per protocol version
+    /// @dev The verifier address per protocol version.
+    /// @dev Updating this mapping only affects CTM storage; it does NOT update already deployed chains.
+    /// @dev Emergency verifier changes still require a chain upgrade (diamond cut).
     mapping(uint256 protocolVersion => address) public protocolVersionVerifier;
 
     /// @dev Contract is expected to be used as proxy implementation.
@@ -291,7 +294,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @notice Sets verifier address for a protocol version
     /// @param _protocolVersion The protocol version
     /// @param _verifier The verifier address
-    function setProtocolVersionVerifier(uint256 _protocolVersion, address _verifier) external onlyOwnerOrAdmin {
+    function setProtocolVersionVerifier(uint256 _protocolVersion, address _verifier) external onlyOwner {
         _setProtocolVersionVerifier(_protocolVersion, _verifier);
     }
 

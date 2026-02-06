@@ -462,10 +462,7 @@ library Utils {
         return IVerifier(testnetVerifier);
     }
 
-    function makeInitializeData(
-        address /* testnetVerifier */,
-        address bridgehub
-    ) public pure returns (InitializeData memory) {
+    function makeInitializeData(address bridgehub) public pure returns (InitializeData memory) {
         return
             InitializeData({
                 chainId: 1,
@@ -502,7 +499,7 @@ library Utils {
         DiamondInit diamondInit = new DiamondInit(false);
         bytes memory diamondInitData = abi.encodeWithSelector(
             diamondInit.initialize.selector,
-            makeInitializeData(testnetVerifier, bridgehub)
+            makeInitializeData(bridgehub)
         );
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
