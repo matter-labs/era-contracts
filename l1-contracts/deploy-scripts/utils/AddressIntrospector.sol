@@ -90,19 +90,14 @@ library AddressIntrospector {
         });
     }
 
-    function _getUptoDateZkChainAddress(ChainTypeManagerBase _ctm) public view returns (address) {
+    function _getUptoDateZkChainAddress(ChainTypeManagerBase _ctm) internal view returns (address) {
         address ctmAddr = address(_ctm);
         IBridgehubBase bridgehub = IBridgehubBase(_ctm.BRIDGE_HUB());
         uint256 protocolVersion = _ctm.protocolVersion();
         address[] memory zkChains = bridgehub.getAllZKChains();
 
         for (uint256 i = 0; i < zkChains.length; i++) {
-            address zkChainAddr = zkChains[i];
-            // Skip address(0) entries
-            if (zkChainAddr == address(0)) {
-                continue;
-            }
-            IZKChain zkChain = IZKChain(zkChainAddr);
+            IZKChain zkChain = IZKChain(zkChains[i]);
             address chainCTM;
             try zkChain.getChainTypeManager() returns (address result) {
                 chainCTM = result;
@@ -304,12 +299,7 @@ library AddressIntrospector {
         uint256 protocolVersion = _ctm.protocolVersion();
         address[] memory zkChains = _bridgehub.getAllZKChains();
         for (uint256 i = 0; i < zkChains.length; i++) {
-            address zkChainAddr = zkChains[i];
-            // Skip address(0) entries
-            if (zkChainAddr == address(0)) {
-                continue;
-            }
-            IZKChain zkChain = IZKChain(zkChainAddr);
+            IZKChain zkChain = IZKChain(zkChains[i]);
             address chainCTM;
             try zkChain.getChainTypeManager() returns (address result) {
                 chainCTM = result;
@@ -325,7 +315,6 @@ library AddressIntrospector {
             }
         }
         revert NoUptoDateZkChainFound();
-        return info;
     }
 
     function getBridgesDeployedAddresses(
@@ -471,14 +460,14 @@ library AddressIntrospector {
         // Get all registered chains to check protocol version
         address[] memory zkChains = bridgehub.getAllZKChains();
 
-        // Protocol version v30 introduced messageRoot, so use v29 introspection for versions < v30
-        uint256 v30Version = SemVer.packSemVer(0, 30, 0);
+        // Protocol version v31 is the target version, so use v29 introspection for versions < v31
+        uint256 v31Version = SemVer.packSemVer(0, 31, 0);
 
         // If there are any chains, check the protocol version of the first one
         if (zkChains.length > 0) {
             IZKChain zkChain = IZKChain(zkChains[0]);
             uint256 protocolVersion = zkChain.getProtocolVersion();
-            useV29Introspection = protocolVersion < v30Version;
+            useV29Introspection = protocolVersion < v31Version;
         } else {
             // No chains exist yet - this can happen during initial upgrade script generation
             useV29Introspection = false;

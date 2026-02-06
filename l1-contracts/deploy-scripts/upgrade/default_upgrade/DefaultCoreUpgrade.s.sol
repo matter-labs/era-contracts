@@ -25,6 +25,7 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
+import {Utils} from "../../utils/Utils.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ChainCreationParamsLib} from "../../ctm/ChainCreationParamsLib.sol";
 
@@ -121,10 +122,12 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesInputPath);
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
 
-        // Read isZKsyncOS flag from permanent values
-        if (permanentValuesToml.keyExists("$.is_zk_sync_os")) {
-            additionalConfig.isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
-        }
+        // Read isZKsyncOS flag from permanent values (required)
+        require(
+            permanentValuesToml.keyExists("$.is_zk_sync_os"),
+            "is_zk_sync_os flag is required in permanent values"
+        );
+        additionalConfig.isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
 
         // Protocol version comes from genesis config
         additionalConfig.newProtocolVersion = loadProtocolVersionFromGenesis();
@@ -141,7 +144,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         L1Bridgehub bridgehub = L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
         Governance governance = Governance(payable(coreAddresses.shared.governance));
         config.l1ChainId = block.chainid;
-        config.deployerAddress = tx.origin;
+        config.deployerAddress = Utils.getBroadcasterAddress();
         config.eraChainId = assetRouter.ERA_CHAIN_ID();
         config.eraDiamondProxyAddress = bridgehub.getZKChain(assetRouter.ERA_CHAIN_ID());
 

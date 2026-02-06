@@ -144,7 +144,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         string memory toml = vm.readFile(configPath);
 
         config.l1ChainId = block.chainid;
-        config.deployerAddress = tx.origin;
+        config.deployerAddress = Utils.getBroadcasterAddress();
 
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.

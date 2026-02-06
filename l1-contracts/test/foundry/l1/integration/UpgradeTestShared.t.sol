@@ -213,6 +213,9 @@ contract UpgradeIntegrationTestBase is Test {
             vm.serializeString("root2", "chain2", chain2);
         }
 
+        // Serialize is_zk_sync_os at root level
+        vm.serializeBool("root2", "is_zk_sync_os", isZKsyncOs);
+
         // Write the final TOML
         string memory permanentValuesToml2 = vm.serializeUint("root2", "era_chain_id", eraChainId);
         vm.writeToml(permanentValuesToml2, permanentValuesInputPath);

@@ -18,7 +18,6 @@ import {IL1MessageRoot} from "../core/message-root/IL1MessageRoot.sol";
 
 error PriorityQueueNotReady();
 error V31UpgradeGatewayBlockNumberNotSet();
-error GWNotV31(uint256 chainId);
 error NotAllBatchesExecuted();
 
 /// @author Matter Labs
@@ -60,18 +59,6 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         super.upgrade(proposedUpgrade);
         IChainAssetHandler chainAssetHandler = IChainAssetHandler(bridgehub.chainAssetHandler());
         IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());
-
-        // The lines below ensure that chains can only upgrade once the ZK Gateway itself is upgraded,
-        // i.e. its minor protocol version is at least 30. Note, we use The tuple of (major, minor, patch)
-        // to denote protocol version.
-        // Only perform this check if a gateway chain is deployed
-        uint256 gwChainId = messageRoot.ERA_GATEWAY_CHAIN_ID();
-        address gwChain = bridgehub.getZKChain(gwChainId);
-        if (gwChain != address(0)) {
-            // slither-disable-next-line unused-return
-            (, uint256 gwMinor, ) = IGetters(gwChain).getSemverProtocolVersion();
-            require(gwMinor >= 30, GWNotV31(gwChainId));
-        }
 
         chainAssetHandler.setMigrationNumberForV31(s.chainId);
 
