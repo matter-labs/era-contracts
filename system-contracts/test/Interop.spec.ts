@@ -47,7 +47,7 @@ describe("Interop tests", function () {
 
     await deployContractOnAddress(REAL_L2_INTEROP_ROOT_STORAGE_ADDRESS, "L2InteropRootStorage", false);
 
-    await deployContractOnAddress(TEST_BASE_TOKEN_SYSTEM_CONTRACT_ADDRESS, "L2BaseToken");
+    await deployContractOnAddress(TEST_BASE_TOKEN_SYSTEM_CONTRACT_ADDRESS, "MockContract");
     // console.log("kl todo 6");
     await deployContractOnAddress(
       TEST_L2_ASSET_ROUTER_ADDRESS,

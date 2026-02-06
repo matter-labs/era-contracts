@@ -312,7 +312,10 @@ library SystemContractsProcessing {
             if (systemContracts[i].isPrecompile) {
                 result[i] = Utils.readPrecompileBytecode(systemContracts[i].codeName);
             } else {
-                if (systemContracts[i].lang == Language.Solidity) {
+                // L2BaseToken is now in l1-contracts as L2BaseTokenEra
+                if (Utils.compareStrings(systemContracts[i].codeName, "L2BaseToken")) {
+                    result[i] = Utils.readZKFoundryBytecodeL1("L2BaseTokenEra.sol", "L2BaseTokenEra");
+                } else if (systemContracts[i].lang == Language.Solidity) {
                     result[i] = Utils.readSystemContractsBytecode(systemContracts[i].codeName);
                 } else {
                     result[i] = Utils.readSystemContractsYulBytecode(systemContracts[i].codeName);

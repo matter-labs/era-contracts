@@ -187,11 +187,6 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
         vm.mockCall(
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue.selector),
-            abi.encode(bytes(""))
-        );
-        vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
             abi.encode(bytes(""))
         );

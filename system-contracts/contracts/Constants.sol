@@ -143,7 +143,6 @@ IL2AssetTracker constant L2_ASSET_TRACKER = IL2AssetTracker(address(L2_ASSET_TRA
 address constant GW_ASSET_TRACKER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x10);
 IGWAssetTracker constant GW_ASSET_TRACKER = IGWAssetTracker(address(GW_ASSET_TRACKER_ADDRESS));
 
-
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.
 uint256 constant MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT = 1;

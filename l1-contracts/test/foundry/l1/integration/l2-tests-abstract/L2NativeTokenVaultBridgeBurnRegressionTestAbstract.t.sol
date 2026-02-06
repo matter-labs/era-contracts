@@ -11,14 +11,12 @@ import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BASE_TOKEN_HOLDER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
 import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
 
 abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
@@ -59,23 +57,16 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         // Deal ETH to the asset router (needed because bridgeBurn is called with msg.value)
         vm.deal(L2_ASSET_ROUTER_ADDR, depositAmount);
 
-        // Mock the burnMsgValue call on L2_BASE_TOKEN_SYSTEM_CONTRACT
-        // Before the fix: This wouldn't be called, and bridgeBurn would fail
-        // After the fix: This should be called with the correct value
-        vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            depositAmount,
-            abi.encodeCall(IBaseToken.burnMsgValue, ()),
-            abi.encode()
-        );
+        // After the change: tokens are sent to BaseTokenHolder via burnAndStartBridging
+        // The DummyL2BaseTokenHolder deployed in test setup already has burnAndStartBridging()
 
-        // Expect the burnMsgValue call
-        vm.expectCall(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, depositAmount, abi.encodeCall(IBaseToken.burnMsgValue, ()));
+        // Record the BaseTokenHolder balance before
+        uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
 
         // Call bridgeBurn from the asset router (which is the only allowed caller)
         // Before the fix: This would revert because bridgeBurn would try to call
         // IBridgedStandardToken(L2_BASE_TOKEN_SYSTEM_CONTRACT).bridgeBurn() which doesn't exist
-        // After the fix: This should succeed and call burnMsgValue instead
+        // After the fix: This should succeed and send ETH to BaseTokenHolder
         vm.prank(L2_ASSET_ROUTER_ADDR);
         IAssetHandler(address(l2NativeTokenVault)).bridgeBurn{value: depositAmount}(
             destinationChainId,
@@ -85,7 +76,13 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
             data
         );
 
-        // If we reach here, the fix is working - burnMsgValue was called instead of bridgeBurn
+        // Verify that BaseTokenHolder received the ETH (effectively "burning" from circulation)
+        uint256 holderBalanceAfter = L2_BASE_TOKEN_HOLDER_ADDR.balance;
+        assertEq(
+            holderBalanceAfter - holderBalanceBefore,
+            depositAmount,
+            "BaseTokenHolder should receive the deposit amount"
+        );
     }
 
     /// @notice Test that bridgeBurn still works correctly for regular bridged tokens (non-base token)
@@ -187,15 +184,11 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
 
         vm.deal(L2_ASSET_ROUTER_ADDR, depositAmount);
 
-        // Mock burnMsgValue
-        vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            depositAmount,
-            abi.encodeCall(IBaseToken.burnMsgValue, ()),
-            abi.encode()
-        );
+        // The DummyL2BaseTokenHolder deployed in test setup already has burnAndStartBridging()
 
-        // Should succeed and call burnMsgValue
+        uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
+
+        // Should succeed and send ETH to BaseTokenHolder
         vm.prank(L2_ASSET_ROUTER_ADDR);
         IAssetHandler(address(l2NativeTokenVault)).bridgeBurn{value: depositAmount}(
             destinationChainId,
@@ -203,6 +196,13 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
             baseTokenAssetIdLocal,
             originalCaller,
             data
+        );
+
+        // Verify BaseTokenHolder received the ETH
+        assertEq(
+            L2_BASE_TOKEN_HOLDER_ADDR.balance - holderBalanceBefore,
+            depositAmount,
+            "BaseTokenHolder should receive the deposit amount"
         );
     }
 }

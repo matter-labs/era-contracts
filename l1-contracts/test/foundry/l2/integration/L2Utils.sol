@@ -6,9 +6,11 @@ import {Vm} from "forge-std/Vm.sol";
 
 import "forge-std/console.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_ASSET_TRACKER_ADDR, GW_ASSET_TRACKER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_ASSET_TRACKER_ADDR, GW_ASSET_TRACKER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DummyL2L1Messenger} from "contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 import {DummyInteropRecipient} from "contracts/dev-contracts/test/DummyInteropRecipient.sol";
+import {DummyL2BaseTokenSystemContract} from "contracts/dev-contracts/test/DummyBaseTokenSystemContract.sol";
+import {DummyL2BaseTokenHolder} from "contracts/dev-contracts/test/DummyL2BaseTokenHolder.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
@@ -72,6 +74,7 @@ library L2Utils {
         forceDeployL2AssetTracker(_args);
         forceDeployGWAssetTracker(_args);
         forceDeployL2L1Messenger(_args);
+        forceDeployBaseTokenContracts(_args);
 
         initializeBridgehub(_args);
     }
@@ -80,6 +83,20 @@ library L2Utils {
         // Deploy DummyL2L1Messenger to handle sendToL1 calls in zkfoundry
         new DummyL2L1Messenger();
         forceDeployWithoutConstructor("DummyL2L1Messenger", L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR);
+    }
+
+    function forceDeployBaseTokenContracts(SystemContractsArgs memory _args) internal {
+        // Deploy DummyL2BaseTokenSystemContract
+        new DummyL2BaseTokenSystemContract();
+        forceDeployWithoutConstructor("DummyBaseTokenSystemContract", L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+
+        // Deploy DummyL2BaseTokenHolder at the reserved address
+        new DummyL2BaseTokenHolder();
+        forceDeployWithoutConstructor("DummyL2BaseTokenHolder", L2_BASE_TOKEN_HOLDER_ADDR);
+
+        // Initialize the BaseTokenHolder's native ETH balance with 2^127 - 1 tokens
+        // This mirrors the production setup where BaseTokenHolder starts with this balance
+        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, (2 ** 127) - 1);
     }
 
     function deployDummyInteropRecipient(address _targetAddress) internal {
