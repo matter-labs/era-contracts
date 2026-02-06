@@ -160,6 +160,14 @@ interface IChainTypeManager {
         address _verifier
     ) external;
 
+    function createNewPatchUpgrade(
+        uint256 _oldProtocolVersion,
+        uint256 _oldProtocolVersionDeadline,
+        uint256 _newProtocolVersion,
+        address _verifier,
+        address _upgradeContract
+    ) external;
+
     function setUpgradeDiamondCut(Diamond.DiamondCutData calldata _cutData, uint256 _oldProtocolVersion) external;
 
     function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external;
