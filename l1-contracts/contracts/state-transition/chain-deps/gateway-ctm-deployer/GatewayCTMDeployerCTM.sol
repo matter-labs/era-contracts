@@ -25,6 +25,10 @@ contract GatewayCTMDeployerCTM is GatewayCTMDeployerCTMBase {
 
     /// @inheritdoc GatewayCTMDeployerCTMBase
     function _deployCTMImplementation(bytes32 _salt) internal override returns (address) {
-        return address(new EraChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0)));
+        // PermissionlessValidator is address(0) since Priority Mode is L1-only
+        return
+            address(
+                new EraChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0))
+            );
     }
 }

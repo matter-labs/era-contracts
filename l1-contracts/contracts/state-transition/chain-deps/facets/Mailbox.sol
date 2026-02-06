@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
-
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
 import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
@@ -15,18 +13,17 @@ import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {BalanceChange, BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Log, L2Message, TxStatus, WritePriorityOpParams} from "../../../common/Messaging.sol";
 import {MessageHashing, ProofData} from "../../../common/libraries/MessageHashing.sol";
-import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
-import {L1_GAS_PER_PUBDATA_BYTE, MAX_NEW_FACTORY_DEPS, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "../../../common/Config.sol";
+import {MAX_NEW_FACTORY_DEPS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "../../../common/Config.sol";
 import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterShared} from "../../../bridge/asset-router/IAssetRouterShared.sol";
 
-import {AddressNotZero, BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, NotAssetRouter, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
+import {AddressNotZero, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, NotAssetRouter, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {DepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 import {DepthMoreThanOneForRecursiveMerkleProof} from "../../../core/bridgehub/L1BridgehubErrors.sol";
 
@@ -37,7 +34,6 @@ import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol
 import {BALANCE_CHANGE_VERSION} from "../../../bridge/asset-tracker/IAssetTrackerBase.sol";
 import {INativeTokenVaultBase} from "../../../bridge/ntv/INativeTokenVaultBase.sol";
 import {OnlyGateway} from "../../../core/bridgehub/L1BridgehubErrors.sol";
-import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAssetHandler.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
@@ -314,36 +310,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         return l2GasPrice * _l2GasLimit;
     }
 
-    /// @notice Derives the price for L2 gas in base token to be paid.
-    /// @param _l1GasPrice The gas price on L1
-    /// @param _gasPerPubdata The price for each pubdata byte in L2 gas
-    /// @return The price of L2 gas in the base token
-    function _deriveL2GasPrice(uint256 _l1GasPrice, uint256 _gasPerPubdata) internal view returns (uint256) {
-        FeeParams memory feeParams = s.feeParams;
-        if (s.baseTokenGasPriceMultiplierDenominator == 0) {
-            revert BaseTokenGasPriceDenominatorNotSet();
-        }
-        uint256 l1GasPriceConverted = (_l1GasPrice * s.baseTokenGasPriceMultiplierNominator) /
-            s.baseTokenGasPriceMultiplierDenominator;
-        uint256 pubdataPriceBaseToken;
-        if (feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
-            // slither-disable-next-line divide-before-multiply
-            pubdataPriceBaseToken = L1_GAS_PER_PUBDATA_BYTE * l1GasPriceConverted;
-        }
-
-        // slither-disable-next-line divide-before-multiply
-        uint256 batchOverheadBaseToken = uint256(feeParams.batchOverheadL1Gas) * l1GasPriceConverted;
-        uint256 fullPubdataPriceBaseToken = pubdataPriceBaseToken +
-            batchOverheadBaseToken /
-            uint256(feeParams.maxPubdataPerBatch);
-
-        uint256 l2GasPrice = feeParams.minimalL2GasPrice + batchOverheadBaseToken / uint256(feeParams.maxL2GasPerBatch);
-        uint256 minL2GasPriceBaseToken = (fullPubdataPriceBaseToken + _gasPerPubdata - 1) / _gasPerPubdata;
-
-        return Math.max(l2GasPrice, minL2GasPriceBaseToken);
-    }
-
     /// @inheritdoc IMailboxImpl
+    // slither-disable-next-line reentrancy-no-eth
     function requestL2TransactionToGatewayMailboxWithBalanceChange(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
@@ -402,10 +370,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     /// @inheritdoc IMailboxImpl
     function bridgehubRequestL2TransactionOnGateway(
         bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
+        uint64
     ) external override onlyBridgehubOrInteropCenter {
-        _writePriorityOpHash(_canonicalTxHash, _expirationTimestamp);
-        emit NewRelayedPriorityTransaction(_getTotalPriorityTxs(), _canonicalTxHash, _expirationTimestamp);
+        _writePriorityOpHash(_canonicalTxHash);
+        emit NewRelayedPriorityTransaction(_getTotalPriorityTxs(), _canonicalTxHash, 0);
         emit NewPriorityRequestId(_getTotalPriorityTxs(), _canonicalTxHash);
     }
 
@@ -463,16 +431,11 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
                 _chainId: s.chainId,
                 _canonicalTxHash: canonicalTxHash,
-                _expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION),
+                _expirationTimestamp: 0,
                 _baseTokenAmount: 0,
                 _getBalanceChange: false
             });
         }
-    }
-
-    function pauseDepositsOnGateway(uint256 _timestamp) external onlyGatewayAssetTracker onlyGateway {
-        s.pausedDepositsTimestamp = _timestamp;
-        emit IAdmin.DepositsPaused(s.chainId, _timestamp);
     }
 
     function _requestL2TransactionSender(
@@ -521,8 +484,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         // Checking that the user provided enough ether to pay for the transaction.
         _params.l2GasPrice = _deriveL2GasPrice(tx.gasprice, request.l2GasPerPubdataByteLimit);
         uint256 baseCost = _params.l2GasPrice * request.l2GasLimit;
-        if (request.mintValue < baseCost + request.l2Value) {
-            revert MsgValueTooLow(baseCost + request.l2Value, request.mintValue);
+        // User must pay the base cost for the L1 -> L2 transaction.
+        // L2 msg.value can be anything, but if it’s too low the tx will fail.
+        if (request.mintValue < baseCost) {
+            revert MsgValueTooLow(baseCost, request.mintValue);
         }
 
         bool is7702AccountRefundRecipient = false;
@@ -546,12 +511,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (request.sender != tx.origin && !is7702AccountSender) {
             request.sender = AddressAliasHelper.applyL1ToL2Alias(request.sender);
         }
-        // populate missing fields
-        _params.expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast
         L2CanonicalTransaction memory transaction;
         (transaction, canonicalTxHash) = _validateTx(_params);
 
-        _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
+        _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash);
         if (s.settlementLayer != address(0)) {
             address assetRouter = address(IBridgehubBase(s.bridgehub).assetRouter());
             bool getBalanceChange = _params.request.sender == AddressAliasHelper.applyL1ToL2Alias(assetRouter);
@@ -560,7 +523,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
                 _chainId: s.chainId,
                 _canonicalTxHash: canonicalTxHash,
-                _expirationTimestamp: _params.expirationTimestamp,
+                _expirationTimestamp: 0,
                 _baseTokenAmount: _params.request.mintValue,
                 _getBalanceChange: getBalanceChange
             });
@@ -577,13 +540,12 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         WritePriorityOpParams memory params = WritePriorityOpParams({
             request: _request,
             txId: _nextPriorityTxId(),
-            l2GasPrice: 0,
-            expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION)
+            l2GasPrice: 0
         });
 
         L2CanonicalTransaction memory transaction;
         (transaction, canonicalTxHash) = _validateTx(params);
-        _writePriorityOp(transaction, params.request.factoryDeps, canonicalTxHash, params.expirationTimestamp);
+        _writePriorityOp(transaction, params.request.factoryDeps, canonicalTxHash);
     }
 
     function _serializeL2Transaction(
@@ -644,10 +606,9 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     function _writePriorityOp(
         L2CanonicalTransaction memory _transaction,
         bytes[] memory _factoryDeps,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
+        bytes32 _canonicalTxHash
     ) internal {
-        _writePriorityOpHash(_canonicalTxHash, _expirationTimestamp);
+        _writePriorityOpHash(_canonicalTxHash);
 
         /// We only check deposits paused on L1 to keep the GW and L1 Priority queues the same.
         if (block.chainid == L1_CHAIN_ID) {
@@ -656,13 +617,16 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
         // Data that is needed for the operator to simulate priority queue offchain
         // solhint-disable-next-line func-named-parameters
-        emit NewPriorityRequest(_transaction.nonce, _canonicalTxHash, _expirationTimestamp, _transaction, _factoryDeps);
+        emit NewPriorityRequest(_transaction.nonce, _canonicalTxHash, 0, _transaction, _factoryDeps);
         emit NewPriorityRequestId(_transaction.nonce, _canonicalTxHash);
     }
 
     // solhint-disable-next-line no-unused-vars
-    function _writePriorityOpHash(bytes32 _canonicalTxHash, uint64 _expirationTimestamp) internal {
+    function _writePriorityOpHash(bytes32 _canonicalTxHash) internal {
         s.priorityTree.push(_canonicalTxHash);
+        uint256 totalPriorityTxs = s.priorityTree.getTotalPriorityTxs();
+        uint256 newRequestId = totalPriorityTxs - 1;
+        s.priorityOpsRequestTimestamp[newRequestId] = block.timestamp;
     }
 
     ///////////////////////////////////////////////////////

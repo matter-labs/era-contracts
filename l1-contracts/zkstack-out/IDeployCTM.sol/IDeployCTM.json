@@ -38,6 +38,11 @@
                     "name": "bytecodesSupplier",
                     "type": "address",
                     "internalType": "address"
+                  },
+                  {
+                    "name": "permissionlessValidator",
+                    "type": "address",
+                    "internalType": "address"
                   }
                 ]
               },
@@ -63,6 +68,11 @@
                   },
                   {
                     "name": "bytecodesSupplier",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "permissionlessValidator",
                     "type": "address",
                     "internalType": "address"
                   }
@@ -112,6 +122,16 @@
                   },
                   {
                     "name": "gettersFacet",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "migratorFacet",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "committerFacet",
                     "type": "address",
                     "internalType": "address"
                   },

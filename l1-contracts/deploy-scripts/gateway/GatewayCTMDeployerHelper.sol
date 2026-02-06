@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
@@ -64,6 +64,8 @@ struct DirectCreate2Calldata {
     bytes mailboxFacetCalldata;
     bytes executorFacetCalldata;
     bytes gettersFacetCalldata;
+    bytes migratorFacetCalldata;
+    bytes committerFacetCalldata;
     bytes diamondInitCalldata;
     bytes genesisUpgradeCalldata;
     bytes multicall3Calldata;
@@ -313,6 +315,26 @@ library GatewayCTMDeployerHelper {
             "Getters.sol",
             "GettersFacet",
             hex"",
+            config.isZKsyncOS
+        );
+
+        // MigratorFacet
+        bytes memory migratorFacetArgs = abi.encode(config.l1ChainId, config.testnetVerifier);
+        (addresses.facets.migratorFacet, data.migratorFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+            _create2Salt,
+            "Migrator.sol",
+            "MigratorFacet",
+            migratorFacetArgs,
+            config.isZKsyncOS
+        );
+
+        // CommitterFacet
+        bytes memory committerFacetArgs = abi.encode(config.l1ChainId);
+        (addresses.facets.committerFacet, data.committerFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
+            _create2Salt,
+            "Committer.sol",
+            "CommitterFacet",
+            committerFacetArgs,
             config.isZKsyncOS
         );
 
@@ -702,21 +724,21 @@ library GatewayCTMDeployerHelper {
             result.chainTypeManagerImplementation = _deployInternalWithParams(
                 "ZKsyncOSChainTypeManager",
                 "ZKsyncOSChainTypeManager.sol",
-                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0)),
+                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0)),
                 innerConfig
             );
         } else {
             result.chainTypeManagerImplementation = _deployInternalWithParams(
                 "EraChainTypeManager",
                 "EraChainTypeManager.sol",
-                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0)),
+                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0)),
                 innerConfig
             );
         }
 
         // Build diamond cut data
         Facets memory facets = config.facets;
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](6);
         facetCuts[0] = Diamond.FacetCut({
             facet: facets.adminFacet,
             action: Diamond.Action.Add,
@@ -740,6 +762,18 @@ library GatewayCTMDeployerHelper {
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: baseConfig.executorSelectors
+        });
+        facetCuts[4] = Diamond.FacetCut({
+            facet: facets.migratorFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: baseConfig.migratorSelectors
+        });
+        facetCuts[5] = Diamond.FacetCut({
+            facet: facets.committerFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: baseConfig.committerSelectors
         });
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
@@ -817,7 +851,7 @@ library GatewayCTMDeployerHelper {
             result.chainTypeManagerImplementation = _deployInternalWithParamsWithMode(
                 "ZKsyncOSChainTypeManager",
                 "ZKsyncOSChainTypeManager.sol",
-                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0)),
+                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0)),
                 innerConfig,
                 isZKsyncOS
             );
@@ -825,7 +859,7 @@ library GatewayCTMDeployerHelper {
             result.chainTypeManagerImplementation = _deployInternalWithParamsWithMode(
                 "EraChainTypeManager",
                 "EraChainTypeManager.sol",
-                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0)),
+                abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0)),
                 innerConfig,
                 isZKsyncOS
             );
@@ -833,7 +867,7 @@ library GatewayCTMDeployerHelper {
 
         // Build diamond cut data
         Facets memory facets = config.facets;
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](6);
         facetCuts[0] = Diamond.FacetCut({
             facet: facets.adminFacet,
             action: Diamond.Action.Add,
@@ -857,6 +891,18 @@ library GatewayCTMDeployerHelper {
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: baseConfig.executorSelectors
+        });
+        facetCuts[4] = Diamond.FacetCut({
+            facet: facets.migratorFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: baseConfig.migratorSelectors
+        });
+        facetCuts[5] = Diamond.FacetCut({
+            facet: facets.committerFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: baseConfig.committerSelectors
         });
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
@@ -958,7 +1004,8 @@ library GatewayCTMDeployerHelper {
                 eip7702Checker: address(0),
                 verifierFflonk: _deployedContracts.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: _deployedContracts.stateTransition.verifiers.verifierPlonk,
-                verifierOwner: _config.aliasedGovernanceAddress
+                verifierOwner: _config.aliasedGovernanceAddress,
+                permissionlessValidator: address(0)
             });
     }
 
@@ -1071,9 +1118,9 @@ library GatewayCTMDeployerHelper {
         // + 2 ValidatorTimelock contracts (implementation + proxy)
         // + 4 Verifier contracts (Era only)
         // + 2 CTM contracts (ServerNotifier, EraChainTypeManager)
-        // + 8 direct contracts (AdminFacet, MailboxFacet, ExecutorFacet, GettersFacet, DiamondInit, GenesisUpgrade, Multicall3, DiamondProxy)
-        // Total: 5 + 3 + 1 + 2 + 4 + 2 + 8 = 25
-        uint256 totalDependencies = 25;
+        // + 10 direct contracts (AdminFacet, MailboxFacet, ExecutorFacet, GettersFacet, MigratorFacet, CommitterFacet, DiamondInit, GenesisUpgrade, Multicall3, DiamondProxy)
+        // Total: 5 + 3 + 1 + 2 + 4 + 2 + 10 = 27
+        uint256 totalDependencies = 27;
         dependencies = new bytes[](totalDependencies);
         uint256 index = 0;
 
@@ -1123,6 +1170,8 @@ library GatewayCTMDeployerHelper {
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("Mailbox.sol", "MailboxFacet");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("Executor.sol", "ExecutorFacet");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("Getters.sol", "GettersFacet");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("Migrator.sol", "MigratorFacet");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("Committer.sol", "CommitterFacet");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("DiamondInit.sol", "DiamondInit");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("L1GenesisUpgrade.sol", "L1GenesisUpgrade");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("Multicall3.sol", "Multicall3");

@@ -8,6 +8,13 @@
   },
   {
     "type": "function",
+    "name": "activatePriorityMode",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "allowEvmEmulation",
     "inputs": [],
     "outputs": [
@@ -199,6 +206,13 @@
         "internalType": "bytes"
       }
     ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "deactivatePriorityMode",
+    "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -1138,6 +1152,13 @@
   },
   {
     "type": "function",
+    "name": "permanentlyAllowPriorityMode",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "precommitSharedBridge",
     "inputs": [
       {
@@ -1911,6 +1932,19 @@
   },
   {
     "type": "function",
+    "name": "setPriorityModeTransactionFilterer",
+    "inputs": [
+      {
+        "name": "_priorityModeTransactionFilterer",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setPriorityTxMaxGasLimit",
     "inputs": [
       {
@@ -2519,6 +2553,25 @@
   },
   {
     "type": "event",
+    "name": "NewPriorityModeTransactionFilterer",
+    "inputs": [
+      {
+        "name": "oldTransactionFilterer",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "newTransactionFilterer",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "NewPriorityRequest",
     "inputs": [
       {
@@ -2716,6 +2769,24 @@
         "internalType": "address"
       }
     ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PriorityModeActivated",
+    "inputs": [],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PriorityModeAllowed",
+    "inputs": [],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PriorityModeDeactivated",
+    "inputs": [],
     "anonymous": false
   },
   {

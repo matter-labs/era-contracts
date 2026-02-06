@@ -7,6 +7,7 @@ import {Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {MismatchL2DACommitmentScheme} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
@@ -49,19 +50,18 @@ contract CommittingTest is ExecutorTest {
             blobsLinearHashes
         );
 
-        IExecutor.CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
         correctNewCommitBatchInfo.daCommitment = daCommitment;
 
-        IExecutor.CommitBatchInfoZKsyncOS[]
-            memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
             .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, correctCommitBatchInfoArray);
         vm.prank(validator);
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_SuccessfullyCommitBatchWithBlobs() public {
@@ -79,13 +79,12 @@ contract CommittingTest is ExecutorTest {
             )
         );
 
-        IExecutor.CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
         correctNewCommitBatchInfo.daCommitment = daCommitment;
         correctNewCommitBatchInfo.daCommitmentScheme = L2DACommitmentScheme.BLOBS_ZKSYNC_OS;
 
-        IExecutor.CommitBatchInfoZKsyncOS[]
-            memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -99,7 +98,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.blobhashes(blobVersionedHashes);
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_SuccessfullyCommitBatchWithBlobsPrepublished() public {
@@ -117,13 +116,12 @@ contract CommittingTest is ExecutorTest {
             )
         );
 
-        IExecutor.CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
         correctNewCommitBatchInfo.daCommitment = daCommitment;
         correctNewCommitBatchInfo.daCommitmentScheme = L2DACommitmentScheme.BLOBS_ZKSYNC_OS;
 
-        IExecutor.CommitBatchInfoZKsyncOS[]
-            memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -140,7 +138,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.blobhashes(new bytes32[](0));
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_SuccessfullyCommitBatchValidium() public {
@@ -150,13 +148,12 @@ contract CommittingTest is ExecutorTest {
 
         bytes32 daCommitment = bytes32(0); // empty
 
-        IExecutor.CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
         correctNewCommitBatchInfo.daCommitment = daCommitment;
         correctNewCommitBatchInfo.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
 
-        IExecutor.CommitBatchInfoZKsyncOS[]
-            memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -169,7 +166,7 @@ contract CommittingTest is ExecutorTest {
         admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
 
         vm.prank(validator);
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithWrongL2DACommitmentScheme() public {
@@ -187,13 +184,12 @@ contract CommittingTest is ExecutorTest {
             )
         );
 
-        IExecutor.CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
         correctNewCommitBatchInfo.daCommitment = daCommitment;
         correctNewCommitBatchInfo.daCommitmentScheme = L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256;
 
-        IExecutor.CommitBatchInfoZKsyncOS[]
-            memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -208,7 +204,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
         vm.blobhashes(blobVersionedHashes);
         vm.expectRevert(abi.encodeWithSelector(MismatchL2DACommitmentScheme.selector, 3, 4));
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithWrongCalldata() public {
@@ -240,12 +236,11 @@ contract CommittingTest is ExecutorTest {
             blobsLinearHashes
         );
 
-        IExecutor.CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
         correctNewCommitBatchInfo.daCommitment = daCommitment;
 
-        IExecutor.CommitBatchInfoZKsyncOS[]
-            memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -253,7 +248,7 @@ contract CommittingTest is ExecutorTest {
             .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, correctCommitBatchInfoArray);
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSelector(InvalidPubdataHash.selector, totalL2PubdataHash, keccak256(pubdata)));
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithWrongBlobs() public {
@@ -271,13 +266,12 @@ contract CommittingTest is ExecutorTest {
             )
         );
 
-        IExecutor.CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
         correctNewCommitBatchInfo.daCommitment = daCommitment;
         correctNewCommitBatchInfo.daCommitmentScheme = L2DACommitmentScheme.BLOBS_ZKSYNC_OS;
 
-        IExecutor.CommitBatchInfoZKsyncOS[]
-            memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -298,7 +292,7 @@ contract CommittingTest is ExecutorTest {
                 daCommitment
             )
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithNotPrepublishedBlobs() public {
@@ -316,13 +310,12 @@ contract CommittingTest is ExecutorTest {
             )
         );
 
-        IExecutor.CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
         correctNewCommitBatchInfo.daCommitment = daCommitment;
         correctNewCommitBatchInfo.daCommitmentScheme = L2DACommitmentScheme.BLOBS_ZKSYNC_OS;
 
-        IExecutor.CommitBatchInfoZKsyncOS[]
-            memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -336,20 +329,20 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(BlobNotPublished.selector);
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_BatchNumberMismatch() public {
         bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
         bytes32 daCommitment = bytes32(0);
 
-        IExecutor.CommitBatchInfoZKsyncOS memory wrongBatchInfo = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory wrongBatchInfo = newCommitBatchInfoZKsyncOS;
         wrongBatchInfo.operatorDAInput = operatorDAInput;
         wrongBatchInfo.daCommitment = daCommitment;
         wrongBatchInfo.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
         wrongBatchInfo.batchNumber = 5; // Wrong batch number, should be 1
 
-        IExecutor.CommitBatchInfoZKsyncOS[] memory batchArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
         batchArray[0] = wrongBatchInfo;
 
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
@@ -361,20 +354,20 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSignature("BatchNumberMismatch(uint256,uint256)", 1, 5));
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_IncorrectBatchChainId() public {
         bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
         bytes32 daCommitment = bytes32(0);
 
-        IExecutor.CommitBatchInfoZKsyncOS memory wrongChainBatch = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory wrongChainBatch = newCommitBatchInfoZKsyncOS;
         wrongChainBatch.operatorDAInput = operatorDAInput;
         wrongChainBatch.daCommitment = daCommitment;
         wrongChainBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
         wrongChainBatch.chainId = 999; // Wrong chain ID
 
-        IExecutor.CommitBatchInfoZKsyncOS[] memory batchArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
         batchArray[0] = wrongChainBatch;
 
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
@@ -386,21 +379,21 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSignature("IncorrectBatchChainId(uint256,uint256)", 999, l2ChainId));
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_InvalidBlockRange() public {
         bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
         bytes32 daCommitment = bytes32(0);
 
-        IExecutor.CommitBatchInfoZKsyncOS memory invalidBlockBatch = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory invalidBlockBatch = newCommitBatchInfoZKsyncOS;
         invalidBlockBatch.operatorDAInput = operatorDAInput;
         invalidBlockBatch.daCommitment = daCommitment;
         invalidBlockBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
         invalidBlockBatch.firstBlockNumber = 10; // firstBlockNumber > lastBlockNumber
         invalidBlockBatch.lastBlockNumber = 5;
 
-        IExecutor.CommitBatchInfoZKsyncOS[] memory batchArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
         batchArray[0] = invalidBlockBatch;
 
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
@@ -412,21 +405,21 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSignature("InvalidBlockRange(uint64,uint64,uint64)", 1, 10, 5));
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_L2TimestampTooBig() public {
         bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
         bytes32 daCommitment = bytes32(0);
 
-        IExecutor.CommitBatchInfoZKsyncOS memory futureTimestampBatch = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory futureTimestampBatch = newCommitBatchInfoZKsyncOS;
         futureTimestampBatch.operatorDAInput = operatorDAInput;
         futureTimestampBatch.daCommitment = daCommitment;
         futureTimestampBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
         // Set lastBlockTimestamp far in the future
         futureTimestampBatch.lastBlockTimestamp = uint64(block.timestamp + 365 days);
 
-        IExecutor.CommitBatchInfoZKsyncOS[] memory batchArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
         batchArray[0] = futureTimestampBatch;
 
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
@@ -438,21 +431,21 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSignature("L2TimestampTooBig()"));
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_TimeNotReached() public {
         bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
         bytes32 daCommitment = bytes32(0);
 
-        IExecutor.CommitBatchInfoZKsyncOS memory pastTimestampBatch = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory pastTimestampBatch = newCommitBatchInfoZKsyncOS;
         pastTimestampBatch.operatorDAInput = operatorDAInput;
         pastTimestampBatch.daCommitment = daCommitment;
         pastTimestampBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
         // Set firstBlockTimestamp far in the past
         pastTimestampBatch.firstBlockTimestamp = 1;
 
-        IExecutor.CommitBatchInfoZKsyncOS[] memory batchArray = new IExecutor.CommitBatchInfoZKsyncOS[](1);
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
         batchArray[0] = pastTimestampBatch;
 
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
@@ -464,6 +457,6 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(); // TimeNotReached error
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 }

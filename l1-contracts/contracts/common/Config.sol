@@ -38,9 +38,9 @@ uint256 constant ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE = 126;
 /// We are allowed to jump at most 100 minor versions at a time. The major version is always expected to be 0.
 uint256 constant MAX_ALLOWED_MINOR_VERSION_DELTA = 100;
 
-/// @dev The amount of time in seconds the validator has to process the priority transaction
-/// NOTE: The constant is set to zero for the Alpha release period
-uint256 constant PRIORITY_EXPIRATION = 0 days;
+/// @dev Maximum time a priority transaction may remain unprocessed before Priority Mode (escape hatch) can be activated.
+/// Note: This is not the full user exit window. The effective exit window is`UPGRADE_NOTICE_PERIOD` - `PRIORITY_EXPIRATION`.
+uint256 constant PRIORITY_EXPIRATION = 4 days;
 
 // @dev The chainId of Ethereum Mainnet
 uint256 constant MAINNET_CHAIN_ID = 1;
@@ -88,6 +88,14 @@ uint256 constant MAX_NEW_FACTORY_DEPS = 64;
 
 /// @dev The L2 gasPricePerPubdata required to be used in bridges.
 uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = 800;
+
+/// @dev Minimum interval between price updates (fee params or token multiplier).
+uint256 constant PRICE_UPDATE_INTERVAL = 1 days;
+/// @dev Max allowed price increase per update, as a ratio (e.g. 13/10 = 1.3x).
+uint256 constant MAX_PRICE_CHANGE_NUMERATOR = 13;
+uint256 constant MAX_PRICE_CHANGE_DENOMINATOR = 10;
+/// @dev Reference L1 gas price used for price-change bound calculations.
+uint256 constant PRICE_REFERENCE_L1_GAS = 1 gwei;
 
 /// @dev The native price for L1->L2 transactions in ZKsync OS.
 uint256 constant ZKSYNC_OS_L1_TX_NATIVE_PRICE = 10;
@@ -281,3 +289,10 @@ PubdataPricingMode constant DEFAULT_PUBDATA_PRICING_MODE = PubdataPricingMode.Ro
 
 /// @dev Default maximum gas limit for priority transactions during chain creation.
 uint64 constant DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
+
+/// @dev The mask that should be applied to the packed log data containing both the number of L2 and L1 transactions
+/// processed in the batch. Applying this mask is equivalent to calculating modulo 2**128.
+uint256 constant PACKED_NUMBER_OF_L1_TRANSACTIONS_LOG_MASK = 0xffffffffffffffffffffffffffffffff;
+
+/// @dev Bit offset for extracting the upper 128 bits (L2 tx count) from the packed log value.
+uint256 constant PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS = 128;

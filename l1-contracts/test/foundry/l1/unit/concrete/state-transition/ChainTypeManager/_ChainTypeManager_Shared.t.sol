@@ -19,6 +19,8 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
+import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
@@ -43,6 +45,7 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
+import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 
 contract ChainTypeManagerTest is UtilsCallMockerTest {
     using stdStorage for StdStorage;
@@ -53,6 +56,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     L1Bridgehub internal bridgehub;
     L1ChainAssetHandler internal chainAssetHandler;
     L1MessageRoot internal messageroot;
+    PermissionlessValidator internal permissionlessValidator;
     address internal rollupL1DAValidator;
     address internal diamondInit;
     address internal interopCenterAddress;
@@ -89,6 +93,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         serverNotifier = makeAddr("serverNotifier");
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
         messageroot = new L1MessageRoot(address(bridgehub), 1);
+        permissionlessValidator = new PermissionlessValidator();
         chainAssetHandler = new L1ChainAssetHandler(
             governor,
             address(bridgehub),
@@ -120,7 +125,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(address(bridgehub));
-        chainTypeManager = new EraChainTypeManager(address(bridgehub), interopCenterAddress, address(0));
+        chainTypeManager = new EraChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
         diamondInit = address(new DiamondInit(false));
         genesisUpgradeContract = new L1GenesisUpgrade();
 
@@ -134,7 +139,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         );
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)), false)),
+                facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)))),
                 action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: Utils.getAdminSelectors()
@@ -170,6 +175,22 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
                 action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: Utils.getMailboxSelectors()
+            })
+        );
+        facetCuts.push(
+            Diamond.FacetCut({
+                facet: address(new MigratorFacet(block.chainid, false)),
+                action: Diamond.Action.Add,
+                isFreezable: false,
+                selectors: Utils.getMigratorSelectors()
+            })
+        );
+        facetCuts.push(
+            Diamond.FacetCut({
+                facet: address(new CommitterFacet(block.chainid)),
+                action: Diamond.Action.Add,
+                isFreezable: true,
+                selectors: Utils.getCommitterSelectors()
             })
         );
 
@@ -219,7 +240,10 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
-        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain(testnetVerifier);
+        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain(
+            testnetVerifier,
+            address(permissionlessValidator)
+        );
 
         bytes memory initCalldata = abi.encode(initializeData);
 

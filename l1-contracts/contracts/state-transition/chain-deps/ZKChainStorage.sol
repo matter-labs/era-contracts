@@ -52,6 +52,19 @@ struct FeeParams {
     uint64 minimalL2GasPrice;
 }
 
+/// @notice Stores the current Priority Mode (escape hatch) configuration.
+/// @dev Only when `canBeActivated` is true, it is possible to enter Priority Mode.
+/// @dev When `activated` is true, batch settlement is restricted to `permissionlessValidator`.
+/// @param permissionlessValidator The only address allowed to call commit/prove/execute when Priority Mode is enabled.
+/// @param transactionFilterer The transaction filterer to be used when Priority Mode is activated.
+/// Only ZK Governance can change it.
+struct PriorityModeInformation {
+    bool canBeActivated;
+    bool activated;
+    address permissionlessValidator;
+    address transactionFilterer;
+}
+
 /// @dev storing all storage variables for ZK chain diamond facets
 /// NOTE: It is used in a proxy, so it is possible to add new variables to the end
 /// but NOT to modify already existing variables or change their order.
@@ -231,4 +244,16 @@ struct ZKChainStorage {
     /// @dev Timestamp when deposits were paused for chain migration to/from Gateway. 0 = not paused.
     /// @dev STORAGE SLOT: 64
     uint256 pausedDepositsTimestamp;
+    /// @dev Information required in the Priority Mode packed in one storage slot.
+    /// @dev STORAGE SLOT: 65-66
+    PriorityModeInformation priorityModeInfo;
+    /// @dev Timestamp when a priority tx request was made for the specified tx index from priorityTree.
+    /// @dev STORAGE SLOT: 67
+    mapping(uint256 => uint256) priorityOpsRequestTimestamp;
+    /// @dev Timestamp of the last fee params update (changeFeeParams).
+    /// @dev STORAGE SLOT: 68
+    uint256 lastFeeParamsUpdateTimestamp;
+    /// @dev Timestamp of the last base token gas price multiplier update (setTokenMultiplier).
+    /// @dev STORAGE SLOT: 69
+    uint256 lastTokenMultiplierUpdateTimestamp;
 }

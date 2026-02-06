@@ -91,6 +91,7 @@ struct StateTransitionContracts {
     address serverNotifier;
     address validatorTimelock;
     address bytecodesSupplier;
+    address permissionlessValidator;
 }
 
 // solhint-disable-next-line gas-struct-packing
