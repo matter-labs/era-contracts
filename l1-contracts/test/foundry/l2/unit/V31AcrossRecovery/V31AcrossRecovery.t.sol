@@ -26,6 +26,10 @@ contract MockAcrossProxy is Proxy, ERC1967Upgrade {
     function _implementation() internal view override returns (address) {
         return _getImplementation();
     }
+
+    fallback() external payable override {
+        _fallback();
+    }
 }
 
 /// @notice Wrapper contract that deploys EVM bytecode via the ContractDeployer system contract.
@@ -48,12 +52,18 @@ contract EVMBytecodeDeployer {
 }
 
 /// @notice Test upgrade contract that inherits V31AcrossRecovery and overrides getAcrossInfo
-/// with the test-specific addresses.
+/// with the test-specific addresses. Individual immutables are used instead of a struct
+/// because zksolc does not support struct immutables, and storage variables do not work
+/// here since ComplexUpgrader delegatecalls this contract.
 contract TestAcrossRecoveryUpgrade is V31AcrossRecovery {
-    AcrossInfo private _info;
+    address private immutable _proxy;
+    address private immutable _evmImpl;
+    address private immutable _zkevmRecoveryImpl;
 
     constructor(AcrossInfo memory info_) {
-        _info = info_;
+        _proxy = info_.proxy;
+        _evmImpl = info_.evmImplementation;
+        _zkevmRecoveryImpl = info_.zkevmRecoveryImplementation;
     }
 
     function upgrade() external {
@@ -61,7 +71,7 @@ contract TestAcrossRecoveryUpgrade is V31AcrossRecovery {
     }
 
     function getAcrossInfo() internal view override returns (AcrossInfo memory) {
-        return _info;
+        return AcrossInfo({proxy: _proxy, evmImplementation: _evmImpl, zkevmRecoveryImplementation: _zkevmRecoveryImpl});
     }
 }
 
