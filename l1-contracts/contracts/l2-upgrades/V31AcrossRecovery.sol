@@ -29,7 +29,7 @@ abstract contract V31AcrossRecovery {
     /// @dev It is virtual so that we can override it in tests to provide custom Across deployment info.
     /// @dev It is marked as view for easier testing, even though on mainnet the hardcoded values below will be used.
     /// @return info The Across deployment info. All zeros if no deployment is known for the current chain.
-    function getAcrossInfo() internal virtual view returns (AcrossInfo memory info) {
+    function getAcrossInfo() internal view virtual returns (AcrossInfo memory info) {
         if (block.chainid == LENS_MAINNET_CHAIN_ID) {
             info = AcrossInfo({
                 proxy: 0xe7cb3e167e7475dE1331Cf6E0CEb187654619E12,
@@ -50,8 +50,9 @@ abstract contract V31AcrossRecovery {
         }
 
         // Read the bytecode hash of the recovery implementation.
-        bytes32 recoveryBytecodeHash = IAccountCodeStorage(L2_ACCOUNT_CODE_STORAGE_ADDR)
-            .getRawCodeHash(info.zkevmRecoveryImplementation);
+        bytes32 recoveryBytecodeHash = IAccountCodeStorage(L2_ACCOUNT_CODE_STORAGE_ADDR).getRawCodeHash(
+            info.zkevmRecoveryImplementation
+        );
 
         // Force deploy the recovery implementation bytecode at the EVM implementation address.
         IL2ContractDeployer.ForceDeployment[] memory deployments = new IL2ContractDeployer.ForceDeployment[](1);

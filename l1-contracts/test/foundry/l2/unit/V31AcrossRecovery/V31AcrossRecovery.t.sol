@@ -5,12 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 import {SystemContractsCaller} from "contracts/common/l2-helpers/SystemContractsCaller.sol";
-import {
-    L2_ACCOUNT_CODE_STORAGE_ADDR,
-    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
-    L2_FORCE_DEPLOYER_ADDR,
-    L2_COMPLEX_UPGRADER_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ACCOUNT_CODE_STORAGE_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2ContractDeployer, AllowedBytecodeTypes} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {AcrossInfo, V31AcrossRecovery} from "contracts/l2-upgrades/V31AcrossRecovery.sol";
 import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
@@ -88,10 +83,7 @@ contract V31AcrossRecoveryUnitTest is Test {
 
         // Read the EVM bytecode of MockUUPSImplementation (from `out/`, not `zkout/`).
         // This is the same contract, but compiled to standard EVM bytecode.
-        bytes memory evmBytecode = Utils.readFoundryBytecodeL1(
-            "MockUUPSImplementation.sol",
-            "MockUUPSImplementation"
-        );
+        bytes memory evmBytecode = Utils.readFoundryBytecodeL1("MockUUPSImplementation.sol", "MockUUPSImplementation");
 
         // Etch the ContractDeployer system contract (not present by default in zkfoundry unit tests).
         bytes memory contractDeployerBytecode = Utils.readSystemContractsBytecode("ContractDeployer");
@@ -115,7 +107,7 @@ contract V31AcrossRecoveryUnitTest is Test {
         MockUUPSImplementation(proxy).upgradeTo(brokenImplementation);
 
         // Verify the proxy is broken after upgrading to the EVM implementation.
-        (bool success,) = proxy.call(abi.encodeCall(MockUUPSImplementation.value, ()));
+        (bool success, ) = proxy.call(abi.encodeCall(MockUUPSImplementation.value, ()));
         assertFalse(success, "proxy should be broken after upgrading to EVM implementation");
 
         // Etch the AccountCodeStorage system contract (needed by V31AcrossRecovery to read bytecode hashes).
