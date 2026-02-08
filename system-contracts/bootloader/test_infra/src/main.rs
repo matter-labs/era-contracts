@@ -37,7 +37,6 @@ use zksync_types::{
     AccountTreeId, L2ChainId, L2_BASE_TOKEN_ADDRESS, StorageKey, Transaction,
 };
 
-mod example_tx;
 mod hook;
 mod test_count_tracer;
 mod tracer;
@@ -470,9 +469,7 @@ fn main() {
         .init();
 
     let args: Vec<String> = std::env::args().collect();
-    if args.iter().any(|a| a == "--example-tx") {
-        example_tx::run();
-    } else if args.iter().any(|a| a == "--generate-transactions") {
+    if args.iter().any(|a| a == "--generate-transactions") {
         generate_transactions();
     } else {
         execute_internal_bootloader_test();

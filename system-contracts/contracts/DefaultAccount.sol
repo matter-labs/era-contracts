@@ -190,11 +190,6 @@ contract DefaultAccount is IAccount {
             revert InvalidSig(SigField.Length, _signature.length);
         }
 
-        // assembly {
-        //     mstore(0,_hash)
-        //     revert(0,32)
-        // }
-
         uint8 v;
         bytes32 r;
         bytes32 s;

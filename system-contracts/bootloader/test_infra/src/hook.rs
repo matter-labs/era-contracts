@@ -161,9 +161,9 @@ impl TestVmHook {
                         test_hook_as_string(vm_hook_params[2]),
                     ),
                     102 => Self::RequestedAssert(test_hook_as_string(vm_hook_params[0])),
-                    105 => Self::RequestedTxFailure(test_hook_as_string(vm_hook_params[0])),
                     103 => Self::TestCount(vm_hook_params[0].as_u32()),
                     104 => Self::TestStart(test_hook_as_string(vm_hook_params[0])),
+                    105 => Self::RequestedTxFailure(test_hook_as_string(vm_hook_params[0])),
                     _ => Self::NoHook,
                 }
             }
