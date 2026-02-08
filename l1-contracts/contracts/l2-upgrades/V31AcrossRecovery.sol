@@ -27,11 +27,15 @@ struct AcrossInfo {
 /// @title V31AcrossRecovery
 /// @author Matter Labs
 /// @notice Library for performing emergency recovery of the Across protocol on ZKsync ERA.
-library V31AcrossRecovery {
+/// @dev While all the functions are implemented, it is marked as abstract as it is not expected to be used
+/// as a standalone contract, but rather to be inherited and used by the L2V31Upgrade contract.
+abstract contract V31AcrossRecovery {
     /// @notice Returns the Across deployment info based on the L1 chain id.
+    /// @dev It is virtual so that we can override it in tests to provide custom Across deployment info.
+    /// @dev It is marked as view for easier testing, even thoguh on mainnet the hardcoded values below will be used.
     /// @param _l1ChainId The L1 chain id.
     /// @return info The Across deployment info. All zeros if no deployment is known for the given L1 chain id.
-    function getAcrossInfo(uint256 _l1ChainId) internal pure returns (AcrossInfo memory info) {
+    function getAcrossInfo(uint256 _l1ChainId) internal virtual view returns (AcrossInfo memory info) {
         if (_l1ChainId == 1) {
             info = AcrossInfo({
                 proxy: 0xe7cb3e167e7475dE1331Cf6E0CEb187654619E12,
@@ -46,7 +50,7 @@ library V31AcrossRecovery {
     /// @notice Performs the Across recovery by force-deploying the recovery implementation bytecode
     ///         at the EVM implementation address.
     /// @param _l1ChainId The L1 chain id used to determine the correct Across deployment info.
-    function recovery(uint256 _l1ChainId) internal {
+    function accrossRecovery(uint256 _l1ChainId) internal {
         AcrossInfo memory info = getAcrossInfo(_l1ChainId);
 
         if (info.expectedL2ChainId == 0 || info.expectedL2ChainId != block.chainid) {
