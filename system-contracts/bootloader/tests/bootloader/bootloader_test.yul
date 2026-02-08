@@ -208,5 +208,14 @@ function TEST_saturatingSub() {
     testing_assertEq(saturatingSub(2, 4), 0, "Invalid subtraction")
 }
 
-function INT_TEST_empty() {
+function INT_TEST_evm_create_non_zero_to_reverts() {
+    // tx(1) should be an EVM create transaction where `reserved1 == 1` and `to == 0`.
+    let txDataOffset := testing_txDataOffset(1)
+    let innerTxDataOffset := add(txDataOffset, 0x20)
+    testing_assertEq(getReserved1(innerTxDataOffset), 1, "tx(1) must mark EVM create")
+    testing_assertEq(getTo(innerTxDataOffset), 0, "tx(1) must start with zero `to`")
+
+    // Mutate `to` to a non-zero address and let the regular bootloader flow execute it.
+    mstore(add(innerTxDataOffset, 0x40), 1)
+    testing_testTransactionWillFailWith("0xc4141521")
 }
