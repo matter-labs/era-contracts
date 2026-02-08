@@ -2,6 +2,7 @@
 
 This crate runs bootloader tests from `../tests/bootloader/bootloader_test.yul`.
 It supports both:
+
 - unit-style tests (`TEST_*`) that check pure/internal bootloader logic
 - integration-style tests (`INT_TEST_*`) that mutate tx data and then let the normal bootloader transaction flow run
 
