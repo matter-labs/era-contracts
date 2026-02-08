@@ -6,48 +6,30 @@ import {Test} from "forge-std/Test.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 import {SystemContractsCaller} from "contracts/common/l2-helpers/SystemContractsCaller.sol";
 import {
+    L2_ACCOUNT_CODE_STORAGE_ADDR,
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_FORCE_DEPLOYER_ADDR,
     L2_COMPLEX_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2ContractDeployer, AllowedBytecodeTypes} from "contracts/common/interfaces/IL2ContractDeployer.sol";
-import {
-    AcrossInfo,
-    L2_ACCOUNT_CODE_STORAGE_ADDR,
-    V31AcrossRecovery
-} from "contracts/l2-upgrades/V31AcrossRecovery.sol";
+import {AcrossInfo, V31AcrossRecovery} from "contracts/l2-upgrades/V31AcrossRecovery.sol";
 import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
 import {MockUUPSImplementation} from "contracts/dev-contracts/test/MockUUPSImplementation.sol";
-
-bytes32 constant IMPLEMENTATION_SLOT = 0x360894A13BA1A3210667C828492DB98DCA3E2076CC3735A920A3CA505D382BBC;
-
-/// @notice Minimal interface for IContractDeployer.createEVM (not yet in l1-contracts IL2ContractDeployer).
-interface IEVMDeployer {
-    function createEVM(bytes calldata _initCode) external payable returns (uint256 evmGasUsed, address newAddress);
-}
+import {Proxy} from "@openzeppelin/contracts-v4/proxy/Proxy.sol";
+import {ERC1967Upgrade} from "@openzeppelin/contracts-v4/proxy/ERC1967/ERC1967Upgrade.sol";
+import {StorageSlot} from "@openzeppelin/contracts-v4/utils/StorageSlot.sol";
 
 /// @notice A minimal ERC1967-style proxy that delegates all calls to the implementation.
-contract MockAcrossProxy {
+/// @dev Uses OZ's Proxy for delegation and ERC1967Upgrade for the implementation slot.
+/// Does not use ERC1967Proxy directly to avoid Address.isContract checks that may
+/// behave unexpectedly in zkEVM.
+contract MockAcrossProxy is Proxy, ERC1967Upgrade {
     constructor(address _implementation) {
-        assembly {
-            sstore(IMPLEMENTATION_SLOT, _implementation)
-        }
+        StorageSlot.getAddressSlot(_IMPLEMENTATION_SLOT).value = _implementation;
     }
 
-    fallback() external payable {
-        assembly {
-            let implementation := sload(IMPLEMENTATION_SLOT)
-            calldatacopy(0, 0, calldatasize())
-            let success := delegatecall(gas(), implementation, 0, calldatasize(), 0, 0)
-            returndatacopy(0, 0, returndatasize())
-            switch success
-            case 0 {
-                revert(0, returndatasize())
-            }
-            default {
-                return(0, returndatasize())
-            }
-        }
+    function _implementation() internal view override returns (address) {
+        return _getImplementation();
     }
 }
 
@@ -63,7 +45,7 @@ contract EVMBytecodeDeployer {
             type(uint32).max,
             L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
             0,
-            abi.encodeCall(IEVMDeployer.createEVM, (_evmBytecode))
+            abi.encodeCall(IL2ContractDeployer.createEVM, (_evmBytecode))
         );
         require(success, "createEVM failed: zkfoundry may not support EVM contract deployment");
         (, deployedAddress) = abi.decode(returndata, (uint256, address));
@@ -79,20 +61,15 @@ contract TestAcrossRecoveryUpgrade is V31AcrossRecovery {
     address private immutable _zkevmRecoveryImpl;
     uint256 private immutable _expectedChainId;
 
-    constructor(
-        address proxy_,
-        address evmImpl_,
-        address zkevmRecoveryImpl_,
-        uint256 expectedChainId_
-    ) {
-        _proxy = proxy_;
-        _evmImpl = evmImpl_;
-        _zkevmRecoveryImpl = zkevmRecoveryImpl_;
-        _expectedChainId = expectedChainId_;
+    constructor(AcrossInfo memory info_) {
+        _proxy = info_.proxy;
+        _evmImpl = info_.evmImplementation;
+        _zkevmRecoveryImpl = info_.zkevmRecoveryImplementation;
+        _expectedChainId = info_.expectedL2ChainId;
     }
 
     function upgrade(uint256 _l1ChainId) external {
-        accrossRecovery(_l1ChainId);
+        acrossRecovery(_l1ChainId);
     }
 
     function getAcrossInfo(uint256) internal view override returns (AcrossInfo memory info) {
@@ -151,6 +128,10 @@ contract V31AcrossRecoveryUnitTest is Test {
         // This still works because the current (correct) implementation supports upgradeTo.
         MockUUPSImplementation(proxy).upgradeTo(brokenImplementation);
 
+        // Verify the proxy is broken after upgrading to the EVM implementation.
+        (bool success,) = proxy.call(abi.encodeCall(MockUUPSImplementation.value, ()));
+        assertFalse(success, "proxy should be broken after upgrading to EVM implementation");
+
         // Etch the AccountCodeStorage system contract (needed by V31AcrossRecovery to read bytecode hashes).
         bytes memory accountCodeStorageBytecode = Utils.readSystemContractsBytecode("AccountCodeStorage");
         vm.etch(L2_ACCOUNT_CODE_STORAGE_ADDR, accountCodeStorageBytecode);
@@ -164,33 +145,19 @@ contract V31AcrossRecoveryUnitTest is Test {
 
         // Deploy the test upgrade contract with the addresses from this test.
         testUpgrade = new TestAcrossRecoveryUpgrade(
-            proxy,
-            brokenImplementation,
-            correctImplementation,
-            block.chainid
+            AcrossInfo({
+                proxy: proxy,
+                evmImplementation: brokenImplementation,
+                zkevmRecoveryImplementation: correctImplementation,
+                expectedL2ChainId: block.chainid
+            })
         );
     }
 
-    /// @notice After the broken upgrade, the proxy cannot delegatecall the EVM implementation,
-    /// so attempting another upgrade (or any call through the proxy) should revert.
-    function test_RecoverAcrossProxyAfterBrokenUpgrade() public {
-        // Deploy a new correct implementation to try upgrading to.
-        address newCorrectImpl = address(new MockUUPSImplementation());
-
-        // This should revert because the proxy delegates to the EVM implementation,
-        // and delegatecall between zkEVM and EVM bytecode is not allowed.
-        vm.expectRevert();
-        MockUUPSImplementation(proxy).upgradeTo(newCorrectImpl);
-    }
-
-    /// @notice Test the full recovery flow: after the broken upgrade, invoke accrossRecovery
+    /// @notice Test the full recovery flow: after the broken upgrade, invoke acrossRecovery
     /// via the ComplexUpgrader to force-deploy the correct zkEVM bytecode at the broken
     /// implementation address, then verify the proxy works again.
     function test_RecoveryViaComplexUpgrader() public {
-        // Sanity: proxy is broken before recovery.
-        (bool success,) = proxy.call(abi.encodeCall(MockUUPSImplementation.value, ()));
-        assertFalse(success, "proxy should be broken before recovery");
-
         // Execute the recovery via ComplexUpgrader.upgrade().
         // ComplexUpgrader requires msg.sender == FORCE_DEPLOYER.
         vm.prank(L2_FORCE_DEPLOYER_ADDR);

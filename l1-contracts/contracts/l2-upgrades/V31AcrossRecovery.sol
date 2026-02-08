@@ -2,15 +2,8 @@
 pragma solidity 0.8.28;
 
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
-import {SYSTEM_CONTRACTS_OFFSET, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-
-/// @dev The address of the AccountCodeStorage system contract.
-address constant L2_ACCOUNT_CODE_STORAGE_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x02);
-
-/// @notice Minimal interface for the AccountCodeStorage system contract.
-interface IAccountCodeStorage {
-    function getRawCodeHash(address _address) external view returns (bytes32 codeHash);
-}
+import {IAccountCodeStorage} from "../common/interfaces/IAccountCodeStorage.sol";
+import {L2_ACCOUNT_CODE_STORAGE_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @notice Deployment info for the Across protocol on a specific L2 chain.
 struct AcrossInfo {
@@ -26,13 +19,14 @@ struct AcrossInfo {
 
 /// @title V31AcrossRecovery
 /// @author Matter Labs
-/// @notice Library for performing emergency recovery of the Across protocol on ZKsync ERA.
-/// @dev While all the functions are implemented, it is marked as abstract as it is not expected to be used
-/// as a standalone contract, but rather to be inherited and used by the L2V31Upgrade contract.
+/// @notice Abstract contract for performing emergency recovery of the Across protocol on ZKsync ERA.
+/// @dev Marked as abstract (rather than a library) so that `getAcrossInfo` can be overridden in tests
+/// to supply custom deployment addresses.
+/// @dev Not expected to be used as a standalone contract, but rather to be inherited by L2V31Upgrade.
 abstract contract V31AcrossRecovery {
     /// @notice Returns the Across deployment info based on the L1 chain id.
     /// @dev It is virtual so that we can override it in tests to provide custom Across deployment info.
-    /// @dev It is marked as view for easier testing, even thoguh on mainnet the hardcoded values below will be used.
+    /// @dev It is marked as view for easier testing, even though on mainnet the hardcoded values below will be used.
     /// @param _l1ChainId The L1 chain id.
     /// @return info The Across deployment info. All zeros if no deployment is known for the given L1 chain id.
     function getAcrossInfo(uint256 _l1ChainId) internal virtual view returns (AcrossInfo memory info) {
@@ -50,7 +44,7 @@ abstract contract V31AcrossRecovery {
     /// @notice Performs the Across recovery by force-deploying the recovery implementation bytecode
     ///         at the EVM implementation address.
     /// @param _l1ChainId The L1 chain id used to determine the correct Across deployment info.
-    function accrossRecovery(uint256 _l1ChainId) internal {
+    function acrossRecovery(uint256 _l1ChainId) internal {
         AcrossInfo memory info = getAcrossInfo(_l1ChainId);
 
         if (info.expectedL2ChainId == 0 || info.expectedL2ChainId != block.chainid) {

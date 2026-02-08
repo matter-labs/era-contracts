@@ -4,16 +4,12 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {
+    L2_ACCOUNT_CODE_STORAGE_ADDR,
     L2_FORCE_DEPLOYER_ADDR,
     L2_COMPLEX_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {
-    AcrossInfo,
-    IAccountCodeStorage,
-    L2_ACCOUNT_CODE_STORAGE_ADDR,
-    V31AcrossRecovery
-} from "contracts/l2-upgrades/V31AcrossRecovery.sol";
-import {L2V31Upgrade} from "contracts/l2-upgrades/L2V31Upgrade.sol";
+import {IAccountCodeStorage} from "contracts/common/interfaces/IAccountCodeStorage.sol";
+import {AcrossInfo, V31AcrossRecovery} from "contracts/l2-upgrades/V31AcrossRecovery.sol";
 import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
@@ -27,6 +23,15 @@ interface IAcrossSpokePool {
 contract AcrossInfoReader is V31AcrossRecovery {
     function readAcrossInfo(uint256 _l1ChainId) external view returns (AcrossInfo memory) {
         return getAcrossInfo(_l1ChainId);
+    }
+}
+
+/// @notice Minimal upgrade contract that only performs Across recovery.
+/// @dev We use this instead of L2V31Upgrade because the full upgrade requires many factory
+/// deps and VM state changes that are out of scope for this fork test.
+contract MinimalAcrossRecoveryUpgrade is V31AcrossRecovery {
+    function upgrade(uint256 _l1ChainId) external {
+        acrossRecovery(_l1ChainId);
     }
 }
 
@@ -66,13 +71,13 @@ contract V31AcrossRecoveryForkTest is Test {
         bytes32 recoveryBytecodeHash = accountCodeStorage.getRawCodeHash(info.zkevmRecoveryImplementation);
         assertTrue(recoveryBytecodeHash != bytes32(0), "recovery impl should already be deployed on the fork");
 
-        // 2. Deploy the L2V31Upgrade contract and execute recovery via ComplexUpgrader.
-        L2V31Upgrade upgradeContract = new L2V31Upgrade();
+        // 2. Deploy a minimal upgrade contract and execute recovery via ComplexUpgrader.
+        MinimalAcrossRecoveryUpgrade upgradeContract = new MinimalAcrossRecoveryUpgrade();
 
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
         L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(
             address(upgradeContract),
-            abi.encodeCall(L2V31Upgrade.upgrade, (L1_CHAIN_ID, 0, address(0)))
+            abi.encodeCall(MinimalAcrossRecoveryUpgrade.upgrade, (L1_CHAIN_ID))
         );
 
         // 3. Verify: the EVM impl address now has the recovery implementation's bytecode.

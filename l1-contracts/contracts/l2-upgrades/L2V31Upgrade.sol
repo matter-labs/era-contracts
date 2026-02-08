@@ -19,7 +19,7 @@ contract L2V31Upgrade is V31AcrossRecovery {
     /// @param _baseTokenOriginChainId The chainId of the origin chain of the base token.
     /// @param _baseTokenOriginAddress The address of the base token on the origin chain.
     function upgrade(uint256 _l1ChainId, uint256 _baseTokenOriginChainId, address _baseTokenOriginAddress) external {
-        accrossRecovery(_l1ChainId);
+        acrossRecovery(_l1ChainId);
         // kl todo set baseTokenOriginChainId and baseTokenOriginAddress in some location.
         // kl todo add all setAddresses, initL2 and updateL2s from genesis upgrade.
     }
