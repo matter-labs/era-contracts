@@ -71,7 +71,8 @@ contract TestAcrossRecoveryUpgrade is V31AcrossRecovery {
     }
 
     function getAcrossInfo() internal view override returns (AcrossInfo memory) {
-        return AcrossInfo({proxy: _proxy, evmImplementation: _evmImpl, zkevmRecoveryImplementation: _zkevmRecoveryImpl});
+        return
+            AcrossInfo({proxy: _proxy, evmImplementation: _evmImpl, zkevmRecoveryImplementation: _zkevmRecoveryImpl});
     }
 }
 
