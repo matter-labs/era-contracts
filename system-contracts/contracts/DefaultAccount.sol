@@ -139,20 +139,23 @@ contract DefaultAccount is IAccount {
         bytes calldata data = _transaction.data;
         uint32 gas = Utils.safeCastToU32(gasleft());
 
-        if (_transaction.txType != EIP_712_TX_TYPE && _transaction.txType != L1_TO_L2_TX_TYPE) {
-            if (_transaction.reserved[1] == 1) {
-                if (to != address(0)) {
-                    revert EvmCreateNonZeroAddress();
-                }
-                // Note, that createEVM can only be called with "isSystem" flag.
-                SystemContractsCaller.systemCallWithPropagatedRevert(
-                    gas,
-                    address(DEPLOYER_SYSTEM_CONTRACT),
-                    value,
-                    abi.encodeCall(DEPLOYER_SYSTEM_CONTRACT.createEVM, (data))
-                );
-                return;
+        // It is an EVM create transaction
+        if (
+            _transaction.txType != EIP_712_TX_TYPE &&
+            _transaction.txType != L1_TO_L2_TX_TYPE &&
+            _transaction.reserved[1] == 1
+        ) {
+            if (to != address(0)) {
+                revert EvmCreateNonZeroAddress();
             }
+            // Note, that createEVM can only be called with "isSystem" flag.
+            SystemContractsCaller.systemCallWithPropagatedRevert(
+                gas,
+                address(DEPLOYER_SYSTEM_CONTRACT),
+                value,
+                abi.encodeCall(DEPLOYER_SYSTEM_CONTRACT.createEVM, (data))
+            );
+            return;
         }
 
         // Note, that the deployment method from the deployer contract can only be called with a "systemCall" flag.
