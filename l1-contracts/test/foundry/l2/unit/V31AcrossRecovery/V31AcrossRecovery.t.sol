@@ -53,8 +53,7 @@ contract EVMBytecodeDeployer {
 }
 
 /// @notice Test upgrade contract that inherits V31AcrossRecovery and overrides getAcrossInfo
-/// with the test-specific addresses. Addresses are set via immutables in the constructor,
-/// so they are embedded in the deployed bytecode and available even when delegatecalled.
+/// with the test-specific addresses.
 contract TestAcrossRecoveryUpgrade is V31AcrossRecovery {
     AcrossInfo private _info;
 
@@ -62,11 +61,11 @@ contract TestAcrossRecoveryUpgrade is V31AcrossRecovery {
         _info = info_;
     }
 
-    function upgrade(uint256 _l1ChainId) external {
-        acrossRecovery(_l1ChainId);
+    function upgrade() external {
+        acrossRecovery();
     }
 
-    function getAcrossInfo(uint256) internal view override returns (AcrossInfo memory) {
+    function getAcrossInfo() internal view override returns (AcrossInfo memory) {
         return _info;
     }
 }
@@ -76,8 +75,6 @@ contract V31AcrossRecoveryUnitTest is Test {
     address internal correctImplementation;
     address internal brokenImplementation;
     TestAcrossRecoveryUpgrade internal testUpgrade;
-
-    uint256 internal constant TEST_L1_CHAIN_ID = 999;
 
     function setUp() public {
         // Deploy the correct zkEVM implementation (using `new` in zkfoundry deploys zkEVM bytecode).
@@ -137,8 +134,7 @@ contract V31AcrossRecoveryUnitTest is Test {
             AcrossInfo({
                 proxy: proxy,
                 evmImplementation: brokenImplementation,
-                zkevmRecoveryImplementation: correctImplementation,
-                expectedL2ChainId: block.chainid
+                zkevmRecoveryImplementation: correctImplementation
             })
         );
     }
@@ -152,7 +148,7 @@ contract V31AcrossRecoveryUnitTest is Test {
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
         L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(
             address(testUpgrade),
-            abi.encodeCall(TestAcrossRecoveryUpgrade.upgrade, (TEST_L1_CHAIN_ID))
+            abi.encodeCall(TestAcrossRecoveryUpgrade.upgrade, ())
         );
 
         // After recovery, the broken implementation address now has the correct

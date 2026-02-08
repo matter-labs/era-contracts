@@ -21,8 +21,8 @@ interface IAcrossSpokePool {
 
 /// @notice Helper to expose the internal getAcrossInfo function.
 contract AcrossInfoReader is V31AcrossRecovery {
-    function readAcrossInfo(uint256 _l1ChainId) external view returns (AcrossInfo memory) {
-        return getAcrossInfo(_l1ChainId);
+    function readAcrossInfo() external view returns (AcrossInfo memory) {
+        return getAcrossInfo();
     }
 }
 
@@ -30,8 +30,8 @@ contract AcrossInfoReader is V31AcrossRecovery {
 /// @dev We use this instead of L2V31Upgrade because the full upgrade requires many factory
 /// deps and VM state changes that are out of scope for this fork test.
 contract MinimalAcrossRecoveryUpgrade is V31AcrossRecovery {
-    function upgrade(uint256 _l1ChainId) external {
-        acrossRecovery(_l1ChainId);
+    function upgrade() external {
+        acrossRecovery();
     }
 }
 
@@ -41,19 +41,14 @@ contract MinimalAcrossRecoveryUpgrade is V31AcrossRecovery {
 /// All system contracts are live on the fork — no vm.etch needed.
 /// @dev Run: forge test --zksync --match-contract V31AcrossRecoveryForkTest --fork-url https://rpc.lens.xyz
 contract V31AcrossRecoveryForkTest is Test {
-    uint256 constant L1_CHAIN_ID = 1;
-
     AcrossInfo internal info;
     IAccountCodeStorage internal accountCodeStorage = IAccountCodeStorage(L2_ACCOUNT_CODE_STORAGE_ADDR);
 
     function setUp() public {
         AcrossInfoReader reader = new AcrossInfoReader();
-        info = reader.readAcrossInfo(L1_CHAIN_ID);
+        info = reader.readAcrossInfo();
 
-        require(
-            info.expectedL2ChainId == block.chainid,
-            "Fork test must run on the chain matching expectedL2ChainId"
-        );
+        require(info.proxy != address(0), "No Across deployment found for this chain");
     }
 
     function test_AcrossProxyIsBroken() public {
@@ -77,7 +72,7 @@ contract V31AcrossRecoveryForkTest is Test {
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
         L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(
             address(upgradeContract),
-            abi.encodeCall(MinimalAcrossRecoveryUpgrade.upgrade, (L1_CHAIN_ID))
+            abi.encodeCall(MinimalAcrossRecoveryUpgrade.upgrade, ())
         );
 
         // 3. Verify: the EVM impl address now has the recovery implementation's bytecode.

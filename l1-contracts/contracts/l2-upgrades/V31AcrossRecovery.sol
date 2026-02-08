@@ -13,9 +13,10 @@ struct AcrossInfo {
     address evmImplementation;
     /// @notice The address of the Across ZKsync Era recovery implementation contract.
     address zkevmRecoveryImplementation;
-    /// @notice The expected L2 chain id where this deployment lives.
-    uint256 expectedL2ChainId;
 }
+
+/// @dev The L2 chain id of the Lens network where the Across proxy is deployed.
+uint256 constant LENS_MAINNET_CHAIN_ID = 232;
 
 /// @title V31AcrossRecovery
 /// @author Matter Labs
@@ -24,18 +25,16 @@ struct AcrossInfo {
 /// to supply custom deployment addresses.
 /// @dev Not expected to be used as a standalone contract, but rather to be inherited by L2V31Upgrade.
 abstract contract V31AcrossRecovery {
-    /// @notice Returns the Across deployment info based on the L1 chain id.
+    /// @notice Returns the Across deployment info for the current L2 chain.
     /// @dev It is virtual so that we can override it in tests to provide custom Across deployment info.
     /// @dev It is marked as view for easier testing, even though on mainnet the hardcoded values below will be used.
-    /// @param _l1ChainId The L1 chain id.
-    /// @return info The Across deployment info. All zeros if no deployment is known for the given L1 chain id.
-    function getAcrossInfo(uint256 _l1ChainId) internal virtual view returns (AcrossInfo memory info) {
-        if (_l1ChainId == 1) {
+    /// @return info The Across deployment info. All zeros if no deployment is known for the current chain.
+    function getAcrossInfo() internal virtual view returns (AcrossInfo memory info) {
+        if (block.chainid == LENS_MAINNET_CHAIN_ID) {
             info = AcrossInfo({
                 proxy: 0xe7cb3e167e7475dE1331Cf6E0CEb187654619E12,
                 evmImplementation: 0xc7772Ce23a3ED7F87fE51b87617C7C7d21f15d39,
-                zkevmRecoveryImplementation: 0x11c9d12cC96Ae9B1fb30eb5D2D2a6F85656917e5,
-                expectedL2ChainId: 232
+                zkevmRecoveryImplementation: 0x11c9d12cC96Ae9B1fb30eb5D2D2a6F85656917e5
             });
         }
         // Default: all fields are zero.
@@ -43,11 +42,10 @@ abstract contract V31AcrossRecovery {
 
     /// @notice Performs the Across recovery by force-deploying the recovery implementation bytecode
     ///         at the EVM implementation address.
-    /// @param _l1ChainId The L1 chain id used to determine the correct Across deployment info.
-    function acrossRecovery(uint256 _l1ChainId) internal {
-        AcrossInfo memory info = getAcrossInfo(_l1ChainId);
+    function acrossRecovery() internal {
+        AcrossInfo memory info = getAcrossInfo();
 
-        if (info.expectedL2ChainId == 0 || info.expectedL2ChainId != block.chainid) {
+        if (info.proxy == address(0)) {
             return;
         }
 
