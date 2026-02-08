@@ -106,8 +106,6 @@ contract DefaultAccount is IAccount {
 
         if (_isValidSignature(txHash, _transaction.signature)) {
             magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
-        } else {
-            revert("AAA");
         }
     }
 
