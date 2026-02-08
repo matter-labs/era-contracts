@@ -56,29 +56,18 @@ contract EVMBytecodeDeployer {
 /// with the test-specific addresses. Addresses are set via immutables in the constructor,
 /// so they are embedded in the deployed bytecode and available even when delegatecalled.
 contract TestAcrossRecoveryUpgrade is V31AcrossRecovery {
-    address private immutable _proxy;
-    address private immutable _evmImpl;
-    address private immutable _zkevmRecoveryImpl;
-    uint256 private immutable _expectedChainId;
+    AcrossInfo private _info;
 
     constructor(AcrossInfo memory info_) {
-        _proxy = info_.proxy;
-        _evmImpl = info_.evmImplementation;
-        _zkevmRecoveryImpl = info_.zkevmRecoveryImplementation;
-        _expectedChainId = info_.expectedL2ChainId;
+        _info = info_;
     }
 
     function upgrade(uint256 _l1ChainId) external {
         acrossRecovery(_l1ChainId);
     }
 
-    function getAcrossInfo(uint256) internal view override returns (AcrossInfo memory info) {
-        info = AcrossInfo({
-            proxy: _proxy,
-            evmImplementation: _evmImpl,
-            zkevmRecoveryImplementation: _zkevmRecoveryImpl,
-            expectedL2ChainId: _expectedChainId
-        });
+    function getAcrossInfo(uint256) internal view override returns (AcrossInfo memory) {
+        return _info;
     }
 }
 

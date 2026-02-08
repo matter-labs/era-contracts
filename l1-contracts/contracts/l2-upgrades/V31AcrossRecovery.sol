@@ -11,7 +11,7 @@ struct AcrossInfo {
     address proxy;
     /// @notice The address of the Across EVM implementation contract.
     address evmImplementation;
-    /// @notice The address of the Across ZKsync ERA recovery implementation contract.
+    /// @notice The address of the Across ZKsync Era recovery implementation contract.
     address zkevmRecoveryImplementation;
     /// @notice The expected L2 chain id where this deployment lives.
     uint256 expectedL2ChainId;
@@ -19,7 +19,7 @@ struct AcrossInfo {
 
 /// @title V31AcrossRecovery
 /// @author Matter Labs
-/// @notice Abstract contract for performing emergency recovery of the Across protocol on ZKsync ERA.
+/// @notice Abstract contract for performing emergency recovery of the Across protocol on ZKsync Era.
 /// @dev Marked as abstract (rather than a library) so that `getAcrossInfo` can be overridden in tests
 /// to supply custom deployment addresses.
 /// @dev Not expected to be used as a standalone contract, but rather to be inherited by L2V31Upgrade.
