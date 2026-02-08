@@ -7,14 +7,16 @@ edition = "2021"
 
 [dependencies]
 
-zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "636b70c91c6df309799e7f0cd831a9d63ec24727" }
-zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "636b70c91c6df309799e7f0cd831a9d63ec24727" }
-zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "636b70c91c6df309799e7f0cd831a9d63ec24727" }
-zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "636b70c91c6df309799e7f0cd831a9d63ec24727" }
-zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "636b70c91c6df309799e7f0cd831a9d63ec24727" }
-zksync_vlog = { git = "https://github.com/matter-labs/zksync-era.git", rev = "636b70c91c6df309799e7f0cd831a9d63ec24727" }
+zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "62ac89b05e988c3ed16b1ee57155b56ab8c8c12c" }
+zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "62ac89b05e988c3ed16b1ee57155b56ab8c8c12c" }
+zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "62ac89b05e988c3ed16b1ee57155b56ab8c8c12c" }
+zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "62ac89b05e988c3ed16b1ee57155b56ab8c8c12c" }
+zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "62ac89b05e988c3ed16b1ee57155b56ab8c8c12c" }
+zksync_vlog = { git = "https://github.com/matter-labs/zksync-era.git", rev = "62ac89b05e988c3ed16b1ee57155b56ab8c8c12c" }
 
+zk_evm_abstractions = "0.153.6"
 colored = "2.0"
+rlp = "0.5"
 hex = "0.4"
 once_cell = "1.7"
 tracing = { version = "0.1.26", features = ["log"] }
