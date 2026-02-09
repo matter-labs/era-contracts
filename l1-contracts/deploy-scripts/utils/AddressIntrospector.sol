@@ -23,9 +23,36 @@ import {Utils} from "../utils/Utils.sol";
 import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {CoreDeployedAddresses, BridgehubAddresses, BridgehubContracts, ZkChainAddresses, L2ERC20BridgeAddresses, StateTransitionDeployedAddresses, StateTransitionContracts, Verifiers, Facets, BridgesDeployedAddresses, BridgeContracts, CTMDeployedAddresses, CTMAdminAddresses, DataAvailabilityDeployedAddresses} from "./Types.sol";
 
 library AddressIntrospector {
+    function _buildBridgehubAddresses(
+        BridgehubContracts memory proxies,
+        BridgehubContracts memory implementations
+    ) private pure returns (BridgehubAddresses memory info) {
+        info = BridgehubAddresses({proxies: proxies, implementations: implementations});
+    }
+
+    function _buildBridgesDeployedAddresses(
+        BridgeContracts memory proxies,
+        BridgeContracts memory implementations,
+        address bridgedStandardERC20Implementation,
+        address bridgedTokenBeacon,
+        address l1WethToken,
+        bytes32 ethTokenAssetId
+    ) private pure returns (BridgesDeployedAddresses memory info) {
+        info = BridgesDeployedAddresses({
+            proxies: proxies,
+            implementations: implementations,
+            bridgedStandardERC20Implementation: bridgedStandardERC20Implementation,
+            bridgedTokenBeacon: bridgedTokenBeacon,
+            l1WethToken: l1WethToken,
+            ethTokenAssetId: ethTokenAssetId
+        });
+    }
+
     function getBridgehubAddresses(IL1Bridgehub _bridgehub) public view returns (BridgehubAddresses memory info) {
         if (address(_bridgehub) == L2_BRIDGEHUB_ADDR) {
             return getL2BridgehubAddresses();
@@ -46,48 +73,46 @@ library AddressIntrospector {
         address ctmDeploymentTrackerProxy = address(_bridgehub.l1CtmDeployer());
         address chainAssetHandler = _bridgehub.chainAssetHandler();
 
-        info = BridgehubAddresses({
-            proxies: BridgehubContracts({
-                bridgehub: bridgehubProxy,
-                messageRoot: messageRoot,
-                ctmDeploymentTracker: ctmDeploymentTrackerProxy,
-                chainAssetHandler: chainAssetHandler,
-                chainRegistrationSender: address(0),
-                assetTracker: address(0)
-            }),
-            implementations: BridgehubContracts({
-                bridgehub: Utils.getImplementation(bridgehubProxy),
-                messageRoot: Utils.getImplementation(messageRoot),
-                ctmDeploymentTracker: Utils.getImplementation(ctmDeploymentTrackerProxy),
-                chainAssetHandler: Utils.getImplementation(chainAssetHandler),
-                chainRegistrationSender: address(0),
-                assetTracker: address(0)
-            })
+        BridgehubContracts memory proxies = BridgehubContracts({
+            bridgehub: bridgehubProxy,
+            messageRoot: messageRoot,
+            ctmDeploymentTracker: ctmDeploymentTrackerProxy,
+            chainAssetHandler: chainAssetHandler,
+            chainRegistrationSender: address(0),
+            assetTracker: address(0)
         });
+        BridgehubContracts memory implementations = BridgehubContracts({
+            bridgehub: Utils.getImplementation(bridgehubProxy),
+            messageRoot: Utils.getImplementation(messageRoot),
+            ctmDeploymentTracker: Utils.getImplementation(ctmDeploymentTrackerProxy),
+            chainAssetHandler: Utils.getImplementation(chainAssetHandler),
+            chainRegistrationSender: address(0),
+            assetTracker: address(0)
+        });
+        info = _buildBridgehubAddresses(proxies, implementations);
     }
 
     function getL2BridgehubAddresses() public view returns (BridgehubAddresses memory info) {
         IL1Bridgehub _bridgehub = IL1Bridgehub(L2_BRIDGEHUB_ADDR);
         address ctmDeploymentTrackerProxy = address(_bridgehub.l1CtmDeployer());
 
-        info = BridgehubAddresses({
-            proxies: BridgehubContracts({
-                bridgehub: L2_BRIDGEHUB_ADDR,
-                messageRoot: L2_MESSAGE_ROOT_ADDR,
-                ctmDeploymentTracker: ctmDeploymentTrackerProxy,
-                chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
-                chainRegistrationSender: address(0),
-                assetTracker: L2_ASSET_TRACKER_ADDR
-            }),
-            implementations: BridgehubContracts({
-                bridgehub: address(0),
-                messageRoot: address(0),
-                ctmDeploymentTracker: address(0),
-                chainAssetHandler: address(0),
-                chainRegistrationSender: address(0),
-                assetTracker: address(0)
-            })
+        BridgehubContracts memory proxies = BridgehubContracts({
+            bridgehub: L2_BRIDGEHUB_ADDR,
+            messageRoot: L2_MESSAGE_ROOT_ADDR,
+            ctmDeploymentTracker: ctmDeploymentTrackerProxy,
+            chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
+            chainRegistrationSender: address(0),
+            assetTracker: L2_ASSET_TRACKER_ADDR
         });
+        BridgehubContracts memory implementations = BridgehubContracts({
+            bridgehub: address(0),
+            messageRoot: address(0),
+            ctmDeploymentTracker: address(0),
+            chainAssetHandler: address(0),
+            chainRegistrationSender: address(0),
+            assetTracker: address(0)
+        });
+        info = _buildBridgehubAddresses(proxies, implementations);
     }
 
     function _getUptoDateZkChainAddress(ChainTypeManagerBase _ctm) internal view returns (address) {
@@ -328,24 +353,34 @@ library AddressIntrospector {
         address l1NullifierProxy = address(assetRouter.L1_NULLIFIER());
         address l1NativeTokenVaultProxy = address(assetRouter.nativeTokenVault());
 
-        info = BridgesDeployedAddresses({
-            proxies: BridgeContracts({
-                erc20Bridge: erc20BridgeProxy,
-                l1AssetRouter: l1AssetRouterProxy,
-                l1Nullifier: l1NullifierProxy,
-                l1NativeTokenVault: l1NativeTokenVaultProxy
-            }),
-            implementations: BridgeContracts({
-                erc20Bridge: Utils.getImplementation(erc20BridgeProxy),
-                l1AssetRouter: Utils.getImplementation(l1AssetRouterProxy),
-                l1Nullifier: Utils.getImplementation(l1NullifierProxy),
-                l1NativeTokenVault: Utils.getImplementation(l1NativeTokenVaultProxy)
-            }),
-            bridgedStandardERC20Implementation: address(0), // Not available from asset router
-            bridgedTokenBeacon: address(0), // Not available from asset router
-            l1WethToken: address(0), // Not available from asset router
-            ethTokenAssetId: bytes32(0) // Not available from asset router
+        require(l1NativeTokenVaultProxy != address(0), "NativeTokenVault address is zero");
+        NativeTokenVaultBase ntv = NativeTokenVaultBase(l1NativeTokenVaultProxy);
+        address bridgedTokenBeacon = address(ntv.bridgedTokenBeacon());
+        address bridgedStandardERC20Implementation = bridgedTokenBeacon != address(0)
+            ? UpgradeableBeacon(bridgedTokenBeacon).implementation()
+            : address(0);
+
+        BridgeContracts memory proxies = BridgeContracts({
+            erc20Bridge: erc20BridgeProxy,
+            l1AssetRouter: l1AssetRouterProxy,
+            l1Nullifier: l1NullifierProxy,
+            l1NativeTokenVault: l1NativeTokenVaultProxy
         });
+        BridgeContracts memory implementations = BridgeContracts({
+            erc20Bridge: Utils.getImplementation(erc20BridgeProxy),
+            l1AssetRouter: Utils.getImplementation(l1AssetRouterProxy),
+            l1Nullifier: Utils.getImplementation(l1NullifierProxy),
+            l1NativeTokenVault: Utils.getImplementation(l1NativeTokenVaultProxy)
+        });
+
+        info = _buildBridgesDeployedAddresses(
+            proxies,
+            implementations,
+            bridgedStandardERC20Implementation,
+            bridgedTokenBeacon,
+            assetRouter.L1_WETH_TOKEN(),
+            assetRouter.ETH_TOKEN_ASSET_ID()
+        );
     }
 
     function getCoreDeployedAddresses(
@@ -370,24 +405,23 @@ library AddressIntrospector {
         address chainAssetHandler = _bridgehub.chainAssetHandler();
         address messageRoot = address(_bridgehub.messageRoot());
 
-        info = BridgehubAddresses({
-            proxies: BridgehubContracts({
-                bridgehub: bridgehubProxy,
-                messageRoot: messageRoot,
-                ctmDeploymentTracker: ctmDeploymentTrackerProxy,
-                chainAssetHandler: chainAssetHandler,
-                chainRegistrationSender: address(0),
-                assetTracker: address(0)
-            }),
-            implementations: BridgehubContracts({
-                bridgehub: Utils.getImplementation(bridgehubProxy),
-                messageRoot: Utils.getImplementation(messageRoot),
-                ctmDeploymentTracker: Utils.getImplementation(ctmDeploymentTrackerProxy),
-                chainAssetHandler: Utils.getImplementation(chainAssetHandler),
-                chainRegistrationSender: address(0),
-                assetTracker: address(0)
-            })
+        BridgehubContracts memory proxies = BridgehubContracts({
+            bridgehub: bridgehubProxy,
+            messageRoot: messageRoot,
+            ctmDeploymentTracker: ctmDeploymentTrackerProxy,
+            chainAssetHandler: chainAssetHandler,
+            chainRegistrationSender: address(0),
+            assetTracker: address(0)
         });
+        BridgehubContracts memory implementations = BridgehubContracts({
+            bridgehub: Utils.getImplementation(bridgehubProxy),
+            messageRoot: Utils.getImplementation(messageRoot),
+            ctmDeploymentTracker: Utils.getImplementation(ctmDeploymentTrackerProxy),
+            chainAssetHandler: Utils.getImplementation(chainAssetHandler),
+            chainRegistrationSender: address(0),
+            assetTracker: address(0)
+        });
+        info = _buildBridgehubAddresses(proxies, implementations);
     }
 
     function getBridgesDeployedAddressesV29(
@@ -404,24 +438,34 @@ library AddressIntrospector {
         address l1NullifierProxy = address(assetRouter.L1_NULLIFIER());
         address l1NativeTokenVaultProxy = address(assetRouter.nativeTokenVault());
 
-        info = BridgesDeployedAddresses({
-            proxies: BridgeContracts({
-                erc20Bridge: erc20BridgeProxy,
-                l1AssetRouter: l1AssetRouterProxy,
-                l1Nullifier: l1NullifierProxy,
-                l1NativeTokenVault: l1NativeTokenVaultProxy
-            }),
-            implementations: BridgeContracts({
-                erc20Bridge: Utils.getImplementation(erc20BridgeProxy),
-                l1AssetRouter: Utils.getImplementation(l1AssetRouterProxy),
-                l1Nullifier: Utils.getImplementation(l1NullifierProxy),
-                l1NativeTokenVault: Utils.getImplementation(l1NativeTokenVaultProxy)
-            }),
-            bridgedStandardERC20Implementation: address(0), // Not available from asset router
-            bridgedTokenBeacon: address(0), // Not available from asset router
-            l1WethToken: address(0), // Not available from asset router
-            ethTokenAssetId: bytes32(0) // Not available from asset router
+        require(l1NativeTokenVaultProxy != address(0), "NativeTokenVault address is zero");
+        NativeTokenVaultBase ntv = NativeTokenVaultBase(l1NativeTokenVaultProxy);
+        address bridgedTokenBeacon = address(ntv.bridgedTokenBeacon());
+        address bridgedStandardERC20Implementation = bridgedTokenBeacon != address(0)
+            ? UpgradeableBeacon(bridgedTokenBeacon).implementation()
+            : address(0);
+
+        BridgeContracts memory proxies = BridgeContracts({
+            erc20Bridge: erc20BridgeProxy,
+            l1AssetRouter: l1AssetRouterProxy,
+            l1Nullifier: l1NullifierProxy,
+            l1NativeTokenVault: l1NativeTokenVaultProxy
         });
+        BridgeContracts memory implementations = BridgeContracts({
+            erc20Bridge: Utils.getImplementation(erc20BridgeProxy),
+            l1AssetRouter: Utils.getImplementation(l1AssetRouterProxy),
+            l1Nullifier: Utils.getImplementation(l1NullifierProxy),
+            l1NativeTokenVault: Utils.getImplementation(l1NativeTokenVaultProxy)
+        });
+
+        info = _buildBridgesDeployedAddresses(
+            proxies,
+            implementations,
+            bridgedStandardERC20Implementation,
+            bridgedTokenBeacon,
+            assetRouter.L1_WETH_TOKEN(),
+            assetRouter.ETH_TOKEN_ASSET_ID()
+        );
     }
 
     function getCoreDeployedAddressesV29(
