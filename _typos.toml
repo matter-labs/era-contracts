@@ -23,3 +23,5 @@ extend-exclude = [
 # Don't correct the surname "Teh"
 FOT = "FOT"
 ue = "ue"
+# Valid Rust module naming convention for constants
+consts = "consts"

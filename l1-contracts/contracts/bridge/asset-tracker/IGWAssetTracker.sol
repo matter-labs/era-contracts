@@ -9,6 +9,13 @@ import {BalanceChange, TokenBalanceMigrationData, TokenBridgingData} from "../..
 
 /// @title IGWAssetTracker
 interface IGWAssetTracker {
+    /// @notice Emitted when Gateway to L1 migration is initiated for an asset
+    /// @param assetId The asset ID being migrated
+    /// @param chainId The ID of the chain initiating the asset migration
+    /// @param amount The amount being migrated
+    event GatewayToL1MigrationInitiated(bytes32 indexed assetId, uint256 indexed chainId, uint256 amount);
+
+    
     /// @notice Emitted when the gateway settlement fee is updated.
     ///         This is the fee that operator must pay for each interop call.
     ///         It's paid by operator of source chain on the moment of chain settling on GW.
