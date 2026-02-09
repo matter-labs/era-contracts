@@ -63,6 +63,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         uint256 oldProtocolVersion;
         address ecosystemAdminAddress;
         uint256 governanceUpgradeTimerInitialDelay;
+        bool hasV29IntrospectionOverride;
+        bool useV29IntrospectionOverride;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -212,6 +214,12 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(
             chainCreationParamsPath(permanentConfig.isZKsyncOS)
         );
+
+        // Optional override for v29 introspection selection
+        if (toml.keyExists("$.use_v29_introspection")) {
+            newConfig.hasV29IntrospectionOverride = true;
+            newConfig.useV29IntrospectionOverride = toml.readBool("$.use_v29_introspection");
+        }
 
         initializeConfig(chainCreationParams, permanentConfig, address(0));
 
@@ -370,8 +378,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         address bridgehubAddr = ChainTypeManagerBase(ctm).BRIDGE_HUB();
         bridgehub = L1Bridgehub(bridgehubAddr);
 
-        // Determine which introspection method to use based on protocol version
-        bool useV29Introspection = AddressIntrospector.shouldUseV29Introspection(bridgehubAddr);
+        // Determine which introspection method to use based on protocol version or override
+        bool useV29Introspection = newConfig.hasV29IntrospectionOverride
+            ? newConfig.useV29IntrospectionOverride
+            : AddressIntrospector.shouldUseV29Introspection(bridgehubAddr);
 
         // Use appropriate introspection based on version
         if (useV29Introspection) {
@@ -1002,6 +1012,11 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     function getCTMAddress() public view returns (address) {
         return newConfig.ctm;
+    }
+
+    function getChainUpgradeDiamondCutData() public view returns (bytes memory) {
+        require(upgradeConfig.upgradeCutPrepared, "upgrade cut data not prepared");
+        return newlyGeneratedData.upgradeCutData;
     }
     ////////////////////////////// Misc utils /////////////////////////////////
 

@@ -11,6 +11,7 @@ import {DefaultCoreUpgrade} from "./DefaultCoreUpgrade.s.sol";
 import {DefaultCTMUpgrade} from "./DefaultCTMUpgrade.s.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {BridgehubAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
+import {CoreDeployedAddresses, CTMDeployedAddresses} from "../../utils/Types.sol";
 
 /// @notice Unified script that runs both ecosystem core upgrade and CTM upgrade
 /// @dev This script combines DefaultCoreUpgrade and DefaultCTMUpgrade, running them in sequence
@@ -27,6 +28,10 @@ contract DefaultEcosystemUpgrade is Script {
     string internal ecosystemOutputPath;
     string internal coreOutputPath;
     string internal ctmOutputPath;
+    string internal upgradeInputPath;
+
+    bool internal includeStateTransitionInEcosystemOutput;
+    bool internal includeUpgradeAddressesInEcosystemOutput;
 
     /// @notice Create core upgrade instance - can be overridden for version-specific instances
     function createCoreUpgrade() internal virtual returns (DefaultCoreUpgrade) {
@@ -41,12 +46,11 @@ contract DefaultEcosystemUpgrade is Script {
     /// @notice Get core output path - can be overridden for version-specific paths
     /// @dev Returns relative path (without project root), as it will be concatenated in initialize()
     function getCoreOutputPath(string memory _ecosystemOutputPath) internal virtual returns (string memory) {
-        // Default: use environment variable if set, otherwise derive from ecosystem path
+        // Default: require explicit output path to avoid accidentally overwriting ecosystem output
         try vm.envString("UPGRADE_CORE_OUTPUT") returns (string memory coreOutputEnv) {
             return coreOutputEnv;
         } catch {
-            // Fallback: same as ecosystem output (passed as parameter, already relative)
-            return _ecosystemOutputPath;
+            revert("UPGRADE_CORE_OUTPUT environment variable is not set");
         }
     }
 
@@ -64,11 +68,12 @@ contract DefaultEcosystemUpgrade is Script {
     /// @notice Initialize both core and CTM upgrades
     function initialize(
         string memory permanentValuesInputPath,
-        string memory upgradeInputPath,
+        string memory _upgradeInputPath,
         string memory _ecosystemOutputPath
     ) public virtual {
         string memory root = vm.projectRoot();
         ecosystemOutputPath = string.concat(root, _ecosystemOutputPath);
+        upgradeInputPath = _upgradeInputPath;
 
         // Get output paths (these return relative paths)
         string memory _coreOutputPath = getCoreOutputPath(_ecosystemOutputPath);
@@ -80,16 +85,29 @@ contract DefaultEcosystemUpgrade is Script {
 
         // Initialize core upgrade with its own output path
         coreUpgrade = createCoreUpgrade();
-        coreUpgrade.initialize(permanentValuesInputPath, upgradeInputPath, _coreOutputPath);
+        coreUpgrade.initialize(permanentValuesInputPath, _upgradeInputPath, _coreOutputPath);
         _coreInitialized = true;
 
         // Initialize CTM upgrade with its own output path
         ctmUpgrade = createCTMUpgrade();
-        ctmUpgrade.initialize(permanentValuesInputPath, upgradeInputPath, _ctmOutputPath);
+        ctmUpgrade.initialize(permanentValuesInputPath, _upgradeInputPath, _ctmOutputPath);
         _ctmInitialized = true;
 
+        // Configure optional output sections based on upgrade config (default: false)
+        string memory upgradeToml = vm.readFile(string.concat(root, _upgradeInputPath));
+        if (upgradeToml.keyExists("$.include_state_transition_in_ecosystem_output")) {
+            includeStateTransitionInEcosystemOutput = upgradeToml.readBool(
+                "$.include_state_transition_in_ecosystem_output"
+            );
+        }
+        if (upgradeToml.keyExists("$.include_upgrade_addresses_in_ecosystem_output")) {
+            includeUpgradeAddressesInEcosystemOutput = upgradeToml.readBool(
+                "$.include_upgrade_addresses_in_ecosystem_output"
+            );
+        }
+
         // Allow subclasses to override protocol version for local testing
-        overrideProtocolVersionForLocalTesting(upgradeInputPath);
+        overrideProtocolVersionForLocalTesting(_upgradeInputPath);
     }
 
     /// @notice Override this in test environments to set protocol version from config instead of genesis
@@ -145,119 +163,91 @@ contract DefaultEcosystemUpgrade is Script {
 
     /// @notice Save combined output including CTM diamond cut data to ecosystem output
     function saveCombinedOutput() internal virtual {
-        // Read the CTM output to get the diamond cut data (ctmOutputPath is already full path)
-        string memory ctmOutputToml = vm.readFile(ctmOutputPath);
-        bytes memory upgradeCutData = ctmOutputToml.readBytes("$.chain_upgrade_diamond_cut");
+        bytes memory upgradeCutData = ctmUpgrade.getChainUpgradeDiamondCutData();
 
         // Write the diamond cut data to the ecosystem output (create initial file with just diamond cut)
         // Note: Governance calls will be appended later
         string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", upgradeCutData);
         vm.writeToml(toml, ecosystemOutputPath);
 
-        // Copy the state_transition section from CTM output to ecosystem output
-        // This is needed for zkstack CLI which reads these fields from the ecosystem output
-        copyStateTransitionSection(ctmOutputToml);
-
-        // Copy the upgrade_addresses section from CTM output to ecosystem output
-        copyUpgradeAddressesSection(ctmOutputToml);
+        if (includeStateTransitionInEcosystemOutput) {
+            serializeStateTransitionSection(ctmUpgrade.getAddresses());
+        }
+        if (includeUpgradeAddressesInEcosystemOutput) {
+            serializeUpgradeAddressesSection(coreUpgrade.getCoreAddresses());
+        }
 
         console.log("Diamond cut data saved to ecosystem output!");
     }
 
-    /// @notice Copy state_transition section from CTM output to ecosystem output
-    function copyStateTransitionSection(string memory ctmOutputToml) internal virtual {
-        // Read all state_transition fields from CTM output
+    /// @notice Serialize state_transition section to ecosystem output
+    function serializeStateTransitionSection(CTMDeployedAddresses memory ctmAddresses) internal virtual {
         vm.serializeAddress(
             "state_transition",
             "chain_type_manager_implementation_addr",
-            ctmOutputToml.readAddress("$.state_transition.chain_type_manager_implementation_addr")
+            ctmAddresses.stateTransition.implementations.chainTypeManager
         );
         vm.serializeAddress(
             "state_transition",
             "state_transition_implementation_addr",
-            ctmOutputToml.readAddress("$.state_transition.state_transition_implementation_addr")
+            ctmAddresses.stateTransition.implementations.chainTypeManager
         );
-        vm.serializeAddress(
-            "state_transition",
-            "verifier_addr",
-            ctmOutputToml.readAddress("$.state_transition.verifier_addr")
-        );
-        vm.serializeAddress(
-            "state_transition",
-            "admin_facet_addr",
-            ctmOutputToml.readAddress("$.state_transition.admin_facet_addr")
-        );
-        vm.serializeAddress(
-            "state_transition",
-            "mailbox_facet_addr",
-            ctmOutputToml.readAddress("$.state_transition.mailbox_facet_addr")
-        );
+        vm.serializeAddress("state_transition", "verifier_addr", ctmAddresses.stateTransition.verifiers.verifier);
+        vm.serializeAddress("state_transition", "admin_facet_addr", ctmAddresses.stateTransition.facets.adminFacet);
+        vm.serializeAddress("state_transition", "mailbox_facet_addr", ctmAddresses.stateTransition.facets.mailboxFacet);
         vm.serializeAddress(
             "state_transition",
             "executor_facet_addr",
-            ctmOutputToml.readAddress("$.state_transition.executor_facet_addr")
+            ctmAddresses.stateTransition.facets.executorFacet
         );
-        vm.serializeAddress(
-            "state_transition",
-            "getters_facet_addr",
-            ctmOutputToml.readAddress("$.state_transition.getters_facet_addr")
-        );
-        vm.serializeAddress(
-            "state_transition",
-            "diamond_init_addr",
-            ctmOutputToml.readAddress("$.state_transition.diamond_init_addr")
-        );
-        vm.serializeAddress(
-            "state_transition",
-            "genesis_upgrade_addr",
-            ctmOutputToml.readAddress("$.state_transition.genesis_upgrade_addr")
-        );
+        vm.serializeAddress("state_transition", "getters_facet_addr", ctmAddresses.stateTransition.facets.gettersFacet);
+        vm.serializeAddress("state_transition", "diamond_init_addr", ctmAddresses.stateTransition.facets.diamondInit);
+        vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress(
             "state_transition",
             "verifier_fflonk_addr",
-            ctmOutputToml.readAddress("$.state_transition.verifier_fflonk_addr")
+            ctmAddresses.stateTransition.verifiers.verifierFflonk
         );
         vm.serializeAddress(
             "state_transition",
             "verifier_plonk_addr",
-            ctmOutputToml.readAddress("$.state_transition.verifier_plonk_addr")
+            ctmAddresses.stateTransition.verifiers.verifierPlonk
         );
         vm.serializeAddress(
             "state_transition",
             "validator_timelock_implementation_addr",
-            ctmOutputToml.readAddress("$.state_transition.validator_timelock_implementation_addr")
+            ctmAddresses.stateTransition.implementations.validatorTimelock
         );
         vm.serializeAddress(
             "state_transition",
             "validator_timelock_addr",
-            ctmOutputToml.readAddress("$.state_transition.validator_timelock_addr")
+            ctmAddresses.stateTransition.proxies.validatorTimelock
         );
         vm.serializeAddress(
             "state_transition",
             "bytecodes_supplier_addr",
-            ctmOutputToml.readAddress("$.state_transition.bytecodes_supplier_addr")
+            ctmAddresses.stateTransition.proxies.bytecodesSupplier
         );
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
-            ctmOutputToml.readAddress("$.state_transition.default_upgrade_addr")
+            ctmAddresses.stateTransition.defaultUpgrade
         );
 
         vm.writeToml(stateTransition, ecosystemOutputPath, ".state_transition");
     }
 
-    /// @notice Copy upgrade_addresses section from CTM output to ecosystem output
-    function copyUpgradeAddressesSection(string memory ctmOutputToml) internal virtual {
-        // Read upgrade_addresses fields from CTM output
+    /// @notice Serialize upgrade_addresses section to ecosystem output
+    function serializeUpgradeAddressesSection(CoreDeployedAddresses memory coreAddresses) internal virtual {
         vm.serializeAddress(
             "upgrade_addresses",
             "native_token_vault_addr",
-            ctmOutputToml.readAddress("$.upgrade_addresses.native_token_vault_addr")
+            coreAddresses.bridges.proxies.l1NativeTokenVault
         );
         string memory upgradeAddresses = vm.serializeAddress(
             "upgrade_addresses",
             "native_token_vault_implementation_addr",
-            ctmOutputToml.readAddress("$.upgrade_addresses.native_token_vault_implementation_addr")
+            coreAddresses.bridges.implementations.l1NativeTokenVault
         );
 
         vm.writeToml(upgradeAddresses, ecosystemOutputPath, ".upgrade_addresses");

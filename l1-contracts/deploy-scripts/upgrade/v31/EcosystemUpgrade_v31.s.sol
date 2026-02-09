@@ -16,9 +16,9 @@ import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.so
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
 
-import {DefaultEcosystemUpgrade} from "../default_upgrade/DefaultEcosystemUpgrade.s.sol";
-import {DefaultCoreUpgrade} from "../default_upgrade/DefaultCoreUpgrade.s.sol";
-import {DefaultCTMUpgrade} from "../default_upgrade/DefaultCTMUpgrade.s.sol";
+import {DefaultEcosystemUpgrade} from "../default-upgrade/DefaultEcosystemUpgrade.s.sol";
+import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
+import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CoreUpgrade_v31} from "./CoreUpgrade_v31.s.sol";
 import {CTMUpgrade_v31} from "./CTMUpgrade_v31.s.sol";
 import {GatewayUpgrade_v31} from "./GatewayUpgrade_v31.s.sol";

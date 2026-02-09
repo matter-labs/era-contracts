@@ -21,6 +21,7 @@ import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.
 import {Governance} from "contracts/governance/Governance.sol";
 import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {BridgehubAddresses, BridgesDeployedAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
+import {CoreDeployedAddresses} from "../../utils/Types.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
@@ -43,6 +44,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     struct AdditionalConfigParams {
         uint256 newProtocolVersion;
         bool isZKsyncOS;
+        bool hasV29IntrospectionOverride;
+        bool useV29IntrospectionOverride;
     }
     AdditionalConfigParams internal additionalConfig;
 
@@ -115,6 +118,10 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         return coreAddresses.bridgehub;
     }
 
+    function getCoreAddresses() public view returns (CoreDeployedAddresses memory) {
+        return coreAddresses;
+    }
+
     function initializeConfig(string memory permanentValuesInputPath, string memory upgradeInputPath) public virtual {
         string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
         string memory upgradeToml = vm.readFile(upgradeInputPath);
@@ -123,11 +130,14 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
 
         // Read isZKsyncOS flag from permanent values (required)
-        require(
-            permanentValuesToml.keyExists("$.is_zk_sync_os"),
-            "is_zk_sync_os flag is required in permanent values"
-        );
+        require(permanentValuesToml.keyExists("$.is_zk_sync_os"), "is_zk_sync_os flag is required in permanent values");
         additionalConfig.isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
+
+        // Optional override for v29 introspection selection
+        if (upgradeToml.keyExists("$.use_v29_introspection")) {
+            additionalConfig.hasV29IntrospectionOverride = true;
+            additionalConfig.useV29IntrospectionOverride = upgradeToml.readBool("$.use_v29_introspection");
+        }
 
         // Protocol version comes from genesis config
         additionalConfig.newProtocolVersion = loadProtocolVersionFromGenesis();
@@ -135,6 +145,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         coreAddresses.bridgehub.proxies.bridgehub = permanentValuesToml.readAddress(
             "$.core_contracts.bridgehub_proxy_addr"
         );
+        require(coreAddresses.bridgehub.proxies.bridgehub != address(0), "bridgehub_proxy_addr is zero");
         setAddressesBasedOnBridgehub();
         initializeL1CoreUtilsConfig();
     }
@@ -160,8 +171,10 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     function setAddressesBasedOnBridgehub() internal virtual {
         address bridgehubProxy = coreAddresses.bridgehub.proxies.bridgehub;
 
-        // Determine which introspection method to use based on protocol version
-        bool useV29Introspection = AddressIntrospector.shouldUseV29Introspection(bridgehubProxy);
+        // Determine which introspection method to use based on protocol version or override
+        bool useV29Introspection = additionalConfig.hasV29IntrospectionOverride
+            ? additionalConfig.useV29IntrospectionOverride
+            : AddressIntrospector.shouldUseV29Introspection(bridgehubProxy);
 
         if (useV29Introspection) {
             coreAddresses = AddressIntrospector.getCoreDeployedAddressesV29(bridgehubProxy);
