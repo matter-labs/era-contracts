@@ -38,6 +38,14 @@ import {Unauthorized} from "../common/L1ContractErrors.sol";
  * On Era, Transfer events are automatically emitted during any ETH transfer since all transfers
  * go via MsgValueSimulator which calls transferFromTo. On ZK OS, standard ETH transfers work natively.
  * This allows a single implementation to work correctly on both chain types.
+ *
+ * ## Selfdestruct Caveat
+ *
+ * The implicit meaning of this contract's balance is "funds that the chain can still mint".
+ * The totalSupply on Era is computed as INITIAL_BASE_TOKEN_HOLDER_BALANCE - balance[BaseTokenHolder].
+ * If funds were sent to this contract via selfdestruct (bypassing access controls), the holder balance
+ * would increase, causing totalSupply() to undercount. However, selfdestruct is not supported on Era,
+ * so this invariant holds. On ZK OS, totalSupply is not tracked on-chain, so this is not an issue.
  */
 // slither-disable-next-line locked-ether
 contract BaseTokenHolder is IBaseTokenHolder {
@@ -78,8 +86,7 @@ contract BaseTokenHolder is IBaseTokenHolder {
     /// @notice Gives out base tokens from the holder to a recipient.
     /// @dev This replaces the mint operation. Tokens are transferred from this contract's balance.
     /// @dev NOTE: This is not the only way funds leave this contract:
-    /// @dev - On ZK OS, balance is also manipulated directly via storage by the VM.
-    /// @dev - On Era, during deposit the bootloader mints base tokens via the mint function in L2BaseToken contract.
+    /// @dev - On both Era and ZK OS, balance is also manipulated directly via storage by the VM.
     /// @dev WARNING: Since standard ETH transfer is used, the transfer may fail if the recipient
     /// @dev rejects ETH. Only trusted recipients should be used to guarantee successful operation.
     /// @param _to The address to receive the base tokens.

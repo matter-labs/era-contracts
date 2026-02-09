@@ -320,9 +320,9 @@ contract L2BaseTokenZKOSTest is Test {
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2BaseToken.initializeBaseTokenHolderBalance();
 
-        // Second call should revert (OpenZeppelin Initializable)
+        // Second call reverts because the contract no longer has sufficient balance
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        vm.expectRevert("Initializable: contract is already initialized");
+        vm.expectRevert("Address: insufficient balance");
         l2BaseToken.initializeBaseTokenHolderBalance();
     }
 

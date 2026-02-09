@@ -13,10 +13,27 @@ import {L2_BASE_TOKEN_HOLDER, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../
  * @custom:security-contact security@matterlabs.dev
  * @notice Abstract base contract for L2 Base Token implementations.
  * @dev This contract contains the shared withdrawal logic for both Era and ZK OS versions.
+ * @dev Storage variables are declared here to ensure both Era and ZK OS implementations
+ * @dev share the same storage layout, allowing future shared fields to be added safely.
  */
 abstract contract L2BaseTokenBase is IL2BaseTokenBase {
     /// @notice The L1Messenger contract for sending messages to L1
     IL2ToL1Messenger internal constant L1_MESSENGER = IL2ToL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR);
+
+    /// @notice The balances of the users.
+    /// @dev Only used by the Era implementation. Declared here for storage layout alignment.
+    mapping(address account => uint256 balance) internal balance;
+
+    /// @notice Deprecated: The old storage variable for total supply.
+    /// @dev This variable is kept to preserve storage layout. It is only read during the V31 upgrade
+    /// @dev to initialize the BaseTokenHolder balance correctly. After V31, totalSupply is computed
+    /// @dev dynamically from the BaseTokenHolder's balance.
+    /// @dev Only used by the Era implementation. Declared here for storage layout alignment.
+    // slither-disable-next-line uninitialized-state
+    uint256 internal __DEPRECATED_totalSupply;
+
+    /// @dev Storage gap to allow adding new shared storage variables in future upgrades.
+    uint256[48] private __gap;
 
     /// @notice Initiate the withdrawal of the base token, funds will be available to claim on L1 `finalizeEthWithdrawal` method.
     /// @param _l1Receiver The address on L1 to receive the funds.

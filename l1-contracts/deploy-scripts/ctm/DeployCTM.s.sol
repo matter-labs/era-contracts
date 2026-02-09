@@ -503,6 +503,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             beaconDeployerInfo: config.isZKsyncOS
                 ? Utils.getZKOSProxyUpgradeBytecodeInfo("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer")
                 : abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
+            baseTokenHolderBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("BaseTokenHolder.sol", "BaseTokenHolder")
+                : abi.encode(getL2BytecodeHash("BaseTokenHolder")),
             chainAssetHandlerBytecodeInfo: config.isZKsyncOS
                 ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2ChainAssetHandler.sol", "L2ChainAssetHandler")
                 : abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),

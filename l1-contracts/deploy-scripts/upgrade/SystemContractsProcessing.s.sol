@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {console2 as console} from "forge-std/Script.sol";
 import {Utils} from "../utils/Utils.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_HOLDER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
@@ -28,7 +28,7 @@ struct SystemContract {
 /// @dev The number of built-in contracts that reside within the "system-contracts" folder
 uint256 constant SYSTEM_CONTRACTS_COUNT = 31;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
-uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 7;
+uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 8;
 
 library SystemContractsProcessing {
     /// @notice Retrieves the entire list of system contracts as a memory array
@@ -353,6 +353,7 @@ library SystemContractsProcessing {
         result[4] = ContractsBytecodesLib.getCreationCode("L2WrappedBaseToken");
         result[5] = ContractsBytecodesLib.getCreationCode("L2MessageVerification");
         result[6] = ContractsBytecodesLib.getCreationCode("L2ChainAssetHandler");
+        result[7] = ContractsBytecodesLib.getCreationCode("BaseTokenHolder");
     }
 
     /// Note, that while proper initialization may require multiple steps,
@@ -419,6 +420,13 @@ library SystemContractsProcessing {
                 L2_ASSET_ROUTER_ADDR,
                 L2_MESSAGE_ROOT_ADDR
             )
+        });
+        forceDeployments[7] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[7]),
+            newAddress: L2_BASE_TOKEN_HOLDER_ADDR,
+            callConstructor: false,
+            value: 0,
+            input: ""
         });
     }
 

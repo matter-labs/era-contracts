@@ -18,16 +18,6 @@ import {InsufficientFunds, Unauthorized} from "../../common/L1ContractErrors.sol
  * to perform the balance changes while simulating the `msg.value` Ethereum behavior.
  */
 contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
-    /// @notice The balances of the users.
-    mapping(address account => uint256 balance) internal balance;
-
-    /// @notice Deprecated: The old storage variable for total supply.
-    /// @dev This variable is kept to preserve storage layout. It is only read during the V31 upgrade
-    /// @dev to initialize the BaseTokenHolder balance correctly. After V31, totalSupply is computed
-    /// @dev dynamically from the BaseTokenHolder's balance.
-    // slither-disable-next-line uninitialized-state
-    uint256 internal __DEPRECATED_totalSupply;
-
     /// @notice Modifier that makes sure that the method can only be called from the bootloader or InteropHandler.
     modifier onlyCallFromBootloaderOrInteropHandler() {
         if (msg.sender != L2_BOOTLOADER_ADDRESS && msg.sender != L2_INTEROP_HANDLER_ADDR) {
@@ -39,6 +29,8 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
     /// @notice Returns the total circulating supply of base tokens.
     /// @dev Computed as: INITIAL_BASE_TOKEN_HOLDER_BALANCE - current holder balance
     /// @dev This replaces the previous storage-based totalSupply that was incremented on mint.
+    /// @dev This formula is safe because selfdestruct is not supported on Era, so no funds
+    /// @dev can be force-sent to BaseTokenHolder bypassing the access-controlled entry points.
     function totalSupply() external view override returns (uint256) {
         return INITIAL_BASE_TOKEN_HOLDER_BALANCE - balance[L2_BASE_TOKEN_HOLDER_ADDR];
     }
@@ -100,15 +92,11 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
     /// @dev such that the new computed totalSupply() equals the old value.
     /// @dev Formula: balance[holder] = INITIAL_BASE_TOKEN_HOLDER_BALANCE - __DEPRECATED_totalSupply
     /// @dev Can only be called by the ComplexUpgrader contract.
-    /// @dev This function is idempotent - calling it when the balance is already set has no effect.
     function initializeBaseTokenHolderBalance() external override {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert Unauthorized(msg.sender);
         }
 
-        // Only initialize if not already set (idempotent)
-        if (balance[L2_BASE_TOKEN_HOLDER_ADDR] == 0) {
-            balance[L2_BASE_TOKEN_HOLDER_ADDR] = INITIAL_BASE_TOKEN_HOLDER_BALANCE - __DEPRECATED_totalSupply;
-        }
+        balance[L2_BASE_TOKEN_HOLDER_ADDR] = INITIAL_BASE_TOKEN_HOLDER_BALANCE - __DEPRECATED_totalSupply;
     }
 }

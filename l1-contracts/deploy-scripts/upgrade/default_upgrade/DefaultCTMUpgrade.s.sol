@@ -421,6 +421,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             messageRootBytecodeInfo: abi.encode(getL2BytecodeHash("L2MessageRoot")),
             chainAssetHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
             beaconDeployerInfo: abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
+            baseTokenHolderBytecodeInfo: abi.encode(getL2BytecodeHash("BaseTokenHolder")),
             interopCenterBytecodeInfo: abi.encode(getL2BytecodeHash("InteropCenter")),
             interopHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("InteropHandler")),
             assetTrackerBytecodeInfo: abi.encode(getL2BytecodeHash("L2AssetTracker")),

@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
 import {Address} from "@openzeppelin/contracts-v4/utils/Address.sol";
 
 import {L2BaseTokenBase} from "../L2BaseTokenBase.sol";
@@ -30,13 +29,12 @@ import {BaseTokenHolderMintFailed, Unauthorized} from "../../common/L1ContractEr
  *
  * This is done in `L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit()`.
  */
-contract L2BaseTokenZKOS is L2BaseTokenBase, Initializable {
+contract L2BaseTokenZKOS is L2BaseTokenBase {
     /// @notice Initializes the BaseTokenHolder's balance during genesis or V31 upgrade.
     /// @dev This function mints 2^127 - 1 tokens to this contract via the mint hook,
     /// @dev then transfers all tokens to BaseTokenHolder.
     /// @dev Can only be called by the ComplexUpgrader contract.
-    /// @dev Uses OpenZeppelin's Initializable to ensure it can only be called once.
-    function initializeBaseTokenHolderBalance() external initializer {
+    function initializeBaseTokenHolderBalance() external {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert Unauthorized(msg.sender);
         }

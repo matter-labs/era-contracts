@@ -156,7 +156,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         MockSystemContractProxyAdmin etchedProxyAdmin = MockSystemContractProxyAdmin(
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
         );
-        assertEq(etchedProxyAdmin.upgradeCallCount(), 8);
+        assertEq(etchedProxyAdmin.upgradeCallCount(), 9);
     }
 
     function testEraForceDeployment() public {
@@ -189,6 +189,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         assertEq(etchedDeployer.deploymentCount(L2_NATIVE_TOKEN_VAULT_ADDR), 1);
         assertEq(etchedDeployer.deploymentCount(L2_CHAIN_ASSET_HANDLER_ADDR), 1);
         assertEq(etchedDeployer.deploymentCount(L2_NTV_BEACON_DEPLOYER_ADDR), 1);
+        assertEq(etchedDeployer.deploymentCount(L2_BASE_TOKEN_HOLDER_ADDR), 1);
 
         // No proxy upgrades for Era
         MockSystemContractProxyAdmin etchedProxyAdmin = MockSystemContractProxyAdmin(
@@ -241,6 +242,11 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
             abi.encode(keccak256("assetTracker_proxy"), uint32(0), bytes32(0))
         );
 
+        data.baseTokenHolderBytecodeInfo = abi.encode(
+            abi.encode(keccak256("baseTokenHolder_impl"), uint32(0), bytes32(0)),
+            abi.encode(keccak256("baseTokenHolder_proxy"), uint32(0), bytes32(0))
+        );
+
         if (isGenesis) {
             data.beaconDeployerInfo = abi.encode(
                 abi.encode(keccak256("beaconDeployer_impl"), uint32(0), bytes32(0)),
@@ -271,6 +277,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         data.interopHandlerBytecodeInfo = abi.encode(keccak256("interopHandler"));
         data.assetTrackerBytecodeInfo = abi.encode(keccak256("assetTracker"));
         data.beaconDeployerInfo = abi.encode(keccak256("beaconDeployer"));
+        data.baseTokenHolderBytecodeInfo = abi.encode(keccak256("baseTokenHolder"));
 
         return data;
     }
