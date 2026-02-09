@@ -119,7 +119,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
 
         newChainAdmin = makeAddr("chainadmin");
 
-        vm.startPrank(address(bridgehub));
         chainTypeManager = new EraChainTypeManager(address(bridgehub), interopCenterAddress, address(0));
         diamondInit = address(new DiamondInit(false));
         genesisUpgradeContract = new L1GenesisUpgrade();
@@ -214,19 +213,11 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         );
         chainContractAddress = EraChainTypeManager(address(transparentUpgradeableProxy));
 
-        // Set verifier for protocol version 0 (used for chain creation)
-        vm.stopPrank();
-        vm.prank(governor);
-        chainContractAddress.setProtocolVersionVerifier(0, testnetVerifier);
-        vm.startPrank(address(bridgehub));
-
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
-
-        vm.stopPrank();
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
-        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain(testnetVerifier);
+        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain();
 
         bytes memory initCalldata = abi.encode(initializeData);
 

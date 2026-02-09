@@ -399,7 +399,7 @@ describe("L2 upgrade test", function () {
       nonce: 5 + initialMinorProtocolVersion,
     });
 
-    // verifier is now set via setNewVersionUpgrade, not in ProposedUpgrade struct
+    // Verifier is resolved via setNewVersionUpgrade; ProposedUpgrade.verifier is deprecated but kept for compatibility
     const upgrade = {
       bootloaderHash,
       defaultAccountHash,
@@ -478,7 +478,7 @@ describe("L2 upgrade test", function () {
       nonce: 0,
     });
 
-    // verifier is now set via setNewVersionUpgrade, not in ProposedUpgrade struct
+    // Verifier is resolved via setNewVersionUpgrade; ProposedUpgrade.verifier is deprecated but kept for compatibility
     const upgrade = {
       verifier: newVerifier,
       newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 5, 1),
@@ -540,7 +540,7 @@ describe("L2 upgrade test", function () {
       nonce: 5 + 1 + initialMinorProtocolVersion,
     });
 
-    // verifier is now set via setNewVersionUpgrade, not in ProposedUpgrade struct
+    // Verifier is resolved via setNewVersionUpgrade; ProposedUpgrade.verifier is deprecated but kept for compatibility
     const upgrade = {
       bootloaderHash,
       defaultAccountHash,

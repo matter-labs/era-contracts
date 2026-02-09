@@ -18,6 +18,9 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_TRACKER_ADDR}
 // solhint-enable max-line-length
 
 contract UtilsCallMockerTest is Test {
+    address private constant DEFAULT_CHAIN_TYPE_MANAGER = address(0x1234567890876543567890);
+    uint256 private constant DEFAULT_PROTOCOL_VERSION = 0;
+
     function mockDiamondInitInteropCenterCallsWithAddress(
         address bridgehub,
         address assetRouter,
@@ -59,14 +62,9 @@ contract UtilsCallMockerTest is Test {
     /// @dev The chainTypeManager address (0x1234567890876543567890) and protocolVersion (0)
     ///      match the values used in Utils.makeInitializeData()
     function mockChainTypeManagerVerifier(address verifier) public {
-        // This is the chainTypeManager address used in Utils.makeInitializeData()
-        address chainTypeManager = address(0x1234567890876543567890);
-        // This is the protocolVersion used in Utils.makeInitializeData()
-        uint256 protocolVersion = 0;
-
         vm.mockCall(
-            chainTypeManager,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, protocolVersion),
+            DEFAULT_CHAIN_TYPE_MANAGER,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, DEFAULT_PROTOCOL_VERSION),
             abi.encode(verifier)
         );
     }

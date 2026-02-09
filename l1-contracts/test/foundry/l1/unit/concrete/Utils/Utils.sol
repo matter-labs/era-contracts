@@ -480,9 +480,7 @@ library Utils {
             });
     }
 
-    function makeInitializeDataForNewChain(
-        address /* testnetVerifier */
-    ) public pure returns (InitializeDataNewChain memory) {
+    function makeInitializeDataForNewChain() public pure returns (InitializeDataNewChain memory) {
         return
             InitializeDataNewChain({
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
@@ -491,11 +489,7 @@ library Utils {
             });
     }
 
-    function makeDiamondProxy(
-        Diamond.FacetCut[] memory facetCuts,
-        address testnetVerifier,
-        address bridgehub
-    ) public returns (address) {
+    function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address bridgehub) public returns (address) {
         DiamondInit diamondInit = new DiamondInit(false);
         bytes memory diamondInitData = abi.encodeWithSelector(
             diamondInit.initialize.selector,

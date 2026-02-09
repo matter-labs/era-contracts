@@ -89,10 +89,11 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
 
     /// @dev The block number when newChainCreationParams was saved for some protocolVersion.
     /// @dev It's used for easier tracking the upgrade cutData off-chain.
-    /// @dev Populated starting from v31.
+    /// @dev Populated starting from v31 and only when chain creation params change.
     mapping(uint256 protocolVersion => uint256) public newChainCreationParamsBlock;
 
     /// @dev The verifier address per protocol version.
+    /// @dev Populated starting from v31.
     /// @dev Updating this mapping only affects CTM storage; it does NOT update already deployed chains.
     /// @dev Emergency verifier changes still require a chain upgrade (diamond cut).
     mapping(uint256 protocolVersion => address) public protocolVersionVerifier;
@@ -398,25 +399,13 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             initCalldata: upgradeCalldata
         });
 
-        uint256 previousProtocolVersion = protocolVersion;
-        _setProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
-        _setProtocolVersionDeadline(_newProtocolVersion, type(uint256).max);
-        protocolVersion = _newProtocolVersion;
-        emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
-
-        // Set upgrade cut hash for old protocol version
-        bytes32 newCutHash = keccak256(abi.encode(diamondCut));
-        upgradeCutHash[_oldProtocolVersion] = newCutHash;
-        upgradeCutDataBlock[_oldProtocolVersion] = block.number;
-        emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
-        emit NewUpgradeCutData(_oldProtocolVersion, diamondCut);
-
-        // Save the block number for tracking
-        newChainCreationParamsBlock[_newProtocolVersion] = block.number;
-
-        _setProtocolVersionVerifier(_newProtocolVersion, _verifier);
-        // Emit event with backward compatible hack.
-        emit NewUpgradeCutData(_newProtocolVersion, diamondCut);
+        _setNewVersionUpgrade({
+            _cutData: diamondCut,
+            _oldProtocolVersion: _oldProtocolVersion,
+            _oldProtocolVersionDeadline: _oldProtocolVersionDeadline,
+            _newProtocolVersion: _newProtocolVersion,
+            _verifier: _verifier
+        });
     }
 
     /// @dev Common logic for setting new version upgrade
@@ -425,6 +414,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
     /// @param _newProtocolVersion the new protocol version
     /// @param _verifier the verifier address for the new protocol version
+    /// @dev Note: non-sequential protocol versions are allowed (e.g., minor/patch jumps).
     function _setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,

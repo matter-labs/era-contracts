@@ -72,7 +72,7 @@ contract ZKChainBaseTest is UtilsTest {
         dummyBridgehub = new DummyBridgehub();
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), bytes32(0));
         mockChainTypeManagerVerifier(testnetVerifier);
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, address(dummyBridgehub));
+        address diamondProxy = Utils.makeDiamondProxy(facetCuts, address(dummyBridgehub));
         testBaseFacet = TestBaseFacet(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }

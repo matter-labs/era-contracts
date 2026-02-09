@@ -125,8 +125,8 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
         assertEq(storedVerifier, newVerifier);
     }
 
-    // setProtocolVersionVerifier - happy path by admin
-    function test_SuccessfulSetProtocolVersionVerifierByAdmin() public {
+    // setProtocolVersionVerifier - unhappy path by admin
+    function test_RevertWhen_SetProtocolVersionVerifierByAdmin() public {
         uint256 protocolVersionToSet = 200;
         address newVerifier = makeAddr("newVerifier");
         address ctmAdmin = makeAddr("ctmAdmin");
@@ -138,10 +138,8 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
         chainContractAddress.acceptAdmin();
 
         vm.prank(ctmAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, ctmAdmin));
         chainContractAddress.setProtocolVersionVerifier(protocolVersionToSet, newVerifier);
-
-        address storedVerifier = chainContractAddress.protocolVersionVerifier(protocolVersionToSet);
-        assertEq(storedVerifier, newVerifier);
     }
 
     // setProtocolVersionVerifier - unhappy path (zero address)
