@@ -416,7 +416,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @param _verifier the verifier address for the new protocol version
     /// @dev Note: non-sequential protocol versions are allowed (e.g., minor/patch jumps).
     function _setNewVersionUpgrade(
-        Diamond.DiamondCutData calldata _cutData,
+        Diamond.DiamondCutData memory _cutData,
         uint256 _oldProtocolVersion,
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion,
@@ -459,7 +459,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev set upgrade for some protocolVersion
     /// @param _cutData the new diamond cut data
     /// @param _oldProtocolVersion the old protocol version
-    function setUpgradeDiamondCutInner(Diamond.DiamondCutData calldata _cutData, uint256 _oldProtocolVersion) internal {
+    function setUpgradeDiamondCutInner(Diamond.DiamondCutData memory _cutData, uint256 _oldProtocolVersion) internal {
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
         upgradeCutHash[_oldProtocolVersion] = newCutHash;
         upgradeCutDataBlock[_oldProtocolVersion] = block.number;

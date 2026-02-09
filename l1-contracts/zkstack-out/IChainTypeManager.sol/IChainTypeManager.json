@@ -524,6 +524,11 @@
             "internalType": "uint256"
           },
           {
+            "name": "verifier",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
             "name": "serverNotifier",
             "type": "address",
             "internalType": "address"
