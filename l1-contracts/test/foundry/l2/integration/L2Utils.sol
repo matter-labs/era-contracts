@@ -30,6 +30,7 @@ import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {ZKSYNC_ERA_CHAIN_ID, ZK_TOKEN_ERA_ADDRESS} from "foundry-test/Constants.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
@@ -152,7 +153,7 @@ library L2Utils {
         InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
             _args.l1ChainId,
             _args.aliasedOwner,
-            DataEncoding.encodeNTVAssetId(324, address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E))
+            DataEncoding.encodeNTVAssetId(ZKSYNC_ERA_CHAIN_ID, ZK_TOKEN_ERA_ADDRESS)
         );
     }
 

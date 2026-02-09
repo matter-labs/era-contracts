@@ -371,17 +371,12 @@ contract InteropCenter is
                 );
             }
         }
-        // Send protocol fee to block.coinbase. If transfer fails (e.g., coinbase is a reverting contract),
-        // accumulate the fee for later withdrawal via claimProtocolFees().
-        // This is handled to not allow malicious operator to fail sending bundles by providing faulty coinbase.
+        // Accumulate the fee for later withdrawal via claimProtocolFees().
+        // This is handled to not allow malicious operator to fail sending bundles by providing faulty coinbase
+        // and to avoid calls to any untrusted contracts.
         if (protocolFee > 0) {
-            (bool success, ) = block.coinbase.call{value: protocolFee}("");
-            if (success) {
-                emit ProtocolFeesCollected(block.coinbase, protocolFee);
-            } else {
-                accumulatedProtocolFees[block.coinbase] += protocolFee;
-                emit ProtocolFeesAccumulated(block.coinbase, protocolFee);
-            }
+            accumulatedProtocolFees[block.coinbase] += protocolFee;
+            emit ProtocolFeesAccumulated(block.coinbase, protocolFee);
         }
     }
 

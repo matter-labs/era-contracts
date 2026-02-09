@@ -28,6 +28,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
+import {ZKSYNC_ERA_CHAIN_ID, ZK_TOKEN_ERA_ADDRESS} from "foundry-test/Constants.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 
@@ -53,7 +54,7 @@ contract ChainRegistrarTest is Test {
         interopCenter.initL2(
             block.chainid,
             makeAddr("admin"),
-            DataEncoding.encodeNTVAssetId(324, address(0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E))
+            DataEncoding.encodeNTVAssetId(ZKSYNC_ERA_CHAIN_ID, ZK_TOKEN_ERA_ADDRESS)
         );
         messageRoot = new L1MessageRoot(address(bridgeHub), 1);
         ctm = new DummyChainTypeManagerWBH(address(bridgeHub));
