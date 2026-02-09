@@ -7,7 +7,7 @@ import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 import {PriorityQueue} from "../../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
-import {BaseTokenGasPriceDenominatorNotSet, Unauthorized, OnlyNormalMode, OnlyPriorityMode} from "../../../common/L1ContractErrors.sol";
+import {BatchHashMismatch, BaseTokenGasPriceDenominatorNotSet, Unauthorized, OnlyNormalMode, OnlyPriorityMode} from "../../../common/L1ContractErrors.sol";
 import {L2_INTEROP_CENTER_ADDR, GW_ASSET_TRACKER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
@@ -16,6 +16,7 @@ import {L1_GAS_PER_PUBDATA_BYTE, PRIORITY_OPERATION_L2_TX_TYPE, SYSTEM_UPGRADE_L
 import {RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch} from "../../../common/L1ContractErrors.sol";
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
+import {StoredBatchHashing} from "../StoredBatchHashing.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
@@ -178,6 +179,29 @@ contract ZKChainBase is ReentrancyGuard {
 
     function _getUpgradeTxType() internal view returns (uint256) {
         return s.zksyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
+    }
+
+    /// @dev Checks that the batch hash is correct and matches the expected hash.
+    /// @param _lastCommittedBatchData The last committed batch.
+    /// @param _batchNumber The batch number to check.
+    /// @param _checkLegacy Whether to check the legacy hash.
+    function _checkBatchHashMismatch(
+        IExecutor.StoredBatchInfo memory _lastCommittedBatchData,
+        uint256 _batchNumber,
+        bool _checkLegacy
+    ) internal view {
+        bytes32 cachedStoredBatchHashes = s.storedBatchHashes[_batchNumber];
+        if (
+            cachedStoredBatchHashes != StoredBatchHashing.hashStoredBatchInfo(_lastCommittedBatchData) &&
+            (!_checkLegacy ||
+                cachedStoredBatchHashes != StoredBatchHashing.hashLegacyStoredBatchInfo(_lastCommittedBatchData))
+        ) {
+            // incorrect previous batch data
+            revert BatchHashMismatch(
+                cachedStoredBatchHashes,
+                StoredBatchHashing.hashStoredBatchInfo(_lastCommittedBatchData)
+            );
+        }
     }
 
     /// @notice Derives the price for L2 gas in base token to be paid.

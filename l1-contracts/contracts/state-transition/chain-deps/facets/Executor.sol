@@ -11,7 +11,7 @@ import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {GW_ASSET_TRACKER} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
-import {BatchHashMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, InvalidMessageRoot, InvalidProof, NonSequentialBatch, PriorityOperationsRollingHashMismatch, VerifiedBatchesExceedsCommittedBatches} from "../../../common/L1ContractErrors.sol";
+import {CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, InvalidMessageRoot, InvalidProof, NonSequentialBatch, PriorityOperationsRollingHashMismatch, VerifiedBatchesExceedsCommittedBatches} from "../../../common/L1ContractErrors.sol";
 import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MessageRootIsZero, MismatchNumberOfLayer1Txs} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -35,25 +35,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     constructor(uint256 _l1ChainId) {
         L1_CHAIN_ID = _l1ChainId;
-    }
-
-    /// @dev Checks that the batch hash is correct and matches the expected hash.
-    /// @param _lastCommittedBatchData The last committed batch.
-    /// @param _batchNumber The batch number to check.
-    /// @param _checkLegacy Whether to check the legacy hash.
-    function _checkBatchHashMismatch(
-        StoredBatchInfo memory _lastCommittedBatchData,
-        uint256 _batchNumber,
-        bool _checkLegacy
-    ) internal view {
-        bytes32 cachedStoredBatchHashes = s.storedBatchHashes[_batchNumber];
-        if (
-            cachedStoredBatchHashes != _hashStoredBatchInfo(_lastCommittedBatchData) &&
-            (!_checkLegacy || cachedStoredBatchHashes != _hashLegacyStoredBatchInfo(_lastCommittedBatchData))
-        ) {
-            // incorrect previous batch data
-            revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(_lastCommittedBatchData));
-        }
     }
 
     function _rollingHash(bytes32[] memory _hashes) internal pure returns (bytes32) {
@@ -323,23 +304,4 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         _revertBatches(_newLastBatch);
     }
 
-    /// @notice Returns the keccak hash of the ABI-encoded StoredBatchInfo
-    function _hashStoredBatchInfo(StoredBatchInfo memory _storedBatchInfo) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_storedBatchInfo));
-    }
-
-    /// @notice Returns the keccak hash of the ABI-encoded Legacy StoredBatchInfo
-    function _hashLegacyStoredBatchInfo(StoredBatchInfo memory _storedBatchInfo) internal pure returns (bytes32) {
-        LegacyStoredBatchInfo memory legacyStoredBatchInfo = LegacyStoredBatchInfo({
-            batchNumber: _storedBatchInfo.batchNumber,
-            batchHash: _storedBatchInfo.batchHash,
-            indexRepeatedStorageChanges: _storedBatchInfo.indexRepeatedStorageChanges,
-            numberOfLayer1Txs: _storedBatchInfo.numberOfLayer1Txs,
-            priorityOperationsHash: _storedBatchInfo.priorityOperationsHash,
-            l2LogsTreeRoot: _storedBatchInfo.l2LogsTreeRoot,
-            timestamp: _storedBatchInfo.timestamp,
-            commitment: _storedBatchInfo.commitment
-        });
-        return keccak256(abi.encode(legacyStoredBatchInfo));
-    }
 }

@@ -9,10 +9,11 @@ import {ICommitter, CommitBatchInfo, CommitBatchInfoZKsyncOS, PrecommitInfo} fro
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
+import {StoredBatchHashing} from "../StoredBatchHashing.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {BatchHashMismatch, BatchNumberMismatch, CanOnlyProcessOneBatch, EmptyPrecommitData, HashMismatch, IncorrectBatchChainId, InvalidBatchNumber, InvalidLogSender, InvalidNumberOfBlobs, InvalidPackedPrecommitmentLength, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, PrecommitmentMismatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, NonZeroBlobToVerifyZKsyncOS, InvalidBlockRange, InvalidTxCountInPriorityMode} from "../../../common/L1ContractErrors.sol";
+import {BatchNumberMismatch, CanOnlyProcessOneBatch, EmptyPrecommitData, HashMismatch, IncorrectBatchChainId, InvalidBatchNumber, InvalidLogSender, InvalidNumberOfBlobs, InvalidPackedPrecommitmentLength, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, PrecommitmentMismatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, NonZeroBlobToVerifyZKsyncOS, InvalidBlockRange, InvalidTxCountInPriorityMode} from "../../../common/L1ContractErrors.sol";
 import {MismatchL2DACommitmentScheme, SettlementLayerChainIdMismatch} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -196,7 +197,9 @@ contract CommitterFacet is ZKChainBase, ICommitter {
                 _systemContractUpgradeTxHash
             );
 
-            s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(_lastCommittedBatchData);
+            s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = StoredBatchHashing.hashStoredBatchInfo(
+                _lastCommittedBatchData
+            );
             emit BlockCommit(
                 _lastCommittedBatchData.batchNumber,
                 _lastCommittedBatchData.batchHash,
@@ -237,7 +240,9 @@ contract CommitterFacet is ZKChainBase, ICommitter {
                 upgradeTxHash
             );
 
-            s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(_lastCommittedBatchData);
+            s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = StoredBatchHashing.hashStoredBatchInfo(
+                _lastCommittedBatchData
+            );
             emit BlockCommit(
                 _lastCommittedBatchData.batchNumber,
                 _lastCommittedBatchData.batchHash,
@@ -661,25 +666,6 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         }
     }
 
-    /// @dev Checks that the batch hash is correct and matches the expected hash.
-    /// @param _lastCommittedBatchData The last committed batch.
-    /// @param _batchNumber The batch number to check.
-    /// @param _checkLegacy Whether to check the legacy hash.
-    function _checkBatchHashMismatch(
-        IExecutor.StoredBatchInfo memory _lastCommittedBatchData,
-        uint256 _batchNumber,
-        bool _checkLegacy
-    ) internal view {
-        bytes32 cachedStoredBatchHashes = s.storedBatchHashes[_batchNumber];
-        if (
-            cachedStoredBatchHashes != _hashStoredBatchInfo(_lastCommittedBatchData) &&
-            (!_checkLegacy || cachedStoredBatchHashes != _hashLegacyStoredBatchInfo(_lastCommittedBatchData))
-        ) {
-            // incorrect previous batch data
-            revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(_lastCommittedBatchData));
-        }
-    }
-
     /// @dev Creates batch commitment from its data
     function _createBatchCommitment(
         CommitBatchInfo memory _newBatchData,
@@ -768,28 +754,6 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             blobAuxOutputWords[i * 2] = _blobHashes[i];
             blobAuxOutputWords[i * 2 + 1] = _blobCommitments[i];
         }
-    }
-
-    /// @notice Returns the keccak hash of the ABI-encoded StoredBatchInfo
-    function _hashStoredBatchInfo(IExecutor.StoredBatchInfo memory _storedBatchInfo) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_storedBatchInfo));
-    }
-
-    /// @notice Returns the keccak hash of the ABI-encoded Legacy StoredBatchInfo
-    function _hashLegacyStoredBatchInfo(
-        IExecutor.StoredBatchInfo memory _storedBatchInfo
-    ) internal pure returns (bytes32) {
-        IExecutor.LegacyStoredBatchInfo memory legacyStoredBatchInfo = IExecutor.LegacyStoredBatchInfo({
-            batchNumber: _storedBatchInfo.batchNumber,
-            batchHash: _storedBatchInfo.batchHash,
-            indexRepeatedStorageChanges: _storedBatchInfo.indexRepeatedStorageChanges,
-            numberOfLayer1Txs: _storedBatchInfo.numberOfLayer1Txs,
-            priorityOperationsHash: _storedBatchInfo.priorityOperationsHash,
-            l2LogsTreeRoot: _storedBatchInfo.l2LogsTreeRoot,
-            timestamp: _storedBatchInfo.timestamp,
-            commitment: _storedBatchInfo.commitment
-        });
-        return keccak256(abi.encode(legacyStoredBatchInfo));
     }
 
     /// @notice Returns true if the bit at index {_index} is 1

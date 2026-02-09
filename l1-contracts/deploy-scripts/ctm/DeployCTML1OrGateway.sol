@@ -40,7 +40,7 @@ library DeployCTML1OrGateway {
         bool isZKBytecode
     ) internal view returns (bytes memory) {
         if (contractName == CTMContract.AdminFacet) {
-            return abi.encode(config.l1ChainId, config.rollupDAManager, config.testnetVerifier);
+            return abi.encode(config.l1ChainId, config.rollupDAManager);
         } else if (contractName == CTMContract.MailboxFacet) {
             return
                 abi.encode(
