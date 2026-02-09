@@ -20,10 +20,6 @@ contract ServerNotifierTest is Test {
     address internal chainAdmin;
     uint256 internal chainId;
 
-    event MigrateToGateway(uint256 indexed chainId, uint256 migrationNumber);
-    event MigrateFromGateway(uint256 indexed chainId, uint256 migrationNumber);
-    event UpgradeTimestampUpdated(uint256 indexed chainId, uint256 indexed protocolVersion, uint256 upgradeTimestamp);
-
     function setUp() public {
         chainId = 1;
         owner = makeAddr("owner");
@@ -53,8 +49,8 @@ contract ServerNotifierTest is Test {
         chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
 
         vm.startPrank(chainAdmin);
-        vm.expectEmit(true, true, true, true);
-        emit UpgradeTimestampUpdated(chainId, protocolVersion, deadline);
+        vm.expectEmit(true, true, true, true, address(serverNotifier));
+        emit IServerNotifier.UpgradeTimestampUpdated(chainId, protocolVersion, deadline);
         serverNotifier.setUpgradeTimestamp(chainId, protocolVersion, deadline);
         uint256 stored = serverNotifier.protocolVersionToUpgradeTimestamp(chainId, protocolVersion);
         assertEq(stored, deadline);
@@ -85,8 +81,8 @@ contract ServerNotifierTest is Test {
         chainTypeManager.setChainAdmin(chainId, chainAdmin);
 
         vm.startPrank(chainAdmin);
-        vm.expectEmit(true, false, false, true);
-        emit MigrateToGateway(chainId, 0);
+        vm.expectEmit(true, false, false, true, address(serverNotifier));
+        emit IServerNotifier.MigrateToGateway(chainId, 0);
         serverNotifier.migrateToGateway(chainId);
         vm.stopPrank();
     }
@@ -104,8 +100,28 @@ contract ServerNotifierTest is Test {
         chainTypeManager.setChainAdmin(chainId, chainAdmin);
 
         vm.startPrank(chainAdmin);
-        vm.expectEmit(true, false, false, true);
-        emit MigrateFromGateway(chainId, 0);
+        vm.expectEmit(true, false, false, true, address(serverNotifier));
+        emit IServerNotifier.MigrateFromGateway(chainId, 0);
+        serverNotifier.migrateFromGateway(chainId);
+        vm.stopPrank();
+    }
+
+    function test_migrateToGatewayEmitsNonZeroMigrationNumber() public {
+        chainAssetHandler.setMigrationNumber(chainId, 7);
+
+        vm.startPrank(chainAdmin);
+        vm.expectEmit(true, false, false, true, address(serverNotifier));
+        emit IServerNotifier.MigrateToGateway(chainId, 7);
+        serverNotifier.migrateToGateway(chainId);
+        vm.stopPrank();
+    }
+
+    function test_migrateFromGatewayEmitsNonZeroMigrationNumber() public {
+        chainAssetHandler.setMigrationNumber(chainId, 9);
+
+        vm.startPrank(chainAdmin);
+        vm.expectEmit(true, false, false, true, address(serverNotifier));
+        emit IServerNotifier.MigrateFromGateway(chainId, 9);
         serverNotifier.migrateFromGateway(chainId);
         vm.stopPrank();
     }

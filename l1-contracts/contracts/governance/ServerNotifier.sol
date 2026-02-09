@@ -5,6 +5,7 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
 import {InvalidProtocolVersion, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+import {IServerNotifier} from "./IServerNotifier.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandler} from "../core/chain-asset-handler/IChainAssetHandler.sol";
@@ -14,25 +15,9 @@ import {IChainAssetHandler} from "../core/chain-asset-handler/IChainAssetHandler
 /// @custom:security-contact security@matterlabs.dev
 /// @notice This contract enables chain admins to emit migration events for the server.
 /// @dev The `owner` of this contract is expected to be the admin of the chainTypeManager contract.
-contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable {
+contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServerNotifier {
     /// @notice The chainTypeManager, which is used to retrieve chain administrator addresses.
     IChainTypeManager public chainTypeManager;
-
-    /// @notice Emitted to notify the server before a chain migrates to the ZK gateway.
-    /// @param chainId The identifier for the chain initiating migration to the ZK gateway.
-    /// @param migrationNumber The migration number for this migration.
-    event MigrateToGateway(uint256 indexed chainId, uint256 migrationNumber);
-
-    /// @notice Emitted to notify the server before a chain migrates from the ZK gateway.
-    /// @param chainId The identifier for the chain initiating migration from the ZK gateway.
-    /// @param migrationNumber The migration number for this migration.
-    event MigrateFromGateway(uint256 indexed chainId, uint256 migrationNumber);
-
-    /// @notice Emitted whenever an upgrade timestamp is set.
-    /// @param chainId The ID of the chain where the upgrade is scheduled.
-    /// @param protocolVersion The protocol version being scheduled.
-    /// @param upgradeTimestamp UNIX timestamp when the upgrade is expected.
-    event UpgradeTimestampUpdated(uint256 indexed chainId, uint256 indexed protocolVersion, uint256 upgradeTimestamp);
 
     /// @notice Maps each chainId => protocolVersion => expected upgrade timestamp.
     mapping(uint256 chainId => mapping(uint256 protocolVersion => uint256 upgradeTimestamp))
