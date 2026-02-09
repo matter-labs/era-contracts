@@ -24,9 +24,7 @@
       "contractName": "MultisigCommitter",
       "contractAddress": "0x8419fc5e2f47373ef9f39fc5a11c90ecffc4881a",
       "function": null,
-      "arguments": [
-        "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
-      ],
+      "arguments": ["0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"],
       "transaction": {
         "from": "0x5555555590930f501c88b73ea43b3eeb5a71643c",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -63,9 +61,7 @@
       "logs": [
         {
           "address": "0x8419fc5e2f47373ef9f39fc5a11c90ecffc4881a",
-          "topics": [
-            "0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498"
-          ],
+          "topics": ["0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498"],
           "data": "0x00000000000000000000000000000000000000000000000000000000000000ff",
           "blockHash": "0xb97ed01bcdbc83fdf0b0e0c205016becc1a98837eed3d42d483579761e9884ca",
           "blockNumber": "0x99719d",
@@ -89,9 +85,7 @@
       "contractAddress": null
     }
   ],
-  "libraries": [
-    "deploy-scripts/Utils.sol:Utils:0x98f3e2D36a69C495FEA3d13057181b425Ed4550B"
-  ],
+  "libraries": ["deploy-scripts/Utils.sol:Utils:0x98f3e2D36a69C495FEA3d13057181b425Ed4550B"],
   "pending": [],
   "returns": {},
   "timestamp": 1768564778116,
