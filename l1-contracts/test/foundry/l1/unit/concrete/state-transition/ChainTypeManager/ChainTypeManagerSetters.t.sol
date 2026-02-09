@@ -138,7 +138,7 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
         chainContractAddress.acceptAdmin();
 
         vm.prank(ctmAdmin);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, ctmAdmin));
+        vm.expectRevert("Ownable: caller is not the owner");
         chainContractAddress.setProtocolVersionVerifier(protocolVersionToSet, newVerifier);
     }
 
@@ -158,7 +158,7 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
         address randomUser = makeAddr("randomUser");
 
         vm.prank(randomUser);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomUser));
+        vm.expectRevert("Ownable: caller is not the owner");
         chainContractAddress.setProtocolVersionVerifier(protocolVersionToSet, newVerifier);
     }
 
