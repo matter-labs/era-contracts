@@ -44,7 +44,7 @@ contract GWAssetTrackerFeesTest is Test {
 
         // Deploy GWAssetTracker
         gwAssetTracker = new GWAssetTracker();
-        owner = gwAssetTracker.owner();
+        owner = makeAddr("owner");
 
         // Create mock addresses
         mockBridgehub = makeAddr("mockBridgehub");
@@ -67,7 +67,7 @@ contract GWAssetTrackerFeesTest is Test {
 
         // Set up the contract
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        gwAssetTracker.setAddresses(L1_CHAIN_ID);
+        gwAssetTracker.initL2(L1_CHAIN_ID, owner);
 
         vm.mockCall(
             L2_CHAIN_ASSET_HANDLER_ADDR,

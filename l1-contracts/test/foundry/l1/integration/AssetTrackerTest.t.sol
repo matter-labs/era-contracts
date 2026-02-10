@@ -120,7 +120,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2AssetTracker.setAddresses(block.chainid, bytes32(0));
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        gwAssetTracker.setAddresses(block.chainid);
+        gwAssetTracker.initL2(block.chainid, address(this));
 
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,

@@ -133,7 +133,7 @@ library L2UtilsBase {
 
             address gwAssetTrackerAddress = address(new GWAssetTracker());
             vm.etch(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAddress.code);
-            // Note: GWAssetTracker.setAddresses is called later, after NTV is deployed,
+            // Note: GWAssetTracker.initL2 is called later, after NTV is deployed,
             // because it fetches wrappedZKToken from NTV.WETH_TOKEN()
         }
         {
@@ -208,7 +208,7 @@ library L2UtilsBase {
             TestnetERC20Token wrappedZKToken = new TestnetERC20Token("Wrapped ZK", "WZK", 18);
             address wrappedZKTokenAddr = address(wrappedZKToken);
 
-            // Mock L2_NATIVE_TOKEN_VAULT.WETH_TOKEN() to return our token BEFORE setAddresses
+            // Mock L2_NATIVE_TOKEN_VAULT.WETH_TOKEN() to return our token BEFORE initL2
             vm.mockCall(
                 L2_NATIVE_TOKEN_VAULT_ADDR,
                 abi.encodeWithSelector(IL2NativeTokenVault.WETH_TOKEN.selector),
@@ -216,7 +216,7 @@ library L2UtilsBase {
             );
 
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            GWAssetTracker(GW_ASSET_TRACKER_ADDR).setAddresses(_args.l1ChainId);
+            GWAssetTracker(GW_ASSET_TRACKER_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner);
 
             // Set a small settlement fee for testing fee collection logic
             uint256 settlementFee = 0.001 ether; // Small fee for testing

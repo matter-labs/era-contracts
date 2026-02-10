@@ -69,7 +69,7 @@ interface IGWAssetTracker {
     /// @param _chainId Chain ID to revoke agreement for.
     function revokeSettlementFeePayerAgreement(uint256 _chainId) external;
 
-    function setAddresses(uint256 _l1ChainId) external;
+    function initL2(uint256 _l1ChainId, address _owner) external;
 
     function registerBaseTokenOnGateway(TokenBridgingData calldata _baseTokenBridgingData) external;
 

@@ -71,7 +71,7 @@ contract GWAssetTrackerExtendedTest is Test {
         vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, address(mockChainAssetHandler).code);
         vm.etch(L2_ASSET_ROUTER_ADDR, address(mockAssetRouter).code);
 
-        // Mock the WETH_TOKEN() call on NativeTokenVault (required by setAddresses)
+        // Mock the WETH_TOKEN() call on NativeTokenVault (required by initL2)
         vm.mockCall(
             L2_NATIVE_TOKEN_VAULT_ADDR,
             abi.encodeWithSelector(IL2NativeTokenVault.WETH_TOKEN.selector),
@@ -80,7 +80,7 @@ contract GWAssetTrackerExtendedTest is Test {
 
         // Set up the contract
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        gwAssetTracker.setAddresses(L1_CHAIN_ID);
+        gwAssetTracker.initL2(L1_CHAIN_ID, address(this));
 
         vm.mockCall(
             L2_CHAIN_ASSET_HANDLER_ADDR,

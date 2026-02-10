@@ -32,7 +32,6 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
     using stdStorage for StdStorage;
 
     event InteropFeeUpdated(uint256 indexed oldFee, uint256 indexed newFee);
-    event ProtocolFeesCollected(address indexed recipient, uint256 amount);
     event ProtocolFeesAccumulated(address indexed coinbase, uint256 amount);
     event FixedZKFeesAccumulated(address indexed payer, address indexed coinbase, uint256 amount);
     event ProtocolFeesClaimed(address indexed coinbase, address indexed receiver, uint256 amount);
@@ -151,7 +150,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         });
     }
 
-    /// @notice Test that base token protocol fees are collected when useFixedFee=false
+    /// @notice Test that base token protocol fees are accumulated when useFixedFee=false
     function test_sendBundle_collectsBaseTokenFees() public {
         _setupGatewayMode();
 
@@ -164,10 +163,9 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         address sender = makeAddr("feeSender");
         vm.deal(sender, 10 ether);
 
-        // Set up the coinbase to receive fees
+        // Set up the coinbase
         address coinbaseAddr = makeAddr("coinbase");
         vm.coinbase(coinbaseAddr);
-        uint256 coinbaseBalanceBefore = coinbaseAddr.balance;
 
         // Build bundle attributes with useFixedFee=false
         bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(
@@ -187,8 +185,12 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
             bundleAttributes
         );
 
-        // Verify coinbase received the fee
-        assertEq(coinbaseAddr.balance, coinbaseBalanceBefore + protocolFee, "Coinbase should receive protocol fee");
+        // Verify fees were accumulated for coinbase
+        assertEq(
+            l2InteropCenter.accumulatedProtocolFees(coinbaseAddr),
+            protocolFee,
+            "Protocol fees should be accumulated for coinbase"
+        );
     }
 
     /// @notice Test that base token fees scale with call count
@@ -207,7 +209,6 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         // Set up coinbase
         address coinbaseAddr = makeAddr("coinbase");
         vm.coinbase(coinbaseAddr);
-        uint256 coinbaseBalanceBefore = coinbaseAddr.balance;
 
         // Build 3 calls
         InteropCallStarter[] memory calls = new InteropCallStarter[](3);
@@ -232,7 +233,11 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
             bundleAttributes
         );
 
-        assertEq(coinbaseAddr.balance, coinbaseBalanceBefore + totalFee, "Coinbase should receive fee for all calls");
+        assertEq(
+            l2InteropCenter.accumulatedProtocolFees(coinbaseAddr),
+            totalFee,
+            "Protocol fees should be accumulated for all calls"
+        );
     }
 
     /// @notice Test that no base token fees are charged when interopProtocolFee is zero
@@ -264,8 +269,8 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         assertEq(coinbaseAddr.balance, coinbaseBalanceBefore, "Coinbase balance should not change when fee is zero");
     }
 
-    /// @notice Test that ProtocolFeesCollected event is emitted
-    function test_sendBundle_emitsProtocolFeesCollectedEvent() public {
+    /// @notice Test that ProtocolFeesAccumulated event is emitted
+    function test_sendBundle_emitsProtocolFeesAccumulatedEvent() public {
         _setupGatewayMode();
 
         uint256 protocolFee = 0.02 ether;
@@ -283,7 +288,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         InteropCallStarter[] memory calls = _buildSimpleCall();
 
         vm.expectEmit(true, false, false, true);
-        emit ProtocolFeesCollected(coinbaseAddr, protocolFee);
+        emit ProtocolFeesAccumulated(coinbaseAddr, protocolFee);
 
         vm.prank(sender);
         l2InteropCenter.sendBundle{value: protocolFee}(

@@ -25,7 +25,6 @@ const REQUIRED_CONTRACTS = [
   "DeployGatewayTransactionFilterer.s.sol",
   "IAdminFunctions.sol",
   "IEnableEvmEmulator.sol",
-  "ISetInteropFee.sol",
   "IDeployCTM.sol",
   "IDeployL1CoreContracts.sol",
   "IDeployGatewayTransactionFilterer.sol",

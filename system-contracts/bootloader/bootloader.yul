@@ -3403,7 +3403,7 @@ object "Bootloader" {
                     /// Nothing is deployed at this address.
                     let codeSize2 := getCodeSize(add(L2_INTEROP_ROOT_STORAGE(), 10))
                     if iszero(eq(codeSize, codeSize2)) {
-                        revertWithReason(FAILED_TO_SET_NEW_SETTLEMENT_LAYER_CHAIN_ID_ERR_CODE(), 1)
+                        revertWithReason(FAILED_TO_SET_INTEROP_FEE(), 1)
                     }
                 }
             }

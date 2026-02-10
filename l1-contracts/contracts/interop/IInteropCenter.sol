@@ -16,12 +16,7 @@ interface IInteropCenter {
     /// @notice Emitted when the interop protocol fee is updated.
     event InteropFeeUpdated(uint256 indexed oldFee, uint256 indexed newFee);
 
-    /// @notice Emitted when protocol fees (base token) are collected and sent to the coinbase.
-    /// @param recipient Address that received the fees (block.coinbase).
-    /// @param amount Total amount of base token collected.
-    event ProtocolFeesCollected(address indexed recipient, uint256 amount);
-
-    /// @notice Emitted when protocol fees (base token) transfer to coinbase failed and fees are accumulated.
+    /// @notice Emitted when protocol fees (base token) are accumulated for the coinbase.
     /// @param coinbase Address of the block producer (block.coinbase) that earned the fees.
     /// @param amount Amount of base token accumulated (claimable via claimProtocolFees).
     event ProtocolFeesAccumulated(address indexed coinbase, uint256 amount);
@@ -113,6 +108,8 @@ interface IInteropCenter {
     function unpause() external;
 
     function initL2(uint256 _l1ChainId, address _owner, bytes32 _zkTokenAssetId) external;
+
+    function updateL2(uint256 _l1ChainId, address _owner, bytes32 _zkTokenAssetId) external;
 
     /// Mailbox forwarder
 

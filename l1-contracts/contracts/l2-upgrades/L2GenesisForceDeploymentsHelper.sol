@@ -471,6 +471,12 @@ library L2GenesisForceDeploymentsHelper {
                 fixedForceDeploymentsData.aliasedL1Governance,
                 fixedForceDeploymentsData.zkTokenAssetId
             );
+        } else {
+            InteropCenter(L2_INTEROP_CENTER_ADDR).updateL2(
+                fixedForceDeploymentsData.l1ChainId,
+                fixedForceDeploymentsData.aliasedL1Governance,
+                fixedForceDeploymentsData.zkTokenAssetId
+            );
         }
         if (!(_isZKsyncOS && _isGenesisUpgrade)) {
             conductContractUpgrade(
