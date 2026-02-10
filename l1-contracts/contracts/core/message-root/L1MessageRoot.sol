@@ -5,8 +5,10 @@ pragma solidity 0.8.28;
 import {MessageRootBase} from "./MessageRootBase.sol";
 import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessageRoot.sol";
-import {CurrentBatchNumberAlreadySet, OnlyOnSettlementLayer, TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber, TotalBatchesExecutedZero, LocallyNoChainsAtGenesis, V31UpgradeChainBatchNumberAlreadySet, NotAllChainsOnL1} from "../bridgehub/L1BridgehubErrors.sol";
+import {CurrentBatchNumberAlreadySet, OnlyOnSettlementLayer, TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber, TotalBatchesExecutedZero, LocallyNoChainsAtGenesis, V31UpgradeChainBatchNumberAlreadySet, NotAllChainsOnL1, InvalidSettlementLayerForBatch} from "../bridgehub/L1BridgehubErrors.sol";
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
+import {IChainAssetHandler} from "../chain-asset-handler/IChainAssetHandler.sol";
+import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -14,6 +16,9 @@ import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 contract L1MessageRoot is MessageRootBase {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     address public immutable BRIDGE_HUB;
+
+    /// @notice Chain asset handler used for settlement layer validation during proof verification.
+    address public immutable CHAIN_ASSET_HANDLER;
 
     /// @notice The chain id of the Gateway chain.
     uint256 public immutable override ERA_GATEWAY_CHAIN_ID;
@@ -43,6 +48,7 @@ contract L1MessageRoot is MessageRootBase {
     /// @param _eraGatewayChainId Chain ID of the Gateway chain.
     constructor(address _bridgehub, uint256 _eraGatewayChainId) {
         BRIDGE_HUB = _bridgehub;
+        CHAIN_ASSET_HANDLER = IBridgehubBase(_bridgehub).chainAssetHandler();
         ERA_GATEWAY_CHAIN_ID = _eraGatewayChainId;
         uint256[] memory allZKChains = IBridgehubBase(_bridgehub).getAllZKChainChainIDs();
         _v31InitializeInner(allZKChains);
@@ -90,6 +96,31 @@ contract L1MessageRoot is MessageRootBase {
 
         currentChainBatchNumber[_chainId] = totalBatchesExecuted;
         v31UpgradeChainBatchNumber[_chainId] = totalBatchesExecuted + 1;
+    }
+
+    function _proveL2LeafInclusionOnSettlementLayer(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        ProofData memory _proofData,
+        bytes32[] calldata _proof,
+        uint256 _depth
+    ) internal view override returns (bool) {
+        bool isValid = IChainAssetHandler(CHAIN_ASSET_HANDLER).isValidSettlementLayer(
+            _chainId,
+            _batchNumber,
+            _proofData.settlementLayerChainId
+        );
+        require(isValid, InvalidSettlementLayerForBatch(_chainId, _batchNumber, _proofData.settlementLayerChainId));
+
+        return
+            this.proveL2LeafInclusionSharedRecursive({
+                _chainId: _proofData.settlementLayerChainId,
+                _blockOrBatchNumber: _proofData.settlementLayerBatchNumber,
+                _leafProofMask: _proofData.settlementLayerBatchRootMask,
+                _leaf: _proofData.chainIdLeaf,
+                _proof: MessageHashing.extractSliceUntilEnd(_proof, _proofData.ptr),
+                _depth: _depth + 1
+            });
     }
 
     /*//////////////////////////////////////////////////////////////

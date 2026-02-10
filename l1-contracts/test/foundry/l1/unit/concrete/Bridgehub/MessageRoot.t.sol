@@ -41,9 +41,19 @@ contract MessageRootTest is Test {
             abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
             abi.encode(allZKChainChainIDsZero)
         );
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(makeAddr("chainAssetHandler"))
+        );
 
         assetTracker = makeAddr("assetTracker");
         bridgeHub = makeAddr("bridgeHub");
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(makeAddr("chainAssetHandler"))
+        );
         L1_CHAIN_ID = 5;
         gatewayChainId = 506;
         messageRoot = new L1MessageRoot(bridgeHub, 1);

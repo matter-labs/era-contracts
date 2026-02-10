@@ -234,7 +234,7 @@ abstract contract ChainAssetHandlerBase is
             currentMigrationNum < MAX_ALLOWED_NUMBER_OF_MIGRATIONS,
             IteratedMigrationsNotSupported()
         );
-        currentMigrationNum += 1;
+        ++currentMigrationNum;
         migrationNumber[bridgehubBurnData.chainId] = currentMigrationNum;
 
         uint256 batchNumber = IMessageRoot(_messageRoot()).currentChainBatchNumber(bridgehubBurnData.chainId);

@@ -8,12 +8,15 @@ import "forge-std/Test.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE} from "contracts/common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
-import {BatchNotExecuted, HashedLogIsDefault} from "contracts/common/L1ContractErrors.sol";
+import {HashedLogIsDefault} from "contracts/common/L1ContractErrors.sol";
 
 import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
 import {TxStatus} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {InvalidSettlementLayerForBatch} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {MerkleTreeNoSort} from "test/foundry/l1/unit/concrete/common/libraries/Merkle/MerkleTreeNoSort.sol";
 import {MessageHashing, ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
@@ -28,14 +31,37 @@ contract MailboxL2LogsProve is MailboxTest {
     uint256 batchNumber;
     bool isService;
     uint8 shardId;
+    L1MessageRoot messageRoot;
 
     function setUp() public virtual {
         setupDiamondProxy();
 
+        // MessageRoot rejects batch zero proofs, so keep tests on a non-zero executed batch.
+        utilsFacet.util_setTotalBatchesExecuted(1);
+        batchNumber = gettersFacet.getTotalBatchesExecuted();
+
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
+            abi.encode(new uint256[](0))
+        );
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(chainAssetHandler)
+        );
+
+        messageRoot = new L1MessageRoot(address(bridgehub), 1);
+        vm.mockCall(address(bridgehub), abi.encodeCall(IBridgehubBase.messageRoot, ()), abi.encode(address(messageRoot)));
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeCall(IBridgehubBase.getZKChain, (gettersFacet.getChainId())),
+            abi.encode(address(mailboxFacet))
+        );
+
         data = abi.encodePacked("test data");
         merkleTree = new MerkleTreeNoSort();
         merkle = new MerkleTest();
-        batchNumber = gettersFacet.getTotalBatchesExecuted();
         isService = true;
         shardId = 0;
     }
@@ -53,17 +79,20 @@ contract MailboxL2LogsProve is MailboxTest {
         index = elements.length - 1;
     }
 
-    function test_RevertWhen_batchNumberGreaterThanBatchesExecuted() public {
+    function test_FailWhen_batchNumberGreaterThanBatchesExecuted() public {
         L2Message memory message = L2Message({txNumberInBatch: 0, sender: sender, data: data});
         bytes32[] memory proof = _appendProofMetadata(new bytes32[](1));
 
-        _proveL2MessageInclusion({
+        // Mailbox delegates verification to MessageRoot.
+        // MessageRoot does not revert with BatchNotExecuted on out-of-range batches; it returns false.
+        bool result = _proveL2MessageInclusion({
             _batchNumber: batchNumber + 1,
             _index: 0,
             _message: message,
             _proof: proof,
-            _expectedError: abi.encodeWithSelector(BatchNotExecuted.selector, batchNumber + 1)
+            _expectedError: bytes("")
         });
+        assertFalse(result);
     }
 
     function test_success_proveL2MessageInclusion() public {
@@ -290,13 +319,13 @@ contract MailboxL2LogsProve is MailboxTest {
         assertEq(ret, true);
     }
 
-    function checkRecursiveLeafProof(RecursiveProofInfo memory proofInfo) internal returns (bool) {
+    function checkRecursiveLeafProof(RecursiveProofInfo memory proofInfo, bool isValidSettlementLayer) internal returns (bool) {
         address secondDiamondProxy = deployDiamondProxy();
 
-        IMailbox secondMailbox = IMailbox(secondDiamondProxy);
         UtilsFacet secondUtils = UtilsFacet(secondDiamondProxy);
         IGetters secondGetters = IGetters(secondDiamondProxy);
 
+        secondUtils.util_setTotalBatchesExecuted(1);
         uint256 secondBatchNumber = secondGetters.getTotalBatchesExecuted();
 
         (bytes32[] memory proof, bytes32 requiredRoot) = _composeRecursiveProof(
@@ -315,18 +344,29 @@ contract MailboxL2LogsProve is MailboxTest {
                 chainIdProof: proofInfo.chainIdProof
             })
         );
-        utilsFacet.util_setL2LogsRootHash(secondBatchNumber, requiredRoot);
+        secondUtils.util_setL2LogsRootHash(secondBatchNumber, requiredRoot);
+        assertEq(secondGetters.l2LogsRootHash(secondBatchNumber), requiredRoot);
 
         vm.mockCall(
-            address(bridgehub),
-            abi.encodeCall(IBridgehubBase.whitelistedSettlementLayers, (proofInfo.settlementLayerChainId)),
-            abi.encode(true)
+            address(chainAssetHandler),
+            abi.encodeWithSelector(IChainAssetHandler.isValidSettlementLayer.selector),
+            abi.encode(isValidSettlementLayer)
         );
         vm.mockCall(
             address(bridgehub),
             abi.encodeCall(IBridgehubBase.getZKChain, (proofInfo.settlementLayerChainId)),
             abi.encode(secondDiamondProxy)
         );
+        if (!isValidSettlementLayer) {
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    InvalidSettlementLayerForBatch.selector,
+                    gettersFacet.getChainId(),
+                    batchNumber,
+                    proofInfo.settlementLayerChainId
+                )
+            );
+        }
 
         return mailboxFacet.proveL2LeafInclusion(batchNumber, proofInfo.leafProofMask, proofInfo.leaf, proof);
     }
@@ -347,7 +387,8 @@ contract MailboxL2LogsProve is MailboxTest {
                     settlementLayerBatchRootMask: 3,
                     settlementLayerChainId: 255,
                     chainIdProof: bytes32Arr(2, bytes32(uint256(1)), bytes32(uint256(0)))
-                })
+                }),
+                true
             )
         );
     }
@@ -368,9 +409,29 @@ contract MailboxL2LogsProve is MailboxTest {
                     settlementLayerBatchRootMask: 3,
                     settlementLayerChainId: 255,
                     chainIdProof: bytes32Arr(2, bytes32(uint256(1)), bytes32(uint256(0)))
-                })
+                }),
+                true
             )
         );
+    }
+
+    function test_RevertWhen_recursiveProofInvalidSettlementLayer() external {
+        RecursiveProofInfo memory proofInfo = RecursiveProofInfo({
+            leaf: bytes32(0),
+            logProof: bytes32Arr(2, bytes32(0), bytes32(uint256(1))),
+            leafProofMask: 2,
+            // We override it since it is only known here
+            batchNumber: 0,
+            batchProof: bytes32Arr(2, bytes32(uint256(1)), bytes32(uint256(1))),
+            batchLeafProofMask: 1,
+            // We override it since it is only known here
+            settlementLayerBatchNumber: 0,
+            settlementLayerBatchRootMask: 3,
+            settlementLayerChainId: 255,
+            chainIdProof: bytes32Arr(2, bytes32(uint256(1)), bytes32(uint256(0)))
+        });
+
+        checkRecursiveLeafProof(proofInfo, false);
     }
 
     function test_calculateRoot() public {

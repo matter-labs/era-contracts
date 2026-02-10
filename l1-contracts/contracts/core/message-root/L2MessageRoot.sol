@@ -6,8 +6,8 @@ import {MessageRootBase} from "./MessageRootBase.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {OnlyGateway} from "../bridgehub/L1BridgehubErrors.sol";
-import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
+import {OnlyGateway, OnlyL1} from "../bridgehub/L1BridgehubErrors.sol";
+import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
 
 import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
@@ -104,5 +104,15 @@ contract L2MessageRoot is MessageRootBase {
 
         _emitRoot(sharedTreeRoot);
         historicalRoot[block.number] = sharedTreeRoot;
+    }
+
+    function _proveL2LeafInclusionOnSettlementLayer(
+        uint256,
+        uint256,
+        ProofData memory,
+        bytes32[] calldata,
+        uint256
+    ) internal pure override returns (bool) {
+        revert OnlyL1();
     }
 }
