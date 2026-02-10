@@ -26,6 +26,7 @@ import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestne
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress, GenesisBatchHashZero, GenesisBatchCommitmentIncorrect, GenesisUpgradeZero} from "contracts/common/L1ContractErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
+import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
@@ -88,15 +89,16 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
 
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
-        messageroot = new L1MessageRoot(address(bridgehub), 1);
         chainAssetHandler = new L1ChainAssetHandler(
             governor,
             address(bridgehub),
             address(0),
-            address(messageroot),
             address(0),
             IL1Nullifier(address(0))
         );
+        vm.prank(governor);
+        bridgehub.setAddresses(address(0), ICTMDeploymentTracker(address(0)), IMessageRoot(address(0)), address(chainAssetHandler), address(0));
+        messageroot = new L1MessageRoot(address(bridgehub), 1);
 
         stdstore
             .target(address(messageroot))

@@ -34,9 +34,6 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     /// @dev The bridgehub contract.
     IL1Bridgehub public immutable override BRIDGEHUB;
 
-    /// @dev The message root contract.
-    IMessageRoot public immutable override MESSAGE_ROOT;
-
     /// @dev The asset router contract.
     IAssetRouterBase public immutable override ASSET_ROUTER;
 
@@ -59,8 +56,16 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     function _bridgehub() internal view override returns (IL1Bridgehub) {
         return BRIDGEHUB;
     }
+    
+    // An immutable can't be used for MESSAGE_ROOT because L1MessageRoot requires the
+    // chain asset handler address in its constructor, creating a circular dependency.
     function _messageRoot() internal view override returns (IMessageRoot) {
-        return MESSAGE_ROOT;
+        return IBridgehubBase(address(BRIDGEHUB)).messageRoot();
+    }
+
+    // solhint-disable-next-line func-name-mixedcase
+    function MESSAGE_ROOT() public view override returns (IMessageRoot) {
+        return _messageRoot();
     }
     function _assetRouter() internal view override returns (IAssetRouterBase) {
         return ASSET_ROUTER;
@@ -74,14 +79,12 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         address _owner,
         address _bridgehub,
         address _assetRouter,
-        address _messageRoot,
         address _assetTracker,
         IL1Nullifier _l1Nullifier
     ) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGEHUB = IL1Bridgehub(_bridgehub);
         ASSET_ROUTER = IAssetRouterBase(_assetRouter);
-        MESSAGE_ROOT = IMessageRoot(_messageRoot);
         L1_CHAIN_ID = block.chainid;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         ASSET_TRACKER = _assetTracker;

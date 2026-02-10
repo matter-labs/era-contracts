@@ -14,7 +14,7 @@ import {IEIP7702Checker} from "../../chain-interfaces/IEIP7702Checker.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {BalanceChange, BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Log, L2Message, TxStatus, WritePriorityOpParams} from "../../../common/Messaging.sol";
-import {MessageHashing, ProofData} from "../../../common/libraries/MessageHashing.sol";
+import {MessageHashing} from "../../../common/libraries/MessageHashing.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol";
@@ -26,8 +26,8 @@ import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddre
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterShared} from "../../../bridge/asset-router/IAssetRouterShared.sol";
 
-import {AddressNotZero, BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, NotAssetRouter, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
-import {DepositsPaused, LocalRootIsZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
+import {AddressNotZero, BaseTokenGasPriceDenominatorNotSet, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, NotAssetRouter, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
+import {DepositsPaused, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -258,14 +258,15 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) internal view override returns (bool) {
         // No gas optimization here as the usage of the method is discouraged and the Bridgehub one should be used.
         return
-            MessageVerification(address(IBridgehubBase(s.bridgehub).messageRoot())).proveL2LeafInclusionSharedRecursive({
-                _chainId: _chainId,
-                _blockOrBatchNumber: _batchNumber,
-                _leafProofMask: _leafProofMask,
-                _leaf: _leaf,
-                _proof: _proof,
-                _depth: _depth
-            });
+            MessageVerification(address(IBridgehubBase(s.bridgehub).messageRoot()))
+                .proveL2LeafInclusionSharedRecursive({
+                    _chainId: _chainId,
+                    _blockOrBatchNumber: _batchNumber,
+                    _leafProofMask: _leafProofMask,
+                    _leaf: _leaf,
+                    _proof: _proof,
+                    _depth: _depth
+                });
     }
 
     /// @inheritdoc IMailboxImpl

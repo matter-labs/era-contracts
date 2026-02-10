@@ -177,21 +177,19 @@ abstract contract ChainAssetHandlerBase is
         returns (bytes memory bridgehubMintData)
     {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
+        uint256 chainId = bridgehubBurnData.chainId;
         require(
-            _assetId == IBridgehubBase(_bridgehub()).ctmAssetIdFromChainId(bridgehubBurnData.chainId),
-            IncorrectChainAssetId(
-                _assetId,
-                IBridgehubBase(_bridgehub()).ctmAssetIdFromChainId(bridgehubBurnData.chainId)
-            )
+            _assetId == IBridgehubBase(_bridgehub()).ctmAssetIdFromChainId(chainId),
+            IncorrectChainAssetId(_assetId, IBridgehubBase(_bridgehub()).ctmAssetIdFromChainId(chainId))
         );
-        address zkChain = IBridgehubBase(_bridgehub()).getZKChain(bridgehubBurnData.chainId);
+        address zkChain = IBridgehubBase(_bridgehub()).getZKChain(chainId);
 
         bytes memory ctmMintData;
         // to avoid stack too deep
         {
             address ctm;
             (zkChain, ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeBurnSetSettlementLayer(
-                bridgehubBurnData.chainId,
+                chainId,
                 _settlementChainId
             );
 
@@ -202,10 +200,7 @@ abstract contract ChainAssetHandlerBase is
                 revert IncorrectSender(_originalCaller, IZKChain(zkChain).getAdmin());
             }
 
-            ctmMintData = IChainTypeManager(ctm).forwardedBridgeBurn(
-                bridgehubBurnData.chainId,
-                bridgehubBurnData.ctmData
-            );
+            ctmMintData = IChainTypeManager(ctm).forwardedBridgeBurn(chainId, bridgehubBurnData.ctmData);
 
             // For security reasons, chain migration is temporarily restricted to settlement layers with the same CTM
             if (
@@ -218,46 +213,95 @@ abstract contract ChainAssetHandlerBase is
             if (block.chainid != _l1ChainId()) {
                 require(_settlementChainId == _l1ChainId(), MigrationNotToL1());
             }
-            _setMigrationInProgressOnL1(bridgehubBurnData.chainId);
+            _setMigrationInProgressOnL1(chainId);
         }
-        bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
+        // to avoid stack too deep
+        bridgehubMintData = _finalizeBridgeBurn({
+            _chainId: chainId,
+            _settlementChainId: _settlementChainId,
+            _assetId: _assetId,
+            _zkChain: zkChain,
+            _originalCaller: _originalCaller,
+            _ctmMintData: ctmMintData,
+            _chainData: bridgehubBurnData.chainData
+        });
+    }
+
+    /// @dev Handles chain burn, migration bookkeeping, and builds the bridgehub mint data.
+    /// @dev Extracted from bridgeBurn to avoid stack-too-deep.
+    function _finalizeBridgeBurn(
+        uint256 _chainId,
+        uint256 _settlementChainId,
+        bytes32 _assetId,
+        address _zkChain,
+        address _originalCaller,
+        bytes memory _ctmMintData,
+        bytes memory _chainData
+    ) internal returns (bytes memory) {
+        bytes memory chainMintData = IZKChain(_zkChain).forwardedBridgeBurn(
             _settlementChainId == _l1ChainId()
                 ? L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS
                 : IBridgehubBase(_bridgehub()).getZKChain(_settlementChainId),
             _originalCaller,
-            bridgehubBurnData.chainData
+            _chainData
         );
-        uint256 currentMigrationNum = migrationNumber[bridgehubBurnData.chainId];
+        uint256 currentMigrationNum = migrationNumber[_chainId];
         // Iterated migrations are not supported to avoid asset migration number complications related to token balance migration.
         // This means a chain can migrate to GW and back to L1 but only once.
-        require(
-            currentMigrationNum < MAX_ALLOWED_NUMBER_OF_MIGRATIONS,
-            IteratedMigrationsNotSupported()
-        );
+        require(currentMigrationNum < MAX_ALLOWED_NUMBER_OF_MIGRATIONS, IteratedMigrationsNotSupported());
         ++currentMigrationNum;
-        migrationNumber[bridgehubBurnData.chainId] = currentMigrationNum;
+        migrationNumber[_chainId] = currentMigrationNum;
 
-        uint256 batchNumber = IMessageRoot(_messageRoot()).currentChainBatchNumber(bridgehubBurnData.chainId);
+        uint256 batchNumber = IMessageRoot(_messageRoot()).currentChainBatchNumber(_chainId);
 
         // Track migration interval for settlement layer validation.
         // When migrating FROM L1 TO a settlement layer, record the last L1 batch number and the SL chain ID.
         if (block.chainid == _l1ChainId()) {
-            if (_settlementChainId == _l1ChainId()) {
-                revert SettlementLayerMustNotBeL1();
-            }
-            require(
-                currentMigrationNum == MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
-                MigrationNumberMismatch(MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, currentMigrationNum)
-            );
-            _migrationInterval[bridgehubBurnData.chainId][currentMigrationNum] = MigrationInterval({
-                migrateToSLBatchNumber: batchNumber,
-                migrateFromSLBatchNumber: 0,
-                settlementLayerChainId: _settlementChainId,
-                isSet: true
-            });
+            _recordMigrationToSL(_chainId, _settlementChainId, batchNumber, currentMigrationNum);
         }
 
-        bytes32 assetId = IBridgehubBase(_bridgehub()).baseTokenAssetId(bridgehubBurnData.chainId);
+        bytes memory bridgehubMintData = _buildBridgehubMintData({
+            _chainId: _chainId,
+            _batchNumber: batchNumber,
+            _ctmMintData: _ctmMintData,
+            _chainMintData: chainMintData,
+            _currentMigrationNum: currentMigrationNum
+        });
+
+        emit MigrationStarted(_chainId, _assetId, _settlementChainId);
+
+        return bridgehubMintData;
+    }
+
+    function _recordMigrationToSL(
+        uint256 _chainId,
+        uint256 _settlementChainId,
+        uint256 _batchNumber,
+        uint256 _currentMigrationNum
+    ) internal {
+        if (_settlementChainId == _l1ChainId()) {
+            revert SettlementLayerMustNotBeL1();
+        }
+        require(
+            _currentMigrationNum == MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
+            MigrationNumberMismatch(MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, _currentMigrationNum)
+        );
+        _migrationInterval[_chainId][_currentMigrationNum] = MigrationInterval({
+            migrateToSLBatchNumber: _batchNumber,
+            migrateFromSLBatchNumber: 0,
+            settlementLayerChainId: _settlementChainId,
+            isSet: true
+        });
+    }
+
+    function _buildBridgehubMintData(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        bytes memory _ctmMintData,
+        bytes memory _chainMintData,
+        uint256 _currentMigrationNum
+    ) internal view returns (bytes memory) {
+        bytes32 assetId = IBridgehubBase(_bridgehub()).baseTokenAssetId(_chainId);
         TokenBridgingData memory baseTokenBridgingData = TokenBridgingData({
             assetId: assetId,
             originToken: address(0),
@@ -272,17 +316,17 @@ abstract contract ChainAssetHandlerBase is
             baseTokenBridgingData.originChainId = l1Ntv.originChainId(assetId);
         }
 
-        BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
-            chainId: bridgehubBurnData.chainId,
-            baseTokenBridgingData: baseTokenBridgingData,
-            batchNumber: batchNumber,
-            ctmData: ctmMintData,
-            chainData: chainMintData,
-            migrationNumber: currentMigrationNum
-        });
-        bridgehubMintData = abi.encode(bridgeMintStruct);
-
-        emit MigrationStarted(bridgehubBurnData.chainId, _assetId, _settlementChainId);
+        return
+            abi.encode(
+                BridgehubMintCTMAssetData({
+                    chainId: _chainId,
+                    baseTokenBridgingData: baseTokenBridgingData,
+                    batchNumber: _batchNumber,
+                    ctmData: _ctmMintData,
+                    chainData: _chainMintData,
+                    migrationNumber: _currentMigrationNum
+                })
+            );
     }
 
     function _setMigrationInProgressOnL1(uint256 _chainId) internal virtual {}
@@ -317,7 +361,10 @@ abstract contract ChainAssetHandlerBase is
         // Track migration interval for settlement layer validation.
         // When migrating FROM settlement layer BACK TO L1, record the last SL batch number.
         // This happens when migrationNumber is `MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1`.
-        if (block.chainid == _l1ChainId() && bridgehubMintData.migrationNumber == MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1) {
+        if (
+            block.chainid == _l1ChainId() &&
+            bridgehubMintData.migrationNumber == MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1
+        ) {
             MigrationInterval storage interval = _migrationInterval[bridgehubMintData.chainId][
                 MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER
             ];

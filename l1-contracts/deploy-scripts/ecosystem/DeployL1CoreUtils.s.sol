@@ -143,7 +143,6 @@ contract DeployL1CoreUtils is DeployUtils {
                     config.ownerAddress,
                     coreAddresses.bridgehub.proxies.bridgehub,
                     coreAddresses.bridges.proxies.l1AssetRouter,
-                    coreAddresses.bridgehub.proxies.messageRoot,
                     coreAddresses.bridgehub.proxies.assetTracker,
                     coreAddresses.bridges.proxies.l1Nullifier
                 );

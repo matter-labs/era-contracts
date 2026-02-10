@@ -221,7 +221,6 @@ contract ExecutorTest is UtilsCallMockerTest {
             owner,
             address(dummyBridgehub),
             address(sharedBridge),
-            address(messageRoot),
             address(assetTracker),
             IL1Nullifier(address(0))
         );

@@ -302,7 +302,14 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
             revert DepthMoreThanOneForRecursiveMerkleProof();
         }
 
-        return _proveL2LeafInclusionOnSettlementLayer(_chainId, _batchNumber, proofData, _proof, _depth);
+        return
+            _proveL2LeafInclusionOnSettlementLayer({
+                _chainId: _chainId,
+                _batchNumber: _batchNumber,
+                _proofData: proofData,
+                _proof: _proof,
+                _depth: _depth
+            });
     }
 
     /// @notice Internal to get the historical batch root for chains before the v31 upgrade.
@@ -352,5 +359,4 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         uint256 index = chainIndex[_chainId];
         return sharedTree.merklePath(index);
     }
-
 }
