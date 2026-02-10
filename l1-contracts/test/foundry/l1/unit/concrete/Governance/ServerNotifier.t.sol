@@ -83,7 +83,8 @@ contract ServerNotifierTest is Test {
 
         vm.startPrank(chainAdmin);
         vm.expectEmit(true, false, false, true, address(serverNotifier));
-        emit IServerNotifier.MigrateToGateway(chainId, 0);
+        // Migration number is current (0) + 1 to match what ChainAssetHandler will emit after increment
+        emit IServerNotifier.MigrateToGateway(chainId, 1);
         serverNotifier.migrateToGateway(chainId);
         vm.stopPrank();
     }
@@ -102,7 +103,8 @@ contract ServerNotifierTest is Test {
 
         vm.startPrank(chainAdmin);
         vm.expectEmit(true, false, false, true, address(serverNotifier));
-        emit IServerNotifier.MigrateFromGateway(chainId, 0);
+        // Migration number is current (0) + 1 to match what ChainAssetHandler will emit after increment
+        emit IServerNotifier.MigrateFromGateway(chainId, 1);
         serverNotifier.migrateFromGateway(chainId);
         vm.stopPrank();
     }
@@ -112,7 +114,8 @@ contract ServerNotifierTest is Test {
 
         vm.startPrank(chainAdmin);
         vm.expectEmit(true, false, false, true, address(serverNotifier));
-        emit IServerNotifier.MigrateToGateway(chainId, 7);
+        // Migration number is current (7) + 1 to match what ChainAssetHandler will emit after increment
+        emit IServerNotifier.MigrateToGateway(chainId, 8);
         serverNotifier.migrateToGateway(chainId);
         vm.stopPrank();
     }
@@ -122,7 +125,8 @@ contract ServerNotifierTest is Test {
 
         vm.startPrank(chainAdmin);
         vm.expectEmit(true, false, false, true, address(serverNotifier));
-        emit IServerNotifier.MigrateFromGateway(chainId, 9);
+        // Migration number is current (9) + 1 to match what ChainAssetHandler will emit after increment
+        emit IServerNotifier.MigrateFromGateway(chainId, 10);
         serverNotifier.migrateFromGateway(chainId);
         vm.stopPrank();
     }

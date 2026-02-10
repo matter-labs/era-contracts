@@ -59,16 +59,18 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
     /// @notice Emits an event to signal that the chain is migrating to a gateway.
     /// @param _chainId The identifier of the chain that is migrating.
     /// @dev Restricted to the chain administrator.
+    /// @dev The migration number is incremented by 1 to match the value that ChainAssetHandler will emit after increment.
     function migrateToGateway(uint256 _chainId) external onlyChainAdmin(_chainId) {
-        uint256 migrationNumber = _getMigrationNumber(_chainId);
+        uint256 migrationNumber = _getMigrationNumber(_chainId) + 1;
         emit MigrateToGateway(_chainId, migrationNumber);
     }
 
     /// @notice Emits an event to signal that the chain is migrating from a gateway.
     /// @param _chainId The identifier of the chain that is migrating.
     /// @dev Restricted to the chain administrator.
+    /// @dev The migration number is incremented by 1 to match the value that ChainAssetHandler will emit after increment.
     function migrateFromGateway(uint256 _chainId) external onlyChainAdmin(_chainId) {
-        uint256 migrationNumber = _getMigrationNumber(_chainId);
+        uint256 migrationNumber = _getMigrationNumber(_chainId) + 1;
         emit MigrateFromGateway(_chainId, migrationNumber);
     }
 
