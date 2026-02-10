@@ -158,19 +158,11 @@ contract InteropCenter is
     /// @dev Performs the same initialization as `initL2`. A separate method is provided for
     ///      consistency with the initL2/updateL2 pattern used by other L2 system contracts
     ///      and for maintainability, so that future upgrade-specific logic can be added here.
-    function updateL2(
-        uint256 _l1ChainId,
-        address _owner,
-        bytes32 _zkTokenAssetId
-    ) public onlyUpgrader {
+    function updateL2(uint256 _l1ChainId, address _owner, bytes32 _zkTokenAssetId) public onlyUpgrader {
         _initInteropCenter(_l1ChainId, _owner, _zkTokenAssetId);
     }
 
-    function _initInteropCenter(
-        uint256 _l1ChainId,
-        address _owner,
-        bytes32 _zkTokenAssetId
-    ) private {
+    function _initInteropCenter(uint256 _l1ChainId, address _owner, bytes32 _zkTokenAssetId) private {
         L1_CHAIN_ID = _l1ChainId;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
         ZK_TOKEN_ASSET_ID = _zkTokenAssetId;

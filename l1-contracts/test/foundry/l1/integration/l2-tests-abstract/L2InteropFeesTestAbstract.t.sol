@@ -743,18 +743,10 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         l2InteropCenter.claimZKFees(receiver);
 
         // Verify receiver got the ZK tokens
-        assertEq(
-            zkToken.balanceOf(receiver),
-            receiverZKBefore + zkFeePerCall,
-            "Receiver should get claimed ZK fees"
-        );
+        assertEq(zkToken.balanceOf(receiver), receiverZKBefore + zkFeePerCall, "Receiver should get claimed ZK fees");
 
         // Verify accumulated fees are now zero
-        assertEq(
-            l2InteropCenter.accumulatedZKFees(coinbaseAddr),
-            0,
-            "Accumulated ZK fees should be zero after claim"
-        );
+        assertEq(l2InteropCenter.accumulatedZKFees(coinbaseAddr), 0, "Accumulated ZK fees should be zero after claim");
     }
 
     /// @notice Test that claimZKFees returns early when no fees to claim
@@ -833,4 +825,3 @@ contract RevertingReceiver {
         revert("RevertingReceiver: no calls accepted");
     }
 }
-
