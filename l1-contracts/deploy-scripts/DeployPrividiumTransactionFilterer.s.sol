@@ -10,8 +10,7 @@ import {console} from "forge-std/console.sol";
 
 contract DeployPrividiumTransactionFilterer is AdminFunctions {
     /// @notice Returns the address to use as the deployer/owner for contracts.
-    /// @dev This is virtual so test scripts can override it. By default returns tx.origin.
-    function getDeployerAddress() public view virtual returns (address) {
+    function getDeployerAddress() public view returns (address) {
         return tx.origin;
     }
 

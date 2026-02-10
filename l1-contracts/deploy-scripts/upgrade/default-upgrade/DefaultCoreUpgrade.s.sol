@@ -473,7 +473,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     // add this to be excluded from coverage report
 
-    // cspell:ignore Ksync zksync
     /// @notice Load protocol version from genesis config
     /// @dev Reads from Era or ZKsync OS genesis based on config.isZKsyncOS flag
     function loadProtocolVersionFromGenesis() internal virtual returns (uint256) {
