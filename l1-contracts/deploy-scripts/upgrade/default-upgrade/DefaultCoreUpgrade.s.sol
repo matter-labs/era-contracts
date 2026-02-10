@@ -155,7 +155,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         L1Bridgehub bridgehub = L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
         Governance governance = Governance(payable(coreAddresses.shared.governance));
         config.l1ChainId = block.chainid;
-        config.deployerAddress = Utils.getBroadcasterAddress();
+        config.deployerAddress = getBroadcasterAddress();
         config.eraChainId = assetRouter.ERA_CHAIN_ID();
         config.eraDiamondProxyAddress = bridgehub.getZKChain(assetRouter.ERA_CHAIN_ID());
 
@@ -483,6 +483,10 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             ChainCreationParamsLib
                 .getChainCreationParams(genesisPath, additionalConfig.isZKsyncOS)
                 .latestProtocolVersion;
+    }
+
+    function getBroadcasterAddress() internal view virtual returns (address) {
+        return tx.origin;
     }
 
     function test() internal override {}

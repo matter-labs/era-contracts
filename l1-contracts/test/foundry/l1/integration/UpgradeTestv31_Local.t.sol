@@ -139,6 +139,13 @@ contract UpgradeIntegrationTest_Local is
         console.log("setUp: Starting");
         _deployL1Contracts();
         console.log("setUp: L1 contracts deployed");
+
+        // Reset L1MessageRoot's initializer version to 1 so that initializeL1V31Upgrade() (reinitializer(2)) works
+        // Fresh deployments call initialize() which uses reinitializer(2), but we need to test the upgrade path
+        // Initializable storage slot 0 contains the version (uint8) packed with _initializing (bool)
+        address messageRootProxy = address(addresses.bridgehub.messageRoot());
+        vm.store(messageRootProxy, bytes32(uint256(0)), bytes32(uint256(1)));
+        console.log("setUp: Reset L1MessageRoot initializer version to 1");
         _deployTokens();
         console.log("setUp: Tokens deployed");
         _registerNewTokens(tokens);

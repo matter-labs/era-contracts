@@ -144,7 +144,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         string memory toml = vm.readFile(configPath);
 
         config.l1ChainId = block.chainid;
-        config.deployerAddress = Utils.getBroadcasterAddress();
+        config.deployerAddress = getBroadcasterAddress();
 
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
@@ -250,7 +250,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         ChainCreationParams memory chainCreationParams = getChainCreationParams(stateTransition);
         return
             ChainTypeManagerInitializeData({
-                owner: Utils.getBroadcasterAddress(),
+                owner: getBroadcasterAddress(),
                 validatorTimelock: stateTransition.proxies.validatorTimelock,
                 chainCreationParams: chainCreationParams,
                 protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
@@ -471,9 +471,9 @@ abstract contract DeployCTMUtils is DeployUtils {
                 verifierFflonk: ctmAddresses.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: ctmAddresses.stateTransition.verifiers.verifierPlonk,
                 // For L1 deployment we need to use the deployer as the owner of the verifier,
-                // because we set the dual verifier later. Use Utils.getBroadcasterAddress() to get
+                // because we set the dual verifier later. Use getBroadcasterAddress() to get
                 // the actual EOA when this is called from a contract created via `new` during the script.
-                verifierOwner: Utils.getBroadcasterAddress()
+                verifierOwner: getBroadcasterAddress()
             });
     }
 
@@ -518,6 +518,10 @@ abstract contract DeployCTMUtils is DeployUtils {
 
     function transparentProxyAdmin() internal view override returns (address) {
         return ctmAddresses.admin.transparentProxyAdmin;
+    }
+
+    function getBroadcasterAddress() internal view virtual returns (address) {
+        return tx.origin;
     }
 
     function test() internal virtual {}

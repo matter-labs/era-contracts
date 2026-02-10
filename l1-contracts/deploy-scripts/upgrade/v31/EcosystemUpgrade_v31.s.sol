@@ -22,7 +22,6 @@ import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CoreUpgrade_v31} from "./CoreUpgrade_v31.s.sol";
 import {CTMUpgrade_v31} from "./CTMUpgrade_v31.s.sol";
 import {GatewayUpgrade_v31} from "./GatewayUpgrade_v31.s.sol";
-import {Utils} from "../../utils/Utils.sol";
 
 /// @notice Script used for v31 ecosystem upgrade flow (core + CTM)
 contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
@@ -149,7 +148,7 @@ contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
                 console.log("  Balance:", balance);
 
                 // Call AssetTracker to migrate the balance
-                vm.broadcast(Utils.getBroadcasterAddress());
+                vm.broadcast(getBroadcasterAddress());
                 assetTracker.migrateTokenBalanceFromNTVV31(chainId, assetId);
 
                 console.log("  Migration successful");
@@ -218,12 +217,16 @@ contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
             console.log("  Registering assetId:", vm.toString(assetId));
             console.log("  Token address:", tokenAddress);
 
-            vm.broadcast(Utils.getBroadcasterAddress());
+            vm.broadcast(getBroadcasterAddress());
             ntv.addLegacyTokenToBridgedTokensList(tokenAddress);
 
             console.log("  Token registered successfully");
         }
 
         console.log("Bridged tokens registration complete");
+    }
+
+    function getBroadcasterAddress() internal view virtual returns (address) {
+        return tx.origin;
     }
 }
