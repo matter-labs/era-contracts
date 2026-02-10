@@ -15,6 +15,7 @@ import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 contract DummySettlementLayerV31Upgrade is SettlementLayerV31Upgrade, BaseUpgradeUtils {
     function setTotalBatchesCommitted(uint256 _totalBatchesCommitted) public {
@@ -44,6 +45,10 @@ contract DummySettlementLayerV31Upgrade is SettlementLayerV31Upgrade, BaseUpgrad
     function getAssetTracker() public view returns (address) {
         return s.assetTracker;
     }
+
+    function setChainTypeManager(address _chainTypeManager) public {
+        s.chainTypeManager = _chainTypeManager;
+    }
 }
 
 contract SettlementLayerV31UpgradeTest is BaseUpgrade {
@@ -56,6 +61,7 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
     address internal mockMessageRoot;
     address internal mockChainAssetHandler;
     address internal mockGWChain;
+    address internal mockChainTypeManager;
 
     uint256 internal testChainId = 123;
     uint256 internal gwChainId = 456;
@@ -69,10 +75,12 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
         mockMessageRoot = makeAddr("messageRoot");
         mockChainAssetHandler = makeAddr("chainAssetHandler");
         mockGWChain = makeAddr("gwChain");
+        mockChainTypeManager = makeAddr("chainTypeManager");
 
         upgrade = new DummySettlementLayerV31Upgrade();
         upgrade.setBridgehub(mockBridgehub);
         upgrade.setChainId(testChainId);
+        upgrade.setChainTypeManager(mockChainTypeManager);
         upgrade.setTotalBatchesCommitted(100);
         upgrade.setTotalBatchesExecuted(100);
         upgrade.setPriorityTxMaxGasLimit(1 ether);
@@ -178,6 +186,13 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
             mockBridgehub,
             abi.encodeWithSelector(IBridgehubBase.whitelistedSettlementLayers.selector, testChainId),
             abi.encode(false)
+        );
+
+        // Mock chainTypeManager.PERMISSIONLESS_VALIDATOR
+        vm.mockCall(
+            mockChainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.PERMISSIONLESS_VALIDATOR.selector),
+            abi.encode(makeAddr("permissionlessValidator"))
         );
     }
 
