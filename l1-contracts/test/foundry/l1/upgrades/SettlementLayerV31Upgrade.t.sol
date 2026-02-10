@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {SettlementLayerV31Upgrade, PriorityQueueNotReady, NotAllBatchesExecuted, GWNotV31} from "contracts/upgrades/SettlementLayerV31Upgrade.sol";
+import {SettlementLayerV31Upgrade, PriorityQueueNotReady, NotAllBatchesExecuted} from "contracts/upgrades/SettlementLayerV31Upgrade.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
@@ -189,20 +189,6 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
         upgrade.setTotalBatchesExecuted(50);
 
         vm.expectRevert(NotAllBatchesExecuted.selector);
-        upgrade.upgrade(proposedUpgrade);
-    }
-
-    function test_RevertWhen_GatewayNotV31() public {
-        _setupMocks();
-
-        // Override the GW version mock to return version < 30
-        vm.mockCall(
-            mockGWChain,
-            abi.encodeWithSelector(IGetters.getSemverProtocolVersion.selector),
-            abi.encode(uint32(0), uint32(29), uint32(0)) // minor=29 < 30
-        );
-
-        vm.expectRevert(abi.encodeWithSelector(GWNotV31.selector, gwChainId));
         upgrade.upgrade(proposedUpgrade);
     }
 
