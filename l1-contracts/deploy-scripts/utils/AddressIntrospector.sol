@@ -40,20 +40,36 @@ library AddressIntrospector {
         if (address(_bridgehub) == L2_BRIDGEHUB_ADDR) {
             return _getL2BridgehubAddresses();
         }
-        return _getL1BridgehubAddresses(_bridgehub);
+        return _getL1BridgehubAddressesInternal(_bridgehub, false);
     }
 
-    function _getL1BridgehubAddresses(IL1Bridgehub _bridgehub) private view returns (BridgehubAddresses memory info) {
+    function getBridgehubAddressesV29(IL1Bridgehub _bridgehub) public view returns (BridgehubAddresses memory info) {
+        if (address(_bridgehub) == L2_BRIDGEHUB_ADDR) {
+            return _getL2BridgehubAddresses();
+        }
+        return _getL1BridgehubAddressesInternal(_bridgehub, true);
+    }
+
+    function _getL1BridgehubAddressesInternal(
+        IL1Bridgehub _bridgehub,
+        bool isV29
+    ) private view returns (BridgehubAddresses memory info) {
         address bridgehubProxy = address(_bridgehub);
         address messageRoot = address(_bridgehub.messageRoot());
         address ctmDeploymentTrackerProxy = address(_bridgehub.l1CtmDeployer());
         address chainAssetHandler = _bridgehub.chainAssetHandler();
-        address chainRegistrationSenderAddr = IBridgehubBase(bridgehubProxy).chainRegistrationSender();
 
-        // Get assetTracker from NTV via assetRouter
-        address assetRouter = address(_bridgehub.assetRouter());
-        address ntvProxy = address(IL1AssetRouter(assetRouter).nativeTokenVault());
-        address assetTrackerAddr = address(IL1NativeTokenVault(ntvProxy).l1AssetTracker());
+        // chainRegistrationSender and assetTracker only available post-V29
+        address chainRegistrationSenderAddr = address(0);
+        address assetTrackerAddr = address(0);
+        if (!isV29) {
+            chainRegistrationSenderAddr = IBridgehubBase(bridgehubProxy).chainRegistrationSender();
+
+            // Get assetTracker from NTV via assetRouter
+            address assetRouter = address(_bridgehub.assetRouter());
+            address ntvProxy = address(IL1AssetRouter(assetRouter).nativeTokenVault());
+            assetTrackerAddr = address(IL1NativeTokenVault(ntvProxy).l1AssetTracker());
+        }
 
         BridgehubContracts memory proxies = BridgehubContracts({
             bridgehub: bridgehubProxy,
@@ -69,7 +85,7 @@ library AddressIntrospector {
             ctmDeploymentTracker: Utils.getImplementation(ctmDeploymentTrackerProxy),
             chainAssetHandler: Utils.getImplementation(chainAssetHandler),
             chainRegistrationSender: address(0),
-            assetTracker: Utils.getImplementation(assetTrackerAddr)
+            assetTracker: isV29 ? address(0) : Utils.getImplementation(assetTrackerAddr)
         });
         info = BridgehubAddresses({proxies: proxies, implementations: implementations});
     }
@@ -166,7 +182,7 @@ library AddressIntrospector {
         require(_bridgehubProxy != address(0), "Bridgehub address is zero");
         require(_bridgehubProxy.code.length > 0, "Bridgehub has no code");
 
-        coreAddresses.bridgehub = getBridgehubAddresses(IL1Bridgehub(_bridgehubProxy));
+        coreAddresses.bridgehub = getBridgehubAddressesV29(IL1Bridgehub(_bridgehubProxy));
 
         address assetRouter = address(IL1Bridgehub(_bridgehubProxy).assetRouter());
         require(assetRouter != address(0), "AssetRouter address is zero");
@@ -451,10 +467,6 @@ library AddressIntrospector {
                 facets.executorFacet = facetAddr;
             } else if (nameHash == keccak256(bytes("GettersFacet"))) {
                 facets.gettersFacet = facetAddr;
-            } else if (nameHash == keccak256(bytes("MigratorFacet"))) {
-                facets.migratorFacet = facetAddr;
-            } else if (nameHash == keccak256(bytes("CommittorFacet"))) {
-                facets.committorFacet = facetAddr;
             }
         }
     }

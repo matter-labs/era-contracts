@@ -19,10 +19,6 @@ struct Facets {
     address gettersFacet;
     /// @notice Address of the DiamondInit contract.
     address diamondInit;
-    /// @notice Address of the Migrator facet contract.
-    address migratorFacet;
-    /// @notice Address of the Committor facet contract.
-    address committorFacet;
 }
 
 /// @notice Configuration parameters for deploying Gateway CTM.
