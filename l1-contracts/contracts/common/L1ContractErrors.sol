@@ -33,6 +33,10 @@ error AssetIdNotSupported(bytes32 assetId);
 error AssetRouterAllowanceNotZero();
 // 0x9b821ed7
 error BadTransferDataLength();
+// 0xb3e6e790
+error BaseTokenHolderMintFailed();
+// 0xa4a00185
+error BaseTokenTransferFailed();
 // 0x6ef9a972
 error BaseTokenGasPriceDenominatorNotSet();
 // 0x55ad3fd3
@@ -137,6 +141,9 @@ error GenesisUpgradeZero();
 error HashedLogIsDefault();
 // 0x0b08d5be
 error HashMismatch(bytes32 expected, bytes32 actual);
+// 0xd7d93e1f
+// 0xcf479181
+error InsufficientFunds(uint256 required, uint256 actual);
 // 0xd7d93e1f
 error IncorrectBatchBounds(
     uint256 processFromExpected,

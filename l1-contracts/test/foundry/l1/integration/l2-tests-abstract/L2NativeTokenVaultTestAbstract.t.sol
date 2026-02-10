@@ -35,8 +35,9 @@ import {TokenAlreadyInBridgedTokensList} from "contracts/bridge/L1BridgeContract
 
 import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
+import {IBaseTokenHolder} from "contracts/l2-system/interfaces/IBaseTokenHolder.sol";
 
 abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
@@ -361,23 +362,23 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         // Deal ETH to the asset router (needed because bridgeBurn is called with msg.value)
         vm.deal(L2_ASSET_ROUTER_ADDR, depositAmount);
 
-        // Mock the burnMsgValue call on L2_BASE_TOKEN_SYSTEM_CONTRACT
+        // Mock the burnAndStartBridging call on L2_BASE_TOKEN_HOLDER
         // Before the fix: This wouldn't be called, and bridgeBurn would fail
         // After the fix: This should be called with the correct value
         vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            L2_BASE_TOKEN_HOLDER_ADDR,
             depositAmount,
-            abi.encodeCall(IBaseToken.burnMsgValue, ()),
+            abi.encodeCall(IBaseTokenHolder.burnAndStartBridging, ()),
             abi.encode()
         );
 
-        // Expect the burnMsgValue call
-        vm.expectCall(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, depositAmount, abi.encodeCall(IBaseToken.burnMsgValue, ()));
+        // Expect the burnAndStartBridging call
+        vm.expectCall(L2_BASE_TOKEN_HOLDER_ADDR, depositAmount, abi.encodeCall(IBaseTokenHolder.burnAndStartBridging, ()));
 
         // Call bridgeBurn from the asset router (which is the only allowed caller)
         // Before the fix: This would revert because bridgeBurn would try to call
         // IBridgedStandardToken(L2_BASE_TOKEN_SYSTEM_CONTRACT).bridgeBurn() which doesn't exist
-        // After the fix: This should succeed and call burnMsgValue instead
+        // After the fix: This should succeed and call burnAndStartBridging on BaseTokenHolder instead
         vm.prank(L2_ASSET_ROUTER_ADDR);
         IAssetHandler(address(l2NativeTokenVault)).bridgeBurn{value: depositAmount}(
             destinationChainId,
@@ -483,15 +484,15 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
 
         vm.deal(L2_ASSET_ROUTER_ADDR, depositAmount);
 
-        // Mock burnMsgValue
+        // Mock burnAndStartBridging on BaseTokenHolder
         vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            L2_BASE_TOKEN_HOLDER_ADDR,
             depositAmount,
-            abi.encodeCall(IBaseToken.burnMsgValue, ()),
+            abi.encodeCall(IBaseTokenHolder.burnAndStartBridging, ()),
             abi.encode()
         );
 
-        // Should succeed and call burnMsgValue
+        // Should succeed and call burnAndStartBridging
         vm.prank(L2_ASSET_ROUTER_ADDR);
         IAssetHandler(address(l2NativeTokenVault)).bridgeBurn{value: depositAmount}(
             destinationChainId,

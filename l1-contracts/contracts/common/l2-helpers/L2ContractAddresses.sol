@@ -6,7 +6,7 @@ import {IL2ToL1MessengerEra} from "./IL2ToL1MessengerEra.sol";
 import {IL2InteropRootStorage} from "../interfaces/IL2InteropRootStorage.sol";
 import {IMessageVerification} from "../interfaces/IMessageVerification.sol";
 import {IBaseToken} from "./IBaseToken.sol";
-import {IBaseTokenHolder} from "./IBaseTokenHolder.sol";
+import {IBaseTokenHolder} from "../../l2-system/interfaces/IBaseTokenHolder.sol";
 import {IL2ContractDeployer} from "../interfaces/IL2ContractDeployer.sol";
 import {IL2NativeTokenVault} from "../../bridge/ntv/IL2NativeTokenVault.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
@@ -37,6 +37,24 @@ address constant L1_MESSENGER_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x01);
 
 /// @dev The address of the system hook responsible for setting bytecode on address. Can only be called from L2_COMPLEX_UPGRADER address
 address constant SET_BYTECODE_ON_ADDRESS_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x02);
+
+/// @dev The address of the system hook responsible for minting base tokens on ZK OS chains.
+/// This hook can only be called from the L2_BASE_TOKEN_SYSTEM_CONTRACT (address 0x800A).
+///
+/// Usage: To mint base tokens, call the hook with the amount to mint encoded as uint256:
+/// `(bool success, ) = MINT_BASE_TOKEN_HOOK.call(abi.encode(amountToMint));`
+/// The hook will credit the caller (L2BaseToken contract) with the specified amount of native tokens.
+/// After minting, the tokens can be transferred using Address.sendValue() or regular ETH transfers.
+///
+/// This hook is used during genesis/upgrade to initialize the BaseTokenHolder balance:
+/// 1. L2BaseTokenZKOS.initializeBaseTokenHolderBalance() calls this hook to mint 2^127-1 tokens
+/// 2. The minted tokens are then transferred to L2_BASE_TOKEN_HOLDER_ADDR
+/// 3. This establishes the initial token supply invariant for the chain
+///
+/// Authorization:
+/// - The hook validates that msg.sender is L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR (0x800A)
+/// - L2BaseTokenZKOS restricts initializeBaseTokenHolderBalance() to L2_COMPLEX_UPGRADER_ADDR only
+address constant MINT_BASE_TOKEN_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x03);
 
 ////////////////////////////////////////////////////////////
 // System contracts

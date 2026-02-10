@@ -2,7 +2,8 @@
 
 pragma solidity 0.8.28;
 
-import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, L2_INTEROP_CENTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BASE_TOKEN_HOLDER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, L2_INTEROP_CENTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {IL2BaseTokenBase} from "../l2-system/interfaces/IL2BaseTokenBase.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL2WrappedBaseToken} from "../bridge/interfaces/IL2WrappedBaseToken.sol";
@@ -242,7 +243,14 @@ library L2GenesisForceDeploymentsHelper {
             _isGenesisUpgrade: _isGenesisUpgrade,
             _isZKsyncOS: _isZKsyncOS
         });
-        _finalizeDeployments(_ctmDeployer, fixedForceDeploymentsData, additionalForceDeploymentsData);
+        _finalizeDeployments(
+            _ctmDeployer,
+            expectedUpgradeType,
+            fixedForceDeploymentsData,
+            additionalForceDeploymentsData,
+            _isGenesisUpgrade,
+            _isZKsyncOS
+        );
     }
 
     function _setupProxyAdmin() private {
@@ -482,8 +490,11 @@ library L2GenesisForceDeploymentsHelper {
 
     function _finalizeDeployments(
         address _ctmDeployer,
+        IComplexUpgrader.ContractUpgradeType expectedUpgradeType,
         FixedForceDeploymentsData memory fixedForceDeploymentsData,
-        ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData
+        ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData,
+        bool _isGenesisUpgrade,
+        bool _isZKsyncOS
     ) private {
         // It is expected that either through the force deployments above
         // or upon initialization, both the L2 deployment of BridgeHub, AssetRouter, and MessageRoot are deployed.
@@ -510,6 +521,25 @@ library L2GenesisForceDeploymentsHelper {
         );
 
         InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
+
+        // Deploy BaseTokenHolder contract.
+        // For ZKOS genesis, the contract is already deployed by the genesis tool.
+        if (!(_isZKsyncOS && _isGenesisUpgrade)) {
+            conductContractUpgrade(
+                expectedUpgradeType,
+                fixedForceDeploymentsData.baseTokenHolderBytecodeInfo,
+                L2_BASE_TOKEN_HOLDER_ADDR
+            );
+        }
+
+        // Initialize BaseTokenHolder balance during genesis for both Era and ZKOS chains.
+        // This mints the initial token supply and transfers it to BaseTokenHolder.
+        // For Era: reads __DEPRECATED_totalSupply and computes holder balance
+        // For ZKOS: mints via MINT_BASE_TOKEN_HOOK and transfers to holder
+        if (_isGenesisUpgrade) {
+            IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initializeBaseTokenHolderBalance();
+        }
+
         emit PerformForceDeployedContractsInitCompleted();
     }
 
