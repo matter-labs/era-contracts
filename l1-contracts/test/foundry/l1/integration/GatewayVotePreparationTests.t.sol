@@ -116,10 +116,8 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
     /// matches the facet address. This catches the bug where _deployDirectContracts skips
     /// deploying MigratorFacet or CommitterFacet.
     function test_allDiamondCutFacetsHaveDeploymentCalldata() public {
-        (
-            DeployedContracts memory contracts,
-            DirectCreate2Calldata memory directCalldata
-        ) = votePreparationScript.initializeAndCalculateAddresses(address(addresses.bridgehub), eraZKChainId);
+        (DeployedContracts memory contracts, DirectCreate2Calldata memory directCalldata) = votePreparationScript
+            .initializeAndCalculateAddresses(address(addresses.bridgehub), eraZKChainId);
 
         // Each direct calldata entry corresponds to a known facet address from calculateAddresses.
         // If any calldata is empty, the corresponding L1->L2 transaction would not be sent.
@@ -165,10 +163,8 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
     /// If any facet deployment was missing (e.g. MigratorFacet or CommitterFacet), the
     /// DiamondProxy constructor reverts with AddressHasNoCode.
     function test_diamondProxyDeployableWithGatewayDiamondCut() public {
-        (
-            DeployedContracts memory contracts,
-            DirectCreate2Calldata memory directCalldata
-        ) = votePreparationScript.initializeAndCalculateAddresses(address(addresses.bridgehub), eraZKChainId);
+        (DeployedContracts memory contracts, DirectCreate2Calldata memory directCalldata) = votePreparationScript
+            .initializeAndCalculateAddresses(address(addresses.bridgehub), eraZKChainId);
 
         GatewayCTMDeployerConfig memory config = votePreparationScript.getDeployerConfig();
 
