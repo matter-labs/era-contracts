@@ -274,7 +274,7 @@ library GatewayCTMDeployerHelper {
         DAContracts memory daResult
     ) internal returns (DirectDeployedAddresses memory addresses, DirectCreate2Calldata memory data) {
         // AdminFacet
-        bytes memory adminFacetArgs = abi.encode(config.l1ChainId, daResult.rollupDAManager, config.testnetVerifier);
+        bytes memory adminFacetArgs = abi.encode(config.l1ChainId, daResult.rollupDAManager);
         (addresses.facets.adminFacet, data.adminFacetCalldata) = _calculateCreate2AddressAndCalldataWithMode(
             _create2Salt,
             "Admin.sol",

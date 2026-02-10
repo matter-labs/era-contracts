@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, MAX_PRICE_CHANGE_DENOMINATOR, MAX_PRICE_CHANGE_NUMERATOR, PRICE_REFERENCE_L1_GAS, PRICE_UPDATE_INTERVAL, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../common/Config.sol";
+import {FEE_PARAMS_UPDATE_INTERVAL, L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, MAX_PRICE_CHANGE_DENOMINATOR, MAX_PRICE_CHANGE_NUMERATOR, PRICE_REFERENCE_L1_GAS, PRICE_UPDATE_INTERVAL, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
@@ -104,9 +104,9 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function changeFeeParams(FeeParams calldata _newFeeParams) external onlyAdminOrChainTypeManager onlyL1 {
-        uint256 lastUpdateTimestamp = s.lastFeeParamsUpdateTimestamp;
-        if (lastUpdateTimestamp != 0 && block.timestamp < lastUpdateTimestamp + PRICE_UPDATE_INTERVAL) {
-            revert FeeParamsChangeTooFrequent(lastUpdateTimestamp + PRICE_UPDATE_INTERVAL);
+        uint256 lastFeeParamsUpdateTimestamp = s.lastFeeParamsUpdateTimestamp;
+        if (lastFeeParamsUpdateTimestamp != 0 && block.timestamp < lastFeeParamsUpdateTimestamp + FEE_PARAMS_UPDATE_INTERVAL) {
+            revert FeeParamsChangeTooFrequent(lastFeeParamsUpdateTimestamp + FEE_PARAMS_UPDATE_INTERVAL);
         }
 
         // Double checking that the new fee params are valid, i.e.
@@ -122,7 +122,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert InvalidPubdataPricingMode();
         }
 
-        _enforcePriceIncreaseBound({
+        _enforcePriceChangeBound({
             _oldFeeParams: oldFeeParams,
             _newFeeParams: _newFeeParams,
             _oldNominator: s.baseTokenGasPriceMultiplierNominator,
@@ -143,12 +143,16 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert DenominatorIsZero();
         }
 
-        uint256 lastUpdateTimestamp = s.lastTokenMultiplierUpdateTimestamp;
+        uint256 lastFeeParamsUpdateTimestamp = s.lastFeeParamsUpdateTimestamp;
+        uint256 lastTokenMultiplierUpdateTimestamp = s.lastTokenMultiplierUpdateTimestamp;
+        uint256 lastUpdateTimestamp = lastFeeParamsUpdateTimestamp > lastTokenMultiplierUpdateTimestamp
+            ? lastFeeParamsUpdateTimestamp
+            : lastTokenMultiplierUpdateTimestamp;
         if (lastUpdateTimestamp != 0 && block.timestamp < lastUpdateTimestamp + PRICE_UPDATE_INTERVAL) {
             revert TokenMultiplierChangeTooFrequent(lastUpdateTimestamp + PRICE_UPDATE_INTERVAL);
         }
 
-        _enforcePriceIncreaseBound({
+        _enforcePriceChangeBound({
             _oldFeeParams: s.feeParams,
             _newFeeParams: s.feeParams,
             _oldNominator: s.baseTokenGasPriceMultiplierNominator,
@@ -167,24 +171,29 @@ contract AdminFacet is ZKChainBase, IAdmin {
         emit NewBaseTokenMultiplier(oldNominator, oldDenominator, _nominator, _denominator);
     }
 
-    function _enforcePriceIncreaseBound(
+    function _enforcePriceChangeBound(
         FeeParams memory _oldFeeParams,
         FeeParams memory _newFeeParams,
         uint128 _oldNominator,
         uint128 _oldDenominator,
         uint128 _newNominator,
         uint128 _newDenominator
-    ) internal pure {
+    ) internal view {
         uint256 oldPrice = _safeDerivedL2GasPrice(_oldFeeParams, _oldNominator, _oldDenominator);
         uint256 newPrice = _safeDerivedL2GasPrice(_newFeeParams, _newNominator, _newDenominator);
 
-        if (oldPrice == 0 || newPrice <= oldPrice) {
+        if (oldPrice == 0 && s.priorityTree.getSize() == 0) {
             return;
         }
 
         uint256 maxAllowedPrice = (oldPrice * MAX_PRICE_CHANGE_NUMERATOR) / MAX_PRICE_CHANGE_DENOMINATOR;
         if (newPrice > maxAllowedPrice) {
             revert FeeParamsChangeTooLarge(oldPrice, newPrice, maxAllowedPrice);
+        }
+
+        uint256 minAllowedPrice = (oldPrice * MAX_PRICE_CHANGE_DENOMINATOR) / MAX_PRICE_CHANGE_NUMERATOR;
+        if (newPrice < minAllowedPrice) {
+            revert FeeParamsChangeTooLarge(oldPrice, newPrice, minAllowedPrice);
         }
     }
 
@@ -282,6 +291,15 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if (s.priorityModeInfo.canBeActivated) {
             revert PriorityModeAlreadyAllowed();
         }
+        // Ensure that if there are existing priority txs, they have a non-zero request timestamp.
+        // Otherwise activatePriorityMode would be effectively non-functional after the v31 upgrade,
+        // since old priority txs don't have timestamps populated.
+        if (s.priorityTree.getSize() > 0) {
+            uint256 firstUnprocessedTx = s.priorityTree.getFirstUnprocessedPriorityTx();
+            if (s.priorityOpsRequestTimestamp[firstUnprocessedTx] == 0) {
+                revert PriorityOpsRequestTimestampMissing(firstUnprocessedTx);
+            }
+        }
         // Set a transaction filterer that is compatible with Priority Mode.
         //
         // In the common case, ZK Governance does not override `priorityModeInfo.transactionFilterer`,
@@ -310,6 +328,9 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert PriorityModeRequiresPermanentRollup();
         }
         uint256 firstUnprocessedTx = s.priorityTree.getFirstUnprocessedPriorityTx();
+        if (s.priorityTree.getSize() == 0) {
+            revert PriorityOpsRequestTimestampMissing(firstUnprocessedTx);
+        }
         uint256 unprocessedTxRequestedAt = s.priorityOpsRequestTimestamp[firstUnprocessedTx];
         // A zero timestamp means we don't have a recorded "requested at" time for this priority tx.
         // This can happen when:

@@ -15,6 +15,7 @@ import {IL2V31Upgrade} from "./IL2V31Upgrade.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IL1MessageRoot} from "../core/message-root/IL1MessageRoot.sol";
+import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 
 error PriorityQueueNotReady();
 error V31UpgradeGatewayBlockNumberNotSet();
@@ -37,6 +38,10 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         // if a chain settling on Gateway tries to upgrade before ZK Gateway has done the upgrade.
         s.assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
         s.__DEPRECATED_l2DAValidator = address(0);
+
+        // Set the permissionless validator used in Priority Mode, same as done in DiamondInit.
+        s.priorityModeInfo.permissionlessValidator = IChainTypeManager(s.chainTypeManager)
+            .PERMISSIONLESS_VALIDATOR();
 
         require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
 

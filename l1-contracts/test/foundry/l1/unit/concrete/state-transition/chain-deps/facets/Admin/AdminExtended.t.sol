@@ -261,6 +261,7 @@ contract AdminExtendedTest is AdminTest {
     function testFuzz_SetTokenMultiplier(uint128 nominator, uint128 denominator) public {
         vm.assume(denominator != 0);
         vm.assume(uint256(nominator) * 10 <= uint256(denominator) * 13);
+        vm.assume(uint256(nominator) * 13 >= uint256(denominator) * 10);
 
         vm.prank(address(dummyBridgehub));
         utilsFacet.util_setChainTypeManager(address(this));

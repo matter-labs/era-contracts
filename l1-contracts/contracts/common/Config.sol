@@ -89,8 +89,11 @@ uint256 constant MAX_NEW_FACTORY_DEPS = 64;
 /// @dev The L2 gasPricePerPubdata required to be used in bridges.
 uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = 800;
 
-/// @dev Minimum interval between price updates (fee params or token multiplier).
+/// @dev Minimum interval between token multiplier updates.
 uint256 constant PRICE_UPDATE_INTERVAL = 1 days;
+/// @dev Minimum interval between fee params updates. Fee params changes are rarer, so we
+/// use a longer interval to limit the compounding effect of combining fee params and token multiplier changes.
+uint256 constant FEE_PARAMS_UPDATE_INTERVAL = 7 days;
 /// @dev Max allowed price increase per update, as a ratio (e.g. 13/10 = 1.3x).
 uint256 constant MAX_PRICE_CHANGE_NUMERATOR = 13;
 uint256 constant MAX_PRICE_CHANGE_DENOMINATOR = 10;

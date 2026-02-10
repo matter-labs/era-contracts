@@ -144,7 +144,7 @@ contract ChangeFeeParamsTest is AdminTest {
         vm.startPrank(chainTypeManager);
         adminFacet.changeFeeParams(newFeeParams);
 
-        vm.expectRevert(abi.encodeWithSelector(FeeParamsChangeTooFrequent.selector, nowTimestamp + 1 days));
+        vm.expectRevert(abi.encodeWithSelector(FeeParamsChangeTooFrequent.selector, nowTimestamp + 7 days));
         adminFacet.changeFeeParams(newFeeParams);
     }
 
