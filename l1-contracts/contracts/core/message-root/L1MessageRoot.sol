@@ -17,7 +17,7 @@ contract L1MessageRoot is MessageRootBase {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     address public immutable BRIDGE_HUB;
 
-    /// @notice Chain asset handler used for settlement layer validation during proof verification.
+    /// @dev The chain asset handler contract.
     address public immutable CHAIN_ASSET_HANDLER;
 
     /// @notice The chain id of the Gateway chain.
@@ -46,10 +46,10 @@ contract L1MessageRoot is MessageRootBase {
     /// @dev Initialize the implementation to prevent Parity hack.
     /// @param _bridgehub Address of the Bridgehub.
     /// @param _eraGatewayChainId Chain ID of the Gateway chain.
-    constructor(address _bridgehub, uint256 _eraGatewayChainId) {
+    constructor(address _bridgehub, uint256 _eraGatewayChainId, address _chainAssetHandler) {
         BRIDGE_HUB = _bridgehub;
-        CHAIN_ASSET_HANDLER = IBridgehubBase(_bridgehub).chainAssetHandler();
         ERA_GATEWAY_CHAIN_ID = _eraGatewayChainId;
+        CHAIN_ASSET_HANDLER = _chainAssetHandler;
         uint256[] memory allZKChains = IBridgehubBase(_bridgehub).getAllZKChainChainIDs();
         _v31InitializeInner(allZKChains);
         _initialize();

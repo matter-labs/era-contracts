@@ -18,8 +18,6 @@ import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymen
 import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {Governance} from "contracts/governance/Governance.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
@@ -90,6 +88,10 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridgehub.proxies.bridgehub
         ) = deployTuppWithContract("L1Bridgehub", false);
         (
+            coreAddresses.bridgehub.implementations.chainAssetHandler,
+            coreAddresses.bridgehub.proxies.chainAssetHandler
+        ) = deployTuppWithContract("L1ChainAssetHandler", false);
+        (
             coreAddresses.bridgehub.implementations.messageRoot,
             coreAddresses.bridgehub.proxies.messageRoot
         ) = deployTuppWithContract("L1MessageRoot", false);
@@ -132,10 +134,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         ) = deployTuppWithContract("CTMDeploymentTracker", false);
 
         (
-            coreAddresses.bridgehub.implementations.chainAssetHandler,
-            coreAddresses.bridgehub.proxies.chainAssetHandler
-        ) = deployTuppWithContract("L1ChainAssetHandler", false);
-        (
             coreAddresses.bridgehub.implementations.chainRegistrationSender,
             coreAddresses.bridgehub.proxies.chainRegistrationSender
         ) = deployTuppWithContract("ChainRegistrationSender", false);
@@ -150,6 +148,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
     function setBridgehubParams() internal {
         IL1Bridgehub bridgehub = IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
         IL1AssetTracker assetTracker = L1AssetTracker(coreAddresses.bridgehub.proxies.assetTracker);
+        L1ChainAssetHandler chainAssetHandler = L1ChainAssetHandler(coreAddresses.bridgehub.proxies.chainAssetHandler);
         vm.startBroadcast(msg.sender);
         bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
         BridgehubBase(address(bridgehub)).setAddresses(
@@ -160,6 +159,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridgehub.proxies.chainRegistrationSender
         );
         assetTracker.setAddresses();
+        chainAssetHandler.setAddresses();
         vm.stopBroadcast();
         console.log("SharedBridge registered");
     }

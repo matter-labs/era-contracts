@@ -10,7 +10,6 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -89,16 +88,8 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
 
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
-        chainAssetHandler = new L1ChainAssetHandler(
-            governor,
-            address(bridgehub),
-            address(0),
-            address(0),
-            IL1Nullifier(address(0))
-        );
-        vm.prank(governor);
-        bridgehub.setAddresses(address(0), ICTMDeploymentTracker(address(0)), IMessageRoot(address(0)), address(chainAssetHandler), address(0));
-        messageroot = new L1MessageRoot(address(bridgehub), 1);
+        chainAssetHandler = new L1ChainAssetHandler(governor, address(bridgehub));
+        messageroot = new L1MessageRoot(address(bridgehub), 1, address(chainAssetHandler));
 
         stdstore
             .target(address(messageroot))
@@ -114,6 +105,8 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             address(chainAssetHandler),
             address(0)
         );
+        vm.prank(governor);
+        chainAssetHandler.setAddresses();
 
         vm.mockCall(
             address(sharedBridge),

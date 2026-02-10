@@ -56,7 +56,7 @@ contract MessageRootTest is Test {
         );
         L1_CHAIN_ID = 5;
         gatewayChainId = 506;
-        messageRoot = new L1MessageRoot(bridgeHub, 1);
+        messageRoot = new L1MessageRoot(bridgeHub, 1, address(0));
         l2MessageRoot = new L2MessageRoot();
 
         uint256[] memory allZKChainChainIDs = new uint256[](1);

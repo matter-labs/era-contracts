@@ -88,16 +88,8 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         l1Nullifier = makeAddr("l1Nullifier");
         serverNotifier = makeAddr("serverNotifier");
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
-        chainAssetHandler = new L1ChainAssetHandler(
-            governor,
-            address(bridgehub),
-            address(0),
-            address(0),
-            IL1Nullifier(address(0))
-        );
-        vm.prank(governor);
-        bridgehub.setAddresses(address(0), ICTMDeploymentTracker(address(0)), IMessageRoot(address(0)), address(chainAssetHandler), address(0));
-        messageroot = new L1MessageRoot(address(bridgehub), 1);
+        chainAssetHandler = new L1ChainAssetHandler(governor, address(bridgehub));
+        messageroot = new L1MessageRoot(address(bridgehub), 1, address(chainAssetHandler));
         stdstore
             .target(address(messageroot))
             .sig(IL1MessageRoot.v31UpgradeChainBatchNumber.selector)
@@ -111,6 +103,8 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             address(chainAssetHandler),
             address(0)
         );
+        vm.prank(governor);
+        chainAssetHandler.setAddresses();
 
         vm.mockCall(
             address(sharedBridge),

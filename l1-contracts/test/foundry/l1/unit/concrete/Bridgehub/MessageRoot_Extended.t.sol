@@ -51,7 +51,7 @@ contract MessageRoot_Extended_Test is Test {
         );
         vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector), abi.encode(0));
 
-        messageRoot = new L1MessageRoot(bridgeHub, gatewayChainId);
+        messageRoot = new L1MessageRoot(bridgeHub, gatewayChainId, address(0));
         l2MessageRoot = new L2MessageRoot();
 
         uint256[] memory allZKChainChainIDs = new uint256[](1);

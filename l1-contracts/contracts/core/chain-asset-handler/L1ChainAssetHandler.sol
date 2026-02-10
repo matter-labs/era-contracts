@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
 import {TxStatus} from "../../common/Messaging.sol";
 import {IBridgehubBase, BridgehubBurnCTMAssetData} from "../bridgehub/IBridgehubBase.sol";
 import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
@@ -34,20 +33,20 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     /// @dev The bridgehub contract.
     IL1Bridgehub public immutable override BRIDGEHUB;
 
-    /// @dev The asset router contract.
-    IAssetRouterBase public immutable override ASSET_ROUTER;
-
-    /// @dev The asset tracker contract.
-    address internal immutable ASSET_TRACKER;
-
-    /// @dev The L1 nullifier contract.
-    IL1Nullifier internal immutable L1_NULLIFIER;
-
-    /// @dev The mapping showing for each chain if migration is in progress or not, used for freezing deposits.abi
+    /// @dev The mapping showing for each chain if migration is in progress or not, used for freezing deposits.
     mapping(uint256 chainId => bool isMigrationInProgress) public isMigrationInProgress;
 
+    /// @dev The message root contract. Set via `setAddresses` after deployment because
+    /// L1MessageRoot is deployed after L1ChainAssetHandler (so that L1MessageRoot can store
+    /// the chain asset handler address as an immutable).
+    IMessageRoot internal storedMessageRoot;
+
+    /// @dev The asset router contract. Set via `setAddresses` after deployment because
+    /// L1AssetRouter is deployed after L1ChainAssetHandler.
+    IAssetRouterBase internal storedAssetRouter;
+
     /*//////////////////////////////////////////////////////////////
-                        IMMUTABLE GETTERS
+                        GETTERS
     //////////////////////////////////////////////////////////////*/
 
     function _l1ChainId() internal view override returns (uint256) {
@@ -56,39 +55,33 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     function _bridgehub() internal view override returns (IL1Bridgehub) {
         return BRIDGEHUB;
     }
-    
-    // An immutable can't be used for MESSAGE_ROOT because L1MessageRoot requires the
-    // chain asset handler address in its constructor, creating a circular dependency.
+
     function _messageRoot() internal view override returns (IMessageRoot) {
-        return IBridgehubBase(address(BRIDGEHUB)).messageRoot();
+        return storedMessageRoot;
     }
 
     // solhint-disable-next-line func-name-mixedcase
     function MESSAGE_ROOT() public view override returns (IMessageRoot) {
-        return _messageRoot();
-    }
-    function _assetRouter() internal view override returns (IAssetRouterBase) {
-        return ASSET_ROUTER;
+        return storedMessageRoot;
     }
 
-    function _assetTracker() internal view returns (address) {
-        return ASSET_TRACKER;
+    // solhint-disable-next-line func-name-mixedcase
+    function ASSET_ROUTER() public view override returns (IAssetRouterBase) {
+        return storedAssetRouter;
+    }
+
+    function _assetRouter() internal view override returns (IAssetRouterBase) {
+        return storedAssetRouter;
     }
 
     constructor(
         address _owner,
-        address _bridgehub,
-        address _assetRouter,
-        address _assetTracker,
-        IL1Nullifier _l1Nullifier
+        address _bridgehub
     ) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGEHUB = IL1Bridgehub(_bridgehub);
-        ASSET_ROUTER = IAssetRouterBase(_assetRouter);
         L1_CHAIN_ID = block.chainid;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
-        ASSET_TRACKER = _assetTracker;
-        L1_NULLIFIER = _l1Nullifier;
         _transferOwnership(_owner);
     }
 
@@ -96,6 +89,13 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     /// @param _owner the owner of the contract
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
+    }
+
+    /// @notice Sets the addresses of the message root and asset router by querying the bridgehub.
+    /// @dev Called after deployment once the dependent contracts are registered on the bridgehub.
+    function setAddresses() external onlyOwner {
+        storedMessageRoot = BRIDGEHUB.messageRoot();
+        storedAssetRouter = BRIDGEHUB.assetRouter();
     }
 
     /// @dev IL1AssetHandler interface, used to undo a failed migration of a chain.

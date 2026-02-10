@@ -5,7 +5,6 @@ import {Test} from "forge-std/Test.sol";
 
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {IChainAssetHandler, MigrationInterval} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
-import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
 import {MigrationNumberMismatch, MigrationIntervalNotSet, MigrationIntervalInvalid, HistoricalSettlementLayerMismatch} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
@@ -15,10 +14,7 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
 
     address owner = makeAddr("owner");
     address bridgehub = makeAddr("bridgehub");
-    address assetRouter = makeAddr("assetRouter");
     address messageRoot = makeAddr("messageRoot");
-    address assetTracker = makeAddr("assetTracker");
-    IL1Nullifier l1Nullifier = IL1Nullifier(makeAddr("l1Nullifier"));
 
     uint256 constant LEGACY_GW_CHAIN_ID = 505;
     uint256 constant CHAIN_A = 100;
@@ -38,13 +34,14 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
             abi.encode(LEGACY_GW_CHAIN_ID)
         );
 
-        chainAssetHandler = new L1ChainAssetHandler(
-            owner,
+        chainAssetHandler = new L1ChainAssetHandler(owner, bridgehub);
+        vm.mockCall(
             bridgehub,
-            assetRouter,
-            assetTracker,
-            l1Nullifier
+            abi.encodeWithSelector(IBridgehubBase.assetRouter.selector),
+            abi.encode(address(0))
         );
+        vm.prank(owner);
+        chainAssetHandler.setAddresses();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -69,21 +66,17 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
         assertTrue(stored.isSet);
     }
 
-    function test_setHistoricalMigrationInterval_successChainStillOnGW() public {
+    function test_setHistoricalMigrationInterval_revertMigrateFromSLBatchNumberZero() public {
         MigrationInterval memory interval = MigrationInterval({
             migrateToSLBatchNumber: 10,
-            migrateFromSLBatchNumber: 0, // chain hasn't returned from GW
+            migrateFromSLBatchNumber: 0, // invalid: from must be > to
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isSet: true
         });
 
         vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(MigrationIntervalInvalid.selector));
         chainAssetHandler.setHistoricalMigrationInterval(CHAIN_A, 0, interval);
-
-        MigrationInterval memory stored = chainAssetHandler.migrationInterval(CHAIN_A, 0);
-        assertEq(stored.migrateToSLBatchNumber, 10);
-        assertEq(stored.migrateFromSLBatchNumber, 0);
-        assertTrue(stored.isSet);
     }
 
     function test_setHistoricalMigrationInterval_revertNotOwner() public {
@@ -141,17 +134,22 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
         chainAssetHandler.setHistoricalMigrationInterval(CHAIN_A, 0, interval);
     }
 
-    function test_setHistoricalMigrationInterval_revertMigrateToSLBatchNumberZero() public {
+    function test_setHistoricalMigrationInterval_migrateToSLBatchNumberZero() public {
+        // migrateToSLBatchNumber == 0 is valid: the chain migrated before any batches were committed
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 0, // invalid
+            migrateToSLBatchNumber: 0,
             migrateFromSLBatchNumber: 50,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isSet: true
         });
 
         vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(MigrationIntervalInvalid.selector));
         chainAssetHandler.setHistoricalMigrationInterval(CHAIN_A, 0, interval);
+
+        MigrationInterval memory stored = chainAssetHandler.migrationInterval(CHAIN_A, 0);
+        assertEq(stored.migrateToSLBatchNumber, 0);
+        assertEq(stored.migrateFromSLBatchNumber, 50);
+        assertTrue(stored.isSet);
     }
 
     function test_setHistoricalMigrationInterval_revertMigrateFromSLBatchNumberNotGreaterThanTo() public {
@@ -254,25 +252,6 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
         assertTrue(chainAssetHandler.isValidSettlementLayer(CHAIN_A, 100, block.chainid));
     }
 
-    function test_isValidSettlementLayer_chainStillOnGW() public {
-        // Chain migrated to GW and hasn't returned yet
-        MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 10,
-            migrateFromSLBatchNumber: 0, // hasn't returned
-            settlementLayerChainId: LEGACY_GW_CHAIN_ID,
-            isSet: true
-        });
-        vm.prank(owner);
-        chainAssetHandler.setHistoricalMigrationInterval(CHAIN_A, 0, interval);
-
-        // Batch before migration should be on L1
-        assertTrue(chainAssetHandler.isValidSettlementLayer(CHAIN_A, 5, block.chainid));
-
-        // All batches after migration should be on GW
-        assertTrue(chainAssetHandler.isValidSettlementLayer(CHAIN_A, 11, LEGACY_GW_CHAIN_ID));
-        assertTrue(chainAssetHandler.isValidSettlementLayer(CHAIN_A, 1000, LEGACY_GW_CHAIN_ID));
-        assertFalse(chainAssetHandler.isValidSettlementLayer(CHAIN_A, 1000, block.chainid));
-    }
 
     // add this to be excluded from coverage report
     function test() internal virtual {}

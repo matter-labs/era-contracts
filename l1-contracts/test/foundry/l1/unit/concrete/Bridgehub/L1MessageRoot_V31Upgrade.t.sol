@@ -32,7 +32,7 @@ contract L1MessageRootV31UpgradeTest is Test {
             abi.encode(makeAddr("chainAssetHandler"))
         );
 
-        messageRoot = new L1MessageRoot(bridgeHub, 1);
+        messageRoot = new L1MessageRoot(bridgeHub, 1, address(0));
     }
 
     function test_L1_CHAIN_ID() public view {
@@ -162,7 +162,7 @@ contract L1MessageRootV31UpgradeTest is Test {
             abi.encode(block.chainid)
         );
 
-        L1MessageRoot newMessageRoot = new L1MessageRoot(newBridgehub, 1);
+        L1MessageRoot newMessageRoot = new L1MessageRoot(newBridgehub, 1, address(0));
 
         // Verify the placeholder was set
         assertEq(
@@ -214,7 +214,7 @@ contract L1MessageRootV31UpgradeTest is Test {
             abi.encode(block.chainid)
         );
 
-        L1MessageRoot newMessageRoot = new L1MessageRoot(newBridgehub, 1);
+        L1MessageRoot newMessageRoot = new L1MessageRoot(newBridgehub, 1, address(0));
 
         // Setup zkChain mock
         address zkChain = makeAddr("zkChain");
@@ -270,7 +270,7 @@ contract L1MessageRootV31UpgradeTest is Test {
             abi.encode(block.chainid)
         );
 
-        L1MessageRoot newMessageRoot = new L1MessageRoot(newBridgehub, 1);
+        L1MessageRoot newMessageRoot = new L1MessageRoot(newBridgehub, 1, address(0));
 
         // Both chains should have placeholder value
         assertEq(

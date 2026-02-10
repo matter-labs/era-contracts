@@ -50,7 +50,7 @@ contract ChainRegistrarTest is Test {
         interopCenter = new InteropCenter();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         interopCenter.initL2(block.chainid, makeAddr("admin"));
-        messageRoot = new L1MessageRoot(address(bridgeHub), 1);
+        messageRoot = new L1MessageRoot(address(bridgeHub), 1, address(0));
         ctm = new DummyChainTypeManagerWBH(address(bridgeHub));
         admin = makeAddr("admin");
         deployer = makeAddr("deployer");

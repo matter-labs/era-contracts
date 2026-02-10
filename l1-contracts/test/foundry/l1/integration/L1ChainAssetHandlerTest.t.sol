@@ -364,8 +364,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
     function test_setHistoricalMigrationInterval_revertInvalidBatchNumbers() public {
         uint256 gwChainId = _legacyGwChainId();
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 0, // invalid: must be > 0
-            migrateFromSLBatchNumber: 50,
+            migrateToSLBatchNumber: 50,
+            migrateFromSLBatchNumber: 30, // invalid: from must be > to
             settlementLayerChainId: gwChainId,
             isSet: true
         });

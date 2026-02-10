@@ -468,9 +468,7 @@ abstract contract ChainAssetHandlerBase is
             HistoricalSettlementLayerMismatch(legacyGwChainId, _interval.settlementLayerChainId)
         );
         require(
-            _interval.migrateToSLBatchNumber != 0 &&
-                (_interval.migrateFromSLBatchNumber == 0 ||
-                    _interval.migrateFromSLBatchNumber > _interval.migrateToSLBatchNumber),
+            _interval.migrateFromSLBatchNumber > _interval.migrateToSLBatchNumber,
             MigrationIntervalInvalid()
         );
         _migrationInterval[_chainId][_migrationNumber] = _interval;

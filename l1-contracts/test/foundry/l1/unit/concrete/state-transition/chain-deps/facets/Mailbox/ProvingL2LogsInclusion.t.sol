@@ -17,7 +17,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {InvalidSettlementLayerForBatch} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {IChainAssetHandler, MigrationInterval} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
-import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+
 import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {MerkleTreeNoSort} from "test/foundry/l1/unit/concrete/common/libraries/Merkle/MerkleTreeNoSort.sol";
@@ -35,7 +35,6 @@ contract MailboxL2LogsProve is MailboxTest {
     bool isService;
     uint8 shardId;
     L1MessageRoot messageRoot;
-    L1ChainAssetHandler realChainAssetHandler;
 
     /// @dev Gateway chain ID used for legacy historical migration intervals.
     uint256 constant LEGACY_GW_CHAIN_ID = 1;
@@ -48,34 +47,18 @@ contract MailboxL2LogsProve is MailboxTest {
         utilsFacet.util_setTotalBatchesExecuted(2);
         batchNumber = gettersFacet.getTotalBatchesExecuted();
 
-        vm.mockCall(
-            address(bridgehub),
-            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
-            abi.encode(new uint256[](0))
-        );
-
-        // Deploy a real L1ChainAssetHandler for settlement layer validation (avoiding mocks).
-        realChainAssetHandler = new L1ChainAssetHandler(
-            address(this), // owner
-            bridgehub,
-            makeAddr("assetRouter"),
-            makeAddr("assetTracker"),
-            IL1Nullifier(makeAddr("l1Nullifier"))
-        );
-
-        // Point the bridgehub mock at the real handler so L1MessageRoot picks it up.
-        vm.mockCall(
-            address(bridgehub),
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(address(realChainAssetHandler))
-        );
-
-        messageRoot = new L1MessageRoot(address(bridgehub), LEGACY_GW_CHAIN_ID);
+        messageRoot = new L1MessageRoot(address(bridgehub), LEGACY_GW_CHAIN_ID, address(realChainAssetHandler));
         vm.mockCall(
             address(bridgehub),
             abi.encodeCall(IBridgehubBase.messageRoot, ()),
             abi.encode(address(messageRoot))
         );
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeCall(IBridgehubBase.assetRouter, ()),
+            abi.encode(address(0))
+        );
+        realChainAssetHandler.setAddresses();
         vm.mockCall(
             address(bridgehub),
             abi.encodeCall(IBridgehubBase.getZKChain, (gettersFacet.getChainId())),
@@ -347,9 +330,10 @@ contract MailboxL2LogsProve is MailboxTest {
     function _setupSettlementForChain(uint256 _settlementLayerChainId) internal {
         // The main chain's batchNumber is 2 (set in setUp).
         // Place the migration boundary at batch 1 so batch 2 is inside the SL interval.
+        // Use a large migrateFromSLBatchNumber so all test batches fall within the interval.
         MigrationInterval memory interval = MigrationInterval({
             migrateToSLBatchNumber: batchNumber - 1, // batch 1
-            migrateFromSLBatchNumber: 0, // chain hasn't returned yet
+            migrateFromSLBatchNumber: 1000,
             settlementLayerChainId: _settlementLayerChainId,
             isSet: true
         });
@@ -484,7 +468,7 @@ contract MailboxL2LogsProve is MailboxTest {
         // The proof claims the batch is on the GW, but it should be on L1.
         MigrationInterval memory interval = MigrationInterval({
             migrateToSLBatchNumber: 5,
-            migrateFromSLBatchNumber: 0,
+            migrateFromSLBatchNumber: 100,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isSet: true
         });
@@ -503,9 +487,10 @@ contract MailboxL2LogsProve is MailboxTest {
             chainIdProof: bytes32Arr(2, bytes32(uint256(1)), bytes32(uint256(0)))
         });
 
-        // The proof claims GW as settlement layer, but batchNumber=1 < migrateToSLBatchNumber=5,
+        // The proof claims GW as settlement layer, but batchNumber=2 <= migrateToSLBatchNumber=5,
         // so the batch was on L1. This should revert.
         address secondDiamondProxy = deployDiamondProxy();
+
         UtilsFacet secondUtils = UtilsFacet(secondDiamondProxy);
         IGetters secondGetters = IGetters(secondDiamondProxy);
         secondUtils.util_setTotalBatchesExecuted(1);
@@ -571,8 +556,9 @@ contract MailboxL2LogsProve is MailboxTest {
             chainIdProof: bytes32Arr(2, bytes32(uint256(1)), bytes32(uint256(0)))
         });
 
-        // Batch 2 is after return from SL → on L1. Proof claims GW → should revert.
+        // Batch 10 is after return from SL → on L1. Proof claims GW → should revert.
         address secondDiamondProxy = deployDiamondProxy();
+
         UtilsFacet secondUtils = UtilsFacet(secondDiamondProxy);
         IGetters secondGetters = IGetters(secondDiamondProxy);
         secondUtils.util_setTotalBatchesExecuted(1);

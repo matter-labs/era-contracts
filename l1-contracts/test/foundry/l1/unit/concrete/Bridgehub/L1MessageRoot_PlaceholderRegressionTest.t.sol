@@ -46,7 +46,7 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
             abi.encode(block.chainid)
         );
 
-        L1MessageRoot messageRoot = new L1MessageRoot(bridgeHub, 1);
+        L1MessageRoot messageRoot = new L1MessageRoot(bridgeHub, 1, address(0));
 
         // Verify the placeholder value was set (not 0!)
         uint256 storedValue = messageRoot.v31UpgradeChainBatchNumber(CHAIN_ID);
@@ -101,7 +101,7 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
             abi.encode(chainIds)
         );
 
-        L1MessageRoot messageRoot = new L1MessageRoot(bridgeHub, 1);
+        L1MessageRoot messageRoot = new L1MessageRoot(bridgeHub, 1, address(0));
 
         // For a chain not in allZKChains, the mapping defaults to 0
         assertEq(messageRoot.v31UpgradeChainBatchNumber(CHAIN_ID), 0, "New chain should have 0, not placeholder");
@@ -148,7 +148,7 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
             abi.encode(block.chainid)
         );
 
-        L1MessageRoot messageRoot = new L1MessageRoot(bridgeHub, 1);
+        L1MessageRoot messageRoot = new L1MessageRoot(bridgeHub, 1, address(0));
 
         address zkChain = makeAddr("zkChain");
         vm.mockCall(
@@ -222,7 +222,7 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
             abi.encode(block.chainid)
         );
 
-        L1MessageRoot messageRoot = new L1MessageRoot(bridgeHub, 1);
+        L1MessageRoot messageRoot = new L1MessageRoot(bridgeHub, 1, address(0));
 
         address zkChain = makeAddr("zkChain");
         vm.mockCall(
