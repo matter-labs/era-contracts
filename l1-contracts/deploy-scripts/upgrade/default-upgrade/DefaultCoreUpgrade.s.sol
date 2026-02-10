@@ -21,14 +21,18 @@ import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.
 import {Governance} from "contracts/governance/Governance.sol";
 import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {BridgehubAddresses, BridgesDeployedAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
+import {CoreDeployedAddresses} from "../../utils/Types.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
+import {Utils} from "../../utils/Utils.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {ChainCreationParamsLib} from "../../ctm/ChainCreationParamsLib.sol";
 
 /// @notice Script used for default ecosystem upgrade flow should be run as a first for the upgrade.
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
+contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     using stdToml for string;
 
     /// @notice Internal state of the upgrade script
@@ -39,6 +43,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
 
     struct AdditionalConfigParams {
         uint256 newProtocolVersion;
+        bool isZKsyncOS;
+        bool hasV29IntrospectionOverride;
+        bool useV29IntrospectionOverride;
     }
     AdditionalConfigParams internal additionalConfig;
 
@@ -47,20 +54,17 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
     function initialize(
         string memory permanentValuesInputPath,
         string memory upgradeInputPath,
-        string memory newConfigPath,
         string memory _outputPath
     ) public virtual {
         string memory root = vm.projectRoot();
-        newConfigPath = string.concat(root, newConfigPath);
         permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
         upgradeInputPath = string.concat(root, upgradeInputPath);
         console.log("permanentValuesInputPath", permanentValuesInputPath);
         console.log("root", root);
 
-        initializeConfig(permanentValuesInputPath, upgradeInputPath, newConfigPath);
+        initializeConfig(permanentValuesInputPath, upgradeInputPath);
         instantiateCreate2Factory();
 
-        console.log("Initialized config from %s", newConfigPath);
         upgradeConfig.outputPath = string.concat(root, _outputPath);
         upgradeConfig.initialized = true;
     }
@@ -69,6 +73,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
     function prepareEcosystemUpgrade() public virtual {
         deployNewEcosystemContractsL1();
         console.log("Ecosystem contracts are deployed!");
+        saveOutput(upgradeConfig.outputPath);
+        console.log("Core upgrade output saved!");
     }
 
     /// @notice Deploy everything that should be deployed
@@ -79,7 +85,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         initialize(
             vm.envString("PERMANENT_VALUES_INPUT"),
             vm.envString("UPGRADE_INPUT"),
-            vm.envString("UPGRADE_ECOSYSTEM_INPUT"),
             vm.envString("UPGRADE_ECOSYSTEM_OUTPUT")
         );
         prepareEcosystemUpgrade();
@@ -103,8 +108,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
     }
 
     function getOldProtocolDeadline() public virtual returns (uint256) {
-        // Note, that it is this way by design, on stage2 it
-        // will be set to 0
+        // Returns max deadline initially. After the upgrade is complete (stage2),
+        // governance should call setNewVersionUpgrade with deadline=0 to force
+        // all chains to upgrade immediately.
         return type(uint256).max;
     }
 
@@ -112,23 +118,34 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         return coreAddresses.bridgehub;
     }
 
-    function initializeConfig(
-        string memory permanentValuesInputPath,
-        string memory upgradeInputPath,
-        string memory newConfigPath
-    ) public virtual {
+    function getCoreAddresses() public view returns (CoreDeployedAddresses memory) {
+        return coreAddresses;
+    }
+
+    function initializeConfig(string memory permanentValuesInputPath, string memory upgradeInputPath) public virtual {
         string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
         string memory upgradeToml = vm.readFile(upgradeInputPath);
-        string memory toml = vm.readFile(newConfigPath);
 
         (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesInputPath);
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
-        //        config.supportL2LegacySharedBridgeTest = permanentValuesToml.readBool("$.support_l2_legacy_shared_bridge_test");
-        additionalConfig.newProtocolVersion = upgradeToml.readUint("$.contracts.new_protocol_version");
+
+        // Read isZKsyncOS flag from permanent values (required)
+        require(permanentValuesToml.keyExists("$.is_zk_sync_os"), "is_zk_sync_os flag is required in permanent values");
+        additionalConfig.isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
+
+        // Optional override for v29 introspection selection
+        if (upgradeToml.keyExists("$.use_v29_introspection")) {
+            additionalConfig.hasV29IntrospectionOverride = true;
+            additionalConfig.useV29IntrospectionOverride = upgradeToml.readBool("$.use_v29_introspection");
+        }
+
+        // Protocol version comes from genesis config
+        additionalConfig.newProtocolVersion = loadProtocolVersionFromGenesis();
 
         coreAddresses.bridgehub.proxies.bridgehub = permanentValuesToml.readAddress(
             "$.core_contracts.bridgehub_proxy_addr"
         );
+        require(coreAddresses.bridgehub.proxies.bridgehub != address(0), "bridgehub_proxy_addr is zero");
         setAddressesBasedOnBridgehub();
         initializeL1CoreUtilsConfig();
     }
@@ -138,14 +155,13 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         L1Bridgehub bridgehub = L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
         Governance governance = Governance(payable(coreAddresses.shared.governance));
         config.l1ChainId = block.chainid;
-        config.deployerAddress = msg.sender;
+        config.deployerAddress = getBroadcasterAddress();
         config.eraChainId = assetRouter.ERA_CHAIN_ID();
         config.eraDiamondProxyAddress = bridgehub.getZKChain(assetRouter.ERA_CHAIN_ID());
 
         config.ownerAddress = assetRouter.owner();
 
         config.contracts.governanceSecurityCouncilAddress = governance.securityCouncil();
-        // config.contracts.governanceMinDelay = governance.minDelay();
 
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
 
@@ -153,7 +169,18 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
     }
 
     function setAddressesBasedOnBridgehub() internal virtual {
-        coreAddresses = AddressIntrospector.getCoreDeployedAddresses(coreAddresses.bridgehub.proxies.bridgehub);
+        address bridgehubProxy = coreAddresses.bridgehub.proxies.bridgehub;
+
+        // Determine which introspection method to use based on protocol version or override
+        bool useV29Introspection = additionalConfig.hasV29IntrospectionOverride
+            ? additionalConfig.useV29IntrospectionOverride
+            : AddressIntrospector.shouldUseV29Introspection(bridgehubProxy);
+
+        if (useV29Introspection) {
+            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV29(bridgehubProxy);
+        } else {
+            coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubProxy);
+        }
     }
 
     function saveOutput(string memory outputPath) internal virtual {
@@ -380,9 +407,11 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridges.implementations.l1NativeTokenVault
         );
 
-        calls[4] = _buildCallProxyUpgrade(
+        // L1MessageRoot: Use upgradeAndCall to call initializeL1V31Upgrade
+        calls[4] = _buildCallProxyUpgradeAndCall(
             coreAddresses.bridgehub.proxies.messageRoot,
-            coreAddresses.bridgehub.implementations.messageRoot
+            coreAddresses.bridgehub.implementations.messageRoot,
+            "L1MessageRoot"
         );
 
         calls[5] = _buildCallProxyUpgrade(
@@ -390,7 +419,10 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridgehub.implementations.ctmDeploymentTracker
         );
 
-        // calls[6] = _buildCallProxyUpgrade(coreAddresses.bridges.proxies.erc20Bridge, coreAddresses.bridges.implementations.erc20Bridge);
+        calls[6] = _buildCallProxyUpgrade(
+            coreAddresses.bridgehub.proxies.chainAssetHandler,
+            coreAddresses.bridgehub.implementations.chainAssetHandler
+        );
     }
 
     function _buildCallProxyUpgrade(
@@ -409,6 +441,25 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
         });
     }
 
+    function _buildCallProxyUpgradeAndCall(
+        address proxyAddress,
+        address newImplementationAddress,
+        string memory contractName
+    ) internal virtual returns (Call memory call) {
+        require(coreAddresses.shared.transparentProxyAdmin != address(0), "transparentProxyAdmin not newConfigured");
+
+        bytes memory initializeCalldata = getInitializeCalldata(contractName, false);
+
+        call = Call({
+            target: coreAddresses.shared.transparentProxyAdmin,
+            data: abi.encodeCall(
+                ProxyAdmin.upgradeAndCall,
+                (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress, initializeCalldata)
+            ),
+            value: 0
+        });
+    }
+
     function _buildCallBeaconProxyUpgrade(
         address proxyAddress,
         address newImplementationAddress
@@ -421,5 +472,21 @@ contract DefaultEcosystemUpgrade is Script, DeployL1CoreUtils {
     }
 
     // add this to be excluded from coverage report
+
+    /// @notice Load protocol version from genesis config
+    /// @dev Reads from Era or ZKsync OS genesis based on config.isZKsyncOS flag
+    function loadProtocolVersionFromGenesis() internal virtual returns (uint256) {
+        string memory genesisFilename = additionalConfig.isZKsyncOS ? "zksync-os/latest.json" : "era/latest.json";
+        string memory genesisPath = string.concat(vm.projectRoot(), "/../configs/genesis/", genesisFilename);
+        return
+            ChainCreationParamsLib
+                .getChainCreationParams(genesisPath, additionalConfig.isZKsyncOS)
+                .latestProtocolVersion;
+    }
+
+    function getBroadcasterAddress() internal view virtual returns (address) {
+        return tx.origin;
+    }
+
     function test() internal override {}
 }
