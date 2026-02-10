@@ -73,7 +73,7 @@ contract MailboxTest is UtilsCallMockerTest {
         // Mock isValidSettlementLayer to always return true for any settlement layer validation
         vm.mockCall(
             address(chainAssetHandler),
-            abi.encodeWithSelector(IChainAssetHandler.isValidSettlementLayer.selector),
+            abi.encodeWithSelector(IL1ChainAssetHandler.isValidSettlementLayer.selector),
             abi.encode(true)
         );
     }

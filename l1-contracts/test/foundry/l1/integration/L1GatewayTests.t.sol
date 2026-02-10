@@ -378,8 +378,9 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             batchNumber: 0,
             ctmData: ctmData,
             chainData: chainData,
+            // +1 since during migrating back we the passed migration number gets incremented by 1 in the Gateway's ChainAssetHandler
             migrationNumber: IChainAssetHandler(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
-                .migrationNumber(migratingChainId)
+                .migrationNumber(migratingChainId) + 1
         });
         bytes memory bridgehubMintData = abi.encode(data);
         bytes memory message = abi.encodePacked(
