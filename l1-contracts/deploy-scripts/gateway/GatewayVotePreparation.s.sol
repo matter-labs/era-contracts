@@ -191,6 +191,12 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         // Deploy GettersFacet
         runGatewayL1L2Transaction(targetAddr, directCalldata.gettersFacetCalldata);
 
+        // Deploy MigratorFacet
+        runGatewayL1L2Transaction(targetAddr, directCalldata.migratorFacetCalldata);
+
+        // Deploy CommitterFacet
+        runGatewayL1L2Transaction(targetAddr, directCalldata.committerFacetCalldata);
+
         // Deploy DiamondInit
         runGatewayL1L2Transaction(targetAddr, directCalldata.diamondInitCalldata);
 
