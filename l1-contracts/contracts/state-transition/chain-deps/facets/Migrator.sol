@@ -84,6 +84,9 @@ contract MigratorFacet is ZKChainBase, IMigrator {
 
     /// @inheritdoc IMigrator
     function pauseDepositsBeforeInitiatingMigration() external onlyAdminOrChainTypeManager onlyL1 {
+        if (s.priorityModeInfo.canBeActivated) {
+            revert NotCompatibleWithPriorityMode();
+        }
         require(s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_END < block.timestamp, DepositsAlreadyPaused());
         uint256 timestamp;
         // Note, if the chain is new (total number of priority transactions is 0) we allow admin to pause the deposits with immediate effect.
@@ -106,10 +109,11 @@ contract MigratorFacet is ZKChainBase, IMigrator {
 
     /// @inheritdoc IMigrator
     function unpauseDeposits() external onlyAdmin onlyL1 {
-        uint256 timestamp = s.pausedDepositsTimestamp;
-        bool inPausedWindow = timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START <= block.timestamp &&
-            block.timestamp < timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END;
-        require(inPausedWindow, DepositsNotPaused());
+        require(
+            s.pausedDepositsTimestamp != 0 &&
+                s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_START <= block.timestamp,
+            DepositsNotPaused()
+        );
         require(
             !IL1ChainAssetHandler(IL1Bridgehub(s.bridgehub).chainAssetHandler()).isMigrationInProgress(s.chainId),
             MigrationInProgress()

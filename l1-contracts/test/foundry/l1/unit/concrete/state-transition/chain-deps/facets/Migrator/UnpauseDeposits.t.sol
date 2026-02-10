@@ -54,10 +54,6 @@ contract UnpauseDepositsTest is MigratorTest {
         // Call reverts before the paused window comes into effect
         vm.expectRevert(abi.encodeWithSelector(DepositsNotPaused.selector));
         migratorFacet.unpauseDeposits();
-        // Call also reverts after the paused window ends
-        vm.warp(block.timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET);
-        vm.expectRevert(abi.encodeWithSelector(DepositsNotPaused.selector));
-        migratorFacet.unpauseDeposits();
     }
 
     function test_revertWhen_migrationInProgress() public {

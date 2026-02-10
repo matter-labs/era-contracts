@@ -591,13 +591,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
     /// @notice Deposits are paused when a chain migrates to/from GW.
     function depositsPaused() public view returns (bool) {
-        uint256 timestamp = s.pausedDepositsTimestamp;
-        /// We provide 3.5 days window to process all deposits.
-        /// After that, the deposits are not being processed for 3.5 days.
-        bool inPausedWindow = timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START <= block.timestamp &&
-            block.timestamp < timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END;
         return
-            inPausedWindow ||
+            _isInDepositsPausedWindow(PAUSE_DEPOSITS_TIME_WINDOW_START, PAUSE_DEPOSITS_TIME_WINDOW_END) ||
             (block.chainid == L1_CHAIN_ID &&
                 IL1ChainAssetHandler(CHAIN_ASSET_HANDLER).isMigrationInProgress(s.chainId));
     }

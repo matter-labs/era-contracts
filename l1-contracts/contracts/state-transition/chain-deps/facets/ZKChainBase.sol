@@ -181,6 +181,16 @@ contract ZKChainBase is ReentrancyGuard {
         return s.zksyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
     }
 
+    /// @notice Returns whether deposits are currently in the paused window.
+    /// @param _windowStart The delay from `pausedDepositsTimestamp` until deposits become paused.
+    /// @param _windowEnd The duration from `pausedDepositsTimestamp` after which deposits are no longer paused.
+    /// @dev We provide 3.5 days window to process all deposits.
+    /// @dev After that, the deposits are not being processed for 3.5 days.
+    function _isInDepositsPausedWindow(uint256 _windowStart, uint256 _windowEnd) internal view returns (bool) {
+        uint256 timestamp = s.pausedDepositsTimestamp;
+        return timestamp + _windowStart <= block.timestamp && block.timestamp < timestamp + _windowEnd;
+    }
+
     /// @dev Checks that the batch hash is correct and matches the expected hash.
     /// @param _lastCommittedBatchData The last committed batch.
     /// @param _batchNumber The batch number to check.
