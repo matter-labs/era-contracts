@@ -19,7 +19,7 @@ import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol";
 
 import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../../common/Config.sol";
-import {IncorrectChainAssetId, IncorrectSender, MigrationNotToL1, MigrationNumberAlreadySet, MigrationNumberMismatch, NotSystemContext, OnlyChain, SLHasDifferentCTM, ZKChainNotRegistered, IteratedMigrationsNotSupported} from "../bridgehub/L1BridgehubErrors.sol";
+import {IncorrectChainAssetId, IncorrectSender, MigrationIntervalInvalid, MigrationIntervalNotSet, MigrationNotToL1, MigrationNumberAlreadySet, MigrationNumberMismatch, NotSystemContext, OnlyChain, SettlementLayerMustNotBeL1, SLHasDifferentCTM, ZKChainNotRegistered, IteratedMigrationsNotSupported, HistoricalSettlementLayerMismatch} from "../bridgehub/L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused, NotAssetRouter} from "../../common/L1ContractErrors.sol";
 import {MigrationInterval} from "./IChainAssetHandler.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
@@ -53,10 +53,6 @@ abstract contract ChainAssetHandlerBase is
 
     function _assetRouter() internal view virtual returns (IAssetRouterBase);
 
-    /// @notice Returns the chain ID of the legacy Gateway for settlement layer validation.
-    /// @dev This is ecosystem-dependent and set via constructor in L1ChainAssetHandler.
-    function _legacyGwChainId() internal view virtual returns (uint256);
-
     /// @notice Used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
 
@@ -89,6 +85,15 @@ abstract contract ChainAssetHandlerBase is
     /// @dev Migration number 0 is reserved for legacy GW historical data.
     /// @dev Migration numbers 1+ are for regular L1 <-> SL migrations.
     mapping(uint256 chainId => mapping(uint256 migrationNum => MigrationInterval interval)) internal _migrationInterval;
+
+    /// @dev Migration number used when a chain migrates from L1 to a settlement layer.
+    uint256 internal constant MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER = 1;
+
+    /// @dev Migration number used when a chain returns from a settlement layer back to L1.
+    uint256 internal constant MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1 = 2;
+
+    /// @dev Iterated migrations are not supported; chain can migrate only to settlement layer and back once.
+    uint256 internal constant MAX_ALLOWED_NUMBER_OF_MIGRATIONS = 2;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
@@ -141,7 +146,7 @@ abstract contract ChainAssetHandlerBase is
             (!isOnThisSettlementLayer && block.chainid == _l1ChainId());
         /// Note we don't increment the migration number if the chain migrated to GW and back to L1 previously.
         if (shouldIncrementMigrationNumber) {
-            migrationNumber[_chainId] = 1;
+            migrationNumber[_chainId] = MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER;
         }
     }
 
@@ -222,17 +227,28 @@ abstract contract ChainAssetHandlerBase is
             _originalCaller,
             bridgehubBurnData.chainData
         );
+        uint256 currentMigrationNum = migrationNumber[bridgehubBurnData.chainId];
         // Iterated migrations are not supported to avoid asset migration number complications related to token balance migration.
         // This means a chain can migrate to GW and back to L1 but only once.
-        require(migrationNumber[bridgehubBurnData.chainId] < 2, IteratedMigrationsNotSupported());
-        ++migrationNumber[bridgehubBurnData.chainId];
+        require(
+            currentMigrationNum < MAX_ALLOWED_NUMBER_OF_MIGRATIONS,
+            IteratedMigrationsNotSupported()
+        );
+        currentMigrationNum += 1;
+        migrationNumber[bridgehubBurnData.chainId] = currentMigrationNum;
 
         uint256 batchNumber = IMessageRoot(_messageRoot()).currentChainBatchNumber(bridgehubBurnData.chainId);
 
         // Track migration interval for settlement layer validation.
         // When migrating FROM L1 TO a settlement layer, record the last L1 batch number and the SL chain ID.
-        if (block.chainid == _l1ChainId() && _settlementChainId != _l1ChainId()) {
-            uint256 currentMigrationNum = migrationNumber[bridgehubBurnData.chainId];
+        if (block.chainid == _l1ChainId()) {
+            if (_settlementChainId == _l1ChainId()) {
+                revert SettlementLayerMustNotBeL1();
+            }
+            require(
+                currentMigrationNum == MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
+                MigrationNumberMismatch(MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, currentMigrationNum)
+            );
             _migrationInterval[bridgehubBurnData.chainId][currentMigrationNum] = MigrationInterval({
                 migrateToSLBatchNumber: batchNumber,
                 migrateFromSLBatchNumber: 0,
@@ -262,7 +278,7 @@ abstract contract ChainAssetHandlerBase is
             batchNumber: batchNumber,
             ctmData: ctmMintData,
             chainData: chainMintData,
-            migrationNumber: migrationNumber[bridgehubBurnData.chainId]
+            migrationNumber: currentMigrationNum
         });
         bridgehubMintData = abi.encode(bridgeMintStruct);
 
@@ -289,18 +305,24 @@ abstract contract ChainAssetHandlerBase is
         /// If we are not migrating for the first time, we check that the migration number is correct.
         if (currentMigrationNumber != 0 && block.chainid == _l1ChainId()) {
             require(
-                currentMigrationNumber + 1 == bridgehubMintData.migrationNumber,
-                MigrationNumberMismatch(currentMigrationNumber + 1, bridgehubMintData.migrationNumber)
+                currentMigrationNumber == MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
+                MigrationNumberMismatch(MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, currentMigrationNumber)
+            );
+            require(
+                bridgehubMintData.migrationNumber == MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1,
+                MigrationNumberMismatch(MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1, bridgehubMintData.migrationNumber)
             );
         }
         migrationNumber[bridgehubMintData.chainId] = bridgehubMintData.migrationNumber;
-
         // Track migration interval for settlement layer validation.
         // When migrating FROM settlement layer BACK TO L1, record the last SL batch number.
-        // This happens when migrationNumber is 2 (first migration was L1->SL, second is SL->L1).
-        if (block.chainid == _l1ChainId() && bridgehubMintData.migrationNumber == 2) {
-            // The interval was created during migration 1 (L1->SL), now we complete it with the return batch
-            _migrationInterval[bridgehubMintData.chainId][1].migrateFromSLBatchNumber = bridgehubMintData.batchNumber;
+        // This happens when migrationNumber is `MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1`.
+        if (block.chainid == _l1ChainId() && bridgehubMintData.migrationNumber == MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1) {
+            MigrationInterval storage interval = _migrationInterval[bridgehubMintData.chainId][
+                MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER
+            ];
+            require(interval.isSet, MigrationIntervalNotSet());
+            interval.migrateFromSLBatchNumber = bridgehubMintData.batchNumber;
         }
 
         (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeMint(
@@ -353,6 +375,8 @@ abstract contract ChainAssetHandlerBase is
         // Check all migration intervals for this chain (including legacy GW at index 0)
         // We iterate from 0 to current migration number to find which interval contains this batch
         uint256 currentMigrationNum = migrationNumber[_chainId];
+        // IMPORTANT: this method is safe only while migrations are limited to one round-trip (L1->SL->L1).
+        require(currentMigrationNum <= MAX_ALLOWED_NUMBER_OF_MIGRATIONS, IteratedMigrationsNotSupported());
 
         for (uint256 i = 0; i <= currentMigrationNum; ++i) {
             MigrationInterval memory interval = _migrationInterval[_chainId][i];
@@ -372,7 +396,7 @@ abstract contract ChainAssetHandlerBase is
                 // Batch is after migration back from SL, continue to check next interval
             }
             // If batch <= migrateToSLBatchNumber, it was on L1 before this migration
-            // Continue to check if there's a previous interval that covers it
+            // Continue to check if there's a next interval that covers it
         }
 
         // Default: batch was on L1 (no matching SL interval found)
@@ -389,6 +413,19 @@ abstract contract ChainAssetHandlerBase is
         uint256 _migrationNumber,
         MigrationInterval calldata _interval
     ) external onlyOwner {
+        require(_migrationNumber == 0, MigrationNumberMismatch(0, _migrationNumber));
+        require(_interval.isSet, MigrationIntervalNotSet());
+        uint256 legacyGwChainId = IMessageRoot(_messageRoot()).ERA_GATEWAY_CHAIN_ID();
+        require(
+            _interval.settlementLayerChainId == legacyGwChainId,
+            HistoricalSettlementLayerMismatch(legacyGwChainId, _interval.settlementLayerChainId)
+        );
+        require(
+            _interval.migrateToSLBatchNumber != 0 &&
+                (_interval.migrateFromSLBatchNumber == 0 ||
+                    _interval.migrateFromSLBatchNumber > _interval.migrateToSLBatchNumber),
+            MigrationIntervalInvalid()
+        );
         _migrationInterval[_chainId][_migrationNumber] = _interval;
     }
 
@@ -401,13 +438,6 @@ abstract contract ChainAssetHandlerBase is
         uint256 _migrationNumber
     ) external view returns (MigrationInterval memory interval) {
         return _migrationInterval[_chainId][_migrationNumber];
-    }
-
-    /// @notice Returns the legacy Gateway chain ID.
-    /// @dev Exposed for external access to the immutable value.
-    // solhint-disable-next-line func-name-mixedcase
-    function LEGACY_GW_CHAIN_ID() external view returns (uint256) {
-        return _legacyGwChainId();
     }
 
     /*//////////////////////////////////////////////////////////////

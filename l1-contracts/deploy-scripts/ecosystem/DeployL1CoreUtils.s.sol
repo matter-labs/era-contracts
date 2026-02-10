@@ -34,7 +34,6 @@ struct Config {
     uint256 eraChainId;
     address eraDiamondProxyAddress;
     bool supportL2LegacySharedBridgeTest;
-    uint256 legacyGwChainId;
     ContractsConfig contracts;
     TokensConfig tokens;
 }
@@ -80,9 +79,6 @@ contract DeployL1CoreUtils is DeployUtils {
         (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues();
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
         instantiateCreate2Factory();
-
-        // Read legacy gateway chain ID from permanent values
-        config.legacyGwChainId = getLegacyGwChainId();
 
         if (vm.keyExistsToml(toml, "$.contracts.era_diamond_proxy_addr")) {
             config.eraDiamondProxyAddress = toml.readAddress("$.contracts.era_diamond_proxy_addr");
@@ -149,8 +145,7 @@ contract DeployL1CoreUtils is DeployUtils {
                     coreAddresses.bridges.proxies.l1AssetRouter,
                     coreAddresses.bridgehub.proxies.messageRoot,
                     coreAddresses.bridgehub.proxies.assetTracker,
-                    coreAddresses.bridges.proxies.l1Nullifier,
-                    config.legacyGwChainId
+                    coreAddresses.bridges.proxies.l1Nullifier
                 );
         } else if (compareStrings(contractName, "L1AssetRouter")) {
             return

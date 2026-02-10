@@ -35,10 +35,6 @@ interface IChainAssetHandler is IAssetHandler {
 
     function setMigrationNumberForV31(uint256 _chainId) external;
 
-    /// @notice Returns the legacy Gateway chain ID used for settlement layer validation.
-    // solhint-disable-next-line func-name-mixedcase
-    function LEGACY_GW_CHAIN_ID() external view returns (uint256);
-
     /// @notice Returns the migration interval for a chain at a specific migration number.
     /// @param _chainId The ID of the chain.
     /// @param _migrationNumber The migration number (0 for legacy GW, 1+ for regular migrations).

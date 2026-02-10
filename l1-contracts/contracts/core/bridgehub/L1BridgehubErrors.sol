@@ -36,6 +36,10 @@ error MigrationNotToL1();
 error MigrationNumberAlreadySet();
 // 0xde1362a2
 error MigrationNumberMismatch(uint256 _expected, uint256 _actual);
+error MigrationIntervalNotSet();
+error MigrationIntervalInvalid();
+error HistoricalSettlementLayerMismatch(uint256 expectedSettlementLayer, uint256 actualSettlementLayer);
+error SettlementLayerMustNotBeL1();
 // 0x7f4316f3
 error NoEthAllowed();
 // 0x366c42f8

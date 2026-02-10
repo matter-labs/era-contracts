@@ -296,9 +296,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         }
 
         // Validate that the claimed settlement layer is correct for this chain and batch number.
-        // This prevents a malicious settlement layer from claiming batches that were not actually
-        // committed on it (e.g., GW claiming batches after chain migrated back to L1).
-        // Only validate on L1 where migration interval data is available.
         if (block.chainid == L1_CHAIN_ID) {
             bool isValid = IChainAssetHandler(CHAIN_ASSET_HANDLER).isValidSettlementLayer(
                 _chainId,
@@ -306,6 +303,15 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 proofData.settlementLayerChainId
             );
             require(isValid, InvalidSettlementLayerForBatch(_chainId, _batchNumber, proofData.settlementLayerChainId));
+        } else {
+            // Verification on non-L1 environments is not an intended production path.
+            // This branch exists only for debugging purposes.
+            // On non-L1 settlement layers we don't have migration interval data, so the only safe recursive target
+            // is the local chain itself; otherwise a foreign SL could claim arbitrary batches.
+            require(
+                proofData.settlementLayerChainId == block.chainid,
+                InvalidSettlementLayerForBatch(_chainId, _batchNumber, proofData.settlementLayerChainId)
+            );
         }
 
         address settlementLayerAddress = IBridgehubBase(s.bridgehub).getZKChain(proofData.settlementLayerChainId);

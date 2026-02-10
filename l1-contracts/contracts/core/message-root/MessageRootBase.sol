@@ -40,10 +40,6 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
 
     function _eraGatewayChainId() internal view virtual returns (uint256);
 
-    /// @notice Returns the chain asset handler address for settlement layer validation.
-    /// @dev On L1 this returns the immutable address, on L2 it can return address(0) since validation only happens on L1.
-    function _chainAssetHandler() internal view virtual returns (address);
-
     /// @notice The number of chains that are registered.
     uint256 public chainCount;
 
@@ -309,11 +305,9 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         );
 
         // Validate that the claimed settlement layer is correct for this chain and batch number.
-        // This prevents a malicious settlement layer from claiming batches that were not actually
-        // committed on it (e.g., GW claiming batches after chain migrated back to L1).
-        // Only validate on L1 where migration interval data is available.
+        // This check only runs on L1 where migration interval data is tracked.
         if (block.chainid == L1_CHAIN_ID()) {
-            bool isValid = IChainAssetHandler(_chainAssetHandler()).isValidSettlementLayer(
+            bool isValid = IChainAssetHandler(IBridgehubBase(_bridgehub()).chainAssetHandler()).isValidSettlementLayer(
                 _chainId,
                 _batchNumber,
                 proofData.settlementLayerChainId
@@ -379,4 +373,5 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         uint256 index = chainIndex[_chainId];
         return sharedTree.merklePath(index);
     }
+
 }
