@@ -106,7 +106,10 @@ contract AdminFacet is ZKChainBase, IAdmin {
     function changeFeeParams(FeeParams calldata _newFeeParams) external onlyAdminOrChainTypeManager onlyL1 {
         _enforceMinUpdateInterval();
         uint256 lastFeeParamsUpdateTimestamp = s.lastFeeParamsUpdateTimestamp;
-        if (lastFeeParamsUpdateTimestamp != 0 && block.timestamp < lastFeeParamsUpdateTimestamp + FEE_PARAMS_UPDATE_INTERVAL) {
+        if (
+            lastFeeParamsUpdateTimestamp != 0 &&
+            block.timestamp < lastFeeParamsUpdateTimestamp + FEE_PARAMS_UPDATE_INTERVAL
+        ) {
             revert FeeParamsChangeTooFrequent(lastFeeParamsUpdateTimestamp + FEE_PARAMS_UPDATE_INTERVAL);
         }
 

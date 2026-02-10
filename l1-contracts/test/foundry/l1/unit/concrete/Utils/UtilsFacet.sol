@@ -6,6 +6,7 @@ import {FeeParams, IVerifier, VerifierParams} from "contracts/state-transition/c
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {PriorityTree} from "contracts/state-transition/libraries/PriorityTree.sol";
 
 contract UtilsFacet is ZKChainBase {
     function util_setChainId(uint256 _chainId) external {
@@ -280,6 +281,14 @@ contract UtilsFacet is ZKChainBase {
 
     function util_getL2SystemContractsUpgradeTxHash() external view returns (bytes32) {
         return s.l2SystemContractsUpgradeTxHash;
+    }
+
+    function util_setPriorityTreeNextLeafIndex(uint256 _nextLeafIndex) external {
+        s.priorityTree.tree._nextLeafIndex = _nextLeafIndex;
+    }
+
+    function util_setPriorityOpsRequestTimestamp(uint256 _txIndex, uint256 _timestamp) external {
+        s.priorityOpsRequestTimestamp[_txIndex] = _timestamp;
     }
 
     // add this to be excluded from coverage report

@@ -3,11 +3,26 @@
 pragma solidity 0.8.28;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {NotCompatibleWithPriorityMode, OnlyPriorityMode, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {NotCompatibleWithPriorityMode, OnlyPriorityMode, PriorityOpsRequestTimestampMissing, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {PriorityModeAlreadyAllowed} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract PriorityModeAdminTest is AdminTest {
+    /// @dev Fakes a priority tx with a non-zero timestamp so permanentlyAllowPriorityMode can succeed.
+    function _fakePriorityTx() internal {
+        utilsFacet.util_setPriorityTreeNextLeafIndex(1);
+        utilsFacet.util_setPriorityOpsRequestTimestamp(0, block.timestamp);
+    }
+
+    function test_revertWhen_permanentlyAllowPriorityMode_noPriorityTxs() public {
+        address admin = utilsFacet.util_getAdmin();
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(PriorityOpsRequestTimestampMissing.selector, 0));
+        adminFacet.permanentlyAllowPriorityMode();
+    }
+
     function test_revertWhen_permanentlyAllowPriorityMode_calledTwice() public {
+        _fakePriorityTx();
         address admin = utilsFacet.util_getAdmin();
 
         vm.prank(admin);
@@ -32,6 +47,7 @@ contract PriorityModeAdminTest is AdminTest {
     }
 
     function test_setPriorityModeTransactionFilterer_updatesTransactionFiltererWhenAllowed() public {
+        _fakePriorityTx();
         address admin = utilsFacet.util_getAdmin();
         address chainTypeManager = makeAddr("chainTypeManager");
         utilsFacet.util_setChainTypeManager(chainTypeManager);
@@ -49,6 +65,7 @@ contract PriorityModeAdminTest is AdminTest {
     }
 
     function test_permanentlyAllowPriorityMode_usesPriorityModeFilterer() public {
+        _fakePriorityTx();
         address admin = utilsFacet.util_getAdmin();
         address chainTypeManager = makeAddr("chainTypeManager");
         utilsFacet.util_setChainTypeManager(chainTypeManager);

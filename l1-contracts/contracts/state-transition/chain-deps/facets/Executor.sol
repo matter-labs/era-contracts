@@ -303,5 +303,4 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     ) external nonReentrant onlyValidatorOrChainTypeManager notPriorityMode onlySettlementLayer {
         _revertBatches(_newLastBatch);
     }
-
 }

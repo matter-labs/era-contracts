@@ -69,10 +69,7 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         );
 
         // Verify key contract addresses are non-zero
-        assertTrue(
-            contracts.stateTransition.chainTypeManagerProxy != address(0),
-            "CTM proxy should be non-zero"
-        );
+        assertTrue(contracts.stateTransition.chainTypeManagerProxy != address(0), "CTM proxy should be non-zero");
         assertTrue(
             contracts.stateTransition.chainTypeManagerImplementation != address(0),
             "CTM impl should be non-zero"
@@ -81,38 +78,17 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
             contracts.stateTransition.validatorTimelockProxy != address(0),
             "ValidatorTimelock proxy should be non-zero"
         );
-        assertTrue(
-            contracts.stateTransition.verifiers.verifier != address(0),
-            "Verifier should be non-zero"
-        );
-        assertTrue(
-            contracts.stateTransition.facets.adminFacet != address(0),
-            "AdminFacet should be non-zero"
-        );
-        assertTrue(
-            contracts.stateTransition.facets.mailboxFacet != address(0),
-            "MailboxFacet should be non-zero"
-        );
-        assertTrue(
-            contracts.stateTransition.facets.executorFacet != address(0),
-            "ExecutorFacet should be non-zero"
-        );
-        assertTrue(
-            contracts.stateTransition.facets.gettersFacet != address(0),
-            "GettersFacet should be non-zero"
-        );
+        assertTrue(contracts.stateTransition.verifiers.verifier != address(0), "Verifier should be non-zero");
+        assertTrue(contracts.stateTransition.facets.adminFacet != address(0), "AdminFacet should be non-zero");
+        assertTrue(contracts.stateTransition.facets.mailboxFacet != address(0), "MailboxFacet should be non-zero");
+        assertTrue(contracts.stateTransition.facets.executorFacet != address(0), "ExecutorFacet should be non-zero");
+        assertTrue(contracts.stateTransition.facets.gettersFacet != address(0), "GettersFacet should be non-zero");
         assertTrue(contracts.multicall3 != address(0), "Multicall3 should be non-zero");
         assertTrue(contracts.diamondCutData.length > 0, "Diamond cut data should be non-empty");
 
         // Verify DA contracts
-        assertTrue(
-            contracts.daContracts.rollupDAManager != address(0),
-            "RollupDAManager should be non-zero"
-        );
-        assertTrue(
-            contracts.daContracts.validiumDAValidator != address(0),
-            "ValidiumDAValidator should be non-zero"
-        );
+        assertTrue(contracts.daContracts.rollupDAManager != address(0), "RollupDAManager should be non-zero");
+        assertTrue(contracts.daContracts.validiumDAValidator != address(0), "ValidiumDAValidator should be non-zero");
 
         // Verify determinism: calling again produces identical results
         DeployedContracts memory contracts2 = votePreparationScript.initializeAndCalculateAddresses(

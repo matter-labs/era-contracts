@@ -46,6 +46,10 @@ contract SetTransactionFiltererTest is AdminTest {
     function test_revertWhen_priorityModeAllowed() public {
         address admin = utilsFacet.util_getAdmin();
 
+        // Fake a priority tx so permanentlyAllowPriorityMode can succeed
+        utilsFacet.util_setPriorityTreeNextLeafIndex(1);
+        utilsFacet.util_setPriorityOpsRequestTimestamp(0, block.timestamp);
+
         vm.prank(admin);
         adminFacet.permanentlyAllowPriorityMode();
 

@@ -40,8 +40,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         s.__DEPRECATED_l2DAValidator = address(0);
 
         // Set the permissionless validator used in Priority Mode, same as done in DiamondInit.
-        s.priorityModeInfo.permissionlessValidator = IChainTypeManager(s.chainTypeManager)
-            .PERMISSIONLESS_VALIDATOR();
+        s.priorityModeInfo.permissionlessValidator = IChainTypeManager(s.chainTypeManager).PERMISSIONLESS_VALIDATOR();
 
         require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
 
