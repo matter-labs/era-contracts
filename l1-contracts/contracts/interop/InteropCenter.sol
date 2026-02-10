@@ -30,6 +30,11 @@ import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 import {IL2CrossChainSender} from "../bridge/interfaces/IL2CrossChainSender.sol";
 import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol";
 
+/// @dev Default fixed fee for interop calls: 10 ZK tokens.
+/// This is intentionally set sufficiently higher than the intended gateway settlement fee
+/// (and so the intended dynamic fee), to incentivize users to use the dynamic fee path.
+uint256 constant DEFAULT_ZK_INTEROP_FEE = 10e18;
+
 /// @title InteropCenter
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -71,7 +76,7 @@ contract InteropCenter is
     bytes32 public ZK_TOKEN_ASSET_ID;
 
     /// @notice Cached ZK token contract address (resolved from asset ID).
-    IERC20 private zkToken;
+    IERC20 public zkToken;
 
     /// @notice Accumulated protocol fees (base token) per coinbase.
     /// @dev Coinbase addresses can claim their accumulated fees via claimProtocolFees().
@@ -149,8 +154,7 @@ contract InteropCenter is
         L1_CHAIN_ID = _l1ChainId;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
         ZK_TOKEN_ASSET_ID = _zkTokenAssetId;
-        /// TODO: Decide on the exact value for fixed fee.
-        ZK_INTEROP_FEE = 1e18;
+        ZK_INTEROP_FEE = DEFAULT_ZK_INTEROP_FEE;
 
         _transferOwnership(_owner);
     }
@@ -423,26 +427,14 @@ contract InteropCenter is
             }
         }
 
-        // If using fixed fees, collect ZK tokens per-call and send to block.coinbase.
-        // If transfer to coinbase fails, accumulate for later withdrawal via claimZKFees().
+        // If using fixed fees, collect ZK tokens per-call and accumulate for coinbase.
+        // Coinbase can later claim via claimZKFees().
         // This is handled to not allow malicious operator to fail sending bundles by providing malicious coinbase.
         if (_bundleAttributes.useFixedFee) {
             uint256 totalZKFee = ZK_INTEROP_FEE * callStartersLength;
-            IERC20 token = _getZKToken();
-            // First transfer from user to this contract
-            token.safeTransferFrom(msg.sender, address(this), totalZKFee);
-            // Then try to forward to coinbase
-            // Using low-level call to handle potential reverts from coinbase
-            (bool success, ) = address(token).call(
-                abi.encodeWithSelector(IERC20.transfer.selector, block.coinbase, totalZKFee)
-            );
-            if (success) {
-                emit FixedZKFeesCollected(msg.sender, block.coinbase, totalZKFee);
-            } else {
-                // solhint-disable-next-line reentrancy
-                accumulatedZKFees[block.coinbase] += totalZKFee;
-                emit FixedZKFeesAccumulated(msg.sender, block.coinbase, totalZKFee);
-            }
+            _getZKToken().safeTransferFrom(msg.sender, address(this), totalZKFee);
+            accumulatedZKFees[block.coinbase] += totalZKFee;
+            emit FixedZKFeesAccumulated(msg.sender, block.coinbase, totalZKFee);
         }
 
         // Ensure that tokens required for bundle execution were received.

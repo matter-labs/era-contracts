@@ -33,7 +33,6 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     event InteropFeeUpdated(uint256 indexed oldFee, uint256 indexed newFee);
     event ProtocolFeesCollected(address indexed recipient, uint256 amount);
-    event FixedZKFeesCollected(address indexed payer, address indexed recipient, uint256 amount);
     event ProtocolFeesAccumulated(address indexed coinbase, uint256 amount);
     event FixedZKFeesAccumulated(address indexed payer, address indexed coinbase, uint256 amount);
     event ProtocolFeesClaimed(address indexed coinbase, address indexed receiver, uint256 amount);
@@ -95,8 +94,8 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
     //////////////////////////////////////////////////////////////*/
 
     function test_ZK_INTEROP_FEE_Value() public view {
-        // ZK_INTEROP_FEE should be 1e18 (1 ZK token)
-        assertEq(l2InteropCenter.ZK_INTEROP_FEE(), 1e18);
+        // ZK_INTEROP_FEE should be 10e18 (10 ZK tokens)
+        assertEq(l2InteropCenter.ZK_INTEROP_FEE(), 10e18);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -326,7 +325,6 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         // Set up coinbase
         address coinbaseAddr = makeAddr("coinbase");
         vm.coinbase(coinbaseAddr);
-        uint256 coinbaseZKBefore = zkToken.balanceOf(coinbaseAddr);
 
         // Build bundle with useFixedFee=true
         bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(
@@ -344,11 +342,11 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
             bundleAttributes
         );
 
-        // Verify coinbase received ZK tokens
+        // Verify fees accumulated for coinbase
         assertEq(
-            zkToken.balanceOf(coinbaseAddr),
-            coinbaseZKBefore + zkFeePerCall,
-            "Coinbase should receive ZK token fee"
+            l2InteropCenter.accumulatedZKFees(coinbaseAddr),
+            zkFeePerCall,
+            "Coinbase should have accumulated ZK token fee"
         );
     }
 
@@ -378,7 +376,6 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
         address coinbaseAddr = makeAddr("coinbase");
         vm.coinbase(coinbaseAddr);
-        uint256 coinbaseZKBefore = zkToken.balanceOf(coinbaseAddr);
 
         // Build 3 calls
         InteropCallStarter[] memory calls = new InteropCallStarter[](callCount);
@@ -402,14 +399,14 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
         uint256 expectedFee = zkFeePerCall * callCount;
         assertEq(
-            zkToken.balanceOf(coinbaseAddr),
-            coinbaseZKBefore + expectedFee,
-            "Coinbase should receive ZK fee for all calls"
+            l2InteropCenter.accumulatedZKFees(coinbaseAddr),
+            expectedFee,
+            "Coinbase should have accumulated ZK fee for all calls"
         );
     }
 
-    /// @notice Test that FixedZKFeesCollected event is emitted
-    function test_sendBundle_emitsFixedZKFeesCollectedEvent() public {
+    /// @notice Test that FixedZKFeesAccumulated event is emitted
+    function test_sendBundle_emitsFixedZKFeesAccumulatedEvent() public {
         _setupGatewayMode();
 
         // Set up ZK token
@@ -439,7 +436,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         InteropCallStarter[] memory calls = _buildSimpleCall();
 
         vm.expectEmit(true, true, false, true);
-        emit FixedZKFeesCollected(sender, coinbaseAddr, zkFeePerCall);
+        emit FixedZKFeesAccumulated(sender, coinbaseAddr, zkFeePerCall);
 
         vm.prank(sender);
         l2InteropCenter.sendBundle{value: 0}(
@@ -635,43 +632,42 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         assertEq(l2InteropCenter.accumulatedProtocolFees(claimer), 0);
     }
 
-    /// @notice Test that ZK fees accumulate when coinbase transfer fails
-    function test_sendBundle_accumulatesZKFeesWhenCoinbaseReverts() public {
+    /// @notice Test that ZK fees are always accumulated for coinbase
+    function test_sendBundle_accumulatesZKFees() public {
         _setupGatewayMode();
 
-        // Deploy ZK token that fails transfers to a specific address
-        FailingTransferToken failingToken = new FailingTransferToken("ZK Token", "ZK", 18);
-        bytes32 zkTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, address(failingToken));
+        // Deploy ZK token
+        zkToken = new TestnetERC20Token("ZK Token", "ZK", 18);
+        bytes32 zkTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, address(zkToken));
 
         vm.mockCall(
             L2_NATIVE_TOKEN_VAULT_ADDR,
             abi.encodeWithSelector(INativeTokenVaultBase.tokenAddress.selector, zkTokenAssetId),
-            abi.encode(address(failingToken))
+            abi.encode(address(zkToken))
         );
 
         stdstore.target(L2_INTEROP_CENTER_ADDR).sig("ZK_TOKEN_ASSET_ID()").checked_write(zkTokenAssetId);
 
-        // Set coinbase to the address that fails transfers
-        address blockedCoinbase = failingToken.BLOCKED_ADDRESS();
-        vm.coinbase(blockedCoinbase);
+        address coinbaseAddr = makeAddr("coinbase");
+        vm.coinbase(coinbaseAddr);
 
         // Prepare sender
         address sender = makeAddr("zkFeeSender");
         uint256 zkFeePerCall = l2InteropCenter.ZK_INTEROP_FEE();
-        failingToken.mint(sender, zkFeePerCall * 10);
+        zkToken.mint(sender, zkFeePerCall * 10);
 
         vm.prank(sender);
-        failingToken.approve(L2_INTEROP_CENTER_ADDR, type(uint256).max);
+        zkToken.approve(L2_INTEROP_CENTER_ADDR, type(uint256).max);
 
         // Check initial accumulated fees
-        assertEq(l2InteropCenter.accumulatedZKFees(blockedCoinbase), 0);
+        assertEq(l2InteropCenter.accumulatedZKFees(coinbaseAddr), 0);
 
         bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, true);
         InteropCallStarter[] memory calls = _buildSimpleCall();
 
         // Expect accumulation event
         vm.expectEmit(true, true, false, true);
-        emit FixedZKFeesAccumulated(sender, blockedCoinbase, zkFeePerCall);
+        emit FixedZKFeesAccumulated(sender, coinbaseAddr, zkFeePerCall);
 
         vm.prank(sender);
         l2InteropCenter.sendBundle{value: 0}(
@@ -681,11 +677,11 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         );
 
         // Verify fees were accumulated
-        assertEq(l2InteropCenter.accumulatedZKFees(blockedCoinbase), zkFeePerCall, "ZK fees should be accumulated");
+        assertEq(l2InteropCenter.accumulatedZKFees(coinbaseAddr), zkFeePerCall, "ZK fees should be accumulated");
 
         // Verify InteropCenter holds the tokens
         assertEq(
-            failingToken.balanceOf(L2_INTEROP_CENTER_ADDR),
+            zkToken.balanceOf(L2_INTEROP_CENTER_ADDR),
             zkFeePerCall,
             "InteropCenter should hold accumulated ZK tokens"
         );
@@ -695,29 +691,28 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
     function test_claimZKFees_Success() public {
         _setupGatewayMode();
 
-        // Deploy ZK token that fails transfers to a specific address
-        FailingTransferToken failingToken = new FailingTransferToken("ZK Token", "ZK", 18);
-        bytes32 zkTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, address(failingToken));
+        // Deploy ZK token
+        zkToken = new TestnetERC20Token("ZK Token", "ZK", 18);
+        bytes32 zkTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, address(zkToken));
 
         vm.mockCall(
             L2_NATIVE_TOKEN_VAULT_ADDR,
             abi.encodeWithSelector(INativeTokenVaultBase.tokenAddress.selector, zkTokenAssetId),
-            abi.encode(address(failingToken))
+            abi.encode(address(zkToken))
         );
 
         stdstore.target(L2_INTEROP_CENTER_ADDR).sig("ZK_TOKEN_ASSET_ID()").checked_write(zkTokenAssetId);
 
-        // Set coinbase to the address that fails transfers
-        address blockedCoinbase = failingToken.BLOCKED_ADDRESS();
-        vm.coinbase(blockedCoinbase);
+        address coinbaseAddr = makeAddr("coinbase");
+        vm.coinbase(coinbaseAddr);
 
         // Send bundle to accumulate fees
         address sender = makeAddr("zkFeeSender");
         uint256 zkFeePerCall = l2InteropCenter.ZK_INTEROP_FEE();
-        failingToken.mint(sender, zkFeePerCall * 10);
+        zkToken.mint(sender, zkFeePerCall * 10);
 
         vm.prank(sender);
-        failingToken.approve(L2_INTEROP_CENTER_ADDR, type(uint256).max);
+        zkToken.approve(L2_INTEROP_CENTER_ADDR, type(uint256).max);
 
         bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, true);
         InteropCallStarter[] memory calls = _buildSimpleCall();
@@ -730,28 +725,28 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         );
 
         // Verify fees were accumulated
-        assertEq(l2InteropCenter.accumulatedZKFees(blockedCoinbase), zkFeePerCall, "Fees should be accumulated");
+        assertEq(l2InteropCenter.accumulatedZKFees(coinbaseAddr), zkFeePerCall, "Fees should be accumulated");
 
-        // Now claim fees to a different receiver (not blocked)
+        // Claim fees to a receiver
         address receiver = makeAddr("receiver");
-        uint256 receiverZKBefore = failingToken.balanceOf(receiver);
+        uint256 receiverZKBefore = zkToken.balanceOf(receiver);
 
         vm.expectEmit(true, true, false, true);
-        emit ZKFeesClaimed(blockedCoinbase, receiver, zkFeePerCall);
+        emit ZKFeesClaimed(coinbaseAddr, receiver, zkFeePerCall);
 
-        vm.prank(blockedCoinbase);
+        vm.prank(coinbaseAddr);
         l2InteropCenter.claimZKFees(receiver);
 
         // Verify receiver got the ZK tokens
         assertEq(
-            failingToken.balanceOf(receiver),
+            zkToken.balanceOf(receiver),
             receiverZKBefore + zkFeePerCall,
             "Receiver should get claimed ZK fees"
         );
 
         // Verify accumulated fees are now zero
         assertEq(
-            l2InteropCenter.accumulatedZKFees(blockedCoinbase),
+            l2InteropCenter.accumulatedZKFees(coinbaseAddr),
             0,
             "Accumulated ZK fees should be zero after claim"
         );
@@ -834,21 +829,3 @@ contract RevertingReceiver {
     }
 }
 
-/// @notice ERC20 token that reverts transfers to a specific blocked address
-/// @dev Used to test ZK fee accumulation when transfer to coinbase fails
-contract FailingTransferToken is TestnetERC20Token {
-    address public constant BLOCKED_ADDRESS = address(0xB10C3ED);
-
-    constructor(
-        string memory name_,
-        string memory symbol_,
-        uint8 decimals_
-    ) TestnetERC20Token(name_, symbol_, decimals_) {}
-
-    function transfer(address to, uint256 amount) public virtual override returns (bool) {
-        if (to == BLOCKED_ADDRESS) {
-            revert("FailingTransferToken: transfer to blocked address");
-        }
-        return super.transfer(to, amount);
-    }
-}

@@ -118,7 +118,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         _;
     }
 
-    function setAddresses(uint256 _l1ChainId) external onlyUpgrader {
+    function initL2(uint256 _l1ChainId, address _owner) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
 
         // Fetch wrapped ZK token from Native Token Vault
@@ -126,6 +126,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         address wrappedZK = L2_NATIVE_TOKEN_VAULT.WETH_TOKEN();
         require(wrappedZK != address(0), ZeroAddress());
         wrappedZKToken = IERC20(wrappedZK);
+
+        require(_owner != address(0), ZeroAddress());
+        _transferOwnership(_owner);
     }
 
     /// @notice Sets the gateway settlement fee per interop call.

@@ -504,7 +504,10 @@ library L2GenesisForceDeploymentsHelper {
             additionalForceDeploymentsData.baseTokenBridgingData.assetId
         );
 
-        GWAssetTracker(GW_ASSET_TRACKER_ADDR).setAddresses(fixedForceDeploymentsData.l1ChainId);
+        GWAssetTracker(GW_ASSET_TRACKER_ADDR).initL2(
+            fixedForceDeploymentsData.l1ChainId,
+            fixedForceDeploymentsData.aliasedL1Governance
+        );
 
         L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setAddresses(
             additionalForceDeploymentsData.baseTokenBridgingData.originChainId

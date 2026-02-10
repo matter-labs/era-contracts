@@ -2,6 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {BalanceChange, InteropBundle, InteropCallStarter} from "../common/Messaging.sol";
 
 /// @author Matter Labs
@@ -19,12 +20,6 @@ interface IInteropCenter {
     /// @param recipient Address that received the fees (block.coinbase).
     /// @param amount Total amount of base token collected.
     event ProtocolFeesCollected(address indexed recipient, uint256 amount);
-
-    /// @notice Emitted when fixed ZK fees are collected from a user and sent to the coinbase.
-    /// @param payer Address that paid the fees.
-    /// @param recipient Address that received the fees (block.coinbase).
-    /// @param amount Total amount of ZK tokens collected.
-    event FixedZKFeesCollected(address indexed payer, address indexed recipient, uint256 amount);
 
     /// @notice Emitted when protocol fees (base token) transfer to coinbase failed and fees are accumulated.
     /// @param coinbase Address of the block producer (block.coinbase) that earned the fees.
@@ -72,6 +67,9 @@ interface IInteropCenter {
 
     /// @notice Returns the ZK token asset ID.
     function ZK_TOKEN_ASSET_ID() external view returns (bytes32);
+
+    /// @notice Returns the cached ZK token contract address.
+    function zkToken() external view returns (IERC20);
 
     /// @notice Returns the number of bundles sent by a sender.
     function interopBundleNonce(address sender) external view returns (uint256);
