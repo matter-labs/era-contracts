@@ -119,16 +119,6 @@
                     "name": "diamondInit",
                     "type": "address",
                     "internalType": "address"
-                  },
-                  {
-                    "name": "migratorFacet",
-                    "type": "address",
-                    "internalType": "address"
-                  },
-                  {
-                    "name": "committorFacet",
-                    "type": "address",
-                    "internalType": "address"
                   }
                 ]
               },
