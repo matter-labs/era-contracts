@@ -135,9 +135,18 @@ contract AdminFacet is ZKChainBase, IAdmin {
             _newDenominator: s.baseTokenGasPriceMultiplierDenominator
         });
 
-        _enforceFeeParamFieldChangeBound(oldFeeParams.priorityTxMaxPubdata, _newFeeParams.priorityTxMaxPubdata);
-        _enforceFeeParamFieldChangeBound(oldFeeParams.maxPubdataPerBatch, _newFeeParams.maxPubdataPerBatch);
-        _enforceFeeParamFieldChangeBound(oldFeeParams.maxL2GasPerBatch, _newFeeParams.maxL2GasPerBatch);
+        // When priority mode can be activated, capacity fields must not be changed at all.
+        // Reducing pubdata per tx/batch or gas per batch could restrict important transactions
+        // and undermine the safety guarantees of priority mode.
+        if (s.priorityModeInfo.canBeActivated) {
+            require(_newFeeParams.priorityTxMaxPubdata == oldFeeParams.priorityTxMaxPubdata, NotCompatibleWithPriorityMode());
+            require(_newFeeParams.maxPubdataPerBatch == oldFeeParams.maxPubdataPerBatch, NotCompatibleWithPriorityMode());
+            require(_newFeeParams.maxL2GasPerBatch == oldFeeParams.maxL2GasPerBatch, NotCompatibleWithPriorityMode());
+        } else {
+            _enforceFeeParamFieldChangeBound(oldFeeParams.priorityTxMaxPubdata, _newFeeParams.priorityTxMaxPubdata);
+            _enforceFeeParamFieldChangeBound(oldFeeParams.maxPubdataPerBatch, _newFeeParams.maxPubdataPerBatch);
+            _enforceFeeParamFieldChangeBound(oldFeeParams.maxL2GasPerBatch, _newFeeParams.maxL2GasPerBatch);
+        }
 
         s.feeParams = _newFeeParams;
         s.lastFeeParamsUpdateTimestamp = block.timestamp;
@@ -249,6 +258,9 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin onlyL1 {
+        if (s.priorityModeInfo.canBeActivated) {
+            revert NotCompatibleWithPriorityMode();
+        }
         s.feeParams.pubdataPricingMode = _pricingMode;
         emit PubdataPricingModeUpdate(_pricingMode);
     }
