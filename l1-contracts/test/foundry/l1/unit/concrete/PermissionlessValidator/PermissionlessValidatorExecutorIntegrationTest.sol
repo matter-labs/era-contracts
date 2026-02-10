@@ -54,8 +54,6 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
     function _activatePriorityMode() internal {
         vm.prank(owner);
         admin.makePermanentRollup();
-        vm.prank(owner);
-        admin.permanentlyAllowPriorityMode();
         address prioritySender = makeAddr("prioritySender");
         uint256 l2GasLimit = 1_000_000;
         uint256 baseCost = mailbox.l2TransactionBaseCost(10_000_000, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
@@ -70,6 +68,8 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
             _factoryDeps: new bytes[](0),
             _refundRecipient: prioritySender
         });
+        vm.prank(owner);
+        admin.permanentlyAllowPriorityMode();
         vm.warp(block.timestamp + PRIORITY_EXPIRATION + 1);
         admin.activatePriorityMode();
     }
