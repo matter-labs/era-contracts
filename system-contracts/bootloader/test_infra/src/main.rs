@@ -8,7 +8,7 @@ use zksync_multivm::interface::{
 };
 use zksync_multivm::vm_latest::{HistoryDisabled, ToTracerPointer, TracerDispatcher, Vm};
 use zksync_state::interface::{InMemoryStorage, StorageView, IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID};
-use zksync_types::fee_model::BatchFeeInput;
+use zksync_types::{fee_model::BatchFeeInput, U256};
 
 use std::{env, sync::Arc};
 use tracing_subscriber::fmt;
@@ -83,6 +83,7 @@ fn execute_internal_bootloader_test() {
         number: L1BatchNumber::from(1),
         timestamp: 14,
         fee_input: BatchFeeInput::sensible_l1_pegged_default(),
+        interop_fee: U256::zero(),
         fee_account: Address::default(),
 
         enforced_base_fee: None,

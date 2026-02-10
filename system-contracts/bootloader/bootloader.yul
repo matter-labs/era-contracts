@@ -447,27 +447,19 @@ object "Bootloader" {
                 ret := mload(SETTLEMENT_LAYER_CHAIN_ID_BYTE())
             }
 
-            /// @dev Number of slots reserved for `INTEROP_FEE_PER_BLOCK` array in bootloader memory.
-            ///      We've decided to make this number equal to `MAX_TRANSACTIONS_IN_BATCH`. This is due to
-            ///      it having to be equal to the maximal number of blocks per batch, but since we dont enforce
-            ///      that number explicitly, we use the estimation equal to the maximal number of transactions per batch.
-            function INTEROP_FEE_BLOCKS_SLOTS() -> ret {
-                ret := MAX_TRANSACTIONS_IN_BATCH()
-            }
-
-            /// @dev The slot starting from which the interop fees per block are stored.
-            function INTEROP_FEE_PER_BLOCK_BEGIN_SLOT() -> ret {
+            /// @dev The slot dedicated for storing the interop fee.
+            function INTEROP_FEE_SLOT() -> ret {
                 ret := add(SETTLEMENT_LAYER_CHAIN_ID_SLOT(), 1)
             }
 
-            /// @dev The byte starting from which the interop fees per block are stored.
-            function INTEROP_FEE_PER_BLOCK_BEGIN_BYTE() -> ret {
-                ret := mul(INTEROP_FEE_PER_BLOCK_BEGIN_SLOT(), 32)
+            /// @dev The byte starting from which the interop fee is stored.
+            function INTEROP_FEE_BYTE() -> ret {
+                ret := mul(INTEROP_FEE_SLOT(), 32)
             }
 
             /// @dev Returns the interop fee value for a given block index.
-            function getInteropFeeForBlock(blockIndex) -> ret {
-                ret := mload(mul(add(INTEROP_FEE_PER_BLOCK_BEGIN_SLOT(), blockIndex), 32))
+            function getInteropFee() -> ret {
+                ret := mload(INTEROP_FEE_BYTE())
             }
 
             /// @dev The slot starting from which the compressed bytecodes are located in the bootloader's memory.
@@ -481,7 +473,7 @@ object "Bootloader" {
             /// At the start of the bootloader, the value stored at the `TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT` is equal to
             /// `TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT + 32`, where the hash of the first compressed bytecode to publish should be stored.
             function COMPRESSED_BYTECODES_BEGIN_SLOT() -> ret {
-                ret := add(INTEROP_FEE_PER_BLOCK_BEGIN_SLOT(), INTEROP_FEE_BLOCKS_SLOTS())
+                ret := add(INTEROP_FEE_SLOT(), 1)
             }
 
             /// @dev The byte starting from which the compressed bytecodes are located in the bootloader's memory.
@@ -700,7 +692,7 @@ object "Bootloader" {
             }
 
             function L2_INTEROP_CENTER_ADDR() -> ret {
-                ret := 0x000000000000000000000000000000000001000b
+                ret := 0x000000000000000000000000000000000001000d
             }
 
             /// @dev The minimal allowed distance in bytes between the pointer to the compressed data
@@ -770,8 +762,6 @@ object "Bootloader" {
             ) {
                 // We set the L2 block info for this particular transaction
                 setL2Block(transactionIndex)
-                // Set the interop fee for the block before setting interop roots
-                setInteropFeeForBlock(transactionIndex)
                 setInteropRoots(transactionIndex)
 
                 let innerTxDataOffset := add(txDataOffset, 32)
@@ -3358,25 +3348,11 @@ object "Bootloader" {
                 mstore(INTEROP_ROOT_ROLLING_HASH_BYTE(), rollingHashOfProcessedRoots)
             }
 
-            /// @notice Sets the interop fee on InteropCenter for the current block.
-            /// @dev Called once per block transition, before setInteropRoots.
-            /// @param txId The transaction index used to determine block info.
-            function setInteropFeeForBlock(txId) {
-                // Get current block number from tx info
-                let txL2BlockPosition := add(TX_OPERATOR_L2_BLOCK_INFO_BEGIN_BYTE(), mul(TX_OPERATOR_L2_BLOCK_INFO_SIZE_BYTES(), txId))
-                let currentL2BlockNumber := mload(txL2BlockPosition)
-
-                // Skip if block already processed (same check as setInteropRoots)
-                let lastProcessedBlockNumber := mload(LAST_PROCESSED_BLOCK_NUMBER_BYTE())
-                if lt(currentL2BlockNumber, add(lastProcessedBlockNumber, 1)) {
-                    leave
-                }
-
-                // Get fee for this block index
-                let blockIndex := mload(NUMBER_OF_PROCESSED_BLOCKS_BYTE())
-                let fee := getInteropFeeForBlock(blockIndex)
-
-                debugLog("Setting interop fee for block: ", fee)
+            /// @notice Sets the interop fee on InteropCenter for the current batch.
+            /// @dev Called once per batch, before processing transactions.
+            function setInteropFeeForBatch() {
+                let fee := getInteropFee()
+                debugLog("Setting interop fee for batch: ", fee)
 
                 // Encode: setInteropFee(uint256)
                 mstore(0, {{RIGHT_PADDED_SET_INTEROP_FEE_SELECTOR}})
@@ -3403,7 +3379,7 @@ object "Bootloader" {
                     /// Nothing is deployed at this address.
                     let codeSize2 := getCodeSize(add(L2_INTEROP_ROOT_STORAGE(), 10))
                     if iszero(eq(codeSize, codeSize2)) {
-                        revertWithReason(FAILED_TO_SET_INTEROP_FEE(), 1)
+                        revertWithReason(FAILED_TO_SET_NEW_SETTLEMENT_LAYER_CHAIN_ID_ERR_CODE(), 1)
                     }
                 }
             }
@@ -4551,6 +4527,8 @@ object "Bootloader" {
                 GAS_PRICE_PER_PUBDATA := gasPerPubdataFromBaseFee(EXPECTED_BASE_FEE, FAIR_PUBDATA_PRICE)
 
                 <!-- @endif -->
+
+                setInteropFeeForBatch()
             }
 
             // Now, we iterate over all transactions, processing each of them
