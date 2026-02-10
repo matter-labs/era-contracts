@@ -139,8 +139,14 @@ contract AdminFacet is ZKChainBase, IAdmin {
         // Reducing pubdata per tx/batch or gas per batch could restrict important transactions
         // and undermine the safety guarantees of priority mode.
         if (s.priorityModeInfo.canBeActivated) {
-            require(_newFeeParams.priorityTxMaxPubdata == oldFeeParams.priorityTxMaxPubdata, NotCompatibleWithPriorityMode());
-            require(_newFeeParams.maxPubdataPerBatch == oldFeeParams.maxPubdataPerBatch, NotCompatibleWithPriorityMode());
+            require(
+                _newFeeParams.priorityTxMaxPubdata == oldFeeParams.priorityTxMaxPubdata,
+                NotCompatibleWithPriorityMode()
+            );
+            require(
+                _newFeeParams.maxPubdataPerBatch == oldFeeParams.maxPubdataPerBatch,
+                NotCompatibleWithPriorityMode()
+            );
             require(_newFeeParams.maxL2GasPerBatch == oldFeeParams.maxL2GasPerBatch, NotCompatibleWithPriorityMode());
         } else {
             _enforceFeeParamFieldChangeBound(oldFeeParams.priorityTxMaxPubdata, _newFeeParams.priorityTxMaxPubdata);

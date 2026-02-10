@@ -238,9 +238,7 @@ library AddressIntrospector {
             proxies: StateTransitionContracts({
                 chainTypeManager: _ctmAddr,
                 serverNotifier: ctm.serverNotifierAddress(),
-                validatorTimelock: validatorTimelockPostV29 != address(0)
-                ? validatorTimelockPostV29
-                : _ctm.validatorTimelock(),,
+                validatorTimelock: validatorTimelock,
                 bytecodesSupplier: bytecodesSupplier,
                 permissionlessValidator: ctm.PERMISSIONLESS_VALIDATOR()
             }),
