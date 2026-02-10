@@ -41,11 +41,13 @@ contract EraTestnetVerifier is IVerifier, IEraDualVerifier {
     }
 
     /// @inheritdoc IEraDualVerifier
+    // solhint-disable-next-line func-name-mixedcase
     function FFLONK_VERIFIER() external view override returns (IVerifierV2) {
         return DUAL_VERIFIER.FFLONK_VERIFIER();
     }
 
     /// @inheritdoc IEraDualVerifier
+    // solhint-disable-next-line func-name-mixedcase
     function PLONK_VERIFIER() external view override returns (IVerifier) {
         return DUAL_VERIFIER.PLONK_VERIFIER();
     }

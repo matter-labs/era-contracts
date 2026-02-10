@@ -23,3 +23,4 @@ extend-exclude = [
 # Don't correct the surname "Teh"
 FOT = "FOT"
 ue = "ue"
+IZ = "IZ"
