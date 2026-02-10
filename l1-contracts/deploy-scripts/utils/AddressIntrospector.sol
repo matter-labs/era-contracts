@@ -10,6 +10,7 @@ import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {IZKChainBase} from "contracts/state-transition/chain-interfaces/IZKChainBase.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
@@ -27,6 +28,8 @@ import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.so
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {CoreDeployedAddresses, BridgehubAddresses, BridgehubContracts, ZkChainAddresses, L2ERC20BridgeAddresses, StateTransitionDeployedAddresses, StateTransitionContracts, Verifiers, Facets, BridgesDeployedAddresses, BridgeContracts, CTMDeployedAddresses, CTMAdminAddresses, DataAvailabilityDeployedAddresses} from "./Types.sol";
+import {IEraDualVerifier} from "contracts/state-transition/chain-interfaces/IEraDualVerifier.sol";
+import {IZKsyncOSDualVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSDualVerifier.sol";
 
 library AddressIntrospector {
     error NoUptoDateZkChainFound();
@@ -178,32 +181,41 @@ library AddressIntrospector {
     // ============ CTM Addresses ============
 
     function getCTMAddresses(ChainTypeManagerBase _ctm) public view returns (CTMDeployedAddresses memory info) {
-        return _getCTMAddressesInternal(address(_ctm), false);
+        return _getCTMAddressesInternal(address(_ctm), false, false);
     }
 
-    function getCTMAddressesV29(address _ctmAddr) public view returns (CTMDeployedAddresses memory info) {
+    function getCTMAddresses(
+        ChainTypeManagerBase _ctm,
+        bool isZKsyncOS
+    ) public view returns (CTMDeployedAddresses memory info) {
+        return _getCTMAddressesInternal(address(_ctm), false, isZKsyncOS);
+    }
+
+    function getCTMAddressesV29(
+        address _ctmAddr,
+        bool isZKsyncOS
+    ) public view returns (CTMDeployedAddresses memory info) {
         if (_ctmAddr == address(0) || _ctmAddr.code.length == 0) {
             return info;
         }
-        return _getCTMAddressesInternal(_ctmAddr, true);
+        return _getCTMAddressesInternal(_ctmAddr, true, isZKsyncOS);
     }
 
     function _getCTMAddressesInternal(
         address _ctmAddr,
-        bool isV29
+        bool isV29,
+        bool isZKsyncOS
     ) private view returns (CTMDeployedAddresses memory info) {
         ChainTypeManagerBase ctm = ChainTypeManagerBase(_ctmAddr);
 
-        address validatorTimelockPostV29 = _tryAddress(_ctmAddr, "validatorTimelockPostV29()");
-        address validatorTimelock = validatorTimelockPostV29 != address(0)
-            ? validatorTimelockPostV29
-            : ctm.validatorTimelock();
+        address validatorTimelock = ctm.validatorTimelockPostV29();
 
         Facets memory facets = _getFacetsFromUptoDateZkChain(ctm);
         address verifier = _getVerifierFromUptoDateZkChain(ctm);
+        (address verifierFflonk, address verifierPlonk) = _getSubVerifiers(verifier, isZKsyncOS);
 
         // bytecodesSupplier only available in newer versions
-        address bytecodesSupplier = isV29 ? address(0) : _tryAddress(_ctmAddr, "L1_BYTECODES_SUPPLIER()");
+        address bytecodesSupplier = isV29 ? address(0) : ctm.L1_BYTECODES_SUPPLIER();
 
         // Note: daAddresses is left zero-initialized (Solidity default)
         info.stateTransition = StateTransitionDeployedAddresses({
@@ -219,7 +231,7 @@ library AddressIntrospector {
                 validatorTimelock: address(0),
                 bytecodesSupplier: address(0)
             }),
-            verifiers: Verifiers({verifier: verifier, verifierFflonk: address(0), verifierPlonk: address(0)}),
+            verifiers: Verifiers({verifier: verifier, verifierFflonk: verifierFflonk, verifierPlonk: verifierPlonk}),
             facets: facets,
             genesisUpgrade: ctm.l1GenesisUpgrade(),
             defaultUpgrade: address(0),
@@ -264,9 +276,7 @@ library AddressIntrospector {
             }
         }
 
-        IL1Bridgehub bridgehub = address(_bridgehub) == address(0)
-            ? IL1Bridgehub(_zkChain.getBridgehub())
-            : _bridgehub;
+        IL1Bridgehub bridgehub = address(_bridgehub) == address(0) ? IL1Bridgehub(_zkChain.getBridgehub()) : _bridgehub;
 
         bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(chainId);
         address assetHandlerAddress = IAssetRouterBase(bridgehub.assetRouter()).assetHandlerAddress(baseTokenAssetId);
@@ -430,13 +440,9 @@ library AddressIntrospector {
 
         for (uint256 j = 0; j < facetList.length; j++) {
             address facetAddr = facetList[j].addr;
-            (bool success, bytes memory data) = facetAddr.staticcall(abi.encodeWithSignature("getName()"));
-            if (!success || data.length == 0) {
-                continue;
-            }
-
-            string memory name = abi.decode(data, (string));
+            string memory name = IZKChainBase(facetAddr).getName();
             bytes32 nameHash = keccak256(bytes(name));
+
             if (nameHash == keccak256(bytes("AdminFacet"))) {
                 facets.adminFacet = facetAddr;
             } else if (nameHash == keccak256(bytes("MailboxFacet"))) {
@@ -459,5 +465,27 @@ library AddressIntrospector {
             return abi.decode(data, (address));
         }
         return address(0);
+    }
+
+    /// @notice Get fflonk and plonk sub-verifiers from a dual verifier
+    /// @param _verifier The verifier address
+    /// @param _isZKsyncOS If true, uses ZKsyncOSDualVerifier interface; otherwise EraDualVerifier
+    function _getSubVerifiers(
+        address _verifier,
+        bool _isZKsyncOS
+    ) private view returns (address fflonk, address plonk) {
+        if (_verifier == address(0)) {
+            return (address(0), address(0));
+        }
+
+        if (_isZKsyncOS) {
+            IZKsyncOSDualVerifier verifier = IZKsyncOSDualVerifier(_verifier);
+            fflonk = address(verifier.fflonkVerifiers(0));
+            plonk = address(verifier.plonkVerifiers(0));
+        } else {
+            IEraDualVerifier verifier = IEraDualVerifier(_verifier);
+            fflonk = address(verifier.FFLONK_VERIFIER());
+            plonk = address(verifier.PLONK_VERIFIER());
+        }
     }
 }
