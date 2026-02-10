@@ -186,6 +186,8 @@ contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
     }
 
     /// @notice Register legacy bridged tokens (if needed)
+    /// @dev For production use, this function should be extended to register all bridged tokens
+    /// from a config file or by querying on-chain state. Currently only registers ETH for fresh deployments.
     function registerBridgedTokensInNTV(address _bridgehub) public {
         console.log("Registering bridged tokens in NTV...");
 
@@ -202,6 +204,7 @@ contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
         console.log("ETH token address:", ethTokenAddress);
         console.log("ETH assetId:", vm.toString(ethAssetId));
 
+        // TODO: For production, extend this to register all bridged tokens from config
         // Create array with ETH assetId
         bytes32[] memory savedBridgedTokens = new bytes32[](1);
         savedBridgedTokens[0] = ethAssetId;

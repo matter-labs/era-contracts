@@ -178,20 +178,14 @@ contract AdminFunctions is Script, IAdminFunctions {
     /// @notice Upgrade a chain by reading the diamond cut directly from the CTM
     /// @dev This avoids TOML parsing issues with large hex strings
     /// @param chainAddress The address of the chain proxy to upgrade
-    /// @param ctmAddress The address of the ChainTypeManager
     /// @param adminAddr The address of the ChainAdmin
     /// @param accessControlRestriction The address of the AccessControlRestriction
-    function upgradeChainFromCTM(
-        address chainAddress,
-        address ctmAddress,
-        address adminAddr,
-        address accessControlRestriction
-    ) public {
+    function upgradeChainFromCTM(address chainAddress, address adminAddr, address accessControlRestriction) public {
         console.log("AdminFunctions: upgrading chain", chainAddress);
-        console.log("AdminFunctions: using CTM", ctmAddress);
 
         IZKChain chain = IZKChain(chainAddress);
-        IChainTypeManager ctm = IChainTypeManager(ctmAddress);
+        IChainTypeManager ctm = IChainTypeManager(chain.getChainTypeManager());
+        console.log("AdminFunctions: using CTM", address(ctm));
 
         // Get the protocol version from CTM
         uint256 newProtocolVersion = ctm.protocolVersion();
@@ -208,7 +202,7 @@ contract AdminFunctions is Script, IAdminFunctions {
 
         // Get the upgrade data from CTM using the GetDiamondCutData library
         Diamond.DiamondCutData memory diamondCut = GetDiamondCutData.getDiamondCutData(
-            ctmAddress,
+            address(ctm),
             currentProtocolVersion
         );
 

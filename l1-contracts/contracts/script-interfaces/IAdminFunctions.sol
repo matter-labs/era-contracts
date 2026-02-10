@@ -43,12 +43,7 @@ interface IAdminFunctions {
         uint256 timestamp
     ) external;
 
-    function upgradeChainFromCTM(
-        address chainAddress,
-        address ctmAddress,
-        address adminAddr,
-        address accessControlRestriction
-    ) external;
+    function upgradeChainFromCTM(address chainAddress, address adminAddr, address accessControlRestriction) external;
 
     function makePermanentRollup(ChainAdmin chainAdmin, address target) external;
 

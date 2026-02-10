@@ -858,11 +858,6 @@
         "internalType": "address"
       },
       {
-        "name": "ctmAddress",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "adminAddr",
         "type": "address",
         "internalType": "address"
