@@ -147,6 +147,24 @@
   },
   {
     "type": "function",
+    "name": "initL2",
+    "inputs": [
+      {
+        "name": "_l1ChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_owner",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "initiateGatewayToL1MigrationOnGateway",
     "inputs": [
       {
@@ -303,19 +321,6 @@
   },
   {
     "type": "function",
-    "name": "setAddresses",
-    "inputs": [
-      {
-        "name": "_l1ChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "setGatewaySettlementFee",
     "inputs": [
       {
@@ -438,6 +443,31 @@
       },
       {
         "name": "interopCallCount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "GatewayToL1MigrationInitiated",
+    "inputs": [
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "amount",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
