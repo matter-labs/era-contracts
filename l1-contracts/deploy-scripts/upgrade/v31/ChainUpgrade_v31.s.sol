@@ -8,7 +8,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 
 // import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 
-import {DefaultChainUpgrade} from "../default_upgrade/DefaultChainUpgrade.s.sol";
+import {DefaultChainUpgrade} from "../default-upgrade/DefaultChainUpgrade.s.sol";
 
 import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";

@@ -66,6 +66,8 @@ contract ZKChainDeployer is L1ContractDeployer {
 
         address chainAddress = getZKChainAddress(eraZKChainId);
         if (!_pausedDeposits) {
+            address admin = IZKChain(chainAddress).getAdmin();
+            vm.prank(admin);
             IMigrator(chainAddress).unpauseDeposits();
         }
         eraConfig = deployScript.getConfig();
@@ -79,6 +81,8 @@ contract ZKChainDeployer is L1ContractDeployer {
         uint256 chainId = _deployZKChainInner(_baseToken, _chainId);
 
         address chainAddress = getZKChainAddress(chainId);
+        address admin = IZKChain(chainAddress).getAdmin();
+        vm.prank(admin);
         IMigrator(chainAddress).unpauseDeposits();
     }
 
