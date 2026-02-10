@@ -58,12 +58,6 @@ library AddressIntrospector {
             return getL2BridgehubAddresses();
         }
 
-        // Check if we should use v29-compatible introspection (no messageRoot)
-        bool useV29 = shouldUseV29Introspection(address(_bridgehub));
-        if (useV29) {
-            return getBridgehubAddressesV29(_bridgehub);
-        }
-
         return getL1BridgehubAddress(_bridgehub);
     }
 
@@ -399,7 +393,26 @@ library AddressIntrospector {
         coreAddresses.shared.governance = IOwnable(_bridgehubProxy).owner();
     }
 
+    /// @notice Get bridgehub addresses with V29 compatibility check
+    /// @dev Use this when you need to support both pre-V31 and V31+ deployments
     function getBridgehubAddressesV29(IL1Bridgehub _bridgehub) public view returns (BridgehubAddresses memory info) {
+        if (address(_bridgehub) == L2_BRIDGEHUB_ADDR) {
+            return getL2BridgehubAddresses();
+        }
+
+        // Check if we should use v29-compatible introspection
+        bool useV29 = shouldUseV29Introspection(address(_bridgehub));
+        if (useV29) {
+            return _getBridgehubAddressesV29Internal(_bridgehub);
+        }
+
+        return getL1BridgehubAddress(_bridgehub);
+    }
+
+    /// @notice Internal V29 bridgehub address introspection (no version check)
+    function _getBridgehubAddressesV29Internal(
+        IL1Bridgehub _bridgehub
+    ) private view returns (BridgehubAddresses memory info) {
         address bridgehubProxy = address(_bridgehub);
         address ctmDeploymentTrackerProxy = address(_bridgehub.l1CtmDeployer());
         address chainAssetHandler = _bridgehub.chainAssetHandler();
