@@ -172,6 +172,8 @@ interface IChainTypeManager {
 
     function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external;
 
+    function deactivatePriorityMode(uint256 _chainId) external;
+
     function upgradeChainFromVersion(
         uint256 _chainId,
         uint256 _oldProtocolVersion,

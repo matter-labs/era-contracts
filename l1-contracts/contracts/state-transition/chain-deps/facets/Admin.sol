@@ -104,6 +104,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function changeFeeParams(FeeParams calldata _newFeeParams) external onlyAdminOrChainTypeManager onlyL1 {
+        _enforceMinUpdateInterval();
         uint256 lastFeeParamsUpdateTimestamp = s.lastFeeParamsUpdateTimestamp;
         if (lastFeeParamsUpdateTimestamp != 0 && block.timestamp < lastFeeParamsUpdateTimestamp + FEE_PARAMS_UPDATE_INTERVAL) {
             revert FeeParamsChangeTooFrequent(lastFeeParamsUpdateTimestamp + FEE_PARAMS_UPDATE_INTERVAL);
@@ -131,6 +132,10 @@ contract AdminFacet is ZKChainBase, IAdmin {
             _newDenominator: s.baseTokenGasPriceMultiplierDenominator
         });
 
+        _enforceFeeParamFieldChangeBound(oldFeeParams.priorityTxMaxPubdata, _newFeeParams.priorityTxMaxPubdata);
+        _enforceFeeParamFieldChangeBound(oldFeeParams.maxPubdataPerBatch, _newFeeParams.maxPubdataPerBatch);
+        _enforceFeeParamFieldChangeBound(oldFeeParams.maxL2GasPerBatch, _newFeeParams.maxL2GasPerBatch);
+
         s.feeParams = _newFeeParams;
         s.lastFeeParamsUpdateTimestamp = block.timestamp;
 
@@ -143,14 +148,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert DenominatorIsZero();
         }
 
-        uint256 lastFeeParamsUpdateTimestamp = s.lastFeeParamsUpdateTimestamp;
-        uint256 lastTokenMultiplierUpdateTimestamp = s.lastTokenMultiplierUpdateTimestamp;
-        uint256 lastUpdateTimestamp = lastFeeParamsUpdateTimestamp > lastTokenMultiplierUpdateTimestamp
-            ? lastFeeParamsUpdateTimestamp
-            : lastTokenMultiplierUpdateTimestamp;
-        if (lastUpdateTimestamp != 0 && block.timestamp < lastUpdateTimestamp + PRICE_UPDATE_INTERVAL) {
-            revert TokenMultiplierChangeTooFrequent(lastUpdateTimestamp + PRICE_UPDATE_INTERVAL);
-        }
+        _enforceMinUpdateInterval();
 
         _enforcePriceChangeBound({
             _oldFeeParams: s.feeParams,
@@ -169,6 +167,18 @@ contract AdminFacet is ZKChainBase, IAdmin {
         s.lastTokenMultiplierUpdateTimestamp = block.timestamp;
 
         emit NewBaseTokenMultiplier(oldNominator, oldDenominator, _nominator, _denominator);
+    }
+
+    /// @notice Ensures that neither fee params nor token multiplier have been updated within the last PRICE_UPDATE_INTERVAL.
+    function _enforceMinUpdateInterval() internal view {
+        uint256 lastFeeParamsUpdateTimestamp = s.lastFeeParamsUpdateTimestamp;
+        uint256 lastTokenMultiplierUpdateTimestamp = s.lastTokenMultiplierUpdateTimestamp;
+        uint256 lastUpdateTimestamp = lastFeeParamsUpdateTimestamp > lastTokenMultiplierUpdateTimestamp
+            ? lastFeeParamsUpdateTimestamp
+            : lastTokenMultiplierUpdateTimestamp;
+        if (lastUpdateTimestamp != 0 && block.timestamp < lastUpdateTimestamp + PRICE_UPDATE_INTERVAL) {
+            revert TokenMultiplierChangeTooFrequent(lastUpdateTimestamp + PRICE_UPDATE_INTERVAL);
+        }
     }
 
     function _enforcePriceChangeBound(
@@ -194,6 +204,24 @@ contract AdminFacet is ZKChainBase, IAdmin {
         uint256 minAllowedPrice = (oldPrice * MAX_PRICE_CHANGE_DENOMINATOR) / MAX_PRICE_CHANGE_NUMERATOR;
         if (newPrice < minAllowedPrice) {
             revert FeeParamsChangeTooLarge(oldPrice, newPrice, minAllowedPrice);
+        }
+    }
+
+    /// @notice Enforces that an individual fee param field does not change by more than the allowed ratio.
+    /// @dev Prevents admin from setting capacity fields (e.g. priorityTxMaxPubdata) to 0 to block tx ingress.
+    function _enforceFeeParamFieldChangeBound(uint256 _oldValue, uint256 _newValue) internal view {
+        if (_oldValue == 0 && s.priorityTree.getSize() == 0) {
+            return;
+        }
+
+        uint256 maxAllowed = (_oldValue * MAX_PRICE_CHANGE_NUMERATOR) / MAX_PRICE_CHANGE_DENOMINATOR;
+        if (_newValue > maxAllowed) {
+            revert FeeParamsChangeTooLarge(_oldValue, _newValue, maxAllowed);
+        }
+
+        uint256 minAllowed = (_oldValue * MAX_PRICE_CHANGE_DENOMINATOR) / MAX_PRICE_CHANGE_NUMERATOR;
+        if (_newValue < minAllowed) {
+            revert FeeParamsChangeTooLarge(_oldValue, _newValue, minAllowed);
         }
     }
 
@@ -291,14 +319,16 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if (s.priorityModeInfo.canBeActivated) {
             revert PriorityModeAlreadyAllowed();
         }
-        // Ensure that if there are existing priority txs, they have a non-zero request timestamp.
-        // Otherwise activatePriorityMode would be effectively non-functional after the v31 upgrade,
-        // since old priority txs don't have timestamps populated.
-        if (s.priorityTree.getSize() > 0) {
-            uint256 firstUnprocessedTx = s.priorityTree.getFirstUnprocessedPriorityTx();
-            if (s.priorityOpsRequestTimestamp[firstUnprocessedTx] == 0) {
-                revert PriorityOpsRequestTimestampMissing(firstUnprocessedTx);
-            }
+        // Ensure that there is at least one priority tx with a non-zero request timestamp.
+        // This guarantees that activatePriorityMode can actually function, since it relies on
+        // the timestamp of the first unprocessed tx. After the v31 upgrade, old priority txs
+        // don't have timestamps populated, so we require new ones to exist first.
+        uint256 firstUnprocessedTx = s.priorityTree.getFirstUnprocessedPriorityTx();
+        if (s.priorityTree.getSize() == 0) {
+            revert PriorityOpsRequestTimestampMissing(firstUnprocessedTx);
+        }
+        if (s.priorityOpsRequestTimestamp[firstUnprocessedTx] == 0) {
+            revert PriorityOpsRequestTimestampMissing(firstUnprocessedTx);
         }
         // Set a transaction filterer that is compatible with Priority Mode.
         //
@@ -328,9 +358,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert PriorityModeRequiresPermanentRollup();
         }
         uint256 firstUnprocessedTx = s.priorityTree.getFirstUnprocessedPriorityTx();
-        if (s.priorityTree.getSize() == 0) {
-            revert PriorityOpsRequestTimestampMissing(firstUnprocessedTx);
-        }
         uint256 unprocessedTxRequestedAt = s.priorityOpsRequestTimestamp[firstUnprocessedTx];
         // A zero timestamp means we don't have a recorded "requested at" time for this priority tx.
         // This can happen when:

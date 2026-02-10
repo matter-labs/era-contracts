@@ -16,6 +16,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
     }
 
     function test_revertWhen_activatePriorityMode_notPermanentRollup() public {
+        _requestPriorityOp();
         vm.prank(owner);
         admin.permanentlyAllowPriorityMode();
 
@@ -23,24 +24,25 @@ contract PriorityModeExecutorTest is ExecutorTest {
         admin.activatePriorityMode();
     }
 
-    function test_revertWhen_activatePriorityMode_missingTimestamp() public {
+    function test_revertWhen_permanentlyAllowPriorityMode_noPriorityTxs() public {
         vm.prank(owner);
         admin.makePermanentRollup();
-        vm.prank(owner);
-        admin.permanentlyAllowPriorityMode();
 
+        vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(PriorityOpsRequestTimestampMissing.selector, 0));
-        admin.activatePriorityMode();
+        admin.permanentlyAllowPriorityMode();
     }
 
     function test_revertWhen_activatePriorityMode_tooEarly() public {
         vm.prank(owner);
         admin.makePermanentRollup();
-        vm.prank(owner);
-        admin.permanentlyAllowPriorityMode();
 
         vm.warp(100);
         uint256 requestTimestamp = _requestPriorityOp();
+
+        vm.prank(owner);
+        admin.permanentlyAllowPriorityMode();
+
         uint256 earliest = requestTimestamp + PRIORITY_EXPIRATION;
 
         vm.warp(earliest - 1);
@@ -149,9 +151,9 @@ contract PriorityModeExecutorTest is ExecutorTest {
     function _activatePriorityMode() internal {
         vm.prank(owner);
         admin.makePermanentRollup();
+        _requestPriorityOp();
         vm.prank(owner);
         admin.permanentlyAllowPriorityMode();
-        _requestPriorityOp();
         vm.warp(block.timestamp + PRIORITY_EXPIRATION + 1);
         admin.activatePriorityMode();
     }
