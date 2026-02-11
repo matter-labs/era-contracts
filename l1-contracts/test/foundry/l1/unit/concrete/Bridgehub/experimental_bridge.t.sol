@@ -33,7 +33,6 @@ import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymen
 import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, MAX_NEW_FACTORY_DEPS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
-import {ZKSYNC_ERA_CHAIN_ID, ZK_TOKEN_ERA_ADDRESS} from "foundry-test/Constants.sol";
 
 import {SecondBridgeAddressTooLow} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdTooBig, MsgValueMismatch, SharedBridgeNotSet, SlotOccupied, Unauthorized, WrongMagicValue, ZeroChainId} from "contracts/common/L1ContractErrors.sol";
@@ -122,7 +121,7 @@ contract ExperimentalBridgeTest is Test {
         interopCenter.initL2(
             l1ChainId,
             bridgeOwner,
-            DataEncoding.encodeNTVAssetId(ZKSYNC_ERA_CHAIN_ID, ZK_TOKEN_ERA_ADDRESS)
+            DataEncoding.encodeNTVAssetId(eraChainId, makeAddr("zkToken"))
         );
         messageRoot = new L1MessageRoot(address(bridgehub), 1);
         weth = makeAddr("WETH");

@@ -25,7 +25,6 @@ import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol"
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {ZKSYNC_ERA_CHAIN_ID, ZK_TOKEN_ERA_ADDRESS} from "foundry-test/Constants.sol";
 import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {L2MessageVerification} from "../../../../../contracts/interop/L2MessageVerification.sol";
@@ -73,7 +72,7 @@ library L2UtilsBase {
             InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
                 _args.l1ChainId,
                 _args.aliasedOwner,
-                DataEncoding.encodeNTVAssetId(ZKSYNC_ERA_CHAIN_ID, ZK_TOKEN_ERA_ADDRESS)
+                DataEncoding.encodeNTVAssetId(_args.eraChainId, address(uint160(uint256(keccak256("zkToken")))))
             );
         }
 
