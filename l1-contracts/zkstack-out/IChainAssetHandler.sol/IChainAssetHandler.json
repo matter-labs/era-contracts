@@ -102,19 +102,6 @@
   },
   {
     "type": "function",
-    "name": "setMigrationNumberForV31",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "unpauseMigration",
     "inputs": [],
     "outputs": [],
