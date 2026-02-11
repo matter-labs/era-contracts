@@ -198,7 +198,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
     // Helper functions
 
-    function _createFixedForceDeploymentsData(bool isGenesis) internal view returns (FixedForceDeploymentsData memory) {
+    function _createFixedForceDeploymentsData(bool isGenesis) internal returns (FixedForceDeploymentsData memory) {
         FixedForceDeploymentsData memory data;
         data.l1ChainId = L1_CHAIN_ID;
         data.eraChainId = ERA_CHAIN_ID;
@@ -254,7 +254,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         return data;
     }
 
-    function _createEraFixedForceDeploymentsData() internal view returns (FixedForceDeploymentsData memory) {
+    function _createEraFixedForceDeploymentsData() internal returns (FixedForceDeploymentsData memory) {
         FixedForceDeploymentsData memory data;
         data.l1ChainId = L1_CHAIN_ID;
         data.eraChainId = ERA_CHAIN_ID;
