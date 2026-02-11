@@ -18,6 +18,8 @@ error ChainExists();
 error CurrentBatchNumberAlreadySet();
 // 0x68d91b49
 error DepthMoreThanOneForRecursiveMerkleProof();
+// 0xd9d3fc89
+error HistoricalSettlementLayerMismatch(uint256 expectedSettlementLayer, uint256 actualSettlementLayer);
 // 0x48857c1d
 error IncorrectChainAssetId(bytes32 assetId, bytes32 assetIdFromChainId);
 // 0xf5e39c1f
@@ -30,16 +32,16 @@ error IteratedMigrationsNotSupported();
 error LocallyNoChainsAtGenesis();
 // 0x913183d8
 error MessageRootNotRegistered();
+// 0x338fe0e7
+error MigrationIntervalInvalid();
+// 0x81c5808d
+error MigrationIntervalNotSet();
 // 0x4010a88d
 error MigrationNotToL1();
 // 0x12b08c62
 error MigrationNumberAlreadySet();
 // 0xde1362a2
 error MigrationNumberMismatch(uint256 _expected, uint256 _actual);
-error MigrationIntervalNotSet();
-error MigrationIntervalInvalid();
-error HistoricalSettlementLayerMismatch(uint256 expectedSettlementLayer, uint256 actualSettlementLayer);
-error SettlementLayerMustNotBeL1();
 // 0x7f4316f3
 error NoEthAllowed();
 // 0x366c42f8
@@ -80,6 +82,8 @@ error OnlyL1();
 error OnlyOnSettlementLayer();
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
+// 0xefb272e2
+error SettlementLayerMustNotBeL1();
 // 0x36917565
 error SLHasDifferentCTM();
 // 0x90c7cbf1
