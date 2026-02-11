@@ -6,6 +6,12 @@ import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecuto
 import {BalanceChange, TokenBalanceMigrationData, TokenBridgingData} from "../../common/Messaging.sol";
 
 interface IGWAssetTracker {
+    /// @notice Emitted when Gateway to L1 migration is initiated for an asset
+    /// @param assetId The asset ID being migrated
+    /// @param chainId The ID of the chain initiating the asset migration
+    /// @param amount The amount being migrated
+    event GatewayToL1MigrationInitiated(bytes32 indexed assetId, uint256 indexed chainId, uint256 amount);
+
     function setAddresses(uint256 _l1ChainId) external;
 
     function registerBaseTokenOnGateway(TokenBridgingData calldata _baseTokenBridgingData) external;

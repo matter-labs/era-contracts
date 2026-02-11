@@ -131,6 +131,23 @@ library Utils {
     uint256 internal constant MAX_PRIORITY_TX_GAS = 72000000;
 
     /**
+     * @dev Returns the address that should be used for broadcasting transactions.
+     *
+     * In Forge scripts, when contracts are created via `new` during script execution,
+     * the `msg.sender` becomes the intermediate contract address rather than the EOA
+     * that initiated the transaction. This breaks `vm.broadcast(msg.sender)` because
+     * there's no wallet associated with that address.
+     *
+     * Using `tx.origin` ensures we always get the actual EOA that invoked the script,
+     * regardless of how many levels of contract creation have occurred.
+     *
+     * @return The address to use for vm.broadcast() calls
+     */
+    function getBroadcasterAddress() internal view returns (address) {
+        return tx.origin;
+    }
+
+    /**
      * @dev Get all selectors from the bytecode.
      *
      * Selectors are extracted by calling `cast selectors <bytecode>` from foundry.
@@ -259,6 +276,7 @@ library Utils {
 
     /**
      * @dev Deploys contract using CREATE2.
+     * @dev Uses tx.origin for broadcast to ensure the correct sender even when called from nested contracts.
      */
     function deployViaCreate2(bytes memory _bytecode, bytes32 _salt, address _factory) internal returns (address) {
         if (_bytecode.length == 0) {
@@ -269,7 +287,9 @@ library Utils {
             return contractAddress;
         }
 
-        vm.broadcast();
+        // Use tx.origin to ensure the broadcast uses the EOA that invoked the script,
+        // even when this function is called from a contract created via `new` during the script.
+        vm.broadcast(getBroadcasterAddress());
         (bool success, bytes memory data) = _factory.call(getDeterministicCreate2FactoryCalldata(_salt, _bytecode));
         contractAddress = bytesToAddress(data);
 
@@ -507,13 +527,13 @@ library Utils {
         address baseTokenAddress = bridgehub.baseToken(chainId);
         if (ADDRESS_ONE != baseTokenAddress) {
             IERC20 baseToken = IERC20(baseTokenAddress);
-            vm.broadcast();
+            vm.broadcast(getBroadcasterAddress());
             bool success = baseToken.approve(l1SharedBridgeProxy, requiredValueToDeploy);
             require(success, "Approval failed");
             requiredValueToDeploy = 0;
         }
 
-        vm.broadcast();
+        vm.broadcast(getBroadcasterAddress());
         vm.recordLogs();
         bytes32 canonicalTxHash = bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(
             l2TransactionRequestDirect

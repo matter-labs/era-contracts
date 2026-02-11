@@ -132,7 +132,7 @@ function extractTestFunctionNames(sourceCode: string): string[] {
   // Remove multi-line comments
   sourceCode = sourceCode.replace(/\/\*[\s\S]*?\*\//g, "");
 
-  const regexPatterns = [/function\s+(TEST\w+)/g];
+  const regexPatterns = [/function\s+(TEST\w+)/g, /function\s+(INT_TEST\w+)/g];
 
   const results: string[] = [];
   for (const pattern of regexPatterns) {
@@ -152,22 +152,24 @@ function createTestFramework(tests: string[]): string {
     switch test_id
     case 0 {
         testing_totalTests(${tests.length})
+        return(0, 0)
     }
     `;
 
   tests.forEach((value, index) => {
+    const isIntTest = value.startsWith("INT_TEST");
     testFramework += `
         case ${index + 1} {
             testing_start("${value}")
-            ${value}()
+            ${value}()${isIntTest ? "" : "\n            return(0, 0)"}
         }
         `;
   });
 
   testFramework += `
         default {
+            return(0, 0)
         }
-    return (0, 0)
     `;
 
   return testFramework;
