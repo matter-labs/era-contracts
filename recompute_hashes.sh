@@ -26,7 +26,9 @@ if [[ "$FORGE_VERSION" != "$EXPECTED_VERSION" ]]; then
   exit 1
 fi
 
-if [[ "$FORGE_COMMIT" != "$EXPECTED_COMMIT" ]]; then
+# Forge version output is broken on Linux returning VERGEN_IDEMPOTENT_OUTPUT instead of the commit hash.
+# Accept both the expected commit and VERGEN_IDEMPOTENT_OUTPUT.
+if [[ "$FORGE_COMMIT" != "$EXPECTED_COMMIT" && "$FORGE_COMMIT" != "VERGEN_ID" ]]; then
   echo "Incorrect Foundry commit."
   echo "Expected: ${EXPECTED_COMMIT}"
   echo "Found:    ${FORGE_COMMIT}"
