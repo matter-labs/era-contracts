@@ -134,7 +134,6 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
                 initCalldata
             )
         );
-
     }
 
     function deployViaCreate2(
