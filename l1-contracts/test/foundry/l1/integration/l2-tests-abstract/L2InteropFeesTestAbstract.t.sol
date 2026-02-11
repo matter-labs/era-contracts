@@ -18,7 +18,7 @@ import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {ZKTokenNotAvailable, FeeWithdrawalFailed} from "contracts/interop/InteropErrors.sol";
+import {ZKTokenNotAvailable, FeeWithdrawalFailed, UseFixedFeeRequired} from "contracts/interop/InteropErrors.sol";
 import {L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_BRIDGEHUB_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
@@ -772,6 +772,343 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
         // No state changes expected
         assertEq(l2InteropCenter.accumulatedZKFees(claimer), 0);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    useFixedFee Required Revert Tests
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Test that sendBundle reverts when useFixedFee attribute is missing
+    function test_sendBundle_revertsWhenUseFixedFeeMissing() public {
+        _setupGatewayMode();
+
+        address sender = makeAddr("sender");
+        vm.deal(sender, 10 ether);
+
+        // Build bundle attributes WITHOUT useFixedFee (only unbundler)
+        bytes[] memory bundleAttributes = new bytes[](1);
+        bundleAttributes[0] = abi.encodeCall(
+            IERC7786Attributes.unbundlerAddress,
+            (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
+        );
+
+        InteropCallStarter[] memory calls = _buildSimpleCall();
+
+        vm.prank(sender);
+        vm.expectRevert(UseFixedFeeRequired.selector);
+        l2InteropCenter.sendBundle{value: 0}(
+            InteroperableAddress.formatEvmV1(destinationChainId),
+            calls,
+            bundleAttributes
+        );
+    }
+
+    /// @notice Test that sendMessage reverts when useFixedFee attribute is missing
+    function test_sendMessage_revertsWhenUseFixedFeeMissing() public {
+        _setupGatewayMode();
+
+        address sender = makeAddr("sender");
+        vm.deal(sender, 10 ether);
+
+        bytes memory recipient = InteroperableAddress.formatEvmV1(destinationChainId, interopTargetContract);
+        bytes memory payload = hex"";
+
+        // Build attributes WITHOUT useFixedFee (empty attributes)
+        bytes[] memory attributes = new bytes[](0);
+
+        vm.prank(sender);
+        vm.expectRevert(UseFixedFeeRequired.selector);
+        l2InteropCenter.sendMessage{value: 0}(recipient, payload, attributes);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    Claim Failure-Path Tests
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Test that claimProtocolFees reverts with FeeWithdrawalFailed when receiver reverts
+    function test_claimProtocolFees_revertsWhenReceiverReverts() public {
+        _setupGatewayMode();
+
+        uint256 protocolFee = 0.01 ether;
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        l2InteropCenter.setInteropFee(protocolFee);
+
+        // Use a normal address as coinbase
+        address coinbaseAddr = makeAddr("coinbase");
+        vm.coinbase(coinbaseAddr);
+
+        // Send bundle to accumulate fees
+        address sender = makeAddr("feeSender");
+        vm.deal(sender, 10 ether);
+
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false);
+        InteropCallStarter[] memory calls = _buildSimpleCall();
+
+        vm.prank(sender);
+        l2InteropCenter.sendBundle{value: protocolFee}(
+            InteroperableAddress.formatEvmV1(destinationChainId),
+            calls,
+            bundleAttributes
+        );
+
+        // Try to claim fees to a reverting receiver
+        RevertingReceiver revertingReceiver = new RevertingReceiver();
+
+        vm.prank(coinbaseAddr);
+        vm.expectRevert(FeeWithdrawalFailed.selector);
+        l2InteropCenter.claimProtocolFees(address(revertingReceiver));
+    }
+
+    /// @notice Test claimProtocolFees with zero-address receiver
+    function test_claimProtocolFees_zeroAddressReceiver() public {
+        _setupGatewayMode();
+
+        uint256 protocolFee = 0.01 ether;
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        l2InteropCenter.setInteropFee(protocolFee);
+
+        address coinbaseAddr = makeAddr("coinbase");
+        vm.coinbase(coinbaseAddr);
+
+        address sender = makeAddr("feeSender");
+        vm.deal(sender, 10 ether);
+
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false);
+        InteropCallStarter[] memory calls = _buildSimpleCall();
+
+        vm.prank(sender);
+        l2InteropCenter.sendBundle{value: protocolFee}(
+            InteroperableAddress.formatEvmV1(destinationChainId),
+            calls,
+            bundleAttributes
+        );
+
+        // Claim to address(0) - the low-level call to address(0) succeeds (ETH burned)
+        vm.prank(coinbaseAddr);
+        l2InteropCenter.claimProtocolFees(address(0));
+
+        // Accumulated fees should be cleared
+        assertEq(l2InteropCenter.accumulatedProtocolFees(coinbaseAddr), 0, "Accumulated fees should be cleared");
+    }
+
+    /// @notice Test claimZKFees with zero-address receiver
+    function test_claimZKFees_zeroAddressReceiver() public {
+        _setupGatewayMode();
+
+        // Set up ZK token
+        zkToken = new TestnetERC20Token("ZK Token", "ZK", 18);
+        bytes32 zkTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, address(zkToken));
+
+        vm.mockCall(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            abi.encodeWithSelector(INativeTokenVaultBase.tokenAddress.selector, zkTokenAssetId),
+            abi.encode(address(zkToken))
+        );
+
+        stdstore.target(L2_INTEROP_CENTER_ADDR).sig("ZK_TOKEN_ASSET_ID()").checked_write(zkTokenAssetId);
+
+        address coinbaseAddr = makeAddr("coinbase");
+        vm.coinbase(coinbaseAddr);
+
+        address sender = makeAddr("zkFeeSender");
+        uint256 zkFeePerCall = l2InteropCenter.ZK_INTEROP_FEE();
+        zkToken.mint(sender, zkFeePerCall * 10);
+
+        vm.prank(sender);
+        zkToken.approve(L2_INTEROP_CENTER_ADDR, type(uint256).max);
+
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, true);
+        InteropCallStarter[] memory calls = _buildSimpleCall();
+
+        vm.prank(sender);
+        l2InteropCenter.sendBundle{value: 0}(
+            InteroperableAddress.formatEvmV1(destinationChainId),
+            calls,
+            bundleAttributes
+        );
+
+        // SafeERC20 safeTransfer to address(0) will revert
+        vm.prank(coinbaseAddr);
+        vm.expectRevert();
+        l2InteropCenter.claimZKFees(address(0));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    Exact Fee Accounting Tests
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Test exact fee accounting with multiple bundles to the same coinbase
+    function test_sendBundle_multipleBundlesAccumulateFees() public {
+        _setupGatewayMode();
+
+        uint256 protocolFee = 0.005 ether;
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        l2InteropCenter.setInteropFee(protocolFee);
+
+        address coinbaseAddr = makeAddr("coinbase");
+        vm.coinbase(coinbaseAddr);
+
+        address sender = makeAddr("feeSender");
+        vm.deal(sender, 100 ether);
+
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false);
+
+        uint256 totalExpectedFees;
+
+        // Bundle 1: 1 call
+        {
+            InteropCallStarter[] memory calls1 = _buildSimpleCall();
+            uint256 fee1 = protocolFee * 1;
+            totalExpectedFees += fee1;
+
+            vm.prank(sender);
+            l2InteropCenter.sendBundle{value: fee1}(
+                InteroperableAddress.formatEvmV1(destinationChainId),
+                calls1,
+                bundleAttributes
+            );
+        }
+
+        // Bundle 2: 3 calls
+        {
+            InteropCallStarter[] memory calls2 = new InteropCallStarter[](3);
+            bytes[] memory callAttributes = new bytes[](0);
+            for (uint256 i = 0; i < 3; i++) {
+                calls2[i] = InteropCallStarter({
+                    to: InteroperableAddress.formatEvmV1(interopTargetContract),
+                    data: hex"",
+                    callAttributes: callAttributes
+                });
+            }
+            uint256 fee2 = protocolFee * 3;
+            totalExpectedFees += fee2;
+
+            vm.prank(sender);
+            l2InteropCenter.sendBundle{value: fee2}(
+                InteroperableAddress.formatEvmV1(destinationChainId),
+                calls2,
+                bundleAttributes
+            );
+        }
+
+        // Bundle 3: 2 calls
+        {
+            InteropCallStarter[] memory calls3 = new InteropCallStarter[](2);
+            bytes[] memory callAttributes = new bytes[](0);
+            for (uint256 i = 0; i < 2; i++) {
+                calls3[i] = InteropCallStarter({
+                    to: InteroperableAddress.formatEvmV1(interopTargetContract),
+                    data: hex"",
+                    callAttributes: callAttributes
+                });
+            }
+            uint256 fee3 = protocolFee * 2;
+            totalExpectedFees += fee3;
+
+            vm.prank(sender);
+            l2InteropCenter.sendBundle{value: fee3}(
+                InteroperableAddress.formatEvmV1(destinationChainId),
+                calls3,
+                bundleAttributes
+            );
+        }
+
+        // Total: 1 + 3 + 2 = 6 calls * 0.005 ether = 0.03 ether
+        assertEq(totalExpectedFees, protocolFee * 6, "Expected fee total should be 6 * protocolFee");
+        assertEq(
+            l2InteropCenter.accumulatedProtocolFees(coinbaseAddr),
+            totalExpectedFees,
+            "Accumulated fees should match sum of all bundles"
+        );
+    }
+
+    /// @notice Test exact fee accounting: ZK fees across multiple bundles
+    function test_sendBundle_multipleZKBundlesExactAccounting() public {
+        _setupGatewayMode();
+
+        // Set up ZK token
+        zkToken = new TestnetERC20Token("ZK Token", "ZK", 18);
+        bytes32 zkTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, address(zkToken));
+
+        vm.mockCall(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            abi.encodeWithSelector(INativeTokenVaultBase.tokenAddress.selector, zkTokenAssetId),
+            abi.encode(address(zkToken))
+        );
+
+        stdstore.target(L2_INTEROP_CENTER_ADDR).sig("ZK_TOKEN_ASSET_ID()").checked_write(zkTokenAssetId);
+
+        address coinbaseAddr = makeAddr("coinbase");
+        vm.coinbase(coinbaseAddr);
+
+        address sender = makeAddr("zkFeeSender");
+        uint256 zkFeePerCall = l2InteropCenter.ZK_INTEROP_FEE();
+        zkToken.mint(sender, zkFeePerCall * 20);
+
+        vm.prank(sender);
+        zkToken.approve(L2_INTEROP_CENTER_ADDR, type(uint256).max);
+
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, true);
+
+        uint256 senderBalanceBefore = zkToken.balanceOf(sender);
+
+        // Bundle 1: 2 calls
+        {
+            InteropCallStarter[] memory calls = new InteropCallStarter[](2);
+            bytes[] memory callAttributes = new bytes[](0);
+            for (uint256 i = 0; i < 2; i++) {
+                calls[i] = InteropCallStarter({
+                    to: InteroperableAddress.formatEvmV1(interopTargetContract),
+                    data: hex"",
+                    callAttributes: callAttributes
+                });
+            }
+
+            vm.prank(sender);
+            l2InteropCenter.sendBundle{value: 0}(
+                InteroperableAddress.formatEvmV1(destinationChainId),
+                calls,
+                bundleAttributes
+            );
+        }
+
+        // Bundle 2: 4 calls
+        {
+            InteropCallStarter[] memory calls = new InteropCallStarter[](4);
+            bytes[] memory callAttributes = new bytes[](0);
+            for (uint256 i = 0; i < 4; i++) {
+                calls[i] = InteropCallStarter({
+                    to: InteroperableAddress.formatEvmV1(interopTargetContract),
+                    data: hex"",
+                    callAttributes: callAttributes
+                });
+            }
+
+            vm.prank(sender);
+            l2InteropCenter.sendBundle{value: 0}(
+                InteroperableAddress.formatEvmV1(destinationChainId),
+                calls,
+                bundleAttributes
+            );
+        }
+
+        // Total: 2 + 4 = 6 calls
+        uint256 totalExpectedZKFee = zkFeePerCall * 6;
+        assertEq(
+            l2InteropCenter.accumulatedZKFees(coinbaseAddr),
+            totalExpectedZKFee,
+            "ZK fees should match exact call count"
+        );
+        assertEq(
+            zkToken.balanceOf(sender),
+            senderBalanceBefore - totalExpectedZKFee,
+            "Sender balance should decrease by exact fee amount"
+        );
+        assertEq(
+            zkToken.balanceOf(L2_INTEROP_CENTER_ADDR),
+            totalExpectedZKFee,
+            "InteropCenter should hold exact fee amount"
+        );
     }
 
     /// @notice Test multiple fee accumulations before claiming

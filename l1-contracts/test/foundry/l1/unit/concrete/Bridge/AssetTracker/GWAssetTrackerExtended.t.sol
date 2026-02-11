@@ -29,6 +29,7 @@ import {L2_TO_L1_LOGS_MERKLE_TREE_DEPTH, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH} from
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 import {DynamicIncrementalMerkleMemory} from "contracts/common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {GWAssetTrackerTestHelper} from "./GWAssetTracker.t.sol";
+import {ProcessLogsTestHelper} from "./ProcessLogsTestHelper.sol";
 
 contract GWAssetTrackerExtendedTest is Test {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
@@ -89,19 +90,9 @@ contract GWAssetTrackerExtendedTest is Test {
         );
     }
 
-    // Helper function to build proper merkle tree root
+    // Helper function to build proper merkle tree root (delegates to shared library)
     function _buildLogsMerkleRoot(L2Log[] memory logs) internal pure returns (bytes32) {
-        DynamicIncrementalMerkleMemory.Bytes32PushTree memory tree;
-        tree.createTree(L2_TO_L1_LOGS_MERKLE_TREE_DEPTH);
-        tree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
-
-        for (uint256 i = 0; i < logs.length; i++) {
-            bytes32 hashedLog = MessageHashing.getLeafHashFromLog(logs[i]);
-            tree.push(hashedLog);
-        }
-
-        tree.extendUntilEnd();
-        return tree.root();
+        return ProcessLogsTestHelper.buildLogsMerkleRoot(logs);
     }
 
     // Test onlyChain modifier - unauthorized case (line 78)

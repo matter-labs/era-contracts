@@ -160,6 +160,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         if (toml.keyExists("$.zk_token_asset_id")) {
             config.zkTokenAssetId = toml.readBytes32("$.zk_token_asset_id");
         }
+        require(config.zkTokenAssetId != bytes32(0), "zk_token_asset_id must be non-zero in config");
 
         (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesPath);
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);

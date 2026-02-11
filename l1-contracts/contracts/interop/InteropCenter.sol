@@ -163,6 +163,8 @@ contract InteropCenter is
     }
 
     function _initInteropCenter(uint256 _l1ChainId, address _owner, bytes32 _zkTokenAssetId) private {
+        require(_zkTokenAssetId != bytes32(0), ZKTokenNotAvailable());
+
         L1_CHAIN_ID = _l1ChainId;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
         ZK_TOKEN_ASSET_ID = _zkTokenAssetId;

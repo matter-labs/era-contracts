@@ -127,7 +127,7 @@ contract L2GenesisUpgradeTestHelper {
                     l2BridgedStandardERC20Impl: address(0),
                     aliasedChainRegistrationSender: address(1),
                     dangerousTestOnlyForcedBeacon: address(0),
-                    zkTokenAssetId: bytes32(0)
+                    zkTokenAssetId: keccak256("testZkTokenAssetId")
                 })
             );
     }
