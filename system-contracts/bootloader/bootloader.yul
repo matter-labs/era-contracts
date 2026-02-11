@@ -1768,7 +1768,7 @@ object "Bootloader" {
                 mstore(4, address)
                 let success := call(
                     gas(),
-                    KNOWN_CODES_CONTRACT_ADDR(),
+                    ACCOUNT_CODE_STORAGE_ADDR(),
                     0,
                     0,
                     36,
