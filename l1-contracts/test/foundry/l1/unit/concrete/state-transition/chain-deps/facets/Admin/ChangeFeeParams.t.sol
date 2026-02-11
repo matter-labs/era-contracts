@@ -155,6 +155,9 @@ contract ChangeFeeParamsTest is AdminTest {
     }
 
     function test_revertWhen_changeFeeParamsPriceIncreaseTooLarge() public {
+        // Price bounds are only enforced for stage1 chains (canBeActivated = true)
+        utilsFacet.util_setPriorityModeCanBeActivated(true);
+
         address chainTypeManager = utilsFacet.util_getChainTypeManager();
         FeeParams memory newFeeParams = FeeParams({
             pubdataPricingMode: PubdataPricingMode.Rollup,

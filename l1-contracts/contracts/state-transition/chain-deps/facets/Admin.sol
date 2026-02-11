@@ -126,19 +126,21 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert InvalidPubdataPricingMode();
         }
 
-        _enforcePriceChangeBound({
-            _oldFeeParams: oldFeeParams,
-            _newFeeParams: _newFeeParams,
-            _oldNominator: s.baseTokenGasPriceMultiplierNominator,
-            _oldDenominator: s.baseTokenGasPriceMultiplierDenominator,
-            _newNominator: s.baseTokenGasPriceMultiplierNominator,
-            _newDenominator: s.baseTokenGasPriceMultiplierDenominator
-        });
-
-        // When priority mode can be activated, capacity fields must not be changed at all.
-        // Reducing pubdata per tx/batch or gas per batch could restrict important transactions
-        // and undermine the safety guarantees of priority mode.
+        // When priority mode can be activated (stage1), enforce bounds on price and capacity fields.
+        // For non-stage1 chains, these bounds are not enforced.
         if (s.priorityModeInfo.canBeActivated) {
+            _enforcePriceChangeBound({
+                _oldFeeParams: oldFeeParams,
+                _newFeeParams: _newFeeParams,
+                _oldNominator: s.baseTokenGasPriceMultiplierNominator,
+                _oldDenominator: s.baseTokenGasPriceMultiplierDenominator,
+                _newNominator: s.baseTokenGasPriceMultiplierNominator,
+                _newDenominator: s.baseTokenGasPriceMultiplierDenominator
+            });
+
+            // Capacity fields must not be changed at all when priority mode can be activated.
+            // Reducing pubdata per tx/batch or gas per batch could restrict important transactions
+            // and undermine the safety guarantees of priority mode.
             require(
                 _newFeeParams.priorityTxMaxPubdata == oldFeeParams.priorityTxMaxPubdata,
                 NotCompatibleWithPriorityMode()
@@ -148,10 +150,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
                 NotCompatibleWithPriorityMode()
             );
             require(_newFeeParams.maxL2GasPerBatch == oldFeeParams.maxL2GasPerBatch, NotCompatibleWithPriorityMode());
-        } else {
-            _enforceFeeParamFieldChangeBound(oldFeeParams.priorityTxMaxPubdata, _newFeeParams.priorityTxMaxPubdata);
-            _enforceFeeParamFieldChangeBound(oldFeeParams.maxPubdataPerBatch, _newFeeParams.maxPubdataPerBatch);
-            _enforceFeeParamFieldChangeBound(oldFeeParams.maxL2GasPerBatch, _newFeeParams.maxL2GasPerBatch);
         }
 
         s.feeParams = _newFeeParams;
@@ -263,7 +261,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin onlyL1 {
+    function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdminOrChainTypeManager onlyL1 {
         if (s.priorityModeInfo.canBeActivated) {
             revert NotCompatibleWithPriorityMode();
         }
