@@ -22,6 +22,10 @@ pub struct BootloaderTestTracer {
     test_result: Arc<OnceCell<Result<(), String>>>,
     /// Set, if the currently running test should fail with a given assert.
     requested_assert: Arc<OnceCell<String>>,
+    /// Set, if the currently running test expects tx-level failure with concrete returndata.
+    requested_tx_failure: Arc<OnceCell<String>>,
+    /// Full returndata hex of the latest failed tx execution captured via VM hook.
+    tx_failure_data_hex: Arc<OnceCell<String>>,
 
     test_name: Arc<OnceCell<String>>,
 }
@@ -30,11 +34,15 @@ impl BootloaderTestTracer {
     pub fn new(
         test_result: Arc<OnceCell<Result<(), String>>>,
         requested_assert: Arc<OnceCell<String>>,
+        requested_tx_failure: Arc<OnceCell<String>>,
+        tx_failure_data_hex: Arc<OnceCell<String>>,
         test_name: Arc<OnceCell<String>>,
     ) -> Self {
         BootloaderTestTracer {
             test_result,
             requested_assert,
+            requested_tx_failure,
+            tx_failure_data_hex,
             test_name,
         }
     }
@@ -60,6 +68,20 @@ impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for BootloaderTestTracer {
         }
         if let TestVmHook::RequestedAssert(requested_assert) = &hook {
             let _ = self.requested_assert.set(requested_assert.clone());
+        }
+        if let TestVmHook::RequestedTxFailure(expected_revert_data) = &hook {
+            let _ = self.requested_tx_failure.set(expected_revert_data.clone());
+        }
+        if let TestVmHook::TxExecutionResult {
+            success,
+            revert_data_hex,
+        } = &hook
+        {
+            if !success {
+                if let Some(data_hex) = revert_data_hex {
+                    let _ = self.tx_failure_data_hex.set(data_hex.clone());
+                }
+            }
         }
 
         if let TestVmHook::TestStart(test_name) = &hook {

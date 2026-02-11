@@ -41,8 +41,8 @@ import {Call} from "contracts/governance/Common.sol";
 import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
-import {DefaultCTMUpgrade} from "../default_upgrade/DefaultCTMUpgrade.s.sol";
-import {UpgradeUtils} from "../default_upgrade/UpgradeUtils.sol";
+import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
+import {UpgradeUtils} from "../default-upgrade/UpgradeUtils.sol";
 import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
