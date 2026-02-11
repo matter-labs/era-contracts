@@ -265,5 +265,4 @@ abstract contract Create2FactoryUtils is Script {
             create2FactoryAddr = permanentValuesToml.readAddress("$.permanent_contracts.create2_factory_addr");
         }
     }
-
 }

@@ -8,7 +8,6 @@ import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {L2_GENESIS_UPGRADE_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IMessageRoot} from "../core/message-root/IMessageRoot.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
-import {IChainAssetHandler} from "../core/chain-asset-handler/IChainAssetHandler.sol";
 import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 import {IL2V31Upgrade} from "./IL2V31Upgrade.sol";
@@ -57,10 +56,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
         proposedUpgrade.l2ProtocolUpgradeTx.data = complexUpgraderCalldata;
         super.upgrade(proposedUpgrade);
-        IChainAssetHandler chainAssetHandler = IChainAssetHandler(bridgehub.chainAssetHandler());
         IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());
-
-        chainAssetHandler.setMigrationNumberForV31(s.chainId);
 
         if (s.settlementLayer == address(0)) {
             IL1MessageRoot(address(messageRoot)).saveV31UpgradeChainBatchNumber(s.chainId);

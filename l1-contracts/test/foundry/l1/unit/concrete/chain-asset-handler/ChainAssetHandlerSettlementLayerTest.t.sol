@@ -22,11 +22,7 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
 
     function setUp() public {
         // Mock bridgehub.messageRoot() so the chain asset handler can query it dynamically
-        vm.mockCall(
-            bridgehub,
-            abi.encodeWithSelector(IBridgehubBase.messageRoot.selector),
-            abi.encode(messageRoot)
-        );
+        vm.mockCall(bridgehub, abi.encodeWithSelector(IBridgehubBase.messageRoot.selector), abi.encode(messageRoot));
         // Mock the messageRoot ERA_GATEWAY_CHAIN_ID
         vm.mockCall(
             messageRoot,
@@ -35,11 +31,7 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
         );
 
         chainAssetHandler = new L1ChainAssetHandler(owner, bridgehub);
-        vm.mockCall(
-            bridgehub,
-            abi.encodeWithSelector(IBridgehubBase.assetRouter.selector),
-            abi.encode(address(0))
-        );
+        vm.mockCall(bridgehub, abi.encodeWithSelector(IBridgehubBase.assetRouter.selector), abi.encode(address(0)));
         vm.prank(owner);
         chainAssetHandler.setAddresses();
     }
@@ -251,7 +243,6 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
         // Batch 100 (well after return) should be on L1
         assertTrue(chainAssetHandler.isValidSettlementLayer(CHAIN_A, 100, block.chainid));
     }
-
 
     // add this to be excluded from coverage report
     function test() internal virtual {}

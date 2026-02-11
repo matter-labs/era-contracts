@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
-import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1, MAX_ALLOWED_NUMBER_OF_MIGRATIONS} from "../../common/Config.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {TxStatus} from "../../common/Messaging.sol";
 import {IBridgehubBase, BridgehubBurnCTMAssetData} from "../bridgehub/IBridgehubBase.sol";
@@ -81,10 +81,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         return storedAssetRouter;
     }
 
-    constructor(
-        address _owner,
-        address _bridgehub
-    ) reentrancyGuardInitializer {
+    constructor(address _owner, address _bridgehub) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGEHUB = IL1Bridgehub(_bridgehub);
         L1_CHAIN_ID = block.chainid;
@@ -181,10 +178,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
             _interval.settlementLayerChainId == legacyGwChainId,
             HistoricalSettlementLayerMismatch(legacyGwChainId, _interval.settlementLayerChainId)
         );
-        require(
-            _interval.migrateFromSLBatchNumber > _interval.migrateToSLBatchNumber,
-            MigrationIntervalInvalid()
-        );
+        require(_interval.migrateFromSLBatchNumber > _interval.migrateToSLBatchNumber, MigrationIntervalInvalid());
         _migrationInterval[_chainId][_migrationNumber] = _interval;
     }
 
@@ -281,5 +275,4 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         require(interval.isSet, MigrationIntervalNotSet());
         interval.migrateFromSLBatchNumber = _batchNumber;
     }
-
 }

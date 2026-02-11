@@ -128,39 +128,6 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         );
     }
 
-    function test_setMigrationNumberForV31_Success() public {
-        address eraChain = IBridgehubBase(ecosystemAddresses.bridgehub.proxies.bridgehub).getZKChain(eraZKChainId);
-
-        // Verify the chain address is valid
-        assertTrue(eraChain != address(0), "Era chain address should be valid");
-
-        // Get migration number before the call
-        uint256 migrationNumberBefore = IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler)
-            .migrationNumber(eraZKChainId);
-
-        // Call the function as the ZK chain
-        vm.prank(eraChain);
-        IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).setMigrationNumberForV31(
-            eraZKChainId
-        );
-
-        // Verify migration number was set (should be incremented or set to a specific value)
-        uint256 migrationNumberAfter = IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler)
-            .migrationNumber(eraZKChainId);
-        assertTrue(
-            migrationNumberAfter >= migrationNumberBefore,
-            "Migration number should be set after setMigrationNumberForV31"
-        );
-    }
-
-    function test_setMigrationNumberForV31_NotChain() public {
-        address eraChain = IBridgehubBase(ecosystemAddresses.bridgehub.proxies.bridgehub).getZKChain(eraZKChainId);
-        vm.expectRevert();
-        IChainAssetHandler(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).setMigrationNumberForV31(
-            eraZKChainId
-        );
-    }
-
     function test_pauseMigration_byOwner() public {
         address owner = Ownable2StepUpgradeable(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
             .owner();
@@ -383,7 +350,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
     function test_isValidSettlementLayer_noMigration() public {
         // Clear the mock so the real function is called
         vm.clearMockedCalls();
-        
+
         // No migration set for eraZKChainId → all batches should report L1
         bool result = _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 5, block.chainid);
         assertTrue(result, "Batch should be on L1 when no migration is set");

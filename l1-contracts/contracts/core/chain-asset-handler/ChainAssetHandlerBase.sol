@@ -18,8 +18,8 @@ import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol";
 
-import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../../common/Config.sol";
-import {IncorrectChainAssetId, IncorrectSender, MigrationNotToL1, MigrationNumberAlreadySet, MigrationNumberMismatch, NotSystemContext, OnlyChain, SLHasDifferentCTM, ZKChainNotRegistered, IteratedMigrationsNotSupported} from "../bridgehub/L1BridgehubErrors.sol";
+import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1, MAX_ALLOWED_NUMBER_OF_MIGRATIONS} from "../../common/Config.sol";
+import {IncorrectChainAssetId, IncorrectSender, MigrationNotToL1, MigrationNumberMismatch, NotSystemContext, OnlyChain, SLHasDifferentCTM, ZKChainNotRegistered, IteratedMigrationsNotSupported} from "../bridgehub/L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused, NotAssetRouter} from "../../common/L1ContractErrors.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
@@ -76,17 +76,11 @@ abstract contract ChainAssetHandlerBase is
     IAssetRouterBase internal DEPRECATED_ASSET_ROUTER;
 
     /// @notice Used to track the number of times each chain has migrated.
+    /// @dev It is assumed that during the release of the v31 ugprade all chains settle on L1,
+    /// so they will all start with `migrationNumber` equal to 0. Note, that ZKsync Era that used to settle on ZK Gateway
+    /// will also start with migration number equal to 0.
     /// NOTE: this mapping may be deprecated in the future, don't rely on it!
     mapping(uint256 chainId => uint256 migrationNumber) public migrationNumber;
-
-    /// @dev Migration number used when a chain migrates from L1 to a settlement layer.
-    uint256 internal constant MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER = 1;
-
-    /// @dev Migration number used when a chain returns from a settlement layer back to L1.
-    uint256 internal constant MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1 = 2;
-
-    /// @dev Iterated migrations are not supported; chain can migrate only to settlement layer and back once.
-    uint256 internal constant MAX_ALLOWED_NUMBER_OF_MIGRATIONS = 2;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
@@ -129,18 +123,6 @@ abstract contract ChainAssetHandlerBase is
             revert OnlyChain(msg.sender, IBridgehubBase(_bridgehub()).getZKChain(_chainId));
         }
         _;
-    }
-
-    /// @notice Sets the migration number for a chain on the Gateway when the chain's DiamondProxy upgrades.
-    function setMigrationNumberForV31(uint256 _chainId) external onlyChain(_chainId) {
-        require(migrationNumber[_chainId] == 0, MigrationNumberAlreadySet());
-        bool isOnThisSettlementLayer = block.chainid == IBridgehubBase(_bridgehub()).settlementLayer(_chainId);
-        bool shouldIncrementMigrationNumber = (isOnThisSettlementLayer && block.chainid != _l1ChainId()) ||
-            (!isOnThisSettlementLayer && block.chainid == _l1ChainId());
-        /// Note we don't increment the migration number if the chain migrated to GW and back to L1 previously.
-        if (shouldIncrementMigrationNumber) {
-            migrationNumber[_chainId] = MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER;
-        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -343,7 +325,11 @@ abstract contract ChainAssetHandlerBase is
             );
         }
         migrationNumber[bridgehubMintData.chainId] = bridgehubMintData.migrationNumber;
-        _recordMigrationFromSL(bridgehubMintData.chainId, bridgehubMintData.batchNumber, bridgehubMintData.migrationNumber);
+        _recordMigrationFromSL(
+            bridgehubMintData.chainId,
+            bridgehubMintData.batchNumber,
+            bridgehubMintData.migrationNumber
+        );
 
         (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeMint(
             _assetId,
@@ -375,7 +361,6 @@ abstract contract ChainAssetHandlerBase is
 
         emit MigrationFinalized(bridgehubMintData.chainId, _assetId, zkChain);
     }
-
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE

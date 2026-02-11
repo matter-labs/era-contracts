@@ -34,7 +34,7 @@ contract MailboxTest is UtilsCallMockerTest {
     address interopCenter;
     IEIP7702Checker eip7702Checker;
     L1ChainAssetHandler realChainAssetHandler;
-    
+
     function setupEcosystem() internal {
         sender = makeAddr("sender");
         bridgehub = makeAddr("bridgehub");

@@ -53,11 +53,7 @@ contract MailboxL2LogsProve is MailboxTest {
             abi.encodeCall(IBridgehubBase.messageRoot, ()),
             abi.encode(address(messageRoot))
         );
-        vm.mockCall(
-            address(bridgehub),
-            abi.encodeCall(IBridgehubBase.assetRouter, ()),
-            abi.encode(address(0))
-        );
+        vm.mockCall(address(bridgehub), abi.encodeCall(IBridgehubBase.assetRouter, ()), abi.encode(address(0)));
         realChainAssetHandler.setAddresses();
         vm.mockCall(
             address(bridgehub),

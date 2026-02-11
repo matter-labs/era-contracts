@@ -281,3 +281,12 @@ PubdataPricingMode constant DEFAULT_PUBDATA_PRICING_MODE = PubdataPricingMode.Ro
 
 /// @dev Default maximum gas limit for priority transactions during chain creation.
 uint64 constant DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
+
+/// @dev Migration number used when a chain migrates from L1 to a settlement layer.
+uint256 constant MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER = 1;
+
+/// @dev Migration number used when a chain returns from a settlement layer back to L1.
+uint256 constant MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1 = 2;
+
+/// @dev Iterated migrations are not supported; chain can migrate only to settlement layer and back once.
+uint256 constant MAX_ALLOWED_NUMBER_OF_MIGRATIONS = 2;
