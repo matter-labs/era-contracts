@@ -14,7 +14,7 @@ import {IInteropCenter} from "./IInteropCenter.sol";
 
 import {GW_ASSET_TRACKER, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
-import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_INTEROP_ATTRIBUTES} from "../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {BUNDLE_IDENTIFIER, BalanceChange, BundleAttributes, CallAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal} from "../common/Messaging.sol";
 import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
@@ -115,9 +115,7 @@ contract InteropCenter is
         _;
     }
 
-    /// @notice Returns ZK token address if available, zero address otherwise.
-    /// @dev View function to check ZK token availability without modifying state.
-    /// @return The ZK token address or zero address if not available.
+    /// @inheritdoc IInteropCenter
     function getZKTokenAddress() public view returns (address) {
         // Check cached token first
         if (address(zkToken) != address(0)) {
@@ -144,7 +142,7 @@ contract InteropCenter is
         return IERC20(tokenAddress);
     }
 
-    /// @notice Initializes the InteropCenter on a fresh genesis deployment.
+    /// @inheritdoc IInteropCenter
     function initL2(
         uint256 _l1ChainId,
         address _owner,
@@ -154,10 +152,7 @@ contract InteropCenter is
         _initInteropCenter(_l1ChainId, _owner, _zkTokenAssetId);
     }
 
-    /// @notice Initializes the InteropCenter during a non-genesis upgrade on an existing chain.
-    /// @dev Performs the same initialization as `initL2`. A separate method is provided for
-    ///      consistency with the initL2/updateL2 pattern used by other L2 system contracts
-    ///      and for maintainability, so that future upgrade-specific logic can be added here.
+    /// @inheritdoc IInteropCenter
     function updateL2(uint256 _l1ChainId, address _owner, bytes32 _zkTokenAssetId) public onlyUpgrader {
         _initInteropCenter(_l1ChainId, _owner, _zkTokenAssetId);
     }
@@ -186,7 +181,7 @@ contract InteropCenter is
         bytes calldata recipient,
         bytes calldata payload,
         bytes[] calldata attributes
-    ) public payable whenNotPaused returns (bytes32 sendId) {
+    ) external payable whenNotPaused returns (bytes32 sendId) {
         (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(recipient);
 
         _ensureL2ToL2(recipientChainId);
@@ -228,14 +223,7 @@ contract InteropCenter is
         sendId = keccak256(abi.encodePacked(bundleHash, uint256(0)));
     }
 
-    /// @notice Sends an interop bundle.
-    ///         Same as above, but more than one call can be given, and they are given in InteropCallStarter format.
-    /// @param _destinationChainId Chain ID to send to. It's an ERC-7930 address that MUST have an empty address field, and encodes an EVM destination chain ID.
-    /// @param _callStarters Array of call descriptors. The ERC-7930 address in each callStarter.to
-    ///                      MUST have an empty ChainReference field. We assume all of the calls should go to the _destinationChainId,
-    ///                      so specifying the chain ID in _callStarters is redundant.
-    /// @param _bundleAttributes Attributes of the bundle.
-    /// @return bundleHash Hash of the sent bundle.
+    /// @inheritdoc IInteropCenter
     function sendBundle(
         bytes calldata _destinationChainId,
         InteropCallStarter[] calldata _callStarters,
@@ -541,13 +529,7 @@ contract InteropCenter is
                             GW function
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Forwards a transaction from the gateway to a chain mailbox (from L1).
-    /// @dev Note, that `_canonicalTxHash` is provided by the chain and so should not be trusted to be unique,
-    /// while the rest of the fields are trusted to be populated correctly inside the `Mailbox` of the Gateway.
-    /// @param _chainId Target chain ID.
-    /// @param _canonicalTxHash Canonical L1 transaction hash.
-    /// @param _expirationTimestamp Expiration for gateway replay protection.
-    /// @param _balanceChange Balance change for the transaction.
+    /// @inheritdoc IInteropCenter
     function forwardTransactionOnGatewayWithBalanceChange(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
@@ -572,9 +554,7 @@ contract InteropCenter is
                             ERC 7786
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Parses the attributes of the call or bundle.
-    /// @param _attributes ERC-7786 Attributes of the call or bundle.
-    /// @param _restriction Restriction for parsing attributes.
+    /// @inheritdoc IInteropCenter
     function parseAttributes(
         bytes[] calldata _attributes,
         AttributeParsingRestrictions _restriction
@@ -661,7 +641,7 @@ contract InteropCenter is
     /// @return True if the attribute selector is supported, false otherwise.
     function supportsAttribute(
         bytes4 _attributeSelector
-    ) external pure override(IERC7786GatewaySource, IInteropCenter) returns (bool) {
+    ) external pure override returns (bool) {
         bytes4[5] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
         uint256 attributeSelectorsLength = ATTRIBUTE_SELECTORS.length;
         for (uint256 i = 0; i < attributeSelectorsLength; ++i) {
@@ -674,7 +654,7 @@ contract InteropCenter is
 
     /// @notice Returns the attribute selectors supported by the InteropCenter.
     /// @return The attribute selectors supported by the InteropCenter.
-    function _getERC7786AttributeSelectors() internal pure returns (bytes4[5] memory) {
+    function _getERC7786AttributeSelectors() internal pure returns (bytes4[SUPPORTED_INTEROP_ATTRIBUTES] memory) {
         return [
             IERC7786Attributes.interopCallValue.selector,
             IERC7786Attributes.indirectCall.selector,
@@ -688,12 +668,12 @@ contract InteropCenter is
                             PAUSE
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
+    /// @inheritdoc IInteropCenter
     function pause() external onlyOwner {
         _pause();
     }
 
-    /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
+    /// @inheritdoc IInteropCenter
     function unpause() external onlyOwner {
         _unpause();
     }
@@ -702,19 +682,14 @@ contract InteropCenter is
                             Fee Management
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Sets the base token fee per interop call (used when useFixedFee=false).
-    /// @dev Can be set to 0 to disable base token fees for users.
-    /// @param _fee New fee amount in base token wei.
-    /// @dev Only callable by the bootloader as a system transaction, operator-controlled.
+    /// @inheritdoc IInteropCenter
     function setInteropFee(uint256 _fee) external onlyCallFromBootloader {
         uint256 oldFee = interopProtocolFee;
         interopProtocolFee = _fee;
         emit InteropFeeUpdated(oldFee, _fee);
     }
 
-    /// @notice Allows a coinbase to claim their accumulated protocol fees (base token).
-    /// @dev Transfers all accumulated base token fees to the specified receiver.
-    /// @param _receiver Address to receive the fees.
+    /// @inheritdoc IInteropCenter
     function claimProtocolFees(address _receiver) external nonReentrant {
         uint256 amount = accumulatedProtocolFees[msg.sender];
         if (amount == 0) {
@@ -730,9 +705,7 @@ contract InteropCenter is
         emit ProtocolFeesClaimed(msg.sender, _receiver, amount);
     }
 
-    /// @notice Allows a coinbase to claim their accumulated ZK fees.
-    /// @dev Transfers all accumulated ZK token fees to the specified receiver.
-    /// @param _receiver Address to receive the fees.
+    /// @inheritdoc IInteropCenter
     function claimZKFees(address _receiver) external nonReentrant {
         uint256 amount = accumulatedZKFees[msg.sender];
         if (amount == 0) {

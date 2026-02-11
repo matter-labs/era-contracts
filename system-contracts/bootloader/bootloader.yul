@@ -3132,15 +3132,21 @@ object "Bootloader" {
                     debugLog("Failed to set new settlement layer chain id: ", currentSettlementLayerChainId)
 
                     /// During the upgrade the setting of the settlement layer chain will fail, as the system context is not yet upgraded.
-                    /// @dev To be removed after v31 upgrade.
-                    /// We want to check if the interop center is deployed or not, i.e. did we execute V31 upgrade.
-                    let codeSize := getCodeSize(L2_INTEROP_CENTER_ADDR())
-                    debugLog("InteropCenter codeSize", codeSize)
-                    /// Nothing is deployed at this address.
-                    let codeSize2 := getCodeSize(add(L2_INTEROP_ROOT_STORAGE(), 10))
-                    if iszero(eq(codeSize, codeSize2)) {
-                        revertWithReason(FAILED_TO_SET_NEW_SETTLEMENT_LAYER_CHAIN_ID_ERR_CODE(), 1)
-                    }
+                    revertIfPostV31Upgrade(FAILED_TO_SET_NEW_SETTLEMENT_LAYER_CHAIN_ID_ERR_CODE())
+                }
+            }
+
+            /// @notice Some of the functionality is supported only after v31 upgrade is complete.
+            /// @param errCode The error code to revert with if the interop center is deployed, i.e. we are post v31 upgrade.
+            /// @dev To be removed after v31 upgrade.
+            /// We want to check if the interop center is deployed or not, i.e. did we execute V31 upgrade and
+            /// only if true revert. 
+            function revertIfPostV31Upgrade(errCode) {
+                let codeSize := getCodeSize(L2_INTEROP_CENTER_ADDR())
+                debugLog("InteropCenter codeSize", codeSize)
+                
+                if iszero(iszero(codeSize)) {
+                    revertWithReason(errCode, 1)
                 }
             }
 
@@ -3372,15 +3378,7 @@ object "Bootloader" {
                     debugLog("Failed to set interop fee: ", fee)
 
                     /// During the upgrade the setting of the interop fee will fail, as the interop center is not yet upgraded.
-                    /// @dev To be removed after v31 upgrade.
-                    /// We want to check if the interop center is deployed or not, i.e. did we execute V31 upgrade.
-                    let codeSize := getCodeSize(L2_INTEROP_CENTER_ADDR())
-                    debugLog("InteropCenter codeSize", codeSize)
-                    /// Nothing is deployed at this address.
-                    let codeSize2 := getCodeSize(add(L2_INTEROP_ROOT_STORAGE(), 10))
-                    if iszero(eq(codeSize, codeSize2)) {
-                        revertWithReason(FAILED_TO_SET_NEW_SETTLEMENT_LAYER_CHAIN_ID_ERR_CODE(), 1)
-                    }
+                    revertIfPostV31Upgrade(FAILED_TO_SET_INTEROP_FEE())
                 }
             }
 

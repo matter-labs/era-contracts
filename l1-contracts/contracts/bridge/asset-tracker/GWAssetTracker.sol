@@ -29,12 +29,6 @@ import {IInteropHandler} from "../../interop/IInteropHandler.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-/// @dev IMPORTANT - Settlement Fee Payer Setup:
-///      To pay settlement fees for a chain, you must:
-///      1. Call `agreeToPaySettlementFees(chainId)` to opt-in for that specific chain
-///      2. Approve this contract to spend your wrapped ZK tokens
-///      The agreement mechanism prevents front-running attacks where malicious operators
-///      could make you pay for other chains' settlements.
 contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     using FullMerkleMemory for FullMerkleMemory.FullTree;
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
@@ -118,6 +112,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         _;
     }
 
+    /// @inheritdoc IGWAssetTracker
     function initL2(uint256 _l1ChainId, address _owner) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
 
@@ -131,18 +126,14 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         _transferOwnership(_owner);
     }
 
-    /// @notice Sets the gateway settlement fee per interop call.
-    /// @dev Only callable by owner.
-    /// @param _fee New fee amount in ZK tokens
+    /// @inheritdoc IGWAssetTracker
     function setGatewaySettlementFee(uint256 _fee) external onlyOwner {
         uint256 oldFee = gatewaySettlementFee;
         gatewaySettlementFee = _fee;
         emit GatewaySettlementFeeUpdated(oldFee, _fee);
     }
 
-    /// @notice Withdraws collected gateway fees to specified recipient
-    /// @dev Only callable by owner. Withdraws Wrapped ZK tokens collected as settlement fees.
-    /// @param _recipient Address to receive the collected fees
+    /// @inheritdoc IGWAssetTracker
     // vg todo. Only withdrawable by governance now. TBD by BD who has control over this.
     function withdrawGatewayFees(address _recipient) external onlyOwner {
         if (_recipient == address(0)) {
@@ -154,24 +145,19 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
     }
 
-    /// @notice Opt-in to pay settlement fees for a specific chain.
-    /// @dev The fee payer must also approve wrapped ZK tokens for this contract.
-    /// @param _chainId Chain ID to agree to pay fees for.
+    /// @inheritdoc IGWAssetTracker
     function agreeToPaySettlementFees(uint256 _chainId) external {
         settlementFeePayerAgreement[msg.sender][_chainId] = true;
         emit SettlementFeePayerAgreementUpdated(msg.sender, _chainId, true);
     }
 
-    /// @notice Revoke agreement to pay settlement fees for a specific chain.
-    /// @param _chainId Chain ID to revoke agreement for.
+    /// @inheritdoc IGWAssetTracker
     function revokeSettlementFeePayerAgreement(uint256 _chainId) external {
         settlementFeePayerAgreement[msg.sender][_chainId] = false;
         emit SettlementFeePayerAgreementUpdated(msg.sender, _chainId, false);
     }
 
-    /// @notice Sets legacy shared bridge addresses for chains that used the old bridging system.
-    /// @dev This function is called during upgrades to maintain backwards compatibility with pre-V31 chains.
-    /// @dev Legacy bridges are needed to process withdrawal messages from chains that haven't upgraded yet.
+    /// @inheritdoc IGWAssetTracker
     function setLegacySharedBridgeAddress() external onlyUpgrader {
         address l1AssetRouter = address(L2_ASSET_ROUTER.L1_ASSET_ROUTER());
         SharedBridgeOnChainId[] memory sharedBridgeOnChainIds = LegacySharedBridgeAddresses
@@ -181,14 +167,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             legacySharedBridgeAddress[sharedBridgeOnChainIds[i].chainId] = sharedBridgeOnChainIds[i]
                 .legacySharedBridgeAddress;
         }
-    }
-
-    /// @dev for local testing
-    function setLegacySharedBridgeAddressForLocalTesting(
-        uint256 _chainId,
-        address _legacySharedBridgeAddress
-    ) external onlyUpgrader {
-        legacySharedBridgeAddress[_chainId] = _legacySharedBridgeAddress;
     }
 
     function _l1ChainId() internal view returns (uint256) {
@@ -215,6 +193,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         revert RegisterNewTokenNotAllowed();
     }
 
+    /// @inheritdoc IGWAssetTracker
     function registerBaseTokenOnGateway(TokenBridgingData calldata _baseTokenBridgingData) external onlyBridgehub {
         _registerToken(
             _baseTokenBridgingData.assetId,
@@ -223,12 +202,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         );
     }
 
-    /// @notice The function that is expected to be called by the InteropCenter whenever an L1->L2
-    /// transaction gets relayed through ZK Gateway for chain `_chainId`.
-    /// @dev Note on trust assumptions: `_chainId` and `_balanceChange` are trusted to be correct, since
-    /// they are provided directly by the InteropCenter, which in turn, gets those from the L1 implementation of
-    /// the GW Mailbox.
-    /// @dev `_canonicalTxHash` is not trusted as it is provided at will by a malicious chain.
+    /// @inheritdoc IGWAssetTracker
     function handleChainBalanceIncreaseOnGateway(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
@@ -261,9 +235,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         balanceChange[_chainId][_canonicalTxHash] = _balanceChange;
     }
 
-    /// @notice Sets a legacy shared bridge address for a specific chain.
-    /// @param _chainId The chain ID for which to set the legacy bridge address.
-    /// @param _legacySharedBridgeAddress The address of the legacy shared bridge contract.
+    /// @inheritdoc IGWAssetTracker
     function setLegacySharedBridgeAddress(
         uint256 _chainId,
         address _legacySharedBridgeAddress
@@ -275,11 +247,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                     Chain settlement logs processing on Gateway
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Processes L2->Gateway logs and messages to update chain balances and handle cross-chain operations.
-    /// @dev This is the main function that processes a batch of L2 logs from a settling chain.
-    /// @dev It reconstructs the logs Merkle tree, validates messages, and routes them to appropriate handlers.
-    /// @dev The function handles multiple types of messages: interop, base token, asset router, and system messages.
-    /// @param _processLogsInputs The input containing logs, messages, and chain information to process.
+    /// @inheritdoc IGWAssetTracker
     function processLogsAndMessages(
         ProcessLogsInput calldata _processLogsInputs
     ) external onlyChain(_processLogsInputs.chainId) {
@@ -680,16 +648,14 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                     Gateway related token balance migration 
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice used to pause deposits on Gateway from L1 for migration back to L1.
+    /// @inheritdoc IGWAssetTracker
     function requestPauseDepositsForChain(uint256 _chainId) external onlyServiceTransactionSender {
         address zkChain = _bridgehub().getZKChain(_chainId);
         require(zkChain != address(0), ChainIdNotRegistered(_chainId));
         IMailboxImpl(zkChain).pauseDepositsOnGateway(block.timestamp);
     }
 
-    /// @notice Migrates the token balance from Gateway to L1.
-    /// @dev This function can be called multiple times on the Gateway as it saves the chainBalance on the first call.
-    /// @dev This function is permissionless.
+    /// @inheritdoc IGWAssetTracker
     function initiateGatewayToL1MigrationOnGateway(uint256 _chainId, bytes32 _assetId) external {
         address zkChain = L2_BRIDGEHUB.getZKChain(_chainId);
         require(zkChain != address(0), ChainIdNotRegistered(_chainId));
@@ -756,8 +722,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         return tokenSavedTotalSupply.amount;
     }
 
-    /// @notice Confirms a migration operation has been completed and updates the asset migration number.
-    /// @param _data The migration confirmation data containing chain ID, asset ID, and migration number.
+    /// @inheritdoc IGWAssetTracker
     function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _data) external onlyServiceTransactionSender {
         assetMigrationNumber[_data.chainId][_data.assetId] = _data.assetMigrationNumber;
         // Register the token if it wasn't already
@@ -807,23 +772,14 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
     }
 
-    /// @notice Parses interop call data to extract transfer information.
-    /// @param _callData The encoded call data containing transfer information.
-    /// @return fromChainId The chain ID from which the transfer originates.
-    /// @return assetId The asset ID of the token being transferred.
-    /// @return transferData The encoded transfer data.
+    /// @inheritdoc IGWAssetTracker
     function parseInteropCall(
         bytes calldata _callData
     ) external pure returns (uint256 fromChainId, bytes32 assetId, bytes memory transferData) {
         (fromChainId, assetId, transferData) = abi.decode(_callData[4:], (uint256, bytes32, bytes));
     }
 
-    /// @notice Parses token metadata from encoded token data.
-    /// @param _tokenData The encoded token metadata.
-    /// @return originChainId The chain ID where the token was originally created.
-    /// @return name The token name as encoded bytes.
-    /// @return symbol The token symbol as encoded bytes.
-    /// @return decimals The token decimals as encoded bytes.
+    /// @inheritdoc IGWAssetTracker
     function parseTokenData(
         bytes calldata _tokenData
     ) external pure returns (uint256 originChainId, bytes memory name, bytes memory symbol, bytes memory decimals) {
@@ -832,5 +788,17 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
         return L2_CHAIN_ASSET_HANDLER.migrationNumber(_chainId);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        Test-only Functions
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev For local testing only.
+    function setLegacySharedBridgeAddressForLocalTesting(
+        uint256 _chainId,
+        address _legacySharedBridgeAddress
+    ) external onlyUpgrader {
+        legacySharedBridgeAddress[_chainId] = _legacySharedBridgeAddress;
     }
 }

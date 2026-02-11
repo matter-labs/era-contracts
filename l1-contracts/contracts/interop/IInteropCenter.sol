@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-import {BalanceChange, InteropBundle, InteropCallStarter} from "../common/Messaging.sol";
+import {BalanceChange, BundleAttributes, CallAttributes, InteropBundle, InteropCallStarter} from "../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -70,6 +70,8 @@ interface IInteropCenter {
     function interopBundleNonce(address sender) external view returns (uint256);
 
     /// @notice Returns ZK token address if available, zero address otherwise.
+    /// @dev View function to check ZK token availability without modifying state.
+    /// @return The ZK token address or zero address if not available.
     function getZKTokenAddress() external view returns (address);
 
     /// @notice Returns the accumulated protocol fees (base token) for a coinbase.
@@ -83,6 +85,8 @@ interface IInteropCenter {
     function accumulatedZKFees(address coinbase) external view returns (uint256);
 
     /// @notice Sets the base token fee per interop call (used when useFixedFee=false).
+    /// @dev Can be set to 0 to disable base token fees for users.
+    /// @dev Only callable by the bootloader as a system transaction, operator-controlled.
     /// @param _fee New fee amount in base token wei.
     function setInteropFee(uint256 _fee) external;
 
@@ -96,23 +100,34 @@ interface IInteropCenter {
     /// @param _receiver Address to receive the fees.
     function claimZKFees(address _receiver) external;
 
-    /// @notice Checks if the attribute selector is supported by the InteropCenter.
-    /// @param _attributeSelector The attribute selector to check.
-    /// @return True if the attribute selector is supported, false otherwise.
-    function supportsAttribute(bytes4 _attributeSelector) external pure returns (bool);
-
     /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
     function pause() external;
 
-    /// @notice Unpauses the contract.
+    /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
     function unpause() external;
 
+    /// @notice Initializes the InteropCenter on a fresh genesis deployment.
+    /// @param _l1ChainId The chain ID of L1.
+    /// @param _owner The owner address.
+    /// @param _zkTokenAssetId The ZK token asset ID.
     function initL2(uint256 _l1ChainId, address _owner, bytes32 _zkTokenAssetId) external;
 
+    /// @notice Initializes the InteropCenter during a non-genesis upgrade on an existing chain.
+    /// @dev Performs the same initialization as `initL2`. A separate method is provided for
+    ///      consistency with the initL2/updateL2 pattern used by other L2 system contracts
+    ///      and for maintainability, so that future upgrade-specific logic can be added here.
+    /// @param _l1ChainId The chain ID of L1.
+    /// @param _owner The owner address.
+    /// @param _zkTokenAssetId The ZK token asset ID.
     function updateL2(uint256 _l1ChainId, address _owner, bytes32 _zkTokenAssetId) external;
 
-    /// Mailbox forwarder
-
+    /// @notice Forwards a transaction from the gateway to a chain mailbox (from L1).
+    /// @dev Note, that `_canonicalTxHash` is provided by the chain and so should not be trusted to be unique,
+    /// while the rest of the fields are trusted to be populated correctly inside the `Mailbox` of the Gateway.
+    /// @param _chainId Target chain ID.
+    /// @param _canonicalTxHash Canonical L1 transaction hash.
+    /// @param _expirationTimestamp Expiration for gateway replay protection.
+    /// @param _balanceChange Balance change for the transaction.
     function forwardTransactionOnGatewayWithBalanceChange(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
@@ -120,9 +135,24 @@ interface IInteropCenter {
         BalanceChange memory _balanceChange
     ) external;
 
+    /// @notice Sends an interop bundle.
+    /// @param _destinationChainId Chain ID to send to. It's an ERC-7930 address that MUST have an empty address field, and encodes an EVM destination chain ID.
+    /// @param _callStarters Array of call descriptors. The ERC-7930 address in each callStarter.to
+    ///                      MUST have an empty ChainReference field. We assume all of the calls should go to the _destinationChainId,
+    ///                      so specifying the chain ID in _callStarters is redundant.
+    /// @param _bundleAttributes Attributes of the bundle.
+    /// @return bundleHash Hash of the sent bundle.
     function sendBundle(
         bytes calldata _destinationChainId,
         InteropCallStarter[] calldata _callStarters,
         bytes[] calldata _bundleAttributes
-    ) external payable returns (bytes32);
+    ) external payable returns (bytes32 bundleHash);
+
+    /// @notice Parses the attributes of the call or bundle.
+    /// @param _attributes ERC-7786 Attributes of the call or bundle.
+    /// @param _restriction Restriction for parsing attributes.
+    function parseAttributes(
+        bytes[] calldata _attributes,
+        AttributeParsingRestrictions _restriction
+    ) external pure returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes);
 }

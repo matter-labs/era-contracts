@@ -8,6 +8,12 @@ import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecuto
 import {BalanceChange, TokenBalanceMigrationData, TokenBridgingData} from "../../common/Messaging.sol";
 
 /// @title IGWAssetTracker
+/// @dev IMPORTANT - Settlement Fee Payer Setup:
+///      To pay settlement fees for a chain, you must:
+///      1. Call `agreeToPaySettlementFees(chainId)` to opt-in for that specific chain
+///      2. Approve this contract to spend your wrapped ZK tokens
+///      The agreement mechanism prevents front-running attacks where malicious operators
+///      could make you pay for other chains' settlements.
 interface IGWAssetTracker {
     /// @notice Emitted when Gateway to L1 migration is initiated for an asset
     /// @param assetId The asset ID being migrated
@@ -68,23 +74,81 @@ interface IGWAssetTracker {
     /// @param _chainId Chain ID to revoke agreement for.
     function revokeSettlementFeePayerAgreement(uint256 _chainId) external;
 
+    /// @notice Initializes the GWAssetTracker on L2.
+    /// @param _l1ChainId The chain ID of L1.
+    /// @param _owner The owner address.
     function initL2(uint256 _l1ChainId, address _owner) external;
 
+    /// @notice Registers the base token of a chain on the gateway.
+    /// @param _baseTokenBridgingData The bridging data for the base token.
     function registerBaseTokenOnGateway(TokenBridgingData calldata _baseTokenBridgingData) external;
 
+    /// @notice The function that is expected to be called by the InteropCenter whenever an L1->L2
+    /// transaction gets relayed through ZK Gateway for chain `_chainId`.
+    /// @dev Note on trust assumptions: `_chainId` and `_balanceChange` are trusted to be correct, since
+    /// they are provided directly by the InteropCenter, which in turn, gets those from the L1 implementation of
+    /// the GW Mailbox.
+    /// @dev `_canonicalTxHash` is not trusted as it is provided at will by a malicious chain.
+    /// @param _chainId The chain ID of the target chain.
+    /// @param _canonicalTxHash The canonical transaction hash.
+    /// @param _balanceChange The balance change data for the transaction.
     function handleChainBalanceIncreaseOnGateway(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
         BalanceChange calldata _balanceChange
     ) external;
 
-    function processLogsAndMessages(ProcessLogsInput calldata) external;
+    /// @notice Processes L2->Gateway logs and messages to update chain balances and handle cross-chain operations.
+    /// @dev This is the main function that processes a batch of L2 logs from a settling chain.
+    /// @dev It reconstructs the logs Merkle tree, validates messages, and routes them to appropriate handlers.
+    /// @dev The function handles multiple types of messages: interop, base token, asset router, and system messages.
+    /// @param _processLogsInputs The input containing logs, messages, and chain information to process.
+    function processLogsAndMessages(ProcessLogsInput calldata _processLogsInputs) external;
 
+    /// @notice Migrates the token balance from Gateway to L1.
+    /// @dev This function can be called multiple times on the Gateway as it saves the chainBalance on the first call.
+    /// @dev This function is permissionless.
+    /// @param _chainId The chain ID whose token balance is being migrated.
+    /// @param _assetId The asset ID of the token being migrated.
     function initiateGatewayToL1MigrationOnGateway(uint256 _chainId, bytes32 _assetId) external;
 
+    /// @notice Confirms a migration operation has been completed and updates the asset migration number.
+    /// @param _tokenBalanceMigrationData The migration confirmation data containing chain ID, asset ID, and migration number.
     function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
 
+    /// @notice Sets a legacy shared bridge address for a specific chain.
+    /// @param _chainId The chain ID for which to set the legacy bridge address.
+    /// @param _legacySharedBridgeAddress The address of the legacy shared bridge contract.
     function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external;
 
+    /// @notice Used to pause deposits on Gateway from L1 for migration back to L1.
+    /// @param _chainId The chain ID for which to pause deposits.
     function requestPauseDepositsForChain(uint256 _chainId) external;
+
+    /// @notice Returns the L1 chain ID.
+    function L1_CHAIN_ID() external view returns (uint256);
+
+    /// @notice Sets legacy shared bridge addresses for chains that used the old bridging system.
+    /// @dev Called during upgrades to maintain backwards compatibility with pre-V31 chains.
+    /// @dev Legacy bridges are needed to process withdrawal messages from chains that haven't upgraded yet.
+    function setLegacySharedBridgeAddress() external;
+
+    /// @notice Parses interop call data to extract transfer information.
+    /// @param _callData The encoded call data containing transfer information.
+    /// @return fromChainId The chain ID from which the transfer originates.
+    /// @return assetId The asset ID of the token being transferred.
+    /// @return transferData The encoded transfer data.
+    function parseInteropCall(
+        bytes calldata _callData
+    ) external pure returns (uint256 fromChainId, bytes32 assetId, bytes memory transferData);
+
+    /// @notice Parses token metadata from encoded token data.
+    /// @param _tokenData The encoded token metadata.
+    /// @return originChainId The chain ID where the token was originally created.
+    /// @return name The token name as encoded bytes.
+    /// @return symbol The token symbol as encoded bytes.
+    /// @return decimals The token decimals as encoded bytes.
+    function parseTokenData(
+        bytes calldata _tokenData
+    ) external pure returns (uint256 originChainId, bytes memory name, bytes memory symbol, bytes memory decimals);
 }

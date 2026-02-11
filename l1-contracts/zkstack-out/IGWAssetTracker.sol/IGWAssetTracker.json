@@ -1,6 +1,19 @@
 [
   {
     "type": "function",
+    "name": "L1_CHAIN_ID",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "agreeToPaySettlementFees",
     "inputs": [
       {
@@ -183,10 +196,73 @@
   },
   {
     "type": "function",
+    "name": "parseInteropCall",
+    "inputs": [
+      {
+        "name": "_callData",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "fromChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "transferData",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "parseTokenData",
+    "inputs": [
+      {
+        "name": "_tokenData",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "originChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "name",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "symbol",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "decimals",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
     "name": "processLogsAndMessages",
     "inputs": [
       {
-        "name": "",
+        "name": "_processLogsInputs",
         "type": "tuple",
         "internalType": "struct ProcessLogsInput",
         "components": [
@@ -329,6 +405,13 @@
         "internalType": "uint256"
       }
     ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setLegacySharedBridgeAddress",
+    "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
