@@ -269,8 +269,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
     function test_setHistoricalMigrationInterval_success() public {
         uint256 gwChainId = _legacyGwChainId();
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 10,
-            migrateFromSLBatchNumber: 50,
+            migrateToGWBatchNumber: 10,
+            migrateFromGWBatchNumber: 50,
             settlementLayerChainId: gwChainId,
             isActive: false
         });
@@ -280,8 +280,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         // Verify the mapping was populated correctly
         MigrationInterval memory stored = _l1ChainAssetHandler().migrationInterval(eraZKChainId, 0);
-        assertEq(stored.migrateToSLBatchNumber, 10, "migrateToSLBatchNumber mismatch");
-        assertEq(stored.migrateFromSLBatchNumber, 50, "migrateFromSLBatchNumber mismatch");
+        assertEq(stored.migrateToGWBatchNumber, 10, "migrateToGWBatchNumber mismatch");
+        assertEq(stored.migrateFromGWBatchNumber, 50, "migrateFromGWBatchNumber mismatch");
         assertEq(stored.settlementLayerChainId, gwChainId, "settlementLayerChainId mismatch");
         assertFalse(stored.isActive, "historical interval should not be active");
     }
@@ -289,8 +289,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
     function test_setHistoricalMigrationInterval_revertMigrationNumberNotZero() public {
         uint256 gwChainId = _legacyGwChainId();
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 10,
-            migrateFromSLBatchNumber: 50,
+            migrateToGWBatchNumber: 10,
+            migrateFromGWBatchNumber: 50,
             settlementLayerChainId: gwChainId,
             isActive: false
         });
@@ -303,8 +303,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
     function test_setHistoricalMigrationInterval_revertNotSet() public {
         uint256 gwChainId = _legacyGwChainId();
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 10,
-            migrateFromSLBatchNumber: 50,
+            migrateToGWBatchNumber: 10,
+            migrateFromGWBatchNumber: 50,
             settlementLayerChainId: gwChainId,
             isActive: true
         });
@@ -318,8 +318,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         uint256 gwChainId = _legacyGwChainId();
         uint256 wrongSL = 9999;
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 10,
-            migrateFromSLBatchNumber: 50,
+            migrateToGWBatchNumber: 10,
+            migrateFromGWBatchNumber: 50,
             settlementLayerChainId: wrongSL,
             isActive: false
         });
@@ -332,8 +332,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
     function test_setHistoricalMigrationInterval_revertInvalidBatchNumbers() public {
         uint256 gwChainId = _legacyGwChainId();
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 50,
-            migrateFromSLBatchNumber: 30, // invalid: from must be > to
+            migrateToGWBatchNumber: 50,
+            migrateFromGWBatchNumber: 30, // invalid: from must be > to
             settlementLayerChainId: gwChainId,
             isActive: false
         });
@@ -372,8 +372,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         );
 
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 10,
-            migrateFromSLBatchNumber: 50,
+            migrateToGWBatchNumber: 10,
+            migrateFromGWBatchNumber: 50,
             settlementLayerChainId: gwChainId,
             isActive: false
         });
@@ -383,8 +383,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         // Verify the interval was stored correctly
         MigrationInterval memory stored = _l1ChainAssetHandler().migrationInterval(eraZKChainId, 0);
-        assertEq(stored.migrateToSLBatchNumber, 10, "migrateToSLBatchNumber mismatch");
-        assertEq(stored.migrateFromSLBatchNumber, 50, "migrateFromSLBatchNumber mismatch");
+        assertEq(stored.migrateToGWBatchNumber, 10, "migrateToGWBatchNumber mismatch");
+        assertEq(stored.migrateFromGWBatchNumber, 50, "migrateFromGWBatchNumber mismatch");
         assertEq(stored.settlementLayerChainId, gwChainId, "settlementLayerChainId mismatch");
         assertFalse(stored.isActive, "historical interval should not be active");
 

@@ -43,7 +43,7 @@ contract MailboxL2LogsProve is MailboxTest {
         setupDiamondProxy();
 
         // MessageRoot rejects batch zero proofs, so keep tests on a non-zero executed batch.
-        // Use batch 2 so that we can set migrateToSLBatchNumber=1 (must be >0).
+        // Use batch 2 so that we can set migrateToGWBatchNumber=1 (must be >0).
         utilsFacet.util_setTotalBatchesExecuted(2);
         batchNumber = gettersFacet.getTotalBatchesExecuted();
 
@@ -326,10 +326,10 @@ contract MailboxL2LogsProve is MailboxTest {
     function _setupSettlementForChain(uint256 _settlementLayerChainId) internal {
         // The main chain's batchNumber is 2 (set in setUp).
         // Place the migration boundary at batch 1 so batch 2 is inside the SL interval.
-        // Use a large migrateFromSLBatchNumber so all test batches fall within the interval.
+        // Use a large migrateFromGWBatchNumber so all test batches fall within the interval.
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: batchNumber - 1, // batch 1
-            migrateFromSLBatchNumber: 1000,
+            migrateToGWBatchNumber: batchNumber - 1, // batch 1
+            migrateFromGWBatchNumber: 1000,
             settlementLayerChainId: _settlementLayerChainId,
             isActive: false
         });
@@ -463,8 +463,8 @@ contract MailboxL2LogsProve is MailboxTest {
         // Our batchNumber is 1, which is BEFORE the migration.
         // The proof claims the batch is on the GW, but it should be on L1.
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 5,
-            migrateFromSLBatchNumber: 100,
+            migrateToGWBatchNumber: 5,
+            migrateFromGWBatchNumber: 100,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isActive: false
         });
@@ -483,7 +483,7 @@ contract MailboxL2LogsProve is MailboxTest {
             chainIdProof: bytes32Arr(2, bytes32(uint256(1)), bytes32(uint256(0)))
         });
 
-        // The proof claims GW as settlement layer, but batchNumber=2 <= migrateToSLBatchNumber=5,
+        // The proof claims GW as settlement layer, but batchNumber=2 <= migrateToGWBatchNumber=5,
         // so the batch was on L1. This should revert.
         address secondDiamondProxy = deployDiamondProxy();
 
@@ -532,8 +532,8 @@ contract MailboxL2LogsProve is MailboxTest {
         batchNumber = 10;
 
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 1,
-            migrateFromSLBatchNumber: 5,
+            migrateToGWBatchNumber: 1,
+            migrateFromGWBatchNumber: 5,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isActive: false
         });

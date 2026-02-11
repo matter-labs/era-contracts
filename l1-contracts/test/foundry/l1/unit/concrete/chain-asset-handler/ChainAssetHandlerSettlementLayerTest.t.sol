@@ -42,8 +42,8 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
 
     function test_setHistoricalMigrationInterval_success() public {
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 10,
-            migrateFromSLBatchNumber: 50,
+            migrateToGWBatchNumber: 10,
+            migrateFromGWBatchNumber: 50,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isActive: false
         });
@@ -52,16 +52,16 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
         chainAssetHandler.setHistoricalMigrationInterval(CHAIN_A, 0, interval);
 
         MigrationInterval memory stored = chainAssetHandler.migrationInterval(CHAIN_A, 0);
-        assertEq(stored.migrateToSLBatchNumber, 10);
-        assertEq(stored.migrateFromSLBatchNumber, 50);
+        assertEq(stored.migrateToGWBatchNumber, 10);
+        assertEq(stored.migrateFromGWBatchNumber, 50);
         assertEq(stored.settlementLayerChainId, LEGACY_GW_CHAIN_ID);
         assertFalse(stored.isActive);
     }
 
-    function test_setHistoricalMigrationInterval_revertMigrateFromSLBatchNumberZero() public {
+    function test_setHistoricalMigrationInterval_revertmigrateFromGWBatchNumberZero() public {
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 10,
-            migrateFromSLBatchNumber: 0, // invalid: from must be > to
+            migrateToGWBatchNumber: 10,
+            migrateFromGWBatchNumber: 0, // invalid: from must be > to
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isActive: false
         });
@@ -73,8 +73,8 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
 
     function test_setHistoricalMigrationInterval_revertNotOwner() public {
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 10,
-            migrateFromSLBatchNumber: 50,
+            migrateToGWBatchNumber: 10,
+            migrateFromGWBatchNumber: 50,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isActive: false
         });
@@ -86,8 +86,8 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
 
     function test_setHistoricalMigrationInterval_revertMigrationNumberNotZero() public {
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 10,
-            migrateFromSLBatchNumber: 50,
+            migrateToGWBatchNumber: 10,
+            migrateFromGWBatchNumber: 50,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isActive: false
         });
@@ -99,8 +99,8 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
 
     function test_setHistoricalMigrationInterval_revertNotSet() public {
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 10,
-            migrateFromSLBatchNumber: 50,
+            migrateToGWBatchNumber: 10,
+            migrateFromGWBatchNumber: 50,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isActive: true
         });
@@ -113,8 +113,8 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
     function test_setHistoricalMigrationInterval_revertWrongSettlementLayer() public {
         uint256 wrongSL = 999;
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 10,
-            migrateFromSLBatchNumber: 50,
+            migrateToGWBatchNumber: 10,
+            migrateFromGWBatchNumber: 50,
             settlementLayerChainId: wrongSL,
             isActive: false
         });
@@ -126,11 +126,11 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
         chainAssetHandler.setHistoricalMigrationInterval(CHAIN_A, 0, interval);
     }
 
-    function test_setHistoricalMigrationInterval_migrateToSLBatchNumberZero() public {
-        // migrateToSLBatchNumber == 0 is valid: the chain migrated before any batches were committed
+    function test_setHistoricalMigrationInterval_migrateToGWBatchNumberZero() public {
+        // migrateToGWBatchNumber == 0 is valid: the chain migrated before any batches were committed
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 0,
-            migrateFromSLBatchNumber: 50,
+            migrateToGWBatchNumber: 0,
+            migrateFromGWBatchNumber: 50,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isActive: false
         });
@@ -139,15 +139,15 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
         chainAssetHandler.setHistoricalMigrationInterval(CHAIN_A, 0, interval);
 
         MigrationInterval memory stored = chainAssetHandler.migrationInterval(CHAIN_A, 0);
-        assertEq(stored.migrateToSLBatchNumber, 0);
-        assertEq(stored.migrateFromSLBatchNumber, 50);
+        assertEq(stored.migrateToGWBatchNumber, 0);
+        assertEq(stored.migrateFromGWBatchNumber, 50);
         assertFalse(stored.isActive);
     }
 
-    function test_setHistoricalMigrationInterval_revertMigrateFromSLBatchNumberNotGreaterThanTo() public {
+    function test_setHistoricalMigrationInterval_revertmigrateFromGWBatchNumberNotGreaterThanTo() public {
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 50,
-            migrateFromSLBatchNumber: 30, // invalid: from < to
+            migrateToGWBatchNumber: 50,
+            migrateFromGWBatchNumber: 30, // invalid: from < to
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isActive: false
         });
@@ -157,10 +157,10 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
         chainAssetHandler.setHistoricalMigrationInterval(CHAIN_A, 0, interval);
     }
 
-    function test_setHistoricalMigrationInterval_revertMigrateFromSLBatchNumberEqualTo() public {
+    function test_setHistoricalMigrationInterval_revertmigrateFromGWBatchNumberEqualTo() public {
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 50,
-            migrateFromSLBatchNumber: 50, // invalid: from == to
+            migrateToGWBatchNumber: 50,
+            migrateFromGWBatchNumber: 50, // invalid: from == to
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isActive: false
         });
@@ -186,8 +186,8 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
     function test_isValidSettlementLayer_historicalMigrationBatchBeforeMigration() public {
         // Set up historical migration: chain was on GW from batch 10 to batch 50
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 10,
-            migrateFromSLBatchNumber: 50,
+            migrateToGWBatchNumber: 10,
+            migrateFromGWBatchNumber: 50,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isActive: false
         });
@@ -205,8 +205,8 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
 
     function test_isValidSettlementLayer_historicalMigrationBatchDuringMigration() public {
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 10,
-            migrateFromSLBatchNumber: 50,
+            migrateToGWBatchNumber: 10,
+            migrateFromGWBatchNumber: 50,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isActive: false
         });
@@ -228,8 +228,8 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
 
     function test_isValidSettlementLayer_historicalMigrationBatchAfterReturn() public {
         MigrationInterval memory interval = MigrationInterval({
-            migrateToSLBatchNumber: 10,
-            migrateFromSLBatchNumber: 50,
+            migrateToGWBatchNumber: 10,
+            migrateFromGWBatchNumber: 50,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isActive: false
         });

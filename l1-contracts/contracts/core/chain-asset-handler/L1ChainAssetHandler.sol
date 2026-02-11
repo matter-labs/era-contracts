@@ -138,7 +138,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
             );
             migrationNumber[chainId] = failedMigrationNum - 1;
             // Reset migration interval since the L1 -> SL migration failed.
-            // This prevents stale migrateToSLBatchNumber from affecting settlement layer validation.
+            // This prevents stale migrateToGWBatchNumber from affecting settlement layer validation.
             delete _migrationInterval[chainId][failedMigrationNum];
         }
 
@@ -178,7 +178,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
             _interval.settlementLayerChainId == legacyGwChainId,
             HistoricalSettlementLayerMismatch(legacyGwChainId, _interval.settlementLayerChainId)
         );
-        require(_interval.migrateFromSLBatchNumber > _interval.migrateToSLBatchNumber, MigrationIntervalInvalid());
+        require(_interval.migrateFromGWBatchNumber > _interval.migrateToGWBatchNumber, MigrationIntervalInvalid());
         _migrationInterval[_chainId][_migrationNumber] = _interval;
     }
 
@@ -210,17 +210,15 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
                 continue;
             }
 
-            // Check if this batch falls within the SL range of this interval
-            if (_batchNumber > interval.migrateToSLBatchNumber) {
-                // Batch is after migration to SL
-                if (interval.isActive || _batchNumber <= interval.migrateFromSLBatchNumber) {
-                    // Batch is in the SL range: (migrateToSL, migrateFromSL] or chain hasn't returned
-                    return _claimedSettlementLayer == interval.settlementLayerChainId;
-                }
-            } else {
+            if (_batchNumber <= interval.migrateToGWBatchNumber) {
                 // Batch is before migration to SL, so it was on L1 during this interval.
-                // If batch <= migrateToSLBatchNumber, it was on L1 before this migration.
                 return _claimedSettlementLayer == _l1ChainId();
+            }
+
+            // Batch is after migration to SL
+            if (interval.isActive || _batchNumber <= interval.migrateFromGWBatchNumber) {
+                // Batch is in the SL range: (migrateToSL, migrateFromSL] or chain hasn't returned
+                return _claimedSettlementLayer == interval.settlementLayerChainId;
             }
 
             // Batch is after migration back from SL, continue to check next interval
@@ -255,8 +253,8 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
             MigrationNumberMismatch(MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, _newMigrationNum)
         );
         _migrationInterval[_chainId][_newMigrationNum] = MigrationInterval({
-            migrateToSLBatchNumber: _batchNumber,
-            migrateFromSLBatchNumber: 0,
+            migrateToGWBatchNumber: _batchNumber,
+            migrateFromGWBatchNumber: 0,
             settlementLayerChainId: _settlementChainId,
             isActive: true
         });
@@ -273,7 +271,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         );
         MigrationInterval storage interval = _migrationInterval[_chainId][MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER];
         require(interval.isActive, MigrationIntervalNotSet());
-        interval.migrateFromSLBatchNumber = _batchNumber;
+        interval.migrateFromGWBatchNumber = _batchNumber;
         interval.isActive = false;
     }
 }

@@ -47,7 +47,6 @@ rollup_l1_da_validator_addr = "0x5Be9468566A91E9979Cc432a07998424B2f8c264"
 server_notifier_proxy_addr = "0x42CC2aA96D2F0D516A09c071DD27ABb975DB5048"
 transparent_proxy_admin = "0x284bc9851eB6677ee40bA48b93598D61EF5b8DE7"
 transparent_proxy_admin_addr = "0x284bc9851eB6677ee40bA48b93598D61EF5b8DE7"
-<<<<<<< HEAD
 upgrade_stage_validator = "0x9545068B0638508F297F249FB6675F90099b8C99"
 validator_timelock_addr = "0x3AB9Ba534C075573E20938464985e16Df0F7b780"
 validium_l1_da_validator_addr = "0x0000000000000000000000000000000000000000"
