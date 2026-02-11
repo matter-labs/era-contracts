@@ -190,6 +190,9 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
         vm.prank(governor);
         chainContractAddress.setProtocolVersionVerifier(oldProtocolVersion, testnetVerifier);
 
+        // Mock migration paused check
+        _mockMigrationPausedFromBridgehub();
+
         vm.prank(governor);
         vm.expectEmit(true, true, true, true);
         emit IChainTypeManager.NewProtocolVersion(0, newProtocolVersion);

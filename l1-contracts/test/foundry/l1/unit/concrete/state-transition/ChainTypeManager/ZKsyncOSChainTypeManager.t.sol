@@ -360,6 +360,9 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
 
         chainContractAddress = _deployChainTypeManager(chainCreationParams);
 
+        // Mock migration paused check
+        vm.mockCall(address(chainAssetHandler), abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
+
         Diamond.DiamondCutData memory cutData = getDiamondCutData(address(diamondInit));
         uint256 oldProtocolVersion = 0;
         uint256 oldProtocolVersionDeadline = block.timestamp + 100;

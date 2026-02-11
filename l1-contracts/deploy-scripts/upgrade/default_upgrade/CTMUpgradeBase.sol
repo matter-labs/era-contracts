@@ -207,7 +207,6 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     }
 
     function getProposedPatchUpgrade(
-        StateTransitionDeployedAddresses memory /* stateTransition */,
         uint256 newProtocolVersion
     ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
         proposedUpgrade = ProposedUpgrade({

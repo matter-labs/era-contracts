@@ -16,9 +16,10 @@ import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE} from "../common/Config.sol";
 import {AdminZero, InitialForceDeploymentMismatch, NotAPatchUpgrade, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
-import {ChainAlreadyLive, HashMismatch, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {ChainAlreadyLive, HashMismatch, MigrationsNotPaused, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
+import {IChainAssetHandler} from "../core/chain-asset-handler/IChainAssetHandler.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {L2CanonicalTransaction, TxStatus} from "../common/Messaging.sol";
@@ -317,14 +318,21 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
     /// @param _newProtocolVersion the new protocol version
     /// @param _verifier the verifier address for the new protocol version
-    /// @dev To be overridden in derived contracts for custom behavior
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion,
         address _verifier
-    ) external virtual;
+    ) external onlyOwner {
+        _setNewVersionUpgrade({
+            _cutData: _cutData,
+            _oldProtocolVersion: _oldProtocolVersion,
+            _oldProtocolVersionDeadline: _oldProtocolVersionDeadline,
+            _newProtocolVersion: _newProtocolVersion,
+            _verifier: _verifier
+        });
+    }
 
     /// @notice Creates a patch upgrade for verifier-only upgrades (no facet changes)
     /// @dev This function creates a DiamondCutData with empty facet cuts but with an upgrade contract.
@@ -341,7 +349,12 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         address _verifier,
         address _upgradeContract
     ) external onlyOwner {
-        // Validate this is a patch upgrade (major and minor versions must be the same)
+        if (_upgradeContract == address(0)) {
+            revert ZeroAddress();
+        }
+        // Validate this is a patch upgrade (major and minor versions must be the same).
+        // Note: Non-sequential patch jumps are allowed (e.g., 0.25.1 -> 0.25.4) to support
+        // skipping intermediate patch versions when needed.
         {
             (uint32 oldMajor, uint32 oldMinor, uint32 oldPatch) = SemVer.unpackSemVer(
                 SafeCast.toUint96(_oldProtocolVersion)
@@ -422,6 +435,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         uint256 _newProtocolVersion,
         address _verifier
     ) internal {
+        // Migrations must be paused before setting new version upgrades
+        if (!IChainAssetHandler(IL1Bridgehub(BRIDGE_HUB).chainAssetHandler()).migrationPaused()) {
+            revert MigrationsNotPaused();
+        }
         uint256 previousProtocolVersion = protocolVersion;
         _setProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
         _setProtocolVersionDeadline(_newProtocolVersion, type(uint256).max);
