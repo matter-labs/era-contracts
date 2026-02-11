@@ -97,6 +97,6 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
             revert Unauthorized(msg.sender);
         }
 
-        balance[L2_BASE_TOKEN_HOLDER_ADDR] = INITIAL_BASE_TOKEN_HOLDER_BALANCE - __DEPRECATED_totalSupply;
+        balance[L2_BASE_TOKEN_HOLDER_ADDR] = INITIAL_BASE_TOKEN_HOLDER_BALANCE - __DEPRECATED_totalSupply + balance[L2_BASE_TOKEN_HOLDER_ADDR];
     }
 }
