@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "contracts/core/message-root/IMessageRoot.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -27,7 +28,15 @@ contract L1MessageRootV31UpgradeTest is Test {
             abi.encode(allZKChainChainIDs)
         );
 
-        messageRoot = new L1MessageRoot(bridgeHub, 1);
+        messageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(bridgeHub, 1)),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
+        );
     }
 
     function test_L1_CHAIN_ID() public view {
@@ -152,7 +161,15 @@ contract L1MessageRootV31UpgradeTest is Test {
             abi.encode(block.chainid)
         );
 
-        L1MessageRoot newMessageRoot = new L1MessageRoot(newBridgehub, 1);
+        L1MessageRoot newMessageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(newBridgehub, 1)),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
+                )
+            )
+        );
 
         // Verify the placeholder was set
         assertEq(
@@ -199,7 +216,15 @@ contract L1MessageRootV31UpgradeTest is Test {
             abi.encode(block.chainid)
         );
 
-        L1MessageRoot newMessageRoot = new L1MessageRoot(newBridgehub, 1);
+        L1MessageRoot newMessageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(newBridgehub, 1)),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
+                )
+            )
+        );
 
         // Setup zkChain mock
         address zkChain = makeAddr("zkChain");
@@ -250,7 +275,15 @@ contract L1MessageRootV31UpgradeTest is Test {
             abi.encode(block.chainid)
         );
 
-        L1MessageRoot newMessageRoot = new L1MessageRoot(newBridgehub, 1);
+        L1MessageRoot newMessageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(newBridgehub, 1)),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
+                )
+            )
+        );
 
         // Both chains should have placeholder value
         assertEq(
