@@ -129,5 +129,9 @@ COPY --from=build /contracts/lib /contracts/lib
 COPY --from=build /contracts/AllContractsHashes.json /contracts/AllContractsHashes.json
 COPY --from=build /contracts/SystemConfig.json /contracts/SystemConfig.json
 
+# Disable foundry-zksync telemetry prompt
+RUN mkdir -p /root/.config/zksync-tooling && \
+    echo '{"enabled":false}' > /root/.config/zksync-tooling/telemetry.json
+
 # Sanity
 RUN forge --version && cast --version && anvil --version && protocol_ops_cli --help
