@@ -76,7 +76,7 @@ abstract contract ChainAssetHandlerBase is
     IAssetRouterBase internal DEPRECATED_ASSET_ROUTER;
 
     /// @notice Used to track the number of times each chain has migrated.
-    /// @dev It is assumed that during the release of the v31 ugprade all chains settle on L1,
+    /// @dev It is assumed that during the release of the v31 upgrade all chains settle on L1,
     /// so they will all start with `migrationNumber` equal to 0. Note, that ZKsync Era that used to settle on ZK Gateway
     /// will also start with migration number equal to 0.
     /// NOTE: this mapping may be deprecated in the future, don't rely on it!

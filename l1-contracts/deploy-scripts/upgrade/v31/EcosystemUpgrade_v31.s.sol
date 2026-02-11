@@ -24,7 +24,7 @@ import {CTMUpgrade_v31} from "./CTMUpgrade_v31.s.sol";
 import {GatewayUpgrade_v31} from "./GatewayUpgrade_v31.s.sol";
 
 /// @notice Script used for v31 ecosystem upgrade flow (core + CTM)
-/// TODO: IMPORTANTthis script should also contain the following steps:
+/// TODO: IMPORTANT this script should also contain the following steps:
 /// - Initialize the previous Gateway migrations via `L1ChainAssetHandler.setHistoricalMigrationInterval`.
 /// - Remove the whitelisted settlement layer status from the Era based ZK Gateway `L1Bridgehub.registerSettlementLayer`.
 /// - Need to set the initial interop settlement fee on ZK Gateway.
