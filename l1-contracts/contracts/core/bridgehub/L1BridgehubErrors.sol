@@ -38,8 +38,6 @@ error MigrationIntervalInvalid();
 error MigrationIntervalNotSet();
 // 0x4010a88d
 error MigrationNotToL1();
-// 0x12b08c62
-error MigrationNumberAlreadySet();
 // 0xde1362a2
 error MigrationNumberMismatch(uint256 _expected, uint256 _actual);
 // 0x7f4316f3
@@ -64,8 +62,6 @@ error NotOwnerViaRouter(address msgSender, address originalCaller);
 error NotRelayedSender(address msgSender, address settlementLayerRelaySender);
 // 0xb35a7373
 error NotSystemContext(address _sender);
-// 0xb30ebfd8
-error NotWhitelistedSettlementLayer(uint256 chainId);
 // 0x3db511f4
 error OnlyAssetTracker(address, address);
 // 0x527b87c7
