@@ -95,7 +95,6 @@ getters_facet_addr = "0xFd507585BeE701365c393BC8aa2eA03D2Cdde24D"
 mailbox_facet_addr = "0x2785C25456952FE9aF0B1CA793B5879Dc3D905D0"
 state_transition_proxy_addr = "0xb2eA609686d0c1773F0D1aE7480e1eeaEb30f01a"
 validator_timelock_addr = "0x62Db289447F202b1558Ed09E1c316C9d45F2EA8B"
->>>>>>> @{-1}
 validator_timelock_implementation_addr = "0x0000000000000000000000000000000000000000"
 verifier_addr = "0xbFA6563AA6123CE2aa7A12C43F1dde6037903552"
 verifier_fflonk_addr = "0xb3f1E53f1DAa70dC824eB9CDC52dd2542726444b"
