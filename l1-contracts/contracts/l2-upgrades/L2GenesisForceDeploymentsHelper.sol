@@ -243,6 +243,7 @@ library L2GenesisForceDeploymentsHelper {
             _isGenesisUpgrade: _isGenesisUpgrade,
             _isZKsyncOS: _isZKsyncOS
         });
+        // solhint-disable-next-line func-named-parameters
         _finalizeDeployments(
             _ctmDeployer,
             expectedUpgradeType,
