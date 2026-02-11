@@ -412,6 +412,8 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             initCalldata: upgradeCalldata
         });
 
+        newChainCreationParamsBlock[protocolVersion] = newChainCreationParamsBlock[_oldProtocolVersion];
+
         _setNewVersionUpgrade({
             _cutData: diamondCut,
             _oldProtocolVersion: _oldProtocolVersion,
