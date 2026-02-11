@@ -33,6 +33,10 @@ contract DefaultChainUpgrade is Script {
     address currentChainAdmin;
     ChainConfig config;
 
+    function getChainConfig() public view returns (ChainConfig memory) {
+        return config;
+    }
+
     function prepareChain(uint256 chainId, string memory permanentValuesInputPath) public {
         string memory root = vm.projectRoot();
         permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
