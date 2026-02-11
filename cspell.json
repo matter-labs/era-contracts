@@ -1,0 +1,20 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "zksync",
+    "Ksync",
+    "Bridgehub",
+    "bridgehub",
+    "keccak",
+    "multicall",
+    "Multicall",
+    "Timelock",
+    "Pubdata",
+    "pubdata",
+    "chainid",
+    "Rollup",
+    "solhint"
+  ],
+  "ignorePaths": ["node_modules/**", "**/node_modules/**"]
+}

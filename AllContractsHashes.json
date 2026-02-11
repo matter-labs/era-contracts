@@ -291,7 +291,7 @@
   },
   {
     "contractName": "system-contracts/Merkle",
-    "zkBytecodeHash": "0x010000076af10f40521bece3c3f54b8a5d7cbd821b0736eb24a49e51d507108c",
+    "zkBytecodeHash": "0x01000007379ddea58978efdc212d22f47fa34b2e76da3b47ac0efee1e4a09ee1",
     "zkBytecodePath": "/system-contracts/zkout/Merkle.sol/Merkle.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
