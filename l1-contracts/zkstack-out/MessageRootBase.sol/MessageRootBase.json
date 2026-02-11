@@ -894,27 +894,6 @@
   },
   {
     "type": "error",
-    "name": "InvalidSettlementLayerForBatch",
-    "inputs": [
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "batchNumber",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "claimedSettlementLayer",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "MerkleIndexOutOfBounds",
     "inputs": []
   },
@@ -981,17 +960,6 @@
       },
       {
         "name": "batchNumber",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "NotWhitelistedSettlementLayer",
-    "inputs": [
-      {
-        "name": "chainId",
         "type": "uint256",
         "internalType": "uint256"
       }
