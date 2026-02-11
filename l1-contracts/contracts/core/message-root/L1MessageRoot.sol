@@ -16,7 +16,7 @@ contract L1MessageRoot is MessageRootBase {
     address public immutable BRIDGE_HUB;
 
     /// @notice The chain id of the Gateway chain.
-    uint256 public immutable override ERA_GATEWAY_CHAIN_ID;
+    uint256 public immutable ERA_GATEWAY_CHAIN_ID;
 
     /// @notice The mapping storing the batch number at the moment the chain was updated to V31.
     /// Starting from this batch, if a settlement layer has agreed to a proof, it will be held accountable for the content of the message, e.g.
