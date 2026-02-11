@@ -18,7 +18,7 @@ import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {ZKTokenNotAvailable, FeeWithdrawalFailed, UseFixedFeeRequired} from "contracts/interop/InteropErrors.sol";
+import {ZKTokenNotAvailable, FeeWithdrawalFailed} from "contracts/interop/InteropErrors.sol";
 import {L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_BRIDGEHUB_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
@@ -775,15 +775,23 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    useFixedFee Required Revert Tests
+                    useFixedFee Default Behavior Tests
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Test that sendBundle reverts when useFixedFee attribute is missing
-    function test_sendBundle_revertsWhenUseFixedFeeMissing() public {
+    /// @notice Test that sendBundle succeeds when useFixedFee attribute is missing (defaults to false = base token fees)
+    function test_sendBundle_succeedsWhenUseFixedFeeMissing() public {
         _setupGatewayMode();
+
+        // Set a protocol fee to verify base token fee path is taken
+        uint256 protocolFee = 0.01 ether;
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        l2InteropCenter.setInteropFee(protocolFee);
 
         address sender = makeAddr("sender");
         vm.deal(sender, 10 ether);
+
+        address coinbaseAddr = makeAddr("coinbase");
+        vm.coinbase(coinbaseAddr);
 
         // Build bundle attributes WITHOUT useFixedFee (only unbundler)
         bytes[] memory bundleAttributes = new bytes[](1);
@@ -794,17 +802,29 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
         InteropCallStarter[] memory calls = _buildSimpleCall();
 
+        // Should succeed with base token fee (useFixedFee defaults to false)
         vm.prank(sender);
-        vm.expectRevert(UseFixedFeeRequired.selector);
-        l2InteropCenter.sendBundle{value: 0}(
+        l2InteropCenter.sendBundle{value: protocolFee}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
             bundleAttributes
         );
+
+        // Verify base token fees were collected (not ZK fees)
+        assertEq(
+            l2InteropCenter.accumulatedProtocolFees(coinbaseAddr),
+            protocolFee,
+            "Protocol fees should be accumulated when useFixedFee defaults to false"
+        );
+        assertEq(
+            l2InteropCenter.accumulatedZKFees(coinbaseAddr),
+            0,
+            "ZK fees should be zero when useFixedFee defaults to false"
+        );
     }
 
-    /// @notice Test that sendMessage reverts when useFixedFee attribute is missing
-    function test_sendMessage_revertsWhenUseFixedFeeMissing() public {
+    /// @notice Test that sendMessage succeeds when useFixedFee attribute is missing (defaults to false = base token fees)
+    function test_sendMessage_succeedsWhenUseFixedFeeMissing() public {
         _setupGatewayMode();
 
         address sender = makeAddr("sender");
@@ -816,8 +836,8 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         // Build attributes WITHOUT useFixedFee (empty attributes)
         bytes[] memory attributes = new bytes[](0);
 
+        // Should succeed (useFixedFee defaults to false)
         vm.prank(sender);
-        vm.expectRevert(UseFixedFeeRequired.selector);
         l2InteropCenter.sendMessage{value: 0}(recipient, payload, attributes);
     }
 

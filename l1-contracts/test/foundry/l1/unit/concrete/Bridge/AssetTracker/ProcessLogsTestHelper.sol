@@ -38,14 +38,15 @@ library ProcessLogsTestHelper {
         uint16 _txNumberInBatch,
         bytes memory _message
     ) internal pure returns (L2Log memory) {
-        return L2Log({
-            l2ShardId: 0,
-            isService: true,
-            txNumberInBatch: _txNumberInBatch,
-            sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            key: bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR))),
-            value: keccak256(_message)
-        });
+        return
+            L2Log({
+                l2ShardId: 0,
+                isService: true,
+                txNumberInBatch: _txNumberInBatch,
+                sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+                key: bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR))),
+                value: keccak256(_message)
+            });
     }
 
     /// @notice Creates a minimal InteropBundle with the given number of simple calls.
@@ -80,11 +81,7 @@ library ProcessLogsTestHelper {
             destinationChainId: _destinationChainId,
             interopBundleSalt: _salt,
             calls: calls,
-            bundleAttributes: BundleAttributes({
-                executionAddress: "",
-                unbundlerAddress: "",
-                useFixedFee: false
-            })
+            bundleAttributes: BundleAttributes({executionAddress: "", unbundlerAddress: "", useFixedFee: false})
         });
     }
 
@@ -113,14 +110,15 @@ library ProcessLogsTestHelper {
         bytes32 logsRoot = buildLogsMerkleRoot(_logs);
         bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
 
-        return ProcessLogsInput({
-            chainId: _chainId,
-            batchNumber: _batchNumber,
-            logs: _logs,
-            messages: _messages,
-            chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot,
-            settlementFeePayer: _settlementFeePayer
-        });
+        return
+            ProcessLogsInput({
+                chainId: _chainId,
+                batchNumber: _batchNumber,
+                logs: _logs,
+                messages: _messages,
+                chainBatchRoot: chainBatchRoot,
+                messageRoot: emptyMessageRoot,
+                settlementFeePayer: _settlementFeePayer
+            });
     }
 }

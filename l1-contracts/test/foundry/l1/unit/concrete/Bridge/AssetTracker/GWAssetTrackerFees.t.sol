@@ -136,14 +136,8 @@ contract GWAssetTrackerFeesTest is Test {
             messages[i] = message;
         }
 
-        return ProcessLogsTestHelper.buildProcessLogsInput(
-            gwAssetTracker,
-            CHAIN_ID,
-            _batchNumber,
-            logs,
-            messages,
-            _payer
-        );
+        return
+            ProcessLogsTestHelper.buildProcessLogsInput(gwAssetTracker, CHAIN_ID, _batchNumber, logs, messages, _payer);
     }
 
     /// @notice Builds input and executes processLogsAndMessages with interop bundles.

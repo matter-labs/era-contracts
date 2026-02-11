@@ -20,7 +20,7 @@ import {BUNDLE_IDENTIFIER, BalanceChange, BundleAttributes, CallAttributes, INTE
 import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
-import {AttributeAlreadySet, AttributeViolatesRestriction, DestinationChainNotRegistered, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty, UseFixedFeeRequired, FeeWithdrawalFailed, ZKTokenNotAvailable} from "./InteropErrors.sol";
+import {AttributeAlreadySet, AttributeViolatesRestriction, DestinationChainNotRegistered, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty, FeeWithdrawalFailed, ZKTokenNotAvailable} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
@@ -624,24 +624,12 @@ contract InteropCenter is
                 revert IERC7786GatewaySource.UnsupportedAttribute(selector);
             }
         }
-
-        // Enforce useFixedFee attribute as required for all interop calls. This ensures that interop fee is being paid in one way or another.
-        // Only enforce this requirement when parsing bundle attributes.
-        if (
-            !attributeUsed[4] &&
-            (_restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
-                _restriction == AttributeParsingRestrictions.CallAndBundleAttributes)
-        ) {
-            revert UseFixedFeeRequired();
-        }
     }
 
     /// @notice Checks if the attribute selector is supported by the InteropCenter.
     /// @param _attributeSelector The attribute selector to check.
     /// @return True if the attribute selector is supported, false otherwise.
-    function supportsAttribute(
-        bytes4 _attributeSelector
-    ) external pure override returns (bool) {
+    function supportsAttribute(bytes4 _attributeSelector) external pure override returns (bool) {
         bytes4[5] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
         uint256 attributeSelectorsLength = ATTRIBUTE_SELECTORS.length;
         for (uint256 i = 0; i < attributeSelectorsLength; ++i) {

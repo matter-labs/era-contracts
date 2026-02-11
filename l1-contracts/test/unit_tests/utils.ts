@@ -524,10 +524,7 @@ export async function makeExecutedEqualCommitted(
 
   const dummyMerkleProofs = batchesToExecute.map(() => ({ leftPath: [], rightPath: [], itemHashes: [] }));
   await (
-    await proxyExecutor.executeBatchesSharedBridge(
-      0,
-      ...encodeExecuteBatchesData(batchesToExecute, dummyMerkleProofs)
-    )
+    await proxyExecutor.executeBatchesSharedBridge(0, ...encodeExecuteBatchesData(batchesToExecute, dummyMerkleProofs))
   ).wait();
 }
 
@@ -588,7 +585,15 @@ export function encodeExecuteBatchesData(
       "bytes32[]",
       "address",
     ],
-    [batchesData, priorityOpsBatchInfo, emptyInteropRoots, emptyLogs, emptyMessages, emptyMessageRoots, settlementFeePayer]
+    [
+      batchesData,
+      priorityOpsBatchInfo,
+      emptyInteropRoots,
+      emptyLogs,
+      emptyMessages,
+      emptyMessageRoots,
+      settlementFeePayer,
+    ]
   );
   const executeData = hexConcat(["0x01", encodedExecuteDataWithoutVersion]);
   return [batchesData[0].batchNumber, batchesData[batchesData.length - 1].batchNumber, executeData];
