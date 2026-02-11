@@ -84,7 +84,6 @@ contract V31AcrossRecoveryForkTest is Test {
         // 5. Verify: the aliased admin can upgrade the proxy to the zkEVM recovery implementation.
         address aliasedAdmin = AddressAliasHelper.applyL1ToL2Alias(admin);
         vm.prank(aliasedAdmin);
-        // FIXME: it fails due to immutables not being set up correctly in the new implementation
-        // spokePool.upgradeTo(info.zkevmRecoveryImplementation);
+        spokePool.upgradeTo(info.zkevmRecoveryImplementation);
     }
 }

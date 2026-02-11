@@ -13,6 +13,17 @@ struct AcrossInfo {
     address evmImplementation;
     /// @notice The address of the Across ZKsync Era recovery implementation contract.
     address zkevmRecoveryImplementation;
+    /// @notice The constructor calldata for the ZKsync Era recovery implementation.
+    LensSpokePoolConstructorParams zkevmRecoveryImplConstructorParams;
+}
+
+struct LensSpokePoolConstructorParams {
+    address _wrappedNativeTokenAddress;
+    address _circleUSDC;
+    address _zkUSDCBridge;
+    address _cctpTokenMessenger;
+    uint32 _depositQuoteTimeBuffer;
+    uint32 _fillDeadlineBuffer;
 }
 
 /// @dev The L2 chain id of the Lens network where the Across proxy is deployed.
@@ -34,7 +45,15 @@ abstract contract V31AcrossRecovery {
             info = AcrossInfo({
                 proxy: 0xe7cb3e167e7475dE1331Cf6E0CEb187654619E12,
                 evmImplementation: 0xc7772Ce23a3ED7F87fE51b87617C7C7d21f15d39,
-                zkevmRecoveryImplementation: 0x11c9d12cC96Ae9B1fb30eb5D2D2a6F85656917e5
+                zkevmRecoveryImplementation: 0x11c9d12cC96Ae9B1fb30eb5D2D2a6F85656917e5,
+                zkevmRecoveryImplConstructorParams: LensSpokePoolConstructorParams({
+                    _wrappedNativeTokenAddress: address(0x6bDc36E20D267Ff0dd6097799f82e78907105e2F),
+                    _circleUSDC: address(0x88F08E304EC4f90D644Cec3Fb69b8aD414acf884),
+                    _zkUSDCBridge: address(0x7188B6975EeC82ae914b6eC7AC32b3c9a18b2c81),
+                    _cctpTokenMessenger: address(0x0000000000000000000000000000000000000000),
+                    _depositQuoteTimeBuffer: uint32(3600),
+                    _fillDeadlineBuffer: uint32(21600)
+                })
             });
         }
         // Default: all fields are zero.
@@ -59,9 +78,16 @@ abstract contract V31AcrossRecovery {
         deployments[0] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: recoveryBytecodeHash,
             newAddress: info.evmImplementation,
-            callConstructor: false,
+            callConstructor: true,
             value: 0,
-            input: hex""
+            input: abi.encode(
+                info.zkevmRecoveryImplConstructorParams._wrappedNativeTokenAddress,
+                info.zkevmRecoveryImplConstructorParams._circleUSDC,
+                info.zkevmRecoveryImplConstructorParams._zkUSDCBridge,
+                info.zkevmRecoveryImplConstructorParams._cctpTokenMessenger,
+                info.zkevmRecoveryImplConstructorParams._depositQuoteTimeBuffer,
+                info.zkevmRecoveryImplConstructorParams._fillDeadlineBuffer
+            )
         });
 
         IL2ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(deployments);

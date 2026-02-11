@@ -7,7 +7,7 @@ import {Utils} from "deploy-scripts/utils/Utils.sol";
 import {SystemContractsCaller} from "contracts/common/l2-helpers/SystemContractsCaller.sol";
 import {L2_ACCOUNT_CODE_STORAGE_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2ContractDeployer, AllowedBytecodeTypes} from "contracts/common/interfaces/IL2ContractDeployer.sol";
-import {AcrossInfo, V31AcrossRecovery} from "contracts/l2-upgrades/V31AcrossRecovery.sol";
+import {AcrossInfo, LensSpokePoolConstructorParams, V31AcrossRecovery} from "contracts/l2-upgrades/V31AcrossRecovery.sol";
 import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
 import {MockUUPSImplementation} from "contracts/dev-contracts/test/MockUUPSImplementation.sol";
 import {Proxy} from "@openzeppelin/contracts-v4/proxy/Proxy.sol";
@@ -72,7 +72,19 @@ contract TestAcrossRecoveryUpgrade is V31AcrossRecovery {
 
     function getAcrossInfo() internal view override returns (AcrossInfo memory) {
         return
-            AcrossInfo({proxy: _proxy, evmImplementation: _evmImpl, zkevmRecoveryImplementation: _zkevmRecoveryImpl});
+            AcrossInfo({
+                proxy: _proxy,
+                evmImplementation: _evmImpl,
+                zkevmRecoveryImplementation: _zkevmRecoveryImpl,
+                zkevmRecoveryImplConstructorParams: LensSpokePoolConstructorParams({
+                    _wrappedNativeTokenAddress: address(0),
+                    _circleUSDC: address(0),
+                    _zkUSDCBridge: address(0),
+                    _cctpTokenMessenger: address(0),
+                    _depositQuoteTimeBuffer: 0,
+                    _fillDeadlineBuffer: 0
+                })
+            });
     }
 }
 
@@ -137,7 +149,15 @@ contract V31AcrossRecoveryUnitTest is Test {
             AcrossInfo({
                 proxy: proxy,
                 evmImplementation: brokenImplementation,
-                zkevmRecoveryImplementation: correctImplementation
+                zkevmRecoveryImplementation: correctImplementation,
+                zkevmRecoveryImplConstructorParams: LensSpokePoolConstructorParams({
+                    _wrappedNativeTokenAddress: address(0),
+                    _circleUSDC: address(0),
+                    _zkUSDCBridge: address(0),
+                    _cctpTokenMessenger: address(0),
+                    _depositQuoteTimeBuffer: 0,
+                    _fillDeadlineBuffer: 0
+                })
             })
         );
     }
