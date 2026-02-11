@@ -35,7 +35,7 @@ import {InteropHandler} from "../../../../../contracts/interop/InteropHandler.so
 import {DummyL2L1Messenger} from "../../../../../contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 
 import {DummyL2StandardTriggerAccount} from "../../../../../contracts/dev-contracts/test/DummyL2StandardTriggerAccount.sol";
-import {DummyL2BaseTokenSystemContract} from "../../../../../contracts/dev-contracts/test/DummyBaseTokenSystemContract.sol";
+import {DummyBaseTokenSystemContract} from "../../../../../contracts/dev-contracts/test/DummyBaseTokenSystemContract.sol";
 import {DummyL2BaseTokenHolder} from "../../../../../contracts/dev-contracts/test/DummyL2BaseTokenHolder.sol";
 import {DummyL2InteropAccount} from "../../../../../contracts/dev-contracts/test/DummyL2InteropAccount.sol";
 
@@ -143,7 +143,7 @@ library L2UtilsBase {
         }
 
         {
-            address l2DummyBaseTokenSystemContract = address(new DummyL2BaseTokenSystemContract());
+            address l2DummyBaseTokenSystemContract = address(new DummyBaseTokenSystemContract());
             vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, l2DummyBaseTokenSystemContract.code);
 
             // Deploy DummyL2BaseTokenHolder at the reserved address
