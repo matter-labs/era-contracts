@@ -211,7 +211,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             adminAddr,
             accessControlRestriction,
             chainAddress,
-            abi.encodeCall(IAdmin.upgradeChainFromVersion, (currentProtocolVersion, diamondCut)),
+            abi.encodeCall(IAdmin.upgradeChainFromVersion, (chainAddress, currentProtocolVersion, diamondCut)),
             0
         );
 
