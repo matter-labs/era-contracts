@@ -272,7 +272,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
             migrateToSLBatchNumber: 10,
             migrateFromSLBatchNumber: 50,
             settlementLayerChainId: gwChainId,
-            isSet: true
+            isActive: false
         });
 
         vm.prank(_owner());
@@ -283,7 +283,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         assertEq(stored.migrateToSLBatchNumber, 10, "migrateToSLBatchNumber mismatch");
         assertEq(stored.migrateFromSLBatchNumber, 50, "migrateFromSLBatchNumber mismatch");
         assertEq(stored.settlementLayerChainId, gwChainId, "settlementLayerChainId mismatch");
-        assertTrue(stored.isSet, "interval should be set");
+        assertFalse(stored.isActive, "historical interval should not be active");
     }
 
     function test_setHistoricalMigrationInterval_revertMigrationNumberNotZero() public {
@@ -292,7 +292,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
             migrateToSLBatchNumber: 10,
             migrateFromSLBatchNumber: 50,
             settlementLayerChainId: gwChainId,
-            isSet: true
+            isActive: false
         });
 
         vm.prank(_owner());
@@ -306,7 +306,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
             migrateToSLBatchNumber: 10,
             migrateFromSLBatchNumber: 50,
             settlementLayerChainId: gwChainId,
-            isSet: false
+            isActive: true
         });
 
         vm.prank(_owner());
@@ -321,7 +321,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
             migrateToSLBatchNumber: 10,
             migrateFromSLBatchNumber: 50,
             settlementLayerChainId: wrongSL,
-            isSet: true
+            isActive: false
         });
 
         vm.prank(_owner());
@@ -335,7 +335,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
             migrateToSLBatchNumber: 50,
             migrateFromSLBatchNumber: 30, // invalid: from must be > to
             settlementLayerChainId: gwChainId,
-            isSet: true
+            isActive: false
         });
 
         vm.prank(_owner());
@@ -375,7 +375,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
             migrateToSLBatchNumber: 10,
             migrateFromSLBatchNumber: 50,
             settlementLayerChainId: gwChainId,
-            isSet: true
+            isActive: false
         });
 
         vm.prank(_owner());
@@ -386,7 +386,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         assertEq(stored.migrateToSLBatchNumber, 10, "migrateToSLBatchNumber mismatch");
         assertEq(stored.migrateFromSLBatchNumber, 50, "migrateFromSLBatchNumber mismatch");
         assertEq(stored.settlementLayerChainId, gwChainId, "settlementLayerChainId mismatch");
-        assertTrue(stored.isSet, "interval should be set");
+        assertFalse(stored.isActive, "historical interval should not be active");
 
         // Batch before migration (batch 5 <= migrateToSL=10) -> on L1
         assertTrue(

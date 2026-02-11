@@ -46,11 +46,11 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     /// @dev The message root contract. Set via `setAddresses` after deployment because
     /// L1MessageRoot is deployed after L1ChainAssetHandler (so that L1MessageRoot can store
     /// the chain asset handler address as an immutable).
-    IMessageRoot internal storedMessageRoot;
+    IMessageRoot internal messageRoot;
 
     /// @dev The asset router contract. Set via `setAddresses` after deployment because
     /// L1AssetRouter is deployed after L1ChainAssetHandler.
-    IAssetRouterBase internal storedAssetRouter;
+    IAssetRouterBase internal assetRouter;
 
     /*//////////////////////////////////////////////////////////////
                         GETTERS
@@ -64,21 +64,21 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     }
 
     function _messageRoot() internal view override returns (IMessageRoot) {
-        return storedMessageRoot;
+        return messageRoot;
     }
 
     // solhint-disable-next-line func-name-mixedcase
     function MESSAGE_ROOT() public view override returns (IMessageRoot) {
-        return storedMessageRoot;
+        return messageRoot;
     }
 
     // solhint-disable-next-line func-name-mixedcase
     function ASSET_ROUTER() public view override returns (IAssetRouterBase) {
-        return storedAssetRouter;
+        return assetRouter;
     }
 
     function _assetRouter() internal view override returns (IAssetRouterBase) {
-        return storedAssetRouter;
+        return assetRouter;
     }
 
     constructor(address _owner, address _bridgehub) reentrancyGuardInitializer {
@@ -98,8 +98,8 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     /// @notice Sets the addresses of the message root and asset router by querying the bridgehub.
     /// @dev Called after deployment once the dependent contracts are registered on the bridgehub.
     function setAddresses() external onlyOwner {
-        storedMessageRoot = BRIDGEHUB.messageRoot();
-        storedAssetRouter = BRIDGEHUB.assetRouter();
+        messageRoot = BRIDGEHUB.messageRoot();
+        assetRouter = BRIDGEHUB.assetRouter();
     }
 
     /// @dev IL1AssetHandler interface, used to undo a failed migration of a chain.
@@ -172,7 +172,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         MigrationInterval calldata _interval
     ) external onlyOwner {
         require(_migrationNumber == 0, MigrationNumberMismatch(0, _migrationNumber));
-        require(_interval.isSet, MigrationIntervalNotSet());
+        require(!_interval.isActive, MigrationIntervalNotSet());
         uint256 legacyGwChainId = IMessageRoot(_messageRoot()).ERA_GATEWAY_CHAIN_ID();
         require(
             _interval.settlementLayerChainId == legacyGwChainId,
@@ -205,15 +205,15 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         for (uint256 i = 0; i <= currentMigrationNum; ++i) {
             MigrationInterval memory interval = _migrationInterval[_chainId][i];
 
-            // Skip intervals that haven't been set
-            if (!interval.isSet) {
+            // Skip uninitialized intervals
+            if (interval.settlementLayerChainId == 0) {
                 continue;
             }
 
             // Check if this batch falls within the SL range of this interval
             if (_batchNumber > interval.migrateToSLBatchNumber) {
                 // Batch is after migration to SL
-                if (interval.migrateFromSLBatchNumber == 0 || _batchNumber <= interval.migrateFromSLBatchNumber) {
+                if (interval.isActive || _batchNumber <= interval.migrateFromSLBatchNumber) {
                     // Batch is in the SL range: (migrateToSL, migrateFromSL] or chain hasn't returned
                     return _claimedSettlementLayer == interval.settlementLayerChainId;
                 }
@@ -258,7 +258,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
             migrateToSLBatchNumber: _batchNumber,
             migrateFromSLBatchNumber: 0,
             settlementLayerChainId: _settlementChainId,
-            isSet: true
+            isActive: true
         });
     }
 
@@ -272,7 +272,8 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
             MigrationNumberMismatch(MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1, _newMigrationNum)
         );
         MigrationInterval storage interval = _migrationInterval[_chainId][MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER];
-        require(interval.isSet, MigrationIntervalNotSet());
+        require(interval.isActive, MigrationIntervalNotSet());
         interval.migrateFromSLBatchNumber = _batchNumber;
+        interval.isActive = false;
     }
 }

@@ -331,7 +331,7 @@ contract MailboxL2LogsProve is MailboxTest {
             migrateToSLBatchNumber: batchNumber - 1, // batch 1
             migrateFromSLBatchNumber: 1000,
             settlementLayerChainId: _settlementLayerChainId,
-            isSet: true
+            isActive: false
         });
         // setHistoricalMigrationInterval only accepts migration number 0 and the legacy GW chain ID.
         // We use LEGACY_GW_CHAIN_ID as the settlement layer to match this constraint.
@@ -466,7 +466,7 @@ contract MailboxL2LogsProve is MailboxTest {
             migrateToSLBatchNumber: 5,
             migrateFromSLBatchNumber: 100,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
-            isSet: true
+            isActive: false
         });
         realChainAssetHandler.setHistoricalMigrationInterval(gettersFacet.getChainId(), 0, interval);
 
@@ -535,7 +535,7 @@ contract MailboxL2LogsProve is MailboxTest {
             migrateToSLBatchNumber: 1,
             migrateFromSLBatchNumber: 5,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
-            isSet: true
+            isActive: false
         });
         realChainAssetHandler.setHistoricalMigrationInterval(gettersFacet.getChainId(), 0, interval);
 

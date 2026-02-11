@@ -28,6 +28,7 @@ import {GatewayUpgrade_v31} from "./GatewayUpgrade_v31.s.sol";
 /// - Initialize the previous Gateway migrations via `L1ChainAssetHandler.setHistoricalMigrationInterval`.
 /// - Remove the whitelisted settlement layer status from the Era based ZK Gateway `L1Bridgehub.registerSettlementLayer`.
 /// - Need to set the initial interop settlement fee on ZK Gateway.
+/// - Call "L1ChainAssetHandler.setAddresses()"
 contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
     using stdToml for string;
 

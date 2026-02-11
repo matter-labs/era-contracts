@@ -8,12 +8,12 @@ import {IAssetHandler} from "../../bridge/interfaces/IAssetHandler.sol";
 /// @param migrateToSLBatchNumber The last batch executed on L1 before migrating TO the settlement layer.
 /// @param migrateFromSLBatchNumber The last batch executed on SL before migrating back to L1.
 /// @param settlementLayerChainId The chain ID of the settlement layer where migration happened.
-/// @param isSet Whether this migration interval has been set (to distinguish from uninitialized state).
+/// @param isActive Whether the chain is actively settling on the settlement layer right now.
 struct MigrationInterval {
     uint256 migrateToSLBatchNumber;
     uint256 migrateFromSLBatchNumber;
     uint256 settlementLayerChainId;
-    bool isSet;
+    bool isActive;
 }
 
 /// @author Matter Labs

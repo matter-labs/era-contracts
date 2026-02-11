@@ -45,7 +45,7 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
             migrateToSLBatchNumber: 10,
             migrateFromSLBatchNumber: 50,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
-            isSet: true
+            isActive: false
         });
 
         vm.prank(owner);
@@ -55,7 +55,7 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
         assertEq(stored.migrateToSLBatchNumber, 10);
         assertEq(stored.migrateFromSLBatchNumber, 50);
         assertEq(stored.settlementLayerChainId, LEGACY_GW_CHAIN_ID);
-        assertTrue(stored.isSet);
+        assertFalse(stored.isActive);
     }
 
     function test_setHistoricalMigrationInterval_revertMigrateFromSLBatchNumberZero() public {
@@ -63,7 +63,7 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
             migrateToSLBatchNumber: 10,
             migrateFromSLBatchNumber: 0, // invalid: from must be > to
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
-            isSet: true
+            isActive: false
         });
 
         vm.prank(owner);
@@ -76,7 +76,7 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
             migrateToSLBatchNumber: 10,
             migrateFromSLBatchNumber: 50,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
-            isSet: true
+            isActive: false
         });
 
         vm.expectRevert();
@@ -89,7 +89,7 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
             migrateToSLBatchNumber: 10,
             migrateFromSLBatchNumber: 50,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
-            isSet: true
+            isActive: false
         });
 
         vm.prank(owner);
@@ -102,7 +102,7 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
             migrateToSLBatchNumber: 10,
             migrateFromSLBatchNumber: 50,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
-            isSet: false
+            isActive: true
         });
 
         vm.prank(owner);
@@ -116,7 +116,7 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
             migrateToSLBatchNumber: 10,
             migrateFromSLBatchNumber: 50,
             settlementLayerChainId: wrongSL,
-            isSet: true
+            isActive: false
         });
 
         vm.prank(owner);
@@ -132,7 +132,7 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
             migrateToSLBatchNumber: 0,
             migrateFromSLBatchNumber: 50,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
-            isSet: true
+            isActive: false
         });
 
         vm.prank(owner);
@@ -141,7 +141,7 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
         MigrationInterval memory stored = chainAssetHandler.migrationInterval(CHAIN_A, 0);
         assertEq(stored.migrateToSLBatchNumber, 0);
         assertEq(stored.migrateFromSLBatchNumber, 50);
-        assertTrue(stored.isSet);
+        assertFalse(stored.isActive);
     }
 
     function test_setHistoricalMigrationInterval_revertMigrateFromSLBatchNumberNotGreaterThanTo() public {
@@ -149,7 +149,7 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
             migrateToSLBatchNumber: 50,
             migrateFromSLBatchNumber: 30, // invalid: from < to
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
-            isSet: true
+            isActive: false
         });
 
         vm.prank(owner);
@@ -162,7 +162,7 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
             migrateToSLBatchNumber: 50,
             migrateFromSLBatchNumber: 50, // invalid: from == to
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
-            isSet: true
+            isActive: false
         });
 
         vm.prank(owner);
@@ -189,7 +189,7 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
             migrateToSLBatchNumber: 10,
             migrateFromSLBatchNumber: 50,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
-            isSet: true
+            isActive: false
         });
         vm.prank(owner);
         chainAssetHandler.setHistoricalMigrationInterval(CHAIN_A, 0, interval);
@@ -208,7 +208,7 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
             migrateToSLBatchNumber: 10,
             migrateFromSLBatchNumber: 50,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
-            isSet: true
+            isActive: false
         });
         vm.prank(owner);
         chainAssetHandler.setHistoricalMigrationInterval(CHAIN_A, 0, interval);
@@ -231,7 +231,7 @@ contract ChainAssetHandlerSettlementLayerTest is Test {
             migrateToSLBatchNumber: 10,
             migrateFromSLBatchNumber: 50,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
-            isSet: true
+            isActive: false
         });
         vm.prank(owner);
         chainAssetHandler.setHistoricalMigrationInterval(CHAIN_A, 0, interval);
