@@ -17,6 +17,10 @@ struct Facets {
     address executorFacet;
     /// @notice Address of the Getters facet contract.
     address gettersFacet;
+    /// @notice Address of the Migrator facet contract.
+    address migratorFacet;
+    /// @notice Address of the Committer facet contract.
+    address committerFacet;
     /// @notice Address of the DiamondInit contract.
     address diamondInit;
 }
@@ -45,6 +49,10 @@ struct GatewayCTMDeployerConfig {
     bytes4[] mailboxSelectors;
     /// @notice Array of function selectors for the Getters facet.
     bytes4[] gettersSelectors;
+    /// @notice Array of function selectors for the Migrator facet.
+    bytes4[] migratorSelectors;
+    /// @notice Array of function selectors for the Committer facet.
+    bytes4[] committerSelectors;
     /// @notice Hash of the bootloader bytecode.
     bytes32 bootloaderHash;
     /// @notice Hash of the default account bytecode.

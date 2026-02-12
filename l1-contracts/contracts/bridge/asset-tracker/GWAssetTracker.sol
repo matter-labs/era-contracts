@@ -22,6 +22,7 @@ import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IMailboxImpl} from "../../state-transition/chain-interfaces/IMailboxImpl.sol";
+import {IMigrator} from "../../state-transition/chain-interfaces/IMigrator.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {LegacySharedBridgeAddresses, SharedBridgeOnChainId} from "./LegacySharedBridgeAddresses.sol";
 import {InteropDataEncoding} from "../../interop/InteropDataEncoding.sol";
@@ -652,7 +653,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function requestPauseDepositsForChain(uint256 _chainId) external onlyServiceTransactionSender {
         address zkChain = _bridgehub().getZKChain(_chainId);
         require(zkChain != address(0), ChainIdNotRegistered(_chainId));
-        IMailboxImpl(zkChain).pauseDepositsOnGateway(block.timestamp);
+        IMigrator(zkChain).pauseDepositsOnGateway(block.timestamp);
     }
 
     /// @inheritdoc IGWAssetTracker

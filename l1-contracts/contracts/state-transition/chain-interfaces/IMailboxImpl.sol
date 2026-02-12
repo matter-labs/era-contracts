@@ -104,7 +104,7 @@ interface IMailboxImpl is IZKChainBase {
 
     /// @notice The chain's mailbox receives the tx from the Bridgehub on Gateway.
     /// @param _canonicalTxHash the canonical transaction hash.
-    /// @param _expirationTimestamp the expiration timestamp for the transaction.
+    /// @param _expirationTimestamp Deprecated, always 0.
     function bridgehubRequestL2TransactionOnGateway(bytes32 _canonicalTxHash, uint64 _expirationTimestamp) external;
 
     /// @notice Request execution of service L2 transaction from L1.
@@ -116,15 +116,12 @@ interface IMailboxImpl is IZKChainBase {
         bytes calldata _l2Calldata
     ) external returns (bytes32 canonicalTxHash);
 
-    /// @notice Pauses deposits on Gateway, needed as migration is only allowed with this timestamp.
-    function pauseDepositsOnGateway(uint256 _timestamp) external;
-
     /// @dev On L1 we have to forward to the Gateway's mailbox which sends to the Bridgehub on the Gateway.
     /// @dev Note that this function is callable by any chain, including potentially malicious ones, so all inputs
     /// need to be validated (or ensured that their validation will happen on L2).
     /// @param _chainId the chainId of the chain.
     /// @param _canonicalTxHash the canonical transaction hash.
-    /// @param _expirationTimestamp the expiration timestamp.
+    /// @param _expirationTimestamp Deprecated, always 0.
     /// @param _baseTokenAmount the base token amount that is sent with the transaction.
     /// @param _getBalanceChange whether a second token is passed with the transaction,
     /// the amount of which will be fetched from the L1 asset tracker. If false it is not fetched for gas savings.
@@ -170,7 +167,7 @@ interface IMailboxImpl is IZKChainBase {
     /// @notice New priority request event. Emitted when a request is placed into the priority queue.
     /// @param txId Serial number of the priority operation.
     /// @param txHash keccak256 hash of encoded transaction representation.
-    /// @param expirationTimestamp Timestamp up to which priority request should be processed.
+    /// @param expirationTimestamp Deprecated, always 0.
     /// @param transaction The whole transaction structure that is requested to be executed on L2.
     /// @param factoryDeps An array of bytecodes that were shown in the L1 public data.
     /// Will be marked as known bytecodes in L2.
@@ -195,6 +192,6 @@ interface IMailboxImpl is IZKChainBase {
     /// no one should rely on it for indexing purposes.
     /// @param txId Serial number of the priority operation.
     /// @param txHash keccak256 hash of encoded transaction representation.
-    /// @param expirationTimestamp Timestamp up to which priority request should be processed.
+    /// @param expirationTimestamp Deprecated, always 0.
     event NewRelayedPriorityTransaction(uint256 txId, bytes32 txHash, uint64 expirationTimestamp);
 }
