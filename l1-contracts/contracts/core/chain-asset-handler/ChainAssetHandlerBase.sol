@@ -244,8 +244,8 @@ abstract contract ChainAssetHandlerBase is
         });
 
         emit MigrationStarted(
-            bridgehubBurnData.chainId,
-            migrationNumber[bridgehubBurnData.chainId],
+            _chainId,
+            currentMigrationNum,
             _assetId,
             _settlementChainId
         );
