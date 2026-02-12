@@ -23,6 +23,8 @@ pub struct HubInitInput {
     pub owner: Address,
     pub era_chain_id: u64,
     pub with_legacy_bridge: bool,
+    pub create2_factory_addr: Option<Address>,
+    pub create2_factory_salt: Option<H256>,
 }
 
 /// Initialize hub: deploy contracts and accept ownership.
@@ -37,6 +39,8 @@ pub async fn hub_init(
         owner: input.owner,
         era_chain_id: input.era_chain_id,
         with_legacy_bridge: input.with_legacy_bridge,
+        create2_factory_addr: input.create2_factory_addr,
+        create2_factory_salt: input.create2_factory_salt,
     };
     let output = deploy(ctx, &deploy_input)?;
 
@@ -75,6 +79,12 @@ pub struct HubInitArgs {
     #[clap(flatten)]
     #[serde(flatten)]
     pub forge_args: ForgeArgs,
+
+    // Create2 factory options
+    #[clap(long, help = "CREATE2 factory address (if already deployed)", help_heading = "CREATE2 options")]
+    pub create2_factory_addr: Option<Address>,
+    #[clap(long, help = "CREATE2 factory salt (random by default)", help_heading = "CREATE2 options")]
+    pub create2_factory_salt: Option<H256>,
 
     // Dev options
     #[clap(long, help = "Use dev defaults", default_value_t = false, help_heading = "Dev options")]
@@ -138,6 +148,8 @@ pub async fn run(args: HubInitArgs, shell: &Shell) -> anyhow::Result<()> {
         owner,
         era_chain_id: args.era_chain_id,
         with_legacy_bridge: args.with_legacy_bridge,
+        create2_factory_addr: args.create2_factory_addr,
+        create2_factory_salt: args.create2_factory_salt,
     };
 
     let output = {

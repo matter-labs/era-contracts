@@ -247,22 +247,4 @@ abstract contract Create2FactoryUtils is Script {
     function compareStrings(string memory a, string memory b) internal pure returns (bool) {
         return Utils.compareStrings(a, b);
     }
-
-    function getPermanentValues() public view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
-        string memory permanentValuesPath = string.concat(vm.projectRoot(), vm.envString("PERMANENT_VALUES_INPUT"));
-        return getPermanentValues(permanentValuesPath);
-    }
-
-    function getPermanentValues(
-        string memory permanentValuesPath
-    ) public view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
-        // Read create2 factory values from permanent values file
-        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-
-        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.permanent_contracts.create2_factory_salt");
-        address create2FactoryAddr;
-        if (vm.keyExistsToml(permanentValuesToml, "$.permanent_contracts.create2_factory_addr")) {
-            create2FactoryAddr = permanentValuesToml.readAddress("$.permanent_contracts.create2_factory_addr");
-        }
-    }
 }

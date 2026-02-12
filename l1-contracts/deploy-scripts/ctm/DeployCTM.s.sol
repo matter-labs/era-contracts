@@ -121,7 +121,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     /// @notice Returns the address to use as the deployer/owner for contracts.
     function getDeployerAddress() public view returns (address) {
-        return tx.origin;
+        return msg.sender;
     }
 
     function runInner(
@@ -641,8 +641,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function deployServerNotifier() internal returns (address implementation, address proxy) {
         // We will not store the address of the ProxyAdmin as it is trivial to query if needed.
-        address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", ctmAddresses.chainAdmin, false);
-
+        address ecosystemProxyAdmin = ctmAddresses.admin.transparentProxyAdmin;
         (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin, false);
     }
 

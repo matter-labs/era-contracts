@@ -42,6 +42,7 @@ import {L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2Contrac
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
+import {PermanentValuesHelper} from "../../utils/PermanentValuesHelper.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 
@@ -160,7 +161,9 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
         string memory toml = vm.readFile(newConfigPath);
 
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesInputPath);
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(
+            permanentValuesInputPath
+        );
 
         // Can we safely get it from the CTM? is it always exists even for zksync os ?
         uint256 eraChainId = permanentValuesToml.readUint("$.era_chain_id");

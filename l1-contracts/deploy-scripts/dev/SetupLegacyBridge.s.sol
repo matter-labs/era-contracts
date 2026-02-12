@@ -66,7 +66,7 @@ contract SetupLegacyBridge is Script, ISetupLegacyBridge {
         addresses.diamondProxy = IL1Bridgehub(bridgehub).getZKChain(chainId);
 
         // Read create2 factory parameters from permanent-values.toml
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(vm);
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues();
         addresses.create2FactoryAddr = create2FactoryAddr;
         config.create2FactorySalt = create2FactorySalt;
 

@@ -56,6 +56,9 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
+import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
+import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
+import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 
 import {
     StateTransitionDeployedAddresses,
@@ -161,7 +164,9 @@ abstract contract DeployCTMUtils is DeployUtils {
         }
         require(config.zkTokenAssetId != bytes32(0), "zk_token_asset_id must be non-zero in config");
 
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesPath);
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(
+            permanentValuesPath
+        );
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"

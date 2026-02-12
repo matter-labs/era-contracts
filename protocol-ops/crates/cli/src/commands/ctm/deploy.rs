@@ -9,6 +9,7 @@ use protocol_ops_config::{
     forge_interface::{
         deploy_ctm::{input::DeployCTMConfig, output::DeployCTMOutput},
         deploy_ecosystem::input::InitialDeploymentConfig,
+        permanent_values::PermanentValuesConfig,
         script_params::DEPLOY_CTM_SCRIPT_PARAMS,
     },
     traits::{ReadConfig, SaveConfig},
@@ -49,6 +50,12 @@ pub struct CtmDeployArgs {
     #[serde(flatten)]
     pub forge_args: ForgeArgs,
 
+    // Create2 factory options
+    #[clap(long, help = "CREATE2 factory address (if already deployed)", help_heading = "CREATE2 options")]
+    pub create2_factory_addr: Option<Address>,
+    #[clap(long, help = "CREATE2 factory salt (random by default)", help_heading = "CREATE2 options")]
+    pub create2_factory_salt: Option<H256>,
+
     // Dev options
     #[clap(long, help = "Use dev defaults", default_value_t = false, help_heading = "Dev options")]
     pub dev: bool,
@@ -75,12 +82,29 @@ pub struct CtmDeployInput {
     pub reuse_gov_and_admin: bool,
     pub with_testnet_verifier: bool,
     pub with_legacy_bridge: bool,
+    pub create2_factory_addr: Option<Address>,
+    pub create2_factory_salt: Option<H256>,
 }
 
 /// Deploy CTM contracts and return the output.
 pub fn deploy(ctx: &mut ForgeContext, input: &CtmDeployInput) -> anyhow::Result<DeployCTMOutput> {
     let l1_network = L1Network::Localhost;
-    let initial_deployment_config = InitialDeploymentConfig::default();
+    let mut initial_deployment_config = InitialDeploymentConfig::default();
+
+    // Override create2 factory settings if provided
+    if let Some(addr) = input.create2_factory_addr {
+        initial_deployment_config.create2_factory_addr = Some(addr);
+    }
+    if let Some(salt) = input.create2_factory_salt {
+        initial_deployment_config.create2_factory_salt = salt;
+    }
+
+    // Update permanent-values.toml so Forge scripts use the correct factory
+    let permanent_values = PermanentValuesConfig::new(
+        initial_deployment_config.create2_factory_addr,
+        initial_deployment_config.create2_factory_salt,
+    );
+    permanent_values.save(ctx.shell, PermanentValuesConfig::path(ctx.foundry_scripts_path))?;
 
     let deploy_config = DeployCTMConfig::new(
         input.owner,
@@ -167,6 +191,8 @@ pub async fn run(args: CtmDeployArgs, shell: &Shell) -> anyhow::Result<()> {
         reuse_gov_and_admin: args.reuse_gov_and_admin,
         with_testnet_verifier: args.with_testnet_verifier,
         with_legacy_bridge: args.with_legacy_bridge,
+        create2_factory_addr: args.create2_factory_addr,
+        create2_factory_salt: args.create2_factory_salt,
     };
 
     let output = deploy(&mut ctx, &input)?;
