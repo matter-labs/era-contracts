@@ -6,28 +6,35 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
+import {IServerNotifier} from "contracts/governance/IServerNotifier.sol";
 import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManagerForServerNotifier.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {DummyChainAssetHandler} from "contracts/dev-contracts/test/DummyChainAssetHandler.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {InvalidProtocolVersion, SlotOccupied, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract ServerNotifierTest is Test {
     ServerNotifier internal serverNotifier;
     DummyChainTypeManager internal chainTypeManager;
+    DummyBridgehub internal bridgehub;
+    DummyChainAssetHandler internal chainAssetHandler;
 
     address internal owner;
     address internal chainAdmin;
     uint256 internal chainId;
-
-    event MigrateToGateway(uint256 indexed chainId);
-    event MigrateFromGateway(uint256 indexed chainId);
-    event UpgradeTimestampUpdated(uint256 indexed chainId, uint256 indexed protocolVersion, uint256 upgradeTimestamp);
 
     function setUp() public {
         chainId = 1;
         owner = makeAddr("owner");
         chainAdmin = makeAddr("chainAdmin");
 
+        // Set up mock bridgehub and chain asset handler
+        bridgehub = new DummyBridgehub();
+        chainAssetHandler = new DummyChainAssetHandler();
+        bridgehub.setChainAssetHandler(address(chainAssetHandler));
+
         chainTypeManager = new DummyChainTypeManager();
+        chainTypeManager.setBridgeHub(address(bridgehub));
 
         chainTypeManager.setChainAdmin(chainId, chainAdmin);
 
@@ -55,8 +62,8 @@ contract ServerNotifierTest is Test {
         chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
 
         vm.startPrank(chainAdmin);
-        vm.expectEmit(true, true, true, true);
-        emit UpgradeTimestampUpdated(chainId, protocolVersion, deadline);
+        vm.expectEmit(true, true, true, true, address(serverNotifier));
+        emit IServerNotifier.UpgradeTimestampUpdated(chainId, protocolVersion, deadline);
         serverNotifier.setUpgradeTimestamp(chainId, protocolVersion, deadline);
         uint256 stored = serverNotifier.protocolVersionToUpgradeTimestamp(chainId, protocolVersion);
         assertEq(stored, deadline);
@@ -87,8 +94,9 @@ contract ServerNotifierTest is Test {
         chainTypeManager.setChainAdmin(chainId, chainAdmin);
 
         vm.startPrank(chainAdmin);
-        vm.expectEmit(true, false, false, false);
-        emit MigrateToGateway(chainId);
+        vm.expectEmit(true, false, false, true, address(serverNotifier));
+        // Migration number is current (0) + 1 to match what ChainAssetHandler will emit after increment
+        emit IServerNotifier.MigrateToGateway(chainId, 1);
         serverNotifier.migrateToGateway(chainId);
         vm.stopPrank();
     }
@@ -106,8 +114,31 @@ contract ServerNotifierTest is Test {
         chainTypeManager.setChainAdmin(chainId, chainAdmin);
 
         vm.startPrank(chainAdmin);
-        vm.expectEmit(true, false, false, false);
-        emit MigrateFromGateway(chainId);
+        vm.expectEmit(true, false, false, true, address(serverNotifier));
+        // Migration number is current (0) + 1 to match what ChainAssetHandler will emit after increment
+        emit IServerNotifier.MigrateFromGateway(chainId, 1);
+        serverNotifier.migrateFromGateway(chainId);
+        vm.stopPrank();
+    }
+
+    function test_migrateToGatewayEmitsNonZeroMigrationNumber() public {
+        chainAssetHandler.setMigrationNumber(chainId, 7);
+
+        vm.startPrank(chainAdmin);
+        vm.expectEmit(true, false, false, true, address(serverNotifier));
+        // Migration number is current (7) + 1 to match what ChainAssetHandler will emit after increment
+        emit IServerNotifier.MigrateToGateway(chainId, 8);
+        serverNotifier.migrateToGateway(chainId);
+        vm.stopPrank();
+    }
+
+    function test_migrateFromGatewayEmitsNonZeroMigrationNumber() public {
+        chainAssetHandler.setMigrationNumber(chainId, 9);
+
+        vm.startPrank(chainAdmin);
+        vm.expectEmit(true, false, false, true, address(serverNotifier));
+        // Migration number is current (9) + 1 to match what ChainAssetHandler will emit after increment
+        emit IServerNotifier.MigrateFromGateway(chainId, 10);
         serverNotifier.migrateFromGateway(chainId);
         vm.stopPrank();
     }
