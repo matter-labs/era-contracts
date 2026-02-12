@@ -55,7 +55,15 @@ contract ChainRegistrarTest is Test {
             makeAddr("admin"),
             DataEncoding.encodeNTVAssetId(block.chainid, makeAddr("zkToken"))
         );
-        messageRoot = new L1MessageRoot(address(bridgeHub), 1);
+        messageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(address(bridgeHub), 1)),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
+        );
         ctm = new DummyChainTypeManagerWBH(address(bridgeHub));
         admin = makeAddr("admin");
         deployer = makeAddr("deployer");

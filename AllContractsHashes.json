@@ -1591,7 +1591,7 @@
   },
   {
     "contractName": "l1-contracts/L2V31Upgrade",
-    "zkBytecodeHash": "0x0100000fa752219cecf0b4f2f09189a7c7600e373e9f89b7fd51b17f62e995d4",
+    "zkBytecodeHash": "0x0100009513ab7c81ef6ed9db286a15253b6b2861b0559376733d3a856de46793",
     "zkBytecodePath": "/l1-contracts/zkout/L2V31Upgrade.sol/L2V31Upgrade.json",
     "evmBytecodeHash": "0x22e17436f8b8c5bec42f64495bbedb28a0c7bb190080906402c923aaef661576",
     "evmBytecodePath": "/l1-contracts/out/L2V31Upgrade.sol/L2V31Upgrade.json",
