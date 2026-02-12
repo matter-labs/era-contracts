@@ -60,6 +60,10 @@ contract DummyBridgehub {
         sharedBridge = addr;
     }
 
+    function setChainAssetHandler(address _handler) external {
+        chainAssetHandler = _handler;
+    }
+
     function assetRouter() external view returns (address) {
         return sharedBridge;
     }
