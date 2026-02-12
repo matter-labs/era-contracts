@@ -25,7 +25,6 @@ import {IL2AssetTracker} from "./interfaces/IL2AssetTracker.sol";
 import {IGWAssetTracker} from "./interfaces/IGWAssetTracker.sol";
 import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 import {IInteropHandler} from "./interfaces/IInteropHandler.sol";
-import {IInteropCenter} from "./interfaces/IInteropCenter.sol";
 import {IL2InteropRootStorage} from "./interfaces/IL2InteropRootStorage.sol";
 
 /// @dev All the system contracts introduced by ZKsync have their addresses
@@ -136,7 +135,6 @@ address constant L2_UPGRADEABLE_BEACON_DEPLOYER_ADDRESS = address(USER_CONTRACTS
 address constant L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0c);
 
 address constant L2_INTEROP_CENTER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0d);
-IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(L2_INTEROP_CENTER_ADDRESS);
 IInteropHandler constant L2_INTEROP_HANDLER = IInteropHandler(address(USER_CONTRACTS_OFFSET + 0x0e));
 address constant L2_ASSET_TRACKER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0f);
 IL2AssetTracker constant L2_ASSET_TRACKER = IL2AssetTracker(address(L2_ASSET_TRACKER_ADDRESS));

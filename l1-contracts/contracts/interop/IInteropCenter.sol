@@ -21,7 +21,7 @@ interface IInteropCenter {
     /// @param amount Amount of base token accumulated (claimable via claimProtocolFees).
     event ProtocolFeesAccumulated(address indexed coinbase, uint256 amount);
 
-    /// @notice Emitted when ZK fees transfer to coinbase failed and fees are accumulated.
+    /// @notice Emitted when ZK fees are accumulated.
     /// @param payer Address that paid the fees.
     /// @param coinbase Address of the block producer (block.coinbase) that earned the fees.
     /// @param amount Amount of ZK tokens accumulated (claimable via claimZKFees).
