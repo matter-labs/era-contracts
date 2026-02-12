@@ -21,7 +21,6 @@ import {L2Message} from "contracts/common/Messaging.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {IChainAssetHandler, MigrationInterval} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
-import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {MigrationNumberMismatch, MigrationIntervalNotSet, MigrationIntervalInvalid, HistoricalSettlementLayerMismatch} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
@@ -238,11 +237,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
             migrationNumBefore,
             "Migration number should remain unchanged when settlement layer doesn't change"
         );
-
-        // Verify the settlement layer chain ID was processed correctly
-        // The function should complete without revert when called by system context
-        assertEq(eraZKChainId, eraZKChainId, "Settlement layer chain IDs should match for this test case");
     }
+
     function test_setSettlementLayerChainId_NotSystemContext() public {
         address notSystemContext = makeAddr("notSystemContext");
         vm.expectRevert();
@@ -334,6 +330,67 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         MigrationInterval memory interval = MigrationInterval({
             migrateToGWBatchNumber: 50,
             migrateFromGWBatchNumber: 30, // invalid: from must be > to
+            settlementLayerChainId: gwChainId,
+            isActive: false
+        });
+
+        vm.prank(_owner());
+        vm.expectRevert(abi.encodeWithSelector(MigrationIntervalInvalid.selector));
+        _l1ChainAssetHandler().setHistoricalMigrationInterval(eraZKChainId, 0, interval);
+    }
+
+    function test_setHistoricalMigrationInterval_revertmigrateFromGWBatchNumberZero() public {
+        uint256 gwChainId = _legacyGwChainId();
+        MigrationInterval memory interval = MigrationInterval({
+            migrateToGWBatchNumber: 10,
+            migrateFromGWBatchNumber: 0, // invalid: from must be > to
+            settlementLayerChainId: gwChainId,
+            isActive: false
+        });
+
+        vm.prank(_owner());
+        vm.expectRevert(abi.encodeWithSelector(MigrationIntervalInvalid.selector));
+        _l1ChainAssetHandler().setHistoricalMigrationInterval(eraZKChainId, 0, interval);
+    }
+
+    function test_setHistoricalMigrationInterval_revertNotOwner() public {
+        uint256 gwChainId = _legacyGwChainId();
+        MigrationInterval memory interval = MigrationInterval({
+            migrateToGWBatchNumber: 10,
+            migrateFromGWBatchNumber: 50,
+            settlementLayerChainId: gwChainId,
+            isActive: false
+        });
+
+        vm.expectRevert();
+        vm.prank(makeAddr("notOwner"));
+        _l1ChainAssetHandler().setHistoricalMigrationInterval(eraZKChainId, 0, interval);
+    }
+
+    function test_setHistoricalMigrationInterval_migrateToGWBatchNumberZero() public {
+        uint256 gwChainId = _legacyGwChainId();
+        // migrateToGWBatchNumber == 0 is valid: the chain migrated before any batches were committed
+        MigrationInterval memory interval = MigrationInterval({
+            migrateToGWBatchNumber: 0,
+            migrateFromGWBatchNumber: 50,
+            settlementLayerChainId: gwChainId,
+            isActive: false
+        });
+
+        vm.prank(_owner());
+        _l1ChainAssetHandler().setHistoricalMigrationInterval(eraZKChainId, 0, interval);
+
+        MigrationInterval memory stored = _l1ChainAssetHandler().migrationInterval(eraZKChainId, 0);
+        assertEq(stored.migrateToGWBatchNumber, 0);
+        assertEq(stored.migrateFromGWBatchNumber, 50);
+        assertFalse(stored.isActive);
+    }
+
+    function test_setHistoricalMigrationInterval_revertmigrateFromGWBatchNumberEqualTo() public {
+        uint256 gwChainId = _legacyGwChainId();
+        MigrationInterval memory interval = MigrationInterval({
+            migrateToGWBatchNumber: 50,
+            migrateFromGWBatchNumber: 50, // invalid: from == to
             settlementLayerChainId: gwChainId,
             isActive: false
         });

@@ -6,7 +6,7 @@ import {IAssetHandler} from "../../bridge/interfaces/IAssetHandler.sol";
 
 /// @notice Tracks migration batch numbers for a chain that migrated to a settlement layer and back.
 /// @param migrateToGWBatchNumber The last batch executed on L1 before migrating TO the gateway.
-/// @param migrateFromGWBatchNumber The last batch executed on SL before migrating back to L1.
+/// @param migrateFromGWBatchNumber The last batch executed on Gateway before migrating back to L1.
 /// @param settlementLayerChainId The chain ID of the settlement layer where the chain settled during the time period.
 /// @param isActive Whether the chain is actively settling on the settlement layer right now.
 struct MigrationInterval {
