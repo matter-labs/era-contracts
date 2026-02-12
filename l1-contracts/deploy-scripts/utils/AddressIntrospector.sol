@@ -492,7 +492,7 @@ library AddressIntrospector {
 
         if (_isZKsyncOS) {
             IZKsyncOSDualVerifier verifier = IZKsyncOSDualVerifier(_verifier);
-            fflonk = address(verifier.fflonkVerifiers(0));
+            fflonk = address(0);
             plonk = address(verifier.plonkVerifiers(0));
         } else {
             IEraDualVerifier verifier = IEraDualVerifier(_verifier);
