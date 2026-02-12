@@ -8,6 +8,7 @@ import {IExecutor, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/stat
 import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {InvalidTxCountInPriorityMode, OnlyNormalMode, PriorityModeActivationTooEarly, PriorityModeIsNotAllowed, PriorityModeRequiresPermanentRollup, PriorityOpsRequestTimestampMissing, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 contract PriorityModeExecutorTest is ExecutorTest {
     function test_revertWhen_activatePriorityMode_notAllowed() public {
@@ -165,15 +166,19 @@ contract PriorityModeExecutorTest is ExecutorTest {
         vm.deal(prioritySender, baseCost);
         requestTimestamp = block.timestamp;
         vm.prank(prioritySender);
-        mailbox.requestL2Transaction{value: baseCost}({
-            _contractL2: makeAddr("l2Contract"),
-            _l2Value: 0,
-            _calldata: "",
-            _l2GasLimit: l2GasLimit,
-            _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _factoryDeps: new bytes[](0),
-            _refundRecipient: prioritySender
-        });
+        dummyBridgehub.requestL2TransactionDirect{value: baseCost}(
+            L2TransactionRequestDirect({
+                chainId: l2ChainId,
+                mintValue: baseCost,
+                l2Contract: makeAddr("l2Contract"),
+                l2Value: 0,
+                l2Calldata: "",
+                l2GasLimit: l2GasLimit,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                factoryDeps: new bytes[](0),
+                refundRecipient: prioritySender
+            })
+        );
     }
 
     function _mockDAForCommit(

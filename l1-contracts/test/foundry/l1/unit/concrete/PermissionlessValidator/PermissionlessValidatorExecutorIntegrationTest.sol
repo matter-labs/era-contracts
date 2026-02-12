@@ -9,6 +9,7 @@ import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/Priorit
 import {IL1DAValidator, L1DAValidatorOutput} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
     bytes32[] internal defaultBlobVersionedHashes;
@@ -59,15 +60,19 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
         uint256 baseCost = mailbox.l2TransactionBaseCost(10_000_000, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
         vm.deal(prioritySender, baseCost);
         vm.prank(prioritySender);
-        mailbox.requestL2Transaction{value: baseCost}({
-            _contractL2: makeAddr("l2Contract"),
-            _l2Value: 0,
-            _calldata: "",
-            _l2GasLimit: l2GasLimit,
-            _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _factoryDeps: new bytes[](0),
-            _refundRecipient: prioritySender
-        });
+        dummyBridgehub.requestL2TransactionDirect{value: baseCost}(
+            L2TransactionRequestDirect({
+                chainId: l2ChainId,
+                mintValue: baseCost,
+                l2Contract: makeAddr("l2Contract"),
+                l2Value: 0,
+                l2Calldata: "",
+                l2GasLimit: l2GasLimit,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                factoryDeps: new bytes[](0),
+                refundRecipient: prioritySender
+            })
+        );
         vm.prank(owner);
         admin.permanentlyAllowPriorityMode();
         vm.warp(block.timestamp + PRIORITY_EXPIRATION + 1);
