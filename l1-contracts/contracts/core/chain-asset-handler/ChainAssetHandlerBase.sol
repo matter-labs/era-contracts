@@ -243,7 +243,12 @@ abstract contract ChainAssetHandlerBase is
             _currentMigrationNum: currentMigrationNum
         });
 
-        emit MigrationStarted(_chainId, _assetId, _settlementChainId);
+        emit MigrationStarted(
+            bridgehubBurnData.chainId,
+            migrationNumber[bridgehubBurnData.chainId],
+            _assetId,
+            _settlementChainId
+        );
 
         return bridgehubMintData;
     }
@@ -359,7 +364,7 @@ abstract contract ChainAssetHandlerBase is
 
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);
 
-        emit MigrationFinalized(bridgehubMintData.chainId, _assetId, zkChain);
+        emit MigrationFinalized(bridgehubMintData.chainId, bridgehubMintData.migrationNumber, _assetId, zkChain);
     }
 
     /*//////////////////////////////////////////////////////////////
