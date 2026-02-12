@@ -2,13 +2,13 @@
 
 pragma solidity 0.8.28;
 
-import {AdminTest} from "./_Admin_Shared.t.sol";
+import {MigratorTest} from "./_Migrator_Shared.t.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {DepositsAlreadyPaused, NotL1, TotalPriorityTxsIsZero} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
 
-contract PauseDepositsTest is AdminTest {
+contract PauseDepositsTest is MigratorTest {
     event DepositsPaused(uint256 chainId, uint256 pausedDepositsTimestamp);
 
     // The `pausedDepositsTimestamp` sits at slot 62 of ZKChainStorage
@@ -25,7 +25,7 @@ contract PauseDepositsTest is AdminTest {
 
         vm.startPrank(nonAdminOrChainTypeManager);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonAdminOrChainTypeManager));
-        adminFacet.pauseDepositsBeforeInitiatingMigration();
+        migratorFacet.pauseDepositsBeforeInitiatingMigration();
     }
 
     function test_revertWhen_notL1() public {
@@ -35,7 +35,7 @@ contract PauseDepositsTest is AdminTest {
 
         vm.startPrank(admin);
         vm.expectRevert(abi.encodeWithSelector(NotL1.selector, fakeChainId));
-        adminFacet.pauseDepositsBeforeInitiatingMigration();
+        migratorFacet.pauseDepositsBeforeInitiatingMigration();
     }
 
     function test_successfulCall_newChain() public {
@@ -46,10 +46,10 @@ contract PauseDepositsTest is AdminTest {
         vm.startPrank(admin);
         vm.expectEmit(true, false, false, false);
         emit DepositsPaused(chainId, expectedTimestamp);
-        adminFacet.pauseDepositsBeforeInitiatingMigration();
+        migratorFacet.pauseDepositsBeforeInitiatingMigration();
 
         // Read storage to check that the recorded timestamp matches the event
-        uint256 pausedDepositsTimestamp = uint256(vm.load(address(adminFacet), pausedDepositsTimestampSlot));
+        uint256 pausedDepositsTimestamp = uint256(vm.load(address(migratorFacet), pausedDepositsTimestampSlot));
         assertEq(pausedDepositsTimestamp, expectedTimestamp);
     }
 
@@ -60,15 +60,15 @@ contract PauseDepositsTest is AdminTest {
         // The priorityTree sits at slot 51 of ZKChainStorage
         bytes32 slot = bytes32(uint256(51));
         // Fake a deposit by extending the priority tree so `getTotalPriorityTxs` returns non-zero
-        vm.store(address(adminFacet), slot, bytes32(uint256(1)));
+        vm.store(address(migratorFacet), slot, bytes32(uint256(1)));
 
         vm.startPrank(admin);
         vm.expectEmit(true, false, false, false);
         emit DepositsPaused(chainId, block.timestamp);
-        adminFacet.pauseDepositsBeforeInitiatingMigration();
+        migratorFacet.pauseDepositsBeforeInitiatingMigration();
 
         // Read storage to check that the recorded timestamp matches the event
-        uint256 pausedDepositsTimestamp = uint256(vm.load(address(adminFacet), pausedDepositsTimestampSlot));
+        uint256 pausedDepositsTimestamp = uint256(vm.load(address(migratorFacet), pausedDepositsTimestampSlot));
         assertEq(pausedDepositsTimestamp, block.timestamp);
     }
 
@@ -76,11 +76,11 @@ contract PauseDepositsTest is AdminTest {
         address admin = utilsFacet.util_getAdmin();
         // Pause deposits, works
         vm.startPrank(admin);
-        adminFacet.pauseDepositsBeforeInitiatingMigration();
+        migratorFacet.pauseDepositsBeforeInitiatingMigration();
         // Try to pause them again, reverts
         vm.startPrank(admin);
         vm.expectRevert(abi.encodeWithSelector(DepositsAlreadyPaused.selector));
-        adminFacet.pauseDepositsBeforeInitiatingMigration();
+        migratorFacet.pauseDepositsBeforeInitiatingMigration();
     }
 
     function test_revertWhen_settlementLayerSet_andTotalPriorityTxsIsZero() public {
@@ -98,7 +98,7 @@ contract PauseDepositsTest is AdminTest {
 
         vm.startPrank(admin);
         vm.expectRevert(abi.encodeWithSelector(TotalPriorityTxsIsZero.selector));
-        adminFacet.pauseDepositsBeforeInitiatingMigration();
+        migratorFacet.pauseDepositsBeforeInitiatingMigration();
     }
 
     function test_successfulCall_settlementLayerSet_withPriorityTxs() public {
@@ -115,7 +115,7 @@ contract PauseDepositsTest is AdminTest {
         // Fake a deposit by extending the priority tree so `getTotalPriorityTxs` returns non-zero
         // The priorityTree sits at slot 51 of ZKChainStorage
         bytes32 slot = bytes32(uint256(51));
-        vm.store(address(adminFacet), slot, bytes32(uint256(1)));
+        vm.store(address(migratorFacet), slot, bytes32(uint256(1)));
 
         // Mock the requestPauseDepositsForChainOnGateway call
         vm.mockCall(
@@ -127,10 +127,10 @@ contract PauseDepositsTest is AdminTest {
         vm.startPrank(admin);
         vm.expectEmit(true, false, false, false);
         emit DepositsPaused(chainId, block.timestamp);
-        adminFacet.pauseDepositsBeforeInitiatingMigration();
+        migratorFacet.pauseDepositsBeforeInitiatingMigration();
 
         // Read storage to check that the recorded timestamp matches the event
-        uint256 pausedDepositsTimestamp = uint256(vm.load(address(adminFacet), pausedDepositsTimestampSlot));
+        uint256 pausedDepositsTimestamp = uint256(vm.load(address(migratorFacet), pausedDepositsTimestampSlot));
         assertEq(pausedDepositsTimestamp, block.timestamp);
     }
 }

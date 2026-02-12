@@ -102,3 +102,5 @@ error UnsupportedProofMetadataVersion(uint256 metadataVersion);
 error ValL1DAWrongInputLength(uint256 inputLength, uint256 expectedLength);
 // 0x712d02d2
 error VerifiedIsNotConsistentWithCommitted(uint256 batchesVerified, uint256 batchesCommitted);
+// 0x311ca4b0
+error PriorityModeAlreadyAllowed();

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {ValidatorTimelock} from "../../ValidatorTimelock.sol";
+import {ValidatorTimelock} from "../../validators/ValidatorTimelock.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 

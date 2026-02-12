@@ -1139,8 +1139,7 @@ object "Bootloader" {
                 // they were provided on L1. In the future, we may apply a new logic for it.
                 let gasPrice := getMaxFeePerGas(innerTxDataOffset)
                 let txInternalCost := safeMul(gasPrice, gasLimit, "poa")
-                let value := getValue(innerTxDataOffset)
-                if lt(getReserved0(innerTxDataOffset), safeAdd(value, txInternalCost, "ol")) {
+                if lt(getReserved0(innerTxDataOffset), txInternalCost) {
                     assertionError("deposited eth too low")
                 }
 
@@ -1195,16 +1194,16 @@ object "Bootloader" {
                         assertionError("Upgrade tx failed")
                     }
 
-                    // If the transaction reverts, then minting the msg.value to the user has been reverted
-                    // as well, so we can simply mint everything that the user has deposited to
-                    // the refund recipient
+                    // If the transaction reverts, the initial mint to the sender is reverted as well.
+                    // Refund the deposited amount minus the operator payment to the refund recipient.
                     toRefundRecipient := safeSub(getReserved0(innerTxDataOffset), payToOperator, "vji")
                 }
                 default {
-                    // If the transaction succeeds, then it is assumed that msg.value was transferred correctly. However, the remaining
-                    // ETH deposited will be given to the refund recipient.
-
-                    toRefundRecipient := safeSub(getReserved0(innerTxDataOffset), safeAdd(getValue(innerTxDataOffset), payToOperator, "kpa"), "ysl")
+                    // If the transaction succeeds, the initial mint to the sender is assumed to have happened.
+                    // We refund the unused gas (refundGas * gasPrice) to the refund recipient.
+                    // The operator payment is handled separately.
+                    let txInternalCost := safeMul(gasPrice, gasLimit, "poa")
+                    toRefundRecipient := safeSub(txInternalCost, payToOperator, "ysl")
                 }
 
                 if gt(toRefundRecipient, 0) {
@@ -1229,6 +1228,10 @@ object "Bootloader" {
                     mstore(0, mload(PRIORITY_TXS_L1_DATA_BEGIN_BYTE()))
                     mstore(32, canonicalL1TxHash)
                     mstore(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), keccak256(0, 64))
+                    // PRIORITY_TXS_L1_DATA[1] packs two counters into one word:
+                    // - bits 0..127   : number of processed L1→L2 priority txs
+                    // - bits 128..255 : number of processed L2 txs
+                    // Increment the L1 counter (lower 128 bits) by adding 1.  
                     mstore(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32), add(mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)), 1))
                 } 
                 default {
@@ -1401,6 +1404,11 @@ object "Bootloader" {
 
                 notifyAboutRefund(refund)
                 mstore(resultPtr, success)
+                // PRIORITY_TXS_L1_DATA[1] packs two counters into one word:
+                // - bits 0..127   : number of processed L1→L2 priority txs
+                // - bits 128..255 : number of processed L2 txs
+                // Increment the L2 counter (upper 128 bits) by adding 1<<128.  
+                mstore(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32), add(mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)), TWO_POW_128()))
             }
 
             /// @dev Calculates the L2 gas limit for the transaction
@@ -2052,9 +2060,11 @@ object "Bootloader" {
 
                 debugLog("execution itself", 0)
 
-                let value := getValue(innerTxDataOffset)
-                if value {
-                    mintEther(from, value, true)
+                let gasLimit := getGasLimit(innerTxDataOffset)
+                let txInternalCost := safeMul(gasPrice, gasLimit, "poa")
+                let toMint := safeSub(getReserved0(innerTxDataOffset), txInternalCost, "ol")
+                if toMint {
+                    mintEther(from, toMint, true)
                 }
 
                 success := executeL1Tx(innerTxDataOffset, from)
@@ -2315,6 +2325,11 @@ object "Bootloader" {
             /// @dev Returns constant that is equal to `keccak256("")`
             function EMPTY_STRING_KECCAK() -> ret {
                 ret := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
+            }
+
+            /// @dev Returns constant that is equal to 2^128
+            function TWO_POW_128() -> ret {
+                ret := shl(128,1)
             }
 
             /// @dev Returns whether x <= y

@@ -95,6 +95,8 @@ interface IChainTypeManager {
 
     function BRIDGE_HUB() external view returns (address);
 
+    function PERMISSIONLESS_VALIDATOR() external view returns (address);
+
     function setPendingAdmin(address _newPendingAdmin) external;
 
     function acceptAdmin() external;
@@ -169,6 +171,8 @@ interface IChainTypeManager {
     function setValidator(uint256 _chainId, address _validator, bool _active) external;
 
     function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external;
+
+    function deactivatePriorityMode(uint256 _chainId) external;
 
     function upgradeChainFromVersion(
         uint256 _chainId,
