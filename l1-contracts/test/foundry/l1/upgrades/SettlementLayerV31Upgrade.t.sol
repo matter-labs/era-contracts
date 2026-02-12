@@ -10,7 +10,6 @@ import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
-import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
@@ -165,13 +164,6 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
             mockGWChain,
             abi.encodeWithSelector(IGetters.getSemverProtocolVersion.selector),
             abi.encode(uint32(0), uint32(31), uint32(0)) // major=0, minor=31, patch=0
-        );
-
-        // Mock chainAssetHandler.setMigrationNumberForV31
-        vm.mockCall(
-            mockChainAssetHandler,
-            abi.encodeWithSelector(IChainAssetHandler.setMigrationNumberForV31.selector, testChainId),
-            abi.encode()
         );
 
         // Mock messageRoot.saveV31UpgradeChainBatchNumber
