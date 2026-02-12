@@ -72,6 +72,8 @@ error OnlyBridgehubOrChainAssetHandler(address sender, address bridgehub, addres
 error OnlyChain(address msgSender, address zkChainAddress);
 // 0xec76af13
 error OnlyGateway();
+// 0x8d14ca84
+error OnlyL1();
 // 0x6b75db8c
 error OnlyOnSettlementLayer();
 // 0xb78dbaa7
@@ -94,5 +96,3 @@ error V31UpgradeChainBatchNumberNotSet();
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
 // 0x7b968d06
 error ZKChainNotRegistered();
-// 
-error OnlyL1();
