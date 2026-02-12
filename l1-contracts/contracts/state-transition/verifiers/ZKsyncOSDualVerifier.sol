@@ -5,18 +5,16 @@ pragma solidity 0.8.28;
 import {UnknownVerifierVersion} from "../L1StateTransitionErrors.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {EmptyProofLength, UnknownVerifierType, MockVerifierNotSupported, InvalidProofFormat, ZeroAddress, AddressAlreadySet, EmptyPublicInputsLength} from "../../common/L1ContractErrors.sol";
+import {IZKsyncOSDualVerifier} from "../chain-interfaces/IZKsyncOSDualVerifier.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 /// @title ZKsync OS Dual Verifier
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice This contract wraps PLONK verifiers and routes zk-SNARK proof verification
-/// to the verifier based on the provided proof type. Unlike the Era version which supports both FFLONK and PLONK,
-/// this ZKsync OS version only supports PLONK verification as FFLONK has been deprecated for ZKsync OS.
-/// The contract also includes mock verification support for testnet purposes.
-/// It reuses the same interface as on the original `Verifier` contract, while abusing one of the fields
-/// (`_recursiveAggregationInput`) for proof verification type.
-contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier {
+/// @notice This contract wraps ZKsync OS specific Plonk verifiers and routes zk-SNARK proof verification
+/// to the verifier based on the provided proof type. It reuses the same interface as on the original `Verifier`
+/// contract, while abusing on of the fields (`_recursiveAggregationInput`) for proof verification type.
+contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier, IZKsyncOSDualVerifier {
     /// @dev Type of verification for ZKsync OS PLONK verifier.
     uint256 internal constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
 
