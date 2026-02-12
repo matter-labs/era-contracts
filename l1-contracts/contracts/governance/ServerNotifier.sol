@@ -8,7 +8,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IServerNotifier} from "./IServerNotifier.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
-import {IChainAssetHandler} from "../core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHandler.sol";
 
 /// @title ServerNotifier
 /// @author Matter Labs
@@ -80,7 +80,7 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
     function _getMigrationNumber(uint256 _chainId) internal view returns (uint256) {
         address bridgehub = chainTypeManager.BRIDGE_HUB();
         address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
-        return IChainAssetHandler(chainAssetHandler).migrationNumber(_chainId);
+        return IChainAssetHandlerBase(chainAssetHandler).migrationNumber(_chainId);
     }
 
     /// @notice Set the expected upgrade timestamp for a specific protocol version. Only allowed to be called by ChainAdmin.
