@@ -243,12 +243,7 @@ abstract contract ChainAssetHandlerBase is
             _currentMigrationNum: currentMigrationNum
         });
 
-        emit MigrationStarted(
-            _chainId,
-            currentMigrationNum,
-            _assetId,
-            _settlementChainId
-        );
+        emit MigrationStarted(_chainId, currentMigrationNum, _assetId, _settlementChainId);
 
         return bridgehubMintData;
     }
