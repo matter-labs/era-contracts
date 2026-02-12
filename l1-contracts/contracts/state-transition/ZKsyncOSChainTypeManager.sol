@@ -15,8 +15,9 @@ contract ZKsyncOSChainTypeManager is ChainTypeManagerBase {
     constructor(
         address _bridgehub,
         address _interopCenter,
-        address _l1BytecodesSupplier
-    ) ChainTypeManagerBase(_bridgehub, _interopCenter, _l1BytecodesSupplier) {}
+        address _l1BytecodesSupplier,
+        address _permissionlessValidator
+    ) ChainTypeManagerBase(_bridgehub, _interopCenter, _l1BytecodesSupplier, _permissionlessValidator) {}
 
     /// @notice Updates the parameters with which a new chain is created
     /// @param _chainCreationParams The new chain creation parameters

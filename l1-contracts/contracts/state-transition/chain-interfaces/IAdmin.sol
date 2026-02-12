@@ -6,8 +6,7 @@ import {IZKChainBase} from "../chain-interfaces/IZKChainBase.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
-import {L2DACommitmentScheme, ZKChainCommitment} from "../../common/Config.sol";
-import {TxStatus} from "../../common/Messaging.sol";
+import {L2DACommitmentScheme} from "../../common/Config.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
@@ -48,8 +47,28 @@ interface IAdmin is IZKChainBase {
     /// @notice Set the transaction filterer
     function setTransactionFilterer(address _transactionFilterer) external;
 
+    /// @notice Sets the transaction filterer used in Priority Mode.
+    /// By default, there is no transaction filtering in Priority Mode. This is the recommended setup.
+    /// However, for some chains (e.g., Prividium or Gateway), a custom filterer may be required
+    /// for correct system operation. This function allows ZK Governance to set it.
+    function setPriorityModeTransactionFilterer(address _priorityModeTransactionFilterer) external;
+
     /// @notice Allow EVM emulation on chain
     function allowEvmEmulation() external returns (bytes32 canonicalTxHash);
+
+    /// @notice Allow Priority Mode to be activated on the chain (does not activate it).
+    function permanentlyAllowPriorityMode() external;
+
+    /// @notice Deactivate Priority Mode and return the chain to normal mode.
+    function deactivatePriorityMode() external;
+
+    /// @notice Activates the Priority Mode if the whitelisted operator fails
+    /// to process priority transactions within the allotted time.
+    /// @dev Priority Mode is an escape hatch mechanism in which anyone can settle batches (only with L1 -> L2 transactions).
+    /// @dev Priority Mode can be activated if:
+    ///      1. The Chain Admin has explicitly enabled the Priority Mode feature.
+    ///      2. A priority transaction has been outstanding for at least `PRIORITY_EXPIRATION` since it was requested.
+    function activatePriorityMode() external;
 
     /// @notice Perform the upgrade from the current protocol version with the corresponding upgrade data
     /// @param _protocolVersion The current protocol version from which upgrade is executed
@@ -119,6 +138,9 @@ interface IAdmin is IZKChainBase {
     /// @notice The transaction filterer has been updated
     event NewTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);
 
+    /// @notice The address of the transaction filterer contract used when Priority Mode is activated
+    event NewPriorityModeTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);
+
     /// @notice BaseToken multiplier for L1->L2 transactions changed
     event NewBaseTokenMultiplier(
         uint128 oldNominator,
@@ -129,9 +151,6 @@ interface IAdmin is IZKChainBase {
 
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
-
-    /// @notice Emitted when the migration to the new settlement layer is complete.
-    event MigrationComplete();
 
     /// @notice Emitted when the contract is frozen.
     event Freeze();
@@ -151,34 +170,10 @@ interface IAdmin is IZKChainBase {
 
     event BridgeMint(address indexed _account, uint256 _amount);
 
-    event DepositsPaused(uint256 chainId, uint256 pausedDepositsTimestamp);
+    event PriorityModeAllowed();
 
-    event DepositsUnpaused(uint256 chainId);
+    event PriorityModeDeactivated();
 
-    /// @notice Pauses deposits before initiating migration to the Gateway.
-    function pauseDepositsBeforeInitiatingMigration() external;
-
-    /// @notice Unpauses deposits, used after the chain is initialized
-    function unpauseDeposits() external;
-
-    /// @dev Similar to IL1AssetHandler interface, used to send chains.
-    function forwardedBridgeBurn(
-        address _settlementLayer,
-        address _originalCaller,
-        bytes calldata _data
-    ) external payable returns (bytes memory _bridgeMintData);
-
-    /// @dev Similar to IL1AssetHandler interface, used to claim failed chain transfers.
-    function forwardedBridgeConfirmTransferResult(
-        uint256 _chainId,
-        TxStatus _txStatus,
-        bytes32 _assetInfo,
-        address _originalCaller,
-        bytes calldata _chainData
-    ) external payable;
-
-    /// @dev Similar to IL1AssetHandler interface, used to receive chains.
-    function forwardedBridgeMint(bytes calldata _data, bool _contractAlreadyDeployed) external payable;
-
-    function prepareChainCommitment() external view returns (ZKChainCommitment memory commitment);
+    /// @notice Emitted when Priority Mode is activated for the chain.
+    event PriorityModeActivated();
 }
