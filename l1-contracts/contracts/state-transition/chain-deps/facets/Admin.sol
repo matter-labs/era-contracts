@@ -5,13 +5,13 @@ pragma solidity 0.8.28;
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {FEE_PARAMS_UPDATE_INTERVAL, L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, MAX_PRICE_CHANGE_DENOMINATOR, MAX_PRICE_CHANGE_NUMERATOR, PRICE_REFERENCE_L1_GAS, PRICE_UPDATE_INTERVAL, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../common/Config.sol";
+import {L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, MAX_PRICE_CHANGE_DENOMINATOR, MAX_PRICE_CHANGE_NUMERATOR, PRICE_REFERENCE_L1_GAS, PRICE_UPDATE_INTERVAL, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {L1DAValidatorAddressIsZero, NotL1, PriorityModeAlreadyAllowed} from "../../L1StateTransitionErrors.sol";
-import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, FeeParamsChangeTooFrequent, FeeParamsChangeTooLarge, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, PriorityModeActivationTooEarly, PriorityModeIsNotAllowed, PriorityModeRequiresPermanentRollup, PriorityOpsRequestTimestampMissing, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TokenMultiplierChangeTooFrequent, TooMuchGas, Unauthorized, NotCompatibleWithPriorityMode} from "../../../common/L1ContractErrors.sol";
+import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, FeeParamsChangeTooLarge, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, PriorityModeActivationTooEarly, PriorityModeIsNotAllowed, PriorityModeRequiresPermanentRollup, PriorityOpsRequestTimestampMissing, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TokenMultiplierChangeTooFrequent, TooMuchGas, Unauthorized, NotCompatibleWithPriorityMode} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
@@ -105,13 +105,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @inheritdoc IAdmin
     function changeFeeParams(FeeParams calldata _newFeeParams) external onlyAdminOrChainTypeManager onlyL1 {
         _enforceMinUpdateInterval();
-        uint256 lastFeeParamsUpdateTimestamp = s.lastFeeParamsUpdateTimestamp;
-        if (
-            lastFeeParamsUpdateTimestamp != 0 &&
-            block.timestamp < lastFeeParamsUpdateTimestamp + FEE_PARAMS_UPDATE_INTERVAL
-        ) {
-            revert FeeParamsChangeTooFrequent(lastFeeParamsUpdateTimestamp + FEE_PARAMS_UPDATE_INTERVAL);
-        }
 
         // Double checking that the new fee params are valid, i.e.
         // the maximal pubdata per batch is not less than the maximal pubdata per priority transaction.
@@ -220,24 +213,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
         uint256 minAllowedPrice = (oldPrice * MAX_PRICE_CHANGE_DENOMINATOR) / MAX_PRICE_CHANGE_NUMERATOR;
         if (newPrice < minAllowedPrice) {
             revert FeeParamsChangeTooLarge(oldPrice, newPrice, minAllowedPrice);
-        }
-    }
-
-    /// @notice Enforces that an individual fee param field does not change by more than the allowed ratio.
-    /// @dev Prevents admin from setting capacity fields (e.g. priorityTxMaxPubdata) to 0 to block tx ingress.
-    function _enforceFeeParamFieldChangeBound(uint256 _oldValue, uint256 _newValue) internal view {
-        if (_oldValue == 0 && s.priorityTree.getSize() == 0) {
-            return;
-        }
-
-        uint256 maxAllowed = (_oldValue * MAX_PRICE_CHANGE_NUMERATOR) / MAX_PRICE_CHANGE_DENOMINATOR;
-        if (_newValue > maxAllowed) {
-            revert FeeParamsChangeTooLarge(_oldValue, _newValue, maxAllowed);
-        }
-
-        uint256 minAllowed = (_oldValue * MAX_PRICE_CHANGE_DENOMINATOR) / MAX_PRICE_CHANGE_NUMERATOR;
-        if (_newValue < minAllowed) {
-            revert FeeParamsChangeTooLarge(_oldValue, _newValue, minAllowed);
         }
     }
 

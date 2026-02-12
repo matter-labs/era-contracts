@@ -121,8 +121,6 @@ error EVMBytecodeAlreadyPublished(bytes32 bytecodeHash);
 error ExecuteMessageFailed();
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
-// 0xa9972984
-error FeeParamsChangeTooFrequent(uint256 nextAllowedTimestamp);
 // 0x3fce21be
 error FeeParamsChangeTooLarge(uint256 oldPrice, uint256 newPrice, uint256 maxAllowedPrice);
 // 0xc91cf3b1
