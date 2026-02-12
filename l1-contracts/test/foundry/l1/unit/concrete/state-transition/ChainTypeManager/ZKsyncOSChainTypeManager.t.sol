@@ -88,7 +88,15 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
 
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
-        messageroot = new L1MessageRoot(address(bridgehub), 1);
+        messageroot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(address(bridgehub), 1)),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
+        );
         chainAssetHandler = new L1ChainAssetHandler(
             governor,
             address(bridgehub),

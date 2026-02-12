@@ -215,7 +215,15 @@ contract ExecutorTest is UtilsCallMockerTest {
             abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
             abi.encode(allZKChainChainIDsZero)
         );
-        messageRoot = new L1MessageRoot(address(dummyBridgehub), 1);
+        messageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(address(dummyBridgehub), 1)),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
+        );
         PermissionlessValidator permissionlessValidatorImpl = new PermissionlessValidator();
         TransparentUpgradeableProxy permissionlessValidatorProxy = new TransparentUpgradeableProxy(
             address(permissionlessValidatorImpl),

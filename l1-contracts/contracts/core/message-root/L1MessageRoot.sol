@@ -16,7 +16,7 @@ contract L1MessageRoot is MessageRootBase {
     address public immutable BRIDGE_HUB;
 
     /// @notice The chain id of the Gateway chain.
-    uint256 public immutable override ERA_GATEWAY_CHAIN_ID;
+    uint256 public immutable ERA_GATEWAY_CHAIN_ID;
 
     /// @notice The mapping storing the batch number at the moment the chain was updated to V31.
     /// Starting from this batch, if a settlement layer has agreed to a proof, it will be held accountable for the content of the message, e.g.
@@ -35,22 +35,16 @@ contract L1MessageRoot is MessageRootBase {
     /// this attack is not considered viable as the chains belong to the same CTM as the settlement layer and so the SL can trust their `getTotalBatchesExecuted` value.
     mapping(uint256 chainId => uint256 batchNumber) public v31UpgradeChainBatchNumber;
 
-    /// @dev Contract is expected to be used as proxy implementation on L1, but as a system contract on L2.
-    /// This means we call the _initialize in both the constructor and the initialize functions.
-    /// Used for V31 upgrade deployment and local deployments.
-    /// @dev Initialize the implementation to prevent Parity hack.
+    /// @dev This contract is expected to be used as a proxy implementation on L1.
     /// @param _bridgehub Address of the Bridgehub.
-    /// @param _eraGatewayChainId Chain ID of the Gateway chain.
+    /// @param _eraGatewayChainId Chain ID of the Era Gateway chain.
     constructor(address _bridgehub, uint256 _eraGatewayChainId) {
         BRIDGE_HUB = _bridgehub;
         ERA_GATEWAY_CHAIN_ID = _eraGatewayChainId;
-        uint256[] memory allZKChains = IBridgehubBase(_bridgehub).getAllZKChainChainIDs();
-        _v31InitializeInner(allZKChains);
-        _initialize();
         _disableInitializers();
     }
 
-    /// @dev Initializes a contract for later use. Expected to be used in the proxy on L1, on L2 it is a built-in contract without a proxy.
+    /// @dev This initializer is used in local deployments.
     function initialize() external reinitializer(2) {
         _initialize();
         uint256[] memory allZKChains = IBridgehubBase(BRIDGE_HUB).getAllZKChainChainIDs();
@@ -59,9 +53,8 @@ contract L1MessageRoot is MessageRootBase {
         require(allZKChainsLength == 0, LocallyNoChainsAtGenesis());
     }
 
-    /// @dev The initialized used for the V31 upgrade.
-    /// On L2s the initializers are disabled.
-    function initializeL1V31Upgrade() external reinitializer(2) onlyL1 {
+    /// @dev This initializer is used in the v31 upgrade.
+    function initializeL1V31Upgrade() external reinitializer(2) {
         uint256[] memory allZKChains = IBridgehubBase(BRIDGE_HUB).getAllZKChainChainIDs();
         _v31InitializeInner(allZKChains);
     }

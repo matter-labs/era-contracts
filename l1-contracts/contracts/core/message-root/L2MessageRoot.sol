@@ -26,7 +26,7 @@ contract L2MessageRoot is MessageRootBase {
     uint256 internal l1ChainId;
 
     /// @notice The chain id of the Gateway chain.
-    uint256 public override ERA_GATEWAY_CHAIN_ID;
+    uint256 public ERA_GATEWAY_CHAIN_ID;
 
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS

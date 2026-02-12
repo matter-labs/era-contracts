@@ -92,8 +92,16 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         l1Nullifier = makeAddr("l1Nullifier");
         serverNotifier = makeAddr("serverNotifier");
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
-        messageroot = new L1MessageRoot(address(bridgehub), 1);
         permissionlessValidator = new PermissionlessValidator();
+        messageroot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(address(bridgehub), 1)),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
+        );
         chainAssetHandler = new L1ChainAssetHandler(
             governor,
             address(bridgehub),
