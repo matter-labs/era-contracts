@@ -35,7 +35,7 @@ contract L1MessageRoot is MessageRootBase {
     /// this attack is not considered viable as the chains belong to the same CTM as the settlement layer and so the SL can trust their `getTotalBatchesExecuted` value.
     mapping(uint256 chainId => uint256 batchNumber) public v31UpgradeChainBatchNumber;
 
-    /// @dev Contract is expected to be used as proxy implementation on L1.
+    /// @dev This contract is expected to be used as a proxy implementation on L1.
     /// @param _bridgehub Address of the Bridgehub.
     /// @param _eraGatewayChainId Chain ID of the Era Gateway chain.
     constructor(address _bridgehub, uint256 _eraGatewayChainId) {
@@ -44,7 +44,7 @@ contract L1MessageRoot is MessageRootBase {
         _disableInitializers();
     }
 
-    /// @dev Initializes a contract for later use. Expected to be used in the proxy on L1, on L2 it is a built-in contract without a proxy.
+    /// @dev This initializer is used in local deployments.
     function initialize() external reinitializer(2) {
         _initialize();
         uint256[] memory allZKChains = IBridgehubBase(BRIDGE_HUB).getAllZKChainChainIDs();
@@ -53,9 +53,8 @@ contract L1MessageRoot is MessageRootBase {
         require(allZKChainsLength == 0, LocallyNoChainsAtGenesis());
     }
 
-    /// @dev The initialized used for the V31 upgrade.
-    /// On L2s the initializers are disabled.
-    function initializeL1V31Upgrade() external reinitializer(2) onlyL1 {
+    /// @dev This initializer is used in the v31 upgrade.
+    function initializeL1V31Upgrade() external reinitializer(2) {
         uint256[] memory allZKChains = IBridgehubBase(BRIDGE_HUB).getAllZKChainChainIDs();
         _v31InitializeInner(allZKChains);
     }
