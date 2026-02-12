@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "contracts/core/message-root/IMessageRoot.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -39,7 +40,15 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
             abi.encode(block.chainid)
         );
 
-        L1MessageRoot messageRoot = new L1MessageRoot(bridgeHub, 1);
+        L1MessageRoot messageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(bridgeHub, 1)),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
+                )
+            )
+        );
 
         // Verify the placeholder value was set (not 0!)
         uint256 storedValue = messageRoot.v31UpgradeChainBatchNumber(CHAIN_ID);
@@ -96,7 +105,15 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
             abi.encode(chainIds)
         );
 
-        L1MessageRoot messageRoot = new L1MessageRoot(bridgeHub, 1);
+        L1MessageRoot messageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(bridgeHub, 1)),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
+        );
 
         // For a chain not in allZKChains, the mapping defaults to 0
         assertEq(messageRoot.v31UpgradeChainBatchNumber(CHAIN_ID), 0, "New chain should have 0, not placeholder");
@@ -145,7 +162,15 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
             abi.encode(block.chainid)
         );
 
-        L1MessageRoot messageRoot = new L1MessageRoot(bridgeHub, 1);
+        L1MessageRoot messageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(bridgeHub, 1)),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
+                )
+            )
+        );
 
         address zkChain = makeAddr("zkChain");
         vm.mockCall(
@@ -221,7 +246,15 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
             abi.encode(block.chainid)
         );
 
-        L1MessageRoot messageRoot = new L1MessageRoot(bridgeHub, 1);
+        L1MessageRoot messageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(bridgeHub, 1)),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
+                )
+            )
+        );
 
         address zkChain = makeAddr("zkChain");
         vm.mockCall(
