@@ -16,7 +16,7 @@ import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
 import {ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
-import {ChainIdMismatch, CTMNotRegistered} from "../../common/L1ContractErrors.sol";
+import {CTMNotRegistered} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -101,7 +101,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     /// @param _depositSender the address of the entity that initiated the deposit.
     // slither-disable-next-line locked-ether
     function bridgeConfirmTransferResult(
-        uint256 _chainId,
+        uint256,
         TxStatus _txStatus,
         bytes32 _assetId,
         address _depositSender,
@@ -109,9 +109,8 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     ) external payable requireZeroValue(msg.value) onlyAssetRouter {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
 
-        if (_chainId != bridgehubBurnData.chainId) {
-            revert ChainIdMismatch();
-        }
+        // Note: _chainId is the settlement layer chain (e.g. gateway) where the migration tx was proven,
+        // while bridgehubBurnData.chainId is the chain being migrated. These are intentionally different.
 
         (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeConfirmTransferResult(
             bridgehubBurnData.chainId,
