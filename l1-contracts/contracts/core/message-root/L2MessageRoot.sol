@@ -6,7 +6,7 @@ import {MessageRootBase} from "./MessageRootBase.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {OnlyGateway, OnlyL1} from "../bridgehub/L1BridgehubErrors.sol";
+import {OnlyL1} from "../bridgehub/L1BridgehubErrors.sol";
 import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
 
 import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
@@ -26,7 +26,7 @@ contract L2MessageRoot is MessageRootBase {
     uint256 internal l1ChainId;
 
     /// @notice The chain id of the Gateway chain.
-    uint256 public override ERA_GATEWAY_CHAIN_ID;
+    uint256 public ERA_GATEWAY_CHAIN_ID;
 
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
@@ -61,14 +61,6 @@ contract L2MessageRoot is MessageRootBase {
 
     modifier onlyServiceTransactionSender() {
         require(msg.sender == SERVICE_TRANSACTION_SENDER, Unauthorized(msg.sender));
-        _;
-    }
-
-    /// @notice Checks that the Chain ID is the Gateway chain id.
-    modifier onlyGateway() {
-        if (block.chainid != _eraGatewayChainId()) {
-            revert OnlyGateway();
-        }
         _;
     }
 

@@ -199,7 +199,15 @@ contract ExecutorTest is UtilsCallMockerTest {
             abi.encode(allZKChainChainIDsZero)
         );
         chainAssetHandler = new L1ChainAssetHandler(owner, address(dummyBridgehub));
-        messageRoot = new L1MessageRoot(address(dummyBridgehub), 1, address(chainAssetHandler));
+        messageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(address(dummyBridgehub), 1, address(chainAssetHandler))),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
+        );
 
         uint256[] memory allZKChainChainIDs = new uint256[](1);
         allZKChainChainIDs[0] = 271;
