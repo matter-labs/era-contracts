@@ -185,8 +185,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     function handleChainBalanceDecreaseOnL1(
         uint256 _chainId,
         bytes32 _assetId,
-        uint256 _amount,
-        uint256 // _tokenOriginChainId
+        uint256 _amount
     ) external onlyNativeTokenVault {
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
 

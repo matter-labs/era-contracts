@@ -370,7 +370,15 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         vm.startPrank(governor);
         bridgehub.addChainTypeManager(address(chainContractAddress));
         bridgehub.addTokenAssetId(DataEncoding.encodeNTVAssetId(block.chainid, baseToken));
-        L1MessageRoot messageRootNew = new L1MessageRoot(address(bridgehub), 1);
+        L1MessageRoot messageRootNew = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(address(bridgehub), 1)),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
+        );
         bridgehub.setAddresses(
             sharedBridge,
             ICTMDeploymentTracker(address(0)),
