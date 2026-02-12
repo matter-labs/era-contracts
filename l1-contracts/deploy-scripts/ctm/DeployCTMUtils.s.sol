@@ -69,6 +69,7 @@ import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.so
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
+import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 import {StateTransitionDeployedAddresses, DataAvailabilityDeployedAddresses, ChainCreationParamsConfig, BridgehubAddresses, CoreDeployedAddresses} from "../utils/Types.sol";
 import {ChainCreationParamsLib} from "./ChainCreationParamsLib.sol";
 
@@ -162,7 +163,9 @@ abstract contract DeployCTMUtils is DeployUtils {
             config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
         }
 
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesPath);
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(
+            permanentValuesPath
+        );
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"

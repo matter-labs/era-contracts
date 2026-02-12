@@ -178,7 +178,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         }
 
         // Read create2 factory values from permanent values file
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(vm);
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues();
         config.create2FactoryAddress = create2FactoryAddr;
         config.create2Salt = create2FactorySalt;
 

@@ -33,6 +33,7 @@ import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/co
 
 import {Config, CoreDeployedAddresses, DeployL1CoreUtils} from "./DeployL1CoreUtils.s.sol";
 import {IDeployL1CoreContracts} from "contracts/script-interfaces/IDeployL1CoreContracts.sol";
+import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 
 contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1CoreContracts {
     using stdToml for string;
@@ -71,11 +72,9 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         inputPath = string.concat(root, inputPath);
         outputPath = string.concat(root, outputPath);
 
-        createPermanentValuesIfNeeded();
+        PermanentValuesHelper.createPermanentValuesIfNeeded();
 
         initializeConfig(inputPath);
-
-        instantiateCreate2Factory();
 
         (coreAddresses.shared.governance) = deploySimpleContract("Governance", false);
         (coreAddresses.shared.bridgehubAdmin) = deploySimpleContract("ChainAdminOwnable", false);
@@ -147,7 +146,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         updateOwners();
 
         saveOutput(outputPath);
-        preparePermanentValues(outputPath);
     }
 
     function setBridgehubParams() internal {
@@ -346,68 +344,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         vm.writeToml(toml, outputPath);
 
         (address create2FactoryAddr, bytes32 create2FactorySalt) = getCreate2FactoryParams();
-        savePermanentValues(create2FactorySalt, create2FactoryAddr);
-    }
-
-    function createPermanentValuesIfNeeded() internal virtual {
-        // Determine the permanent values path
-        string memory permanentValuesPath = getPermanentValuesPath();
-        if (!vm.isFile(permanentValuesPath)) {
-            savePermanentValues(hex"88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5", address(0));
-        } else {
-            string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-            if (!vm.keyExistsToml(permanentValuesToml, "$.permanent_contracts.create2_factory_salt")) {
-                savePermanentValues(hex"88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5", address(0));
-            }
-        }
-        (address create2FactoryAddr, ) = getPermanentValues(getPermanentValuesPath());
-        if (create2FactoryAddr.code.length == 0) {
-            savePermanentValues(hex"88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5", address(0));
-        }
-    }
-
-    function savePermanentValues(bytes32 create2FactorySalt, address create2FactoryAddr) internal virtual {
-        // Determine the permanent values path
-        string memory permanentValuesPath = getPermanentValuesPath();
-
-        // Create file if it doesn't exist
-        if (!vm.isFile(permanentValuesPath)) {
-            vm.writeFile(permanentValuesPath, "[contracts]\n");
-        }
-
-        vm.serializeString("permanent_contracts", "create2_factory_salt", vm.toString(create2FactorySalt));
-        string memory permanentContracts = vm.serializeAddress(
-            "permanent_contracts",
-            "create2_factory_addr",
-            create2FactoryAddr
-        );
-        string memory toml1 = vm.serializeString("root3", "permanent_contracts", permanentContracts);
-
-        vm.writeToml(toml1, permanentValuesPath);
-        console.log("Updated permanent values at:", permanentValuesPath);
-        console.log("create2_factory_addr:", create2FactoryAddr);
-    }
-
-    function preparePermanentValues(string memory outputPath) internal virtual {
-        // Read from the output file we just created
-        string memory outputDeployL1Toml = vm.readFile(outputPath);
-
-        address create2FactoryAddr;
-        bytes32 create2FactorySalt;
-        if (vm.keyExistsToml(outputDeployL1Toml, "$.permanent_contracts.create2_factory_addr")) {
-            create2FactoryAddr = outputDeployL1Toml.readAddress("$.permanent_contracts.create2_factory_addr");
-            create2FactorySalt = outputDeployL1Toml.readBytes32("$.permanent_contracts.create2_factory_salt");
-        }
-
-        // Only update if create2FactoryAddr is non-zero
-        if (create2FactoryAddr != address(0)) {
-            savePermanentValues(create2FactorySalt, create2FactoryAddr);
-        }
-    }
-
-    function getPermanentValuesPath() internal view virtual returns (string memory) {
-        string memory root = vm.projectRoot();
-        return string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
+        PermanentValuesHelper.savePermanentValues(create2FactoryAddr, create2FactorySalt);
     }
 
     // add this to be excluded from coverage report
