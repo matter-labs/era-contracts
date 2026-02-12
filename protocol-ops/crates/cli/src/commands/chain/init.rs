@@ -11,6 +11,7 @@ use protocol_ops_common::{
 };
 use protocol_ops_config::{
     forge_interface::{
+        permanent_values::PermanentValuesConfig,
         register_chain::{
             input::{NewChainParams, RegisterChainL1Config},
             output::RegisterChainOutput,
@@ -127,6 +128,10 @@ pub struct ChainInitArgs {
     #[serde(flatten)]
     pub forge_args: ForgeArgs,
 
+    // Create2 factory options
+    #[clap(long, help = "CREATE2 factory address (if already deployed)", help_heading = "CREATE2 options")]
+    pub create2_factory_addr: Option<Address>,
+
     // Dev options
     #[clap(long, help = "Use dev defaults", default_value_t = false, help_heading = "Dev options")]
     pub dev: bool,
@@ -141,6 +146,7 @@ pub struct ChainInitInput {
     pub no_da_validium_validator: Address,
     pub chain_params: NewChainParams,
     pub with_legacy_bridge: bool,
+    pub create2_factory_addr: Option<Address>,
 }
 
 /// Output from chain registration.
@@ -155,9 +161,14 @@ pub fn register_chain(
     ctx: &mut ForgeContext,
     input: &ChainInitInput,
 ) -> anyhow::Result<RegisterChainOutput> {
+    // Update permanent-values.toml so Forge scripts use the correct factory
+    // Use default salt (zero) for chain init since it's not configurable
+    let permanent_values = PermanentValuesConfig::new(input.create2_factory_addr, H256::zero());
+    permanent_values.save(ctx.shell, PermanentValuesConfig::path(ctx.foundry_scripts_path))?;
+
     let deploy_config = RegisterChainL1Config::new(
         &input.chain_params,
-        Address::zero(), // create2_factory_addr - will use default
+        input.create2_factory_addr.unwrap_or(Address::zero()),
         input.with_legacy_bridge,
     )?;
 
@@ -307,6 +318,7 @@ pub async fn run(args: ChainInitArgs, shell: &Shell) -> anyhow::Result<()> {
         no_da_validium_validator: args.no_da_validium_validator,
         chain_params: chain_params.clone(),
         with_legacy_bridge: args.with_legacy_bridge,
+        create2_factory_addr: args.create2_factory_addr,
     };
 
     // Step 1: Register chain (as bridgehub admin)

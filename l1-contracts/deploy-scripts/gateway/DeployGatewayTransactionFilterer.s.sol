@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {Script} from "forge-std/Script.sol";
 import {IDeployGatewayTransactionFilterer} from "contracts/script-interfaces/IDeployGatewayTransactionFilterer.sol";
 import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
+import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
@@ -21,7 +22,7 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils, IDeplo
 
     function initializeConfig(address bridgehub, address chainAdmin, address chainProxyAdmin) internal {
         // Read create2 factory parameters from permanent-values.toml
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues();
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues();
 
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
     }

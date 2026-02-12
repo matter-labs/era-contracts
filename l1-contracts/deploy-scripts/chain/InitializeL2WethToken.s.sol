@@ -46,12 +46,7 @@ contract InitializeL2WethTokenScript is Script {
         string memory root = vm.projectRoot();
 
         // Read create2 factory values from permanent values file
-        // Note: This script uses $.contracts prefix instead of $.permanent_contracts
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValuesWithPrefix(
-            vm,
-            PermanentValuesHelper.getPermanentValuesPath(vm),
-            "$.contracts"
-        );
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues();
         config.create2FactoryAddr = create2FactoryAddr;
         config.create2FactorySalt = create2FactorySalt;
 
