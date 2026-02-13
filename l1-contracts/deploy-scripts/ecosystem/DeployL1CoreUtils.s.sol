@@ -107,7 +107,12 @@ contract DeployL1CoreUtils is DeployUtils {
         } else if (compareStrings(contractName, "L1Bridgehub")) {
             return abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains));
         } else if (compareStrings(contractName, "L1MessageRoot")) {
-            return abi.encode(coreAddresses.bridgehub.proxies.bridgehub, config.l1ChainId);
+            return
+                abi.encode(
+                    coreAddresses.bridgehub.proxies.bridgehub,
+                    config.l1ChainId,
+                    coreAddresses.bridgehub.proxies.chainAssetHandler
+                );
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
             return abi.encode(coreAddresses.bridgehub.proxies.bridgehub, coreAddresses.bridges.proxies.l1AssetRouter);
         } else if (compareStrings(contractName, "ChainAssetHandler")) {
@@ -138,15 +143,7 @@ contract DeployL1CoreUtils is DeployUtils {
                     );
             }
         } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
-            return
-                abi.encode(
-                    config.ownerAddress,
-                    coreAddresses.bridgehub.proxies.bridgehub,
-                    coreAddresses.bridges.proxies.l1AssetRouter,
-                    coreAddresses.bridgehub.proxies.messageRoot,
-                    coreAddresses.bridgehub.proxies.assetTracker,
-                    coreAddresses.bridges.proxies.l1Nullifier
-                );
+            return abi.encode(config.ownerAddress, coreAddresses.bridgehub.proxies.bridgehub);
         } else if (compareStrings(contractName, "L1AssetRouter")) {
             return
                 abi.encode(

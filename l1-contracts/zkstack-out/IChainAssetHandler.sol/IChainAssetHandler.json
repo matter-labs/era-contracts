@@ -102,19 +102,6 @@
   },
   {
     "type": "function",
-    "name": "setMigrationNumberForV31",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "unpauseMigration",
     "inputs": [],
     "outputs": [],
@@ -199,6 +186,12 @@
         "internalType": "uint256"
       },
       {
+        "name": "migrationNumber",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
         "name": "assetId",
         "type": "bytes32",
         "indexed": true,
@@ -221,6 +214,12 @@
         "name": "chainId",
         "type": "uint256",
         "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "migrationNumber",
+        "type": "uint256",
+        "indexed": false,
         "internalType": "uint256"
       },
       {

@@ -14,6 +14,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 contract ZKChainDeployer is L1ContractDeployer {
@@ -67,7 +68,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         if (!_pausedDeposits) {
             address admin = IZKChain(chainAddress).getAdmin();
             vm.prank(admin);
-            IAdmin(chainAddress).unpauseDeposits();
+            IMigrator(chainAddress).unpauseDeposits();
         }
         eraConfig = deployScript.getConfig();
     }
@@ -82,7 +83,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         address chainAddress = getZKChainAddress(chainId);
         address admin = IZKChain(chainAddress).getAdmin();
         vm.prank(admin);
-        IAdmin(chainAddress).unpauseDeposits();
+        IMigrator(chainAddress).unpauseDeposits();
     }
 
     function _deployZKChainWithPausedDeposits(address _baseToken, uint256 _chainId) internal {
@@ -234,7 +235,8 @@ contract ZKChainDeployer is L1ContractDeployer {
         uint256 _protocolVersion,
         bytes32 _storedBatchZero,
         address _bridgehub,
-        address _interopCenter
+        address _interopCenter,
+        address _chainTypeManager
     ) internal returns (address) {
         Diamond.DiamondCutData memory diamondCut = abi.decode(
             ecosystemConfig.contracts.diamondCutData,
@@ -250,7 +252,7 @@ contract ZKChainDeployer is L1ContractDeployer {
                 bytes32(_chainId),
                 bytes32(uint256(uint160(address(_bridgehub)))),
                 bytes32(uint256(uint160(address(_interopCenter)))),
-                bytes32(uint256(uint160(address(this))))
+                bytes32(uint256(uint160(_chainTypeManager)))
             );
         }
         {

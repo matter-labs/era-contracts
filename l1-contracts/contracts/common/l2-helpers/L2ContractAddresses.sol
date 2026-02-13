@@ -66,6 +66,9 @@ uint160 constant MAX_BUILT_IN_CONTRACT_ADDR = BUILT_IN_CONTRACTS_OFFSET + 0x1fff
 /// @dev The formal address of the initial program of the system: the bootloader
 address constant L2_BOOTLOADER_ADDRESS = address(SYSTEM_CONTRACTS_OFFSET + 0x01);
 
+/// @dev The address of the AccountCodeStorage system contract
+address constant L2_ACCOUNT_CODE_STORAGE_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x02);
+
 /// @dev The address of the known code storage system contract
 address constant L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x04);
 
