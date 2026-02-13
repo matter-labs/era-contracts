@@ -214,10 +214,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function deployVerifiers() internal {
         if (config.isZKsyncOS) {
-            (ctmAddresses.stateTransition.verifiers.verifierFflonk) = deploySimpleContract(
-                "ZKsyncOSVerifierFflonk",
-                false
-            );
+            // ZKsyncOS only uses PLONK verifier (no FFLONK)
             (ctmAddresses.stateTransition.verifiers.verifierPlonk) = deploySimpleContract(
                 "ZKsyncOSVerifierPlonk",
                 false

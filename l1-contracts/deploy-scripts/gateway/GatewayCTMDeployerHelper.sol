@@ -563,11 +563,7 @@ library GatewayCTMDeployerHelper {
 
         // Deploy base verifiers based on config
         if (config.isZKsyncOS) {
-            result.verifierFflonk = _deployInternalEmptyParams(
-                "ZKsyncOSVerifierFflonk",
-                "ZKsyncOSVerifierFflonk.sol",
-                innerConfig
-            );
+            // ZKsyncOS only uses PLONK verifier (no FFLONK)
             result.verifierPlonk = _deployInternalEmptyParams(
                 "ZKsyncOSVerifierPlonk",
                 "ZKsyncOSVerifierPlonk.sol",
@@ -627,12 +623,7 @@ library GatewayCTMDeployerHelper {
 
         // Deploy base verifiers based on config
         if (config.isZKsyncOS) {
-            result.verifierFflonk = _deployInternalEmptyParamsWithMode(
-                "ZKsyncOSVerifierFflonk",
-                "ZKsyncOSVerifierFflonk.sol",
-                innerConfig,
-                isZKsyncOS
-            );
+            // ZKsyncOS only uses PLONK verifier (no FFLONK)
             result.verifierPlonk = _deployInternalEmptyParamsWithMode(
                 "ZKsyncOSVerifierPlonk",
                 "ZKsyncOSVerifierPlonk.sol",

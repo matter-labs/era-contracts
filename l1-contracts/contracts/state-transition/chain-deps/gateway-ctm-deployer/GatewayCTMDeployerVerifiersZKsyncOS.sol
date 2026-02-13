@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {ZKsyncOSVerifierFflonk} from "../../verifiers/ZKsyncOSVerifierFflonk.sol";
 import {ZKsyncOSVerifierPlonk} from "../../verifiers/ZKsyncOSVerifierPlonk.sol";
 import {ZKsyncOSDualVerifier} from "../../verifiers/ZKsyncOSDualVerifier.sol";
 import {ZKsyncOSTestnetVerifier} from "../../verifiers/ZKsyncOSTestnetVerifier.sol";
@@ -37,8 +36,7 @@ contract GatewayCTMDeployerVerifiersZKsyncOS {
 
         Verifiers memory result;
 
-        // Deploy ZKsyncOS verifiers
-        result.verifierFflonk = address(new ZKsyncOSVerifierFflonk{salt: salt}());
+        // Deploy ZKsyncOS verifier (PLONK only, no FFLONK)
         result.verifierPlonk = address(new ZKsyncOSVerifierPlonk{salt: salt}());
 
         // Deploy main verifier
