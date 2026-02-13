@@ -10,6 +10,7 @@ import {ZeroAddress, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {NotAPatchUpgrade} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 contract ChainTypeManagerSetters is ChainTypeManagerTest {
     function setUp() public {
@@ -186,16 +187,22 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
         address newVerifier = makeAddr("patchVerifier");
         address upgradeContract = address(new DefaultUpgrade());
 
-        // First set the old protocol version as active
-        vm.prank(governor);
-        chainContractAddress.setProtocolVersionVerifier(oldProtocolVersion, testnetVerifier);
-
         // Mock migration paused check
         _mockMigrationPausedFromBridgehub();
 
+        // First advance the CTM's protocolVersion from 0 to 0.25.0 so the patch upgrade has the correct base
+        Diamond.FacetCut[] memory emptyFacetCuts = new Diamond.FacetCut[](0);
+        Diamond.DiamondCutData memory emptyCut = Diamond.DiamondCutData({
+            facetCuts: emptyFacetCuts,
+            initAddress: address(0),
+            initCalldata: ""
+        });
+        vm.prank(governor);
+        chainContractAddress.setNewVersionUpgrade(emptyCut, 0, block.timestamp + 1 days, oldProtocolVersion, testnetVerifier);
+
         vm.prank(governor);
         vm.expectEmit(true, true, true, true);
-        emit IChainTypeManager.NewProtocolVersion(0, newProtocolVersion);
+        emit IChainTypeManager.NewProtocolVersion(oldProtocolVersion, newProtocolVersion);
         chainContractAddress.createNewPatchUpgrade(
             oldProtocolVersion,
             oldProtocolVersionDeadline,
