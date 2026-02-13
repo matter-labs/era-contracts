@@ -189,12 +189,17 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         _simulateCreate2(create2Factory, directCalldata.genesisUpgradeCalldata, "GenesisUpgrade");
         _simulateCreate2(create2Factory, directCalldata.multicall3Calldata, "Multicall3");
 
-        // Mock the CTM call that DiamondInit.initialize() makes
+        // Mock the CTM calls that DiamondInit.initialize() makes
         address mockCTM = address(0xC7A1);
         vm.mockCall(
             mockCTM,
             abi.encodeWithSelector(IChainTypeManager.PERMISSIONLESS_VALIDATOR.selector),
             abi.encode(address(0))
+        );
+        vm.mockCall(
+            mockCTM,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector),
+            abi.encode(makeAddr("mockVerifier"))
         );
 
         // Build full initCalldata: selector + InitializeData fields.
