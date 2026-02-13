@@ -34,6 +34,7 @@ contract L2BaseTokenZKOS is L2BaseTokenBase, IL2BaseTokenZKOS {
     /// @dev Computed as: _zkosPreV31TotalSupply + (INITIAL_BASE_TOKEN_HOLDER_BALANCE - BaseTokenHolder.balance)
     /// @dev _zkosPreV31TotalSupply captures the total supply that existed before the V31 upgrade.
     /// @dev The delta (INITIAL - holder.balance) tracks tokens minted after V31 via the BaseTokenHolder pattern.
+    /// @dev WARNING: totalSupply() will return an incorrect value until the chain admin sets the pre-V31 total supply via setZkosPreV31TotalSupply(). This is done as a separate post-upgrade step.
     function totalSupply() external view returns (uint256) {
         return _zkosPreV31TotalSupply + (INITIAL_BASE_TOKEN_HOLDER_BALANCE - L2_BASE_TOKEN_HOLDER_ADDR.balance);
     }
