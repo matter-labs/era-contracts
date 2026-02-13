@@ -107,4 +107,9 @@ contract L2MessageRoot is MessageRootBase {
     ) internal pure override returns (bool) {
         revert OnlyL1();
     }
+
+    /// @inheritdoc MessageRootBase
+    function _noBatchFallback(uint256 _chainId, uint256 _batchNumber) internal view override returns (bytes32) {
+        return bytes32(0);
+    }
 }

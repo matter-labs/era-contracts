@@ -66,14 +66,14 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
 
     /// @notice The mapping from chainId to its current executed batch number.
     /// @dev We store the current batch number for each chain once it upgrades to v31. This value is moved between settlement layers
-    /// during migration to ensure consistency. For now, only using a settlement layer from the same CTM is allowed,
-    /// so the value can be trusted on top of the settlement layer.
+    /// during migration to ensure consistency.
     mapping(uint256 chainId => uint256 currentChainBatchNumber) public currentChainBatchNumber;
 
     /// @notice The mapping from chainId to batchNumber to chainBatchRoot.
     /// @dev These are the same values as the leaves of the chainTree.
     /// @dev We store these values for message verification on L1 and Gateway.
-    /// @dev We only update the chainTree on GW as of V31.
+    /// @dev We only updated the chainTree on deprecated Era GW as of V31.
+    /// @dev An expected invariant is that for all batches starting from currentChainBatchNumber + 1, the `chainBatchRoots` is 0. 
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
     /// @notice The total number of published interop roots.
@@ -153,8 +153,10 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         uint256 _chainId,
         uint256 _batchNumber
     ) external onlyBridgehubOrChainAssetHandler {
+        // Note, that it is possible that chain migrates to GW and returns to L1 without
+        // committing any batches on GW.
         require(
-            chainBatchRoots[_chainId][_batchNumber] == bytes32(0),
+            currentChainBatchNumber[_chainId] <= _batchNumber,
             ChainBatchRootAlreadyExists(_chainId, _batchNumber)
         );
         currentChainBatchNumber[_chainId] = _batchNumber;
@@ -182,17 +184,14 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
             chainBatchRoots[_chainId][_batchNumber] == bytes32(0),
             ChainBatchRootAlreadyExists(_chainId, _batchNumber)
         );
+        uint256 expectedNewChainBatchNumber = currentChainBatchNumber[_chainId] + 1;
         require(
-            _batchNumber == currentChainBatchNumber[_chainId] + 1,
+            _batchNumber == expectedNewChainBatchNumber,
             NonConsecutiveBatchNumber(_chainId, _batchNumber)
         );
 
         chainBatchRoots[_chainId][_batchNumber] = _chainBatchRoot;
-        ++currentChainBatchNumber[_chainId];
-        if (block.chainid == L1_CHAIN_ID()) {
-            /// On L1 we only store the chainBatchRoot, but don't update the chainTree or sharedTree.
-            return;
-        }
+        currentChainBatchNumber[_chainId] = expectedNewChainBatchNumber;
     }
 
     /// @notice emit a new message root when committing a new batch
@@ -305,7 +304,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
             });
     }
 
-    /// @notice Internal to get the historical batch root for chains before the v31 upgrade.
+    /// @notice Internal to get the historical batch root for chains.
     function _getChainBatchRoot(uint256 _chainId, uint256 _batchNumber) internal view returns (bytes32) {
         /// In current server the zeroth batch does not have L2->L1 logs.
         require(_batchNumber > 0, BatchZeroNotAllowed());
@@ -313,8 +312,16 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         if (savedChainBatchRoot != bytes32(0)) {
             return savedChainBatchRoot;
         }
-        return IGetters(IBridgehubBase(_bridgehub()).getZKChain(_chainId)).l2LogsRootHash(_batchNumber);
+
+        return _noBatchFallback(_chainId, _batchNumber);
     }
+
+    /// @notice This function is used to prove the return the expected batch root for batch number that is not stored inside the message root.
+    /// @dev On L2, it should always return 0, since on newer GW implementation it is guaranteed that all available batch roots are stored inside the message root.
+    /// @dev On L1, if the batch was produced before the v31 upgrade, we must query the chain. Once the ZKsync OS CTM's ownership is transferred to the decentralized
+    /// governance, we can trust this value completely. Before it happens, we just assume that no ZKsync OS based Gateway is present,
+    /// and so the chain can at most damage itself by providing a wrongful batch root for its own batches, but it cannot affect other chains.  
+    function _noBatchFallback(uint256 _chainId, uint256 _batchNumber) internal virtual view returns (bytes32);
 
     /// @notice Extracts and returns proof data for settlement layer verification.
     /// @dev Wrapper function around MessageHashing._getProofData for public access.

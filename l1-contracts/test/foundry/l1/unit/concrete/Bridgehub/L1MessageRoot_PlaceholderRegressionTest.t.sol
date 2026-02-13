@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
-import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "contracts/core/message-root/IMessageRoot.sol";
+import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "contracts/core/message-root/IMessageRoot.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {V31UpgradeChainBatchNumberAlreadySet} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
@@ -61,7 +61,7 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
         uint256 storedValue = messageRoot.v31UpgradeChainBatchNumber(CHAIN_ID);
         assertEq(
             storedValue,
-            V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
+            V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE,
             "Chain should have placeholder value, not 0"
         );
         assertNotEq(storedValue, 0, "Placeholder value should NOT be 0");
@@ -193,7 +193,7 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
 
         // Verify value is now the real batch number (not placeholder, not 0)
         uint256 storedValue = messageRoot.v31UpgradeChainBatchNumber(CHAIN_ID);
-        assertNotEq(storedValue, V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1, "Should not be placeholder");
+        assertNotEq(storedValue, V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE, "Should not be placeholder");
         assertNotEq(storedValue, 0, "Should not be 0");
 
         // Second call should revert
@@ -207,19 +207,19 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
     function test_regression_placeholderValueIsLargeHash() public pure {
         // The placeholder should be a hash-derived value
         uint256 expectedPlaceholder = uint256(
-            keccak256(abi.encodePacked("V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1"))
+            keccak256(abi.encodePacked("V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE"))
         );
 
         assertEq(
-            V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
+            V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE,
             expectedPlaceholder,
             "Placeholder should be keccak256 of the constant name"
         );
 
         // Verify it's not 0 and not a small value (collision risk)
-        assertNotEq(V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1, 0, "Placeholder must not be 0");
+        assertNotEq(V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE, 0, "Placeholder must not be 0");
         assertGt(
-            V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
+            V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE,
             type(uint128).max,
             "Placeholder should be a large value"
         );
@@ -231,7 +231,7 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
         // Skip invalid values
         vm.assume(totalBatchesExecuted > 0);
         vm.assume(totalBatchesExecuted < type(uint256).max); // Prevent overflow in +1
-        vm.assume(totalBatchesExecuted != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1);
+        vm.assume(totalBatchesExecuted != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE);
 
         uint256[] memory chainIds = new uint256[](1);
         chainIds[0] = CHAIN_ID;
