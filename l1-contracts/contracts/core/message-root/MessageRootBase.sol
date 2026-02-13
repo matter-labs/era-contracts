@@ -261,6 +261,14 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     //// IMessageVerification ////
     //////////////////////////////
 
+    function _proveL2LeafInclusionOnSettlementLayer(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        ProofData memory _proofData,
+        bytes32[] calldata _proof,
+        uint256 _depth
+    ) internal view virtual returns (bool);
+
     function _proveL2LeafInclusionRecursive(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -285,23 +293,13 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
             revert DepthMoreThanOneForRecursiveMerkleProof();
         }
 
-        // Assuming that `settlementLayerChainId` is an honest chain, the `chainIdLeaf` should belong
-        // to a chain's message root only if the chain has indeed executed its batch on top of it.
-        //
-        // We trust all chains whitelisted by the Bridgehub governance.
-        require(
-            IBridgehubBase(_bridgehub()).whitelistedSettlementLayers(proofData.settlementLayerChainId),
-            NotWhitelistedSettlementLayer(proofData.settlementLayerChainId)
-        );
-
         return
-            this.proveL2LeafInclusionSharedRecursive({
-                _chainId: proofData.settlementLayerChainId,
-                _blockOrBatchNumber: proofData.settlementLayerBatchNumber, // SL block number
-                _leafProofMask: proofData.settlementLayerBatchRootMask,
-                _leaf: proofData.chainIdLeaf,
-                _proof: MessageHashing.extractSliceUntilEnd(_proof, proofData.ptr),
-                _depth: _depth + 1
+            _proveL2LeafInclusionOnSettlementLayer({
+                _chainId: _chainId,
+                _batchNumber: _batchNumber,
+                _proofData: proofData,
+                _proof: _proof,
+                _depth: _depth
             });
     }
 

@@ -17,6 +17,9 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     address public immutable BRIDGE_HUB;
 
+    /// @dev The chain asset handler contract.
+    address public immutable CHAIN_ASSET_HANDLER;
+
     /// @notice The chain id of the Gateway chain.
     uint256 public immutable ERA_GATEWAY_CHAIN_ID;
 
@@ -40,10 +43,12 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
     /// @dev This contract is expected to be used as a proxy implementation on L1.
     /// @param _bridgehub Address of the Bridgehub.
     /// @param _eraGatewayChainId Chain ID of the Era Gateway chain.
-    constructor(address _bridgehub, uint256 _eraGatewayChainId) {
+    constructor(address _bridgehub, uint256 _eraGatewayChainId, address _chainAssetHandler) {
         require(_bridgehub != address(0), ZeroAddress());
+        require(_chainAssetHandler != address(0), ZeroAddress());
         BRIDGE_HUB = _bridgehub;
         ERA_GATEWAY_CHAIN_ID = _eraGatewayChainId;
+        CHAIN_ASSET_HANDLER = _chainAssetHandler;
         _disableInitializers();
     }
 
@@ -86,6 +91,31 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
 
         currentChainBatchNumber[_chainId] = totalBatchesExecuted;
         v31UpgradeChainBatchNumber[_chainId] = totalBatchesExecuted + 1;
+    }
+
+    function _proveL2LeafInclusionOnSettlementLayer(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        ProofData memory _proofData,
+        bytes32[] calldata _proof,
+        uint256 _depth
+    ) internal view override returns (bool) {
+        bool isValid = IL1ChainAssetHandler(CHAIN_ASSET_HANDLER).isValidSettlementLayer(
+            _chainId,
+            _batchNumber,
+            _proofData.settlementLayerChainId
+        );
+        require(isValid, InvalidSettlementLayerForBatch(_chainId, _batchNumber, _proofData.settlementLayerChainId));
+
+        return
+            this.proveL2LeafInclusionSharedRecursive({
+                _chainId: _proofData.settlementLayerChainId,
+                _blockOrBatchNumber: _proofData.settlementLayerBatchNumber,
+                _leafProofMask: _proofData.settlementLayerBatchRootMask,
+                _leaf: _proofData.chainIdLeaf,
+                _proof: MessageHashing.extractSliceUntilEnd(_proof, _proofData.ptr),
+                _depth: _depth + 1
+            });
     }
 
     /*//////////////////////////////////////////////////////////////

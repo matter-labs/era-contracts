@@ -6,8 +6,8 @@ import {MessageRootBase} from "./MessageRootBase.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {OnlyGateway} from "../bridgehub/L1BridgehubErrors.sol";
-import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
+import {OnlyL1} from "../bridgehub/L1BridgehubErrors.sol";
+import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
 
 import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
@@ -64,14 +64,6 @@ contract L2MessageRoot is MessageRootBase {
         _;
     }
 
-    /// @notice Checks that the Chain ID is the Gateway chain id.
-    modifier onlyGateway() {
-        if (block.chainid != _eraGatewayChainId()) {
-            revert OnlyGateway();
-        }
-        _;
-    }
-
     /// @notice Initializes the contract.
     /// @dev This function is used to initialize the contract with the initial values.
     /// @param _l1ChainId The chain id of L1.
@@ -104,5 +96,15 @@ contract L2MessageRoot is MessageRootBase {
 
         _emitRoot(sharedTreeRoot);
         historicalRoot[block.number] = sharedTreeRoot;
+    }
+
+    function _proveL2LeafInclusionOnSettlementLayer(
+        uint256,
+        uint256,
+        ProofData memory,
+        bytes32[] calldata,
+        uint256
+    ) internal pure override returns (bool) {
+        revert OnlyL1();
     }
 }

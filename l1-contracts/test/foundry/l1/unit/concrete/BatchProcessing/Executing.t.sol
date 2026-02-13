@@ -10,6 +10,7 @@ import {POINT_EVALUATION_PRECOMPILE_ADDR, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, TES
 import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {SystemLogKey} from "system-contracts/contracts/Constants.sol";
+import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {BatchHashMismatch, CantExecuteUnprovenBatches, NonSequentialBatch, PriorityOperationsRollingHashMismatch, QueueIsEmpty} from "contracts/common/L1ContractErrors.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
@@ -119,7 +120,7 @@ contract ExecutingTest is ExecutorTest {
         newCommitBatchInfo.priorityOperationsHash = correctRollingHash;
         newCommitBatchInfo.numberOfLayer1Txs = priorityOpsHashes.length;
 
-        IExecutor.CommitBatchInfo[] memory commitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory commitBatchInfoArray = new CommitBatchInfo[](1);
         commitBatchInfoArray[0] = newCommitBatchInfo;
 
         vm.prank(validator);
@@ -129,7 +130,7 @@ contract ExecutingTest is ExecutorTest {
             genesisStoredBatchInfo,
             commitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
         /// These constants were the hashes that are needed for the test to run. PriorityTree hashing validity is checked separately.
         executor.setPriorityTreeHistoricalRoot(0x682709a1fd539b1a69dfd64ade8d17231d5498c372fb8a6325ec545137f8a35a);
         executor.setPriorityTreeHistoricalRoot(0xa09200c9b365ebf37db651d6096b20c46ea62ff692839090fb0494a53ee80b28);
@@ -255,12 +256,12 @@ contract ExecutingTest is ExecutorTest {
             bytes32(uint256(1))
         );
 
-        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
         correctNewCommitBatchInfo.priorityOperationsHash = correctRollingHash;
         correctNewCommitBatchInfo.numberOfLayer1Txs = 1;
 
-        IExecutor.CommitBatchInfo[] memory correctNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory correctNewCommitBatchInfoArray = new CommitBatchInfo[](1);
         correctNewCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
 
         vm.prank(validator);
@@ -270,7 +271,7 @@ contract ExecutingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         IExecutor.StoredBatchInfo memory correctNewStoredBatchInfo = newStoredBatchInfo;
@@ -336,12 +337,12 @@ contract ExecutingTest is ExecutorTest {
             uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
             bytes32(uint256(2))
         );
-        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
         correctNewCommitBatchInfo.priorityOperationsHash = correctRollingHash;
         correctNewCommitBatchInfo.numberOfLayer1Txs = 2;
 
-        IExecutor.CommitBatchInfo[] memory correctNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory correctNewCommitBatchInfoArray = new CommitBatchInfo[](1);
         correctNewCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
 
         vm.prank(validator);
@@ -351,7 +352,7 @@ contract ExecutingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         IExecutor.StoredBatchInfo memory correctNewStoredBatchInfo = newStoredBatchInfo;
@@ -421,10 +422,10 @@ contract ExecutingTest is ExecutorTest {
             bytes32("")
         );
 
-        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.systemLogs = correctL2Logs;
 
-        IExecutor.CommitBatchInfo[] memory correctNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory correctNewCommitBatchInfoArray = new CommitBatchInfo[](1);
         correctNewCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
 
         bytes32 wrongPreviousBatchHash = Utils.randomBytes32("wrongPreviousBatchHash");
@@ -442,7 +443,7 @@ contract ExecutingTest is ExecutorTest {
             genesisBlock,
             correctNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_ShouldExecuteBatchesSuccessfully() public {

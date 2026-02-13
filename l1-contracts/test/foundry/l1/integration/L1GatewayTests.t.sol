@@ -36,6 +36,7 @@ import {InvalidProof, DepositDoesNotExist} from "contracts/common/L1ContractErro
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {GatewayUtils} from "deploy-scripts/gateway/GatewayUtils.s.sol";
 import {Utils} from "../unit/concrete/Utils/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -365,7 +366,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(migratingChainId);
 
-        bytes memory chainData = abi.encode(IAdmin(address(migratingChain)).prepareChainCommitment());
+        bytes memory chainData = abi.encode(IMigrator(address(migratingChain)).prepareChainCommitment());
         bytes memory ctmData = abi.encode(
             baseTokenAssetId,
             msg.sender,
@@ -378,8 +379,9 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             batchNumber: 0,
             ctmData: ctmData,
             chainData: chainData,
+            // +1 since during migrating back we the passed migration number gets incremented by 1 in the Gateway's ChainAssetHandler
             migrationNumber: IChainAssetHandlerBase(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
-                .migrationNumber(migratingChainId)
+                .migrationNumber(migratingChainId) + 1
         });
         bytes memory bridgehubMintData = abi.encode(data);
         bytes memory message = abi.encodePacked(
@@ -666,7 +668,13 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         assertNotEq(addresses.l1Nullifier.depositHappened(migratingChainId, merkleProofData.l2TxHash), 0x00);
         assertEq(IChainAssetHandlerBase(chainAssetHandler).migrationNumber(migratingChainId), 1);
 
-        vm.recordLogs();
+        if (txStatus == TxStatus.Success) {
+            vm.expectEmit();
+            emit IMigrator.DepositsUnpaused(migratingChainId);
+        } else {
+            vm.expectEmit();
+            emit IL1AssetRouter.ClaimedFailedDepositAssetRouter(gatewayChainId, assetId, transferData);
+        }
         addresses.l1Nullifier.bridgeConfirmTransferResult(transferResultData);
         _verifyMigrationEvents(txStatus);
 

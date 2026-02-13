@@ -18,20 +18,26 @@ error ChainExists();
 error CurrentBatchNumberAlreadySet();
 // 0x68d91b49
 error DepthMoreThanOneForRecursiveMerkleProof();
+// 0xd9d3fc89
+error HistoricalSettlementLayerMismatch(uint256 expectedSettlementLayer, uint256 actualSettlementLayer);
 // 0x48857c1d
 error IncorrectChainAssetId(bytes32 assetId, bytes32 assetIdFromChainId);
 // 0xf5e39c1f
 error IncorrectSender(address prevMsgSender, address chainAdmin);
+// 0x896555dc
+error InvalidSettlementLayerForBatch(uint256 chainId, uint256 batchNumber, uint256 claimedSettlementLayer);
 // 0x47d42b1b
 error IteratedMigrationsNotSupported();
 // 0xc3bd3c65
 error LocallyNoChainsAtGenesis();
 // 0x913183d8
 error MessageRootNotRegistered();
+// 0x338fe0e7
+error MigrationIntervalInvalid();
+// 0x81c5808d
+error MigrationIntervalNotSet();
 // 0x4010a88d
 error MigrationNotToL1();
-// 0x12b08c62
-error MigrationNumberAlreadySet();
 // 0xde1362a2
 error MigrationNumberMismatch(uint256 _expected, uint256 _actual);
 // 0x7f4316f3
@@ -54,8 +60,6 @@ error NotOwnerViaRouter(address msgSender, address originalCaller);
 error NotRelayedSender(address msgSender, address settlementLayerRelaySender);
 // 0xb35a7373
 error NotSystemContext(address _sender);
-// 0xb30ebfd8
-error NotWhitelistedSettlementLayer(uint256 chainId);
 // 0x3db511f4
 error OnlyAssetTracker(address, address);
 // 0x527b87c7
@@ -66,10 +70,14 @@ error OnlyBridgehubOrChainAssetHandler(address sender, address bridgehub, addres
 error OnlyChain(address msgSender, address zkChainAddress);
 // 0xec76af13
 error OnlyGateway();
+// 0x8d14ca84
+error OnlyL1();
 // 0x6b75db8c
 error OnlyOnSettlementLayer();
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
+// 0xefb272e2
+error SettlementLayerMustNotBeL1();
 // 0x36917565
 error SLHasDifferentCTM();
 // 0x90c7cbf1

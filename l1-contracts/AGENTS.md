@@ -40,6 +40,12 @@ address result = _tryAddress(target, "someFunction()");
 - They mask initialization issues and timing problems
 - The codebase should fail fast and clearly, not silently return defaults
 
+### Constructors and Immutables
+
+- ONLY contracts deployed on L1 should have immutables. Contracts on L2 are deployed within zksync os environment and so and so DO NOT SUPPORT CONSTRUCTORS ALL (and so no immutable can be set). It is important that the `*Base` contracts that the L2 contracts inherit from dont have immutables or constructors too.
+- If you want to add an immutable for L1, always double check whether it is possible to deterministically obtain from other contracts.
+- If there is variable that can be an immutable on L1, but we need a similar field on L2, a common pattern is to create a method in the base contract that can be inherited by both. On L2 it can be either a constant (esp if it is an L2 built-in contract address) or a storage variable that must be initialized within during the genesis. For example, look how `initL2` functions are used.
+
 ## Debugging Strategies
 
 When debugging Solidity compilation or script failures:

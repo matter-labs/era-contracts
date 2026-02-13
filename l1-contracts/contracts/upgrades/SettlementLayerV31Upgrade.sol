@@ -8,13 +8,13 @@ import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {L2_GENESIS_UPGRADE_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
-import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHandler.sol";
 import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 import {IL2V31Upgrade} from "./IL2V31Upgrade.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IL1MessageRoot} from "../core/message-root/IL1MessageRoot.sol";
+import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 
 error PriorityQueueNotReady();
 error V31UpgradeGatewayBlockNumberNotSet();
@@ -39,6 +39,9 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         s.assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
         s.__DEPRECATED_l2DAValidator = address(0);
 
+        // Set the permissionless validator used in Priority Mode, same as done in DiamondInit.
+        s.priorityModeInfo.permissionlessValidator = IChainTypeManager(s.chainTypeManager).PERMISSIONLESS_VALIDATOR();
+
         require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
 
         bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(s.chainId);
@@ -57,10 +60,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
         proposedUpgrade.l2ProtocolUpgradeTx.data = complexUpgraderCalldata;
         super.upgrade(proposedUpgrade);
-        IChainAssetHandlerBase chainAssetHandler = IChainAssetHandlerBase(bridgehub.chainAssetHandler());
-        IMessageRootBase messageRoot = bridgehub.messageRoot();
-
-        chainAssetHandler.setMigrationNumberForV31(s.chainId);
+IMessageRootBase messageRoot = IMessageRoot(bridgehub.messageRoot());
 
         if (s.settlementLayer == address(0)) {
             IL1MessageRoot(address(messageRoot)).saveV31UpgradeChainBatchNumber(s.chainId);

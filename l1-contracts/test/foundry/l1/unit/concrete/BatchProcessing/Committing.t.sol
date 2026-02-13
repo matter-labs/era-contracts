@@ -8,6 +8,7 @@ import {EMPTY_PREPUBLISHED_COMMITMENT, ExecutorTest, POINT_EVALUATION_PRECOMPILE
 
 import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {SystemLogKey} from "system-contracts/contracts/Constants.sol";
+import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 
 import {BLOB_DATA_OFFSET} from "../../../da-contracts-imports/CalldataDA.sol";
@@ -58,7 +59,7 @@ contract CommittingTest is ExecutorTest {
     }
 
     function test_RevertWhen_CommittingWithWrongLastCommittedBatchData() public {
-        IExecutor.CommitBatchInfo[] memory newCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory newCommitBatchInfoArray = new CommitBatchInfo[](1);
         newCommitBatchInfoArray[0] = newCommitBatchInfo;
 
         IExecutor.StoredBatchInfo memory wrongGenesisStoredBatchInfo = genesisStoredBatchInfo;
@@ -77,14 +78,14 @@ contract CommittingTest is ExecutorTest {
             wrongGenesisStoredBatchInfo,
             newCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithWrongOrderOfBatches() public {
-        IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
         wrongNewCommitBatchInfo.batchNumber = 2; // wrong batch number
 
-        IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
         wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
 
         vm.prank(validator);
@@ -94,7 +95,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithWrongNewBatchTimestamp() public {
@@ -108,11 +109,11 @@ contract CommittingTest is ExecutorTest {
             wrongNewBatchTimestamp
         );
 
-        IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
         wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
         wrongNewCommitBatchInfo.operatorDAInput = operatorDAInput;
 
-        IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
         wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
 
         vm.prank(validator);
@@ -123,7 +124,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithTooSmallNewBatchTimestamp() public {
@@ -136,12 +137,12 @@ contract CommittingTest is ExecutorTest {
             Utils.packBatchTimestampAndBlockTimestamp(1, 1)
         );
 
-        IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
         wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
         wrongNewCommitBatchInfo.timestamp = uint64(wrongNewBatchTimestamp);
         wrongNewCommitBatchInfo.operatorDAInput = operatorDAInput;
 
-        IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
         wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
 
         vm.prank(validator);
@@ -152,7 +153,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingTooBigLastL2BatchTimestamp() public {
@@ -165,12 +166,12 @@ contract CommittingTest is ExecutorTest {
             Utils.packBatchTimestampAndBlockTimestamp(wrongNewBatchTimestamp, wrongNewBatchTimestamp)
         );
 
-        IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
         wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
         wrongNewCommitBatchInfo.timestamp = wrongNewBatchTimestamp;
         wrongNewCommitBatchInfo.operatorDAInput = operatorDAInput;
 
-        IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
         wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
 
         vm.prank(validator);
@@ -181,7 +182,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithWrongPreviousBatchHash() public {
@@ -194,11 +195,11 @@ contract CommittingTest is ExecutorTest {
             wrongPreviousBatchHash
         );
 
-        IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
         wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
         wrongNewCommitBatchInfo.operatorDAInput = operatorDAInput;
 
-        IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
         wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
 
         vm.prank(validator);
@@ -209,18 +210,18 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithoutProcessingSystemContextLog() public {
         bytes[] memory wrongL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
         delete wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))];
 
-        IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
         wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
         wrongNewCommitBatchInfo.operatorDAInput = operatorDAInput;
 
-        IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
         wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
 
         vm.prank(validator);
@@ -231,7 +232,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithProcessingSystemContextLogTwice() public {
@@ -248,11 +249,11 @@ contract CommittingTest is ExecutorTest {
             )
         );
 
-        IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
         wrongNewCommitBatchInfo.systemLogs = wrongL2Logs;
         wrongNewCommitBatchInfo.operatorDAInput = operatorDAInput;
 
-        IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
         wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
 
         vm.prank(validator);
@@ -263,7 +264,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_UnexpectedL2ToL1Log() public {
@@ -276,10 +277,10 @@ contract CommittingTest is ExecutorTest {
             bytes32("")
         );
 
-        IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
         wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
 
-        IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
         wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
 
         vm.prank(validator);
@@ -295,7 +296,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithWrongCanonicalTxHash() public {
@@ -308,11 +309,11 @@ contract CommittingTest is ExecutorTest {
             wrongChainedPriorityHash
         );
 
-        IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
         wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
         wrongNewCommitBatchInfo.operatorDAInput = operatorDAInput;
 
-        IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
         wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
 
         vm.blobhashes(defaultBlobVersionedHashes);
@@ -323,7 +324,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithWrongNumberOfLayer1txs() public {
@@ -332,26 +333,26 @@ contract CommittingTest is ExecutorTest {
             true,
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
-            bytes32(bytes1(0x01))
+            bytes32(uint256(type(uint96).max))
         );
 
-        IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
         wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
         wrongNewCommitBatchInfo.numberOfLayer1Txs = 2;
         wrongNewCommitBatchInfo.operatorDAInput = operatorDAInput;
 
-        IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
         wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
 
         vm.blobhashes(defaultBlobVersionedHashes);
         vm.prank(validator);
 
-        vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, uint256(bytes32(bytes1(0x01))), uint256(2)));
+        vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, type(uint96).max, uint256(2)));
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_CommittingWithUnknownSystemLogKey() public {
@@ -362,10 +363,10 @@ contract CommittingTest is ExecutorTest {
             abi.encodePacked(bytes2(0x0001), bytes2(0x0000), L2_SYSTEM_CONTEXT_ADDRESS, uint256(1234), bytes32(""))
         );
 
-        IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
         wrongNewCommitBatchInfo.systemLogs = abi.encodePacked(wrongL2Logs);
 
-        IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
         wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
 
         vm.prank(validator);
@@ -375,7 +376,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_SystemLogIsFromIncorrectAddress() public {
@@ -394,10 +395,10 @@ contract CommittingTest is ExecutorTest {
             address wrongAddress = makeAddr("randomAddress");
             wrongL2Logs[i] = Utils.constructL2Log(true, wrongAddress, i, values[i]);
 
-            IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
+            CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
             wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
 
-            IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+            CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
             wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
 
             vm.prank(validator);
@@ -407,7 +408,7 @@ contract CommittingTest is ExecutorTest {
                 genesisStoredBatchInfo,
                 wrongNewCommitBatchInfoArray
             );
-            executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+            committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
         }
     }
 
@@ -416,10 +417,10 @@ contract CommittingTest is ExecutorTest {
             bytes[] memory l2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
             delete l2Logs[i];
 
-            IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
+            CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
             wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(l2Logs);
 
-            IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+            CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
             wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
 
             vm.prank(validator);
@@ -432,7 +433,7 @@ contract CommittingTest is ExecutorTest {
                 genesisStoredBatchInfo,
                 wrongNewCommitBatchInfoArray
             );
-            executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+            committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
         }
     }
 
@@ -468,7 +469,7 @@ contract CommittingTest is ExecutorTest {
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
 
-        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
 
@@ -490,7 +491,7 @@ contract CommittingTest is ExecutorTest {
             blobHashes
         );
 
-        IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -501,7 +502,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
@@ -524,11 +525,11 @@ contract CommittingTest is ExecutorTest {
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
 
-        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
 
-        IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -541,7 +542,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
@@ -594,11 +595,11 @@ contract CommittingTest is ExecutorTest {
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
 
-        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
         correctNewCommitBatchInfo.operatorDAInput = daInput;
 
-        IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
 
         vm.prank(validator);
@@ -610,7 +611,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
@@ -625,9 +626,9 @@ contract CommittingTest is ExecutorTest {
     }
 
     function test_RevertWhen_CommittingBatchMoreThanOneBatch() public {
-        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
 
-        IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](2);
+        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](2);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[1] = correctNewCommitBatchInfo;
 
@@ -638,7 +639,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_EmptyPubdataCommitments() public {
@@ -652,10 +653,10 @@ contract CommittingTest is ExecutorTest {
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
 
-        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
 
-        IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -668,7 +669,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_PartialPubdataCommitment() public {
@@ -680,7 +681,7 @@ contract CommittingTest is ExecutorTest {
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
 
-        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
 
@@ -696,7 +697,7 @@ contract CommittingTest is ExecutorTest {
             bytes("")
         );
 
-        IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = daInput;
 
@@ -708,7 +709,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_TooManyPubdataCommitments() public {
@@ -735,10 +736,10 @@ contract CommittingTest is ExecutorTest {
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
 
-        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
 
-        IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = daInput;
 
@@ -749,7 +750,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_NotEnoughPubdataCommitments() public {
@@ -761,10 +762,10 @@ contract CommittingTest is ExecutorTest {
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
 
-        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
 
-        IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -780,7 +781,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
 
         vm.clearMockedCalls();
     }
@@ -794,10 +795,10 @@ contract CommittingTest is ExecutorTest {
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
 
-        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
 
-        IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -808,7 +809,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
 
         vm.clearMockedCalls();
     }
@@ -822,10 +823,10 @@ contract CommittingTest is ExecutorTest {
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
 
-        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
 
-        IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -841,7 +842,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
 
         vm.clearMockedCalls();
     }
@@ -885,10 +886,10 @@ contract CommittingTest is ExecutorTest {
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
 
-        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
 
-        IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -900,7 +901,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_SecondBlobLinearHashNotZeroWithEmptyCommitment() public {
@@ -940,10 +941,10 @@ contract CommittingTest is ExecutorTest {
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
 
-        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
 
-        IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -956,7 +957,7 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     // For accurate measuring of gas usage via snapshot cheatcodes,
@@ -972,11 +973,11 @@ contract CommittingTest is ExecutorTest {
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
 
-        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
 
-        IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -996,7 +997,7 @@ contract CommittingTest is ExecutorTest {
     function test_commitBlockRealData() public {
         vm.prank(validator);
         vm.expectRevert();
-        executor.commitBatchesSharedBridge(
+        committer.commitBatchesSharedBridge(
             address(0),
             1,
             1,

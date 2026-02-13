@@ -120,7 +120,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     /// @notice Used to forward a transaction on the gateway to the chains mailbox.
     /// @param _chainId the chainId of the chain
     /// @param _canonicalTxHash the canonical transaction hash
-    /// @param _expirationTimestamp the expiration timestamp for the transaction
+    /// @param _expirationTimestamp Deprecated, always 0.
     function forwardTransactionOnGateway(
         uint256 _chainId,
         bytes32 _canonicalTxHash,

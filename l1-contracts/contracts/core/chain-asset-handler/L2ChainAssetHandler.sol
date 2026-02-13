@@ -120,4 +120,21 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
             ++migrationNumber[block.chainid];
         }
     }
+
+    function _recordMigrationToSL(
+        uint256 _chainId,
+        uint256 _settlementChainId,
+        uint256 _batchNumber,
+        uint256 _currentMigrationNum
+    ) internal override {
+        // We do not track migration intervals on L2.
+    }
+
+    function _recordMigrationFromSL(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        uint256 _currentMigrationNum
+    ) internal override {
+        // We do not track migration intervals on L2.
+    }
 }

@@ -1,3 +1,4 @@
+
 access_control_restriction_addr = "0x0000000000000000000000000000000000000000"
 chain_admin_addr = "0xe670b3ba34c5022D8915aA524825407Faaab7856"
 chain_proxy_admin_addr = "0x9D03660E47AEc72DC894426242B200e4C8365800"
@@ -46,10 +47,9 @@ rollup_l1_da_validator_addr = "0x5Be9468566A91E9979Cc432a07998424B2f8c264"
 server_notifier_proxy_addr = "0x42CC2aA96D2F0D516A09c071DD27ABb975DB5048"
 transparent_proxy_admin = "0x284bc9851eB6677ee40bA48b93598D61EF5b8DE7"
 transparent_proxy_admin_addr = "0x284bc9851eB6677ee40bA48b93598D61EF5b8DE7"
-upgrade_stage_validator = "0x7357F2936D94Db253bba22D0D4E8E0313Fd27B45"
-validator_timelock_addr = "0x62Db289447F202b1558Ed09E1c316C9d45F2EA8B"
+upgrade_stage_validator = "0x9545068B0638508F297F249FB6675F90099b8C99"
+validator_timelock_addr = "0x3AB9Ba534C075573E20938464985e16Df0F7b780"
 validium_l1_da_validator_addr = "0x0000000000000000000000000000000000000000"
-
 [deployed_addresses.bridgehub]
 bridgehub_implementation_addr = "0xb6C58AF61AdFF702fD4dCF18C270363a6974Fdd1"
 bridgehub_proxy_addr = "0x54aB226CaE17b582CDC6c3894234dD4ee3561CF6"
@@ -96,9 +96,8 @@ mailbox_facet_addr = "0x2785C25456952FE9aF0B1CA793B5879Dc3D905D0"
 state_transition_proxy_addr = "0xb2eA609686d0c1773F0D1aE7480e1eeaEb30f01a"
 validator_timelock_addr = "0x62Db289447F202b1558Ed09E1c316C9d45F2EA8B"
 validator_timelock_implementation_addr = "0x0000000000000000000000000000000000000000"
-verifier_addr = "0x6bE2d622f3Ef7e95b99357a33aC786C4a568719d"
-verifier_fflonk_addr = "0x8A599c441B59f7712a21d36c6d3b6A595BA1Abb5"
-verifier_plonk_addr = "0x9DE304DBd9Bc673b11f27e00cd50e0b2D931baA8"
+verifier_addr = "0xbFA6563AA6123CE2aa7A12C43F1dde6037903552"
+verifier_fflonk_addr = "0xb3f1E53f1DAa70dC824eB9CDC52dd2542726444b"
 
 [tokens.DAI]
 address = "0x3e8fA85969fDEb3d93702E7f16B8595AB91A6CD1"

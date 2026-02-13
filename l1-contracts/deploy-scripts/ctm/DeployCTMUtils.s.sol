@@ -47,11 +47,14 @@ import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsy
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
+import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
+import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
@@ -125,6 +128,8 @@ abstract contract DeployCTMUtils is DeployUtils {
         ctmAddresses.stateTransition.facets.adminFacet = deploySimpleContract("AdminFacet", false);
         ctmAddresses.stateTransition.facets.mailboxFacet = deploySimpleContract("MailboxFacet", false);
         ctmAddresses.stateTransition.facets.gettersFacet = deploySimpleContract("GettersFacet", false);
+        ctmAddresses.stateTransition.facets.migratorFacet = deploySimpleContract("MigratorFacet", false);
+        ctmAddresses.stateTransition.facets.committerFacet = deploySimpleContract("CommitterFacet", false);
         ctmAddresses.stateTransition.facets.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
@@ -180,13 +185,13 @@ abstract contract DeployCTMUtils is DeployUtils {
         return ChainCreationParamsLib.getChainCreationParams(_config, config.isZKsyncOS);
     }
 
-    /// @notice Get all four facet cuts
+    /// @notice Get all six facet cuts
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
         // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.
         // If we start to use different selectors for Gateway, we should change this.
-        facetCuts = new Diamond.FacetCut[](4);
+        facetCuts = new Diamond.FacetCut[](6);
         facetCuts[0] = Diamond.FacetCut({
             facet: stateTransition.facets.adminFacet,
             action: Diamond.Action.Add,
@@ -210,6 +215,18 @@ abstract contract DeployCTMUtils is DeployUtils {
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: Utils.getAllSelectors(ctmAddresses.stateTransition.facets.executorFacet.code)
+        });
+        facetCuts[4] = Diamond.FacetCut({
+            facet: stateTransition.facets.migratorFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getAllSelectors(ctmAddresses.stateTransition.facets.migratorFacet.code)
+        });
+        facetCuts[5] = Diamond.FacetCut({
+            facet: stateTransition.facets.committerFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getAllSelectors(ctmAddresses.stateTransition.facets.committerFacet.code)
         });
     }
 
@@ -344,6 +361,8 @@ abstract contract DeployCTMUtils is DeployUtils {
                 return type(L1GenesisUpgrade).creationCode;
             } else if (compareStrings(contractName, "ValidatorTimelock")) {
                 return type(ValidatorTimelock).creationCode;
+            } else if (compareStrings(contractName, "PermissionlessValidator")) {
+                return type(PermissionlessValidator).creationCode;
             } else if (compareStrings(contractName, "EraChainTypeManager")) {
                 return type(EraChainTypeManager).creationCode;
             } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
@@ -358,6 +377,10 @@ abstract contract DeployCTMUtils is DeployUtils {
                 return type(MailboxFacet).creationCode;
             } else if (compareStrings(contractName, "GettersFacet")) {
                 return type(GettersFacet).creationCode;
+            } else if (compareStrings(contractName, "MigratorFacet")) {
+                return type(MigratorFacet).creationCode;
+            } else if (compareStrings(contractName, "CommitterFacet")) {
+                return type(CommitterFacet).creationCode;
             } else if (compareStrings(contractName, "DiamondInit")) {
                 return type(DiamondInit).creationCode;
             } else if (compareStrings(contractName, "ServerNotifier")) {
@@ -430,6 +453,8 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode(restrictions);
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "PermissionlessValidator")) {
+            return abi.encode();
         } else if (compareStrings(contractName, "ProxyAdmin")) {
             return abi.encode();
         } else if (compareStrings(contractName, "GettersFacet")) {
@@ -473,7 +498,8 @@ abstract contract DeployCTMUtils is DeployUtils {
                 // For L1 deployment we need to use the deployer as the owner of the verifier,
                 // because we set the dual verifier later. Use getBroadcasterAddress() to get
                 // the actual EOA when this is called from a contract created via `new` during the script.
-                verifierOwner: getBroadcasterAddress()
+                verifierOwner: getBroadcasterAddress(),
+                permissionlessValidator: ctmAddresses.stateTransition.proxies.permissionlessValidator
             });
     }
 
@@ -511,6 +537,8 @@ abstract contract DeployCTMUtils is DeployUtils {
                 );
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
             return abi.encodeCall(BytecodesSupplier.initialize, ());
+        } else if (compareStrings(contractName, "PermissionlessValidator")) {
+            return abi.encodeCall(PermissionlessValidator.initialize, ());
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }
