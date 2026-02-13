@@ -156,6 +156,19 @@
   },
   {
     "type": "function",
+    "name": "deactivatePriorityMode",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "executeUpgrade",
     "inputs": [
       {
