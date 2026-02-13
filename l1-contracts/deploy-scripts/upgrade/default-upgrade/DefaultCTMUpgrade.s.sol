@@ -694,7 +694,13 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             target: ctmAddresses.stateTransition.proxies.chainTypeManager,
             data: abi.encodeCall(
                 IChainTypeManager.setNewVersionUpgrade,
-                (upgradeCut, previousProtocolVersion, deadline, newProtocolVersion)
+                (
+                    upgradeCut,
+                    previousProtocolVersion,
+                    deadline,
+                    newProtocolVersion,
+                    ctmAddresses.stateTransition.verifiers.verifier
+                )
             ),
             value: 0
         });

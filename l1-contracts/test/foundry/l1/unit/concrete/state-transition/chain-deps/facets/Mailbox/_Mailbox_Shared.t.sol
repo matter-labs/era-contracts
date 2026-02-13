@@ -106,7 +106,24 @@ contract MailboxTest is UtilsCallMockerTest {
             selectors: Utils.getGettersSelectors()
         });
 
-        proxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, bridgehub);
+        mockDiamondInitInteropCenterCallsWithAddress(bridgehub, address(0), bytes32(0));
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(chainAssetHandler)
+        );
+        vm.mockCall(
+            address(chainAssetHandler),
+            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
+            abi.encode(1)
+        );
+        vm.mockCall(
+            address(chainAssetHandler),
+            abi.encodeWithSelector(IL1ChainAssetHandler.isMigrationInProgress.selector),
+            abi.encode(false)
+        );
+        mockChainTypeManagerVerifier(testnetVerifier);
+        proxy = Utils.makeDiamondProxy(facetCuts, bridgehub);
         utilsFacet = UtilsFacet(proxy);
         utilsFacet.util_setBridgehub(bridgehub);
     }

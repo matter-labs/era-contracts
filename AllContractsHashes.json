@@ -2201,12 +2201,12 @@
   },
   {
     "contractName": "l1-contracts/ValidiumL1DAValidator",
-    "zkBytecodeHash": "0x010000332a6f58b26a616fab6281a67aca10d2df21a4bc31c44c34fedd79c90e",
+    "zkBytecodeHash": "0x010000336e6e84031630bae5c7df736dfac553eb77d4527cdf779c7da4c8fcf8",
     "zkBytecodePath": "/l1-contracts/zkout/ValidiumL1DAValidator.sol/ValidiumL1DAValidator.json",
-    "evmBytecodeHash": "0xe0c4f39e1a59875f4fbd9234559ab42cc74c0cc3a56a0899811c368c66241fd0",
+    "evmBytecodeHash": "0xb647052e1e3cb1937c68c972bf41889bb7b3101022226c5d2524fa31ec344dd5",
     "evmBytecodePath": "/l1-contracts/out/ValidiumL1DAValidator.sol/ValidiumL1DAValidator.json",
-    "evmDeployedBytecodeHash": "0x2ea7d6f63e594cb5b457c84f2a52e05b9ffa70fca1ef564406bff71a0a6278f5",
-    "evmDeployedBytecodeBlakeHash": "0x6bb42749ef4ac9d37dd9ab1d691da481ca2d63d1e57f422ad0f026608cd8622f",
+    "evmDeployedBytecodeHash": "0x44858ce34fd0efa66a49771491e4ee1ee9adc43d68974783b1d5b09b7ea88acb",
+    "evmDeployedBytecodeBlakeHash": "0xcc08ba5d5936d227b900058d2304f0217e05f05d454dc8836ff7876918e18869",
     "evmDeployedBytecodeLength": 797
   },
   {
