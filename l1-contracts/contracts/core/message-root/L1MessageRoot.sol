@@ -82,7 +82,7 @@ contract L1MessageRoot is MessageRootBase {
         uint256 totalBatchesExecuted = IGetters(msg.sender).getTotalBatchesExecuted();
         require(totalBatchesExecuted > 0, TotalBatchesExecutedZero());
         require(
-            totalBatchesExecuted != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1 - 1,
+            totalBatchesExecuted != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE - 1,
             TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber()
         );
         require(
@@ -105,7 +105,8 @@ contract L1MessageRoot is MessageRootBase {
         bool isValid = IL1ChainAssetHandler(CHAIN_ASSET_HANDLER).isValidSettlementLayer(
             _chainId,
             _batchNumber,
-            _proofData.settlementLayerChainId
+            _proofData.settlementLayerChainId,
+            _proofData.settlementLayerBatchNumber
         );
         require(isValid, InvalidSettlementLayerForBatch(_chainId, _batchNumber, _proofData.settlementLayerChainId));
 

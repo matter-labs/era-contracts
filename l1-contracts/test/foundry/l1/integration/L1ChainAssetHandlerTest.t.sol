@@ -267,6 +267,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         MigrationInterval memory interval = MigrationInterval({
             migrateToGWBatchNumber: 10,
             migrateFromGWBatchNumber: 50,
+            settlementLayerBatchLowerBound: 100,
+            settlementLayerBatchUpperBound: 200,
             settlementLayerChainId: gwChainId,
             isActive: false
         });
@@ -287,6 +289,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         MigrationInterval memory interval = MigrationInterval({
             migrateToGWBatchNumber: 10,
             migrateFromGWBatchNumber: 50,
+            settlementLayerBatchLowerBound: 100,
+            settlementLayerBatchUpperBound: 200,
             settlementLayerChainId: gwChainId,
             isActive: false
         });
@@ -301,6 +305,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         MigrationInterval memory interval = MigrationInterval({
             migrateToGWBatchNumber: 10,
             migrateFromGWBatchNumber: 50,
+            settlementLayerBatchLowerBound: 100,
+            settlementLayerBatchUpperBound: 200,
             settlementLayerChainId: gwChainId,
             isActive: true
         });
@@ -316,6 +322,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         MigrationInterval memory interval = MigrationInterval({
             migrateToGWBatchNumber: 10,
             migrateFromGWBatchNumber: 50,
+            settlementLayerBatchLowerBound: 100,
+            settlementLayerBatchUpperBound: 200,
             settlementLayerChainId: wrongSL,
             isActive: false
         });
@@ -330,6 +338,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         MigrationInterval memory interval = MigrationInterval({
             migrateToGWBatchNumber: 50,
             migrateFromGWBatchNumber: 30, // invalid: from must be > to
+            settlementLayerBatchLowerBound: 100,
+            settlementLayerBatchUpperBound: 200,
             settlementLayerChainId: gwChainId,
             isActive: false
         });
@@ -344,6 +354,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         MigrationInterval memory interval = MigrationInterval({
             migrateToGWBatchNumber: 10,
             migrateFromGWBatchNumber: 0, // invalid: from must be > to
+            settlementLayerBatchLowerBound: 100,
+            settlementLayerBatchUpperBound: 200,
             settlementLayerChainId: gwChainId,
             isActive: false
         });
@@ -358,6 +370,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         MigrationInterval memory interval = MigrationInterval({
             migrateToGWBatchNumber: 10,
             migrateFromGWBatchNumber: 50,
+            settlementLayerBatchLowerBound: 100,
+            settlementLayerBatchUpperBound: 200,
             settlementLayerChainId: gwChainId,
             isActive: false
         });
@@ -373,6 +387,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         MigrationInterval memory interval = MigrationInterval({
             migrateToGWBatchNumber: 0,
             migrateFromGWBatchNumber: 50,
+            settlementLayerBatchLowerBound: 100,
+            settlementLayerBatchUpperBound: 200,
             settlementLayerChainId: gwChainId,
             isActive: false
         });
@@ -391,6 +407,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         MigrationInterval memory interval = MigrationInterval({
             migrateToGWBatchNumber: 50,
             migrateFromGWBatchNumber: 50, // invalid: from == to
+            settlementLayerBatchLowerBound: 100,
+            settlementLayerBatchUpperBound: 200,
             settlementLayerChainId: gwChainId,
             isActive: false
         });
@@ -409,10 +427,10 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         vm.clearMockedCalls();
 
         // No migration set for eraZKChainId → all batches should report L1
-        bool result = _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 5, block.chainid);
+        bool result = _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 5, block.chainid, 0);
         assertTrue(result, "Batch should be on L1 when no migration is set");
 
-        result = _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 5, 999);
+        result = _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 5, 999, 0);
         assertFalse(result, "Claiming wrong SL should return false");
     }
 
@@ -431,6 +449,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         MigrationInterval memory interval = MigrationInterval({
             migrateToGWBatchNumber: 10,
             migrateFromGWBatchNumber: 50,
+            settlementLayerBatchLowerBound: 100,
+            settlementLayerBatchUpperBound: 200,
             settlementLayerChainId: gwChainId,
             isActive: false
         });
@@ -442,43 +462,57 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         MigrationInterval memory stored = _l1ChainAssetHandler().migrationInterval(eraZKChainId, 0);
         assertEq(stored.migrateToGWBatchNumber, 10, "migrateToGWBatchNumber mismatch");
         assertEq(stored.migrateFromGWBatchNumber, 50, "migrateFromGWBatchNumber mismatch");
+        assertEq(stored.settlementLayerBatchLowerBound, 100, "settlementLayerBatchLowerBound mismatch");
+        assertEq(stored.settlementLayerBatchUpperBound, 200, "settlementLayerBatchUpperBound mismatch");
         assertEq(stored.settlementLayerChainId, gwChainId, "settlementLayerChainId mismatch");
         assertFalse(stored.isActive, "historical interval should not be active");
 
         // Batch before migration (batch 5 <= migrateToSL=10) -> on L1
         assertTrue(
-            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 5, block.chainid),
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 5, block.chainid, 0),
             "Batch before migration should be on L1"
         );
         assertFalse(
-            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 5, gwChainId),
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 5, gwChainId, 150),
             "Batch before migration should NOT be on GW"
         );
 
-        // Batch during migration (10 < batch 30 <= migrateFromSL=50) -> on GW
+        // Batch during migration (10 < batch 30 <= migrateFromSL=50) -> on GW with valid SL batch
         assertTrue(
-            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 30, gwChainId),
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 30, gwChainId, 150),
             "Batch during migration should be on GW"
         );
         assertFalse(
-            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 30, block.chainid),
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 30, block.chainid, 0),
             "Batch during migration should NOT be on L1"
+        );
+
+        // Batch during migration but SL batch number below lower bound -> invalid
+        assertFalse(
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 30, gwChainId, 50),
+            "SL batch below lower bound should be invalid"
+        );
+
+        // Batch during migration but SL batch number above upper bound -> invalid
+        assertFalse(
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 30, gwChainId, 300),
+            "SL batch above upper bound should be invalid"
         );
 
         // Batch after return (batch 60 > migrateFromSL=50) -> on L1
         assertTrue(
-            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 60, block.chainid),
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 60, block.chainid, 0),
             "Batch after return should be on L1"
         );
         assertFalse(
-            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 60, gwChainId),
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 60, gwChainId, 150),
             "Batch after return should NOT be on GW"
         );
 
         // Wrong chain ID always returns false
         uint256 wrongChainId = 9999;
         assertFalse(
-            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 5, wrongChainId),
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 5, wrongChainId, 0),
             "Wrong chain ID should be invalid"
         );
     }

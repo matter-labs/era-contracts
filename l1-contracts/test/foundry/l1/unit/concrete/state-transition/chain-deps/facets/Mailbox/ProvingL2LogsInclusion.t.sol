@@ -330,6 +330,8 @@ contract MailboxL2LogsProve is MailboxTest {
         MigrationInterval memory interval = MigrationInterval({
             migrateToGWBatchNumber: batchNumber - 1, // batch 1
             migrateFromGWBatchNumber: 1000,
+            settlementLayerBatchLowerBound: 0,
+            settlementLayerBatchUpperBound: type(uint256).max,
             settlementLayerChainId: _settlementLayerChainId,
             isActive: false
         });
@@ -465,6 +467,8 @@ contract MailboxL2LogsProve is MailboxTest {
         MigrationInterval memory interval = MigrationInterval({
             migrateToGWBatchNumber: 5,
             migrateFromGWBatchNumber: 100,
+            settlementLayerBatchLowerBound: 0,
+            settlementLayerBatchUpperBound: type(uint256).max,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isActive: false
         });
@@ -534,6 +538,8 @@ contract MailboxL2LogsProve is MailboxTest {
         MigrationInterval memory interval = MigrationInterval({
             migrateToGWBatchNumber: 1,
             migrateFromGWBatchNumber: 5,
+            settlementLayerBatchLowerBound: 0,
+            settlementLayerBatchUpperBound: type(uint256).max,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isActive: false
         });
