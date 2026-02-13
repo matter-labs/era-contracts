@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2BaseTokenBase} from "../l2-system/interfaces/IL2BaseTokenBase.sol";
+import {IL2BaseTokenZKOS} from "../l2-system/zksync-os/interfaces/IL2BaseTokenZKOS.sol";
 
 /// @dev Storage slot with the admin of the contract used for EIP‑1967 proxies (e.g., TUP, BeaconProxy, etc.).
 bytes32 constant PROXY_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
@@ -23,8 +24,14 @@ contract L2V31Upgrade {
         // TODO: add all setAddresses, initL2 and updateL2s from genesis upgrade.
 
         // Initialize the BaseTokenHolder balance in L2BaseToken.
-        // This works for both Era VM (via storage manipulation) and ZK OS (via mint hook + transfer).
-        // Both implementations are idempotent.
         IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initializeBaseTokenHolderBalance();
+    }
+
+    /// @notice Sets the pre-V31 total supply on ZKOS chains.
+    /// @dev Intended to be delegate-called by the ComplexUpgrader contract, separately from the main upgrade.
+    /// @dev Chain admin provides the total supply that existed before the V31 upgrade.
+    /// @param _totalSupply The total supply that existed before the V31 upgrade.
+    function setZkosPreV31TotalSupply(uint256 _totalSupply) external {
+        IL2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).setZkosPreV31TotalSupply(_totalSupply);
     }
 }

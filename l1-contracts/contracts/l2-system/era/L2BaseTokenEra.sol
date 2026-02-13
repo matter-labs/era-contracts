@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {L2BaseTokenBase} from "../L2BaseTokenBase.sol";
 import {IL2BaseTokenEra} from "./interfaces/IL2BaseTokenEra.sol";
-import {L2_ASSET_TRACKER, L2_BASE_TOKEN_HOLDER_ADDR, L2_BOOTLOADER_ADDRESS, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_HANDLER_ADDR, MSG_VALUE_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_TRACKER, L2_BASE_TOKEN_HOLDER_ADDR, L2_BOOTLOADER_ADDRESS, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, MSG_VALUE_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "../../common/Config.sol";
 import {InsufficientFunds, Unauthorized} from "../../common/L1ContractErrors.sol";
 
@@ -18,9 +18,9 @@ import {InsufficientFunds, Unauthorized} from "../../common/L1ContractErrors.sol
  * to perform the balance changes while simulating the `msg.value` Ethereum behavior.
  */
 contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
-    /// @notice Modifier that makes sure that the method can only be called from the bootloader or InteropHandler.
-    modifier onlyCallFromBootloaderOrInteropHandler() {
-        if (msg.sender != L2_BOOTLOADER_ADDRESS && msg.sender != L2_INTEROP_HANDLER_ADDR) {
+    /// @notice Modifier that makes sure that the method can only be called from the bootloader.
+    modifier onlyBootloader() {
+        if (msg.sender != L2_BOOTLOADER_ADDRESS) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -29,10 +29,9 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
     /// @notice Returns the total circulating supply of base tokens.
     /// @dev Computed as: INITIAL_BASE_TOKEN_HOLDER_BALANCE - current holder balance
     /// @dev This replaces the previous storage-based totalSupply that was incremented on mint.
-    /// @dev This formula is safe because selfdestruct is not supported on Era, so no funds
-    /// @dev can be force-sent to BaseTokenHolder bypassing the access-controlled entry points.
+    /// @dev This formula is safe because selfdestruct is not supported on Era, so no funds can be force-sent to BaseTokenHolder.
     function totalSupply() external view override returns (uint256) {
-        return INITIAL_BASE_TOKEN_HOLDER_BALANCE - balance[L2_BASE_TOKEN_HOLDER_ADDR];
+        return INITIAL_BASE_TOKEN_HOLDER_BALANCE - eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR];
     }
 
     /// @notice Transfer tokens from one address to another.
@@ -51,15 +50,15 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
             revert Unauthorized(msg.sender);
         }
 
-        uint256 fromBalance = balance[_from];
+        uint256 fromBalance = eraAccountBalance[_from];
         if (fromBalance < _amount) {
             revert InsufficientFunds(_amount, fromBalance);
         }
         unchecked {
-            balance[_from] = fromBalance - _amount;
+            eraAccountBalance[_from] = fromBalance - _amount;
             // Overflow not possible: the sum of all balances is capped by totalSupply, and the sum is preserved by
             // decrementing then incrementing.
-            balance[_to] += _amount;
+            eraAccountBalance[_to] += _amount;
         }
 
         emit Transfer(_from, _to, _amount);
@@ -70,7 +69,7 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
     /// Ethereum's `BALANCE` opcode that accepts uint256 as an argument and truncates any upper bits
     /// @param _account The address of the account to return the balance of.
     function balanceOf(uint256 _account) external view override returns (uint256) {
-        return balance[address(uint160(_account))];
+        return eraAccountBalance[address(uint160(_account))];
     }
 
     /// @notice Increase the balance of the receiver by transferring from BaseTokenHolder.
@@ -78,28 +77,27 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
     /// @dev The totalSupply is now computed from BaseTokenHolder balance, so we only update balances.
     /// @param _account The address which to mint the funds to.
     /// @param _amount The amount of ETH in wei to be minted.
-    function mint(address _account, uint256 _amount) external override onlyCallFromBootloaderOrInteropHandler {
+    function mint(address _account, uint256 _amount) external override onlyBootloader {
         L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(_amount);
         // Transfer from BaseTokenHolder to the recipient
         // This decreases holder balance, which increases totalSupply() automatically
-        balance[L2_BASE_TOKEN_HOLDER_ADDR] -= _amount;
-        balance[_account] += _amount;
+        eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR] -= _amount;
+        eraAccountBalance[_account] += _amount;
         emit Mint(_account, _amount);
     }
 
     /// @notice Initializes the BaseTokenHolder's balance during the V31 upgrade.
-    /// @dev Reads the old totalSupply from __DEPRECATED_totalSupply and sets the holder balance
-    /// @dev such that the new computed totalSupply() equals the old value.
-    /// @dev Formula: balance[holder] = INITIAL_BASE_TOKEN_HOLDER_BALANCE - __DEPRECATED_totalSupply
+    /// @dev Sets the holder balance so that the new computed totalSupply() equals the old value.
+    /// @dev Formula: eraAccountBalance[holder] = INITIAL_BASE_TOKEN_HOLDER_BALANCE - __DEPRECATED_totalSupply + eraAccountBalance[holder]
     /// @dev Can only be called by the ComplexUpgrader contract.
     function initializeBaseTokenHolderBalance() external override {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert Unauthorized(msg.sender);
         }
 
-        balance[L2_BASE_TOKEN_HOLDER_ADDR] =
+        eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR] =
             INITIAL_BASE_TOKEN_HOLDER_BALANCE -
             __DEPRECATED_totalSupply +
-            balance[L2_BASE_TOKEN_HOLDER_ADDR];
+            eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR];
     }
 }

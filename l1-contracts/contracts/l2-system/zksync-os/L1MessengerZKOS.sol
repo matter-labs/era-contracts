@@ -20,7 +20,7 @@ import {L1MessageGasLib} from "./L1MessageGasLib.sol";
  * - The contract on L1 accepts all sent messages and if the message came from this system contract
  * it requires that the preimage of `value` be provided.
  */
-contract L1Messenger is IL2ToL1Messenger {
+contract L1MessengerZKOS is IL2ToL1Messenger {
     function burnGas(bytes calldata _message) internal {
         uint256 gasToBurn = L1MessageGasLib.estimateL1MessageGas(_message.length);
 

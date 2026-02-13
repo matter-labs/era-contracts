@@ -3,14 +3,14 @@ pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 import {L1_MESSENGER_HOOK} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import "contracts/l2-system/zksync-os/L1Messenger.sol";
+import "contracts/l2-system/zksync-os/L1MessengerZKOS.sol";
 import {IL2ToL1Messenger} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
 
-contract L1MessengerTest is Test {
-    L1Messenger messenger;
+contract L1MessengerZKOSTest is Test {
+    L1MessengerZKOS messenger;
 
     function setUp() public {
-        messenger = new L1Messenger();
+        messenger = new L1MessengerZKOS();
     }
 
     function test_sendToL1_works_andEmitsEvent() public {

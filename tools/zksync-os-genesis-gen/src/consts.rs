@@ -123,7 +123,7 @@ pub const INITIAL_CONTRACTS: [(Address, ContractSource); 20] = [
     (L2_BASE_TOKEN_HOLDER_ADDR, ContractSource::L1ContractName("BaseTokenHolder")),
     // System contracts (0x8000 range)
     (L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, ContractSource::L1ContractName("ZKOSContractDeployer")),
-    (L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, ContractSource::L1ContractName("L1Messenger")),
+    (L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, ContractSource::L1ContractName("L1MessengerZKOS")),
     (L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, ContractSource::L1ContractName("L2BaseTokenZKOS")),
     // Deterministic Create2 factory
     (DETERMINISTIC_CREATE2_ADDRESS, ContractSource::Bytecode(CREATE2_FACTORY_RUNTIME_BYTECODE)),

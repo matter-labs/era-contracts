@@ -5,4 +5,6 @@ pragma solidity ^0.8.24;
 /// @custom:security-contact security@matterlabs.dev
 interface IL2V31Upgrade {
     function upgrade(uint256 _baseTokenOriginChainId, address _baseTokenOriginAddress) external;
+
+    function setZkosPreV31TotalSupply(uint256 _totalSupply) external;
 }

@@ -22,7 +22,7 @@ abstract contract L2BaseTokenBase is IL2BaseTokenBase {
 
     /// @notice The balances of the users.
     /// @dev Only used by the Era implementation. Declared here for storage layout alignment.
-    mapping(address account => uint256 balance) internal balance;
+    mapping(address account => uint256 balance) internal eraAccountBalance;
 
     /// @notice Deprecated: The old storage variable for total supply.
     /// @dev This variable is kept to preserve storage layout. It is only read during the V31 upgrade
@@ -32,8 +32,15 @@ abstract contract L2BaseTokenBase is IL2BaseTokenBase {
     // slither-disable-next-line uninitialized-state
     uint256 internal __DEPRECATED_totalSupply;
 
+    /// @notice The pre-V31 total supply for ZKOS chains, set by chain admin during V31 upgrade.
+    /// @dev Only used by the ZKOS implementation. Declared here for storage layout alignment.
+    /// @dev On ZKOS chains, pre-V31 total supply was never tracked on-chain. This value is set
+    /// @dev during the V31 upgrade so that totalSupply() can be computed correctly.
+    // slither-disable-next-line uninitialized-state
+    uint256 internal _zkosPreV31TotalSupply;
+
     /// @dev Storage gap to allow adding new shared storage variables in future upgrades.
-    uint256[48] private __gap;
+    uint256[47] private __gap;
 
     /// @notice Initiate the withdrawal of the base token, funds will be available to claim on L1 `finalizeEthWithdrawal` method.
     /// @param _l1Receiver The address on L1 to receive the funds.

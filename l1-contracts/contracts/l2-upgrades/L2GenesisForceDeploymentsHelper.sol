@@ -246,11 +246,9 @@ library L2GenesisForceDeploymentsHelper {
         // solhint-disable-next-line func-named-parameters
         _finalizeDeployments(
             _ctmDeployer,
-            expectedUpgradeType,
             fixedForceDeploymentsData,
             additionalForceDeploymentsData,
-            _isGenesisUpgrade,
-            _isZKsyncOS
+            _isGenesisUpgrade
         );
     }
 
@@ -486,16 +484,20 @@ library L2GenesisForceDeploymentsHelper {
                 fixedForceDeploymentsData.interopHandlerBytecodeInfo,
                 L2_INTEROP_HANDLER_ADDR
             );
+
+            conductContractUpgrade(
+                expectedUpgradeType,
+                fixedForceDeploymentsData.baseTokenHolderBytecodeInfo,
+                L2_BASE_TOKEN_HOLDER_ADDR
+            );
         }
     }
 
     function _finalizeDeployments(
         address _ctmDeployer,
-        IComplexUpgrader.ContractUpgradeType expectedUpgradeType,
         FixedForceDeploymentsData memory fixedForceDeploymentsData,
         ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData,
-        bool _isGenesisUpgrade,
-        bool _isZKsyncOS
+        bool _isGenesisUpgrade
     ) private {
         // It is expected that either through the force deployments above
         // or upon initialization, both the L2 deployment of BridgeHub, AssetRouter, and MessageRoot are deployed.
@@ -522,16 +524,6 @@ library L2GenesisForceDeploymentsHelper {
         );
 
         InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
-
-        // Deploy BaseTokenHolder contract.
-        // For ZKOS genesis, the contract is already deployed by the genesis tool.
-        if (!(_isZKsyncOS && _isGenesisUpgrade)) {
-            conductContractUpgrade(
-                expectedUpgradeType,
-                fixedForceDeploymentsData.baseTokenHolderBytecodeInfo,
-                L2_BASE_TOKEN_HOLDER_ADDR
-            );
-        }
 
         // Initialize BaseTokenHolder balance during genesis for both Era and ZKOS chains.
         // This mints the initial token supply and transfers it to BaseTokenHolder.
