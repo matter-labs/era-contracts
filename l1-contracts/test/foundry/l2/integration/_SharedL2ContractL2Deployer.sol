@@ -16,13 +16,15 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
+import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -33,6 +35,13 @@ import {ChainCreationParamsConfig} from "deploy-scripts/utils/Types.sol";
 
 contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
     using stdToml for string;
+
+    function initSystemContracts(SystemContractsArgs memory _args) internal virtual override {
+        L2Utils.initSystemContracts(_args);
+        // Deploy DummyInteropRecipient using force deploy pattern for zkfoundry
+        L2Utils.deployDummyInteropRecipient(interopTargetContract);
+        vm.deal(interopTargetContract, 1000 ether);
+    }
 
     /// @notice Override to avoid library delegatecall issues in ZKsync mode
     /// Returns hardcoded values from the test config
@@ -53,10 +62,6 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         chainCreationParams.evmEmulatorHash = bytes32(
             0x01000D83E0329D9144AD041430FAFCBC2B388E5434DB8CB8A96E80157738A1DA
         );
-    }
-
-    function initSystemContracts(SystemContractsArgs memory _args) internal virtual override {
-        L2Utils.initSystemContracts(_args);
     }
 
     /// @notice this is duplicate code, but the inheritance is already complex
@@ -94,21 +99,23 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         );
         ctmAddresses.stateTransition.facets.executorFacet = address(new ExecutorFacet(config.l1ChainId));
         ctmAddresses.stateTransition.facets.adminFacet = address(
-            new AdminFacet(config.l1ChainId, RollupDAManager(ctmAddresses.daAddresses.rollupDAManager), false)
+            new AdminFacet(config.l1ChainId, RollupDAManager(ctmAddresses.daAddresses.rollupDAManager))
         );
         ctmAddresses.stateTransition.facets.mailboxFacet = address(
             new MailboxFacet(config.l1ChainId, L2_CHAIN_ASSET_HANDLER_ADDR, IEIP7702Checker(address(0)), false)
         );
         ctmAddresses.stateTransition.facets.gettersFacet = address(new GettersFacet());
+        ctmAddresses.stateTransition.facets.migratorFacet = address(new MigratorFacet(config.l1ChainId, true));
+        ctmAddresses.stateTransition.facets.committerFacet = address(new CommitterFacet(config.l1ChainId));
         ctmAddresses.stateTransition.facets.diamondInit = address(new DiamondInit(false));
         // Deploy ChainTypeManager implementation
         if (config.isZKsyncOS) {
             ctmAddresses.stateTransition.implementations.chainTypeManager = address(
-                new ZKsyncOSChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0))
+                new ZKsyncOSChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0))
             );
         } else {
             ctmAddresses.stateTransition.implementations.chainTypeManager = address(
-                new EraChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0))
+                new EraChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0))
             );
         }
 

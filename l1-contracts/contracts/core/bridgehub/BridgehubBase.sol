@@ -15,13 +15,13 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 
-import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "../../common/Messaging.sol";
+import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus, TokenBridgingData} from "../../common/Messaging.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "../message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {AlreadyCurrentSL, NotChainAssetHandler, SLNotWhitelisted} from "./L1BridgehubErrors.sol";
 import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdCantBeCurrentChain, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, NoCTMForAssetId, NotCurrentSettlementLayer, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../../common/L1ContractErrors.sol";
-import {L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_COMPLEX_UPGRADER_ADDR, GW_ASSET_TRACKER} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -87,8 +87,10 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     /// @dev used to indicate the currently active settlement layer for a given chainId
     mapping(uint256 chainId => uint256 activeSettlementLayerChainId) public settlementLayer;
 
-    /// @notice shows whether the given chain can be used as a settlement layer.
-    /// @dev the Gateway will be one of the possible settlement layers. The L1 is also a settlement layer.
+    /// @notice Shows whether a chain can currently be selected as a migration target settlement layer.
+    /// @dev This does NOT represent historical settlement layers used in message proof verification.
+    /// @dev Historical settlement layer assignments are tracked in ChainAssetHandler `_migrationInterval`.
+    /// @dev The Gateway will be one of the possible settlement layers. L1 is also a settlement layer.
     /// @dev Sync layer chain is expected to have .. as the base token.
     mapping(uint256 chainId => bool isWhitelistedSettlementLayer) public whitelistedSettlementLayers;
 
@@ -477,13 +479,13 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     /// @notice IL1AssetHandler interface, used to migrate (transfer) a chain to the settlement layer.
     /// @param _assetId The asset ID of the chain.
     /// @param _chainId The chain ID of the ZK chain.
-    /// @param _baseTokenAssetId The asset ID of the base token.
+    /// @param _baseTokenBridgingData The data for the base token.
     /// @return zkChain The address of the ZK chain.
     /// @return ctm The address of the CTM of the chain.
     function forwardedBridgeMint(
         bytes32 _assetId,
         uint256 _chainId,
-        bytes32 _baseTokenAssetId
+        TokenBridgingData calldata _baseTokenBridgingData
     ) external onlyChainAssetHandler returns (address zkChain, address ctm) {
         ctm = ctmAssetIdToAddress[_assetId];
         if (ctm == address(0)) {
@@ -495,10 +497,14 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
 
         settlementLayer[_chainId] = block.chainid;
         chainTypeManager[_chainId] = ctm;
-        baseTokenAssetId[_chainId] = _baseTokenAssetId;
+        baseTokenAssetId[_chainId] = _baseTokenBridgingData.assetId;
         // To keep `assetIdIsRegistered` consistent, we'll also automatically register the base token.
         // It is assumed that if the bridging happened, the token was approved on L1 already.
-        assetIdIsRegistered[_baseTokenAssetId] = true;
+        assetIdIsRegistered[_baseTokenBridgingData.assetId] = true;
+
+        if (block.chainid != _l1ChainId()) {
+            GW_ASSET_TRACKER.registerBaseTokenOnGateway(_baseTokenBridgingData);
+        }
 
         zkChain = getZKChain(_chainId);
     }

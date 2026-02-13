@@ -80,18 +80,18 @@ contract GatewayMigrateTokenBalances is ZKSProvider, IGatewayMigrateTokenBalance
             );
         }
 
-        for (uint256 i = 0; i < bridgedTokenCount; i++) {
-            if (finalizeL1DepositParams[i].merkleProof.length == 0) {
-                console.log("No merkle proof for token", i, vm.toString(txHashes[i]));
-                continue;
-            }
-            waitForBatchToBeExecuted(address(bridgehub), chainId, finalizeL1DepositParams[i]);
-            break;
-        }
+        // for (uint256 i = 0; i < bridgedTokenCount; i++) {
+        //     if (finalizeL1DepositParams[i].merkleProof.length == 0) {
+        //         console.log("No merkle proof for token", i, vm.toString(txHashes[i]));
+        //         continue;
+        //     }
+        //     waitForBatchToBeExecuted(address(bridgehub), chainId, finalizeL1DepositParams[i]);
+        //     break;
+        // }
 
-        if (onlyWaitForFinalization) {
-            return;
-        }
+        // if (onlyWaitForFinalization) {
+        //     return;
+        // }
 
         IL1AssetTracker l1AssetTracker = IL1AssetTracker(address(l1NativeTokenVault.l1AssetTracker()));
         IAssetTrackerBase l1AssetTrackerBase = IAssetTrackerBase(address(l1AssetTracker));

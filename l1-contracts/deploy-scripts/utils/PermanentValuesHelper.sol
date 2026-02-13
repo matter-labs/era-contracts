@@ -62,4 +62,26 @@ library PermanentValuesHelper {
             create2FactoryAddr = permanentValuesToml.readAddress(addrPath);
         }
     }
+
+    /// @notice Reads the legacy Gateway chain ID from the permanent values TOML file
+    /// @param vm The Forge VM instance
+    /// @param permanentValuesPath The path to the permanent values file
+    /// @return legacyGwChainId The legacy Gateway chain ID (0 if not configured)
+    function getLegacyGwChainId(
+        Vm vm,
+        string memory permanentValuesPath
+    ) internal view returns (uint256 legacyGwChainId) {
+        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
+        if (vm.keyExistsToml(permanentValuesToml, "$.legacy_gateway.chain_id")) {
+            legacyGwChainId = permanentValuesToml.readUint("$.legacy_gateway.chain_id");
+        }
+    }
+
+    /// @notice Convenience function to get legacy GW chain ID without providing the path
+    /// @param vm The Forge VM instance
+    /// @return legacyGwChainId The legacy Gateway chain ID (0 if not configured)
+    function getLegacyGwChainId(Vm vm) internal view returns (uint256 legacyGwChainId) {
+        string memory permanentValuesPath = getPermanentValuesPath(vm);
+        return getLegacyGwChainId(vm, permanentValuesPath);
+    }
 }

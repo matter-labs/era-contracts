@@ -8,6 +8,7 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
 import {IAdmin} from "./chain-interfaces/IAdmin.sol";
+import {IMigrator} from "./chain-interfaces/IMigrator.sol";
 import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "./IChainTypeManager.sol";
@@ -38,6 +39,9 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
 
     /// @notice Address of the L1 bytecodes supplier used for upgrades
     address public immutable L1_BYTECODES_SUPPLIER;
+
+    /// @notice Address of the permissionless validator used in Priority Mode
+    address public immutable PERMISSIONLESS_VALIDATOR;
 
     /// @notice The map from chainId => zkChain contract
     EnumerableMap.UintToAddressMap internal __DEPRECATED_zkChainMap;
@@ -95,10 +99,16 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// - It prevents the function from being called twice (including in the proxy impl).
     /// - It makes the local version consistent with the one in production, which already had the reentrancy guard
     /// initialized.
-    constructor(address _bridgehub, address _interopCenter, address _l1BytecodesSupplier) reentrancyGuardInitializer {
+    constructor(
+        address _bridgehub,
+        address _interopCenter,
+        address _l1BytecodesSupplier,
+        address _permissionlessValidator
+    ) reentrancyGuardInitializer {
         BRIDGE_HUB = _bridgehub;
         INTEROP_CENTER = _interopCenter;
         L1_BYTECODES_SUPPLIER = _l1BytecodesSupplier;
+        PERMISSIONLESS_VALIDATOR = _permissionlessValidator;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
@@ -426,6 +436,13 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         IZKChain(getZKChain(_chainId)).setPorterAvailability(_zkPorterIsAvailable);
     }
 
+    /// @notice Deactivates Priority Mode for the specified chain.
+    /// The chain will return to normal operation with whitelisted validators.
+    /// @param _chainId the chainId of the chain
+    function deactivatePriorityMode(uint256 _chainId) external onlyOwner {
+        IZKChain(getZKChain(_chainId)).deactivatePriorityMode();
+    }
+
     /// @notice deploys a full set of chains contracts
     /// @param _chainId the chain's id
     /// @param _baseTokenAssetId the base token asset id used to pay for gas fees
@@ -514,7 +531,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         );
         // Deposits start paused by default to allow immediate Gateway migration.
         // Otherwise, any deposit would trigger the PAUSE_DEPOSITS_TIME_WINDOW_START delay.
-        IAdmin(zkChainAddress).pauseDepositsBeforeInitiatingMigration();
+        IMigrator(zkChainAddress).pauseDepositsBeforeInitiatingMigration();
     }
 
     /// @param _chainId the chainId of the chain
