@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 // solhint-disable no-console, gas-custom-errors
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {stdToml} from "forge-std/StdToml.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
@@ -48,8 +47,6 @@ import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 
 /// @notice Script used for v31 upgrade flow
 contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
-    using stdToml for string;
-
     /// @notice E2e upgrade generation
     function run() public virtual override {
         initialize(
@@ -64,84 +61,78 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
 
     /// todo create in deploy scripts instead of here.
     function preparePermanentValues() public {
-        string memory root = vm.projectRoot();
-        string memory permanentValuesInputPath = string.concat(root, "/upgrade-envs/permanent-values/local.toml");
-        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
-        string memory outputDeployL1Toml = vm.readFile(string.concat(root, "/script-out/output-deploy-l1.toml"));
-        string memory outputDeployCTMToml = vm.readFile(string.concat(root, "/script-out/output-deploy-ctm.toml"));
-
-        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.permanent_contracts.create2_factory_salt");
-        address create2FactoryAddr;
-        if (vm.keyExistsToml(permanentValuesToml, "$.permanent_contracts.create2_factory_addr")) {
-            create2FactoryAddr = permanentValuesToml.readAddress("$.permanent_contracts.create2_factory_addr");
-        }
-        address ctm = outputDeployCTMToml.readAddress(
-            "$.deployed_addresses.state_transition.state_transition_proxy_addr"
-        );
-        address bytecodesSupplier = outputDeployCTMToml.readAddress(
-            "$.deployed_addresses.state_transition.bytecodes_supplier_addr"
-        );
-        address l1Bridgehub = outputDeployL1Toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
-        address rollupDAManager = outputDeployCTMToml.readAddress("$.deployed_addresses.l1_rollup_da_manager");
-        uint256 eraChainId = outputDeployL1Toml.readUint("$.era_chain_id");
-
-        // Serialize permanent_contracts section
-        {
-            vm.serializeString("permanent_contracts", "create2_factory_salt", vm.toString(create2FactorySalt));
-            string memory permanent_contracts = vm.serializeAddress(
-                "permanent_contracts",
-                "create2_factory_addr",
-                create2FactoryAddr
-            );
-            vm.serializeString("root", "permanent_contracts", permanent_contracts);
-        }
-
-        // Serialize ctm_contracts section
-        {
-            vm.serializeAddress("ctm_contracts", "ctm_proxy_addr", ctm);
-            vm.serializeAddress("ctm_contracts", "rollup_da_manager", rollupDAManager);
-            string memory ctm_contracts = vm.serializeAddress(
-                "ctm_contracts",
-                "l1_bytecodes_supplier_addr",
-                bytecodesSupplier
-            );
-            vm.serializeString("root", "ctm_contracts", ctm_contracts);
-        }
-
-        // Serialize core_contracts section
-        {
-            string memory core_contracts = vm.serializeAddress("core_contracts", "bridgehub_proxy_addr", l1Bridgehub);
-            vm.serializeString("root", "core_contracts", core_contracts);
-        }
-
-        // Write the final TOML
-        string memory outputToml = vm.serializeUint("root", "era_chain_id", eraChainId);
-        vm.writeToml(outputToml, permanentValuesInputPath);
-    }
-
-    function deployNewEcosystemContractsL1() public virtual override {
-        coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub", false);
-        coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot", false);
-        coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier", false);
-        coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter", false);
-        coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault", false);
-        (
-            coreAddresses.bridgehub.implementations.assetTracker,
-            coreAddresses.bridgehub.proxies.assetTracker
-        ) = deployTuppWithContract("L1AssetTracker", false);
-        coreAddresses.bridgehub.implementations.ctmDeploymentTracker = deploySimpleContract(
-            "CTMDeploymentTracker",
-            false
-        );
-        coreAddresses.bridgehub.implementations.chainAssetHandler = deploySimpleContract("L1ChainAssetHandler", false);
-        coreAddresses.bridgehub.implementations.chainRegistrationSender = deploySimpleContract(
-            "ChainRegistrationSender",
-            false
-        );
-        // deploySimpleContract("L1ChainTypeManager", false);
-
-        // Configure AssetTracker connections after deployment
-        updateContractConnections();
+        /// usused code?
+        //     string memory root = vm.projectRoot();
+        //     string memory permanentValuesInputPath = string.concat(root, "/upgrade-envs/permanent-values/local.toml");
+        //     string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
+        //     string memory outputDeployL1Toml = vm.readFile(string.concat(root, "/script-out/output-deploy-l1.toml"));
+        //     string memory outputDeployCTMToml = vm.readFile(string.concat(root, "/script-out/output-deploy-ctm.toml"));
+        //     bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.permanent_contracts.create2_factory_salt");
+        //     address create2FactoryAddr;
+        //     if (vm.keyExistsToml(permanentValuesToml, "$.permanent_contracts.create2_factory_addr")) {
+        //         create2FactoryAddr = permanentValuesToml.readAddress("$.permanent_contracts.create2_factory_addr");
+        //     }
+        //     address ctm = outputDeployCTMToml.readAddress(
+        //         "$.deployed_addresses.state_transition.state_transition_proxy_addr"
+        //     );
+        //     address bytecodesSupplier = outputDeployCTMToml.readAddress(
+        //         "$.deployed_addresses.state_transition.bytecodes_supplier_addr"
+        //     );
+        //     address l1Bridgehub = outputDeployL1Toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
+        //     address rollupDAManager = outputDeployCTMToml.readAddress("$.deployed_addresses.l1_rollup_da_manager");
+        //     uint256 eraChainId = outputDeployL1Toml.readUint("$.era_chain_id");
+        //     // Serialize permanent_contracts section
+        //     {
+        //         vm.serializeString("permanent_contracts", "create2_factory_salt", vm.toString(create2FactorySalt));
+        //         string memory permanent_contracts = vm.serializeAddress(
+        //             "permanent_contracts",
+        //             "create2_factory_addr",
+        //             create2FactoryAddr
+        //         );
+        //         vm.serializeString("root", "permanent_contracts", permanent_contracts);
+        //     }
+        //     // Serialize ctm_contracts section
+        //     {
+        //         vm.serializeAddress("ctm_contracts", "ctm_proxy_addr", ctm);
+        //         vm.serializeAddress("ctm_contracts", "rollup_da_manager", rollupDAManager);
+        //         string memory ctm_contracts = vm.serializeAddress(
+        //             "ctm_contracts",
+        //             "l1_bytecodes_supplier_addr",
+        //             bytecodesSupplier
+        //         );
+        //         vm.serializeString("root", "ctm_contracts", ctm_contracts);
+        //     }
+        //     // Serialize core_contracts section
+        //     {
+        //         string memory core_contracts = vm.serializeAddress("core_contracts", "bridgehub_proxy_addr", l1Bridgehub);
+        //         vm.serializeString("root", "core_contracts", core_contracts);
+        //     }
+        //     // Write the final TOML
+        //     string memory outputToml = vm.serializeUint("root", "era_chain_id", eraChainId);
+        //     vm.writeToml(outputToml, permanentValuesInputPath);
+        // }
+        // function deployNewEcosystemContractsL1() public virtual override {
+        //     coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub", false);
+        //     coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot", false);
+        //     coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier", false);
+        //     coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter", false);
+        //     coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault", false);
+        //     (
+        //         coreAddresses.bridgehub.implementations.assetTracker,
+        //         coreAddresses.bridgehub.proxies.assetTracker
+        //     ) = deployTuppWithContract("L1AssetTracker", false);
+        //     coreAddresses.bridgehub.implementations.ctmDeploymentTracker = deploySimpleContract(
+        //         "CTMDeploymentTracker",
+        //         false
+        //     );
+        //     coreAddresses.bridgehub.implementations.chainAssetHandler = deploySimpleContract("L1ChainAssetHandler", false);
+        //     coreAddresses.bridgehub.implementations.chainRegistrationSender = deploySimpleContract(
+        //         "ChainRegistrationSender",
+        //         false
+        //     );
+        //     // deploySimpleContract("L1ChainTypeManager", false);
+        //     // Configure AssetTracker connections after deployment
+        //     updateContractConnections();
     }
 
     /// @notice Configure contract connections after deployment
