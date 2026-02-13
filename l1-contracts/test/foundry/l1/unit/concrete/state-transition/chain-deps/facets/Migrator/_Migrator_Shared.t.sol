@@ -50,7 +50,7 @@ contract MigratorTest is UtilsCallMockerTest {
 
         dummyBridgehub = new DummyBridgehub();
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), bytes32(0));
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, address(dummyBridgehub));
+        address diamondProxy = Utils.makeDiamondProxy(facetCuts, address(dummyBridgehub));
         migratorFacet = IMigrator(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }

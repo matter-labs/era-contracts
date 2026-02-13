@@ -277,6 +277,8 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
             newVerifier,
             upgradeContract
         );
+    }
+
     // deactivatePriorityMode
     function test_SuccessfulDeactivatePriorityMode() public {
         address chainAddress = createNewChain(getDiamondCutData(diamondInit));
