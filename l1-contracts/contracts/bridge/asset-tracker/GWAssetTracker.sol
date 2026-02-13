@@ -21,7 +21,6 @@ import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
-import {IMailboxImpl} from "../../state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IMailboxLegacy} from "../../state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {IMigrator} from "../../state-transition/chain-interfaces/IMigrator.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
