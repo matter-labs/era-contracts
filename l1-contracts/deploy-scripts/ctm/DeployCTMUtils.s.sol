@@ -259,15 +259,6 @@ abstract contract DeployCTMUtils is DeployUtils {
             });
     }
 
-    function getVerifierParams() internal returns (VerifierParams memory) {
-        return
-            VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            });
-    }
-
     function getInitializeData(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (DiamondInitializeDataNewChain memory) {

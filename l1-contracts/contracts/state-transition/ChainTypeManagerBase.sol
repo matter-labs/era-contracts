@@ -412,7 +412,8 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             initCalldata: upgradeCalldata
         });
 
-        newChainCreationParamsBlock[protocolVersion] = newChainCreationParamsBlock[_oldProtocolVersion];
+        // For patch upgrades, chain creation params don't change — carry forward from the old version.
+        newChainCreationParamsBlock[_newProtocolVersion] = newChainCreationParamsBlock[_oldProtocolVersion];
 
         _setNewVersionUpgrade({
             _cutData: diamondCut,
@@ -442,6 +443,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             revert MigrationsNotPaused();
         }
         uint256 previousProtocolVersion = protocolVersion;
+        // Explicitly verify that _oldProtocolVersion matches the current one.
+        if (previousProtocolVersion != _oldProtocolVersion) {
+            revert OutdatedProtocolVersion(previousProtocolVersion, _oldProtocolVersion);
+        }
         _setProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
         _setProtocolVersionDeadline(_newProtocolVersion, type(uint256).max);
         protocolVersion = _newProtocolVersion;
