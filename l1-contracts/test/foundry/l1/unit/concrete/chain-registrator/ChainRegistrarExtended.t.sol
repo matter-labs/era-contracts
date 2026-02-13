@@ -51,7 +51,7 @@ contract ChainRegistrarExtendedTest is Test {
         bridgeHub = new DummyBridgehub();
         interopCenter = new InteropCenter();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        interopCenter.initL2(block.chainid, makeAddr("interopAdmin"), bytes32(0));
+        interopCenter.initL2(block.chainid, makeAddr("interopAdmin"), keccak256("testZkTokenAssetId"));
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
