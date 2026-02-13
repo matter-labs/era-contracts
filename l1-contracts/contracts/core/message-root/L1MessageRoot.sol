@@ -5,8 +5,10 @@ pragma solidity 0.8.28;
 import {MessageRootBase} from "./MessageRootBase.sol";
 import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessageRoot.sol";
-import {CurrentBatchNumberAlreadySet, OnlyOnSettlementLayer, TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber, TotalBatchesExecutedZero, LocallyNoChainsAtGenesis, V31UpgradeChainBatchNumberAlreadySet, NotAllChainsOnL1} from "../bridgehub/L1BridgehubErrors.sol";
+import {CurrentBatchNumberAlreadySet, OnlyOnSettlementLayer, TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber, TotalBatchesExecutedZero, LocallyNoChainsAtGenesis, V31UpgradeChainBatchNumberAlreadySet, NotAllChainsOnL1, InvalidSettlementLayerForBatch} from "../bridgehub/L1BridgehubErrors.sol";
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
+import {IL1ChainAssetHandler} from "../chain-asset-handler/IL1ChainAssetHandler.sol";
+import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -15,8 +17,11 @@ contract L1MessageRoot is MessageRootBase {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     address public immutable BRIDGE_HUB;
 
+    /// @dev The chain asset handler contract.
+    address public immutable CHAIN_ASSET_HANDLER;
+
     /// @notice The chain id of the Gateway chain.
-    uint256 public immutable override ERA_GATEWAY_CHAIN_ID;
+    uint256 public immutable ERA_GATEWAY_CHAIN_ID;
 
     /// @notice The mapping storing the batch number at the moment the chain was updated to V31.
     /// Starting from this batch, if a settlement layer has agreed to a proof, it will be held accountable for the content of the message, e.g.
@@ -35,22 +40,17 @@ contract L1MessageRoot is MessageRootBase {
     /// this attack is not considered viable as the chains belong to the same CTM as the settlement layer and so the SL can trust their `getTotalBatchesExecuted` value.
     mapping(uint256 chainId => uint256 batchNumber) public v31UpgradeChainBatchNumber;
 
-    /// @dev Contract is expected to be used as proxy implementation on L1, but as a system contract on L2.
-    /// This means we call the _initialize in both the constructor and the initialize functions.
-    /// Used for V31 upgrade deployment and local deployments.
-    /// @dev Initialize the implementation to prevent Parity hack.
+    /// @dev This contract is expected to be used as a proxy implementation on L1.
     /// @param _bridgehub Address of the Bridgehub.
-    /// @param _eraGatewayChainId Chain ID of the Gateway chain.
-    constructor(address _bridgehub, uint256 _eraGatewayChainId) {
+    /// @param _eraGatewayChainId Chain ID of the Era Gateway chain.
+    constructor(address _bridgehub, uint256 _eraGatewayChainId, address _chainAssetHandler) {
         BRIDGE_HUB = _bridgehub;
         ERA_GATEWAY_CHAIN_ID = _eraGatewayChainId;
-        uint256[] memory allZKChains = IBridgehubBase(_bridgehub).getAllZKChainChainIDs();
-        _v31InitializeInner(allZKChains);
-        _initialize();
+        CHAIN_ASSET_HANDLER = _chainAssetHandler;
         _disableInitializers();
     }
 
-    /// @dev Initializes a contract for later use. Expected to be used in the proxy on L1, on L2 it is a built-in contract without a proxy.
+    /// @dev This initializer is used in local deployments.
     function initialize() external reinitializer(2) {
         _initialize();
         uint256[] memory allZKChains = IBridgehubBase(BRIDGE_HUB).getAllZKChainChainIDs();
@@ -59,9 +59,8 @@ contract L1MessageRoot is MessageRootBase {
         require(allZKChainsLength == 0, LocallyNoChainsAtGenesis());
     }
 
-    /// @dev The initialized used for the V31 upgrade.
-    /// On L2s the initializers are disabled.
-    function initializeL1V31Upgrade() external reinitializer(2) onlyL1 {
+    /// @dev This initializer is used in the v31 upgrade.
+    function initializeL1V31Upgrade() external reinitializer(2) {
         uint256[] memory allZKChains = IBridgehubBase(BRIDGE_HUB).getAllZKChainChainIDs();
         _v31InitializeInner(allZKChains);
     }
@@ -90,6 +89,31 @@ contract L1MessageRoot is MessageRootBase {
 
         currentChainBatchNumber[_chainId] = totalBatchesExecuted;
         v31UpgradeChainBatchNumber[_chainId] = totalBatchesExecuted + 1;
+    }
+
+    function _proveL2LeafInclusionOnSettlementLayer(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        ProofData memory _proofData,
+        bytes32[] calldata _proof,
+        uint256 _depth
+    ) internal view override returns (bool) {
+        bool isValid = IL1ChainAssetHandler(CHAIN_ASSET_HANDLER).isValidSettlementLayer(
+            _chainId,
+            _batchNumber,
+            _proofData.settlementLayerChainId
+        );
+        require(isValid, InvalidSettlementLayerForBatch(_chainId, _batchNumber, _proofData.settlementLayerChainId));
+
+        return
+            this.proveL2LeafInclusionSharedRecursive({
+                _chainId: _proofData.settlementLayerChainId,
+                _blockOrBatchNumber: _proofData.settlementLayerBatchNumber,
+                _leafProofMask: _proofData.settlementLayerBatchRootMask,
+                _leaf: _proofData.chainIdLeaf,
+                _proof: MessageHashing.extractSliceUntilEnd(_proof, _proofData.ptr),
+                _depth: _depth + 1
+            });
     }
 
     /*//////////////////////////////////////////////////////////////

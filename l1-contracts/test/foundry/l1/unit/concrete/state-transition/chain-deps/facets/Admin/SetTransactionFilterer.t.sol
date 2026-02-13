@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {NotCompatibleWithPriorityMode, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract SetTransactionFiltererTest is AdminTest {
     event NewTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);
@@ -41,5 +41,20 @@ contract SetTransactionFiltererTest is AdminTest {
         vm.startPrank(nonAdmin);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonAdmin));
         adminFacet.setTransactionFilterer(transactionFilterer);
+    }
+
+    function test_revertWhen_priorityModeAllowed() public {
+        address admin = utilsFacet.util_getAdmin();
+
+        // Fake a priority tx so permanentlyAllowPriorityMode can succeed
+        utilsFacet.util_setPriorityTreeNextLeafIndex(1);
+        utilsFacet.util_setPriorityOpsRequestTimestamp(0, block.timestamp);
+
+        vm.prank(admin);
+        adminFacet.permanentlyAllowPriorityMode();
+
+        vm.prank(admin);
+        vm.expectRevert(NotCompatibleWithPriorityMode.selector);
+        adminFacet.setTransactionFilterer(makeAddr("transactionFilterer"));
     }
 }

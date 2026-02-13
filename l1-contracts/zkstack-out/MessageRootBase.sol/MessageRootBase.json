@@ -967,17 +967,6 @@
   },
   {
     "type": "error",
-    "name": "NotWhitelistedSettlementLayer",
-    "inputs": [
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "OnlyAssetTracker",
     "inputs": [
       {

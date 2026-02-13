@@ -52,7 +52,15 @@ contract ChainRegistrarExtendedTest is Test {
         interopCenter = new InteropCenter();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         interopCenter.initL2(block.chainid, makeAddr("interopAdmin"));
-        messageRoot = new L1MessageRoot(address(bridgeHub), 1);
+        messageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(address(bridgeHub), 1, address(0))),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
+        );
         ctm = new DummyChainTypeManagerWBH(address(bridgeHub));
         admin = makeAddr("admin");
         proxyAdmin = makeAddr("proxyAdmin");

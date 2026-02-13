@@ -32,7 +32,7 @@ export default {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 27700,
+        runs: 20000,
       },
       outputSelection: {
         "*": {
