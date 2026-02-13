@@ -68,7 +68,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     }
 
     // solhint-disable-next-line func-name-mixedcase
-    function MESSAGE_ROOT() public view override returns (IMessageRoot) {
+    function MESSAGE_ROOT() public view override returns (IMessageRootBase) {
         return messageRoot;
     }
 
@@ -179,7 +179,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     ) external onlyOwner {
         require(_migrationNumber == 0, MigrationNumberMismatch(0, _migrationNumber));
         require(!_interval.isActive, MigrationIntervalNotSet());
-        uint256 legacyGwChainId = IMessageRoot(_messageRoot()).ERA_GATEWAY_CHAIN_ID();
+        uint256 legacyGwChainId = IMessageRootBase(_messageRoot()).ERA_GATEWAY_CHAIN_ID();
         require(
             _interval.settlementLayerChainId == legacyGwChainId,
             HistoricalSettlementLayerMismatch(legacyGwChainId, _interval.settlementLayerChainId)

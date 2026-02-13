@@ -60,7 +60,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
         proposedUpgrade.l2ProtocolUpgradeTx.data = complexUpgraderCalldata;
         super.upgrade(proposedUpgrade);
-IMessageRootBase messageRoot = IMessageRoot(bridgehub.messageRoot());
+        IMessageRootBase messageRoot = IMessageRootBase(bridgehub.messageRoot());
 
         if (s.settlementLayer == address(0)) {
             IL1MessageRoot(address(messageRoot)).saveV31UpgradeChainBatchNumber(s.chainId);

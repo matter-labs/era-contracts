@@ -715,7 +715,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             if (logs[i].topics[0] == IL1Nullifier.TransientSettlementLayerSet.selector) {
                 transientSettlementLayerSetIndex = i;
             }
-            if (logs[i].topics[0] == IAdmin.DepositsUnpaused.selector) {
+            if (logs[i].topics[0] == IMigrator.DepositsUnpaused.selector) {
                 depositsUnpausedIndex = i;
             }
             if (logs[i].topics[0] == IL1AssetRouter.ClaimedFailedDepositAssetRouter.selector) {

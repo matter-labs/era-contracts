@@ -62,7 +62,7 @@ contract MailboxTest is UtilsCallMockerTest {
         );
         vm.mockCall(
             address(chainAssetHandler),
-            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
+            abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
             abi.encode(1)
         );
         vm.mockCall(

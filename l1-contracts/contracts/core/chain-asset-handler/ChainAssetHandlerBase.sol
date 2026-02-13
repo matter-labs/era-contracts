@@ -229,7 +229,7 @@ abstract contract ChainAssetHandlerBase is
         ++currentMigrationNum;
         migrationNumber[_chainId] = currentMigrationNum;
 
-        uint256 batchNumber = IMessageRoot(_messageRoot()).currentChainBatchNumber(_chainId);
+        uint256 batchNumber = IMessageRootBase(_messageRoot()).currentChainBatchNumber(_chainId);
 
         // Track migration interval for settlement layer validation.
         // When migrating FROM L1 TO a settlement layer, record the last L1 batch number and the SL chain ID.

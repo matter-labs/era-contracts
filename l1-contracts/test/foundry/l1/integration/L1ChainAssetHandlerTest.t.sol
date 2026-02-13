@@ -261,7 +261,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
     }
 
     function _legacyGwChainId() internal view returns (uint256) {
-        return IMessageRoot(ecosystemAddresses.bridgehub.proxies.messageRoot).ERA_GATEWAY_CHAIN_ID();
+        return IMessageRootBase(ecosystemAddresses.bridgehub.proxies.messageRoot).ERA_GATEWAY_CHAIN_ID();
     }
 
     function test_setHistoricalMigrationInterval_success() public {
@@ -426,7 +426,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         uint256 gwChainId = 506;
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.proxies.messageRoot),
-            abi.encodeWithSelector(IMessageRoot.ERA_GATEWAY_CHAIN_ID.selector),
+            abi.encodeWithSelector(IMessageRootBase.ERA_GATEWAY_CHAIN_ID.selector),
             abi.encode(gwChainId)
         );
 

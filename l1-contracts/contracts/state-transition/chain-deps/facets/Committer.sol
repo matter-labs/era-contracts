@@ -13,7 +13,7 @@ import {StoredBatchHashing} from "../StoredBatchHashing.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {BatchNumberMismatch, CanOnlyProcessOneBatch, EmptyPrecommitData, HashMismatch, IncorrectBatchChainId, InvalidBatchNumber, InvalidLogSender, InvalidNumberOfBlobs, InvalidPackedPrecommitmentLength, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, PrecommitmentMismatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, NonZeroBlobToVerifyZKsyncOS, InvalidBlockRange, InvalidTxCountInPriorityMode} from "../../../common/L1ContractErrors.sol";
+import {BatchNumberMismatch, CanOnlyProcessOneBatch, EmptyPrecommitData, HashMismatch, IncorrectBatchChainId, InvalidBatchNumber, InvalidLogSender, InvalidNumberOfBlobs, InvalidPackedPrecommitmentLength, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, PrecommitmentMismatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, NonZeroBlobToVerifyZKsyncOS, InvalidBlockRange, InvalidTxCountInPriorityMode, ZKsyncOSPrecommitsNotSupported} from "../../../common/L1ContractErrors.sol";
 import {MismatchL2DACommitmentScheme, SettlementLayerChainIdMismatch} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -584,7 +584,7 @@ contract CommitterFacet is ZKChainBase, ICommitter {
                 _verifyLogSender(logSender, L2_BOOTLOADER_ADDRESS, logKey);
                 logOutput.numberOfLayer1Txs = uint256(logValue) & PACKED_NUMBER_OF_L1_TRANSACTIONS_LOG_MASK;
                 logOutput.numberOfLayer2Txs = uint256(logValue) >> PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS;
-            } else if (logKey == uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)) {
+            } else if (logKey == uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY)) {
                 _verifyLogSender(logSender, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, logKey);
                 if (uint256(s.l2DACommitmentScheme) != uint256(logValue)) {
                     revert MismatchL2DACommitmentScheme(uint256(logValue), uint256(s.l2DACommitmentScheme));
