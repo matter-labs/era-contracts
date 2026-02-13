@@ -7,7 +7,7 @@ import {FeeParams} from "contracts/state-transition/chain-deps/ZKChainStorage.so
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 contract BaseUpgradeUtils is Test, ZKChainBase {
-    function setChainTypeManager(address _chainTypeManager) public {
+    function setChainTypeManager(address _chainTypeManager) public virtual {
         s.chainTypeManager = _chainTypeManager;
     }
 

@@ -16,7 +16,6 @@ import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FeeParams} from "../../state-transition/chain-deps/ZKChainStorage.sol";
-import {IChainTypeManager} from "../IChainTypeManager.sol";
 
 /// @author Matter Labs
 /// @dev The contract is used only once to initialize the diamond proxy.

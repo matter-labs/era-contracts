@@ -198,7 +198,13 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
             initCalldata: ""
         });
         vm.prank(governor);
-        chainContractAddress.setNewVersionUpgrade(emptyCut, 0, block.timestamp + 1 days, oldProtocolVersion, testnetVerifier);
+        chainContractAddress.setNewVersionUpgrade(
+            emptyCut,
+            0,
+            block.timestamp + 1 days,
+            oldProtocolVersion,
+            testnetVerifier
+        );
 
         vm.prank(governor);
         vm.expectEmit(true, true, true, true);

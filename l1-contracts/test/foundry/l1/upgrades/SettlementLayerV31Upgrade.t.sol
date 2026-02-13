@@ -45,7 +45,7 @@ contract DummySettlementLayerV31Upgrade is SettlementLayerV31Upgrade, BaseUpgrad
         return s.assetTracker;
     }
 
-    function setChainTypeManager(address _chainTypeManager) public {
+    function setChainTypeManager(address _chainTypeManager) public override {
         s.chainTypeManager = _chainTypeManager;
     }
 }
