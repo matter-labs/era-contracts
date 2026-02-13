@@ -89,7 +89,6 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     }
 
     /// @notice Override to deploy v31-specific upgrade contract
-    /// @dev SettlementLayerV31Upgrade contains the setMigrationNumberForV31() call
     function deployUsedUpgradeContract() internal virtual override returns (address) {
         console.log("Deploying SettlementLayerV31Upgrade as the chain upgrade contract");
         return deploySimpleContract("SettlementLayerV31Upgrade", false);

@@ -7,7 +7,7 @@ import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializabl
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 
 import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH} from "./IMessageRoot.sol";
-import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, DepthMoreThanOneForRecursiveMerkleProof, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyChain} from "../bridgehub/L1BridgehubErrors.sol";
+import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, DepthMoreThanOneForRecursiveMerkleProof, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyChain} from "../bridgehub/L1BridgehubErrors.sol";
 
 import {GW_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
@@ -263,6 +263,14 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     //// IMessageVerification ////
     //////////////////////////////
 
+    function _proveL2LeafInclusionOnSettlementLayer(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        ProofData memory _proofData,
+        bytes32[] calldata _proof,
+        uint256 _depth
+    ) internal view virtual returns (bool);
+
     function _proveL2LeafInclusionRecursive(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -287,23 +295,13 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
             revert DepthMoreThanOneForRecursiveMerkleProof();
         }
 
-        // Assuming that `settlementLayerChainId` is an honest chain, the `chainIdLeaf` should belong
-        // to a chain's message root only if the chain has indeed executed its batch on top of it.
-        //
-        // We trust all chains whitelisted by the Bridgehub governance.
-        require(
-            IBridgehubBase(_bridgehub()).whitelistedSettlementLayers(proofData.settlementLayerChainId),
-            NotWhitelistedSettlementLayer(proofData.settlementLayerChainId)
-        );
-
         return
-            this.proveL2LeafInclusionSharedRecursive({
-                _chainId: proofData.settlementLayerChainId,
-                _blockOrBatchNumber: proofData.settlementLayerBatchNumber, // SL block number
-                _leafProofMask: proofData.settlementLayerBatchRootMask,
-                _leaf: proofData.chainIdLeaf,
-                _proof: MessageHashing.extractSliceUntilEnd(_proof, proofData.ptr),
-                _depth: _depth + 1
+            _proveL2LeafInclusionOnSettlementLayer({
+                _chainId: _chainId,
+                _batchNumber: _batchNumber,
+                _proofData: proofData,
+                _proof: _proof,
+                _depth: _depth
             });
     }
 

@@ -18,12 +18,19 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
     uint256 constant CHAIN_ID = 271;
     uint256 constant TOTAL_BATCHES_EXECUTED = 100;
 
+    function setUp() public {
+        bridgeHub = makeAddr("bridgeHub");
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(makeAddr("chainAssetHandler"))
+        );
+    }
+
     /// @notice Test demonstrating the regression: chains with placeholder value can be updated
     /// @dev Before the fix, this would have failed because the check was `mapping == 0`
     ///      but the mapping had a placeholder value (not 0)
     function test_regression_chainWithPlaceholderCanBeUpdated() public {
-        bridgeHub = makeAddr("bridgeHub");
-
         // Setup: Create a MessageRoot where the chain is initialized with a placeholder
         // This simulates what happens during the V31 upgrade for existing chains
         uint256[] memory chainIds = new uint256[](1);
@@ -43,7 +50,7 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
         L1MessageRoot messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, 1)),
+                    address(new L1MessageRoot(bridgeHub, 1, address(0))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
                 )
@@ -95,8 +102,6 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
     /// @dev New chains that were not in allZKChains at upgrade time have v31UpgradeChainBatchNumber == 0
     ///      These chains should not be able to set a batch number (they're already under v31 rules)
     function test_regression_chainWithZeroValueCannotBeUpdated() public {
-        bridgeHub = makeAddr("bridgeHub");
-
         // Create a MessageRoot with NO chains initialized (empty allZKChains)
         uint256[] memory chainIds = new uint256[](0);
         vm.mockCall(
@@ -108,7 +113,7 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
         L1MessageRoot messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, 1)),
+                    address(new L1MessageRoot(bridgeHub, 1, address(0))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )
@@ -145,8 +150,6 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
     /// @notice Test that once the real value is set, it cannot be changed again
     /// @dev After successfully setting the batch number, further calls should revert
     function test_regression_cannotSetTwice() public {
-        bridgeHub = makeAddr("bridgeHub");
-
         // Setup chain with placeholder
         uint256[] memory chainIds = new uint256[](1);
         chainIds[0] = CHAIN_ID;
@@ -165,7 +168,7 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
         L1MessageRoot messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, 1)),
+                    address(new L1MessageRoot(bridgeHub, 1, address(0))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
                 )
@@ -230,8 +233,6 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
         vm.assume(totalBatchesExecuted < type(uint256).max); // Prevent overflow in +1
         vm.assume(totalBatchesExecuted != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1);
 
-        bridgeHub = makeAddr("bridgeHub");
-
         uint256[] memory chainIds = new uint256[](1);
         chainIds[0] = CHAIN_ID;
 
@@ -249,7 +250,7 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
         L1MessageRoot messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, 1)),
+                    address(new L1MessageRoot(bridgeHub, 1, address(0))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
                 )

@@ -12,7 +12,7 @@ import {IEIP7702Checker} from "../../chain-interfaces/IEIP7702Checker.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {BalanceChange, BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Log, L2Message, TxStatus, WritePriorityOpParams} from "../../../common/Messaging.sol";
-import {MessageHashing, ProofData} from "../../../common/libraries/MessageHashing.sol";
+import {MessageHashing} from "../../../common/libraries/MessageHashing.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
@@ -23,9 +23,8 @@ import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddre
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterShared} from "../../../bridge/asset-router/IAssetRouterShared.sol";
 
-import {AddressNotZero, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, NotAssetRouter, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
-import {DepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
-import {DepthMoreThanOneForRecursiveMerkleProof} from "../../../core/bridgehub/L1BridgehubErrors.sol";
+import {AddressNotZero, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, NotAssetRouter, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
+import {DepositsPaused, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -253,51 +252,17 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes32[] calldata _proof,
         uint256 _depth
     ) internal view override returns (bool) {
-        ProofData memory proofData = MessageHashing._getProofData({
-            _chainId: _chainId,
-            _batchNumber: _batchNumber,
-            _leafProofMask: _leafProofMask,
-            _leaf: _leaf,
-            _proof: _proof
-        });
-
-        // If the `finalProofNode` is true, then we assume that this is L1 contract of the top-level
-        // in the aggregation, i.e. the batch root is stored here on L1.
-        if (proofData.finalProofNode) {
-            // Double checking that the batch has been executed.
-            if (_batchNumber > s.totalBatchesExecuted) {
-                revert BatchNotExecuted(_batchNumber);
-            }
-
-            bytes32 correctBatchRoot = s.l2LogsRootHashes[_batchNumber];
-            if (correctBatchRoot == bytes32(0)) {
-                revert LocalRootIsZero();
-            }
-            return correctBatchRoot == proofData.batchSettlementRoot;
-        }
-        if (_depth == 1) {
-            revert DepthMoreThanOneForRecursiveMerkleProof();
-        }
-
-        if (s.l2LogsRootHashes[_batchNumber] != bytes32(0)) {
-            revert LocalRootMustBeZero();
-        }
-        // Assuming that `settlementLayerChainId` is an honest chain, the `chainIdLeaf` should belong
-        // to a chain's message root only if the chain has indeed executed its batch on top of it.
-        //
-        // We trust all chains whitelisted by the Bridgehub governance.
-        if (!IBridgehubBase(s.bridgehub).whitelistedSettlementLayers(proofData.settlementLayerChainId)) {
-            revert NotSettlementLayer();
-        }
-        address settlementLayerAddress = IBridgehubBase(s.bridgehub).getZKChain(proofData.settlementLayerChainId);
-
+        // No gas optimization here as the usage of the method is discouraged and the Bridgehub one should be used.
         return
-            IMailbox(settlementLayerAddress).proveL2LeafInclusion(
-                proofData.settlementLayerBatchNumber,
-                proofData.settlementLayerBatchRootMask,
-                proofData.chainIdLeaf,
-                MessageHashing.extractSliceUntilEnd(_proof, proofData.ptr)
-            );
+            MessageVerification(address(IBridgehubBase(s.bridgehub).messageRoot()))
+                .proveL2LeafInclusionSharedRecursive({
+                    _chainId: _chainId,
+                    _blockOrBatchNumber: _batchNumber,
+                    _leafProofMask: _leafProofMask,
+                    _leaf: _leaf,
+                    _proof: _proof,
+                    _depth: _depth
+                });
     }
 
     /// @inheritdoc IMailboxImpl

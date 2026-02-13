@@ -27,11 +27,16 @@ contract L1MessageRootV31UpgradeTest is Test {
             abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
             abi.encode(allZKChainChainIDs)
         );
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(makeAddr("chainAssetHandler"))
+        );
 
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, 1)),
+                    address(new L1MessageRoot(bridgeHub, 1, address(0))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )
@@ -157,6 +162,11 @@ contract L1MessageRootV31UpgradeTest is Test {
         );
         vm.mockCall(
             newBridgehub,
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(makeAddr("chainAssetHandler"))
+        );
+        vm.mockCall(
+            newBridgehub,
             abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector, CHAIN_ID),
             abi.encode(block.chainid)
         );
@@ -164,7 +174,7 @@ contract L1MessageRootV31UpgradeTest is Test {
         L1MessageRoot newMessageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(newBridgehub, 1)),
+                    address(new L1MessageRoot(newBridgehub, 1, address(0))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
                 )
@@ -212,6 +222,11 @@ contract L1MessageRootV31UpgradeTest is Test {
         );
         vm.mockCall(
             newBridgehub,
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(makeAddr("chainAssetHandler"))
+        );
+        vm.mockCall(
+            newBridgehub,
             abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector, CHAIN_ID),
             abi.encode(block.chainid)
         );
@@ -219,7 +234,7 @@ contract L1MessageRootV31UpgradeTest is Test {
         L1MessageRoot newMessageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(newBridgehub, 1)),
+                    address(new L1MessageRoot(newBridgehub, 1, address(0))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
                 )
@@ -266,6 +281,11 @@ contract L1MessageRootV31UpgradeTest is Test {
         );
         vm.mockCall(
             newBridgehub,
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(makeAddr("chainAssetHandler"))
+        );
+        vm.mockCall(
+            newBridgehub,
             abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector, chainId1),
             abi.encode(block.chainid)
         );
@@ -278,7 +298,7 @@ contract L1MessageRootV31UpgradeTest is Test {
         L1MessageRoot newMessageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(newBridgehub, 1)),
+                    address(new L1MessageRoot(newBridgehub, 1, address(0))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
                 )

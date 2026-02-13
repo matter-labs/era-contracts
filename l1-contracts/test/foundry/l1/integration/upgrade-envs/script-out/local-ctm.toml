@@ -1,3 +1,4 @@
+
 access_control_restriction_addr = "0x0000000000000000000000000000000000000000"
 chain_admin_addr = "0xA5ed87d8A63eb85765213Cbfdc72e010FFBFf9Cb"
 chain_proxy_admin_addr = "0x271aC2d81c47a8C970C38d55807d7479d26Cf8EC"
@@ -43,13 +44,20 @@ l1_rollup_da_manager = "0x0000000000000000000000000000000000000000"
 native_token_vault_addr = "0x09e0BF3081Ec23c6DBF405046f0DEDb20B16a36a"
 no_da_validium_l1_validator_addr = "0x8BAcC454f93c18790D1eE696FfE7c9f7408EcEad"
 rollup_l1_da_validator_addr = "0x5Be9468566A91E9979Cc432a07998424B2f8c264"
+<<<<<<< HEAD
 server_notifier_proxy_addr = "0xb04784008cC6d14e3036e03AEAA217Dd77950681"
 transparent_proxy_admin = "0x8Cb8560387E030D1b0016265427A65203483f37d"
 transparent_proxy_admin_addr = "0x8Cb8560387E030D1b0016265427A65203483f37d"
 upgrade_stage_validator = "0x139CD3461F27df0f91090375A92bE769E6ad8B0b"
 validator_timelock_addr = "0xbF194479f08e415EE274Cc80B483a8e60306485D"
+=======
+server_notifier_proxy_addr = "0x42CC2aA96D2F0D516A09c071DD27ABb975DB5048"
+transparent_proxy_admin = "0x284bc9851eB6677ee40bA48b93598D61EF5b8DE7"
+transparent_proxy_admin_addr = "0x284bc9851eB6677ee40bA48b93598D61EF5b8DE7"
+upgrade_stage_validator = "0x9545068B0638508F297F249FB6675F90099b8C99"
+validator_timelock_addr = "0x3AB9Ba534C075573E20938464985e16Df0F7b780"
+>>>>>>> @{-1}
 validium_l1_da_validator_addr = "0x0000000000000000000000000000000000000000"
-
 [deployed_addresses.bridgehub]
 bridgehub_implementation_addr = "0x0C9CD7259971771c553f60CA7cd028A777Ff20D8"
 bridgehub_proxy_addr = "0x7451aB392cbD037F0a512Bbc8faBaBdb9879EC0D"
@@ -96,9 +104,14 @@ mailbox_facet_addr = "0x01f128b7FbfF7d33171acc5c96636b53a1802353"
 state_transition_proxy_addr = "0x9e92FE766f14C074e48aE605ae0f08c73fcCBe4c"
 validator_timelock_addr = "0xbF194479f08e415EE274Cc80B483a8e60306485D"
 validator_timelock_implementation_addr = "0x0000000000000000000000000000000000000000"
+<<<<<<< HEAD
 verifier_addr = "0x9394f0EA91FCe844331664E03bE5CDF5850C58AA"
 verifier_fflonk_addr = "0x4D24E911e40D51bAbd4aD79EC790b50F32Df6095"
 verifier_plonk_addr = "0xE0adCb497a98A9A03Dd4AB3defb54e5e6139611d"
+=======
+verifier_addr = "0xbFA6563AA6123CE2aa7A12C43F1dde6037903552"
+verifier_fflonk_addr = "0xb3f1E53f1DAa70dC824eB9CDC52dd2542726444b"
+>>>>>>> @{-1}
 
 [tokens.DAI]
 address = "0xc9ADF0De63b63E47c9cEa7f833378E19b3428348"

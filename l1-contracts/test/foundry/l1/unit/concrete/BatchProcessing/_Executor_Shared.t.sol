@@ -10,7 +10,6 @@ import {ValidatorTimelock} from "contracts/state-transition/validators/Validator
 import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_DA_COMMITMENT_SCHEME, TEST_ROLLUP_DA_MANAGER_OWNER} from "../Utils/Utils.sol";
 import {TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IAssetRouterShared} from "contracts/bridge/asset-router/IAssetRouterShared.sol";
 import {DummyChainTypeManagerForValidatorTimelock as DummyCTM} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -215,10 +214,11 @@ contract ExecutorTest is UtilsCallMockerTest {
             abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
             abi.encode(allZKChainChainIDsZero)
         );
+        chainAssetHandler = new L1ChainAssetHandler(owner, address(dummyBridgehub));
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(address(dummyBridgehub), 1)),
+                    address(new L1MessageRoot(address(dummyBridgehub), 1, address(chainAssetHandler))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )
@@ -247,18 +247,11 @@ contract ExecutorTest is UtilsCallMockerTest {
         address interopCenter = makeAddr("interopCenter");
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
-        address assetTracker = makeAddr("assetTracker");
-        chainAssetHandler = new L1ChainAssetHandler(
-            owner,
-            address(dummyBridgehub),
-            address(sharedBridge),
-            address(messageRoot),
-            address(assetTracker),
-            IL1Nullifier(address(0))
-        );
         // dummyBridgehub.setChainAssetHandler(address(chainAssetHandler));
 
         dummyBridgehub.setSharedBridge(address(sharedBridge));
+        vm.prank(owner);
+        chainAssetHandler.setAddresses();
 
         vm.mockCall(
             address(messageRoot),
