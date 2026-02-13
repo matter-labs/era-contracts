@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 struct CTMCoreDeploymentConfig {
     bool isZKsyncOS;
     bool testnetVerifier;
-    uint256 eraChainId;
     uint256 l1ChainId;
     address bridgehubProxy;
     address interopCenterProxy;

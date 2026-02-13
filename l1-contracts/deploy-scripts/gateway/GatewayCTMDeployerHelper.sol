@@ -947,7 +947,6 @@ library GatewayCTMDeployerHelper {
             CTMCoreDeploymentConfig({
                 isZKsyncOS: _config.isZKsyncOS,
                 testnetVerifier: _config.testnetVerifier,
-                eraChainId: _config.eraChainId,
                 l1ChainId: _config.l1ChainId,
                 bridgehubProxy: L2_BRIDGEHUB_ADDR,
                 interopCenterProxy: L2_INTEROP_CENTER_ADDR,
