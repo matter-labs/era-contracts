@@ -247,6 +247,7 @@ contract ZKChainDeployer is L1ContractDeployer {
 
         {
             // stack too deep
+            // InitializeData layout includes bridgehub, interop center, and CTM for v31+ init calldata.
             initData1 = bytes.concat(
                 IDiamondInit.initialize.selector,
                 bytes32(_chainId),

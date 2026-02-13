@@ -39,7 +39,7 @@ contract InitializationTest is DiamondCutTest {
         DiamondInit diamondInit = new DiamondInit(false);
         bytes memory diamondInitData = abi.encodeWithSelector(
             diamondInit.initialize.selector,
-            Utils.makeInitializeData(address(0), address(0))
+            Utils.makeInitializeData(address(0))
         );
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
 
