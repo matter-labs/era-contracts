@@ -456,7 +456,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         vm.mockCall(
             ctm,
             abi.encodeCall(IChainTypeManager.protocolVersionVerifier, (newProtocolVersion)),
-            abi.encode(IZKChain(address(migratingChain)).getVerifier())
+            abi.encode(address(0x1))
         );
         vm.mockCall(
             address(gatewayChain),
