@@ -638,8 +638,8 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     // Used for both successful and failed migrations.
     function _confirmMigration(TxStatus txStatus) internal {
         MerkleProofData memory merkleProofData = _getMerkleProofData();
-        // Use migratingChainId for message inclusion since that's the chain being migrated
-        _mockMessageInclusion(migratingChainId, merkleProofData, txStatus);
+        // Use gatewayChainId for message inclusion since the deposit goes TO the gateway
+        _mockMessageInclusion(gatewayChainId, merkleProofData, txStatus);
 
         IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
         address chainAssetHandler = address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler);
@@ -649,14 +649,14 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         bytes memory transferData = _getTransferData();
 
-        // Set Deposit Happened - use migratingChainId since that's the chain being confirmed
+        // Set Deposit Happened - use gatewayChainId since the deposit goes TO the gateway
         bytes32 txDataHash = keccak256(
             bytes.concat(NEW_ENCODING_VERSION, abi.encode(chainAdmin, assetId, transferData))
         );
-        _setDepositHappened(migratingChainId, merkleProofData.l2TxHash, txDataHash);
+        _setDepositHappened(gatewayChainId, merkleProofData.l2TxHash, txDataHash);
 
         ConfirmTransferResultData memory transferResultData = _getConfirmTransferResultData(
-            migratingChainId,
+            gatewayChainId,
             merkleProofData,
             chainAdmin,
             assetId,
@@ -665,7 +665,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
 
         // Sanity check before
-        assertNotEq(addresses.l1Nullifier.depositHappened(migratingChainId, merkleProofData.l2TxHash), 0x00);
+        assertNotEq(addresses.l1Nullifier.depositHappened(gatewayChainId, merkleProofData.l2TxHash), 0x00);
         assertEq(IChainAssetHandlerBase(chainAssetHandler).migrationNumber(migratingChainId), 1);
 
         if (txStatus == TxStatus.Success) {
@@ -675,13 +675,14 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             vm.expectEmit();
             emit IL1AssetRouter.ClaimedFailedDepositAssetRouter(gatewayChainId, assetId, transferData);
         }
+        vm.recordLogs();
         addresses.l1Nullifier.bridgeConfirmTransferResult(transferResultData);
         _verifyMigrationEvents(txStatus);
 
         {
             // Avoid stack-too-deep
             // Check that value in `depositHappened` mapping was cleared
-            assertEq(addresses.l1Nullifier.depositHappened(migratingChainId, merkleProofData.l2TxHash), 0x00);
+            assertEq(addresses.l1Nullifier.depositHappened(gatewayChainId, merkleProofData.l2TxHash), 0x00);
             // Read storage to check that the recorded timestamp is reset to 0, ie, deposits were unpaused
             uint256 pausedDepositsTimestamp = uint256(vm.load(address(zkChain), pausedDepositsTimestampSlot));
             assertEq(pausedDepositsTimestamp, 0);
