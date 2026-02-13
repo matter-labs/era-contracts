@@ -61,6 +61,8 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         uint256 _batchNumber,
         bytes calldata _precommitData
     ) external nonReentrant onlyValidator notPriorityMode onlySettlementLayer {
+        // Block precommitments for ZKsync OS as they are not supported
+        require(!s.zksyncOS, ZKsyncOSPrecommitsNotSupported());
         uint256 expectedBatchNumber = s.totalBatchesCommitted + 1;
         if (_batchNumber != expectedBatchNumber) {
             revert InvalidBatchNumber(_batchNumber, expectedBatchNumber);
@@ -188,9 +190,9 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         CommitBatchInfo[] memory _newBatchesData,
         bytes32 _systemContractUpgradeTxHash
     ) internal {
-        // We disable this check because calldata array length is cheap.
+        // We disable this check because memory array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
-        for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < _newBatchesData.length; ++i) {
             _lastCommittedBatchData = _commitOneBatchEra(
                 _lastCommittedBatchData,
                 _newBatchesData[i],
@@ -231,9 +233,9 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             upgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         }
 
-        // We disable this check because calldata array length is cheap.
+        // We disable this check because memory array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
-        for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < _newBatchesData.length; ++i) {
             _lastCommittedBatchData = _commitOneBatchZKsyncOS(
                 _lastCommittedBatchData,
                 _newBatchesData[i],
