@@ -13,6 +13,7 @@ const REQUIRED_CONTRACTS = [
   "MessageRootBase.sol",
   "IZKChain.sol",
   "IValidatorTimelock.sol",
+  "IChainAssetHandler.sol",
   "IChainTypeManager.sol",
   "IAdmin.sol",
   "IDiamondCut.sol",
