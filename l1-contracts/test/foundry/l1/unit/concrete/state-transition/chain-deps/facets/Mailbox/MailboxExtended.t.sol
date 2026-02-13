@@ -72,7 +72,8 @@ contract MailboxOnGatewayTest is UtilsCallMockerTest {
         );
 
         address testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, bridgehub);
+        mockChainTypeManagerVerifier(testnetVerifier);
+        address diamondProxy = Utils.makeDiamondProxy(facetCuts, bridgehub);
 
         mailboxFacet = IMailbox(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);

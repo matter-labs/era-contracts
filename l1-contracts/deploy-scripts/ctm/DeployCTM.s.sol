@@ -190,6 +190,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.stateTransition.implementations.chainTypeManager,
             ctmAddresses.stateTransition.proxies.chainTypeManager
         ) = deployTuppWithContract(ctmContractName, false);
+
         setChainTypeManagerInServerNotifier();
 
         updateOwners();

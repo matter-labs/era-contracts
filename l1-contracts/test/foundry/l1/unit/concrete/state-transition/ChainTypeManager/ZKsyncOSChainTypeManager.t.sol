@@ -192,6 +192,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -205,7 +206,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
-        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain(testnetVerifier, address(0));
+        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain();
         bytes memory initCalldata = abi.encode(initializeData);
         return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
     }
@@ -244,6 +245,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -272,6 +274,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -304,6 +307,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -336,6 +340,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -364,6 +369,9 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
 
         chainContractAddress = _deployChainTypeManager(chainCreationParams);
 
+        // Mock migration paused check
+        vm.mockCall(address(chainAssetHandler), abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
+
         Diamond.DiamondCutData memory cutData = getDiamondCutData(address(diamondInit));
         uint256 oldProtocolVersion = 0;
         uint256 oldProtocolVersionDeadline = block.timestamp + 100;
@@ -374,11 +382,16 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             cutData,
             oldProtocolVersion,
             oldProtocolVersionDeadline,
-            newProtocolVersion
+            newProtocolVersion,
+            testnetVerifier
         );
 
         // Verify that the protocol version deadline was set
         assertEq(chainContractAddress.protocolVersionDeadline(oldProtocolVersion), oldProtocolVersionDeadline);
+        // Verify that the new protocol version is set
+        assertEq(chainContractAddress.protocolVersion(), newProtocolVersion);
+        // Verify that the verifier is set for the new protocol version
+        assertEq(chainContractAddress.protocolVersionVerifier(newProtocolVersion), testnetVerifier);
     }
 
     function test_RevertWhen_setNewVersionUpgradeNotOwner() public {
@@ -405,7 +418,8 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             cutData,
             oldProtocolVersion,
             oldProtocolVersionDeadline,
-            newProtocolVersion
+            newProtocolVersion,
+            testnetVerifier
         );
     }
 
@@ -452,6 +466,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
