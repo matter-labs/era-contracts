@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
@@ -41,12 +42,30 @@ contract MessageRootTest is Test {
             abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
             abi.encode(allZKChainChainIDsZero)
         );
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(makeAddr("chainAssetHandler"))
+        );
 
         assetTracker = makeAddr("assetTracker");
         bridgeHub = makeAddr("bridgeHub");
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(makeAddr("chainAssetHandler"))
+        );
         L1_CHAIN_ID = 5;
         gatewayChainId = 506;
-        messageRoot = new L1MessageRoot(bridgeHub, 1);
+        messageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(bridgeHub, 1, address(0))),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
+        );
         l2MessageRoot = new L2MessageRoot();
 
         uint256[] memory allZKChainChainIDs = new uint256[](1);

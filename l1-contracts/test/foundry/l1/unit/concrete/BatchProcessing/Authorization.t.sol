@@ -6,11 +6,12 @@ import {Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract AuthorizationTest is ExecutorTest {
     IExecutor.StoredBatchInfo private storedBatchInfo;
-    IExecutor.CommitBatchInfo private commitBatchInfo;
+    CommitBatchInfo private commitBatchInfo;
 
     function setUp() public {
         storedBatchInfo = IExecutor.StoredBatchInfo({
@@ -25,7 +26,7 @@ contract AuthorizationTest is ExecutorTest {
             commitment: Utils.randomBytes32("commitment")
         });
 
-        commitBatchInfo = IExecutor.CommitBatchInfo({
+        commitBatchInfo = CommitBatchInfo({
             batchNumber: 0,
             timestamp: 0,
             indexRepeatedStorageChanges: 0,
@@ -40,7 +41,7 @@ contract AuthorizationTest is ExecutorTest {
     }
 
     function test_RevertWhen_CommittingByUnauthorisedAddress() public {
-        IExecutor.CommitBatchInfo[] memory commitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory commitBatchInfoArray = new CommitBatchInfo[](1);
         commitBatchInfoArray[0] = commitBatchInfo;
 
         vm.prank(randomSigner);
@@ -50,7 +51,7 @@ contract AuthorizationTest is ExecutorTest {
             storedBatchInfo,
             commitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_ProvingByUnauthorisedAddress() public {

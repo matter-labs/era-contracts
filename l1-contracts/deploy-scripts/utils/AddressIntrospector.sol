@@ -239,13 +239,15 @@ library AddressIntrospector {
                 chainTypeManager: _ctmAddr,
                 serverNotifier: ctm.serverNotifierAddress(),
                 validatorTimelock: validatorTimelock,
-                bytecodesSupplier: bytecodesSupplier
+                bytecodesSupplier: bytecodesSupplier,
+                permissionlessValidator: ctm.PERMISSIONLESS_VALIDATOR()
             }),
             implementations: StateTransitionContracts({
                 chainTypeManager: Utils.getImplementation(_ctmAddr),
                 serverNotifier: address(0),
                 validatorTimelock: address(0),
-                bytecodesSupplier: address(0)
+                bytecodesSupplier: address(0),
+                permissionlessValidator: address(0)
             }),
             verifiers: Verifiers({verifier: verifier, verifierFflonk: verifierFflonk, verifierPlonk: verifierPlonk}),
             facets: facets,
@@ -467,6 +469,10 @@ library AddressIntrospector {
                 facets.executorFacet = facetAddr;
             } else if (nameHash == keccak256(bytes("GettersFacet"))) {
                 facets.gettersFacet = facetAddr;
+            } else if (nameHash == keccak256(bytes("MigratorFacet"))) {
+                facets.migratorFacet = facetAddr;
+            } else if (nameHash == keccak256(bytes("CommitterFacet"))) {
+                facets.committerFacet = facetAddr;
             }
         }
     }

@@ -62,11 +62,11 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
 
         FeeParams memory newFeeParams = FeeParams({
             pubdataPricingMode: PubdataPricingMode.Rollup,
-            batchOverheadL1Gas: 1000000,
-            maxPubdataPerBatch: 120000,
-            maxL2GasPerBatch: 80000000,
-            priorityTxMaxPubdata: 99000,
-            minimalL2GasPrice: 250000000
+            batchOverheadL1Gas: 1_000_000,
+            maxPubdataPerBatch: 120_000,
+            maxL2GasPerBatch: 80_000_000,
+            priorityTxMaxPubdata: 99_000,
+            minimalL2GasPrice: 250_000_000
         });
 
         _mockGetZKChainFromBridgehub(chainAddress);
@@ -277,5 +277,17 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
             newVerifier,
             upgradeContract
         );
+    // deactivatePriorityMode
+    function test_SuccessfulDeactivatePriorityMode() public {
+        address chainAddress = createNewChain(getDiamondCutData(diamondInit));
+        UtilsFacet utilsFacet = UtilsFacet(chainAddress);
+
+        utilsFacet.util_setPriorityModeActivated(true);
+        _mockGetZKChainFromBridgehub(chainAddress);
+
+        vm.prank(governor);
+        chainContractAddress.deactivatePriorityMode(chainId);
+
+        assertFalse(utilsFacet.util_getPriorityModeActivated());
     }
 }

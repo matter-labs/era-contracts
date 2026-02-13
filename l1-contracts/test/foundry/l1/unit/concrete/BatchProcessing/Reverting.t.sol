@@ -8,9 +8,12 @@ import {EMPTY_PREPUBLISHED_COMMITMENT, ExecutorTest, POINT_EVALUATION_PRECOMPILE
 
 import {POINT_EVALUATION_PRECOMPILE_ADDR, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {RevertedBatchNotAfterNewLastBatch} from "contracts/common/L1ContractErrors.sol";
 
 contract RevertingTest is ExecutorTest {
+    uint256 private constant MAX_REVERT_BATCHES_GAS = 300_000;
+
     bytes32 l2DAValidatorOutputHash;
     bytes32[] blobVersionedHashes;
     bytes operatorDAInput;
@@ -34,7 +37,7 @@ contract RevertingTest is ExecutorTest {
         newCommitBatchInfo.systemLogs = l2Logs;
         newCommitBatchInfo.operatorDAInput = operatorDAInput;
 
-        IExecutor.CommitBatchInfo[] memory commitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory commitBatchInfoArray = new CommitBatchInfo[](1);
         commitBatchInfoArray[0] = newCommitBatchInfo;
 
         vm.prank(validator);
@@ -44,7 +47,7 @@ contract RevertingTest is ExecutorTest {
             genesisStoredBatchInfo,
             commitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         newStoredBatchInfo = IExecutor.StoredBatchInfo({
@@ -126,5 +129,14 @@ contract RevertingTest is ExecutorTest {
 
         uint256 totalBlocksVerified = getters.getTotalBlocksVerified();
         assertEq(totalBlocksVerified, 0, "totalBlocksVerified");
+    }
+
+    function test_RevertBatchesGasBound() public {
+        vm.prank(validator);
+        uint256 gasBefore = gasleft();
+        executor.revertBatchesSharedBridge(address(0), 0);
+        uint256 gasUsed = gasBefore - gasleft();
+
+        assertLt(gasUsed, MAX_REVERT_BATCHES_GAS, "revertBatchesSharedBridge gas too high");
     }
 }

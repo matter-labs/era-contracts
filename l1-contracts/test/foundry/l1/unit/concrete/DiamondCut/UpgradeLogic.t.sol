@@ -20,6 +20,7 @@ import {DiamondAlreadyFrozen, DiamondNotFrozen, Unauthorized} from "contracts/co
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {
     DiamondProxy private diamondProxy;
@@ -27,6 +28,7 @@ contract UpgradeLogicTest is DiamondCutTest {
     AdminFacet private adminFacet;
     AdminFacet private proxyAsAdmin;
     GettersFacet private proxyAsGetters;
+    PermissionlessValidator private permissionlessValidator;
     address interopCenter = makeAddr("interopCenter");
     address private admin;
     address private chainTypeManager;
@@ -58,8 +60,9 @@ contract UpgradeLogicTest is DiamondCutTest {
 
         diamondCutTestContract = new DiamondCutTestContract();
         diamondInit = new DiamondInit(false);
-        adminFacet = new AdminFacet(block.chainid, RollupDAManager(address(0)), false);
+        adminFacet = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         gettersFacet = new GettersFacet();
+        permissionlessValidator = new PermissionlessValidator();
 
         // Mock CTM to return a verifier for protocol version 0
         address testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));

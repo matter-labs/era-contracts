@@ -13,9 +13,11 @@ import {L2_GENESIS_UPGRADE_ADDR} from "contracts/common/l2-helpers/L2ContractAdd
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 import {IExecutor, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
+import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {IL2GenesisUpgrade} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -23,7 +25,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 contract RevertBatchesTest is ChainTypeManagerTest {
     // Items for logs & commits
     uint256 internal currentTimestamp;
-    IExecutor.CommitBatchInfo internal newCommitBatchInfo;
+    CommitBatchInfo internal newCommitBatchInfo;
     IExecutor.StoredBatchInfo internal newStoredBatchInfo;
     IExecutor.StoredBatchInfo internal genesisStoredBatchInfo;
     uint256[] internal proofInput;
@@ -43,6 +45,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
     // Facets exposing the diamond
     AdminFacet internal adminFacet;
     ExecutorFacet internal executorFacet;
+    CommitterFacet internal committerFacet;
     GettersFacet internal gettersFacet;
 
     function setUp() public {
@@ -69,7 +72,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
         });
         vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
         currentTimestamp = block.timestamp;
-        newCommitBatchInfo = IExecutor.CommitBatchInfo({
+        newCommitBatchInfo = CommitBatchInfo({
             batchNumber: 1,
             timestamp: uint64(currentTimestamp),
             indexRepeatedStorageChanges: 0,
@@ -110,6 +113,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
         );
 
         executorFacet = ExecutorFacet(address(newChainAddress));
+        committerFacet = CommitterFacet(address(newChainAddress));
         gettersFacet = GettersFacet(address(newChainAddress));
         adminFacet = AdminFacet(address(newChainAddress));
 
@@ -158,7 +162,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
 
-        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.timestamp = uint64(currentTimestamp);
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
@@ -181,7 +185,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             blobHashes
         );
 
-        IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -193,7 +197,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executorFacet.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        committerFacet.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
