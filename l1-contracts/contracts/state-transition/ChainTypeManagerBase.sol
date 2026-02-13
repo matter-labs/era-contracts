@@ -23,10 +23,9 @@ import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {IChainAssetHandler} from "../core/chain-asset-handler/IChainAssetHandler.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {L2CanonicalTransaction, TxStatus} from "../common/Messaging.sol";
-import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
+import {TxStatus} from "../common/Messaging.sol";
+import {ProposedUpgrade, ProposedUpgradeLib} from "./libraries/ProposedUpgradeLib.sol";
 import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
-import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
 
 /// @title Chain Type Manager Base contract
 /// @author Matter Labs
@@ -378,39 +377,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         }
 
         // Construct minimal ProposedUpgrade for patch (VK-only) upgrade
-        ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: L2CanonicalTransaction({
-                txType: 0,
-                from: uint256(0),
-                to: uint256(0),
-                gasLimit: 0,
-                gasPerPubdataByteLimit: 0,
-                maxFeePerGas: 0,
-                maxPriorityFeePerGas: 0,
-                paymaster: 0,
-                nonce: 0,
-                value: 0,
-                reserved: [uint256(0), 0, 0, 0],
-                data: "",
-                signature: "",
-                factoryDeps: new uint256[](0),
-                paymasterInput: "",
-                reservedDynamic: ""
-            }),
-            bootloaderHash: bytes32(0),
-            defaultAccountHash: bytes32(0),
-            evmEmulatorHash: bytes32(0),
-            verifier: address(0),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            }),
-            l1ContractsUpgradeCalldata: "",
-            postUpgradeCalldata: "",
-            upgradeTimestamp: 0,
-            newProtocolVersion: _newProtocolVersion
-        });
+        ProposedUpgrade memory proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(_newProtocolVersion);
 
         bytes memory upgradeCalldata = abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade));
 
