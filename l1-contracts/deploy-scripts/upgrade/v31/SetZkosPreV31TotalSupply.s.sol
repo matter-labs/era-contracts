@@ -41,7 +41,12 @@ contract SetZkosPreV31TotalSupplyScript is Script {
 
         // Calculate L1->L2 tx cost
         uint256 gasPrice = Utils.bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
-        uint256 baseCost = bridgehub.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
+        uint256 baseCost = bridgehub.l2TransactionBaseCost(
+            chainId,
+            gasPrice,
+            l2GasLimit,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+        );
 
         console.log("Gas Price:", gasPrice);
         console.log("Base Cost:", baseCost);
