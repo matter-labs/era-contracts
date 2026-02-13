@@ -9,7 +9,7 @@ import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
-import {ProposedUpgrade, ProposedUpgradeLib} from "../state-transition/libraries/ProposedUpgradeLib.sol";
+import {ProposedUpgrade} from "../state-transition/libraries/ProposedUpgradeLib.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, NewProtocolMajorVersionNotZero, PatchCantSetUpgradeTxn, PatchUpgradeCantSetBootloader, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetEvmEmulator, PreviousProtocolMajorVersionNotZero, PreviousUpgradeNotCleaned, PreviousUpgradeNotFinalized, ProtocolVersionMinorDeltaTooBig, ProtocolVersionTooSmall, SettlementLayerUpgradeMustPrecedeChainUpgrade} from "./ZkSyncUpgradeErrors.sol";
