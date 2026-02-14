@@ -5,7 +5,6 @@ pub mod anvil;
 pub mod cmd;
 pub mod config;
 pub mod contracts;
-pub mod docker;
 pub mod files;
 pub mod forge;
 pub mod ethereum;

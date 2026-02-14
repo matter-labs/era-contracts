@@ -390,14 +390,13 @@ pub async fn run(args: ChainInitArgs, shell: &Shell) -> anyhow::Result<()> {
         .await?;
     }
 
-    // Build and output plan
-    let plan = build_plan(&init_input, &register_output, &runner);
-    let plan_json = serde_json::to_string_pretty(&plan)?;
+    let result = build_output(&init_input, &register_output, &runner);
+    let result_json = serde_json::to_string_pretty(&result)?;
     if let Some(out_path) = &args.forge_args.runner.out {
-        std::fs::write(out_path, &plan_json)?;
-        logger::info(format!("Plan written to: {}", out_path.display()));
+        std::fs::write(out_path, &result_json)?;
+        logger::info(format!("Output written to: {}", out_path.display()));
     } else {
-        println!("{}", plan_json);
+        println!("{}", result_json);
     }
 
     if is_simulation {
@@ -411,23 +410,19 @@ pub async fn run(args: ChainInitArgs, shell: &Shell) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn build_plan(
+fn build_output(
     input: &ChainInitInput,
     output: &RegisterChainOutput,
     runner: &ForgeRunner,
 ) -> serde_json::Value {
-    let mut transactions = Vec::new();
-    for run in runner.runs() {
-        if let Some(txs) = run.transactions() {
-            for tx in txs {
-                transactions.push(tx.clone());
-            }
-        }
-    }
+    let runs: Vec<_> = runner.runs().iter().map(|r| json!({
+        "script": r.script.display().to_string(),
+        "run": r.payload,
+    })).collect();
 
     json!({
         "command": "chain.init",
-        "transactions": transactions,
+        "runs": runs,
         "input": {
             "chain_id": input.chain_params.chain_id.as_u64(),
             "ctm_proxy": format!("{:#x}", input.ctm_proxy),

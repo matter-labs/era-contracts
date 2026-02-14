@@ -13,11 +13,10 @@ use ethers::{
 };
 use serde::{Deserialize, Serialize};
 use strum::Display;
-use url::Url;
 use xshell::Shell;
 
 use super::runner::ForgeRunner;
-use crate::{docker::adjust_localhost_for_docker, ethereum::create_ethers_client};
+use crate::ethereum::create_ethers_client;
 
 /// ForgeScript is a wrapper around the forge script command.
 pub struct ForgeScript {
@@ -288,13 +287,10 @@ pub struct ForgeScriptArgs {
 }
 
 impl ForgeScriptArgs {
-    /// Build the forge script command arguments for a specific runner mode.
-    pub(crate) fn build_for_runner(&mut self, use_docker: bool) -> Vec<String> {
+    /// Build the forge script command arguments.
+    pub fn build(&mut self) -> Vec<String> {
         self.add_verify_args();
         self.cleanup_contract_args();
-        if use_docker {
-            self.adjust_args_for_docker();
-        }
         if self.zksync {
             self.add_arg(ForgeScriptArg::Zksync);
         }
@@ -304,11 +300,6 @@ impl ForgeScriptArgs {
             .map(|arg| arg.to_string())
             .chain(self.additional_args.clone())
             .collect()
-    }
-
-    /// Builds the forge script command arguments without any runner customisation.
-    pub fn build(&mut self) -> Vec<String> {
-        self.build_for_runner(false)
     }
 
     /// Adds verify arguments to the forge script command.
@@ -382,21 +373,6 @@ impl ForgeScriptArgs {
         }
 
         self.additional_args = cleaned_args;
-    }
-
-    // If running via Docker, rewrite localhost RPCs to host.docker.internal
-    fn adjust_args_for_docker(&mut self) {
-        if let Some(ForgeScriptArg::RpcUrl { url }) = self
-            .args
-            .iter_mut()
-            .find(|a| matches!(a, ForgeScriptArg::RpcUrl { .. }))
-        {
-            if let Ok(parsed) = Url::parse(url) {
-                if let Ok(new_url) = adjust_localhost_for_docker(parsed) {
-                    *url = new_url.to_string();
-                }
-            }
-        }
     }
 
     /// Add additional arguments to the forge script command.
