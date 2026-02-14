@@ -4234,29 +4234,31 @@ dependencies = [
 ]
 
 [[package]]
-name = "protocol_ops_cli"
-version = "0.2.1"
+name = "protocol_ops"
+version = "0.1.0"
 dependencies = [
  "alloy",
  "anyhow",
+ "async-trait",
  "chrono",
  "clap",
  "clap-markdown",
  "clap_complete",
  "cliclack",
+ "console",
  "dirs",
  "ethers",
  "futures",
  "human-panic",
  "lazy_static",
+ "once_cell",
  "prost",
- "protocol_ops_common",
- "protocol_ops_config",
- "protocol_ops_types",
+ "rand 0.8.5",
  "reqwest 0.12.24",
  "secrecy",
  "serde",
  "serde_json",
+ "serde_with 1.14.0",
  "serde_yaml",
  "sha2",
  "slugify-rs",
@@ -4268,64 +4270,6 @@ dependencies = [
  "url",
  "walkdir",
  "xshell",
-]
-
-[[package]]
-name = "protocol_ops_common"
-version = "0.2.1"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "clap",
- "cliclack",
- "console",
- "ethers",
- "futures",
- "once_cell",
- "serde",
- "serde_json",
- "serde_yaml",
- "strum 0.26.3",
- "thiserror 2.0.17",
- "tokio",
- "toml 0.8.23",
- "url",
- "xshell",
-]
-
-[[package]]
-name = "protocol_ops_config"
-version = "0.2.1"
-dependencies = [
- "anyhow",
- "clap",
- "ethers",
- "protocol_ops_common",
- "protocol_ops_types",
- "rand 0.8.5",
- "serde",
- "serde_json",
- "serde_yaml",
- "strum 0.26.3",
- "thiserror 2.0.17",
- "tokio",
- "url",
- "xshell",
-]
-
-[[package]]
-name = "protocol_ops_types"
-version = "0.2.1"
-dependencies = [
- "anyhow",
- "clap",
- "ethers",
- "serde",
- "serde_json",
- "serde_with 1.14.0",
- "strum 0.26.3",
- "thiserror 2.0.17",
 ]
 
 [[package]]
