@@ -1,11 +1,10 @@
 use std::{
     fs,
-    io::IsTerminal as _,
     path::{Path, PathBuf},
 };
 
-use anyhow::{bail, Context};
-use clap::{Parser, ValueEnum};
+use anyhow::Context;
+use clap::Parser;
 use chrono::Utc;
 use ethers::middleware::Middleware as _;
 use serde::{Deserialize, Serialize};
@@ -18,44 +17,6 @@ use crate::{
     cmd::{Cmd, CmdResult},
     ethereum::get_ethers_provider,
 };
-
-#[derive(Debug, Clone, Serialize, Deserialize, ValueEnum, Default)]
-pub enum ForgeRunnerModeArg {
-    #[default]
-    Local,
-    Docker,
-}
-
-#[derive(Debug, Clone)]
-enum ForgeRunnerMode {
-    Local,
-    Docker { image: String, workdir: PathBuf },
-}
-
-#[derive(Debug, Clone)]
-struct DockerMounts {
-    script_config: PathBuf,
-    script_out: PathBuf,
-    broadcast: PathBuf,
-}
-
-impl DockerMounts {
-    fn new(base_path: &Path) -> anyhow::Result<Self> {
-        let script_config = base_path.join("script-config");
-        let script_out = base_path.join("script-out");
-        let broadcast = base_path.join("broadcast");
-
-        fs::create_dir_all(&script_config)?;
-        fs::create_dir_all(&script_out)?;
-        fs::create_dir_all(&broadcast)?;
-
-        Ok(Self {
-            script_config,
-            script_out,
-            broadcast,
-        })
-    }
-}
 
 /// Result of a forge script execution containing the broadcast JSON payload.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -75,23 +36,16 @@ impl ForgeScriptRun {
     }
 }
 
-/// Arguments controlling how forge scripts are executed (local vs. docker, output handling, etc).
+/// Arguments controlling how forge scripts are executed.
 #[derive(Debug, Default, Serialize, Deserialize, Parser, Clone)]
 #[clap(next_help_heading = "Forge runner options")]
 pub struct ForgeRunnerArgs {
-    #[clap(long, value_enum, default_value_t = ForgeRunnerModeArg::Local)]
-    pub mode: ForgeRunnerModeArg,
-    /// Use forge binary from a Dockerized image.
-    /// Example: matterlabs/forge-zksync:nightly-ae913af65381734ad46c044a9495b67310bc77c4
-    #[clap(long = "forge-version")]
-    pub forge_version: Option<String>,
     /// Append each broadcast run into the specified JSON file.
     #[clap(long = "out")]
     pub out: Option<PathBuf>,
 }
 
 pub struct ForgeRunner {
-    mode: ForgeRunnerMode,
     out: Option<PathBuf>,
     runs: Vec<ForgeScriptRun>,
 }
@@ -99,7 +53,6 @@ pub struct ForgeRunner {
 impl Default for ForgeRunner {
     fn default() -> Self {
         Self {
-            mode: ForgeRunnerMode::Local,
             out: None,
             runs: Vec::new(),
         }
@@ -108,15 +61,7 @@ impl Default for ForgeRunner {
 
 impl ForgeRunner {
     pub fn new(args: ForgeRunnerArgs) -> Self {
-        let mode = match args.mode {
-            ForgeRunnerModeArg::Docker => ForgeRunnerMode::Docker {
-                image: args.forge_version.clone().unwrap_or_default(),
-                workdir: PathBuf::from("/contracts/l1-contracts"),
-            },
-            ForgeRunnerModeArg::Local => ForgeRunnerMode::Local,
-        };
         Self {
-            mode,
             out: args.out,
             runs: Vec::new(),
         }
@@ -128,10 +73,8 @@ impl ForgeRunner {
             script.args.add_arg(ForgeScriptArg::Skip { skip_path });
         }
 
-        let use_docker = matches!(self.mode, ForgeRunnerMode::Docker { .. });
-
         let mut args_no_resume = script.args.clone();
-        let args_no_resume = args_no_resume.build_for_runner(use_docker);
+        let args_no_resume = args_no_resume.build();
 
         let command_result = if script.args.resume {
             let mut args_with_resume = args_no_resume.clone();
@@ -163,48 +106,13 @@ impl ForgeRunner {
         args: &[String],
         for_resume: bool,
     ) -> anyhow::Result<CmdResult<()>> {
-        match &self.mode {
-            ForgeRunnerMode::Local => {
-                let script_path = script.script_name().as_os_str();
-                let _dir_guard = shell.push_dir(script.base_path());
-                let mut cmd =
-                    Cmd::new(cmd!(shell, "forge script {script_path} --legacy {args...}"));
-                if for_resume {
-                    cmd = cmd.with_piped_std_err();
-                }
-                Ok(cmd.run())
-            }
-            ForgeRunnerMode::Docker { image, workdir } => {
-                if for_resume {
-                    bail!("Resume is not supported for Dockerized protocol images");
-                }
-                let _mounts = DockerMounts::new(script.base_path())?;
-                let contracts_root = script.base_path().join("..").canonicalize()?;
-                let mut docker_args: Vec<String> = vec![
-                    "--rm".to_string(),
-                    "--platform".to_string(),
-                    "linux/amd64".to_string(),
-                    "--add-host=host.docker.internal:host-gateway".to_string(),
-                    format!("--workdir={}", workdir.display()),
-                    format!("-v={}:{}", contracts_root.display(), "/contracts".to_string()),
-                ];
-
-                if std::io::stdin().is_terminal() {
-                    docker_args.push("-i".to_string());
-                }
-                if std::io::stdout().is_terminal() {
-                    docker_args.push("-t".to_string());
-                }
-
-                let script_path = script.script_name().as_os_str();
-                let cmd = Cmd::new(cmd!(
-                    shell,
-                    "docker run {docker_args...} {image} forge script {script_path} --legacy {args...}"
-                ))
-                .with_force_run();
-                Ok(cmd.run())
-            }
+        let script_path = script.script_name().as_os_str();
+        let _dir_guard = shell.push_dir(script.base_path());
+        let mut cmd = Cmd::new(cmd!(shell, "forge script {script_path} --legacy {args...}"));
+        if for_resume {
+            cmd = cmd.with_piped_std_err();
         }
+        Ok(cmd.run())
     }
 
     fn record_run_latest(&mut self, script: &ForgeScript) -> anyhow::Result<()> {

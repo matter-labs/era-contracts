@@ -189,14 +189,13 @@ pub async fn run(args: HubInitArgs, shell: &Shell) -> anyhow::Result<()> {
         accept_ownership(&mut ctx, &accept_input).await?;
     }
 
-    // Build and output plan
-    let plan = build_plan(&output, &runner);
-    let plan_json = serde_json::to_string_pretty(&plan)?;
+    let result = build_output(&output, &runner);
+    let result_json = serde_json::to_string_pretty(&result)?;
     if let Some(out_path) = &args.forge_args.runner.out {
-        std::fs::write(out_path, &plan_json)?;
-        logger::info(format!("Plan written to: {}", out_path.display()));
+        std::fs::write(out_path, &result_json)?;
+        logger::info(format!("Output written to: {}", out_path.display()));
     } else {
-        println!("{}", plan_json);
+        println!("{}", result_json);
     }
 
     if is_simulation {
@@ -210,22 +209,18 @@ pub async fn run(args: HubInitArgs, shell: &Shell) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn build_plan(output: &DeployL1CoreContractsOutput, runner: &ForgeRunner) -> serde_json::Value {
+fn build_output(output: &DeployL1CoreContractsOutput, runner: &ForgeRunner) -> serde_json::Value {
     let deployed = &output.deployed_addresses;
 
-    let mut transactions = Vec::new();
-    for run in runner.runs() {
-        if let Some(txs) = run.transactions() {
-            for tx in txs {
-                transactions.push(tx.clone());
-            }
-        }
-    }
+    let runs: Vec<_> = runner.runs().iter().map(|r| json!({
+        "script": r.script.display().to_string(),
+        "run": r.payload,
+    })).collect();
 
     json!({
         "command": "hub.init",
-        "transactions": transactions,
-        "artifacts": {
+        "runs": runs,
+        "output": {
             "create2_factory_addr": format!("{:#x}", output.contracts.create2_factory_addr),
             "create2_factory_salt": format!("{:#x}", output.contracts.create2_factory_salt),
             "core_ecosystem_contracts": {
