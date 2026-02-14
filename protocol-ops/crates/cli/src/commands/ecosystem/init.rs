@@ -190,14 +190,13 @@ pub async fn run(args: EcosystemInitArgs, shell: &Shell) -> anyhow::Result<()> {
 
     logger::info(format!("CTM initialized. CTM proxy: {:#x}", ctm_output.ctm_proxy));
 
-    // Build and output plan
-    let plan = build_plan(&hub_output, &ctm_output, &runner);
-    let plan_json = serde_json::to_string_pretty(&plan)?;
+    let result = build_output(&hub_output, &ctm_output, &runner);
+    let result_json = serde_json::to_string_pretty(&result)?;
     if let Some(out_path) = &args.forge_args.runner.out {
-        std::fs::write(out_path, &plan_json)?;
-        logger::info(format!("Plan written to: {}", out_path.display()));
+        std::fs::write(out_path, &result_json)?;
+        logger::info(format!("Output written to: {}", out_path.display()));
     } else {
-        println!("{}", plan_json);
+        println!("{}", result_json);
     }
 
     if is_simulation {
@@ -211,7 +210,7 @@ pub async fn run(args: EcosystemInitArgs, shell: &Shell) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn build_plan(
+fn build_output(
     hub_output: &DeployL1CoreContractsOutput,
     ctm_output: &CtmInitOutput,
     runner: &ForgeRunner,
@@ -219,18 +218,14 @@ fn build_plan(
     let hub = &hub_output.deployed_addresses;
     let ctm = &ctm_output.deploy_output.deployed_addresses;
 
-    let mut transactions = Vec::new();
-    for run in runner.runs() {
-        if let Some(txs) = run.transactions() {
-            for tx in txs {
-                transactions.push(tx.clone());
-            }
-        }
-    }
+    let runs: Vec<_> = runner.runs().iter().map(|r| json!({
+        "script": r.script.display().to_string(),
+        "run": r.payload,
+    })).collect();
 
     json!({
         "command": "ecosystem.init",
-        "transactions": transactions,
+        "runs": runs,
         "output": {
             "hub": {
                 "create2_factory_addr": format!("{:#x}", hub_output.contracts.create2_factory_addr),

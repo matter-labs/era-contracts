@@ -197,13 +197,13 @@ pub async fn run(args: CtmDeployArgs, shell: &Shell) -> anyhow::Result<()> {
 
     let output = deploy(&mut ctx, &input)?;
 
-    let plan = build_plan(&output, ctx.runner, &input);
-    let plan_json = serde_json::to_string_pretty(&plan)?;
+    let result = build_output(&output, ctx.runner, &input);
+    let result_json = serde_json::to_string_pretty(&result)?;
     if let Some(out_path) = &args.forge_args.runner.out {
-        std::fs::write(out_path, &plan_json)?;
-        logger::info(format!("Plan written to: {}", out_path.display()));
+        std::fs::write(out_path, &result_json)?;
+        logger::info(format!("Output written to: {}", out_path.display()));
     } else {
-        println!("{}", plan_json);
+        println!("{}", result_json);
     }
 
     if is_simulation {
@@ -217,29 +217,25 @@ pub async fn run(args: CtmDeployArgs, shell: &Shell) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn build_plan(output: &DeployCTMOutput, runner: &ForgeRunner, input: &CtmDeployInput) -> serde_json::Value {
+fn build_output(output: &DeployCTMOutput, runner: &ForgeRunner, input: &CtmDeployInput) -> serde_json::Value {
     let deployed = &output.deployed_addresses;
 
-    let mut transactions = Vec::new();
-    for run in runner.runs() {
-        if let Some(txs) = run.transactions() {
-            for tx in txs {
-                transactions.push(tx.clone());
-            }
-        }
-    }
+    let runs: Vec<_> = runner.runs().iter().map(|r| json!({
+        "script": r.script.display().to_string(),
+        "run": r.payload,
+    })).collect();
 
     json!({
         "command": "ctm.deploy",
-        "config": {
+        "input": {
             "bridgehub": format!("{:#x}", input.bridgehub),
             "vm_type": format!("{:?}", input.vm_type),
             "reuse_gov_and_admin": input.reuse_gov_and_admin,
             "with_testnet_verifier": input.with_testnet_verifier,
             "with_legacy_bridge": input.with_legacy_bridge,
         },
-        "transactions": transactions,
-        "artifacts": {
+        "runs": runs,
+        "output": {
             "state_transition": {
                 "proxy_addr": format!("{:#x}", deployed.state_transition.state_transition_proxy_addr),
                 "verifier_addr": format!("{:#x}", deployed.state_transition.verifier_addr),
