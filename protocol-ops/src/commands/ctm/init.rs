@@ -1,10 +1,12 @@
+use std::path::PathBuf;
+
 use clap::Parser;
 use ethers::{
     signers::{LocalWallet, Signer},
     types::{Address, H256},
 };
 use crate::common::{
-    forge::{ForgeArgs, ForgeRunner},
+    forge::{resolve_execution, ExecutionMode, ForgeArgs, ForgeContext, ForgeRunner, SenderAuth},
     logger,
 };
 use crate::config::forge_interface::deploy_ctm::output::DeployCTMOutput;
@@ -16,7 +18,6 @@ use xshell::Shell;
 use crate::commands::ctm::accept_ownership::{accept_ownership, CtmAcceptOwnershipInput};
 use crate::commands::ctm::deploy::{deploy, CtmDeployInput};
 use crate::commands::hub::register_ctm::{register_ctm, RegisterCtmInput};
-use crate::forge_ctx::{resolve_execution, ExecutionMode, ForgeContext, SenderAuth};
 use crate::utils::paths;
 
 /// Input parameters for ctm init.
@@ -145,14 +146,12 @@ pub struct CtmInitArgs {
     #[clap(long)]
     pub owner: Option<Address>,
 
-    /// Owner private key (required if owner != sender)
+    /// Owner private key
     #[clap(long, alias = "owner-pk")]
     pub owner_private_key: Option<H256>,
-
-    /// Bridgehub governance owner private key for accepting ownership (required when reuse_gov_and_admin=true, as it uses hub's governance)
+    /// Bridgehub governance owner private key for accepting ownership (if reuse_gov_and_admin=true)
     #[clap(long, alias = "bridgehub-owner-pk")]
     pub bridgehub_owner_private_key: Option<H256>,
-
     /// Bridgehub admin private key for registering CTM (default: uses governance owner key)
     #[clap(long, alias = "bridgehub-admin-pk")]
     pub bridgehub_admin_private_key: Option<H256>,
@@ -176,21 +175,23 @@ pub struct CtmInitArgs {
     #[clap(long, help = "CREATE2 factory salt (random by default)", help_heading = "CREATE2 options")]
     pub create2_factory_salt: Option<H256>,
 
-    // Dev options
-    #[clap(long, help = "Use dev defaults", default_value_t = false, help_heading = "Dev options")]
-    pub dev: bool,
+    // Options
     /// VM type: zksyncos (default) or eravm
-    #[clap(long, default_value = "zksyncos", help_heading = "Dev options")]
+    #[clap(long, default_value = "zksyncos")]
     pub vm_type: String,
     /// Reuse governance and admin contracts from hub (default: true)
-    #[clap(long, default_value_t = true, help_heading = "Dev options")]
+    #[clap(long, default_value_t = true)]
     pub reuse_gov_and_admin: bool,
     /// Use testnet verifier (default: true)
-    #[clap(long, default_value_t = true, help_heading = "Dev options")]
+    #[clap(long, default_value_t = true)]
     pub with_testnet_verifier: bool,
     /// Enable support for legacy bridge testing (default: false)
-    #[clap(long, default_value_t = false, help_heading = "Dev options")]
+    #[clap(long, default_value_t = false)]
     pub with_legacy_bridge: bool,
+
+    // Output
+    #[clap(long, help = "Write full JSON output to file", help_heading = "Output")]
+    pub out: Option<PathBuf>,
 }
 
 pub async fn run(args: CtmInitArgs, shell: &Shell) -> anyhow::Result<()> {
@@ -203,7 +204,7 @@ pub async fn run(args: CtmInitArgs, shell: &Shell) -> anyhow::Result<()> {
     };
 
     let (sender_auth, sender, execution_mode) =
-        resolve_execution(args.private_key, args.sender, args.dev, args.simulate, &args.l1_rpc_url)?;
+        resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
     let owner = args.owner.unwrap_or(sender);
 
     // Resolve owner auth for accept_ownership and register steps
@@ -276,7 +277,7 @@ pub async fn run(args: CtmInitArgs, shell: &Shell) -> anyhow::Result<()> {
     // In simulation mode, forge targets the anvil fork instead of the original RPC.
     let effective_rpc = execution_mode.rpc_url(&args.l1_rpc_url);
 
-    let mut runner = ForgeRunner::new(args.forge_args.runner.clone());
+    let mut runner = ForgeRunner::new();
 
     // Step 1: Deploy CTM contracts (as sender)
     logger::info(format!("Deploying CTM contracts as sender: {:#x}", sender));
@@ -352,19 +353,17 @@ pub async fn run(args: CtmInitArgs, shell: &Shell) -> anyhow::Result<()> {
         register_ctm(&mut ctx, &register_input)?;
     }
 
-    let result = build_output(&deploy_input, &deploy_output, &runner);
-    let result_json = serde_json::to_string_pretty(&result)?;
-    if let Some(out_path) = &args.forge_args.runner.out {
+    if let Some(out_path) = &args.out {
+        let result = build_output(&deploy_input, &deploy_output, &runner);
+        let result_json = serde_json::to_string_pretty(&result)?;
         std::fs::write(out_path, &result_json)?;
-        logger::info(format!("Output written to: {}", out_path.display()));
-    } else {
-        println!("{}", result_json);
+        logger::info(format!("Full output written to: {}", out_path.display()));
     }
 
     if is_simulation {
-        logger::outro("CTM init simulation complete (no on-chain changes)");
+        logger::outro(format!("CTM init simulation complete — CTM Proxy: {:#x}", ctm_proxy));
     } else {
-        logger::outro("CTM initialized");
+        logger::outro(format!("CTM Proxy deployed at: {:#x}", ctm_proxy));
     }
 
     drop(execution_mode);

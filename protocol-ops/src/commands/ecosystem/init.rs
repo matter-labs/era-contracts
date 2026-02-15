@@ -1,10 +1,12 @@
+use std::path::PathBuf;
+
 use clap::Parser;
 use ethers::{
     signers::{LocalWallet, Signer},
     types::{Address, H256},
 };
 use crate::common::{
-    forge::{ForgeArgs, ForgeRunner},
+    forge::{resolve_execution, ExecutionMode, ForgeArgs, ForgeContext, ForgeRunner, SenderAuth},
     logger,
 };
 use crate::config::forge_interface::deploy_ecosystem::output::DeployL1CoreContractsOutput;
@@ -15,7 +17,6 @@ use xshell::Shell;
 
 use crate::commands::ctm::init::{ctm_init, CtmInitInput, CtmInitOutput};
 use crate::commands::hub::init::{hub_init, HubInitInput};
-use crate::forge_ctx::{resolve_execution, ExecutionMode, ForgeContext, SenderAuth};
 use crate::utils::paths;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
@@ -24,7 +25,7 @@ pub struct EcosystemInitArgs {
     #[clap(long)]
     pub owner: Option<Address>,
 
-    /// Owner private key (required if owner != sender)
+    /// Owner private key
     #[clap(long, alias = "owner-pk")]
     pub owner_private_key: Option<H256>,
 
@@ -47,20 +48,22 @@ pub struct EcosystemInitArgs {
     #[clap(long, help = "CREATE2 factory salt (random by default)", help_heading = "CREATE2 options")]
     pub create2_factory_salt: Option<H256>,
 
-    // Dev options
-    #[clap(long, help = "Use dev defaults", default_value_t = false, help_heading = "Dev options")]
-    pub dev: bool,
-    #[clap(long, help = "Era chain ID", default_value_t = 270, help_heading = "Dev options")]
+    // Options
+    #[clap(long, help = "Era chain ID", default_value_t = 270)]
     pub era_chain_id: u64,
     /// VM type: zksyncos (default) or eravm
-    #[clap(long, default_value = "zksyncos", help_heading = "Dev options")]
+    #[clap(long, default_value = "zksyncos")]
     pub vm_type: String,
     /// Use testnet verifier (default: true)
-    #[clap(long, default_value_t = true, help_heading = "Dev options")]
+    #[clap(long, default_value_t = true)]
     pub with_testnet_verifier: bool,
     /// Enable support for legacy bridge testing (default: false)
-    #[clap(long, default_value_t = false, help_heading = "Dev options")]
+    #[clap(long, default_value_t = false)]
     pub with_legacy_bridge: bool,
+
+    // Output
+    #[clap(long, help = "Write full JSON output to file", help_heading = "Output")]
+    pub out: Option<PathBuf>,
 }
 
 /// Input parameters for ecosystem init.
@@ -90,7 +93,7 @@ pub async fn run(args: EcosystemInitArgs, shell: &Shell) -> anyhow::Result<()> {
     };
 
     let (sender_auth, sender, execution_mode) =
-        resolve_execution(args.private_key, args.sender, args.dev, args.simulate, &args.l1_rpc_url)?;
+        resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
     let owner = args.owner.unwrap_or(sender);
 
     // Resolve owner auth
@@ -125,7 +128,7 @@ pub async fn run(args: EcosystemInitArgs, shell: &Shell) -> anyhow::Result<()> {
     }
 
     let effective_rpc = execution_mode.rpc_url(&args.l1_rpc_url);
-    let mut runner = ForgeRunner::new(args.forge_args.runner.clone());
+    let mut runner = ForgeRunner::new();
 
     logger::info("Initializing ecosystem...");
     logger::info(format!("Sender: {:#x}", sender));
@@ -190,19 +193,26 @@ pub async fn run(args: EcosystemInitArgs, shell: &Shell) -> anyhow::Result<()> {
 
     logger::info(format!("CTM initialized. CTM proxy: {:#x}", ctm_output.ctm_proxy));
 
-    let result = build_output(&hub_output, &ctm_output, &runner);
-    let result_json = serde_json::to_string_pretty(&result)?;
-    if let Some(out_path) = &args.forge_args.runner.out {
+    let bridgehub_addr = hub_output.deployed_addresses.bridgehub.bridgehub_proxy_addr;
+    let ctm_proxy_addr = ctm_output.ctm_proxy;
+
+    if let Some(out_path) = &args.out {
+        let result = build_output(&hub_output, &ctm_output, &runner);
+        let result_json = serde_json::to_string_pretty(&result)?;
         std::fs::write(out_path, &result_json)?;
-        logger::info(format!("Output written to: {}", out_path.display()));
-    } else {
-        println!("{}", result_json);
+        logger::info(format!("Full output written to: {}", out_path.display()));
     }
 
     if is_simulation {
-        logger::outro("Ecosystem init simulation complete (no on-chain changes)");
+        logger::outro(format!(
+            "Ecosystem init simulation complete — Bridgehub Proxy: {:#x}, CTM Proxy: {:#x}",
+            bridgehub_addr, ctm_proxy_addr
+        ));
     } else {
-        logger::outro("Ecosystem initialized");
+        logger::outro(format!(
+            "Bridgehub Proxy deployed at: {:#x}, CTM Proxy deployed at: {:#x}",
+            bridgehub_addr, ctm_proxy_addr
+        ));
     }
 
     drop(execution_mode);

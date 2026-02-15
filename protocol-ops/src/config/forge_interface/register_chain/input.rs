@@ -50,6 +50,7 @@ impl RegisterChainL1Config {
     pub fn new(
         chain_params: &NewChainParams,
         create2_factory_addr: Address,
+        create2_factory_salt: Option<H256>,
         initialize_legacy_bridge: bool,
     ) -> anyhow::Result<Self> {
         Ok(Self {
@@ -65,13 +66,13 @@ impl RegisterChainL1Config {
                 bridgehub_create_new_chain_salt: rand::thread_rng().gen_range(0..=i64::MAX) as u64,
                 validium_mode: chain_params.da_mode == DAValidatorType::NoDA || chain_params.da_mode == DAValidatorType::Avail,
                 validator_sender_operator_eth: chain_params.commit_operator,
-                validator_sender_operator_blobs_eth: chain_params.prove_operator,                
+                validator_sender_operator_blobs_eth: chain_params.prove_operator,
                 allow_evm_emulator: true,
             },
             owner_address: chain_params.owner,
             contracts: Create2Addresses {
                 create2_factory_addr,
-                create2_factory_salt: H256::random(),
+                create2_factory_salt: create2_factory_salt.unwrap_or_else(H256::random),
             },
             initialize_legacy_bridge,
         })

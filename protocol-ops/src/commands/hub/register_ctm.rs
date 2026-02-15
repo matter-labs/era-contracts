@@ -1,8 +1,10 @@
+use std::path::PathBuf;
+
 use clap::Parser;
 use ethers::{contract::BaseContract, types::{Address, H256}};
 use lazy_static::lazy_static;
 use crate::common::{
-    forge::{Forge, ForgeArgs, ForgeRunner},
+    forge::{resolve_execution, ExecutionMode, Forge, ForgeArgs, ForgeContext, ForgeRunner, SenderAuth},
     logger,
 };
 use crate::config::{
@@ -15,7 +17,6 @@ use xshell::Shell;
 
 use crate::abi::IREGISTERCTMABI_ABI;
 use crate::admin_functions::AdminScriptOutputInner;
-use crate::forge_ctx::{resolve_execution, ExecutionMode, ForgeContext, SenderAuth};
 use crate::utils::paths;
 
 lazy_static! {
@@ -41,12 +42,14 @@ pub struct HubRegisterCtmArgs {
     pub sender: Option<Address>,
     #[clap(long, help = "Simulate against anvil fork (no on-chain changes)")]
     pub simulate: bool,
-    #[clap(long, help = "Use dev defaults")]
-    pub dev: bool,
 
     #[clap(flatten)]
     #[serde(flatten)]
     pub forge_args: ForgeArgs,
+
+    // Output
+    #[clap(long, help = "Write full JSON output to file", help_heading = "Output")]
+    pub out: Option<PathBuf>,
 }
 
 /// Input parameters for registering a CTM on the bridgehub.
@@ -102,7 +105,7 @@ pub async fn run(args: HubRegisterCtmArgs, shell: &Shell) -> anyhow::Result<()> 
     let foundry_scripts_path = paths::path_from_root("l1-contracts");
 
     let (auth, sender, execution_mode) =
-        resolve_execution(args.private_key, args.sender, args.dev, args.simulate, &args.l1_rpc_url)?;
+        resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
 
     let is_simulation = matches!(execution_mode, ExecutionMode::Simulate(_));
     if is_simulation {
@@ -119,7 +122,7 @@ pub async fn run(args: HubRegisterCtmArgs, shell: &Shell) -> anyhow::Result<()> 
     // In simulation mode, forge targets the anvil fork instead of the original RPC.
     let effective_rpc = execution_mode.rpc_url(&args.l1_rpc_url);
 
-    let mut runner = ForgeRunner::new(args.forge_args.runner.clone());
+    let mut runner = ForgeRunner::new();
     let mut ctx = ForgeContext {
         shell,
         foundry_scripts_path: foundry_scripts_path.as_path(),
@@ -136,13 +139,11 @@ pub async fn run(args: HubRegisterCtmArgs, shell: &Shell) -> anyhow::Result<()> 
 
     let output = register_ctm(&mut ctx, &input)?;
 
-    let result = build_output(&input, &output, ctx.runner);
-    let result_json = serde_json::to_string_pretty(&result)?;
-    if let Some(out_path) = &args.forge_args.runner.out {
+    if let Some(out_path) = &args.out {
+        let result = build_output(&input, &output, ctx.runner);
+        let result_json = serde_json::to_string_pretty(&result)?;
         std::fs::write(out_path, &result_json)?;
-        logger::info(format!("Output written to: {}", out_path.display()));
-    } else {
-        println!("{}", result_json);
+        logger::info(format!("Full output written to: {}", out_path.display()));
     }
 
     if is_simulation {

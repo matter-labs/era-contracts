@@ -275,8 +275,6 @@ pub struct ForgeScriptArgs {
     #[clap(long)]
     pub verifier_api_key: Option<String>,
     #[clap(long)]
-    pub resume: bool,
-    #[clap(long)]
     pub zksync: bool,
     /// List of additional arguments that can be passed through the CLI.
     ///

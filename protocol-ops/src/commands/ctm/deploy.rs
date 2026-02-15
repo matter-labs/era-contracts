@@ -1,8 +1,10 @@
+use std::path::PathBuf;
+
 use clap::Parser;
 use ethers::{contract::BaseContract, types::{Address, H256}};
 use lazy_static::lazy_static;
 use crate::common::{
-    forge::{Forge, ForgeArgs, ForgeRunner},
+    forge::{resolve_execution, ExecutionMode, Forge, ForgeArgs, ForgeContext, ForgeRunner, SenderAuth},
     logger,
 };
 use crate::config::{
@@ -20,7 +22,6 @@ use serde_json::json;
 use xshell::Shell;
 
 use crate::abi::IDEPLOYCTMABI_ABI;
-use crate::forge_ctx::{resolve_execution, ExecutionMode, ForgeContext, SenderAuth};
 use crate::utils::paths;
 
 lazy_static! {
@@ -56,21 +57,23 @@ pub struct CtmDeployArgs {
     #[clap(long, help = "CREATE2 factory salt (random by default)", help_heading = "CREATE2 options")]
     pub create2_factory_salt: Option<H256>,
 
-    // Dev options
-    #[clap(long, help = "Use dev defaults", default_value_t = false, help_heading = "Dev options")]
-    pub dev: bool,
+    // Options
     /// VM type: zksyncos (default) or eravm
-    #[clap(long, default_value = "zksyncos", help_heading = "Dev options")]
+    #[clap(long, default_value = "zksyncos")]
     pub vm_type: String,
     /// Reuse governance and admin contracts from hub (default: true)
-    #[clap(long, default_value_t = true, help_heading = "Dev options")]
+    #[clap(long, default_value_t = true)]
     pub reuse_gov_and_admin: bool,
     /// Use testnet verifier (default: true)
-    #[clap(long, default_value_t = true, help_heading = "Dev options")]
+    #[clap(long, default_value_t = true)]
     pub with_testnet_verifier: bool,
     /// Enable support for legacy bridge testing (default: false)
-    #[clap(long, default_value_t = false, help_heading = "Dev options")]
+    #[clap(long, default_value_t = false)]
     pub with_legacy_bridge: bool,
+
+    // Output
+    #[clap(long, help = "Write full JSON output to file", help_heading = "Output")]
+    pub out: Option<PathBuf>,
 }
 
 /// Input parameters for deploying CTM contracts.
@@ -160,7 +163,7 @@ pub async fn run(args: CtmDeployArgs, shell: &Shell) -> anyhow::Result<()> {
     };
 
     let (auth, sender, execution_mode) =
-        resolve_execution(args.private_key, args.sender, args.dev, args.simulate, &args.l1_rpc_url)?;
+        resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
     let owner = args.owner.unwrap_or(sender);
 
     let is_simulation = matches!(execution_mode, ExecutionMode::Simulate(_));
@@ -174,7 +177,7 @@ pub async fn run(args: CtmDeployArgs, shell: &Shell) -> anyhow::Result<()> {
     // In simulation mode, forge targets the anvil fork instead of the original RPC.
     let effective_rpc = execution_mode.rpc_url(&args.l1_rpc_url);
 
-    let mut runner = ForgeRunner::new(args.forge_args.runner.clone());
+    let mut runner = ForgeRunner::new();
     let mut ctx = ForgeContext {
         shell,
         foundry_scripts_path: foundry_scripts_path.as_path(),
@@ -197,19 +200,19 @@ pub async fn run(args: CtmDeployArgs, shell: &Shell) -> anyhow::Result<()> {
 
     let output = deploy(&mut ctx, &input)?;
 
-    let result = build_output(&output, ctx.runner, &input);
-    let result_json = serde_json::to_string_pretty(&result)?;
-    if let Some(out_path) = &args.forge_args.runner.out {
+    let ctm_proxy_addr = output.deployed_addresses.state_transition.state_transition_proxy_addr;
+
+    if let Some(out_path) = &args.out {
+        let result = build_output(&output, ctx.runner, &input);
+        let result_json = serde_json::to_string_pretty(&result)?;
         std::fs::write(out_path, &result_json)?;
-        logger::info(format!("Output written to: {}", out_path.display()));
-    } else {
-        println!("{}", result_json);
+        logger::info(format!("Full output written to: {}", out_path.display()));
     }
 
     if is_simulation {
-        logger::outro("CTM deploy simulation complete (no on-chain changes)");
+        logger::outro(format!("CTM deploy simulation complete — CTM Proxy: {:#x}", ctm_proxy_addr));
     } else {
-        logger::outro("CTM contracts deployed");
+        logger::outro(format!("CTM Proxy deployed at: {:#x}", ctm_proxy_addr));
     }
 
     drop(execution_mode);

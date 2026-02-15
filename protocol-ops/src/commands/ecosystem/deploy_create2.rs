@@ -1,13 +1,11 @@
 use clap::Parser;
 use ethers::types::{Address, H256};
 use crate::common::{
-    forge::{Forge, ForgeArgs, ForgeRunner},
+    forge::{resolve_execution, ExecutionMode, Forge, ForgeArgs, ForgeRunner, SenderAuth},
     logger,
 };
 use serde::{Deserialize, Serialize};
 use xshell::Shell;
-
-use crate::forge_ctx::{resolve_execution, ExecutionMode, SenderAuth};
 use crate::utils::paths;
 
 /// The deterministic CREATE2 factory address (Arachnid's deterministic-deployment-proxy)
@@ -24,8 +22,6 @@ pub struct DeployCreate2Args {
     pub sender: Option<Address>,
     #[clap(long, help = "Simulate against anvil fork (no on-chain changes)")]
     pub simulate: bool,
-    #[clap(long, help = "Use dev defaults", default_value_t = false)]
-    pub dev: bool,
 
     #[clap(flatten)]
     #[serde(flatten)]
@@ -36,7 +32,7 @@ pub async fn run(args: DeployCreate2Args, shell: &Shell) -> anyhow::Result<()> {
     let foundry_scripts_path = paths::path_from_root("l1-contracts");
 
     let (auth, sender, execution_mode) =
-        resolve_execution(args.private_key, args.sender, args.dev, args.simulate, &args.l1_rpc_url)?;
+        resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
 
     let is_simulation = matches!(execution_mode, ExecutionMode::Simulate(_));
     if is_simulation {
@@ -47,7 +43,7 @@ pub async fn run(args: DeployCreate2Args, shell: &Shell) -> anyhow::Result<()> {
     }
 
     let effective_rpc = execution_mode.rpc_url(&args.l1_rpc_url);
-    let mut runner = ForgeRunner::new(args.forge_args.runner.clone());
+    let mut runner = ForgeRunner::new();
 
     logger::info(format!("Deploying CREATE2 factory as: {:#x}", sender));
     logger::info(format!("Target address: {}", DETERMINISTIC_CREATE2_ADDRESS));
