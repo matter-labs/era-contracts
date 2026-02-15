@@ -49,15 +49,19 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     mapping(uint256 chainIndex => uint256 chainId) public chainIndexToId;
 
     /// @notice The shared full merkle tree storing the aggregate hash.
+    /// @dev Note, that on L1, the chainId leafs are empty.
     FullMerkle.FullTree public sharedTree;
 
     /// @dev The incremental merkle tree storing the chain message roots.
+    /// @dev On L1, these are empty leaves and are populated only during the addition of the chain 
+    /// are not updated thereafter.
     mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) public chainTree;
 
     /// @notice The mapping from block number to the global message root.
     /// @dev Each block might have multiple txs that change the historical root. You can safely use the final root in the block,
     /// since each new root cumulatively aggregates all prior changes — so the last root always contains (at minimum) everything
     /// from the earlier ones.
+    /// @dev Populated only on L2.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
     /// @dev Chain ID of L1.
@@ -194,19 +198,6 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         currentChainBatchNumber[_chainId] = expectedNewChainBatchNumber;
     }
 
-    /// @notice emit a new message root when committing a new batch
-    function _emitRoot(bytes32 _root) internal {
-        // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
-        // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
-        bytes32[] memory _sides = new bytes32[](1);
-        _sides[0] = _root;
-
-        uint256 currentCount = totalPublishedInteropRoots;
-        totalPublishedInteropRoots = currentCount + 1;
-
-        emit NewInteropRoot(block.chainid, block.number, currentCount, _sides);
-    }
-
     /// @notice Gets the aggregated root of all chains.
     function getAggregatedRoot() external view returns (bytes32) {
         if (chainCount == 0) {
@@ -223,18 +214,6 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
             revert MessageRootNotRegistered();
         }
         return chainTree[_chainId].root();
-    }
-
-    function updateFullTree() public {
-        uint256 cachedChainCount = chainCount;
-        bytes32[] memory newLeaves = new bytes32[](cachedChainCount);
-        for (uint256 i = 0; i < cachedChainCount; ++i) {
-            uint256 chainId = chainIndexToId[i];
-            newLeaves[i] = MessageHashing.chainIdLeafHash(chainTree[chainId].root(), chainId);
-        }
-        bytes32 newRoot = sharedTree.updateAllLeaves(newLeaves);
-        _emitRoot(newRoot);
-        historicalRoot[block.number] = newRoot;
     }
 
     /// @dev Adds a single chain to the message root.

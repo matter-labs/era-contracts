@@ -302,7 +302,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             address originToken = nativeTokenVault.originToken(assetId);
             balanceChange = BalanceChange({
                 version: BALANCE_CHANGE_VERSION,
-                // baseTokenAssetId is known on Gateway.
+                // baseTokenAssetId is known on Gateway. If for some reason,
+                // it is not registered, the GW part of the function is expected to revert.
                 baseTokenAssetId: bytes32(0),
                 baseTokenAmount: _baseTokenAmount,
                 assetId: assetId,
@@ -313,7 +314,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         } else {
             balanceChange = BalanceChange({
                 version: BALANCE_CHANGE_VERSION,
-                // baseTokenAssetId is known on Gateway.
+                // baseTokenAssetId is known on Gateway. If for some reason,
+                // it is not registered, the GW part of the function is expected to revert.
                 baseTokenAssetId: bytes32(0),
                 baseTokenAmount: _baseTokenAmount,
                 assetId: bytes32(0),

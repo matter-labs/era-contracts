@@ -82,6 +82,19 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         return L1_CHAIN_ID;
     }
 
+    /// @notice baseToken function, which takes chainId as input, reads assetHandler from AR, and tokenAddress from AH
+    function baseToken(uint256 _chainId) public view returns (address) {
+        bytes32 baseTokenAssetId = baseTokenAssetId[_chainId];
+        address assetHandlerAddress = IAssetRouterBase(assetRouter).assetHandlerAddress(baseTokenAssetId);
+
+        // It is possible that the asset handler is not deployed for a chain on the current layer.
+        // In this case we throw an error.
+        if (assetHandlerAddress == address(0)) {
+            revert AssetHandlerNotRegistered(baseTokenAssetId);
+        }
+        return IL1BaseTokenAssetHandler(assetHandlerAddress).tokenAddress(baseTokenAssetId);
+    }
+
     /// @notice Used to register a chain as a settlement layer.
     /// @param _newSettlementLayerChainId the chainId of the chain
     /// @param _isWhitelisted whether the chain is a whitelisted settlement layer

@@ -44,16 +44,19 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// and vice versa.
     mapping(uint256 chainId => mapping(bytes32 canonicalTxHash => BalanceChange balanceChange)) internal balanceChange;
 
-    /// Used only on Gateway.
+    /// @notice The address of the token on the origin chain.
+    /// @dev We assume that if a chain is registered on the GW's bridgehub and it able to submit related deposits or 
+    /// or batches, this value has been populated for its base token. 
     mapping(bytes32 assetId => address originToken) internal originToken;
 
-    /// Used only on Gateway.
+    /// @notice The chain on which the token was originally issued. For tokens issued on L1, this will be equal to the L1 chain ID.
     mapping(bytes32 assetId => uint256 originChainId) internal tokenOriginChainId;
 
-    /// Used only on Gateway.
+    /// @notice The address of the L2 shared bridge. It is used only on some old EraVM-based chains. 
+    /// On such chains, it is responsible for sending withdrawal messages.
     mapping(uint256 chainId => address legacySharedBridgeAddress) internal legacySharedBridgeAddress;
 
-    /// empty messageRoot calculated for specific chain.
+    /// @notice Empty messageRoot calculated for specific chain.
     mapping(uint256 chainId => bytes32 emptyMessageRoot) internal emptyMessageRoot;
 
     /// @notice We save the chainBalance which equals the chains totalSupply before the first GW->L1 migration so that it can be replayed.
@@ -164,6 +167,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes32 _canonicalTxHash,
         BalanceChange calldata _balanceChange
     ) external onlyL2InteropCenter {
+        // FIXME Q: can it be anything other than 1?
         uint256 chainMigrationNumber = _getChainMigrationNumber(_chainId);
 
         if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _balanceChange.assetId)) {
@@ -333,10 +337,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         if (savedBalanceChange.amount > 0) {
             _decreaseChainBalance(_chainId, savedBalanceChange.assetId, savedBalanceChange.amount);
         }
-        /// Note the base token is never native to the chain as of V31.
-        if (savedBalanceChange.baseTokenAmount > 0) {
-            _decreaseChainBalance(_chainId, savedBalanceChange.baseTokenAssetId, savedBalanceChange.baseTokenAmount);
-        }
+        // Note, that we do not reduce the base token balance for failed deposits, 
+        // as it is expected that these funds stay on L2 inside the refundRecipient's balance.
     }
 
     function _handleInteropCenterMessage(uint256 _chainId, bytes calldata _message) internal {
@@ -372,6 +374,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             // solhint-disable-next-line
             _processInteropCall(_chainId, bundleHash, interopCall, interopBundle.destinationChainId);
         }
+        // FIXME: this value can be zero leading to settlement failure.
         bytes32 destinationChainBaseTokenAssetId = _bridgehub().baseTokenAssetId(interopBundle.destinationChainId);
         _decreaseChainBalance(_chainId, destinationChainBaseTokenAssetId, totalBaseTokenAmount);
         interopBalanceChange[interopBundle.destinationChainId][bundleHash].baseTokenAmount = totalBaseTokenAmount;
@@ -451,7 +454,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// @param _assetId The asset id of the asset.
     /// @param _transferData The transfer data of the asset.
     /// @dev This function is used to handle the logic of the AssetRouter message.
-
     function _handleAssetRouterMessageInner(
         uint256 _sourceChainId,
         uint256 _destinationChainId,
@@ -507,7 +509,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             functionSignature == IL1ERC20Bridge.finalizeWithdrawal.selector,
             InvalidFunctionSignature(functionSignature)
         );
-        /// The legacy shared bridge message is only for L1 tokens on legacy chains where the legacy L2 shared bridge is deployed.
+        // The legacy shared bridge message is only for L1 tokens on legacy chains where the legacy L2 shared bridge is deployed.
         // Convert legacy L1 token to modern asset ID format
         bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
 
@@ -662,6 +664,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         uint256 _amount,
         uint256 _chainMigrationNumber
     ) internal {
+        // FIXME: maybe add a require to ensure that _chainMigrationNumber is odd.
+
         // We save the chainBalance for the previous migration number so that the chain balance can be migrated back to GW in case it was not migrated.
         // Note, that for this logic to be correct, we need to ensure that `_chainMigrationNumber` is odd, i.e. the chain actually
         // actively settles on top of Gateway.
@@ -672,6 +676,12 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
     }
 
+    /// @notice Registers a token's original details if it hasn't been registered yet.
+    /// @dev Note, that we do not double check the correctness of the data provided here, so it must come from a trusted soruce. 
+    /// - In case of deposits, the should come from the Mailbox of Gateway.
+    /// - In case of registration of base token on Gateway, it is checked inside the L1ChainAssetHandler.
+    /// - In case of migration confirmation, it should be checked by the L1AssetTracker.
+    /// - In case of interop transactions, the assetId check is performed inside the GWAssetTracker.
     function _registerToken(bytes32 _assetId, address _originalToken, uint256 _tokenOriginChainId) internal {
         if (originToken[_assetId] == address(0)) {
             originToken[_assetId] = _originalToken;

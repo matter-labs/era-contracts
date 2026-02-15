@@ -281,6 +281,9 @@ abstract contract ChainAssetHandlerBase is
             INativeTokenVaultBase l1Ntv = l1AssetRouter.nativeTokenVault();
             baseTokenBridgingData.originToken = l1Ntv.originToken(assetId);
             baseTokenBridgingData.originChainId = l1Ntv.originChainId(assetId);
+
+            require(baseTokenBridgingData.originToken != address(0), "Base token not registered on L1 native vault");
+            require(baseTokenBridgingData.originChainId != uint256(0), "Base token not registered on L1 native vault");
         }
 
         return

@@ -124,7 +124,7 @@ contract L1MessageRoot is MessageRootBase {
     /// @inheritdoc MessageRootBase
     function _noBatchFallback(uint256 _chainId, uint256 _batchNumber) internal view override returns (bytes32) {
         uint256 v31UpgradeBatchNumber = v31UpgradeChainBatchNumber[_chainId];
-        if (v31UpgradeBatchNumber == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE || _batchNumber < v31UpgradeChainBatchNumber[_chainId]) {
+        if (v31UpgradeBatchNumber == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE || _batchNumber < v31UpgradeBatchNumber) {
             return IGetters(IBridgehubBase(_bridgehub()).getZKChain(_chainId)).l2LogsRootHash(_batchNumber);
         }
         return bytes32(0);

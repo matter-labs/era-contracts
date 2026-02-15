@@ -112,4 +112,29 @@ contract L2MessageRoot is MessageRootBase {
     function _noBatchFallback(uint256 _chainId, uint256 _batchNumber) internal view override returns (bytes32) {
         return bytes32(0);
     }
+
+    /// @notice emit a new message root when committing a new batch
+    function _emitRoot(bytes32 _root) internal {
+        // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
+        // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
+        bytes32[] memory _sides = new bytes32[](1);
+        _sides[0] = _root;
+
+        uint256 currentCount = totalPublishedInteropRoots;
+        totalPublishedInteropRoots = currentCount + 1;
+
+        emit NewInteropRoot(block.chainid, block.number, currentCount, _sides);
+    }
+
+    function updateFullTree() public {
+        uint256 cachedChainCount = chainCount;
+        bytes32[] memory newLeaves = new bytes32[](cachedChainCount);
+        for (uint256 i = 0; i < cachedChainCount; ++i) {
+            uint256 chainId = chainIndexToId[i];
+            newLeaves[i] = MessageHashing.chainIdLeafHash(chainTree[chainId].root(), chainId);
+        }
+        bytes32 newRoot = sharedTree.updateAllLeaves(newLeaves);
+        _emitRoot(newRoot);
+        historicalRoot[block.number] = newRoot;
+    }
 }

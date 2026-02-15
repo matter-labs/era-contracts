@@ -51,16 +51,6 @@ contract InteropCenter is
     ///         is to ensure that each bundle has a unique hash.
     mapping(address sender => uint256 numberOfBundlesSent) public interopBundleNonce;
 
-    modifier onlyL1() {
-        require(L1_CHAIN_ID == block.chainid, NotL1(L1_CHAIN_ID, block.chainid));
-        _;
-    }
-
-    modifier onlyL2ToL2(uint256 _destinationChainId) {
-        _ensureL2ToL2(_destinationChainId);
-        _;
-    }
-
     modifier onlySettlementLayerRelayedSender() {
         require(msg.sender == SETTLEMENT_LAYER_RELAY_SENDER, Unauthorized(msg.sender));
         _;
@@ -96,7 +86,7 @@ contract InteropCenter is
         bytes calldata recipient,
         bytes calldata payload,
         bytes[] calldata attributes
-    ) external payable whenNotPaused returns (bytes32 sendId) {
+    ) external payable whenNotPaused nonReentrant returns (bytes32 sendId) {
         (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(recipient);
 
         _ensureL2ToL2(recipientChainId);
@@ -150,7 +140,7 @@ contract InteropCenter is
         bytes calldata _destinationChainId,
         InteropCallStarter[] calldata _callStarters,
         bytes[] calldata _bundleAttributes
-    ) external payable whenNotPaused returns (bytes32 bundleHash) {
+    ) external payable whenNotPaused nonReentrant returns (bytes32 bundleHash) {
         // Validate that the destination chain ERC-7930 address has an empty address field.
         _ensureEmptyAddress(_destinationChainId);
 
@@ -261,10 +251,15 @@ contract InteropCenter is
         uint256 _totalBurnedCallsValue,
         uint256 _totalIndirectCallsValue
     ) internal {
+        // Note, that non-zero `destinationChainBaseTokenAssetId` does not mean that the destination chain 
+        // actually settles on the GW or is able to receive the message.
+        // However, this value is provided from L1 by chain asset handler, so it can be trusted to be correct. 
         bytes32 destinationChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
         require(destinationChainBaseTokenAssetId != bytes32(0), DestinationChainNotRegistered(_destinationChainId));
-        // We burn the value that is passed along the bundle here, on source chain.
         bytes32 thisChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(block.chainid);
+        require(thisChainBaseTokenAssetId != bytes32(0), ThisChainNotRegisteredForInterop(block.chainid));
+
+        // We burn the value that is passed along the bundle here, on source chain.
         if (destinationChainBaseTokenAssetId == thisChainBaseTokenAssetId) {
             require(
                 msg.value == _totalBurnedCallsValue + _totalIndirectCallsValue,
@@ -424,17 +419,18 @@ contract InteropCenter is
         uint64 _expirationTimestamp,
         BalanceChange memory _balanceChange
     ) external override onlySettlementLayerRelayedSender {
-        if (L1_CHAIN_ID == block.chainid) {
-            revert NotInGatewayMode();
+        address zkChain = L2_BRIDGEHUB.getZKChain(_chainId);
+        if (zkChain == address(0)) {
+            revert DestinationChainNotRegistered(_chainId);
         }
-        _balanceChange.baseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_chainId);
+
+        _balanceChange.baseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_chainId);        
         GW_ASSET_TRACKER.handleChainBalanceIncreaseOnGateway({
             _chainId: _chainId,
             _canonicalTxHash: _canonicalTxHash,
             _balanceChange: _balanceChange
         });
 
-        address zkChain = L2_BRIDGEHUB.getZKChain(_chainId);
         IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     }
 
