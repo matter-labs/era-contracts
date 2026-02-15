@@ -40,12 +40,6 @@ pub async fn accept_admin(
     forge_args: &ForgeScriptArgs,
     l1_rpc_url: String,
 ) -> anyhow::Result<()> {
-    // Resume for accept admin doesn't work properly. Foundry assumes that if signature of the function is the same,
-    // than it's the same call, but because we are calling this function multiple times during the init process,
-    // code assumes that doing only once is enough, but actually we need to accept admin multiple times
-    let mut forge_args = forge_args.clone();
-    forge_args.resume = false;
-
     let calldata = ADMIN_FUNCTIONS
         .encode("chainAdminAcceptAdmin", (admin, target_address))
         .unwrap();
@@ -71,10 +65,6 @@ pub async fn accept_owner(
     forge_args: &ForgeScriptArgs,
     l1_rpc_url: String,
 ) -> anyhow::Result<()> {
-    // resume doesn't properly work here.
-    let mut forge_args = forge_args.clone();
-    forge_args.resume = false;
-
     let calldata = ADMIN_FUNCTIONS
         .encode("governanceAcceptOwner", (governor_contract, target_address))
         .unwrap();

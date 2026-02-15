@@ -1,14 +1,13 @@
 use clap::Parser;
 use ethers::types::{Address, H256};
 use crate::common::{
-    forge::{ForgeArgs, ForgeRunner},
+    forge::{resolve_execution, ExecutionMode, ForgeArgs, ForgeContext, ForgeRunner},
     logger,
 };
 use serde::{Deserialize, Serialize};
 use xshell::Shell;
 
 use crate::admin_functions::{accept_admin, accept_owner};
-use crate::forge_ctx::{resolve_execution, ExecutionMode, ForgeContext};
 use crate::utils::paths;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
@@ -38,8 +37,6 @@ pub struct HubAcceptOwnershipArgs {
     pub sender: Option<Address>,
     #[clap(long, help = "Simulate against anvil fork (no on-chain changes)")]
     pub simulate: bool,
-    #[clap(long, help = "Use dev defaults")]
-    pub dev: bool,
 
     #[clap(flatten)]
     #[serde(flatten)]
@@ -145,7 +142,6 @@ pub async fn run(args: HubAcceptOwnershipArgs, shell: &Shell) -> anyhow::Result<
     let (auth, sender, execution_mode) = resolve_execution(
         args.private_key,
         args.sender,
-        args.dev,
         args.simulate,
         &args.l1_rpc_url,
     )?;
@@ -164,7 +160,7 @@ pub async fn run(args: HubAcceptOwnershipArgs, shell: &Shell) -> anyhow::Result<
     logger::info(format!("Governance contract: {:#x}", args.governance));
     logger::info(format!("Chain admin contract: {:#x}", args.chain_admin));
 
-    let mut runner = ForgeRunner::new(args.forge_args.runner.clone());
+    let mut runner = ForgeRunner::new();
 
     let input = AcceptOwnershipInput {
         bridgehub: args.bridgehub,

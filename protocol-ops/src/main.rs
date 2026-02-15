@@ -1,5 +1,5 @@
 use crate::commands::{
-    chain::ChainCommands, ctm::CtmCommands, dev::DevCommands, ecosystem::EcosystemCommands,
+    chain::ChainCommands, ctm::CtmCommands, ecosystem::EcosystemCommands,
     hub::HubCommands,
 };
 use clap::{command, Parser, Subcommand};
@@ -17,7 +17,6 @@ mod config;
 pub mod abi;
 pub mod admin_functions;
 mod commands;
-pub mod forge_ctx;
 mod utils;
 
 #[derive(Parser, Debug)]
@@ -43,9 +42,6 @@ pub enum ProtocolCliSubcommands {
     /// Chain Type Manager related commands
     #[command(subcommand)]
     Ctm(Box<CtmCommands>),
-    /// Dev related commands
-    #[command(subcommand)]
-    Dev(Box<DevCommands>),
 }
 
 #[derive(Parser, Debug)]
@@ -84,7 +80,6 @@ async fn run_subcommand(cli_args: ProtocolCli) -> anyhow::Result<()> {
         ProtocolCliSubcommands::Chain(args) => commands::chain::run(&shell, *args).await?,
         ProtocolCliSubcommands::Hub(args) => commands::hub::run(&shell, *args).await?,
         ProtocolCliSubcommands::Ctm(args) => commands::ctm::run(&shell, *args).await?,
-        ProtocolCliSubcommands::Dev(args) => commands::dev::run(&shell, *args).await?,
     }
     Ok(())
 }
