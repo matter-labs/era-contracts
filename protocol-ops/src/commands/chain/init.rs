@@ -1,12 +1,18 @@
+use std::path::PathBuf;
+
 use clap::Parser;
 use ethers::{
     contract::BaseContract,
+    middleware::Middleware,
     signers::{LocalWallet, Signer},
     types::{Address, H256},
+    utils::hex,
 };
 use lazy_static::lazy_static;
+use tokio::task::block_in_place;
 use crate::common::{
-    forge::{Forge, ForgeArgs, ForgeRunner},
+    ethereum::get_ethers_provider,
+    forge::{resolve_execution, ExecutionMode, Forge, ForgeArgs, ForgeContext, ForgeRunner, SenderAuth},
     logger,
 };
 use crate::config::{
@@ -27,16 +33,11 @@ use xshell::Shell;
 
 use crate::abi::IREGISTERZKCHAINABI_ABI;
 use crate::admin_functions::{accept_admin, set_da_validator_pair, AdminScriptMode};
-use crate::forge_ctx::{resolve_execution, ExecutionMode, ForgeContext, SenderAuth};
 use crate::utils::paths;
 
 lazy_static! {
     static ref REGISTER_CHAIN_FUNCTIONS: BaseContract = BaseContract::from(IREGISTERZKCHAINABI_ABI.clone());
 }
-
-/// Default values for dev mode
-const DEV_CHAIN_ID: u64 = 271;
-const DEV_OPERATOR: &str = "0x0000000000000000000000000000000000000000";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct ChainInitArgs {
@@ -44,17 +45,9 @@ pub struct ChainInitArgs {
     #[clap(long)]
     pub ctm_proxy: Address,
 
-    /// Bridgehub proxy address
+    /// L1 DA validator address
     #[clap(long)]
-    pub bridgehub: Address,
-
-    /// L1 rollup DA validator address
-    #[clap(long)]
-    pub rollup_da_validator: Address,
-
-    /// L1 no-DA validium validator address
-    #[clap(long)]
-    pub no_da_validium_validator: Address,
+    pub l1_da_validator: Address,
 
     /// Owner address for the chain (default: sender)
     #[clap(long)]
@@ -62,11 +55,11 @@ pub struct ChainInitArgs {
 
     /// Commit operator address
     #[clap(long)]
-    pub commit_operator: Option<Address>,
+    pub commit_operator: Address,
 
     /// Prove operator address
     #[clap(long)]
-    pub prove_operator: Option<Address>,
+    pub prove_operator: Address,
 
     /// Execute operator address
     #[clap(long)]
@@ -78,23 +71,25 @@ pub struct ChainInitArgs {
 
     /// Chain ID
     #[clap(long)]
-    pub chain_id: Option<u64>,
+    pub chain_id: u64,
 
     /// Base token address (default: ETH = 0x0...01)
     #[clap(long, default_value = "0x0000000000000000000000000000000000000001")]
     pub base_token_addr: Address,
 
-    /// Base token gas price multiplier numerator
-    #[clap(long, default_value_t = 1)]
-    pub base_token_gas_price_multiplier_numerator: u64,
-
-    /// Base token gas price multiplier denominator
-    #[clap(long, default_value_t = 1)]
-    pub base_token_gas_price_multiplier_denominator: u64,
+    /// Base token price ratio relative to ETH (numerator/denominator).
+    /// Used to calculate fees for priority transactions.
+    /// e.g. "4000/1" means 1 base token ~ 1/4000 ETH.
+    #[clap(long, default_value = "1/1")]
+    pub base_token_price_ratio: String,
 
     /// Data availability mode
     #[clap(long, value_enum, default_value_t = DAValidatorType::Rollup)]
     pub da_mode: DAValidatorType,
+
+    /// VM type (EraVM or ZKSyncOsVM)
+    #[clap(long, value_enum, default_value_t = VMOption::ZKSyncOsVM)]
+    pub vm_type: VMOption,
 
     /// Enable support for legacy bridge testing
     #[clap(long, default_value_t = false)]
@@ -131,10 +126,12 @@ pub struct ChainInitArgs {
     // Create2 factory options
     #[clap(long, help = "CREATE2 factory address (if already deployed)", help_heading = "CREATE2 options")]
     pub create2_factory_addr: Option<Address>,
+    #[clap(long, help = "CREATE2 factory salt (random by default)", help_heading = "CREATE2 options")]
+    pub create2_factory_salt: Option<H256>,
 
-    // Dev options
-    #[clap(long, help = "Use dev defaults", default_value_t = false, help_heading = "Dev options")]
-    pub dev: bool,
+    // Output
+    #[clap(long, help = "Write full JSON output to file", help_heading = "Output")]
+    pub out: Option<PathBuf>,
 }
 
 /// Input parameters for chain initialization.
@@ -142,11 +139,11 @@ pub struct ChainInitArgs {
 pub struct ChainInitInput {
     pub ctm_proxy: Address,
     pub bridgehub: Address,
-    pub rollup_da_validator: Address,
-    pub no_da_validium_validator: Address,
+    pub l1_da_validator: Address,
     pub chain_params: NewChainParams,
     pub with_legacy_bridge: bool,
     pub create2_factory_addr: Option<Address>,
+    pub create2_factory_salt: Option<H256>,
 }
 
 /// Output from chain registration.
@@ -162,13 +159,14 @@ pub fn register_chain(
     input: &ChainInitInput,
 ) -> anyhow::Result<RegisterChainOutput> {
     // Update permanent-values.toml so Forge scripts use the correct factory
-    // Use default salt (zero) for chain init since it's not configurable
-    let permanent_values = PermanentValuesConfig::new(input.create2_factory_addr, H256::zero());
+    let salt = input.create2_factory_salt.unwrap_or(H256::zero());
+    let permanent_values = PermanentValuesConfig::new(input.create2_factory_addr, salt);
     permanent_values.save(ctx.shell, PermanentValuesConfig::path(ctx.foundry_scripts_path))?;
 
     let deploy_config = RegisterChainL1Config::new(
         &input.chain_params,
         input.create2_factory_addr.unwrap_or(Address::zero()),
+        input.create2_factory_salt,
         input.with_legacy_bridge,
     )?;
 
@@ -210,43 +208,59 @@ pub fn register_chain(
     RegisterChainOutput::read(ctx.shell, output_path)
 }
 
+/// Parse a ratio string like "4000/1" into (numerator, denominator).
+fn parse_ratio(s: &str) -> anyhow::Result<(u64, u64)> {
+    let parts: Vec<&str> = s.split('/').collect();
+    if parts.len() != 2 {
+        anyhow::bail!("Invalid ratio format '{}'. Expected 'numerator/denominator' (e.g. '4000/1')", s);
+    }
+    let num: u64 = parts[0].trim().parse()
+        .map_err(|_| anyhow::anyhow!("Invalid numerator '{}' in ratio '{}'", parts[0].trim(), s))?;
+    let den: u64 = parts[1].trim().parse()
+        .map_err(|_| anyhow::anyhow!("Invalid denominator '{}' in ratio '{}'", parts[1].trim(), s))?;
+    if den == 0 {
+        anyhow::bail!("Denominator cannot be zero in ratio '{}'", s);
+    }
+    Ok((num, den))
+}
+
+/// Query the bridgehub address from a CTM proxy contract via `BRIDGE_HUB()`.
+fn query_bridgehub(rpc_url: &str, ctm_proxy: Address) -> anyhow::Result<Address> {
+    let provider = get_ethers_provider(rpc_url)?;
+    // BRIDGE_HUB() selector = keccak256("BRIDGE_HUB()")[..4] = 0x5d4edca7
+    let calldata = ethers::types::Bytes::from(hex::decode("5d4edca7").unwrap());
+    let tx: ethers::types::transaction::eip2718::TypedTransaction =
+        ethers::types::TransactionRequest::new()
+            .to(ctm_proxy)
+            .data(calldata)
+            .into();
+    let fut = provider.call(&tx, None);
+    let result = if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        block_in_place(|| handle.block_on(fut))?
+    } else {
+        tokio::runtime::Runtime::new()
+            .map_err(|e| anyhow::anyhow!("Failed to create Tokio runtime: {}", e))?
+            .block_on(fut)?
+    };
+    if result.len() < 32 {
+        anyhow::bail!("Invalid response from BRIDGE_HUB() call on CTM proxy {:#x}", ctm_proxy);
+    }
+    Ok(Address::from_slice(&result[12..32]))
+}
+
 pub async fn run(args: ChainInitArgs, shell: &Shell) -> anyhow::Result<()> {
     let foundry_scripts_path = paths::path_from_root("l1-contracts");
 
-    // Resolve chain_id
-    let chain_id = if let Some(id) = args.chain_id {
-        id
-    } else if args.dev {
-        DEV_CHAIN_ID
-    } else {
-        anyhow::bail!("--chain-id is required (or use --dev for default)");
-    };
+    let (price_ratio_num, price_ratio_den) = parse_ratio(&args.base_token_price_ratio)?;
 
-    // Resolve operators
-    let zero_addr = Address::zero();
-    let dev_operator = DEV_OPERATOR.parse::<Address>().unwrap();
-
-    let commit_operator = args.commit_operator.unwrap_or_else(|| {
-        if args.dev { dev_operator } else { zero_addr }
-    });
-    let prove_operator = args.prove_operator.unwrap_or_else(|| {
-        if args.dev { dev_operator } else { zero_addr }
-    });
+    let chain_id = args.chain_id;
+    let commit_operator = args.commit_operator;
+    let prove_operator = args.prove_operator;
     let execute_operator = args.execute_operator;
     let token_multiplier_setter = args.token_multiplier_setter;
 
-    // Validate operators unless dev mode
-    if !args.dev {
-        if commit_operator == zero_addr {
-            anyhow::bail!("--commit-operator is required (or use --dev for default)");
-        }
-        if prove_operator == zero_addr {
-            anyhow::bail!("--prove-operator is required (or use --dev for default)");
-        }
-    }
-
     let (sender_auth, sender, execution_mode) =
-        resolve_execution(args.private_key, args.sender, args.dev, args.simulate, &args.l1_rpc_url)?;
+        resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
     let owner = args.owner.unwrap_or(sender);
 
     // Resolve owner auth for accept_admin step
@@ -295,17 +309,22 @@ pub async fn run(args: ChainInitArgs, shell: &Shell) -> anyhow::Result<()> {
 
     let effective_rpc = execution_mode.rpc_url(&args.l1_rpc_url);
 
-    let mut runner = ForgeRunner::new(args.forge_args.runner.clone());
+    // Derive bridgehub address from CTM proxy
+    logger::info(format!("Querying bridgehub from CTM proxy {:#x}...", args.ctm_proxy));
+    let bridgehub = query_bridgehub(effective_rpc, args.ctm_proxy)?;
+    logger::info(format!("Bridgehub: {:#x}", bridgehub));
+
+    let mut runner = ForgeRunner::new();
 
     // Build chain params
     let chain_params = NewChainParams {
         chain_id: L2ChainId::from(chain_id as u32),
         base_token_addr: args.base_token_addr,
-        base_token_gas_price_multiplier_numerator: args.base_token_gas_price_multiplier_numerator,
-        base_token_gas_price_multiplier_denominator: args.base_token_gas_price_multiplier_denominator,
+        base_token_gas_price_multiplier_numerator: price_ratio_num,
+        base_token_gas_price_multiplier_denominator: price_ratio_den,
         owner,
         commit_operator,
-        prove_operator: prove_operator,
+        prove_operator,
         execute_operator,
         token_multiplier_setter,
         da_mode: args.da_mode,
@@ -313,12 +332,12 @@ pub async fn run(args: ChainInitArgs, shell: &Shell) -> anyhow::Result<()> {
 
     let init_input = ChainInitInput {
         ctm_proxy: args.ctm_proxy,
-        bridgehub: args.bridgehub,
-        rollup_da_validator: args.rollup_da_validator,
-        no_da_validium_validator: args.no_da_validium_validator,
+        bridgehub,
+        l1_da_validator: args.l1_da_validator,
         chain_params: chain_params.clone(),
         with_legacy_bridge: args.with_legacy_bridge,
         create2_factory_addr: args.create2_factory_addr,
+        create2_factory_salt: args.create2_factory_salt,
     };
 
     // Step 1: Register chain (as bridgehub admin)
@@ -361,15 +380,11 @@ pub async fn run(args: ChainInitArgs, shell: &Shell) -> anyhow::Result<()> {
 
     // Step 3: Set DA validator pair (as owner)
     logger::info("Setting DA validator pair...");
-    let l1_da_validator = match args.da_mode {
-        DAValidatorType::Rollup => args.rollup_da_validator,
-        DAValidatorType::NoDA => args.no_da_validium_validator,
-        DAValidatorType::Avail => args.no_da_validium_validator, // TODO: separate avail validator
-        DAValidatorType::Eigen => args.no_da_validium_validator,
-    };
-
     let commitment_scheme = match args.da_mode {
-        DAValidatorType::Rollup => L2DACommitmentScheme::BlobsZKSyncOS, // Assuming ZKSyncOS
+        DAValidatorType::Rollup => match args.vm_type {
+            VMOption::EraVM => L2DACommitmentScheme::BlobsAndPubdataKeccak256,
+            VMOption::ZKSyncOsVM => L2DACommitmentScheme::BlobsZKSyncOS,
+        },
         DAValidatorType::Avail | DAValidatorType::Eigen => L2DACommitmentScheme::PubdataKeccak256,
         DAValidatorType::NoDA => L2DACommitmentScheme::EmptyNoDA,
     };
@@ -382,27 +397,31 @@ pub async fn run(args: ChainInitArgs, shell: &Shell) -> anyhow::Result<()> {
             foundry_scripts_path.as_path(),
             AdminScriptMode::Broadcast(owner_wallet.clone()),
             chain_id,
-            args.bridgehub,
-            l1_da_validator,
+            bridgehub,
+            args.l1_da_validator,
             commitment_scheme,
             effective_rpc.to_string(),
         )
         .await?;
     }
 
-    let result = build_output(&init_input, &register_output, &runner);
-    let result_json = serde_json::to_string_pretty(&result)?;
-    if let Some(out_path) = &args.forge_args.runner.out {
+    if let Some(out_path) = &args.out {
+        let result = build_output(&init_input, &register_output, &runner);
+        let result_json = serde_json::to_string_pretty(&result)?;
         std::fs::write(out_path, &result_json)?;
-        logger::info(format!("Output written to: {}", out_path.display()));
-    } else {
-        println!("{}", result_json);
+        logger::info(format!("Full output written to: {}", out_path.display()));
     }
 
     if is_simulation {
-        logger::outro("Chain init simulation complete (no on-chain changes)");
+        logger::outro(format!(
+            "Chain init simulation complete — DiamondProxy: {:#x}, ChainAdmin: {:#x}",
+            diamond_proxy, chain_admin
+        ));
     } else {
-        logger::outro("Chain initialized");
+        logger::outro(format!(
+            "DiamondProxy deployed at: {:#x}, ChainAdmin deployed at: {:#x}",
+            diamond_proxy, chain_admin
+        ));
     }
 
     drop(execution_mode);
@@ -427,6 +446,7 @@ fn build_output(
             "chain_id": input.chain_params.chain_id.as_u64(),
             "ctm_proxy": format!("{:#x}", input.ctm_proxy),
             "bridgehub": format!("{:#x}", input.bridgehub),
+            "l1_da_validator": format!("{:#x}", input.l1_da_validator),
             "owner": format!("{:#x}", input.chain_params.owner),
             "base_token_addr": format!("{:#x}", input.chain_params.base_token_addr),
             "da_mode": format!("{:?}", input.chain_params.da_mode),

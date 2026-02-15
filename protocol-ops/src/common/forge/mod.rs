@@ -1,9 +1,11 @@
+mod ctx;
 mod runner;
 mod script;
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
-pub use runner::{ForgeRunner, ForgeRunnerArgs, ForgeScriptRun};
+pub use ctx::{resolve_execution, ExecutionMode, ForgeContext, SenderAuth};
+pub use runner::{ForgeRunner, ForgeScriptRun};
 pub use script::{ForgeScript, ForgeScriptArg, ForgeScriptArgs, ForgeVerifier};
 use serde::{Deserialize, Serialize};
 
@@ -38,22 +40,10 @@ pub struct ForgeArgs {
     #[clap(flatten)]
     #[serde(flatten)]
     pub script: ForgeScriptArgs,
-    #[clap(flatten)]
-    #[serde(flatten)]
-    pub runner: ForgeRunnerArgs,
 }
 
 impl From<ForgeScriptArgs> for ForgeArgs {
     fn from(script: ForgeScriptArgs) -> Self {
-        Self {
-            script,
-            runner: ForgeRunnerArgs::default(),
-        }
-    }
-}
-
-impl From<(ForgeScriptArgs, ForgeRunnerArgs)> for ForgeArgs {
-    fn from((script, runner): (ForgeScriptArgs, ForgeRunnerArgs)) -> Self {
-        Self { script, runner }
+        Self { script }
     }
 }

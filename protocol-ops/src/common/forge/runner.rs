@@ -4,7 +4,6 @@ use std::{
 };
 
 use anyhow::Context;
-use clap::Parser;
 use chrono::Utc;
 use ethers::middleware::Middleware as _;
 use serde::{Deserialize, Serialize};
@@ -36,35 +35,21 @@ impl ForgeScriptRun {
     }
 }
 
-/// Arguments controlling how forge scripts are executed.
-#[derive(Debug, Default, Serialize, Deserialize, Parser, Clone)]
-#[clap(next_help_heading = "Forge runner options")]
-pub struct ForgeRunnerArgs {
-    /// Append each broadcast run into the specified JSON file.
-    #[clap(long = "out")]
-    pub out: Option<PathBuf>,
-}
-
 pub struct ForgeRunner {
-    out: Option<PathBuf>,
     runs: Vec<ForgeScriptRun>,
 }
 
 impl Default for ForgeRunner {
     fn default() -> Self {
         Self {
-            out: None,
             runs: Vec::new(),
         }
     }
 }
 
 impl ForgeRunner {
-    pub fn new(args: ForgeRunnerArgs) -> Self {
-        Self {
-            out: args.out,
-            runs: Vec::new(),
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn run(&mut self, shell: &Shell, mut script: ForgeScript) -> anyhow::Result<()> {
@@ -73,21 +58,8 @@ impl ForgeRunner {
             script.args.add_arg(ForgeScriptArg::Skip { skip_path });
         }
 
-        let mut args_no_resume = script.args.clone();
-        let args_no_resume = args_no_resume.build();
-
-        let command_result = if script.args.resume {
-            let mut args_with_resume = args_no_resume.clone();
-            args_with_resume.push(ForgeScriptArg::Resume.to_string());
-            let res = self.execute(shell, &script, &args_with_resume, true)?;
-            if res.resume_not_successful_because_has_not_began() {
-                self.execute(shell, &script, &args_no_resume, false)?
-            } else {
-                res
-            }
-        } else {
-            self.execute(shell, &script, &args_no_resume, false)?
-        };
+        let args = script.args.build();
+        let command_result = self.execute(shell, &script, &args, false)?;
 
         if command_result.proposal_error() {
             return Ok(());
@@ -130,7 +102,6 @@ impl ForgeRunner {
             ts_ms: Utc::now().timestamp_millis(),
         };
         self.runs.push(run.clone());
-        self.save_runs_to_output()?;
         Ok(())
     }
 
@@ -174,25 +145,6 @@ impl ForgeRunner {
         }
     }
 
-    pub fn save_runs_to_output(&self) -> anyhow::Result<()> {
-        if let Some(ref path) = self.out {
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent).with_context(|| {
-                    format!(
-                        "Failed to create parent directories for output file: {}",
-                        parent.display()
-                    )
-                })?;
-            }
-            let payloads: Vec<&Value> = self.runs.iter().map(|run| &run.payload).collect();
-            let serialized = serde_json::to_string_pretty(&payloads)
-                .context("Failed to serialize accumulated runs to JSON")?;
-            fs::write(path, serialized)
-                .with_context(|| format!("Failed to write JSON output to {}", path.display()))?;
-        }
-        Ok(())
-    }
-
     /// Read-only access to accumulated runs in this runner session.
     pub fn runs(&self) -> &[ForgeScriptRun] {
         &self.runs
@@ -232,9 +184,6 @@ impl ForgeRunner {
 
 // Trait for handling forge errors. Required for implementing method for CmdResult
 pub(crate) trait ForgeErrorHandler {
-    // Resume doesn't work if the forge script has never been started on this chain before.
-    // So we want to catch it and try again without resume arg if it's the case
-    fn resume_not_successful_because_has_not_began(&self) -> bool;
     // Catch the error if upgrade tx has already been processed. We do execute much of
     // txs using upgrade mechanism and if this particular upgrade has already been processed we could assume
     // it as a success
@@ -242,11 +191,6 @@ pub(crate) trait ForgeErrorHandler {
 }
 
 impl ForgeErrorHandler for CmdResult<()> {
-    fn resume_not_successful_because_has_not_began(&self) -> bool {
-        let text = "Deployment not found for chain";
-        check_error(self, text)
-    }
-
     fn proposal_error(&self) -> bool {
         let text = "revert: Operation with this proposal id already exists";
         check_error(self, text)

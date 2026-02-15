@@ -1,5 +1,5 @@
 use clap::Parser;
-use crate::common::forge::{Forge, ForgeArgs, ForgeRunner, ForgeScriptArgs};
+use crate::common::forge::{ForgeArgs, ForgeRunner};
 use serde::{Deserialize, Serialize};
 use xshell::Shell;
 
@@ -11,6 +11,6 @@ pub struct CtmUpgradeArgs {
 }
 
 pub async fn run(args: CtmUpgradeArgs, shell: &Shell) -> anyhow::Result<()> {
-    let mut runner = ForgeRunner::new(args.forge_args.runner.clone());
+    let mut runner = ForgeRunner::new();
     Ok(())
 }
