@@ -25,7 +25,7 @@ use crate::types::{DAValidatorType, L1Network, L2ChainId, L2DACommitmentScheme, 
 use serde::{Deserialize, Serialize};
 use xshell::Shell;
 
-use crate::utils::{paths, runlog};
+use crate::utils::paths;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct HubRegisterChainArgs {

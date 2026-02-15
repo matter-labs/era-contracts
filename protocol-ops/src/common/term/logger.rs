@@ -1,12 +1,25 @@
 use std::fmt::Display;
 
 use cliclack::{intro as cliclak_intro, log, outro as cliclak_outro, Theme, ThemeState};
-use console::{style, Emoji, Term};
+use console::{style, Emoji, Style, Term};
 use serde::Serialize;
 
-use crate::common::prompt::CliclackTheme;
-
 const S_BAR: Emoji = Emoji("│", "|");
+pub struct CliclackTheme;
+
+impl Theme for CliclackTheme {
+    fn bar_color(&self, state: &ThemeState) -> Style {
+        match state {
+            ThemeState::Active => Style::new().cyan(),
+            ThemeState::Error(_) => Style::new().yellow(),
+            _ => Style::new().cyan().dim(),
+        }
+    }
+}
+
+pub fn init_theme() {
+    cliclack::set_theme(CliclackTheme);
+}
 
 fn term_write(msg: impl Display) {
     let msg = &format!("{}", msg);

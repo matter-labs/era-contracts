@@ -6,7 +6,7 @@ use clap::{command, Parser, Subcommand};
 use crate::common::{
     config::{init_global_config, GlobalConfig},
     error::log_error,
-    init_prompt_theme, logger,
+    logger,
 };
 use xshell::Shell;
 
@@ -67,7 +67,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn run_subcommand(cli_args: ProtocolCli) -> anyhow::Result<()> {
-    init_prompt_theme();
+    logger::init_theme();
 
     logger::new_empty_line();
     logger::intro();
