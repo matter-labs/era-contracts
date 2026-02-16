@@ -46,7 +46,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     /// @notice The address of the token on the origin chain.
     /// @dev We assume that if a chain is registered on the GW's bridgehub and it able to submit related deposits or 
-    /// or batches, this value has been populated for its base token. 
+    /// batches, this value has been populated for its base token. 
     mapping(bytes32 assetId => address originToken) internal originToken;
 
     /// @notice The chain on which the token was originally issued. For tokens issued on L1, this will be equal to the L1 chain ID.
@@ -167,7 +167,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes32 _canonicalTxHash,
         BalanceChange calldata _balanceChange
     ) external onlyL2InteropCenter {
-        // FIXME Q: can it be anything other than 1?
+        // FIXME Q: can it be anything other than 1? If not, maybe add a require?
         uint256 chainMigrationNumber = _getChainMigrationNumber(_chainId);
 
         if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _balanceChange.assetId)) {
@@ -397,6 +397,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         interopBalanceChange[_destinationChainId][_bundleHash].assetBalanceChanges.push(change);
     }
 
+    // FIXME: this function is totally wrong:
+    // - it transfers funds upon `verifyBundle` call, but should only upon execute.
+    // - it treats the bundle as atomic, but it can be unbundled.
+    // We should probably delete this function entirely and come up with some future plan to solve this problem.
     function _handleInteropHandlerReceiveMessage(
         uint256 _chainId,
         bytes calldata _message,

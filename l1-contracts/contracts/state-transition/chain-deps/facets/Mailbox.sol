@@ -304,6 +304,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 version: BALANCE_CHANGE_VERSION,
                 // baseTokenAssetId is known on Gateway. If for some reason,
                 // it is not registered, the GW part of the function is expected to revert.
+                // FIXME: can it happen in non-malicious cases? If yes, it can lead to loss of funds.
                 baseTokenAssetId: bytes32(0),
                 baseTokenAmount: _baseTokenAmount,
                 assetId: assetId,
