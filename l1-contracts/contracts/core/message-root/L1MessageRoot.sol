@@ -61,7 +61,8 @@ contract L1MessageRoot is MessageRootBase {
         require(allZKChainsLength == 0, LocallyNoChainsAtGenesis());
     }
 
-    /// @dev This initializer is used in the v31 upgrade.
+    /// @dev This initializer is used in the v31 upgrade. It is expected that it does not call `_initialize`, since
+    /// all the actions from there should've been already performed during the previous deployment.
     function initializeL1V31Upgrade() external reinitializer(2) {
         uint256[] memory allZKChains = IBridgehubBase(BRIDGE_HUB).getAllZKChainChainIDs();
         _v31InitializeInner(allZKChains);
@@ -145,5 +146,9 @@ contract L1MessageRoot is MessageRootBase {
 
     function _eraGatewayChainId() internal view override returns (uint256) {
         return ERA_GATEWAY_CHAIN_ID;
+    }
+
+    function _chainAssetHandler() internal view override returns (address) {
+        return CHAIN_ASSET_HANDLER;
     }
 }

@@ -17,7 +17,7 @@ import {BUNDLE_IDENTIFIER, BalanceChange, BundleAttributes, CallAttributes, INTE
 import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
-import {AttributeAlreadySet, AttributeViolatesRestriction, DestinationChainNotRegistered, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty} from "./InteropErrors.sol";
+import {AttributeAlreadySet, AttributeViolatesRestriction, DestinationChainNotRegistered, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty, ThisChainNotRegisteredForInterop} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
@@ -43,9 +43,6 @@ contract InteropCenter is
     /// L1 that is at the most base layer.
     uint256 public L1_CHAIN_ID;
 
-    /// @notice The asset ID of ETH on L1.
-    bytes32 internal ETH_TOKEN_ASSET_ID;
-
     /// @notice This mapping stores a number of interop bundles sent by an individual sender.
     ///         It's being used to derive interopBundleSalt in InteropBundle struct, whose role
     ///         is to ensure that each bundle has a unique hash.
@@ -68,7 +65,6 @@ contract InteropCenter is
     function initL2(uint256 _l1ChainId, address _owner) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
         L1_CHAIN_ID = _l1ChainId;
-        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
 
         _transferOwnership(_owner);
     }

@@ -191,12 +191,12 @@ contract MessageRoot_Extended_Test is Test {
         messageRoot.saveV31UpgradeChainBatchNumber(chainId);
     }
 
-    function test_SetMigratingChainBatchRoot_Success() public {
+    function test_setMigratingChainBatchNumber_Success() public {
         uint256 chainId = 271;
         uint256 batchNumber = 1;
 
         vm.prank(bridgeHub);
-        messageRoot.setMigratingChainBatchRoot(chainId, batchNumber);
+        messageRoot.setMigratingChainBatchNumber(chainId, batchNumber);
 
         assertEq(messageRoot.currentChainBatchNumber(chainId), batchNumber);
     }
@@ -256,7 +256,7 @@ contract MessageRoot_Extended_Test is Test {
         uint256 v31UpgradeBatchNumber = 0;
 
         vm.prank(bridgeHub);
-        messageRoot.setMigratingChainBatchRoot(chainId, 1);
+        messageRoot.setMigratingChainBatchNumber(chainId, 1);
 
         uint256 v31Batch = messageRoot.v31UpgradeChainBatchNumber(chainId);
         assertEq(v31Batch, v31UpgradeBatchNumber);
@@ -333,7 +333,7 @@ contract MessageRoot_Extended_Test is Test {
         address chainSender = makeAddr("chainSender");
 
         vm.mockCall(
-            bridgeHub,
+            L2_BRIDGEHUB_ADDR,
             abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
             abi.encode(chainSender)
         );
@@ -345,28 +345,28 @@ contract MessageRoot_Extended_Test is Test {
             abi.encode(0, 29, 0) // major, minor, patch
         );
 
-        vm.prank(bridgeHub);
-        messageRoot.addNewChain(chainId, 0);
+        vm.prank(L2_BRIDGEHUB_ADDR);
+        l2MessageRoot.addNewChain(chainId, 0);
 
         // Verify totalPublishedInteropRoots is 0 before any updates
-        assertEq(messageRoot.totalPublishedInteropRoots(), 0, "totalPublishedInteropRoots should be 0 before");
+        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 0, "totalPublishedInteropRoots should be 0 before");
 
         // Add a batch root
-        vm.prank(chainSender);
-        messageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"));
+        vm.prank(GW_ASSET_TRACKER_ADDR);
+        l2MessageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"));
 
         // Update the full tree
-        messageRoot.updateFullTree();
+        l2MessageRoot.updateFullTree();
 
         // Verify totalPublishedInteropRoots incremented after updateFullTree
         assertEq(
-            messageRoot.totalPublishedInteropRoots(),
-            1,
-            "totalPublishedInteropRoots should be 1 after updateFullTree"
+            l2MessageRoot.totalPublishedInteropRoots(),
+            2,
+            "totalPublishedInteropRoots should be 2 after updateFullTree"
         );
 
         // Verify the aggregated root is updated
-        bytes32 root = messageRoot.getAggregatedRoot();
+        bytes32 root = l2MessageRoot.getAggregatedRoot();
         assertTrue(root != bytes32(0));
     }
 

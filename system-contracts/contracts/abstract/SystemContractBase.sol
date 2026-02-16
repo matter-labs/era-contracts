@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, L2_INTEROP_CENTER, L2_INTEROP_HANDLER, L2_NATIVE_TOKEN_VAULT} from "../Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, L2_INTEROP_CENTER_ADDRESS, L2_INTEROP_HANDLER_ADDRESS, L2_NATIVE_TOKEN_VAULT} from "../Constants.sol";
 import {CallerMustBeBootloader, CallerMustBeEvmContract, CallerMustBeInteropCenterOrNTV, CallerMustBeSystemContract, SystemCallFlagRequired, Unauthorized} from "../SystemContractErrors.sol";
 
 /**
@@ -64,7 +64,7 @@ abstract contract SystemContractBase {
     /// @notice Modifier that makes sure that the method
     /// can only be called from the bootloader.
     modifier onlyCallFromBootloaderOrInteropHandler() {
-        if (msg.sender != BOOTLOADER_FORMAL_ADDRESS && msg.sender != address(L2_INTEROP_HANDLER)) {
+        if (msg.sender != BOOTLOADER_FORMAL_ADDRESS && msg.sender != L2_INTEROP_HANDLER_ADDRESS) {
             revert CallerMustBeBootloader();
         }
         _;
@@ -73,7 +73,7 @@ abstract contract SystemContractBase {
     /// @notice Modifier that makes sure that the method
     /// can only be called from the interop center or the NTV.
     modifier onlyCallFromInteropCenterOrNTV() {
-        if (msg.sender != address(L2_INTEROP_CENTER) && msg.sender != address(L2_NATIVE_TOKEN_VAULT)) {
+        if (msg.sender != L2_INTEROP_CENTER_ADDRESS && msg.sender != address(L2_NATIVE_TOKEN_VAULT)) {
             revert CallerMustBeInteropCenterOrNTV();
         }
         _;

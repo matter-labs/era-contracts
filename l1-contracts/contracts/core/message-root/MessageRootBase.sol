@@ -34,6 +34,8 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
 
     function _bridgehub() internal view virtual returns (address);
 
+    function _chainAssetHandler() internal view virtual returns (address);
+
     // solhint-disable-next-line func-name-mixedcase
     function L1_CHAIN_ID() public view virtual returns (uint256);
 
@@ -94,11 +96,11 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
-        if (msg.sender != _bridgehub() && msg.sender != address(IBridgehubBase(_bridgehub()).chainAssetHandler())) {
+        if (msg.sender != _bridgehub() && msg.sender != _chainAssetHandler()) {
             revert OnlyBridgehubOrChainAssetHandler(
                 msg.sender,
                 address(_bridgehub()),
-                address(IBridgehubBase(_bridgehub()).chainAssetHandler())
+                _chainAssetHandler()
             );
         }
         _;
@@ -113,9 +115,9 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         _;
     }
 
-    /// On L1, the chain can add it directly.
-    /// On GW, the asset tracker should add it,
-    /// except for PreV31 chains, which can add it directly.
+    /// @notice On L1, the chain can add it directly, while on GW, the asset tracker should add it,
+    /// @dev Note, that at the moment of the v31 upgrade we no chains to settle on top of the old
+    /// Era-based Gateway, and so no special handling is needed for pre-v31 chains.
     modifier addChainBatchRootRestriction(uint256 _chainId) {
         if (block.chainid != L1_CHAIN_ID()) {
             if (msg.sender != GW_ASSET_TRACKER_ADDR) {
@@ -152,8 +154,8 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         _addNewChain(_chainId, _startingBatchNumber);
     }
 
-    /// @notice we set the chainBatchRoot to be nonempty for when a chain migrates.
-    function setMigratingChainBatchRoot(
+    /// @notice During the chain migration, we move the batch number from the old settlement layer to the new one to ensure consistency. 
+    function setMigratingChainBatchNumber(
         uint256 _chainId,
         uint256 _batchNumber
     ) external onlyBridgehubOrChainAssetHandler {

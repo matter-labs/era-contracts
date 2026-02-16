@@ -28,6 +28,7 @@ struct InteropRoot {
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
  * @notice InteropRootStorage contract responsible for storing the message roots of other chains on the L2.
+ * FIXME: this file should be moved to the l1-contracts folder.
  */
 contract L2InteropRootStorage is SystemContractBase {
     /// @notice Mapping of chain ID to block or batch number to message root.

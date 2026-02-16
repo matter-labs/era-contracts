@@ -354,7 +354,7 @@ abstract contract ChainAssetHandlerBase is
             // A malicious settlement layer could provide invalid values here.
             // To support untrusted CTMs, we would need to at the very least enforce
             // that the `v31UpgradeChainBatchNumber` is not in conflict with the existing values.
-            IMessageRoot(_messageRoot()).setMigratingChainBatchRoot(
+            IMessageRoot(_messageRoot()).setMigratingChainBatchNumber(
                 bridgehubMintData.chainId,
                 bridgehubMintData.batchNumber
             );
