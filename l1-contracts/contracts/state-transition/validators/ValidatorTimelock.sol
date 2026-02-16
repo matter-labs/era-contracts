@@ -197,7 +197,7 @@ contract ValidatorTimelock is
         address _chainAddress,
         uint256, // _l2BlockNumber (unused in this specific implementation)
         bytes calldata // _l2Block (unused in this specific implementation)
-    ) public virtual onlyRole(_chainAddress, PRECOMMITTER_ROLE) {
+    ) public onlyRole(_chainAddress, PRECOMMITTER_ROLE) {
         _propagateToZKChain(_chainAddress);
     }
 
@@ -233,7 +233,7 @@ contract ValidatorTimelock is
     function revertBatchesSharedBridge(
         address _chainAddress,
         uint256 /*_newLastBatch*/
-    ) public virtual onlyRole(_chainAddress, REVERTER_ROLE) {
+    ) external onlyRole(_chainAddress, REVERTER_ROLE) {
         _propagateToZKChain(_chainAddress);
     }
 
@@ -243,7 +243,7 @@ contract ValidatorTimelock is
         uint256, // _processBatchFrom (unused in this specific implementation)
         uint256, // _processBatchTo (unused in this specific implementation)
         bytes calldata // _proofData (unused in this specific implementation)
-    ) public virtual onlyRole(_chainAddress, PROVER_ROLE) {
+    ) external onlyRole(_chainAddress, PROVER_ROLE) {
         _propagateToZKChain(_chainAddress);
     }
 
@@ -253,7 +253,7 @@ contract ValidatorTimelock is
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata // _batchData (unused in this specific implementation)
-    ) public virtual onlyRole(_chainAddress, EXECUTOR_ROLE) {
+    ) external onlyRole(_chainAddress, EXECUTOR_ROLE) {
         uint256 delay = executionDelay; // uint32
         unchecked {
             for (uint256 i = _processBatchFrom; i <= _processBatchTo; ++i) {
