@@ -791,11 +791,16 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (block.chainid == L1_CHAIN_ID) {
             require(logs.length == 0, InvalidBatchesDataLength(0, logs.length));
             require(messages.length == 0, InvalidBatchesDataLength(0, messages.length));
+            require(messageRoots.length == 0, InvalidBatchesDataLength(0, messageRoots.length));
         } else {
             require(batchesData.length == logs.length, InvalidBatchesDataLength(batchesData.length, logs.length));
             require(
                 batchesData.length == messages.length,
                 InvalidBatchesDataLength(batchesData.length, messages.length)
+            );
+            require(
+                batchesData.length == messageRoots.length,
+                InvalidBatchesDataLength(batchesData.length, messageRoots.length)
             );
         }
 
