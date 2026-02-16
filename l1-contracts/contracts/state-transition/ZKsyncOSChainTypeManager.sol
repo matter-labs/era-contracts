@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import {ChainTypeManagerBase} from "./ChainTypeManagerBase.sol";
-import {Diamond} from "./libraries/Diamond.sol";
 import {ChainCreationParams} from "./IChainTypeManager.sol";
 import {GenesisBatchHashZero, GenesisBatchCommitmentIncorrect, GenesisUpgradeZero} from "../common/L1ContractErrors.sol";
 
@@ -45,20 +44,5 @@ contract ZKsyncOSChainTypeManager is ChainTypeManagerBase {
         if (_chainCreationParams.genesisBatchHash == bytes32(0)) {
             revert GenesisBatchHashZero();
         }
-    }
-
-    /// @dev set New Version with upgrade from old version
-    /// @param _cutData the new diamond cut data
-    /// @param _oldProtocolVersion the old protocol version
-    /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
-    /// @param _newProtocolVersion the new protocol version
-    function setNewVersionUpgrade(
-        Diamond.DiamondCutData calldata _cutData,
-        uint256 _oldProtocolVersion,
-        uint256 _oldProtocolVersionDeadline,
-        uint256 _newProtocolVersion
-    ) external override onlyOwner {
-        // No additional validation needed for ZKsync OS
-        _setNewVersionUpgrade(_cutData, _oldProtocolVersion, _oldProtocolVersionDeadline, _newProtocolVersion);
     }
 }

@@ -2,8 +2,6 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IVerifier} from "./IVerifier.sol";
-
 /// @param chainId the id of the chain
 /// @param bridgehub the address of the bridgehub contract
 /// @param chainTypeManager contract's address
@@ -12,7 +10,6 @@ import {IVerifier} from "./IVerifier.sol";
 /// @param admin address who can manage the contract
 /// @param baseTokenAssetId asset id of the base token of the chain
 /// @param storedBatchZero hash of the initial genesis batch
-/// @param verifier address of Verifier contract
 /// @param l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
 /// @param l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
 /// @param l2EvmEmulatorBytecodeHash The hash of EVM emulator L2 bytecode
@@ -27,18 +24,15 @@ struct InitializeData {
     address validatorTimelock;
     bytes32 baseTokenAssetId;
     bytes32 storedBatchZero;
-    IVerifier verifier;
     bytes32 l2BootloaderBytecodeHash;
     bytes32 l2DefaultAccountBytecodeHash;
     bytes32 l2EvmEmulatorBytecodeHash;
 }
 
-/// @param verifier address of Verifier contract
 /// @param l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
 /// @param l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
 /// @param l2EvmEmulatorBytecodeHash The hash of EVM emulator L2 bytecode
 struct InitializeDataNewChain {
-    IVerifier verifier;
     bytes32 l2BootloaderBytecodeHash;
     bytes32 l2DefaultAccountBytecodeHash;
     bytes32 l2EvmEmulatorBytecodeHash;
