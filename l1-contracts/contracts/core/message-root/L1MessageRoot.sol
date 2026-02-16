@@ -36,7 +36,7 @@ contract L1MessageRoot is MessageRootBase {
     /// @notice Also, as a consequence of the above, the MessageRoot on a settlement layer will require that all messages after this batch go through the asset tracker
     /// to ensure balance consistency.
     /// @dev A completely malicious chain (i.e. with malicious DiamondProxy implementation) could provide a wrongful value for this variable, e.g. it could be too low or too high.
-    /// The system should be ready to handle such cases as long as no settlement layer (except for L1) is allowed. Before a settlement layer is added, it is the responsiblity of the governance to double check that
+    /// The system should be ready to handle such cases as long as no settlement layer (except for L1) is allowed. Before a settlement layer is added, it is the responsibility of the governance to double check that
     /// no malicious activity has happened before the transition of the ownership of the CTMs within the ecosystem.
     /// @dev Once set on a settlement layer, it will always stay the same. After v31 upgrade is complete, it will be replaced with a library of constant
     /// values for cheaper access.

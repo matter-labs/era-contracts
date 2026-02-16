@@ -681,7 +681,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     }
 
     /// @notice Registers a token's original details if it hasn't been registered yet.
-    /// @dev Note, that we do not double check the correctness of the data provided here, so it must come from a trusted soruce.
+    /// @dev Note, that we do not double check the correctness of the data provided here, so it must come from a trusted source.
     /// - In case of deposits, the should come from the Mailbox of Gateway.
     /// - In case of registration of base token on Gateway, it is checked inside the L1ChainAssetHandler.
     /// - In case of migration confirmation, it should be checked by the L1AssetTracker.

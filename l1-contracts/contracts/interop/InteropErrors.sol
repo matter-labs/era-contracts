@@ -7,8 +7,6 @@ error AttributeAlreadySet(bytes4 selector);
 error AttributeViolatesRestriction(bytes4 selector, uint256 restriction);
 // 0x5bba5111
 error BundleAlreadyProcessed(bytes32 bundleHash);
-// 0xa43d2953
-error BundleVerifiedAlready(bytes32 bundleHash);
 // 0xd5c7a376
 error CallAlreadyExecuted(bytes32 bundleHash, uint256 callIndex);
 // 0xc087b727

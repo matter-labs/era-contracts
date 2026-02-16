@@ -49,7 +49,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     mapping(uint256 chainIndex => uint256 chainId) public chainIndexToId;
 
     /// @notice The shared full merkle tree storing the aggregate hash.
-    /// @dev Note, that on L1, the chainId leafs are empty.
+    /// @dev Note, that on L1, the chainId leaves are empty.
     FullMerkle.FullTree public sharedTree;
 
     /// @dev The incremental merkle tree storing the chain message roots.
