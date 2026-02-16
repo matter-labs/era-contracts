@@ -79,6 +79,7 @@ contract ChainTypeManagerGettersAndSettersTest is ChainTypeManagerTest {
     function test_setLegacyValidatorTimelock() public {
         address newLegacyTimelock = makeAddr("newLegacyTimelock");
 
+        vm.prank(governor);
         chainContractAddress.setLegacyValidatorTimelock(newLegacyTimelock);
 
         address result = chainContractAddress.validatorTimelock();
@@ -92,6 +93,7 @@ contract ChainTypeManagerGettersAndSettersTest is ChainTypeManagerTest {
         vm.expectEmit(true, true, true, true);
         emit NewValidatorTimelock(address(0), newLegacyTimelock);
 
+        vm.prank(governor);
         chainContractAddress.setLegacyValidatorTimelock(newLegacyTimelock);
     }
 
@@ -111,6 +113,7 @@ contract ChainTypeManagerGettersAndSettersTest is ChainTypeManagerTest {
     function test_setServerNotifier() public {
         address newServerNotifier = makeAddr("newServerNotifier");
 
+        vm.prank(governor);
         chainContractAddress.setServerNotifier(newServerNotifier);
 
         address result = chainContractAddress.serverNotifierAddress();
@@ -124,6 +127,7 @@ contract ChainTypeManagerGettersAndSettersTest is ChainTypeManagerTest {
         vm.expectEmit(true, true, true, true);
         emit NewServerNotifier(serverNotifier, newServerNotifier);
 
+        vm.prank(governor);
         chainContractAddress.setServerNotifier(newServerNotifier);
     }
 
@@ -131,9 +135,9 @@ contract ChainTypeManagerGettersAndSettersTest is ChainTypeManagerTest {
     function test_setServerNotifierByAdmin() public {
         // First set an admin
         address ctmAdmin = makeAddr("ctmAdmin");
+        vm.prank(governor);
         chainContractAddress.setPendingAdmin(ctmAdmin);
 
-        vm.stopPrank();
         vm.prank(ctmAdmin);
         chainContractAddress.acceptAdmin();
 

@@ -271,16 +271,8 @@ abstract contract DeployCTMUtils is DeployUtils {
                 validatorTimelock: stateTransition.proxies.validatorTimelock,
                 chainCreationParams: chainCreationParams,
                 protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
+                verifier: stateTransition.verifiers.verifier,
                 serverNotifier: stateTransition.proxies.serverNotifier
-            });
-    }
-
-    function getVerifierParams() internal returns (VerifierParams memory) {
-        return
-            VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
             });
     }
 
@@ -299,7 +291,6 @@ abstract contract DeployCTMUtils is DeployUtils {
 
         return
             DiamondInitializeDataNewChain({
-                verifier: IVerifier(stateTransition.verifiers.verifier),
                 l2BootloaderBytecodeHash: config.contracts.chainCreationParams.bootloaderHash,
                 l2DefaultAccountBytecodeHash: config.contracts.chainCreationParams.defaultAAHash,
                 l2EvmEmulatorBytecodeHash: config.contracts.chainCreationParams.evmEmulatorHash
