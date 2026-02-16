@@ -57,10 +57,11 @@ contract MessageRootTest is Test {
         );
         L1_CHAIN_ID = 5;
         gatewayChainId = 506;
+        address chainAssetHandler = makeAddr("chainAssetHandler");
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, 1, address(0))),
+                    address(new L1MessageRoot(bridgeHub, 1, chainAssetHandler)),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )

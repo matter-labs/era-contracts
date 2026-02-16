@@ -223,7 +223,8 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
 
             if (interval.isActive) {
                 // Batch is after migration to SL, and the chain hasn't returned yet, so it must be on the settlement layer.
-                return _claimedSettlementLayer == interval.settlementLayerChainId &&
+                return
+                    _claimedSettlementLayer == interval.settlementLayerChainId &&
                     _claimedSettlementLayerBatchNumber >= interval.settlementLayerBatchLowerBound;
             }
 
@@ -232,7 +233,8 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
                 // Batch is in the SL range: (migrateToSL, migrateFromSL] or chain hasn't returned.
                 // Also verify the claimed SL batch number falls within the recorded bounds.
                 // For active intervals, the upper bound is not yet known so we only check the lower bound.
-                return _claimedSettlementLayer == interval.settlementLayerChainId &&
+                return
+                    _claimedSettlementLayer == interval.settlementLayerChainId &&
                     _claimedSettlementLayerBatchNumber >= interval.settlementLayerBatchLowerBound &&
                     _claimedSettlementLayerBatchNumber <= interval.settlementLayerBatchUpperBound;
             }

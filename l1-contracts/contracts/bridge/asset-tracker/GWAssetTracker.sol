@@ -45,14 +45,14 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     mapping(uint256 chainId => mapping(bytes32 canonicalTxHash => BalanceChange balanceChange)) internal balanceChange;
 
     /// @notice The address of the token on the origin chain.
-    /// @dev We assume that if a chain is registered on the GW's bridgehub and it able to submit related deposits or 
-    /// batches, this value has been populated for its base token. 
+    /// @dev We assume that if a chain is registered on the GW's bridgehub and it able to submit related deposits or
+    /// batches, this value has been populated for its base token.
     mapping(bytes32 assetId => address originToken) internal originToken;
 
     /// @notice The chain on which the token was originally issued. For tokens issued on L1, this will be equal to the L1 chain ID.
     mapping(bytes32 assetId => uint256 originChainId) internal tokenOriginChainId;
 
-    /// @notice The address of the L2 shared bridge. It is used only on some old EraVM-based chains. 
+    /// @notice The address of the L2 shared bridge. It is used only on some old EraVM-based chains.
     /// On such chains, it is responsible for sending withdrawal messages.
     mapping(uint256 chainId => address legacySharedBridgeAddress) internal legacySharedBridgeAddress;
 
@@ -337,7 +337,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         if (savedBalanceChange.amount > 0) {
             _decreaseChainBalance(_chainId, savedBalanceChange.assetId, savedBalanceChange.amount);
         }
-        // Note, that we do not reduce the base token balance for failed deposits, 
+        // Note, that we do not reduce the base token balance for failed deposits,
         // as it is expected that these funds stay on L2 inside the refundRecipient's balance.
     }
 
@@ -681,7 +681,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     }
 
     /// @notice Registers a token's original details if it hasn't been registered yet.
-    /// @dev Note, that we do not double check the correctness of the data provided here, so it must come from a trusted soruce. 
+    /// @dev Note, that we do not double check the correctness of the data provided here, so it must come from a trusted soruce.
     /// - In case of deposits, the should come from the Mailbox of Gateway.
     /// - In case of registration of base token on Gateway, it is checked inside the L1ChainAssetHandler.
     /// - In case of migration confirmation, it should be checked by the L1AssetTracker.

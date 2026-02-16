@@ -13,7 +13,7 @@ import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailbox
 import {IAssetRouterBase, LEGACY_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
-import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
+import {IBaseTokenAssetHandler} from "contracts/bridge/interfaces/IBaseTokenAssetHandler.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
@@ -108,7 +108,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         // ToDo: remove the mock call and register custom asset handler?
         vm.mockCall(
             address(nativeTokenVault),
-            abi.encodeWithSelector(IL1BaseTokenAssetHandler.tokenAddress.selector, tokenAssetId),
+            abi.encodeWithSelector(IBaseTokenAssetHandler.tokenAddress.selector, tokenAssetId),
             abi.encode(address(token))
         );
         vm.prank(bridgehubAddress);

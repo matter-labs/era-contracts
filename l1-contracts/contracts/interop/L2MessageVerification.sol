@@ -43,7 +43,7 @@ contract L2MessageVerification is MessageVerification {
             this.proveL2LeafInclusionSharedRecursive({
                 _chainId: proofData.settlementLayerChainId,
                 // Here we use SL *block* number, NOT batch number
-                _blockOrBatchNumber: proofData.settlementLayerBatchNumber, 
+                _blockOrBatchNumber: proofData.settlementLayerBatchNumber,
                 _leafProofMask: proofData.settlementLayerBatchRootMask,
                 _leaf: proofData.chainIdLeaf,
                 _proof: MessageHashing.extractSliceUntilEnd(_proof, proofData.ptr),

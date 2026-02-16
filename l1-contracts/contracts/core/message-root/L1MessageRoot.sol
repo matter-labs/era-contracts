@@ -36,7 +36,7 @@ contract L1MessageRoot is MessageRootBase {
     /// @notice Also, as a consequence of the above, the MessageRoot on a settlement layer will require that all messages after this batch go through the asset tracker
     /// to ensure balance consistency.
     /// @dev A completely malicious chain (i.e. with malicious DiamondProxy implementation) could provide a wrongful value for this variable, e.g. it could be too low or too high.
-    /// The system should be ready to handle such cases as long as no settlement layer (except for L1) is allowed. Before a settlement layer is added, it is the responsiblity of the governance to double check that 
+    /// The system should be ready to handle such cases as long as no settlement layer (except for L1) is allowed. Before a settlement layer is added, it is the responsiblity of the governance to double check that
     /// no malicious activity has happened before the transition of the ownership of the CTMs within the ecosystem.
     /// @dev Once set on a settlement layer, it will always stay the same. After v31 upgrade is complete, it will be replaced with a library of constant
     /// values for cheaper access.
@@ -77,7 +77,7 @@ contract L1MessageRoot is MessageRootBase {
     }
 
     function saveV31UpgradeChainBatchNumber(uint256 _chainId) external onlyChain(_chainId) {
-        // While it is checked in other places that all chains settle on L1 at the time of the v31 upgrade, 
+        // While it is checked in other places that all chains settle on L1 at the time of the v31 upgrade,
         // we have this double check just in case.
         require(block.chainid == IBridgehubBase(_bridgehub()).settlementLayer(_chainId), OnlyOnSettlementLayer());
         uint256 totalBatchesExecuted = IGetters(msg.sender).getTotalBatchesExecuted();
@@ -125,7 +125,10 @@ contract L1MessageRoot is MessageRootBase {
     /// @inheritdoc MessageRootBase
     function _noBatchFallback(uint256 _chainId, uint256 _batchNumber) internal view override returns (bytes32) {
         uint256 v31UpgradeBatchNumber = v31UpgradeChainBatchNumber[_chainId];
-        if (v31UpgradeBatchNumber == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE || _batchNumber < v31UpgradeBatchNumber) {
+        if (
+            v31UpgradeBatchNumber == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE ||
+            _batchNumber < v31UpgradeBatchNumber
+        ) {
             return IGetters(IBridgehubBase(_bridgehub()).getZKChain(_chainId)).l2LogsRootHash(_batchNumber);
         }
         return bytes32(0);

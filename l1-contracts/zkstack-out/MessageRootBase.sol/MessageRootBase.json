@@ -727,13 +727,6 @@
     "stateMutability": "view"
   },
   {
-    "type": "function",
-    "name": "updateFullTree",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
     "type": "event",
     "name": "AddedChain",
     "inputs": [
@@ -923,22 +916,6 @@
       },
       {
         "name": "maxNodeNumber",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "MerkleWrongLength",
-    "inputs": [
-      {
-        "name": "newLeavesLength",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "leafNumber",
         "type": "uint256",
         "internalType": "uint256"
       }

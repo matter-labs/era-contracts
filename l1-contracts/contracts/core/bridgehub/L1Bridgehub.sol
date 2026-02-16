@@ -18,9 +18,8 @@ import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol
 import {IMessageRoot} from "../message-root/IMessageRoot.sol";
 import {BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 import {SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
-import {AssetHandlerNotRegistered, SettlementLayersMustSettleOnL1} from "../../common/L1ContractErrors.sol";
+import {SettlementLayersMustSettleOnL1} from "../../common/L1ContractErrors.sol";
 import {ChainIdAlreadyExists, ChainIdMismatch, IncorrectBridgeHubAddress, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../../common/L1ContractErrors.sol";
-import {IL1BaseTokenAssetHandler} from "../../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IL1CrossChainSender} from "../../bridge/interfaces/IL1CrossChainSender.sol";
 
 /// @author Matter Labs
@@ -81,19 +80,6 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     /// @dev Returns the L1 chain ID for internal use.
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
-    }
-
-    /// @notice baseToken function, which takes chainId as input, reads assetHandler from AR, and tokenAddress from AH
-    function baseToken(uint256 _chainId) public view returns (address) {
-        bytes32 baseTokenAssetId = baseTokenAssetId[_chainId];
-        address assetHandlerAddress = IAssetRouterBase(assetRouter).assetHandlerAddress(baseTokenAssetId);
-
-        // It is possible that the asset handler is not deployed for a chain on the current layer.
-        // In this case we throw an error.
-        if (assetHandlerAddress == address(0)) {
-            revert AssetHandlerNotRegistered(baseTokenAssetId);
-        }
-        return IL1BaseTokenAssetHandler(assetHandlerAddress).tokenAddress(baseTokenAssetId);
     }
 
     /// @notice Used to register a chain as a settlement layer.

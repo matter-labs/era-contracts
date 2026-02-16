@@ -10,7 +10,7 @@ import {BUNDLE_IDENTIFIER, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, BundleS
 import {IERC7786Recipient} from "./IERC7786Recipient.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
-import {BundleAlreadyProcessed, BundleVerifiedAlready, CallAlreadyExecuted, CallNotExecutable, CanNotUnbundle, ExecutingNotAllowed, MessageNotIncluded, UnauthorizedMessageSender, UnbundlingNotAllowed, WrongCallStatusLength, WrongDestinationChainId, WrongSourceChainId, InvalidInteropBundleVersion, InvalidInteropCallVersion} from "./InteropErrors.sol";
+import {BundleAlreadyProcessed, CallAlreadyExecuted, CallNotExecutable, CanNotUnbundle, ExecutingNotAllowed, MessageNotIncluded, UnauthorizedMessageSender, UnbundlingNotAllowed, WrongCallStatusLength, WrongDestinationChainId, WrongSourceChainId, InvalidInteropBundleVersion, InvalidInteropCallVersion} from "./InteropErrors.sol";
 import {InvalidSelector, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
@@ -144,10 +144,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         );
 
         // If the bundle was already fully executed or unbundled, we revert stating that it was processed already.
-        require(
-            status == BundleStatus.Unreceived,
-            BundleAlreadyProcessed(bundleHash)
-        );
+        require(status == BundleStatus.Unreceived, BundleAlreadyProcessed(bundleHash));
 
         // Verify the bundle inclusion
         _verifyBundle(_bundle, _proof, bundleHash);
@@ -309,7 +306,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// That message gets sent to L1 by origin chain in InteropCenter contract, and is picked up and included in receiving chain by sequencer.
     function _verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bytes32 _bundleHash) internal {
         // Verify that the message came from the legitimate InteropCenter.
-        // It is expected that all allowed messages have gone through the GWAssetTracker which 
+        // It is expected that all allowed messages have gone through the GWAssetTracker which
         // ensured that if the `L2_INTEROP_CENTER_ADDR` is the sender of the message, then the message
         // corresponds to a bundle with the valid balance changes.
         require(

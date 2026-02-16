@@ -217,9 +217,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         /// For chains that were settling on GW before V31, we need to update the chain's chainBalance until the chain updates to V31.
         /// Logic: If no settlement layer OR the batch number is before V31 upgrade, update the chain itself.
         /// Otherwise, update the settlement layer (Gateway) balance.
-        chainToUpdate = settlementLayer == 0 || l2BatchNumber < v31UpgradeChainBatchNumber
-            ? _chainId
-            : settlementLayer;
+        chainToUpdate = settlementLayer == 0 || l2BatchNumber < v31UpgradeChainBatchNumber ? _chainId : settlementLayer;
     }
 
     /*//////////////////////////////////////////////////////////////

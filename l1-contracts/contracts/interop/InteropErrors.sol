@@ -17,7 +17,6 @@ error CallNotExecutable(bytes32 bundleHash, uint256 callIndex);
 error CanNotUnbundle(bytes32 bundleHash);
 // 0x2d159f39
 error DestinationChainNotRegistered(uint256 destinationChainId);
-error ThisChainNotRegisteredForInterop(uint256 chainId);
 // 0xe845be4c
 error ExecutingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes executionAddress);
 // 0x62d214aa
@@ -32,6 +31,8 @@ error InvalidInteropBundleVersion();
 error InvalidInteropCallVersion();
 // 0x32c2e156
 error MessageNotIncluded();
+// 0x95eb7603
+error ThisChainNotRegisteredForInterop(uint256 chainId);
 // 0x89fd2c76
 error UnauthorizedMessageSender(address expected, address actual);
 // 0x0345c281

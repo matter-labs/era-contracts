@@ -6,15 +6,14 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IInteropCenter} from "./IInteropCenter.sol";
 
 import {GW_ASSET_TRACKER, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_COMPLEX_UPGRADER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
-import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
+import {SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BUNDLE_IDENTIFIER, BalanceChange, BundleAttributes, CallAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal} from "../common/Messaging.sol";
-import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
+import {MsgValueMismatch, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
 import {AttributeAlreadySet, AttributeViolatesRestriction, DestinationChainNotRegistered, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty, ThisChainNotRegisteredForInterop} from "./InteropErrors.sol";
@@ -247,9 +246,9 @@ contract InteropCenter is
         uint256 _totalBurnedCallsValue,
         uint256 _totalIndirectCallsValue
     ) internal {
-        // Note, that non-zero `destinationChainBaseTokenAssetId` does not mean that the destination chain 
+        // Note, that non-zero `destinationChainBaseTokenAssetId` does not mean that the destination chain
         // actually settles on the GW or is able to receive the message.
-        // However, this value is provided from L1 by chain asset handler, so it can be trusted to be correct. 
+        // However, this value is provided from L1 by chain asset handler, so it can be trusted to be correct.
         bytes32 destinationChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
         require(destinationChainBaseTokenAssetId != bytes32(0), DestinationChainNotRegistered(_destinationChainId));
         bytes32 thisChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(block.chainid);
@@ -420,7 +419,7 @@ contract InteropCenter is
             revert DestinationChainNotRegistered(_chainId);
         }
 
-        _balanceChange.baseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_chainId);        
+        _balanceChange.baseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_chainId);
         GW_ASSET_TRACKER.handleChainBalanceIncreaseOnGateway({
             _chainId: _chainId,
             _canonicalTxHash: _canonicalTxHash,

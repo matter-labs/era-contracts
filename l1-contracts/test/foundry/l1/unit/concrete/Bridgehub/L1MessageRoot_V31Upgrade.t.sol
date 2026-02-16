@@ -182,10 +182,7 @@ contract L1MessageRootV31UpgradeTest is Test {
         );
 
         // Verify the placeholder was set
-        assertEq(
-            newMessageRoot.v31UpgradeChainBatchNumber(CHAIN_ID),
-            V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE
-        );
+        assertEq(newMessageRoot.v31UpgradeChainBatchNumber(CHAIN_ID), V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE);
 
         // Setup zkChain mock
         address zkChain = makeAddr("zkChain");
@@ -306,13 +303,7 @@ contract L1MessageRootV31UpgradeTest is Test {
         );
 
         // Both chains should have placeholder value
-        assertEq(
-            newMessageRoot.v31UpgradeChainBatchNumber(chainId1),
-            V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE
-        );
-        assertEq(
-            newMessageRoot.v31UpgradeChainBatchNumber(chainId2),
-            V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE
-        );
+        assertEq(newMessageRoot.v31UpgradeChainBatchNumber(chainId1), V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE);
+        assertEq(newMessageRoot.v31UpgradeChainBatchNumber(chainId2), V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE);
     }
 }

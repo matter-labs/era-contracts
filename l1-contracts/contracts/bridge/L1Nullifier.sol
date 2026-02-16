@@ -520,7 +520,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         {
             address l2Sender = _finalizeWithdrawalParams.l2Sender;
             bool baseTokenWithdrawal = (assetId == BRIDGE_HUB.baseTokenAssetId(_finalizeWithdrawalParams.chainId));
-            if(baseTokenWithdrawal) {
+            if (baseTokenWithdrawal) {
                 require(l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, WrongL2Sender(l2Sender));
             } else {
                 bool isL2SenderCorrect = l2Sender == L2_ASSET_ROUTER_ADDR ||

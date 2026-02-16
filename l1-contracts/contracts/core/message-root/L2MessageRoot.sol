@@ -12,7 +12,6 @@ import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.s
 import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 import {InvalidCaller} from "../../common/L1ContractErrors.sol";
-import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -114,7 +113,7 @@ contract L2MessageRoot is MessageRootBase {
     }
 
     /// @inheritdoc MessageRootBase
-    function _noBatchFallback(uint256 _chainId, uint256 _batchNumber) internal view override returns (bytes32) {
+    function _noBatchFallback(uint256, uint256) internal pure override returns (bytes32) {
         return bytes32(0);
     }
 
@@ -132,7 +131,7 @@ contract L2MessageRoot is MessageRootBase {
     }
 
     /// @notice This function is used to update the full tree with the latest batch roots of all chains.
-    /// @dev It is expected to be public. 
+    /// @dev It is expected to be public.
     /// FIXME: it is harmless, but why do we need it?
     function updateFullTree() public {
         uint256 cachedChainCount = chainCount;

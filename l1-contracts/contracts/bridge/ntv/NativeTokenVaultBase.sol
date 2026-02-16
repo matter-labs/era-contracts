@@ -55,17 +55,17 @@ abstract contract NativeTokenVaultBase is
     IBeacon public bridgedTokenBeacon;
 
     /// @dev A mapping assetId => originChainId
-    /// @dev It is assumed, that `originChainId`, `tokenAddress` and `assetId` 
-    /// mappings are always atomically populated 
+    /// @dev It is assumed, that `originChainId`, `tokenAddress` and `assetId`
+    /// mappings are always atomically populated
     mapping(bytes32 assetId => uint256 originChainId) public originChainId;
 
     /// @dev A mapping assetId => tokenAddress
-    /// @dev It is assumed, that `originChainId`, `tokenAddress` and `assetId` 
+    /// @dev It is assumed, that `originChainId`, `tokenAddress` and `assetId`
     /// mappings are always atomically populated
     mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
 
     /// @dev A mapping tokenAddress => assetId
-    /// @dev It is assumed, that `originChainId`, `tokenAddress` and `assetId` 
+    /// @dev It is assumed, that `originChainId`, `tokenAddress` and `assetId`
     /// mappings are always atomically populated
     mapping(address tokenAddress => bytes32 assetId) public assetId;
 
@@ -144,7 +144,7 @@ abstract contract NativeTokenVaultBase is
         if (tokenAssetId == bytes32(0)) {
             revert TokenNotLegacy();
         }
-        // FIXME: a single token can be inserted twice as its index will be 0. 
+        // FIXME: a single token can be inserted twice as its index will be 0.
         if (tokenIndex[tokenAssetId] != 0) {
             revert TokenAlreadyInBridgedTokensList();
         }

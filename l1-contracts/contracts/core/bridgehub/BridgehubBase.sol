@@ -10,7 +10,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 import {IBridgehubBase} from "./IBridgehubBase.sol";
 
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
-import {IL1BaseTokenAssetHandler} from "../../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
+import {IBaseTokenAssetHandler} from "../../bridge/interfaces/IBaseTokenAssetHandler.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
@@ -290,6 +290,19 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
                              Getters
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice baseToken function, which takes chainId as input, reads assetHandler from AR, and tokenAddress from AH
+    function baseToken(uint256 _chainId) public view returns (address) {
+        bytes32 baseTokenAssetId = baseTokenAssetId[_chainId];
+        address assetHandlerAddress = IAssetRouterBase(assetRouter).assetHandlerAddress(baseTokenAssetId);
+
+        // It is possible that the asset handler is not deployed for a chain on the current layer.
+        // In this case we throw an error.
+        if (assetHandlerAddress == address(0)) {
+            revert AssetHandlerNotRegistered(baseTokenAssetId);
+        }
+        return IBaseTokenAssetHandler(assetHandlerAddress).tokenAddress(baseTokenAssetId);
+    }
+
     /// @notice Returns all the registered zkChain addresses
     function getAllZKChains() public view override returns (address[] memory chainAddresses) {
         uint256[] memory keys = zkChainMap.keys();
@@ -467,7 +480,7 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     /// @param _assetId The asset ID of the chain.
     /// @param _chainId The chain ID of the ZK chain.
     /// @param _baseTokenBridgingData The data for the base token. Note, that when migrating L2->L1, this
-    /// data contains ONLY `assetId`. The rest of the data is populated with zeroes and so should not be used. 
+    /// data contains ONLY `assetId`. The rest of the data is populated with zeroes and so should not be used.
     /// When migrating L1->L2 all the fields are populated and can be trusted to be correct, since they are checked in
     /// the chain asset handler contract.
     /// @return zkChain The address of the ZK chain.

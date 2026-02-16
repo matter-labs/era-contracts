@@ -17,8 +17,6 @@ import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
 
 import {MessageVerification} from "../../common/MessageVerification.sol";
 
-import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
-
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
@@ -55,7 +53,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     FullMerkle.FullTree public sharedTree;
 
     /// @dev The incremental merkle tree storing the chain message roots.
-    /// @dev On L1, these are empty leaves and are populated only during the addition of the chain 
+    /// @dev On L1, these are empty leaves and are populated only during the addition of the chain
     /// are not updated thereafter.
     mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) public chainTree;
 
@@ -79,7 +77,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// @dev These are the same values as the leaves of the chainTree.
     /// @dev We store these values for message verification on L1 and Gateway.
     /// @dev We only updated the chainTree on deprecated Era GW as of V31.
-    /// @dev An expected invariant is that for all batches starting from currentChainBatchNumber + 1, the `chainBatchRoots` is 0. 
+    /// @dev An expected invariant is that for all batches starting from currentChainBatchNumber + 1, the `chainBatchRoots` is 0.
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
     /// @notice The total number of published interop roots.
@@ -97,11 +95,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
         if (msg.sender != _bridgehub() && msg.sender != _chainAssetHandler()) {
-            revert OnlyBridgehubOrChainAssetHandler(
-                msg.sender,
-                address(_bridgehub()),
-                _chainAssetHandler()
-            );
+            revert OnlyBridgehubOrChainAssetHandler(msg.sender, address(_bridgehub()), _chainAssetHandler());
         }
         _;
     }
@@ -154,17 +148,14 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         _addNewChain(_chainId, _startingBatchNumber);
     }
 
-    /// @notice During the chain migration, we move the batch number from the old settlement layer to the new one to ensure consistency. 
+    /// @notice During the chain migration, we move the batch number from the old settlement layer to the new one to ensure consistency.
     function setMigratingChainBatchNumber(
         uint256 _chainId,
         uint256 _batchNumber
     ) external onlyBridgehubOrChainAssetHandler {
         // Note, that it is possible that chain migrates to GW and returns to L1 without
         // committing any batches on GW.
-        require(
-            currentChainBatchNumber[_chainId] <= _batchNumber,
-            ChainBatchRootAlreadyExists(_chainId, _batchNumber)
-        );
+        require(currentChainBatchNumber[_chainId] <= _batchNumber, ChainBatchRootAlreadyExists(_chainId, _batchNumber));
         currentChainBatchNumber[_chainId] = _batchNumber;
     }
 
@@ -191,10 +182,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
             ChainBatchRootAlreadyExists(_chainId, _batchNumber)
         );
         uint256 expectedNewChainBatchNumber = currentChainBatchNumber[_chainId] + 1;
-        require(
-            _batchNumber == expectedNewChainBatchNumber,
-            NonConsecutiveBatchNumber(_chainId, _batchNumber)
-        );
+        require(_batchNumber == expectedNewChainBatchNumber, NonConsecutiveBatchNumber(_chainId, _batchNumber));
 
         chainBatchRoots[_chainId][_batchNumber] = _chainBatchRoot;
         currentChainBatchNumber[_chainId] = expectedNewChainBatchNumber;
@@ -301,8 +289,8 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// @dev On L2, it should always return 0, since on newer GW implementation it is guaranteed that all available batch roots are stored inside the message root.
     /// @dev On L1, if the batch was produced before the v31 upgrade, we must query the chain. Once the ZKsync OS CTM's ownership is transferred to the decentralized
     /// governance, we can trust this value completely. Before it happens, we just assume that no ZKsync OS based Gateway is present,
-    /// and so the chain can at most damage itself by providing a wrongful batch root for its own batches, but it cannot affect other chains.  
-    function _noBatchFallback(uint256 _chainId, uint256 _batchNumber) internal virtual view returns (bytes32);
+    /// and so the chain can at most damage itself by providing a wrongful batch root for its own batches, but it cannot affect other chains.
+    function _noBatchFallback(uint256 _chainId, uint256 _batchNumber) internal view virtual returns (bytes32);
 
     /// @notice Extracts and returns proof data for settlement layer verification.
     /// @dev Wrapper function around MessageHashing._getProofData for public access.

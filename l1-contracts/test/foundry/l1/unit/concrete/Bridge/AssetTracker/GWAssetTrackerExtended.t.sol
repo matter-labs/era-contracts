@@ -629,9 +629,11 @@ contract GWAssetTrackerExtendedTest is Test {
         vm.prank(mockZKChain);
         gwAssetTracker.processLogsAndMessages(input);
 
-        // Verify balances were decreased (lines 318, 322)
+        // Verify asset balance was decreased (line 338)
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), 0);
-        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), 0);
+        // Base token balance is NOT decreased for failed deposits,
+        // as the funds stay on L2 inside the refundRecipient's balance.
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), BASE_TOKEN_AMOUNT);
     }
 
     // Test requestPauseDepositsForChain success (line 543)
