@@ -140,6 +140,16 @@
     "evmDeployedBytecodeLength": null
   },
   {
+    "contractName": "system-contracts/DummyL2AssetRouter",
+    "zkBytecodeHash": "0x0100002d502a8c05eafb5bace0450639be66aa22c4c5c1c22d279d5ae4f9f461",
+    "zkBytecodePath": "/system-contracts/zkout/DummyL2AssetRouter.sol/DummyL2AssetRouter.json",
+    "evmBytecodeHash": null,
+    "evmBytecodePath": null,
+    "evmDeployedBytecodeHash": null,
+    "evmDeployedBytecodeBlakeHash": null,
+    "evmDeployedBytecodeLength": null
+  },
+  {
     "contractName": "system-contracts/DummyL2MessageVerification",
     "zkBytecodeHash": "0x010001599e3e636468a5eaddaa4437eef22190188e9d646c6f9dc2bf686af1af",
     "zkBytecodePath": "/system-contracts/zkout/DummyL2MessageVerification.sol/DummyL2MessageVerification.json",
