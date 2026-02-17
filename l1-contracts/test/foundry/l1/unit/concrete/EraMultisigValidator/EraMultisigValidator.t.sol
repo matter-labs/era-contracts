@@ -140,7 +140,7 @@ contract EraMultisigValidatorTest is Test {
                 new TransparentUpgradeableProxy(
                     address(impl),
                     address(admin),
-                    abi.encodeCall(EraMultisigValidator.initialize, (_owner, _delay, _validatorTimelock))
+                    abi.encodeCall(IEraMultisigValidator.initialize, (_owner, _delay, _validatorTimelock))
                 )
             );
     }
@@ -171,6 +171,18 @@ contract EraMultisigValidatorTest is Test {
         eraMultisig.initialize(owner, executionDelay, address(validatorTimelock));
     }
 
+    function test_initialize_parentTwoParamInitializeReverts() public {
+        // The 2-param initialize inherited from ValidatorTimelock is disabled
+        ProxyAdmin admin = new ProxyAdmin();
+        EraMultisigValidator impl = new EraMultisigValidator(address(dummyBridgehub));
+        vm.expectRevert();
+        new TransparentUpgradeableProxy(
+            address(impl),
+            address(admin),
+            abi.encodeCall(ValidatorTimelock.initialize, (owner, executionDelay))
+        );
+    }
+
     function test_initialize_revertsIfTimelockHasNoCode() public {
         address eoa = makeAddr("eoa");
         ProxyAdmin admin = new ProxyAdmin();
@@ -179,7 +191,7 @@ contract EraMultisigValidatorTest is Test {
         new TransparentUpgradeableProxy(
             address(impl),
             address(admin),
-            abi.encodeCall(EraMultisigValidator.initialize, (owner, executionDelay, eoa))
+            abi.encodeCall(IEraMultisigValidator.initialize, (owner, executionDelay, eoa))
         );
     }
 

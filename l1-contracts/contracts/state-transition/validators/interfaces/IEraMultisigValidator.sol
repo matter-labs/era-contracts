@@ -29,6 +29,9 @@ interface IEraMultisigValidator is IValidatorTimelock {
     /// @notice Thrown when a member attempts to approve the same hash twice.
     error AlreadySigned();
 
+    /// @notice Thrown when the inherited 2-param `initialize` from `ValidatorTimelock` is called.
+    error InitializeNotAvailable();
+
     /// @notice The downstream `ValidatorTimelock` to which calls are forwarded.
     function validatorTimelock() external view returns (address);
 

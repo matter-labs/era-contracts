@@ -47,12 +47,17 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
         _disableInitializers();
     }
 
+    /// @dev Disable the inherited 2-param `initialize` from `ValidatorTimelock` / `IValidatorTimelock`.
+    function initialize(address, uint32) external pure override(ValidatorTimelock, IValidatorTimelock) {
+        revert InitializeNotAvailable();
+    }
+
     /// @inheritdoc IEraMultisigValidator
     function initialize(
         address _initialOwner,
         uint32 _initialExecutionDelay,
         address _validatorTimelock
-    ) external override initializer {
+    ) external initializer {
         _validatorTimelockInit(_initialOwner, _initialExecutionDelay);
         _initializeEraMultisig(_validatorTimelock);
     }
