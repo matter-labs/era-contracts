@@ -1,6 +1,7 @@
 mod term;
 
 pub mod anvil;
+pub mod versions;
 pub mod cmd;
 pub mod config;
 pub mod contracts;
