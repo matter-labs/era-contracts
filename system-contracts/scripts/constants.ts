@@ -135,9 +135,9 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
   },
   L2BaseToken: {
     address: "0x000000000000000000000000000000000000800a",
-    codeName: "L2BaseToken",
+    codeName: "L2BaseTokenEra",
     lang: Language.Solidity,
-    location: SourceLocation.SystemContracts,
+    location: SourceLocation.L1Contracts,
   },
   systemContext: {
     address: "0x000000000000000000000000000000000000800b",
