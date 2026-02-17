@@ -87,7 +87,7 @@ library PermanentValuesHelper {
     /// @param vm The Forge VM instance
     /// @return legacyGwChainId The legacy Gateway chain ID (0 if not configured)
     function getLegacyGwChainId(Vm vm) internal view returns (uint256 legacyGwChainId) {
-        string memory permanentValuesPath = getPermanentValuesPath(vm);
+        string memory permanentValuesPath = getPermanentValuesPath();
         return getLegacyGwChainId(vm, permanentValuesPath);
     }
 }

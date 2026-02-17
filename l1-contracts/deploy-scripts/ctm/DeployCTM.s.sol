@@ -120,7 +120,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     /// @notice Returns the address to use as the deployer/owner for contracts.
-    function getDeployerAddress() public view returns (address) {
+    function getDeployerAddress() public view virtual returns (address) {
         return msg.sender;
     }
 
