@@ -112,7 +112,12 @@ function askConfirmation(question: string): Promise<boolean> {
 // Codex execution
 // ---------------------------------------------------------------------------
 
-function runCodexExec(prompt: string, outputFile: string): Promise<void> {
+interface CodexOptions {
+  model: string;
+  reasoningEffort: string;
+}
+
+function runCodexExec(prompt: string, outputFile: string, codexOpts: CodexOptions): Promise<void> {
   return new Promise((resolve, reject) => {
     // Write prompt to a temp file to avoid OS argument length limits.
     const promptFile = outputFile.replace(/\.md$/, ".prompt.txt");
@@ -123,7 +128,11 @@ function runCodexExec(prompt: string, outputFile: string): Promise<void> {
     const outStream = fs.createWriteStream(outputFile, { flags: "w", encoding: "utf-8" });
 
     // Invoke codex with the prompt piped via stdin.
-    const child = spawnChild("codex", ["exec"], {
+    const child = spawnChild("codex", [
+      "exec",
+      "--config", `model=${codexOpts.model}`,
+      "--config", `model_reasoning_effort=${codexOpts.reasoningEffort}`,
+    ], {
       cwd: REPO_ROOT,
       env: { ...process.env },
       stdio: [fs.openSync(promptFile, "r"), "pipe", "pipe"],
@@ -351,15 +360,10 @@ export function aiGeneralReviewCommand(): Command {
     .option("--num-jobs <number>", "Number of parallel review jobs", "1")
     .option("--output-dir <dir>", "Output directory for review reports", "output")
     .option("--full-report <path>", "Path for the merged report file", "full_report.md")
+    .option("--model <model>", "Codex model name", "gpt-5.3-codex")
+    .option("--reasoning-effort <effort>", "Model reasoning effort level", "xhigh")
     .action(async (options) => {
-      // Codex uses whatever one has inside `codex login`.
-      // // ------------------------------------------------------------------
-      // // 1. Validate environment
-      // // ------------------------------------------------------------------
-      // if (!process.env.OPENAI_API_KEY) {
-      //   console.error(chalk.red("Error: OPENAI_API_KEY environment variable is not set."));
-      //   process.exit(1);
-      // }
+      // Codex uses whatever one has inside `codex login`, so API key is not necessary.
 
       const contractsInfo = loadContractsInfo();
       const numJobs = parseInt(options.numJobs, 10);
@@ -423,6 +427,11 @@ export function aiGeneralReviewCommand(): Command {
       // ------------------------------------------------------------------
       // 5. Run reviews with concurrency
       // ------------------------------------------------------------------
+      const codexOpts: CodexOptions = {
+        model: options.model,
+        reasoningEffort: options.reasoningEffort,
+      };
+
       await runWithConcurrency(tasks, numJobs, async (task) => {
         task.status = "in_progress";
         display.render();
@@ -431,7 +440,7 @@ export function aiGeneralReviewCommand(): Command {
         try {
           const info = contractsInfo[task.contractName];
           const prompt = buildPrompt(task.contractName, info);
-          await runCodexExec(prompt, task.outputFile);
+          await runCodexExec(prompt, task.outputFile, codexOpts);
           task.status = "done";
         } catch (err: any) {
           task.status = "failed";

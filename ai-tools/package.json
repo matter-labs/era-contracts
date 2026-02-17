@@ -8,7 +8,8 @@
   },
   "scripts": {
     "ai-general-review": "ts-node src/index.ts ai-general-review",
-    "combine-reports": "ts-node src/index.ts combine-reports"
+    "combine-reports": "ts-node src/index.ts combine-reports",
+    "v31-core-review": "yarn ai-general-review --num-jobs 5 --contract L1Bridgehub,L2Bridgehub,InteropCenter,InteropHandler,L1AssetTracker,GWAssetTracker,L2AssetTracker,L1NativeTokenVault,L2NativeTokenVault,L1AssetRouter,L2AssetRouter --output-dir v31-core-review --full-report v31-full_report.md"
   },
   "dependencies": {
     "chalk": "^4.1.0",
