@@ -21,7 +21,7 @@ contract FullMerkleTest {
         tree.updateLeaf(_index, _item);
     }
 
-function root() external view returns (bytes32) {
+    function root() external view returns (bytes32) {
         return tree.root();
     }
 
