@@ -31,8 +31,8 @@ abigen!(
 );
 
 abigen!(
-    IChainAssetHandlerAbi,
-    "../l1-contracts/zkstack-out/IChainAssetHandler.sol/IChainAssetHandler.json",
+    IChainAssetHandlerBaseAbi,
+    "../l1-contracts/zkstack-out/IChainAssetHandler.sol/IChainAssetHandlerBase.json",
     event_derives(serde::Deserialize, serde::Serialize)
 );
 
