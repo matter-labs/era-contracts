@@ -3,7 +3,6 @@ pragma solidity 0.8.28;
 
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2BaseTokenBase} from "../l2-system/interfaces/IL2BaseTokenBase.sol";
-import {IL2BaseTokenZKOS} from "../l2-system/zksync-os/interfaces/IL2BaseTokenZKOS.sol";
 import {V31AcrossRecovery} from "./V31AcrossRecovery.sol";
 import {IL2V31Upgrade} from "../upgrades/IL2V31Upgrade.sol";
 
@@ -24,13 +23,5 @@ contract L2V31Upgrade is V31AcrossRecovery, IL2V31Upgrade {
 
         // Initialize the BaseTokenHolder balance in L2BaseToken.
         IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initializeBaseTokenHolderBalance();
-    }
-
-    /// @notice Sets the pre-V31 total supply on ZKOS chains.
-    /// @dev Intended to be delegate-called by the ComplexUpgrader contract, separately from the main upgrade.
-    /// @dev Chain admin provides the total supply that existed before the V31 upgrade.
-    /// @param _totalSupply The total supply that existed before the V31 upgrade.
-    function setZkosPreV31TotalSupply(uint256 _totalSupply) external {
-        IL2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).setZkosPreV31TotalSupply(_totalSupply);
     }
 }

@@ -14,8 +14,9 @@ import {L1DAValidatorAddressIsZero, NotL1, PriorityModeAlreadyAllowed} from "../
 import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, FeeParamsChangeTooLarge, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, PriorityModeActivationTooEarly, PriorityModeIsNotAllowed, PriorityModeRequiresPermanentRollup, PriorityOpsRequestTimestampMissing, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TokenMultiplierChangeTooFrequent, TooMuchGas, Unauthorized, NotCompatibleWithPriorityMode} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
+import {IL2BaseTokenZKOS} from "../../../l2-system/zksync-os/interfaces/IL2BaseTokenZKOS.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -381,6 +382,14 @@ contract AdminFacet is ZKChainBase, IAdmin {
             abi.encodeCall(IL2ContractDeployer.setAllowedBytecodeTypesToDeploy, AllowedBytecodeTypes.EraVmAndEVM)
         );
         emit EnableEvmEmulator();
+    }
+
+    /// @inheritdoc IAdmin
+    function setZkosPreV31TotalSupply(uint256 _totalSupply) external onlyAdmin onlyL1 returns (bytes32 canonicalTxHash) {
+        canonicalTxHash = IMailbox(address(this)).requestL2ServiceTransaction(
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            abi.encodeCall(IL2BaseTokenZKOS.setZkosPreV31TotalSupply, (_totalSupply))
+        );
     }
 
     /*//////////////////////////////////////////////////////////////

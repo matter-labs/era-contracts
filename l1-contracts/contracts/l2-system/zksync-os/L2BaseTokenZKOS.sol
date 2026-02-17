@@ -7,7 +7,7 @@ import {Address} from "@openzeppelin/contracts-v4/utils/Address.sol";
 import {L2BaseTokenBase} from "../L2BaseTokenBase.sol";
 import {IL2BaseTokenZKOS} from "./interfaces/IL2BaseTokenZKOS.sol";
 import {L2_BASE_TOKEN_HOLDER_ADDR, L2_COMPLEX_UPGRADER_ADDR, MINT_BASE_TOKEN_HOOK} from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "../../common/Config.sol";
+import {INITIAL_BASE_TOKEN_HOLDER_BALANCE, SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {BaseTokenHolderMintFailed, Unauthorized} from "../../common/L1ContractErrors.sol";
 
 /**
@@ -39,11 +39,11 @@ contract L2BaseTokenZKOS is L2BaseTokenBase, IL2BaseTokenZKOS {
         return _zkosPreV31TotalSupply + (INITIAL_BASE_TOKEN_HOLDER_BALANCE - L2_BASE_TOKEN_HOLDER_ADDR.balance);
     }
 
-    /// @notice Sets the pre-V31 total supply for ZKOS chains during V31 upgrade.
-    /// @dev Can only be called by the ComplexUpgrader contract.
+    /// @notice Sets the pre-V31 total supply for ZKOS chains.
+    /// @dev Can only be called via a service transaction (triggered by the chain admin on L1).
     /// @param _totalSupply The total supply that existed before the V31 upgrade.
     function setZkosPreV31TotalSupply(uint256 _totalSupply) external {
-        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+        if (msg.sender != SERVICE_TRANSACTION_SENDER) {
             revert Unauthorized(msg.sender);
         }
         _zkosPreV31TotalSupply = _totalSupply;

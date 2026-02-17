@@ -339,6 +339,25 @@
   },
   {
     "type": "function",
+    "name": "setZkosPreV31TotalSupply",
+    "inputs": [
+      {
+        "name": "_totalSupply",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "canonicalTxHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "unfreezeDiamond",
     "inputs": [],
     "outputs": [],

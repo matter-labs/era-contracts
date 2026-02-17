@@ -9,6 +9,4 @@ interface IL2V31Upgrade {
     /// @param _baseTokenOriginChainId The chainId of the origin chain of the base token.
     /// @param _baseTokenOriginAddress The address of the base token on the origin chain.
     function upgrade(uint256 _baseTokenOriginChainId, address _baseTokenOriginAddress) external;
-
-    function setZkosPreV31TotalSupply(uint256 _totalSupply) external;
 }

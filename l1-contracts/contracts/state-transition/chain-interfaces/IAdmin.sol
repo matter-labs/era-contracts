@@ -56,6 +56,11 @@ interface IAdmin is IZKChainBase {
     /// @notice Allow EVM emulation on chain
     function allowEvmEmulation() external returns (bytes32 canonicalTxHash);
 
+    /// @notice Sets the pre-V31 total supply on ZKOS chains.
+    /// @dev Sends a service transaction to L2BaseTokenZKOS to set the value.
+    /// @param _totalSupply The total supply that existed before the V31 upgrade.
+    function setZkosPreV31TotalSupply(uint256 _totalSupply) external returns (bytes32 canonicalTxHash);
+
     /// @notice Allow Priority Mode to be activated on the chain (does not activate it).
     function permanentlyAllowPriorityMode() external;
 
