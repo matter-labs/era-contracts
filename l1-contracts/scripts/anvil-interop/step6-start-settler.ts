@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { JsonRpcProvider } from "ethers";
+import { providers } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { sleep } from "./src/utils";
 
@@ -19,12 +19,12 @@ async function main() {
   }
 
   // Create providers directly from RPC URLs
-  const l1Provider = new JsonRpcProvider(state.chains.l1.rpcUrl);
+  const l1Provider = new providers.JsonRpcProvider(state.chains.l1.rpcUrl);
   const l2Providers = new Map();
   const chainAddressesMap = new Map();
 
   for (const l2Chain of state.chains.l2) {
-    const l2Provider = new JsonRpcProvider(l2Chain.rpcUrl);
+    const l2Provider = new providers.JsonRpcProvider(l2Chain.rpcUrl);
     l2Providers.set(l2Chain.chainId, l2Provider);
 
     const addr = state.chainAddresses.find((c) => c.chainId === l2Chain.chainId);

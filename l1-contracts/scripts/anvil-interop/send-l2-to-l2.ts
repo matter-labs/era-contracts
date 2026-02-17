@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { JsonRpcProvider, Wallet, Contract, AbiCoder } from "ethers";
+import { providers, Wallet, Contract, AbiCoder } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { getDefaultAccountPrivateKey } from "./src/utils";
 
@@ -49,7 +49,7 @@ async function main() {
   console.log();
 
   const privateKey = getDefaultAccountPrivateKey();
-  const sourceProvider = new JsonRpcProvider(sourceChain.rpcUrl);
+  const sourceProvider = new providers.JsonRpcProvider(sourceChain.rpcUrl);
   const wallet = new Wallet(privateKey, sourceProvider);
 
   // InteropCenter is deployed at system address
@@ -83,7 +83,7 @@ async function main() {
   console.log();
 
   // Get target chain provider and starting block BEFORE sending to avoid missing the relayed tx
-  const targetProvider = new JsonRpcProvider(targetChain.rpcUrl);
+  const targetProvider = new providers.JsonRpcProvider(targetChain.rpcUrl);
   const startBlock = await targetProvider.getBlockNumber();
 
   console.log("🚀 Sending cross-chain message via InteropCenter...");
@@ -141,7 +141,7 @@ async function main() {
 
       // Check recent blocks for transactions to the target address
       for (let i = startBlock; i <= currentBlock; i++) {
-        const block = await targetProvider.getBlock(i, true);
+        const block = await targetProvider.getBlock(i);
         if (block && block.transactions) {
           for (const txHash of block.transactions) {
             const tx = await targetProvider.getTransaction(txHash as string);

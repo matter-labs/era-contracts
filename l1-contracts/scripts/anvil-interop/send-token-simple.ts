@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { JsonRpcProvider, Wallet, Contract, parseUnits, hexlify, getBytes, AbiCoder, keccak256, toUtf8Bytes } from "ethers";
+import { ethers, providers, Wallet, Contract } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { getDefaultAccountPrivateKey } from "./src/utils";
 
@@ -28,17 +28,17 @@ const L2_ASSET_ROUTER_ABI = [
 function encodeEvmChain(chainId: number): string {
   let chainIdHex = chainId.toString(16);
   if (chainIdHex.length % 2 !== 0) chainIdHex = "0" + chainIdHex;
-  const chainRefBytes = getBytes("0x" + chainIdHex);
+  const chainRefBytes = ethers.utils.arrayify("0x" + chainIdHex);
   const chainRefLen = chainRefBytes.length;
-  return hexlify(new Uint8Array([0x00, 0x01, 0x00, 0x00, chainRefLen, ...chainRefBytes, 0x00]));
+  return ethers.utils.hexlify(new Uint8Array([0x00, 0x01, 0x00, 0x00, chainRefLen, ...chainRefBytes, 0x00]));
 }
 
 /**
  * Encode an address in ERC-7930 format (EVM address without chain reference)
  */
 function encodeEvmAddress(address: string): string {
-  const addrBytes = getBytes(address);
-  return hexlify(new Uint8Array([0x00, 0x01, 0x00, 0x00, 0x00, 0x14, ...addrBytes]));
+  const addrBytes = ethers.utils.arrayify(address);
+  return ethers.utils.hexlify(new Uint8Array([0x00, 0x01, 0x00, 0x00, 0x00, 0x14, ...addrBytes]));
 }
 
 /**
@@ -69,7 +69,7 @@ async function main() {
   }
 
   const privateKey = getDefaultAccountPrivateKey();
-  const sourceProvider = new JsonRpcProvider(sourceChain.rpcUrl);
+  const sourceProvider = new providers.JsonRpcProvider(sourceChain.rpcUrl);
   const sourceWallet = new Wallet(privateKey, sourceProvider);
 
   const sourceTokenAddr = state.testTokens[sourceChainId];
@@ -95,14 +95,14 @@ async function main() {
   const balance = await testToken.balanceOf(sourceWallet.address);
   console.log(`💰 Source balance: ${balance.toString()} TEST tokens`);
 
-  const amountWei = parseUnits(amount, 18);
-  if (balance < amountWei) {
+  const amountWei = ethers.utils.parseUnits(amount, 18);
+  if (balance.lt(amountWei)) {
     throw new Error(`Insufficient balance. Have: ${balance.toString()}, Need: ${amountWei.toString()}`);
   }
 
   // Check and approve L2NativeTokenVault (which actually pulls the tokens)
   const currentAllowance = await testToken.allowance(sourceWallet.address, L2_NATIVE_TOKEN_VAULT_ADDR);
-  if (currentAllowance < amountWei) {
+  if (currentAllowance.lt(amountWei)) {
     console.log(`\n📝 Approving L2NativeTokenVault to spend ${amount} TEST tokens...`);
     const approveTx = await testToken.approve(L2_NATIVE_TOKEN_VAULT_ADDR, amountWei);
     await approveTx.wait();
@@ -112,8 +112,10 @@ async function main() {
   }
 
   // Calculate asset ID (keccak256(abi.encode(chainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress)))
-  const abiCoder = AbiCoder.defaultAbiCoder();
-  const assetId = keccak256(abiCoder.encode(["uint256", "address", "address"], [sourceChainId, L2_NATIVE_TOKEN_VAULT_ADDR, sourceTokenAddr]));
+  const abiCoder = ethers.utils.defaultAbiCoder;
+  const assetId = ethers.utils.keccak256(
+    abiCoder.encode(["uint256", "address", "address"], [sourceChainId, L2_NATIVE_TOKEN_VAULT_ADDR, sourceTokenAddr])
+  );
   console.log(`\n🔑 Asset ID: ${assetId}`);
 
   // Ensure token is registered in L2NativeTokenVault
@@ -131,16 +133,16 @@ async function main() {
     // mapping(address tokenAddress => bytes32 assetId) public assetId;       // slot 51
 
     // Set assetId[tokenAddress] = assetId (slot 51)
-    const assetIdSlot = keccak256(abiCoder.encode(["address", "uint256"], [sourceTokenAddr, 51]));
+    const assetIdSlot = ethers.utils.keccak256(abiCoder.encode(["address", "uint256"], [sourceTokenAddr, 51]));
     await sourceProvider.send("anvil_setStorageAt", [L2_NATIVE_TOKEN_VAULT_ADDR, assetIdSlot, assetId]);
 
     // Set tokenAddress[assetId] = tokenAddress (slot 50)
-    const tokenAddressSlot = keccak256(abiCoder.encode(["bytes32", "uint256"], [assetId, 50]));
+    const tokenAddressSlot = ethers.utils.keccak256(abiCoder.encode(["bytes32", "uint256"], [assetId, 50]));
     const paddedTokenAddress = abiCoder.encode(["address"], [sourceTokenAddr]);
     await sourceProvider.send("anvil_setStorageAt", [L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddressSlot, paddedTokenAddress]);
 
     // Set originChainId[assetId] = chainId (slot 49)
-    const originChainIdSlot = keccak256(abiCoder.encode(["bytes32", "uint256"], [assetId, 49]));
+    const originChainIdSlot = ethers.utils.keccak256(abiCoder.encode(["bytes32", "uint256"], [assetId, 49]));
     const paddedChainId = abiCoder.encode(["uint256"], [sourceChainId]);
     await sourceProvider.send("anvil_setStorageAt", [L2_NATIVE_TOKEN_VAULT_ADDR, originChainIdSlot, paddedChainId]);
 
@@ -183,13 +185,15 @@ async function main() {
   // This tells InteropCenter to call initiateIndirectCall on the target contract (L2AssetRouter)
   // For token-only transfers, indirectCallMessageValue is 0 (no ETH sent to AssetRouter)
   // The token amount is handled via the approval and the bridgehubDepositBaseToken call
-  const indirectCallSelector = keccak256(toUtf8Bytes("indirectCall(uint256)")).slice(0, 10); // First 4 bytes (8 hex chars + 0x)
-  const indirectCallMessageValue = 0n; // No ETH value for token-only transfers
+  const indirectCallSelector = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("indirectCall(uint256)")).slice(0, 10); // First 4 bytes (8 hex chars + 0x)
+  const indirectCallMessageValue = 0; // No ETH value for token-only transfers
   const indirectCallAttribute = indirectCallSelector + abiCoder.encode(["uint256"], [indirectCallMessageValue]).slice(2);
 
   // Also encode interopCallValue for the actual call value on destination (0 for token transfers)
-  const interopCallValueSelector = keccak256(toUtf8Bytes("interopCallValue(uint256)")).slice(0, 10);
-  const interopCallValueAttribute = interopCallValueSelector + abiCoder.encode(["uint256"], [0n]).slice(2);
+  const interopCallValueSelector = ethers.utils
+    .keccak256(ethers.utils.toUtf8Bytes("interopCallValue(uint256)"))
+    .slice(0, 10);
+  const interopCallValueAttribute = interopCallValueSelector + abiCoder.encode(["uint256"], [0]).slice(2);
 
   console.log(`\n🔄 Using indirect call attributes`);
   console.log(`   indirectCall selector: ${indirectCallSelector}`);

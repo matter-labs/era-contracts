@@ -2,7 +2,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { JsonRpcProvider } from "ethers";
+import { providers } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
 
 /**
@@ -31,7 +31,7 @@ async function main() {
   for (const l2Chain of state.chains.l2) {
     console.log(`Chain ${l2Chain.chainId}:`);
 
-    const provider = new JsonRpcProvider(l2Chain.rpcUrl);
+    const provider = new providers.JsonRpcProvider(l2Chain.rpcUrl);
 
     // Check if already deployed
     const existingCode = await provider.getCode(L2_INTEROP_HANDLER_ADDR);

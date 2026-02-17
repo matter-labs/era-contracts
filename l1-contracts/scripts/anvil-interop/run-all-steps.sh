@@ -10,6 +10,12 @@ echo "  ZKSync Anvil Interop - Full Setup"
 echo "=========================================="
 echo ""
 
+# Always reset stale state before starting full flow.
+echo "🧹 Pre-cleaning previous run state..."
+yarn cleanup
+echo "✅ Pre-clean complete"
+echo ""
+
 # Step 1: Start chains (in background)
 echo "📍 Step 1: Starting Anvil chains..."
 yarn step1

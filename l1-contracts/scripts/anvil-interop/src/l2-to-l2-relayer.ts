@@ -1,5 +1,5 @@
-import type { JsonRpcProvider } from "ethers";
-import { Contract, Wallet, AbiCoder } from "ethers";
+import type { providers } from "ethers";
+import { Contract, Wallet, utils } from "ethers";
 import type { ChainAddresses, CoreDeployedAddresses } from "./types";
 import { sleep } from "./utils";
 
@@ -16,8 +16,8 @@ import { sleep } from "./utils";
  * - Data: ABI-encoded (targetChainId, targetAddress, targetCalldata)
  */
 export class L2ToL2Relayer {
-  private l1Provider: JsonRpcProvider;
-  private l2Providers: Map<number, JsonRpcProvider>;
+  private l1Provider: providers.JsonRpcProvider;
+  private l2Providers: Map<number, providers.JsonRpcProvider>;
   private l1Wallet: Wallet;
   private l1Addresses: CoreDeployedAddresses;
   private chainAddresses: Map<number, ChainAddresses>;
@@ -34,8 +34,8 @@ export class L2ToL2Relayer {
   private readonly INTEROP_BUNDLE_SENT_TOPIC = "0xd5e1642d9c6ff371d1f102384c70a9a38530493e4747a53919f128685013cb6e";
 
   constructor(
-    l1Provider: JsonRpcProvider,
-    l2Providers: Map<number, JsonRpcProvider>,
+    l1Provider: providers.JsonRpcProvider,
+    l2Providers: Map<number, providers.JsonRpcProvider>,
     privateKey: string,
     l1Addresses: CoreDeployedAddresses,
     chainAddresses: Map<number, ChainAddresses>,
@@ -96,7 +96,7 @@ export class L2ToL2Relayer {
     }
   }
 
-  private async processChain(sourceChainId: number, provider: JsonRpcProvider): Promise<void> {
+  private async processChain(sourceChainId: number, provider: providers.JsonRpcProvider): Promise<void> {
     const currentBlock = await provider.getBlockNumber();
     const lastProcessed = this.lastProcessedBlocks.get(sourceChainId) || 0;
 
@@ -119,12 +119,12 @@ export class L2ToL2Relayer {
 
   private async processBlockRange(
     sourceChainId: number,
-    provider: JsonRpcProvider,
+    provider: providers.JsonRpcProvider,
     fromBlock: number,
     toBlock: number
   ): Promise<void> {
     for (let blockNum = fromBlock; blockNum <= toBlock; blockNum++) {
-      const block = await provider.getBlock(blockNum, true);
+      const block = await provider.getBlock(blockNum);
 
       if (!block || !block.transactions) {
         continue;
@@ -138,7 +138,7 @@ export class L2ToL2Relayer {
 
   private async processTransaction(
     sourceChainId: number,
-    provider: JsonRpcProvider,
+    provider: providers.JsonRpcProvider,
     txHash: string
   ): Promise<void> {
     // Skip if already processed
@@ -188,10 +188,10 @@ export class L2ToL2Relayer {
     sourceChainId: number,
     sourceTxHash: string,
     interopEventLog: any,
-    sourceProvider: JsonRpcProvider
+    sourceProvider: providers.JsonRpcProvider
   ): Promise<void> {
     // Parse InteropBundleSent event to extract destination chain and calls
-    const abiCoder = AbiCoder.defaultAbiCoder();
+    const abiCoder = new utils.AbiCoder();
 
     // InteropBundleSent event structure:
     // event InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle interopBundle)

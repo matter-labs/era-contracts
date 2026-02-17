@@ -1,11 +1,10 @@
-import { JsonRpcProvider, keccak256, toUtf8Bytes, AbiCoder } from "ethers";
-import type { TransactionReceipt } from "ethers";
-import { parse as parseToml } from "@iarna/toml";
+import { providers, utils } from "ethers";
+import { parse as parseToml } from "toml";
 import * as fs from "fs";
 import * as path from "path";
 
 export async function waitForChainReady(rpcUrl: string, maxAttempts = 30): Promise<boolean> {
-  const provider = new JsonRpcProvider(rpcUrl);
+  const provider = new providers.JsonRpcProvider(rpcUrl);
 
   for (let i = 0; i < maxAttempts; i++) {
     try {
@@ -79,7 +78,7 @@ export function ensureDirectoryExists(dirPath: string): void {
 }
 
 export function keccak256Hash(data: string): string {
-  return keccak256(toUtf8Bytes(data));
+  return utils.keccak256(utils.toUtf8Bytes(data));
 }
 
 export function encodeSystemLogs(logs: Array<{ data?: string }>): string {
@@ -87,7 +86,7 @@ export function encodeSystemLogs(logs: Array<{ data?: string }>): string {
     return "0x";
   }
 
-  const abiCoder = AbiCoder.defaultAbiCoder();
+  const abiCoder = new utils.AbiCoder();
   return abiCoder.encode(["bytes[]"], [logs.map((log) => log.data || "0x")]);
 }
 
@@ -107,10 +106,10 @@ export function bytesToHex(bytes: Uint8Array): string {
 }
 
 export async function waitForTransactionReceipt(
-  provider: JsonRpcProvider,
+  provider: providers.JsonRpcProvider,
   txHash: string,
   maxAttempts = 60
-): Promise<TransactionReceipt | null> {
+): Promise<providers.TransactionReceipt | null> {
   for (let i = 0; i < maxAttempts; i++) {
     try {
       const receipt = await provider.getTransactionReceipt(txHash);

@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import type { JsonRpcProvider } from "ethers";
+import type { providers } from "ethers";
 import { AnvilManager } from "./anvil-manager";
 import { ForgeDeployer } from "./deployer";
 import { ChainRegistry } from "./chain-registry";
@@ -204,8 +204,8 @@ export class DeploymentRunner {
   }
 
   async step6StartBatchSettler(
-    l1Provider: JsonRpcProvider,
-    l2Providers: Map<number, JsonRpcProvider>,
+    l1Provider: providers.JsonRpcProvider,
+    l2Providers: Map<number, providers.JsonRpcProvider>,
     chainAddresses: Map<number, ChainAddresses>,
     config: AnvilConfig
   ): Promise<{ settler: BatchSettler; l1ToL2Relayer: L1ToL2Relayer; l2ToL2Relayer: L2ToL2Relayer }> {

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { JsonRpcProvider, Wallet, Contract } from "ethers";
+import { providers, Wallet, Contract } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { getDefaultAccountPrivateKey } from "./src/utils";
 
@@ -28,7 +28,7 @@ async function main() {
   const privateKey = getDefaultAccountPrivateKey();
 
   // Setup providers directly from RPC URLs
-  const l1Provider = new JsonRpcProvider(state.chains.l1.rpcUrl);
+  const l1Provider = new providers.JsonRpcProvider(state.chains.l1.rpcUrl);
   const wallet = new Wallet(privateKey, l1Provider);
 
   const chain11 = state.chains.l2.find((c) => c.chainId === 11);
@@ -72,8 +72,8 @@ async function main() {
 
   // Test 2: Check L2 RPC connectivity
   console.log("Test 2: Verifying L2 RPC connectivity...");
-  const l2Provider11 = new JsonRpcProvider(chain11.rpcUrl);
-  const l2Provider12 = new JsonRpcProvider(chain12.rpcUrl);
+  const l2Provider11 = new providers.JsonRpcProvider(chain11.rpcUrl);
+  const l2Provider12 = new providers.JsonRpcProvider(chain12.rpcUrl);
 
   const blockNum11 = await l2Provider11.getBlockNumber();
   const blockNum12 = await l2Provider12.getBlockNumber();

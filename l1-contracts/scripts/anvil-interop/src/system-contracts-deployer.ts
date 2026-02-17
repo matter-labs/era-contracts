@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { JsonRpcProvider, Contract, Wallet } from "ethers";
+import { providers, Contract, Wallet, utils } from "ethers";
 
 /**
  * SystemContractsDeployer
@@ -10,12 +10,12 @@ import { JsonRpcProvider, Contract, Wallet } from "ethers";
  * and handles initialization properly.
  */
 export class SystemContractsDeployer {
-  private l2Provider: JsonRpcProvider;
+  private l2Provider: providers.JsonRpcProvider;
   private l2Wallet: Wallet;
   private contractsRoot: string;
 
   constructor(l2RpcUrl: string, privateKey: string) {
-    this.l2Provider = new JsonRpcProvider(l2RpcUrl);
+    this.l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
     this.l2Wallet = new Wallet(privateKey, this.l2Provider);
     this.contractsRoot = path.resolve(__dirname, "../../../..");
   }
@@ -261,9 +261,8 @@ export class SystemContractsDeployer {
    */
   private async registerChainsOnBridgehub(l2Bridgehub: Contract): Promise<void> {
     const chains = [10, 11, 12];
-    const { keccak256, AbiCoder } = require("ethers");
-    const abiCoder = AbiCoder.defaultAbiCoder();
-    const ethAssetId = keccak256(
+    const abiCoder = new utils.AbiCoder();
+    const ethAssetId = utils.keccak256(
       abiCoder.encode(["uint256", "address"], [1, "0x0000000000000000000000000000000000000001"])
     );
 
@@ -432,9 +431,8 @@ export class SystemContractsDeployer {
       );
 
       const ownerAddress = await this.l2Wallet.getAddress();
-      const { keccak256, AbiCoder } = require("ethers");
-      const abiCoder = AbiCoder.defaultAbiCoder();
-      const ethAssetId = keccak256(
+      const abiCoder = new utils.AbiCoder();
+      const ethAssetId = utils.keccak256(
         abiCoder.encode(["uint256", "address"], [1, "0x0000000000000000000000000000000000000001"])
       );
 
@@ -529,11 +527,10 @@ export class SystemContractsDeployer {
       );
 
       // Initialize via L2ComplexUpgrader
-      const { keccak256, AbiCoder } = require("ethers");
-      const abiCoder = AbiCoder.defaultAbiCoder();
+      const abiCoder = new utils.AbiCoder();
 
-      // Calculate ETH asset ID (keccak256(abi.encode(1, 0x0000...0001)))
-      const ethAssetId = keccak256(
+      // Calculate ETH asset ID (utils.keccak256(abi.encode(1, 0x0000...0001)))
+      const ethAssetId = utils.keccak256(
         abiCoder.encode(["uint256", "address"], [1, "0x0000000000000000000000000000000000000001"])
       );
 
@@ -611,10 +608,9 @@ export class SystemContractsDeployer {
     }
 
     const tokenAddress = state.testTokens[chainId];
-    const { keccak256, AbiCoder } = require("ethers");
-    const abiCoder = AbiCoder.defaultAbiCoder();
-    // Asset ID format: keccak256(abi.encode(chainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress))
-    const assetId = keccak256(abiCoder.encode(["uint256", "address", "address"], [chainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress]));
+    const abiCoder = new utils.AbiCoder();
+    // Asset ID format: utils.keccak256(abi.encode(chainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress))
+    const assetId = utils.keccak256(abiCoder.encode(["uint256", "address", "address"], [chainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress]));
 
     console.log(`   Registering asset handler for token ${tokenAddress}...`);
     console.log(`   Asset ID: ${assetId}`);

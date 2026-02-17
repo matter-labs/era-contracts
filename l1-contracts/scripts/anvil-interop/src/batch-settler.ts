@@ -1,11 +1,11 @@
-import type { JsonRpcProvider } from "ethers";
-import { Contract, Wallet, keccak256, toUtf8Bytes, AbiCoder } from "ethers";
+import type { providers } from "ethers";
+import { Contract, Wallet, utils } from "ethers";
 import type { BatchState, L2Transaction, CommitBatchInfo, StoredBatchInfo, ProofInput, ChainAddresses } from "./types";
 import { sleep } from "./utils";
 
 export class BatchSettler {
-  private l1Provider: JsonRpcProvider;
-  private l2Providers: Map<number, JsonRpcProvider>;
+  private l1Provider: providers.JsonRpcProvider;
+  private l2Providers: Map<number, providers.JsonRpcProvider>;
   private wallet: Wallet;
   private batchStates: Map<number, BatchState> = new Map();
   private pollingInterval: number = 5000;
@@ -14,8 +14,8 @@ export class BatchSettler {
   private chainAddresses: Map<number, ChainAddresses>;
 
   constructor(
-    l1Provider: JsonRpcProvider,
-    l2Providers: Map<number, JsonRpcProvider>,
+    l1Provider: providers.JsonRpcProvider,
+    l2Providers: Map<number, providers.JsonRpcProvider>,
     privateKey: string,
     chainAddresses: Map<number, ChainAddresses>,
     pollingIntervalMs: number = 5000,
@@ -68,7 +68,7 @@ export class BatchSettler {
     }
   }
 
-  private async processChain(chainId: number, provider: JsonRpcProvider): Promise<void> {
+  private async processChain(chainId: number, provider: providers.JsonRpcProvider): Promise<void> {
     const state = this.batchStates.get(chainId);
     if (!state) {
       return;
@@ -84,7 +84,7 @@ export class BatchSettler {
     console.log(`📊 Chain ${chainId}: Processing blocks ${lastProcessedBlock + 1} to ${latestBlock}`);
 
     for (let blockNumber = lastProcessedBlock + 1; blockNumber <= latestBlock; blockNumber++) {
-      const block = await provider.getBlock(blockNumber, true);
+      const block = await provider.getBlock(blockNumber);
 
       if (block && block.transactions) {
         for (const txHash of block.transactions) {
@@ -145,13 +145,13 @@ export class BatchSettler {
 
       const storedBatchInfo: StoredBatchInfo = {
         batchNumber: BigInt(state.lastCommitted),
-        batchHash: keccak256(toUtf8Bytes(`batch-${state.lastCommitted}`)),
+        batchHash: utils.keccak256(utils.toUtf8Bytes(`batch-${state.lastCommitted}`)),
         indexRepeatedStorageChanges: 0n,
         numberOfLayer1Txs: 0n,
-        priorityOperationsHash: keccak256(toUtf8Bytes("empty")),
-        l2LogsTreeRoot: keccak256(toUtf8Bytes("logs")),
+        priorityOperationsHash: utils.keccak256(utils.toUtf8Bytes("empty")),
+        l2LogsTreeRoot: utils.keccak256(utils.toUtf8Bytes("logs")),
         timestamp: BigInt(Math.floor(Date.now() / 1000)),
-        commitment: keccak256(toUtf8Bytes(`commitment-${state.lastCommitted}`)),
+        commitment: utils.keccak256(utils.toUtf8Bytes(`commitment-${state.lastCommitted}`)),
       };
 
       const tx = await executor.commitBatchesSharedBridge(chainId, storedBatchInfo, [commitBatchInfo]);
@@ -191,24 +191,24 @@ export class BatchSettler {
 
       const prevBatch: StoredBatchInfo = {
         batchNumber: BigInt(state.lastProved),
-        batchHash: keccak256(toUtf8Bytes(`batch-${state.lastProved}`)),
+        batchHash: utils.keccak256(utils.toUtf8Bytes(`batch-${state.lastProved}`)),
         indexRepeatedStorageChanges: 0n,
         numberOfLayer1Txs: 0n,
-        priorityOperationsHash: keccak256(toUtf8Bytes("empty")),
-        l2LogsTreeRoot: keccak256(toUtf8Bytes("logs")),
+        priorityOperationsHash: utils.keccak256(utils.toUtf8Bytes("empty")),
+        l2LogsTreeRoot: utils.keccak256(utils.toUtf8Bytes("logs")),
         timestamp: BigInt(Math.floor(Date.now() / 1000)),
-        commitment: keccak256(toUtf8Bytes(`commitment-${state.lastProved}`)),
+        commitment: utils.keccak256(utils.toUtf8Bytes(`commitment-${state.lastProved}`)),
       };
 
       const committedBatch: StoredBatchInfo = {
         batchNumber: BigInt(batchNumber),
-        batchHash: keccak256(toUtf8Bytes(`batch-${batchNumber}`)),
+        batchHash: utils.keccak256(utils.toUtf8Bytes(`batch-${batchNumber}`)),
         indexRepeatedStorageChanges: 0n,
         numberOfLayer1Txs: 0n,
-        priorityOperationsHash: keccak256(toUtf8Bytes("empty")),
-        l2LogsTreeRoot: keccak256(toUtf8Bytes("logs")),
+        priorityOperationsHash: utils.keccak256(utils.toUtf8Bytes("empty")),
+        l2LogsTreeRoot: utils.keccak256(utils.toUtf8Bytes("logs")),
         timestamp: BigInt(Math.floor(Date.now() / 1000)),
-        commitment: keccak256(toUtf8Bytes(`commitment-${batchNumber}`)),
+        commitment: utils.keccak256(utils.toUtf8Bytes(`commitment-${batchNumber}`)),
       };
 
       const proof = this.generateMockProof();
@@ -249,13 +249,13 @@ export class BatchSettler {
 
       const batchData: StoredBatchInfo = {
         batchNumber: BigInt(batchNumber),
-        batchHash: keccak256(toUtf8Bytes(`batch-${batchNumber}`)),
+        batchHash: utils.keccak256(utils.toUtf8Bytes(`batch-${batchNumber}`)),
         indexRepeatedStorageChanges: 0n,
         numberOfLayer1Txs: 0n,
-        priorityOperationsHash: keccak256(toUtf8Bytes("empty")),
-        l2LogsTreeRoot: keccak256(toUtf8Bytes("logs")),
+        priorityOperationsHash: utils.keccak256(utils.toUtf8Bytes("empty")),
+        l2LogsTreeRoot: utils.keccak256(utils.toUtf8Bytes("logs")),
         timestamp: BigInt(Math.floor(Date.now() / 1000)),
-        commitment: keccak256(toUtf8Bytes(`commitment-${batchNumber}`)),
+        commitment: utils.keccak256(utils.toUtf8Bytes(`commitment-${batchNumber}`)),
       };
 
       const tx = await executor.executeBatchesSharedBridge(chainId, [batchData]);
@@ -272,7 +272,7 @@ export class BatchSettler {
 
   private buildCommitBatchInfo(batchNumber: number, txs: L2Transaction[]): CommitBatchInfo {
     const timestamp = BigInt(Math.floor(Date.now() / 1000));
-    const newStateRoot = keccak256(toUtf8Bytes(`state-${batchNumber}-${txs.length}`));
+    const newStateRoot = utils.keccak256(utils.toUtf8Bytes(`state-${batchNumber}-${txs.length}`));
     const systemLogs = this.encodeSystemLogs(txs);
 
     return {
@@ -281,9 +281,9 @@ export class BatchSettler {
       indexRepeatedStorageChanges: 0n,
       newStateRoot,
       numberOfLayer1Txs: 0n,
-      priorityOperationsHash: keccak256(toUtf8Bytes("empty")),
-      bootloaderHeapInitialContentsHash: keccak256(toUtf8Bytes("bootloader")),
-      eventsQueueStateHash: keccak256(toUtf8Bytes("events")),
+      priorityOperationsHash: utils.keccak256(utils.toUtf8Bytes("empty")),
+      bootloaderHeapInitialContentsHash: utils.keccak256(utils.toUtf8Bytes("bootloader")),
+      eventsQueueStateHash: utils.keccak256(utils.toUtf8Bytes("events")),
       systemLogs,
       operatorDAInput: "0x",
     };
@@ -294,7 +294,7 @@ export class BatchSettler {
       return "0x";
     }
 
-    const abiCoder = AbiCoder.defaultAbiCoder();
+    const abiCoder = new utils.AbiCoder();
 
     const logs = txs.map((tx) => tx.hash);
 

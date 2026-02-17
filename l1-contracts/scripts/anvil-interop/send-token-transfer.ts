@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { JsonRpcProvider, Wallet, Contract, AbiCoder, keccak256, parseUnits } from "ethers";
+import { ethers, providers, Wallet, Contract } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { getDefaultAccountPrivateKey } from "./src/utils";
 
@@ -67,7 +67,7 @@ async function main() {
   }
 
   const privateKey = getDefaultAccountPrivateKey();
-  const sourceProvider = new JsonRpcProvider(sourceChain.rpcUrl);
+  const sourceProvider = new providers.JsonRpcProvider(sourceChain.rpcUrl);
   const sourceWallet = new Wallet(privateKey, sourceProvider);
 
   const testToken = new Contract(sourceTokenAddr, TEST_TOKEN_ABI, sourceWallet);
@@ -86,18 +86,18 @@ async function main() {
   const balance = await testToken.balanceOf(sourceWallet.address);
   console.log(`💰 Current balance: ${balance.toString()} TEST tokens`);
 
-  const amountWei = parseUnits(amount, 18);
-  if (balance < amountWei) {
+  const amountWei = ethers.utils.parseUnits(amount, 18);
+  if (balance.lt(amountWei)) {
     throw new Error(`Insufficient balance. Have: ${balance.toString()}, Need: ${amountWei.toString()}`);
   }
 
   // For token transfers, we encode the finalizeDeposit call
   // finalizeDeposit(uint256 _chainId, address _assetId, bytes calldata _transferData)
 
-  const abiCoder = AbiCoder.defaultAbiCoder();
+  const abiCoder = ethers.utils.defaultAbiCoder;
 
   // Calculate asset ID for the token (keccak256(abi.encode(chainId, tokenAddress)))
-  const assetId = keccak256(abiCoder.encode(["uint256", "address"], [sourceChainId, sourceTokenAddr]));
+  const assetId = ethers.utils.keccak256(abiCoder.encode(["uint256", "address"], [sourceChainId, sourceTokenAddr]));
 
   console.log(`🔑 Asset ID: ${assetId}`);
 
@@ -136,7 +136,7 @@ async function main() {
   const bundleAttributes: string[] = [];
 
   // Get target chain provider and starting block BEFORE sending
-  const targetProvider = new JsonRpcProvider(targetChain.rpcUrl);
+  const targetProvider = new providers.JsonRpcProvider(targetChain.rpcUrl);
   const startBlock = await targetProvider.getBlockNumber();
 
   console.log("🚀 Sending token transfer via InteropCenter...");
@@ -202,7 +202,7 @@ async function main() {
 
       // Check recent blocks for transactions to the AssetRouter
       for (let i = startBlock; i <= currentBlock; i++) {
-        const block = await targetProvider.getBlock(i, true);
+        const block = await targetProvider.getBlock(i);
         if (block && block.transactions) {
           for (const txHash of block.transactions) {
             const tx = await targetProvider.getTransaction(txHash as string);

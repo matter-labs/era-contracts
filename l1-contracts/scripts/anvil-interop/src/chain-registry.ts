@@ -2,7 +2,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
 import * as fs from "fs";
-import { JsonRpcProvider, Contract, Wallet, AbiCoder } from "ethers";
+import { providers, Contract, Wallet } from "ethers";
 import type { ChainConfig, ChainAddresses, CoreDeployedAddresses, CTMDeployedAddresses } from "./types";
 import { parseForgeScriptOutput, ensureDirectoryExists, saveTomlConfig } from "./utils";
 import { buildComplexUpgraderCalldata, getL2ComplexUpgraderAddress } from "./l2-genesis-helper";
@@ -13,7 +13,7 @@ const execAsync = promisify(exec);
 export class ChainRegistry {
   private l1RpcUrl: string;
   private privateKey: string;
-  private l1Provider: JsonRpcProvider;
+  private l1Provider: providers.JsonRpcProvider;
   private wallet: Wallet;
   private projectRoot: string;
   private outputDir: string;
@@ -28,7 +28,7 @@ export class ChainRegistry {
   ) {
     this.l1RpcUrl = l1RpcUrl;
     this.privateKey = privateKey;
-    this.l1Provider = new JsonRpcProvider(l1RpcUrl);
+    this.l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
     this.wallet = new Wallet(privateKey, this.l1Provider);
     this.projectRoot = path.resolve(__dirname, "../../..");
     this.outputDir = path.join(__dirname, "../outputs");
@@ -60,6 +60,7 @@ export class ChainRegistry {
       CTM_OUTPUT: ctmOutputRelPath,
       ZK_CHAIN_CONFIG: chainConfigRelPath,
       ZK_CHAIN_OUT: chainOutputRelPath,
+      PERMANENT_VALUES_INPUT: "/scripts/anvil-interop/config/permanent-values.toml",
     };
 
     await this.runForgeScript(scriptPath, envVars, sig, args);
@@ -90,7 +91,7 @@ export class ChainRegistry {
     console.log(`🔧 Initializing L2 system contracts for chain ${chainId}...`);
 
     // Connect directly to L2 chain
-    const l2Provider = new JsonRpcProvider(l2RpcUrl);
+    const l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
     const l2Wallet = new Wallet(this.privateKey, l2Provider);
 
     // Get the contracts root (go up from scripts/anvil-interop to contracts/)
@@ -182,7 +183,7 @@ export class ChainRegistry {
     }
 
     // Register chains on L2Bridgehub for interop
-    // ETH base token asset ID (keccak256(abi.encode(1, 0x0000000000000000000000000000000000000001)))
+    // ETH base token asset ID (utils.keccak256(abi.encode(1, 0x0000000000000000000000000000000000000001)))
     const ethAssetId = "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
 
     // Register common chain IDs for Anvil test environment (10, 11, 12)

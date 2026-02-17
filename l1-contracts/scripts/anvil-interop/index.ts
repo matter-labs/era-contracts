@@ -2,7 +2,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import type { JsonRpcProvider } from "ethers";
+import type { providers } from "ethers";
 import { AnvilManager } from "./src/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { BatchSettler } from "./src/batch-settler";
@@ -63,7 +63,7 @@ async function main() {
     }
 
     // Step 6: Start batch settler daemon
-    const l2Providers: Map<number, JsonRpcProvider> = new Map();
+    const l2Providers: Map<number, providers.JsonRpcProvider> = new Map();
     const chainAddressesMap: Map<number, ChainAddresses> = new Map();
 
     for (const l2Chain of chains.l2) {

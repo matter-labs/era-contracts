@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { AbiCoder, sha256 } from "ethers";
+import { utils } from "ethers";
 
 /**
  * Helper for building L2GenesisUpgrade data structures
@@ -117,10 +117,10 @@ export function hashL2Bytecode(bytecode: string): string {
   }
 
   // Compute SHA256 hash (not keccak256!) of the padded bytecode
-  const hash = sha256("0x" + bytecode);
+  const hash = utils.sha256("0x" + bytecode);
 
   // Build the bytecode hash per L2ContractHelper.sol:
-  // hashedBytecode = sha256(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+  // hashedBytecode = utils.sha256(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
   // hashedBytecode = (hashedBytecode | bytes32(uint256(1 << 248)))  // Set version = 1
   // hashedBytecode = hashedBytecode | bytes32(bytecodeLenInWords << 224)  // Set length
 
@@ -203,12 +203,12 @@ export function getBytecodeInfo(contractsRoot: string): BytecodeInfo {
       const bytecode = readSolcBytecode(contractsRoot, contract.file, contract.name);
       const hash = hashL2Bytecode(bytecode); // Pads and hashes Solc bytecode
       // Encode as bytes32 for L2GenesisUpgrade
-      const abiCoder = AbiCoder.defaultAbiCoder();
+      const abiCoder = new utils.AbiCoder();
       info[contract.key] = abiCoder.encode(["bytes32"], [hash]);
     } catch (error: any) {
       console.warn(`Warning: Could not read ${contract.name}: ${error.message}`);
       // Use a placeholder hash if bytecode can't be read
-      info[contract.key] = AbiCoder.defaultAbiCoder().encode(
+      info[contract.key] = new utils.AbiCoder().encode(
         ["bytes32"],
         ["0x0000000000000000000000000000000000000000000000000000000000000000"]
       );
@@ -249,7 +249,7 @@ export function buildFixedForceDeploymentsData(
     dangerousTestOnlyForcedBeacon: "0x0000000000000000000000000000000000000000",
   };
 
-  const abiCoder = AbiCoder.defaultAbiCoder();
+  const abiCoder = new utils.AbiCoder();
   return abiCoder.encode(
     [
       "tuple(uint256 l1ChainId, uint256 gatewayChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes bridgehubBytecodeInfo, bytes l2AssetRouterBytecodeInfo, bytes l2NtvBytecodeInfo, bytes messageRootBytecodeInfo, bytes chainAssetHandlerBytecodeInfo, bytes interopCenterBytecodeInfo, bytes interopHandlerBytecodeInfo, bytes assetTrackerBytecodeInfo, bytes beaconDeployerInfo, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl, address aliasedChainRegistrationSender, address dangerousTestOnlyForcedBeacon)",
@@ -301,7 +301,7 @@ export function buildAdditionalForceDeploymentsData(baseTokenL1Address: string):
     },
   };
 
-  const abiCoder = AbiCoder.defaultAbiCoder();
+  const abiCoder = new utils.AbiCoder();
   return abiCoder.encode(
     [
       "tuple(address l2LegacySharedBridge, address predeployedL2WethAddress, address baseTokenL1Address, tuple(string name, string symbol, uint8 decimals) baseTokenMetadata, tuple(bytes32 assetId, uint256 originChainId, address originToken) baseTokenBridgingData)",
@@ -332,7 +332,7 @@ export function buildL2GenesisUpgradeCalldata(
   const fixedForceDeploymentsData = buildFixedForceDeploymentsData(chainId, l1AssetRouter, bytecodeInfo);
   const additionalForceDeploymentsData = buildAdditionalForceDeploymentsData(baseTokenL1Address);
 
-  const abiCoder = AbiCoder.defaultAbiCoder();
+  const abiCoder = new utils.AbiCoder();
 
   // Encode IL2GenesisUpgrade.genesisUpgrade call
   const genesisUpgradeCalldata = abiCoder.encode(
@@ -380,7 +380,7 @@ export function buildComplexUpgraderCalldata(
     contractsRoot
   );
 
-  const abiCoder = AbiCoder.defaultAbiCoder();
+  const abiCoder = new utils.AbiCoder();
 
   // Encode IComplexUpgrader.upgrade(address, bytes)
   const complexUpgraderCalldata = abiCoder.encode(

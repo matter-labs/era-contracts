@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { JsonRpcProvider, Contract, Wallet } from "ethers";
+import { providers, Contract, Wallet } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { getDefaultAccountPrivateKey } from "./src/utils";
 
@@ -29,7 +29,7 @@ async function main() {
   for (const l2Chain of state.chains.l2) {
     console.log(`Chain ${l2Chain.chainId}:`);
 
-    const provider = new JsonRpcProvider(l2Chain.rpcUrl);
+    const provider = new providers.JsonRpcProvider(l2Chain.rpcUrl);
     const wallet = new Wallet(privateKey, provider);
 
     const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbi, provider);

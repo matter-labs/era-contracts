@@ -2,7 +2,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { JsonRpcProvider } from "ethers";
+import { providers } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
 
 /**
@@ -32,7 +32,7 @@ async function main() {
   for (const l2Chain of state.chains.l2) {
     console.log(`Chain ${l2Chain.chainId}:`);
 
-    const provider = new JsonRpcProvider(l2Chain.rpcUrl);
+    const provider = new providers.JsonRpcProvider(l2Chain.rpcUrl);
 
     // Always redeploy the mock (force replace)
     console.log(`   Deploying MockL2MessageVerification at ${L2_MESSAGE_VERIFICATION_ADDR}...`);

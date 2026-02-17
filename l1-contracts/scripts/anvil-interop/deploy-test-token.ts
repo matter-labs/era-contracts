@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { JsonRpcProvider, Wallet, ContractFactory, Contract } from "ethers";
+import { providers, Wallet, ContractFactory, Contract } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { getDefaultAccountPrivateKey } from "./src/utils";
 import * as fs from "fs";
@@ -38,7 +38,7 @@ async function main() {
 
   for (const chain of state.chains.l2) {
     console.log(`🚀 Deploying TestToken on chain ${chain.chainId}...`);
-    const provider = new JsonRpcProvider(chain.rpcUrl);
+    const provider = new providers.JsonRpcProvider(chain.rpcUrl);
     const wallet = new Wallet(privateKey, provider);
 
     try {

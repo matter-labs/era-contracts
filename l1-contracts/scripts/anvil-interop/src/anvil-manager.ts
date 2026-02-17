@@ -1,5 +1,5 @@
 import { spawn } from "child_process";
-import { JsonRpcProvider } from "ethers";
+import { providers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
 import type { AnvilChain } from "./types";
@@ -139,12 +139,12 @@ export class AnvilManager {
     console.log("✅ All chains stopped");
   }
 
-  getProvider(chainId: number): JsonRpcProvider {
+  getProvider(chainId: number): providers.JsonRpcProvider {
     const chain = this.chains.get(chainId);
     if (!chain) {
       throw new Error(`Chain ${chainId} not found`);
     }
-    return new JsonRpcProvider(chain.rpcUrl);
+    return new providers.JsonRpcProvider(chain.rpcUrl);
   }
 
   getChain(chainId: number): AnvilChain | undefined {

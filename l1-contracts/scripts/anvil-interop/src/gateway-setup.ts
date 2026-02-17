@@ -1,8 +1,8 @@
-import { JsonRpcProvider, Contract, Wallet } from "ethers";
+import { providers, Contract, Wallet } from "ethers";
 import type { CoreDeployedAddresses, CTMDeployedAddresses } from "./types";
 
 export class GatewaySetup {
-  private l1Provider: JsonRpcProvider;
+  private l1Provider: providers.JsonRpcProvider;
   private wallet: Wallet;
   private l1Addresses: CoreDeployedAddresses;
   private ctmAddresses: CTMDeployedAddresses;
@@ -13,7 +13,7 @@ export class GatewaySetup {
     l1Addresses: CoreDeployedAddresses,
     ctmAddresses: CTMDeployedAddresses
   ) {
-    this.l1Provider = new JsonRpcProvider(l1RpcUrl);
+    this.l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
     this.wallet = new Wallet(privateKey, this.l1Provider);
     this.l1Addresses = l1Addresses;
     this.ctmAddresses = ctmAddresses;

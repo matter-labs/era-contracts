@@ -1,5 +1,5 @@
-import type { JsonRpcProvider, Log } from "ethers";
-import { Contract, Wallet, AbiCoder, EventLog } from "ethers";
+import type { providers } from "ethers";
+import { Contract, Wallet, utils } from "ethers";
 import type { ChainAddresses, CoreDeployedAddresses } from "./types";
 import { sleep } from "./utils";
 
@@ -12,8 +12,8 @@ import { sleep } from "./utils";
  * This simulates what a real ZKsync server would do - processing L1→L2 messages.
  */
 export class L1ToL2Relayer {
-  private l1Provider: JsonRpcProvider;
-  private l2Providers: Map<number, JsonRpcProvider>;
+  private l1Provider: providers.JsonRpcProvider;
+  private l2Providers: Map<number, providers.JsonRpcProvider>;
   private l1Addresses: CoreDeployedAddresses;
   private chainAddresses: Map<number, ChainAddresses>;
   private privateKey: string;
@@ -23,8 +23,8 @@ export class L1ToL2Relayer {
   private processedTxIds: Set<string> = new Set();
 
   constructor(
-    l1Provider: JsonRpcProvider,
-    l2Providers: Map<number, JsonRpcProvider>,
+    l1Provider: providers.JsonRpcProvider,
+    l2Providers: Map<number, providers.JsonRpcProvider>,
     privateKey: string,
     l1Addresses: CoreDeployedAddresses,
     chainAddresses: Map<number, ChainAddresses>,
@@ -101,7 +101,7 @@ export class L1ToL2Relayer {
     try {
       // Get all blocks in range and check for transactions to bridgehub
       for (let blockNum = fromBlock; blockNum <= toBlock; blockNum++) {
-        const block = await this.l1Provider.getBlock(blockNum, true);
+        const block = await this.l1Provider.getBlock(blockNum);
 
         if (!block || !block.transactions) {
           continue;
