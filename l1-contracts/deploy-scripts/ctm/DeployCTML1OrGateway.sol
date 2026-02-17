@@ -62,8 +62,8 @@ library DeployCTML1OrGateway {
             return abi.encode(config.isZKsyncOS);
         } else if (contractName == CTMContract.Verifier) {
             if (config.isZKsyncOS) {
-                // ZKsyncOS DualVerifier/TestnetVerifier take (plonkVerifier, owner)
-                return abi.encode(config.verifierPlonk, config.verifierOwner);
+                // ZKsyncOS DualVerifier/TestnetVerifier take (fflonkVerifier, plonkVerifier, owner)
+                return abi.encode(config.verifierFflonk, config.verifierPlonk, config.verifierOwner);
             } else {
                 // Era DualVerifier/TestnetVerifier take (fflonkVerifier, plonkVerifier)
                 return abi.encode(config.verifierFflonk, config.verifierPlonk);

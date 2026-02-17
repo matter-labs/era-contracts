@@ -2,11 +2,13 @@
 
 pragma solidity 0.8.28;
 
+import {ZKsyncOSVerifierFflonk} from "../../verifiers/ZKsyncOSVerifierFflonk.sol";
 import {ZKsyncOSVerifierPlonk} from "../../verifiers/ZKsyncOSVerifierPlonk.sol";
 import {ZKsyncOSDualVerifier} from "../../verifiers/ZKsyncOSDualVerifier.sol";
 import {ZKsyncOSTestnetVerifier} from "../../verifiers/ZKsyncOSTestnetVerifier.sol";
 
 import {IVerifier} from "../../chain-interfaces/IVerifier.sol";
+import {IVerifierV2} from "../../chain-interfaces/IVerifierV2.sol";
 
 import {WrongCTMDeployerVariant} from "../../../common/L1ContractErrors.sol";
 
@@ -36,20 +38,26 @@ contract GatewayCTMDeployerVerifiersZKsyncOS {
 
         Verifiers memory result;
 
-        // Deploy ZKsyncOS verifier (PLONK only, no FFLONK)
+        // Deploy ZKsyncOS verifiers
+        result.verifierFflonk = address(new ZKsyncOSVerifierFflonk{salt: salt}());
         result.verifierPlonk = address(new ZKsyncOSVerifierPlonk{salt: salt}());
 
         // Deploy main verifier
         if (_config.testnetVerifier) {
             result.verifier = address(
                 new ZKsyncOSTestnetVerifier{salt: salt}(
+                    IVerifierV2(result.verifierFflonk),
                     IVerifier(result.verifierPlonk),
                     _config.aliasedGovernanceAddress
                 )
             );
         } else {
             result.verifier = address(
-                new ZKsyncOSDualVerifier{salt: salt}(IVerifier(result.verifierPlonk), _config.aliasedGovernanceAddress)
+                new ZKsyncOSDualVerifier{salt: salt}(
+                    IVerifierV2(result.verifierFflonk),
+                    IVerifier(result.verifierPlonk),
+                    _config.aliasedGovernanceAddress
+                )
             );
         }
 

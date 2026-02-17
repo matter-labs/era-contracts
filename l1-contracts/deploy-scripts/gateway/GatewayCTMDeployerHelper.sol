@@ -563,7 +563,11 @@ library GatewayCTMDeployerHelper {
 
         // Deploy base verifiers based on config
         if (config.isZKsyncOS) {
-            // ZKsyncOS only uses PLONK verifier (no FFLONK)
+            result.verifierFflonk = _deployInternalEmptyParams(
+                "ZKsyncOSVerifierFflonk",
+                "ZKsyncOSVerifierFflonk.sol",
+                innerConfig
+            );
             result.verifierPlonk = _deployInternalEmptyParams(
                 "ZKsyncOSVerifierPlonk",
                 "ZKsyncOSVerifierPlonk.sol",
@@ -584,7 +588,7 @@ library GatewayCTMDeployerHelper {
                 result.verifier = _deployInternalWithParams(
                     "ZKsyncOSTestnetVerifier",
                     "ZKsyncOSTestnetVerifier.sol",
-                    abi.encode(result.verifierPlonk, config.aliasedGovernanceAddress),
+                    abi.encode(result.verifierFflonk, result.verifierPlonk, config.aliasedGovernanceAddress),
                     innerConfig
                 );
             } else {
@@ -600,7 +604,7 @@ library GatewayCTMDeployerHelper {
                 result.verifier = _deployInternalWithParams(
                     "ZKsyncOSDualVerifier",
                     "ZKsyncOSDualVerifier.sol",
-                    abi.encode(result.verifierPlonk, config.aliasedGovernanceAddress),
+                    abi.encode(result.verifierFflonk, result.verifierPlonk, config.aliasedGovernanceAddress),
                     innerConfig
                 );
             } else {
@@ -623,7 +627,12 @@ library GatewayCTMDeployerHelper {
 
         // Deploy base verifiers based on config
         if (config.isZKsyncOS) {
-            // ZKsyncOS only uses PLONK verifier (no FFLONK)
+            result.verifierFflonk = _deployInternalEmptyParamsWithMode(
+                "ZKsyncOSVerifierFflonk",
+                "ZKsyncOSVerifierFflonk.sol",
+                innerConfig,
+                isZKsyncOS
+            );
             result.verifierPlonk = _deployInternalEmptyParamsWithMode(
                 "ZKsyncOSVerifierPlonk",
                 "ZKsyncOSVerifierPlonk.sol",
@@ -651,7 +660,7 @@ library GatewayCTMDeployerHelper {
                 result.verifier = _deployInternalWithParamsWithMode(
                     "ZKsyncOSTestnetVerifier",
                     "ZKsyncOSTestnetVerifier.sol",
-                    abi.encode(result.verifierPlonk, config.aliasedGovernanceAddress),
+                    abi.encode(result.verifierFflonk, result.verifierPlonk, config.aliasedGovernanceAddress),
                     innerConfig,
                     isZKsyncOS
                 );
@@ -669,7 +678,7 @@ library GatewayCTMDeployerHelper {
                 result.verifier = _deployInternalWithParamsWithMode(
                     "ZKsyncOSDualVerifier",
                     "ZKsyncOSDualVerifier.sol",
-                    abi.encode(result.verifierPlonk, config.aliasedGovernanceAddress),
+                    abi.encode(result.verifierFflonk, result.verifierPlonk, config.aliasedGovernanceAddress),
                     innerConfig,
                     isZKsyncOS
                 );

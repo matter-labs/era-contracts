@@ -214,7 +214,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function deployVerifiers() internal {
         if (config.isZKsyncOS) {
-            // ZKsyncOS only uses PLONK verifier (no FFLONK)
+            (ctmAddresses.stateTransition.verifiers.verifierFflonk) = deploySimpleContract(
+                "ZKsyncOSVerifierFflonk",
+                false
+            );
             (ctmAddresses.stateTransition.verifiers.verifierPlonk) = deploySimpleContract(
                 "ZKsyncOSVerifierPlonk",
                 false
@@ -231,6 +234,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             vm.startBroadcast(getDeployerAddress());
             ZKsyncOSDualVerifier(ctmAddresses.stateTransition.verifiers.verifier).addVerifier(
                 DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
+                IVerifierV2(ctmAddresses.stateTransition.verifiers.verifierFflonk),
                 IVerifier(ctmAddresses.stateTransition.verifiers.verifierPlonk)
             );
             ZKsyncOSDualVerifier(ctmAddresses.stateTransition.verifiers.verifier).transferOwnership(
