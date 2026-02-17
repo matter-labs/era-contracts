@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "types": ["node"],
+    "downlevelIteration": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true
+  }
+}

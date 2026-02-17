@@ -1,0 +1,21 @@
+{
+  "name": "ai-tools",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=16"
+  },
+  "scripts": {
+    "ai-general-review": "ts-node src/index.ts ai-general-review"
+  },
+  "dependencies": {
+    "chalk": "^4.1.0",
+    "commander": "^8.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "ts-node": "^10.1.0",
+    "typescript": "^4.6.4"
+  }
+}

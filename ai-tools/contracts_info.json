@@ -1,0 +1,138 @@
+{
+  "L1Bridgehub": {
+    "additional_comments": "The version of Bridgehub deployed on L1 only.",
+    "path": "l1-contracts/contracts/core/bridgehub/L1Bridgehub.sol"
+  },
+  "L2Bridgehub": {
+    "additional_comments": "The version of Bridgehub deployed on L2/Gateway only.",
+    "path": "l1-contracts/contracts/core/bridgehub/L2Bridgehub.sol"
+  },
+  "L1ChainAssetHandler": {
+    "additional_comments": "Handles chain asset registration and migration on L1.",
+    "path": "l1-contracts/contracts/core/chain-asset-handler/L1ChainAssetHandler.sol"
+  },
+  "L2ChainAssetHandler": {
+    "additional_comments": "Handles chain asset registration and migration on L2/Gateway.",
+    "path": "l1-contracts/contracts/core/chain-asset-handler/L2ChainAssetHandler.sol"
+  },
+  "CTMDeploymentTracker": {
+    "additional_comments": "Tracks ChainTypeManager deployments across settlement layers.",
+    "path": "l1-contracts/contracts/core/ctm-deployment/CTMDeploymentTracker.sol"
+  },
+  "L1MessageRoot": {
+    "additional_comments": "Aggregates message roots from all chains on L1.",
+    "path": "l1-contracts/contracts/core/message-root/L1MessageRoot.sol"
+  },
+  "L2MessageRoot": {
+    "additional_comments": "Aggregates message roots from all chains on L2/Gateway.",
+    "path": "l1-contracts/contracts/core/message-root/L2MessageRoot.sol"
+  },
+  "L1AssetRouter": {
+    "additional_comments": "Routes asset deposits and withdrawals on L1.",
+    "path": "l1-contracts/contracts/bridge/asset-router/L1AssetRouter.sol"
+  },
+  "L2AssetRouter": {
+    "additional_comments": "Routes asset deposits and withdrawals on L2.",
+    "path": "l1-contracts/contracts/bridge/asset-router/L2AssetRouter.sol"
+  },
+  "L1AssetTracker": {
+    "additional_comments": "Tracks asset registrations and metadata on L1.",
+    "path": "l1-contracts/contracts/bridge/asset-tracker/L1AssetTracker.sol"
+  },
+  "L2AssetTracker": {
+    "additional_comments": "Tracks asset registrations and metadata on L2.",
+    "path": "l1-contracts/contracts/bridge/asset-tracker/L2AssetTracker.sol"
+  },
+  "GWAssetTracker": {
+    "additional_comments": "Gateway-specific asset tracker for cross-chain asset management.",
+    "path": "l1-contracts/contracts/bridge/asset-tracker/GWAssetTracker.sol"
+  },
+  "L1NativeTokenVault": {
+    "additional_comments": "Manages native token custody and bridging on L1.",
+    "path": "l1-contracts/contracts/bridge/ntv/L1NativeTokenVault.sol"
+  },
+  "L2NativeTokenVault": {
+    "additional_comments": "Manages native token custody and bridging on L2.",
+    "path": "l1-contracts/contracts/bridge/ntv/L2NativeTokenVault.sol"
+  },
+  "L1Nullifier": {
+    "additional_comments": "Handles withdrawal finalization and legacy bridge support on L1.",
+    "path": "l1-contracts/contracts/bridge/L1Nullifier.sol"
+  },
+  "L1ERC20Bridge": {
+    "additional_comments": "Legacy ERC20 bridge on L1, mostly a thin wrapper around L1AssetRouter.",
+    "path": "l1-contracts/contracts/bridge/L1ERC20Bridge.sol"
+  },
+  "BridgedStandardERC20": {
+    "additional_comments": "Standard ERC20 token deployed on L2 representing a bridged L1 token.",
+    "path": "l1-contracts/contracts/bridge/BridgedStandardERC20.sol"
+  },
+  "AdminFacet": {
+    "additional_comments": "Diamond facet handling ZK chain administration (freezing, upgrades, fee params).",
+    "path": "l1-contracts/contracts/state-transition/chain-deps/facets/Admin.sol"
+  },
+  "CommitterFacet": {
+    "additional_comments": "Diamond facet handling batch commitment logic.",
+    "path": "l1-contracts/contracts/state-transition/chain-deps/facets/Committer.sol"
+  },
+  "ExecutorFacet": {
+    "additional_comments": "Diamond facet handling batch execution and proving.",
+    "path": "l1-contracts/contracts/state-transition/chain-deps/facets/Executor.sol"
+  },
+  "GettersFacet": {
+    "additional_comments": "Diamond facet providing read-only view functions for chain state.",
+    "path": "l1-contracts/contracts/state-transition/chain-deps/facets/Getters.sol"
+  },
+  "MailboxFacet": {
+    "additional_comments": "Diamond facet handling L1<->L2 message passing and transaction requests.",
+    "path": "l1-contracts/contracts/state-transition/chain-deps/facets/Mailbox.sol"
+  },
+  "MigratorFacet": {
+    "additional_comments": "Diamond facet handling chain migration between settlement layers.",
+    "path": "l1-contracts/contracts/state-transition/chain-deps/facets/Migrator.sol"
+  },
+  "DiamondInit": {
+    "additional_comments": "Initialization contract for the Diamond proxy pattern.",
+    "path": "l1-contracts/contracts/state-transition/chain-deps/DiamondInit.sol"
+  },
+  "DiamondProxy": {
+    "additional_comments": "The Diamond proxy contract that delegates to facets.",
+    "path": "l1-contracts/contracts/state-transition/chain-deps/DiamondProxy.sol"
+  },
+  "ValidatorTimelock": {
+    "additional_comments": "Enforces a delay between batch commitment and execution for security.",
+    "path": "l1-contracts/contracts/state-transition/validators/ValidatorTimelock.sol"
+  },
+  "Governance": {
+    "additional_comments": "Main governance contract managing protocol upgrades with timelocks.",
+    "path": "l1-contracts/contracts/governance/Governance.sol"
+  },
+  "ChainAdmin": {
+    "additional_comments": "Per-chain admin contract that applies restrictions to admin calls.",
+    "path": "l1-contracts/contracts/governance/ChainAdmin.sol"
+  },
+  "ServerNotifier": {
+    "additional_comments": "Notifies off-chain server about important on-chain events.",
+    "path": "l1-contracts/contracts/governance/ServerNotifier.sol"
+  },
+  "DefaultUpgrade": {
+    "additional_comments": "Default upgrade implementation handling standard protocol upgrades.",
+    "path": "l1-contracts/contracts/upgrades/DefaultUpgrade.sol"
+  },
+  "GovernanceUpgradeTimer": {
+    "additional_comments": "Ensures minimum time between upgrade stages for safety.",
+    "path": "l1-contracts/contracts/upgrades/GovernanceUpgradeTimer.sol"
+  },
+  "InteropCenter": {
+    "additional_comments": "Central contract for cross-chain interoperability messaging.",
+    "path": "l1-contracts/contracts/interop/InteropCenter.sol"
+  },
+  "InteropHandler": {
+    "additional_comments": "Handles incoming interop messages and dispatches to receivers.",
+    "path": "l1-contracts/contracts/interop/InteropHandler.sol"
+  },
+  "GatewayTransactionFilterer": {
+    "additional_comments": "Filters transactions on the Gateway to enforce access policies.",
+    "path": "l1-contracts/contracts/transactionFilterer/GatewayTransactionFilterer.sol"
+  }
+}
