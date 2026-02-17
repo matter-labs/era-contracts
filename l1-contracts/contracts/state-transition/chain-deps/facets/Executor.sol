@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
-import {IMessageRoot} from "../../../core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../../../core/message-root/IMessageRoot.sol";
 import {EMPTY_STRING_KECCAK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
 import {IExecutor, ProcessLogsInput} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
@@ -40,7 +40,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     function _rollingHash(bytes32[] memory _hashes) internal pure returns (bytes32) {
         bytes32 hash = EMPTY_STRING_KECCAK;
         uint256 nHashes = _hashes.length;
-        for (uint256 i = 0; i < nHashes; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < nHashes; ++i) {
             hash = keccak256(abi.encode(hash, _hashes[i]));
         }
         return hash;
@@ -99,9 +99,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         InteropRoot[] memory _dependencyRoots
     ) internal view returns (bytes32 dependencyRootsRollingHash) {
         uint256 length = _dependencyRoots.length;
-        IMessageRoot messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
+        IMessageRootBase messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
 
-        for (uint256 i = 0; i < length; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < length; ++i) {
             InteropRoot memory interopRoot = _dependencyRoots[i];
             bytes32 correctRootHash;
             if (interopRoot.chainId == block.chainid) {
@@ -135,7 +135,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @dev We only call this function on L1.
     function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
         // Once the batch is executed, we include its message to the message root.
-        IMessageRoot messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
+        IMessageRootBase messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
         messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
     }
 
@@ -175,7 +175,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // message verification.
         if (block.chainid != L1_CHAIN_ID) {
             uint256 messagesLength = messages.length;
-            for (uint256 i = 0; i < messagesLength; i = i.uncheckedInc()) {
+            for (uint256 i = 0; i < messagesLength; ++i) {
                 ProcessLogsInput memory processLogsInput = ProcessLogsInput({
                     logs: logs[i],
                     messages: messages[i],
@@ -188,12 +188,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             }
         } else {
             uint256 batchesDataLength = batchesData.length;
-            for (uint256 i = 0; i < batchesDataLength; i = i.uncheckedInc()) {
+            for (uint256 i = 0; i < batchesDataLength; ++i) {
                 _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
             }
         }
 
-        for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < nBatches; ++i) {
             _executeOneBatch(batchesData[i], priorityOpsData[i], dependencyRoots[i], i);
             emit BlockExecution(batchesData[i].batchNumber, batchesData[i].batchHash, batchesData[i].commitment);
         }
@@ -236,24 +236,18 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
         bytes32 prevBatchStateCommitment = prevBatch.batchHash;
-        for (uint256 i = 0; i < committedBatchesLength; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < committedBatchesLength; ++i) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
             _checkBatchHashMismatch(committedBatches[i], currentTotalBatchesVerified, false);
 
             bytes32 currentBatchCommitment = committedBatches[i].commitment;
             bytes32 currentBatchStateCommitment = committedBatches[i].batchHash;
             if (s.zksyncOS) {
-                proofPublicInput[i] =
-                    uint256(
-                        keccak256(
-                            abi.encodePacked(
-                                prevBatchStateCommitment,
-                                currentBatchStateCommitment,
-                                currentBatchCommitment
-                            )
-                        )
-                    ) >>
-                    PUBLIC_INPUT_SHIFT;
+                proofPublicInput[i] = _getBatchProofPublicInputZKsyncOS(
+                    prevBatchStateCommitment,
+                    currentBatchStateCommitment,
+                    currentBatchCommitment
+                );
             } else {
                 proofPublicInput[i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
             }
@@ -284,7 +278,21 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
-    /// @dev Gets zk proof public input
+    /// @dev Gets zk proof public input for ZKSync OS
+    function _getBatchProofPublicInputZKsyncOS(
+        bytes32 _prevBatchStateCommitment,
+        bytes32 _currentBatchStateCommitment,
+        bytes32 _currentBatchCommitment
+    ) internal pure returns (uint256) {
+        return
+            uint256(
+                keccak256(
+                    abi.encodePacked(_prevBatchStateCommitment, _currentBatchStateCommitment, _currentBatchCommitment)
+                )
+            ) >> PUBLIC_INPUT_SHIFT;
+    }
+
+    /// @dev Gets zk proof public input for Era
     function _getBatchProofPublicInput(
         bytes32 _prevBatchCommitment,
         bytes32 _currentBatchCommitment

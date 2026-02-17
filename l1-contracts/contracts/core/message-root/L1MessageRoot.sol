@@ -5,15 +5,17 @@ pragma solidity 0.8.28;
 import {MessageRootBase} from "./MessageRootBase.sol";
 import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessageRoot.sol";
-import {CurrentBatchNumberAlreadySet, OnlyOnSettlementLayer, TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber, TotalBatchesExecutedZero, LocallyNoChainsAtGenesis, V31UpgradeChainBatchNumberAlreadySet, NotAllChainsOnL1, InvalidSettlementLayerForBatch} from "../bridgehub/L1BridgehubErrors.sol";
+import {IL1MessageRoot} from "./IL1MessageRoot.sol";
+import {CurrentBatchNumberAlreadySet, InvalidSettlementLayerForBatch, OnlyOnSettlementLayer, TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber, TotalBatchesExecutedZero, LocallyNoChainsAtGenesis, V31UpgradeChainBatchNumberAlreadySet, NotAllChainsOnL1} from "../bridgehub/L1BridgehubErrors.sol";
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
-import {IL1ChainAssetHandler} from "../chain-asset-handler/IL1ChainAssetHandler.sol";
+import {ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
+import {IL1ChainAssetHandler} from "../chain-asset-handler/IL1ChainAssetHandler.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
-contract L1MessageRoot is MessageRootBase {
+contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     address public immutable BRIDGE_HUB;
 
@@ -44,6 +46,8 @@ contract L1MessageRoot is MessageRootBase {
     /// @param _bridgehub Address of the Bridgehub.
     /// @param _eraGatewayChainId Chain ID of the Era Gateway chain.
     constructor(address _bridgehub, uint256 _eraGatewayChainId, address _chainAssetHandler) {
+        require(_bridgehub != address(0), ZeroAddress());
+        require(_chainAssetHandler != address(0), ZeroAddress());
         BRIDGE_HUB = _bridgehub;
         ERA_GATEWAY_CHAIN_ID = _eraGatewayChainId;
         CHAIN_ASSET_HANDLER = _chainAssetHandler;

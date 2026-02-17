@@ -25,7 +25,7 @@ interface IMigrator is IZKChainBase {
     /// @notice Unpauses deposits, used after the chain is initialized
     function unpauseDeposits() external;
 
-    /// @dev Similar to IL1AssetHandler interface, used to send chains.
+    /// @dev Similar to IL1AssetHandler interface, used to send chains to another settlement layer.
     function forwardedBridgeBurn(
         address _settlementLayer,
         address _originalCaller,
@@ -41,7 +41,7 @@ interface IMigrator is IZKChainBase {
         bytes calldata _chainData
     ) external payable;
 
-    /// @dev Similar to IL1AssetHandler interface, used to receive chains.
+    /// @dev Similar to IL1AssetHandler interface, used to receive chains from another settlement layer.
     function forwardedBridgeMint(bytes calldata _data, bool _contractAlreadyDeployed) external payable;
 
     /// @notice Returns the commitment for a chain.

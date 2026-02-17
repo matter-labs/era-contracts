@@ -1063,7 +1063,7 @@ library GatewayCTMDeployerHelper {
         string memory fileName,
         bytes memory params,
         InnerDeployConfig memory config
-    ) private returns (address) {
+    ) private view returns (address) {
         bytes memory bytecode = Utils.readZKFoundryBytecodeL1(fileName, contractName);
 
         return

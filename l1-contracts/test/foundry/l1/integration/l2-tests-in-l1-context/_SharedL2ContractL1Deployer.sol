@@ -63,9 +63,14 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         // TODO refactor
         ctmAddresses.admin.transparentProxyAdmin = makeAddr("transparentProxyAdmin");
         ctmAddresses.admin.governance = makeAddr("governance");
+        ctmAddresses.chainAdmin = makeAddr("chainAdmin");
         ctmAddresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
         ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract("Verifier", true);
         ctmAddresses.stateTransition.proxies.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
+        (
+            ctmAddresses.stateTransition.implementations.serverNotifier,
+            ctmAddresses.stateTransition.proxies.serverNotifier
+        ) = deployServerNotifier();
         ctmAddresses.admin.eip7702Checker = address(0);
         initializeGeneratedData();
         deployStateTransitionDiamondFacets();

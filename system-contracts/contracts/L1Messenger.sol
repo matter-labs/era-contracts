@@ -327,8 +327,8 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
 
         // Pubdata-related input, includes logs, messages, bytecodes, compressed and uncompressed state diffs
         // encoded as `bytes`, so it has offset and length
-        uint256 operatorDataOffset = 4 + uint256(bytes32(_operatorInput[4 + 32 * 4:4 + 32 * 4 + 32]));
-        uint256 operatorDataLength = uint256(bytes32(_operatorInput[operatorDataOffset:operatorDataOffset + 32]));
+        uint256 operatorDataOffset = 4 + offset;
+        uint256 operatorDataLength = length;
 
         // Validate pubdata and make commitment. Logs are not checked since we already checked them above.
         // Does nothing if commitment scheme is EMPTY_NO_DA.

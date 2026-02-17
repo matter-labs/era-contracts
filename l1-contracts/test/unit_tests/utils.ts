@@ -41,6 +41,17 @@ export const PUBDATA_CHUNK_PUBLISHER_ADDRESS = "0x000000000000000000000000000000
 
 export const SYSTEM_UPGRADE_TX_TYPE = 254;
 
+export enum L2DACommitmentScheme {
+  NONE,
+  EMPTY_NO_DA,
+  PUBDATA_KECCAK256,
+  BLOBS_AND_PUBDATA_KECCAK256,
+  BLOBS_ZKSYNC_OS,
+}
+
+// Default L2 DA commitment scheme for tests
+export const L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.PUBDATA_KECCAK256;
+
 export function randomAddress() {
   return ethers.utils.hexlify(ethers.utils.randomBytes(20));
 }
@@ -55,7 +66,7 @@ export enum SYSTEM_LOG_KEYS {
   // it is the only one that is emitted before the system contracts are upgraded.
   PREV_BATCH_HASH_KEY,
   L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
-  USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+  USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY,
   EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
 }
 
@@ -254,8 +265,8 @@ export function createSystemLogs(
     constructL2Log(
       true,
       L2_TO_L1_MESSENGER,
-      SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATOR_ADDRESS_KEY,
-      process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR
+      SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY,
+      ethers.utils.hexZeroPad(ethers.utils.hexlify(L2_DA_COMMITMENT_SCHEME), 32)
     ),
   ];
 }
@@ -302,8 +313,8 @@ export function createSystemLogsWithUpgrade(
     constructL2Log(
       true,
       L2_TO_L1_MESSENGER,
-      SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATOR_ADDRESS_KEY,
-      process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR || ethers.constants.AddressZero
+      SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY,
+      ethers.utils.hexZeroPad(ethers.utils.hexlify(L2_DA_COMMITMENT_SCHEME), 32)
     ),
     constructL2Log(
       true,

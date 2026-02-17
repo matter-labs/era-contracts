@@ -19,8 +19,6 @@ interface IL1ERC20Bridge {
         uint256 amount
     );
 
-    event WithdrawalFinalized(address indexed to, address indexed l1Token, uint256 amount);
-
     event ClaimedFailedDeposit(address indexed to, address indexed l1Token, uint256 amount);
 
     function isWithdrawalFinalized(uint256 _l2BatchNumber, uint256 _l2MessageIndex) external view returns (bool);
