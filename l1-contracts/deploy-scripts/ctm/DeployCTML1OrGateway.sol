@@ -54,18 +54,12 @@ library DeployCTML1OrGateway {
         } else if (contractName == CTMContract.DiamondInit) {
             return abi.encode(config.isZKsyncOS);
         } else if (contractName == CTMContract.Verifier) {
-            if (config.testnetVerifier) {
-                if (config.isZKsyncOS) {
-                    return abi.encode(config.verifierFflonk, config.verifierPlonk, config.verifierOwner);
-                } else {
-                    return abi.encode(config.verifierFflonk, config.verifierPlonk);
-                }
+            if (config.isZKsyncOS) {
+                // ZKsyncOS DualVerifier/TestnetVerifier take (fflonkVerifier, plonkVerifier, owner)
+                return abi.encode(config.verifierFflonk, config.verifierPlonk, config.verifierOwner);
             } else {
-                if (config.isZKsyncOS) {
-                    return abi.encode(config.verifierFflonk, config.verifierPlonk, config.verifierOwner);
-                } else {
-                    return abi.encode(config.verifierFflonk, config.verifierPlonk);
-                }
+                // Era DualVerifier/TestnetVerifier take (fflonkVerifier, plonkVerifier)
+                return abi.encode(config.verifierFflonk, config.verifierPlonk);
             }
         } else if (contractName == CTMContract.ZKsyncOSChainTypeManager) {
             return

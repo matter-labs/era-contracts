@@ -36,7 +36,7 @@ contract L1MessageRootV31UpgradeTest is Test {
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, 1, address(0))),
+                    address(new L1MessageRoot(bridgeHub, 1, makeAddr("chainAssetHandler"))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )
@@ -174,7 +174,7 @@ contract L1MessageRootV31UpgradeTest is Test {
         L1MessageRoot newMessageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(newBridgehub, 1, address(0))),
+                    address(new L1MessageRoot(newBridgehub, 1, makeAddr("chainAssetHandler"))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
                 )
@@ -234,7 +234,7 @@ contract L1MessageRootV31UpgradeTest is Test {
         L1MessageRoot newMessageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(newBridgehub, 1, address(0))),
+                    address(new L1MessageRoot(newBridgehub, 1, makeAddr("chainAssetHandler"))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
                 )
@@ -298,7 +298,7 @@ contract L1MessageRootV31UpgradeTest is Test {
         L1MessageRoot newMessageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(newBridgehub, 1, address(0))),
+                    address(new L1MessageRoot(newBridgehub, 1, makeAddr("chainAssetHandler"))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
                 )

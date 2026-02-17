@@ -342,7 +342,7 @@ library Utils {
         bytes32 create2Salt,
         bytes32 bytecodeHash,
         bytes memory constructorArgs
-    ) internal view returns (address) {
+    ) internal pure returns (address) {
         return
             L2ContractHelper.computeCreate2Address(
                 L2_CREATE2_FACTORY_ADDR,
@@ -356,7 +356,7 @@ library Utils {
         bytes32 create2Salt,
         bytes memory bytecode,
         bytes memory constructorArgs
-    ) internal view returns (bytes32 bytecodeHash, bytes memory data) {
+    ) internal pure returns (bytes32 bytecodeHash, bytes memory data) {
         bytecodeHash = L2ContractHelper.hashL2Bytecode(bytecode);
 
         data = abi.encodeWithSignature("create2(bytes32,bytes32,bytes)", create2Salt, bytecodeHash, constructorArgs);
@@ -632,7 +632,7 @@ library Utils {
         uint256 secondBridgeValue,
         bytes memory secondBridgeCalldata,
         address refundRecipient
-    ) internal returns (Call[] memory calls) {
+    ) internal view returns (Call[] memory calls) {
         (
             L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
             uint256 requiredValueToDeploy
@@ -701,7 +701,7 @@ library Utils {
         address bridgehubAddress,
         address l1SharedBridgeProxy,
         address refundRecipient
-    ) internal returns (Call[] memory calls) {
+    ) internal view returns (Call[] memory calls) {
         // 1) Prepare the L2TransactionRequestDirect (same logic as before)
         (
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
@@ -756,7 +756,7 @@ library Utils {
         uint256 secondBridgeValue,
         bytes memory secondBridgeCalldata,
         address refundRecipient
-    ) internal returns (Call[] memory calls) {
+    ) internal view returns (Call[] memory calls) {
         // 1) Prepare the L2TransactionRequestTwoBridges (same logic as before)
         (
             L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
@@ -891,7 +891,7 @@ library Utils {
         address l1SharedBridgeProxy,
         uint256 chainId,
         uint256 amountToApprove
-    ) internal returns (uint256 ethAmountToPass, Call[] memory calls) {
+    ) internal view returns (uint256 ethAmountToPass, Call[] memory calls) {
         address baseTokenAddress = bridgehub.baseToken(chainId);
         if (ADDRESS_ONE != baseTokenAddress) {
             // Base token is not ETH, so we need to create an approval call
@@ -1138,7 +1138,10 @@ library Utils {
         vm.stopBroadcast();
     }
 
-    function encodeChainAdminMulticall(Call[] memory _calls, bool _requireSuccess) internal returns (bytes memory) {
+    function encodeChainAdminMulticall(
+        Call[] memory _calls,
+        bool _requireSuccess
+    ) internal pure returns (bytes memory) {
         return abi.encodeCall(IChainAdmin.multicall, (_calls, _requireSuccess));
     }
 
@@ -1383,7 +1386,7 @@ library Utils {
         bytes32 observableBytecodeHash = keccak256(bytecode);
         bytecodeInfo = ZKSyncOSBytecodeInfo.encodeZKSyncOSBytecodeInfo(
             bytecodeBlakeHash,
-            bytecode.length,
+            uint32(bytecode.length),
             observableBytecodeHash
         );
     }

@@ -25,7 +25,7 @@ import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
 import {BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {BalanceChange} from "contracts/common/Messaging.sol";
-import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 
 abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
@@ -69,7 +69,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         vm.prank(SETTLEMENT_LAYER_RELAY_SENDER);
         vm.mockCall(
             L2_CHAIN_ASSET_HANDLER_ADDR,
-            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
+            abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
             abi.encode(1)
         );
         BalanceChange memory balanceChange = BalanceChange({

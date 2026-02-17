@@ -18,7 +18,7 @@ struct MigrationInterval {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IChainAssetHandler is IAssetHandler {
+interface IChainAssetHandlerBase is IAssetHandler {
     /// @notice Emitted when the bridging to the chain is started.
     /// @param chainId Chain ID of the ZK chain
     /// @param migrationNumber The migration number for this migration.
