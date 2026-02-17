@@ -13,29 +13,25 @@ import {L2_BASE_TOKEN_HOLDER, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../
  * @custom:security-contact security@matterlabs.dev
  * @notice Abstract base contract for L2 Base Token implementations.
  * @dev This contract contains the shared withdrawal logic for both Era and ZK OS versions.
- * @dev Storage variables are declared here to ensure both Era and ZK OS implementations
- * @dev share the same storage layout, allowing future shared fields to be added safely.
+ * @dev Storage variables are declared here to ensure both Era and ZK OS implementations share the same storage layout, allowing future shared fields to be added safely.
  */
 abstract contract L2BaseTokenBase is IL2BaseTokenBase {
     /// @notice The L1Messenger contract for sending messages to L1
     IL2ToL1Messenger internal constant L1_MESSENGER = IL2ToL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR);
 
     /// @notice The balances of the users.
-    /// @dev Only used by the Era implementation. Declared here for storage layout alignment.
+    /// @dev Only used by the Era implementation. Declared in the base contract so that L2BaseTokenEra and L2BaseTokenZKOS share the same storage layout.
     mapping(address account => uint256 balance) internal eraAccountBalance;
 
     /// @notice Deprecated: The old storage variable for total supply.
-    /// @dev This variable is kept to preserve storage layout. It is only read during the V31 upgrade
-    /// @dev to initialize the BaseTokenHolder balance correctly. After V31, totalSupply is computed
-    /// @dev dynamically from the BaseTokenHolder's balance.
-    /// @dev Only used by the Era implementation. Declared here for storage layout alignment.
+    /// @dev Only read during the V31 upgrade to initialize the BaseTokenHolder balance correctly. After V31, totalSupply is computed dynamically from the BaseTokenHolder's balance.
+    /// @dev Only used by the Era implementation. Declared in the base contract so that L2BaseTokenEra and L2BaseTokenZKOS share the same storage layout.
     // slither-disable-next-line uninitialized-state
     uint256 internal __DEPRECATED_totalSupply;
 
-    /// @notice The pre-V31 total supply for ZKOS chains, set by chain admin during V31 upgrade.
-    /// @dev Only used by the ZKOS implementation. Declared here for storage layout alignment.
-    /// @dev On ZKOS chains, pre-V31 total supply was never tracked on-chain. This value is set
-    /// @dev during the V31 upgrade so that totalSupply() can be computed correctly.
+    /// @notice The pre-V31 total supply for ZKOS chains, set by chain admin via service transaction.
+    /// @dev On ZKOS chains, pre-V31 total supply was never tracked on-chain. This value is set after the V31 upgrade so that totalSupply() can be computed correctly.
+    /// @dev Only used by the ZKOS implementation. Declared in the base contract so that L2BaseTokenEra and L2BaseTokenZKOS share the same storage layout.
     // slither-disable-next-line uninitialized-state
     uint256 internal _zkosPreV31TotalSupply;
 

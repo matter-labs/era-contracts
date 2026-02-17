@@ -50,8 +50,7 @@ contract L2BaseTokenZKOS is L2BaseTokenBase, IL2BaseTokenZKOS {
     }
 
     /// @notice Initializes the BaseTokenHolder's balance during genesis or V31 upgrade.
-    /// @dev This function mints 2^127 - 1 tokens to this contract via the mint hook,
-    /// @dev then transfers all tokens to BaseTokenHolder.
+    /// @dev This function mints 2^127 - 1 tokens to this contract via the mint hook, then transfers all tokens to BaseTokenHolder.
     /// @dev Can only be called by the ComplexUpgrader contract.
     function initializeBaseTokenHolderBalance() external {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
