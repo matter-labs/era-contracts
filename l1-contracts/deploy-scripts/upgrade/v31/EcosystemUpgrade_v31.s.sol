@@ -71,9 +71,8 @@ contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
         coreOutputPath = string.concat(root, _coreOutputPath);
         ctmOutputPath = string.concat(root, _ctmOutputPath);
 
-        // Create v31 core upgrade and prepare permanent values BEFORE initialization
+        // Create v31 core upgrade
         coreUpgrade = createCoreUpgrade();
-        // CoreUpgrade_v31(address(coreUpgrade)).preparePermanentValues();
         coreUpgrade.initialize(permanentValuesInputPath, upgradeInputPath, _coreOutputPath);
         _coreInitialized = true;
 

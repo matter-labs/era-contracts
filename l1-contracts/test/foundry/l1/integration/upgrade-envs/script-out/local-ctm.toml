@@ -6,10 +6,10 @@ chain_upgrade_diamond_cut = "0x0000000000000000000000000000000000000000000000000
 deployer_addr = "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496"
 diamond_proxy_addr = "0xc337074a9D72C7CB256Ff1a622dE3A3A0E2c45bD"
 era_chain_id = 9
-governance_addr = "0xEd040bdF0f355680A0994bE62dc5E0C37DB14F67"
+governance_addr = "0x810D449117d5E92e3F6B589a90277d59f0120F11"
 is_zk_sync_os = false
 l1_chain_id = 31337
-multicall3_addr = "0xF1113a33864Ce52baca93c4FffA79082509528cF"
+multicall3_addr = "0x962BD50403f6C3fe555f4585114296753c84c651"
 owner_address = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
 
 [chain]
@@ -37,9 +37,9 @@ old_protocol_version = 133143986176
 [deployed_addresses]
 access_control_restriction_addr = "0x0000000000000000000000000000000000000000"
 avail_l1_da_validator_addr = "0x7aD5989A2689D5fBF7e5EFa66d1367Da262DdA9C"
-chain_admin = "0xe670b3ba34c5022D8915aA524825407Faaab7856"
-governance_addr = "0xEd040bdF0f355680A0994bE62dc5E0C37DB14F67"
-l1_governance_upgrade_timer = "0xaE0CFC65B3435C47115c30a08f8f8422851bf260"
+chain_admin = "0xe0419B7454B1902675e447b1bf08A1b0CE05D673"
+governance_addr = "0x810D449117d5E92e3F6B589a90277d59f0120F11"
+l1_governance_upgrade_timer = "0xE11aCc123f68386b41CBC559c1b3522653deAF2e"
 l1_rollup_da_manager = "0x0000000000000000000000000000000000000000"
 native_token_vault_addr = "0xd9be29DB5a70A0D141f7F9F72f4cfE504AEF8d9F"
 no_da_validium_l1_validator_addr = "0x2875459A9697A646BEb5676d95D10489424C8aF3"
@@ -100,7 +100,7 @@ verifier_addr = "0xbFA6563AA6123CE2aa7A12C43F1dde6037903552"
 verifier_fflonk_addr = "0xb3f1E53f1DAa70dC824eB9CDC52dd2542726444b"
 
 [tokens.DAI]
-address = "0xa9ed5Fe77D39807e38F94a8F3161ef64438f18DF"
+address = "0x3e8fA85969fDEb3d93702E7f16B8595AB91A6CD1"
 decimals = 18
 implementation = "TestnetERC20Token.sol"
 mint = "0x2540be400"
@@ -108,7 +108,7 @@ name = "DAI"
 symbol = "DAI"
 
 [tokens.USDC]
-address = "0xA7737418434B98bEB558742988eC23cAB90C7DF9"
+address = "0x0110c9c89bc4f39e1577ddDE45202Bc2F5c3Ed40"
 decimals = 18
 implementation = "TestnetERC20Token.sol"
 mint = "0x2540be400"

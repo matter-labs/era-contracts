@@ -24,6 +24,7 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractA
 import {EmptyToken, TokenAlreadyInBridgedTokensList} from "../L1BridgeContractErrors.sol";
 import {AddressMismatch, AmountMustBeGreaterThanZero, AssetIdAlreadyRegistered, AssetIdMismatch, BurningNativeWETHNotSupported, DeployingBridgedTokenForNativeToken, EmptyDeposit, NonEmptyMsgValue, TokenNotLegacy, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
+import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 
 /// @author Matter Labs
@@ -33,6 +34,7 @@ import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 abstract contract NativeTokenVaultBase is
     INativeTokenVaultBase,
     IAssetHandler,
+    ReentrancyGuard,
     Ownable2StepUpgradeable,
     PausableUpgradeable,
     AssetHandlerModifiers
@@ -291,7 +293,7 @@ abstract contract NativeTokenVaultBase is
     function _decodeBurnAndCheckAssetId(
         bytes calldata _data,
         bytes32 _suppliedAssetId
-    ) internal returns (uint256 amount, address receiver, address parsedTokenAddress) {
+    ) internal view returns (uint256 amount, address receiver, address parsedTokenAddress) {
         (amount, receiver, parsedTokenAddress) = DataEncoding.decodeBridgeBurnData(_data);
 
         if (parsedTokenAddress == address(0)) {

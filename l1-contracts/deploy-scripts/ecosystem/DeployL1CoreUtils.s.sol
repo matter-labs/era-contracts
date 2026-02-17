@@ -92,9 +92,7 @@ contract DeployL1CoreUtils is DeployUtils {
         string memory contractName,
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "ChainRegistrar")) {
-            return abi.encode();
-        } else if (compareStrings(contractName, "ProxyAdmin")) {
+        if (compareStrings(contractName, "ProxyAdmin")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ChainRegistrationSender")) {
             return abi.encode(coreAddresses.bridgehub.proxies.bridgehub);

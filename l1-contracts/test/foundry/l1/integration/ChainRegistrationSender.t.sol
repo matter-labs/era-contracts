@@ -19,7 +19,7 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/co
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 
 contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {

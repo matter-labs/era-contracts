@@ -6,7 +6,7 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {CTMNotRegistered, CTMAlreadyRegistered, ZeroAddress, ChainIdNotRegistered, AssetIdAlreadyRegistered, AssetHandlerNotRegistered, Unauthorized, NoCTMForAssetId} from "contracts/common/L1ContractErrors.sol";
 import {NotChainAssetHandler, AlreadyCurrentSL} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {TokenBridgingData} from "contracts/common/Messaging.sol";
@@ -227,7 +227,7 @@ contract BridgehubBase_Extended_Test is Test {
         bridgehub.setAddresses(
             assetRouter,
             ICTMDeploymentTracker(l1CtmDeployer),
-            IMessageRoot(messageRootAddr),
+            IMessageRootBase(messageRootAddr),
             chainAssetHandler,
             chainRegistrationSender
         );
@@ -252,7 +252,7 @@ contract BridgehubBase_Extended_Test is Test {
         bridgehub.setAddresses(
             assetRouter,
             ICTMDeploymentTracker(address(0)),
-            IMessageRoot(address(0)),
+            IMessageRootBase(address(0)),
             chainAssetHandler,
             address(0)
         );
@@ -283,7 +283,7 @@ contract BridgehubBase_Extended_Test is Test {
         bridgehub.setAddresses(
             assetRouter,
             ICTMDeploymentTracker(address(0)),
-            IMessageRoot(address(0)),
+            IMessageRootBase(address(0)),
             chainAssetHandler,
             address(0)
         );
@@ -313,7 +313,7 @@ contract BridgehubBase_Extended_Test is Test {
         bridgehub.setAddresses(
             assetRouter,
             ICTMDeploymentTracker(l1CtmDeployer),
-            IMessageRoot(address(0)),
+            IMessageRootBase(address(0)),
             chainAssetHandler,
             address(0)
         );
@@ -359,7 +359,7 @@ contract BridgehubBase_Extended_Test is Test {
         bridgehub.setAddresses(
             assetRouter,
             ICTMDeploymentTracker(address(0)),
-            IMessageRoot(address(0)),
+            IMessageRootBase(address(0)),
             chainAssetHandler,
             address(0)
         );
