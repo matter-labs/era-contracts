@@ -280,7 +280,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         bool _executeAllCalls,
         CallStatus[] memory _providedCallStatus
     ) internal {
-        /// We send the fact of call execuction to L1 so that the GWAssetTracker can process the chainBalance changes.
+        /// We send the fact of call execution to L1 so that the GWAssetTracker can process the chainBalance changes.
         require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
 
         uint256 callsLength = _interopBundle.calls.length;
