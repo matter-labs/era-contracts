@@ -140,7 +140,7 @@ contract EraMultisigValidatorTest is Test {
                 new TransparentUpgradeableProxy(
                     address(impl),
                     address(admin),
-                    abi.encodeCall(EraMultisigValidator.initializeV2, (_owner, _delay, _validatorTimelock))
+                    abi.encodeCall(EraMultisigValidator.initialize, (_owner, _delay, _validatorTimelock))
                 )
             );
     }
@@ -158,20 +158,20 @@ contract EraMultisigValidatorTest is Test {
     //                      INITIALIZATION
     // ═══════════════════════════════════════════════════════════════════
 
-    function test_initializeV2_setsOwner() public view {
+    function test_initialize_setsOwner() public view {
         assertEq(eraMultisig.owner(), owner);
     }
 
-    function test_initializeV2_setsValidatorTimelock() public view {
+    function test_initialize_setsValidatorTimelock() public view {
         assertEq(eraMultisig.validatorTimelock(), address(validatorTimelock));
     }
 
-    function test_initializeV2_revertsOnDoubleInit() public {
+    function test_initialize_revertsOnDoubleInit() public {
         vm.expectRevert();
-        eraMultisig.initializeV2(owner, executionDelay, address(validatorTimelock));
+        eraMultisig.initialize(owner, executionDelay, address(validatorTimelock));
     }
 
-    function test_initializeV2_revertsIfTimelockHasNoCode() public {
+    function test_initialize_revertsIfTimelockHasNoCode() public {
         address eoa = makeAddr("eoa");
         ProxyAdmin admin = new ProxyAdmin();
         EraMultisigValidator impl = new EraMultisigValidator(address(dummyBridgehub));
@@ -179,13 +179,8 @@ contract EraMultisigValidatorTest is Test {
         new TransparentUpgradeableProxy(
             address(impl),
             address(admin),
-            abi.encodeCall(EraMultisigValidator.initializeV2, (owner, executionDelay, eoa))
+            abi.encodeCall(EraMultisigValidator.initialize, (owner, executionDelay, eoa))
         );
-    }
-
-    function test_reinitializeV2_revertsIfAlreadyInitialized() public {
-        vm.expectRevert();
-        eraMultisig.reinitializeV2(address(validatorTimelock));
     }
 
     // ═══════════════════════════════════════════════════════════════════

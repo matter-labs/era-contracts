@@ -48,17 +48,12 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
     }
 
     /// @inheritdoc IEraMultisigValidator
-    function initializeV2(
+    function initialize(
         address _initialOwner,
         uint32 _initialExecutionDelay,
         address _validatorTimelock
-    ) external reinitializer(2) {
+    ) external override initializer {
         _validatorTimelockInit(_initialOwner, _initialExecutionDelay);
-        _initializeEraMultisig(_validatorTimelock);
-    }
-
-    /// @inheritdoc IEraMultisigValidator
-    function reinitializeV2(address _validatorTimelock) external reinitializer(2) {
         _initializeEraMultisig(_validatorTimelock);
     }
 
