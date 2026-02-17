@@ -10,7 +10,7 @@ import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {L1DAValidatorAddressIsZero, NotL1, PriorityModeAlreadyAllowed} from "../../L1StateTransitionErrors.sol";
+import {L1DAValidatorAddressIsZero, NotL1, NotZKsyncOS, PriorityModeAlreadyAllowed} from "../../L1StateTransitionErrors.sol";
 import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, FeeParamsChangeTooLarge, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, PriorityModeActivationTooEarly, PriorityModeIsNotAllowed, PriorityModeRequiresPermanentRollup, PriorityOpsRequestTimestampMissing, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TokenMultiplierChangeTooFrequent, TooMuchGas, Unauthorized, NotCompatibleWithPriorityMode} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
@@ -385,7 +385,12 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setZkosPreV31TotalSupply(uint256 _totalSupply) external onlyAdmin onlyL1 returns (bytes32 canonicalTxHash) {
+    function setZkosPreV31TotalSupply(
+        uint256 _totalSupply
+    ) external onlyAdmin onlyL1 returns (bytes32 canonicalTxHash) {
+        if (!s.zksyncOS) {
+            revert NotZKsyncOS();
+        }
         canonicalTxHash = IMailbox(address(this)).requestL2ServiceTransaction(
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
             abi.encodeCall(IL2BaseTokenZKOS.setZkosPreV31TotalSupply, (_totalSupply))
