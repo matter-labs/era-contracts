@@ -250,10 +250,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
 
         emit AddedChain(_chainId, cachedChainCount);
 
-        // Emit NewInteropRoot event and update historicalRoot to maintain consistency with other shared tree updates
-        bytes32[] memory _sides = new bytes32[](1);
-        _sides[0] = sharedTreeRoot;
-        emit NewInteropRoot(block.chainid, block.number, 0, _sides);
+        _emitRoot(sharedTreeRoot);
         historicalRoot[block.number] = sharedTreeRoot;
     }
 
