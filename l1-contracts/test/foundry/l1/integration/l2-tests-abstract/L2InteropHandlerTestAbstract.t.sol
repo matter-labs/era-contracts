@@ -489,10 +489,9 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         );
     }
 
-    /// @notice Test that verifyBundle correctly reverts with NotInGatewayMode when settling on L1
-    /// @dev This test verifies the access to currentSettlementLayerChainId works but the
-    ///      business logic correctly rejects verification when not in gateway mode
-    function test_regression_verifyBundleRevertsWhenSettlingOnL1() public {
+    /// @notice Test that executeBundle correctly reverts with NotInGatewayMode when settling on L1
+    /// @dev This ensures the gateway-mode check is enforced before executing calls
+    function test_regression_executeBundleRevertsWhenSettlingOnL1() public {
         // Set the L1_CHAIN_ID storage variable in InteropHandler
         // (The test setup doesn't call initL2, so L1_CHAIN_ID is uninitialized at slot 0)
         vm.store(L2_INTEROP_HANDLER_ADDR, bytes32(0), bytes32(uint256(L1_CHAIN_ID)));
@@ -517,9 +516,50 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         );
 
         // The call to currentSettlementLayerChainId should succeed (access control fixed),
-        // but the function should revert with NotInGatewayMode because we're settling on L1
+        // but executeBundle should revert with NotInGatewayMode because we're settling on L1
         vm.expectRevert(NotInGatewayMode.selector);
+        vm.prank(EXECUTION_ADDRESS);
+        L2_INTEROP_HANDLER.executeBundle(bundle, proof);
+    }
+
+    /// @notice Test that unbundleBundle correctly reverts with NotInGatewayMode when settling on L1
+    /// @dev This ensures the gateway-mode check is enforced before executing unbundled calls
+    function test_regression_unbundleBundleRevertsWhenSettlingOnL1() public {
+        // Set the L1_CHAIN_ID storage variable in InteropHandler
+        // (The test setup doesn't call initL2, so L1_CHAIN_ID is uninitialized at slot 0)
+        vm.store(L2_INTEROP_HANDLER_ADDR, bytes32(0), bytes32(uint256(L1_CHAIN_ID)));
+
+        InteropBundle memory interopBundle = getInteropBundle(1);
+        bytes memory bundle = abi.encode(interopBundle);
+        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
+
+        // Mock message verification to return true
+        vm.mockCall(
+            address(L2_MESSAGE_VERIFICATION),
+            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
+            abi.encode(true)
+        );
+
+        // Mock currentSettlementLayerChainId to return L1_CHAIN_ID (not in gateway mode)
+        // This simulates the chain settling directly on L1
+        vm.mockCall(
+            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
+            abi.encode(L1_CHAIN_ID)
+        );
+
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
+
+        CallStatus[] memory callStatuses = new CallStatus[](3);
+        callStatuses[0] = CallStatus.Unprocessed;
+        callStatuses[1] = CallStatus.Cancelled;
+        callStatuses[2] = CallStatus.Executed;
+
+        // The call to currentSettlementLayerChainId should succeed (access control fixed),
+        // but unbundleBundle should revert with NotInGatewayMode because we're settling on L1
+        vm.expectRevert(NotInGatewayMode.selector);
+        vm.prank(UNBUNDLER_ADDRESS);
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(proof.chainId, bundle, callStatuses);
     }
 
     /// @notice Test that executeBundle works in gateway mode by accessing currentSettlementLayerChainId

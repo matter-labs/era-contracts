@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/console2.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 
-import {BalanceChange, TokenBalanceMigrationData, L2Log, TxStatus, InteropBundle, InteropCall} from "contracts/common/Messaging.sol";
+import {BalanceChange, TokenBalanceMigrationData, L2Log, TxStatus, InteropBundle, InteropCall, BundleAttributes, BUNDLE_IDENTIFIER, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION} from "contracts/common/Messaging.sol";
 import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_HANDLER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_COMPRESSOR_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER, MAX_BUILT_IN_CONTRACT_ADDR, L2_INTEROP_CENTER_ADDR as INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
@@ -24,6 +24,7 @@ import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExe
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
+import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 
 import {L2_TO_L1_LOGS_MERKLE_TREE_DEPTH, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH} from "contracts/common/Config.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
@@ -95,6 +96,88 @@ contract GWAssetTrackerExtendedTest is Test {
 
         tree.extendUntilEnd();
         return tree.root();
+    }
+
+    function _buildInteropPerCallInput(
+        uint256 _call0Value,
+        uint256 _call1Value,
+        uint256 _callIndex,
+        bool _includeCenter
+    ) internal returns (ProcessLogsInput memory input, bytes32 chainBatchRoot) {
+        InteropCall[] memory calls = new InteropCall[](2);
+        calls[0] = InteropCall({
+            version: INTEROP_CALL_VERSION,
+            shadowAccount: false,
+            to: address(0x1111),
+            from: address(0x2222),
+            value: _call0Value,
+            data: ""
+        });
+        calls[1] = InteropCall({
+            version: INTEROP_CALL_VERSION,
+            shadowAccount: false,
+            to: address(0x3333),
+            from: address(0x4444),
+            value: _call1Value,
+            data: ""
+        });
+
+        InteropBundle memory bundle = InteropBundle({
+            version: INTEROP_BUNDLE_VERSION,
+            sourceChainId: CHAIN_ID,
+            destinationChainId: CHAIN_ID,
+            interopBundleSalt: keccak256("bundleSalt"),
+            calls: calls,
+            bundleAttributes: BundleAttributes({executionAddress: "", unbundlerAddress: ""})
+        });
+
+        bytes memory bundleBytes = abi.encode(bundle);
+        bytes memory interopCenterMessage = bytes.concat(BUNDLE_IDENTIFIER, bundleBytes);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(CHAIN_ID, bundleBytes);
+        bytes memory interopHandlerMessage = abi.encodePacked(
+            IInteropHandler.executeBundle.selector,
+            bundleHash,
+            bytes32(_callIndex)
+        );
+
+        uint256 logsLength = _includeCenter ? 2 : 1;
+        L2Log[] memory logs = new L2Log[](logsLength);
+        bytes[] memory messages = new bytes[](logsLength);
+        if (_includeCenter) {
+            logs[0] = L2Log({
+                l2ShardId: 0,
+                isService: true,
+                txNumberInBatch: 0,
+                sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+                key: bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR))),
+                value: keccak256(interopCenterMessage)
+            });
+            messages[0] = interopCenterMessage;
+        }
+
+        uint256 handlerIndex = _includeCenter ? 1 : 0;
+        logs[handlerIndex] = L2Log({
+            l2ShardId: 0,
+            isService: true,
+            txNumberInBatch: 0,
+            sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            key: bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR))),
+            value: keccak256(interopHandlerMessage)
+        });
+        messages[handlerIndex] = interopHandlerMessage;
+
+        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 logsRoot = _buildLogsMerkleRoot(logs);
+        chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+
+        input = ProcessLogsInput({
+            chainId: CHAIN_ID,
+            batchNumber: 1,
+            logs: logs,
+            messages: messages,
+            chainBatchRoot: chainBatchRoot,
+            messageRoot: emptyMessageRoot
+        });
     }
 
     // Test onlyChain modifier - unauthorized case (line 78)
@@ -271,7 +354,7 @@ contract GWAssetTrackerExtendedTest is Test {
     function test_ProcessLogsAndMessages_InteropHandler() public {
         // First, set up an interop balance change
         bytes32 bundleHash = keccak256("bundleHash");
-        bytes memory message = abi.encodePacked(IInteropHandler.verifyBundle.selector, bundleHash);
+        bytes memory message = abi.encodePacked(IInteropHandler.executeBundle.selector, bundleHash, bytes32(uint256(0)));
 
         L2Log[] memory logs = new L2Log[](1);
         logs[0] = L2Log({
@@ -323,6 +406,106 @@ contract GWAssetTrackerExtendedTest is Test {
         vm.prank(mockZKChain);
         vm.expectRevert(abi.encodeWithSelector(InvalidInteropBalanceChange.selector, bundleHash));
         gwAssetTracker.processLogsAndMessages(input);
+    }
+
+    function test_ProcessLogsAndMessages_InteropHandler_PerCall() public {
+        gwAssetTracker.setChainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID, 1000);
+        uint256 call0Value = 100;
+        uint256 call1Value = 200;
+        (ProcessLogsInput memory input, bytes32 chainBatchRoot) = _buildInteropPerCallInput(
+            call0Value,
+            call1Value,
+            1,
+            true
+        );
+
+        // Mock getZKChain
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, CHAIN_ID),
+            abi.encode(mockZKChain)
+        );
+
+        // Mock base token asset ID
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, CHAIN_ID),
+            abi.encode(BASE_TOKEN_ASSET_ID)
+        );
+
+        // Mock message root addChainBatchRoot
+        vm.mockCall(
+            L2_MESSAGE_ROOT_ADDR,
+            abi.encodeWithSignature("addChainBatchRoot(uint256,uint256,bytes32)", CHAIN_ID, 1, chainBatchRoot),
+            abi.encode()
+        );
+
+        uint256 balanceBefore = gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID);
+
+        vm.prank(mockZKChain);
+        gwAssetTracker.processLogsAndMessages(input);
+
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), balanceBefore - call0Value);
+    }
+
+    function test_ProcessLogsAndMessages_InteropHandler_PerCall_TwoSteps() public {
+        gwAssetTracker.setChainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID, 1000);
+        uint256 call0Value = 100;
+        uint256 call1Value = 200;
+
+        (ProcessLogsInput memory inputFirst, bytes32 chainBatchRootFirst) = _buildInteropPerCallInput(
+            call0Value,
+            call1Value,
+            0,
+            true
+        );
+
+        // Mock getZKChain
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, CHAIN_ID),
+            abi.encode(mockZKChain)
+        );
+
+        // Mock base token asset ID
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, CHAIN_ID),
+            abi.encode(BASE_TOKEN_ASSET_ID)
+        );
+
+        // Mock message root addChainBatchRoot for first tx
+        vm.mockCall(
+            L2_MESSAGE_ROOT_ADDR,
+            abi.encodeWithSignature("addChainBatchRoot(uint256,uint256,bytes32)", CHAIN_ID, 1, chainBatchRootFirst),
+            abi.encode()
+        );
+
+        uint256 balanceBefore = gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID);
+
+        vm.prank(mockZKChain);
+        gwAssetTracker.processLogsAndMessages(inputFirst);
+
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), balanceBefore - call1Value);
+
+        (ProcessLogsInput memory inputSecond, bytes32 chainBatchRootSecond) = _buildInteropPerCallInput(
+            call0Value,
+            call1Value,
+            1,
+            false
+        );
+
+        // Mock message root addChainBatchRoot for second tx
+        vm.mockCall(
+            L2_MESSAGE_ROOT_ADDR,
+            abi.encodeWithSignature("addChainBatchRoot(uint256,uint256,bytes32)", CHAIN_ID, 1, chainBatchRootSecond),
+            abi.encode()
+        );
+
+        vm.prank(mockZKChain);
+        gwAssetTracker.processLogsAndMessages(inputSecond);
+
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), balanceBefore);
     }
 
     // Test processLogsAndMessages with base token system contract message (lines 233, 510, 516-517, 521)
