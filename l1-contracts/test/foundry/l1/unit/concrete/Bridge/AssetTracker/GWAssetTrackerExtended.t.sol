@@ -354,7 +354,11 @@ contract GWAssetTrackerExtendedTest is Test {
     function test_ProcessLogsAndMessages_InteropHandler() public {
         // First, set up an interop balance change
         bytes32 bundleHash = keccak256("bundleHash");
-        bytes memory message = abi.encodePacked(IInteropHandler.executeBundle.selector, bundleHash, bytes32(uint256(0)));
+        bytes memory message = abi.encodePacked(
+            IInteropHandler.executeBundle.selector,
+            bundleHash,
+            bytes32(uint256(0))
+        );
 
         L2Log[] memory logs = new L2Log[](1);
         logs[0] = L2Log({
