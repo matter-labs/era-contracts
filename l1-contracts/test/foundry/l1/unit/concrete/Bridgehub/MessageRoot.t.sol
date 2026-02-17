@@ -174,8 +174,10 @@ contract MessageRootTest is Test {
         vm.prank(L2_BRIDGEHUB_ADDR);
         l2MessageRoot.addNewChain(alphaChainId, 0);
 
-        // Verify totalPublishedInteropRoots is 0 before adding batch root
-        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 0, "totalPublishedInteropRoots should be 0 before");
+        // totalPublishedInteropRoots accounts for _emitRoot calls in _addNewChain:
+        // initL2 adds block.chainid (1), addNewChain(L1_CHAIN_ID) (2), addNewChain(alphaChainId) (3)
+        uint256 countBefore = l2MessageRoot.totalPublishedInteropRoots();
+        assertEq(countBefore, 3, "totalPublishedInteropRoots should be 3 after chain additions");
 
         vm.prank(alphaChainSender);
         vm.expectEmit(true, false, false, false);
@@ -185,7 +187,11 @@ contract MessageRootTest is Test {
         l2MessageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
 
         // Verify totalPublishedInteropRoots incremented after addChainBatchRoot
-        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 1, "totalPublishedInteropRoots should be 1 after");
+        assertEq(
+            l2MessageRoot.totalPublishedInteropRoots(),
+            countBefore + 1,
+            "totalPublishedInteropRoots should increment by 1"
+        );
     }
 
     function test_updateFullTree() public {
@@ -219,8 +225,10 @@ contract MessageRootTest is Test {
         l2MessageRoot.addNewChain(alphaChainId, 0);
         vm.chainId(gatewayChainId);
 
-        // Verify totalPublishedInteropRoots before adding batch root
-        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 0, "totalPublishedInteropRoots should be 0 before");
+        // totalPublishedInteropRoots accounts for _emitRoot calls in _addNewChain:
+        // initL2 adds block.chainid (1), addNewChain(alphaChainId) (2)
+        uint256 countBefore = l2MessageRoot.totalPublishedInteropRoots();
+        assertEq(countBefore, 2, "totalPublishedInteropRoots should be 2 after chain additions");
 
         vm.prank(GW_ASSET_TRACKER_ADDR);
         l2MessageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
@@ -228,8 +236,8 @@ contract MessageRootTest is Test {
         // Verify totalPublishedInteropRoots after adding batch root (L2MessageRoot.addChainBatchRoot calls _emitRoot)
         assertEq(
             l2MessageRoot.totalPublishedInteropRoots(),
-            1,
-            "totalPublishedInteropRoots should be 1 after addChainBatchRoot"
+            countBefore + 1,
+            "totalPublishedInteropRoots should increment by 1 after addChainBatchRoot"
         );
 
         l2MessageRoot.updateFullTree();
@@ -237,8 +245,8 @@ contract MessageRootTest is Test {
         // Verify totalPublishedInteropRoots after updateFullTree
         assertEq(
             l2MessageRoot.totalPublishedInteropRoots(),
-            2,
-            "totalPublishedInteropRoots should be 2 after updateFullTree"
+            countBefore + 2,
+            "totalPublishedInteropRoots should increment by 2 after updateFullTree"
         );
 
         assertEq(l2MessageRoot.getAggregatedRoot(), 0x0ef1ac67d77f177a33449c47a8f05f0283300a81adca6f063c92c774beed140c);
