@@ -350,6 +350,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(_chainId, _message[1:]);
         interopBalanceChange[interopBundle.destinationChainId][bundleHash].version = INTEROP_BALANCE_CHANGE_VERSION;
 
+        bytes32 destinationChainBaseTokenAssetId = _bridgehub().baseTokenAssetId(interopBundle.destinationChainId);
         uint256 totalBaseTokenAmount = 0;
 
         uint256 interopBundleCallsLength = interopBundle.calls.length;
@@ -357,24 +358,21 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         for (uint256 callCount = 0; callCount < interopBundleCallsLength; ++callCount) {
             InteropCall memory interopCall = interopBundle.calls[callCount];
 
-            if (interopCall.value > 0) {
-                totalBaseTokenAmount += interopCall.value;
-            }
+            totalBaseTokenAmount += interopCall.value;
 
-            // e.g. for direct calls we just skip
             if (interopCall.from != L2_ASSET_ROUTER_ADDR) {
-                continue;
+                AssetBalanceChange memory change;
+                change.baseTokenAmount = interopCall.value;
+                interopBalanceChange[interopBundle.destinationChainId][bundleHash].assetBalanceChanges.push(change);
+            } else {
+                if (bytes4(interopCall.data) != AssetRouterBase.finalizeDeposit.selector) {
+                    revert InvalidInteropCalldata(bytes4(interopCall.data));
+                }
+                // solhint-disable-next-line
+                _processInteropCall(_chainId, bundleHash, interopCall, interopBundle.destinationChainId);
             }
-
-            if (bytes4(interopCall.data) != AssetRouterBase.finalizeDeposit.selector) {
-                revert InvalidInteropCalldata(bytes4(interopCall.data));
-            }
-            // solhint-disable-next-line
-            _processInteropCall(_chainId, bundleHash, interopCall, interopBundle.destinationChainId);
         }
-        bytes32 destinationChainBaseTokenAssetId = _bridgehub().baseTokenAssetId(interopBundle.destinationChainId);
         _decreaseChainBalance(_chainId, destinationChainBaseTokenAssetId, totalBaseTokenAmount);
-        interopBalanceChange[interopBundle.destinationChainId][bundleHash].baseTokenAmount = totalBaseTokenAmount;
     }
 
     function _processInteropCall(
@@ -390,7 +388,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         // solhint-disable-next-line func-named-parameters
         uint256 amount = _handleAssetRouterMessageInner(_chainId, _destinationChainId, assetId, transferData, true);
 
-        AssetBalanceChange memory change = AssetBalanceChange({assetId: assetId, amount: amount});
+        AssetBalanceChange memory change = AssetBalanceChange({
+            assetId: assetId,
+            amount: amount,
+            baseTokenAmount: _interopCall.value
+        });
         interopBalanceChange[_destinationChainId][_bundleHash].assetBalanceChanges.push(change);
     }
 
@@ -400,36 +402,33 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes32 _baseTokenAssetId
     ) internal {
         bytes4 functionSelector = bytes4(_message[0:4]);
-        require(functionSelector == IInteropHandler.verifyBundle.selector, InvalidFunctionSignature(functionSelector));
+        require(functionSelector == IInteropHandler.executeBundle.selector, InvalidFunctionSignature(functionSelector));
         bytes32 bundleHash = bytes32(_message[4:36]);
+        uint256 callIndex = uint256(bytes32(_message[36:68]));
 
         InteropBalanceChange memory receivedInteropBalanceChange = interopBalanceChange[_chainId][bundleHash];
         require(
             receivedInteropBalanceChange.version == INTEROP_BALANCE_CHANGE_VERSION,
             InvalidInteropBalanceChange(bundleHash)
         );
-        interopBalanceChange[_chainId][bundleHash].version = 0;
 
-        uint256 length = receivedInteropBalanceChange.assetBalanceChanges.length;
         uint256 chainMigrationNumber = _getChainMigrationNumber(_chainId);
-        for (uint256 i = 0; i < length; ++i) {
-            uint256 amount = receivedInteropBalanceChange.assetBalanceChanges[i].amount;
-            interopBalanceChange[_chainId][bundleHash].assetBalanceChanges[i].assetId = bytes32(0);
-            interopBalanceChange[_chainId][bundleHash].assetBalanceChanges[i].amount = 0;
+        uint256 amount = receivedInteropBalanceChange.assetBalanceChanges[callIndex].amount;
+        uint256 baseTokenAmount = receivedInteropBalanceChange.assetBalanceChanges[callIndex].baseTokenAmount;
+        interopBalanceChange[_chainId][bundleHash].assetBalanceChanges[callIndex].assetId = bytes32(0);
+        interopBalanceChange[_chainId][bundleHash].assetBalanceChanges[callIndex].amount = 0;
+        interopBalanceChange[_chainId][bundleHash].assetBalanceChanges[callIndex].baseTokenAmount = 0;
+        if (amount > 0) {
             _increaseAndSaveChainBalance(
                 _chainId,
-                receivedInteropBalanceChange.assetBalanceChanges[i].assetId,
+                receivedInteropBalanceChange.assetBalanceChanges[callIndex].assetId,
                 amount,
                 chainMigrationNumber
             );
         }
-        interopBalanceChange[_chainId][bundleHash].baseTokenAmount = 0;
-        _increaseAndSaveChainBalance(
-            _chainId,
-            _baseTokenAssetId,
-            receivedInteropBalanceChange.baseTokenAmount,
-            chainMigrationNumber
-        );
+        if (baseTokenAmount > 0) {
+            _increaseAndSaveChainBalance(_chainId, _baseTokenAssetId, baseTokenAmount, chainMigrationNumber);
+        }
     }
 
     /// @notice L2->L1 withdrawals go through the L2AssetRouter directly.

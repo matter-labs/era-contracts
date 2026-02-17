@@ -339,11 +339,11 @@ struct BalanceChange {
 struct AssetBalanceChange {
     bytes32 assetId;
     uint256 amount;
+    uint256 baseTokenAmount;
 }
 
 struct InteropBalanceChange {
     bytes1 version;
-    uint256 baseTokenAmount;
     AssetBalanceChange[] assetBalanceChanges;
 }
 

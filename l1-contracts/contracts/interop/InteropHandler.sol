@@ -280,6 +280,9 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         bool _executeAllCalls,
         CallStatus[] memory _providedCallStatus
     ) internal {
+        /// We send the fact of call execuction to L1 so that the GWAssetTracker can process the chainBalance changes.
+        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
+
         uint256 callsLength = _interopBundle.calls.length;
         for (uint256 i = 0; i < callsLength; ++i) {
             if (!_executeAllCalls) {
@@ -291,6 +294,11 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             }
             InteropCall memory interopCall = _interopBundle.calls[i];
             require(interopCall.version == INTEROP_CALL_VERSION, InvalidInteropCallVersion());
+
+            // slither-disable-next-line reentrancy-no-eth,unused-return
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+                bytes.concat(this.executeBundle.selector, _bundleHash, bytes32(i))
+            );
 
             if (interopCall.value > 0) {
                 L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(this), interopCall.value);
@@ -331,12 +339,6 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         require(isIncluded, MessageNotIncluded());
 
         bundleStatus[_bundleHash] = BundleStatus.Verified;
-
-        /// We send the fact of verification to L1 so that the GWAssetTracker can process the chainBalance changes.
-        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
-
-        // slither-disable-next-line reentrancy-no-eth,unused-return
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(this.verifyBundle.selector, _bundleHash));
 
         // Emit event stating that the bundle was verified.
         emit BundleVerified(_bundleHash);
