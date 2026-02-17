@@ -230,8 +230,7 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
     function testFuzz_regression_anyValidBatchNumberWorks(uint256 totalBatchesExecuted) public {
         // Skip invalid values
         vm.assume(totalBatchesExecuted > 0);
-        vm.assume(totalBatchesExecuted < type(uint256).max); // Prevent overflow in +1
-        vm.assume(totalBatchesExecuted != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE);
+        vm.assume(totalBatchesExecuted < V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE - 1);
 
         uint256[] memory chainIds = new uint256[](1);
         chainIds[0] = CHAIN_ID;

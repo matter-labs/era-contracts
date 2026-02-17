@@ -328,48 +328,6 @@ contract MessageRoot_Extended_Test is Test {
         assertEq(messageRoot.currentChainBatchNumber(chainId), 2);
     }
 
-    function test_UpdateFullTree() public {
-        uint256 chainId = 271;
-        address chainSender = makeAddr("chainSender");
-
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
-            abi.encode(chainSender)
-        );
-
-        // Mock the getSemverProtocolVersion call
-        vm.mockCall(
-            chainSender,
-            abi.encodeWithSelector(IGetters.getSemverProtocolVersion.selector),
-            abi.encode(0, 29, 0) // major, minor, patch
-        );
-
-        vm.prank(L2_BRIDGEHUB_ADDR);
-        l2MessageRoot.addNewChain(chainId, 0);
-
-        // Verify totalPublishedInteropRoots is 0 before any updates
-        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 0, "totalPublishedInteropRoots should be 0 before");
-
-        // Add a batch root
-        vm.prank(GW_ASSET_TRACKER_ADDR);
-        l2MessageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"));
-
-        // Update the full tree
-        l2MessageRoot.updateFullTree();
-
-        // Verify totalPublishedInteropRoots incremented after updateFullTree
-        assertEq(
-            l2MessageRoot.totalPublishedInteropRoots(),
-            2,
-            "totalPublishedInteropRoots should be 2 after updateFullTree"
-        );
-
-        // Verify the aggregated root is updated
-        bytes32 root = l2MessageRoot.getAggregatedRoot();
-        assertTrue(root != bytes32(0));
-    }
-
     function test_HistoricalRoot() public {
         uint256 chainId = 271;
         address chainSender = makeAddr("chainSender");

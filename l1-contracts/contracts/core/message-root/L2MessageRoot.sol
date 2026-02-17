@@ -129,19 +129,4 @@ contract L2MessageRoot is MessageRootBase {
 
         emit NewInteropRoot(block.chainid, block.number, currentCount, _sides);
     }
-
-    /// @notice This function is used to update the full tree with the latest batch roots of all chains.
-    /// @dev It is expected to be public.
-    /// FIXME: it is harmless, but why do we need it?
-    function updateFullTree() public {
-        uint256 cachedChainCount = chainCount;
-        bytes32[] memory newLeaves = new bytes32[](cachedChainCount);
-        for (uint256 i = 0; i < cachedChainCount; ++i) {
-            uint256 chainId = chainIndexToId[i];
-            newLeaves[i] = MessageHashing.chainIdLeafHash(chainTree[chainId].root(), chainId);
-        }
-        bytes32 newRoot = sharedTree.updateAllLeaves(newLeaves);
-        _emitRoot(newRoot);
-        historicalRoot[block.number] = newRoot;
-    }
 }

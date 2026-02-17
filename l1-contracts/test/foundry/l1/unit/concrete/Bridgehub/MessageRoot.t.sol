@@ -189,62 +189,6 @@ contract MessageRootTest is Test {
         assertEq(l2MessageRoot.totalPublishedInteropRoots(), 1, "totalPublishedInteropRoots should be 1 after");
     }
 
-    function test_updateFullTree() public {
-        address alphaChainSender = makeAddr("alphaChainSender");
-        uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
-        vm.mockCall(
-            address(bridgeHub),
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, alphaChainId),
-            abi.encode(alphaChainSender)
-        );
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, alphaChainId),
-            abi.encode(alphaChainSender)
-        );
-        vm.mockCall(
-            address(bridgeHub),
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(L2_CHAIN_ASSET_HANDLER_ADDR)
-        );
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(L2_CHAIN_ASSET_HANDLER_ADDR)
-        );
-        vm.prank(bridgeHub);
-        messageRoot.addNewChain(alphaChainId, 0);
-        vm.prank(alphaChainSender);
-        messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
-        vm.prank(L2_BRIDGEHUB_ADDR);
-        l2MessageRoot.addNewChain(alphaChainId, 0);
-        vm.chainId(gatewayChainId);
-
-        // Verify totalPublishedInteropRoots before adding batch root
-        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 0, "totalPublishedInteropRoots should be 0 before");
-
-        vm.prank(GW_ASSET_TRACKER_ADDR);
-        l2MessageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
-
-        // Verify totalPublishedInteropRoots after adding batch root (L2MessageRoot.addChainBatchRoot calls _emitRoot)
-        assertEq(
-            l2MessageRoot.totalPublishedInteropRoots(),
-            1,
-            "totalPublishedInteropRoots should be 1 after addChainBatchRoot"
-        );
-
-        l2MessageRoot.updateFullTree();
-
-        // Verify totalPublishedInteropRoots after updateFullTree
-        assertEq(
-            l2MessageRoot.totalPublishedInteropRoots(),
-            2,
-            "totalPublishedInteropRoots should be 2 after updateFullTree"
-        );
-
-        assertEq(l2MessageRoot.getAggregatedRoot(), 0x0ef1ac67d77f177a33449c47a8f05f0283300a81adca6f063c92c774beed140c);
-    }
-
     function test_addChainBatchRootWithRealData() public {
         address alphaChainSender = makeAddr("alphaChainSender");
         uint256 alphaChainId = 271; //uint256(uint160(makeAddr("alphaChainId")));

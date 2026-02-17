@@ -83,7 +83,7 @@ contract L1MessageRoot is MessageRootBase {
         uint256 totalBatchesExecuted = IGetters(msg.sender).getTotalBatchesExecuted();
         require(totalBatchesExecuted > 0, TotalBatchesExecutedZero());
         require(
-            totalBatchesExecuted != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE - 1,
+            totalBatchesExecuted < V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE - 1,
             TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber()
         );
         require(
