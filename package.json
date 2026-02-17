@@ -29,6 +29,7 @@
     "solhint": "^6.0.1"
   },
   "scripts": {
+    "build-all-contracts": "yarn install && yarn --cwd da-contracts build:foundry && yarn --cwd l1-contracts build:foundry && yarn --cwd l2-contracts build:foundry && yarn --cwd system-contracts build:foundry",
     "calculate-hashes:check": "ts-node scripts/calculate-hashes.ts --check-only",
     "calculate-hashes:fix": "ts-node scripts/calculate-hashes.ts",
     "calculate-hashes:rebuild-and-fix": "./recompute_hashes.sh",

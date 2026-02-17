@@ -233,7 +233,8 @@ library AddressIntrospector {
                 serverNotifier: ctm.serverNotifierAddress(),
                 validatorTimelock: validatorTimelock,
                 bytecodesSupplier: bytecodesSupplier,
-                permissionlessValidator: ctm.PERMISSIONLESS_VALIDATOR()
+                // v29 CTM does not expose PERMISSIONLESS_VALIDATOR, so avoid calling it.
+                permissionlessValidator: isV29 ? address(0) : ctm.PERMISSIONLESS_VALIDATOR()
             }),
             implementations: StateTransitionContracts({
                 chainTypeManager: Utils.getImplementation(_ctmAddr),
