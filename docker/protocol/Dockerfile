@@ -4,7 +4,7 @@ ARG FOUNDRY_ARCH=linux_amd64
 ARG FOUNDRY_ZKSYNC_TAG=nightly-807f47ace7cdd90eed7190dc4481952cfaa25938
 ARG FOUNDRY_VANILLA_VERSION=v1.3.5
 ARG NODE_MAJOR=18
-ARG NODE_VERSION=18.20.6
+ARG NODE_VERSION=18.20.8
 ARG RUST_TARGET=x86_64-unknown-linux-gnu
 ARG RUST_TOOLCHAIN=nightly-2025-09-19
 ARG YARN_VERSION=1.22.19
@@ -64,10 +64,10 @@ RUN rustup target add ${RUST_TARGET}
 WORKDIR /contracts
 COPY . /contracts
 
-# === Build protocol_ops_cli ===
+# === Build protocol_ops ===
 WORKDIR /contracts/protocol-ops
-RUN cargo build --bin protocol_ops_cli --release --target ${RUST_TARGET} && \
-    cp target/${RUST_TARGET}/release/protocol_ops_cli /usr/local/bin/ && \
+RUN cargo build --bin protocol_ops --release --target ${RUST_TARGET} && \
+    cp target/${RUST_TARGET}/release/protocol_ops /usr/local/bin/ && \
     rm -rf target
 
 # === Install dependencies ===
@@ -115,8 +115,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=build /usr/local/bin/forge /usr/local/bin/forge
 COPY --from=build /usr/local/bin/cast  /usr/local/bin/cast
 COPY --from=build /usr/local/bin/anvil /usr/local/bin/anvil
-# === Copy the new protocol_ops_cli binary ===
-COPY --from=build /usr/local/bin/protocol_ops_cli /usr/local/bin/protocol_ops_cli
+# === Copy the new protocol_ops binary ===
+COPY --from=build /usr/local/bin/protocol_ops /usr/local/bin/protocol_ops
 
 # === Set new WORKDIR and copy artifacts to /contracts/ ===
 WORKDIR /contracts
@@ -134,4 +134,4 @@ RUN mkdir -p /root/.config/zksync-tooling && \
     echo '{"enabled":false}' > /root/.config/zksync-tooling/telemetry.json
 
 # Sanity
-RUN forge --version && cast --version && anvil --version && protocol_ops_cli --help
+RUN forge --version && cast --version && anvil --version && protocol_ops --help
