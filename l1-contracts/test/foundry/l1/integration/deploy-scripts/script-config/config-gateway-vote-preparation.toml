@@ -1,7 +1,7 @@
 force_deployments_data = "0x00"
 gateway_chain_id = 506
 is_zk_sync_os = true
-owner_address = "0x20Ac6825F71011320652D6373ffA1A366F5366f3"
+owner_address = "0x4ed04c55C350396A203c3fe0d295b2526A7d96DE"
 refund_recipient = "0x000000000000000000000000000000000000bEEF"
 support_l2_legacy_shared_bridge_test = false
 testnet_verifier = true
