@@ -7,7 +7,8 @@
     "node": ">=16"
   },
   "scripts": {
-    "ai-general-review": "ts-node src/index.ts ai-general-review"
+    "ai-general-review": "ts-node src/index.ts ai-general-review",
+    "combine-reports": "ts-node src/index.ts combine-reports"
   },
   "dependencies": {
     "chalk": "^4.1.0",

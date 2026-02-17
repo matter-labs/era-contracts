@@ -1,11 +1,12 @@
 import { Command } from "commander";
-import { aiGeneralReviewCommand } from "./commands/ai-general-review";
+import { aiGeneralReviewCommand, combineReportsCommand } from "./commands/ai-general-review";
 
 async function main() {
   const program = new Command();
   program.name("ai-tools").version("0.1.0").description("AI-powered tools for smart contract analysis");
 
   program.addCommand(aiGeneralReviewCommand());
+  program.addCommand(combineReportsCommand());
 
   await program.parseAsync(process.argv);
 }

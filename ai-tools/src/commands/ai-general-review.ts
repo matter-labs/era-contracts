@@ -179,8 +179,9 @@ function runCodexExec(prompt: string, outputFile: string): Promise<void> {
 
 /**
  * Reads the raw codex output file and extracts the subreport section.
- * The subreport starts at the `## <name> report summary` header and runs
- * until end-of-file (excluding any trailing `--- STDERR ---` block).
+ * Uses the **last** occurrence of `## <name> report summary` so that any
+ * earlier mentions (e.g. in codex reasoning / echoed prompt) are skipped.
+ * Runs until end-of-file, excluding any trailing `--- STDERR ---` block.
  */
 function extractSubreport(outputFile: string, contractName: string): string | null {
   if (!fs.existsSync(outputFile)) {
@@ -189,9 +190,8 @@ function extractSubreport(outputFile: string, contractName: string): string | nu
 
   const raw = fs.readFileSync(outputFile, "utf-8");
 
-  // Find the report header – the prompt guarantees this exact pattern.
   const header = `## ${contractName} report summary`;
-  const idx = raw.indexOf(header);
+  const idx = raw.lastIndexOf(header);
   if (idx === -1) {
     return null;
   }
@@ -206,6 +206,34 @@ function extractSubreport(outputFile: string, contractName: string): string | nu
   }
 
   return subreport.trimEnd();
+}
+
+/**
+ * Shared logic: merge individual report files into a single full_report.md.
+ * Returns the number of successfully extracted subreports.
+ */
+function mergeReports(contractNames: string[], outputDir: string, fullReportPath: string): number {
+  const subreports: string[] = [];
+
+  for (const name of contractNames) {
+    const outputFile = path.join(outputDir, `${name}.md`);
+    const sub = extractSubreport(outputFile, name);
+    if (sub) {
+      subreports.push(sub);
+    } else {
+      subreports.push(
+        `## ${name} report summary\n\n` +
+          `> _Warning: could not extract structured subreport. See raw output in \`${outputFile}\`._`
+      );
+    }
+  }
+
+  if (subreports.length > 0) {
+    const header = `# AI General Review Report\n\n` + `_Generated on ${new Date().toISOString()}_\n\n---\n\n`;
+    fs.writeFileSync(fullReportPath, header + subreports.join("\n\n---\n\n") + "\n", "utf-8");
+  }
+
+  return subreports.length;
 }
 
 // ---------------------------------------------------------------------------
@@ -322,6 +350,7 @@ export function aiGeneralReviewCommand(): Command {
     .option("--contract <names>", "Contract name(s) to review, comma-separated (must exist in contracts_info.json)")
     .option("--num-jobs <number>", "Number of parallel review jobs", "1")
     .option("--output-dir <dir>", "Output directory for review reports", "output")
+    .option("--full-report <path>", "Path for the merged report file", "full_report.md")
     .action(async (options) => {
       // Codex uses whatever one has inside `codex login`.
       // // ------------------------------------------------------------------
@@ -420,28 +449,9 @@ export function aiGeneralReviewCommand(): Command {
       // ------------------------------------------------------------------
       // 6. Merge subreports into a single file
       // ------------------------------------------------------------------
-      const fullReportPath = path.join(outputDir, "full_report.md");
-      const subreports: string[] = [];
-
-      for (const task of tasks) {
-        if (task.status !== "done") {
-          continue;
-        }
-        const sub = extractSubreport(task.outputFile, task.contractName);
-        if (sub) {
-          subreports.push(sub);
-        } else {
-          subreports.push(
-            `## ${task.contractName} report summary\n\n` +
-              `> _Warning: could not extract structured subreport. See raw output in \`${task.outputFile}\`._`
-          );
-        }
-      }
-
-      if (subreports.length > 0) {
-        const header = `# AI General Review Report\n\n` + `_Generated on ${new Date().toISOString()}_\n\n---\n\n`;
-        fs.writeFileSync(fullReportPath, header + subreports.join("\n\n---\n\n") + "\n", "utf-8");
-      }
+      const fullReportPath = path.resolve(process.cwd(), options.fullReport);
+      const doneNames = tasks.filter((t) => t.status === "done").map((t) => t.contractName);
+      const merged = mergeReports(doneNames, outputDir, fullReportPath);
 
       // ------------------------------------------------------------------
       // 7. Final summary
@@ -460,13 +470,56 @@ export function aiGeneralReviewCommand(): Command {
       }
 
       console.log(chalk.gray(`Individual reports: ${outputDir}/`));
-      if (subreports.length > 0) {
+      if (merged > 0) {
         console.log(chalk.bold(`Merged report:      ${fullReportPath}`));
       }
 
       if (failedCount > 0) {
         process.exit(1);
       }
+    });
+
+  return cmd;
+}
+
+// ---------------------------------------------------------------------------
+// combine-reports command
+// ---------------------------------------------------------------------------
+
+export function combineReportsCommand(): Command {
+  const cmd = new Command("combine-reports");
+
+  cmd
+    .description("Combine individual raw review outputs into a single merged report")
+    .requiredOption("--contract <names>", "Contract name(s) to include, comma-separated")
+    .option("--output-dir <dir>", "Directory containing individual <Contract>.md files", "output")
+    .option("--full-report <path>", "Path for the merged report file", "full_report.md")
+    .action((options) => {
+      const contractNames = (options.contract as string)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      if (contractNames.length === 0) {
+        console.error(chalk.red("Error: no contract names provided."));
+        process.exit(1);
+      }
+
+      const outputDir = path.resolve(process.cwd(), options.outputDir);
+      const fullReportPath = path.resolve(process.cwd(), options.fullReport);
+
+      // Validate that the individual files exist.
+      const missing = contractNames.filter((n) => !fs.existsSync(path.join(outputDir, `${n}.md`)));
+      if (missing.length > 0) {
+        console.error(chalk.red(`Error: missing report file(s) in ${outputDir}/:`));
+        for (const m of missing) {
+          console.error(chalk.red(`  - ${m}.md`));
+        }
+        process.exit(1);
+      }
+
+      const merged = mergeReports(contractNames, outputDir, fullReportPath);
+      console.log(chalk.green(`Merged ${merged} subreport(s) into ${fullReportPath}`));
     });
 
   return cmd;
