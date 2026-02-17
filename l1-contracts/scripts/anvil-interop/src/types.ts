@@ -122,3 +122,53 @@ export interface DeploymentContext {
   chainAddresses: Map<number, ChainAddresses>;
   gatewayChainId?: number;
 }
+
+export interface L1ChainInfo {
+  chainId: number;
+  rpcUrl: string;
+  port: number;
+}
+
+export interface L2ChainInfo {
+  chainId: number;
+  rpcUrl: string;
+  port: number;
+}
+
+export interface ChainInfo {
+  l1: L1ChainInfo | null;
+  l2: L2ChainInfo[];
+  config: AnvilConfig["chains"];
+}
+
+export interface DeploymentState {
+  chains?: ChainInfo;
+  l1Addresses?: CoreDeployedAddresses;
+  ctmAddresses?: CTMDeployedAddresses;
+  chainAddresses?: ChainAddresses[];
+  testTokens?: Record<number, string>;
+}
+
+export interface MultiChainTokenTransferParams {
+  sourceChainId?: number;
+  targetChainId?: number;
+  amount?: string;
+}
+
+export interface MultiChainTokenTransferResult {
+  sourceChainId: number;
+  targetChainId: number;
+  sourceRpcUrl: string;
+  targetRpcUrl: string;
+  sender: string;
+  sourceToken: string;
+  destinationToken: string;
+  assetId: string;
+  amountWei: string;
+  sourceBalanceBefore: string;
+  sourceBalanceAfter: string;
+  destinationBalanceBefore: string;
+  destinationBalanceAfter: string;
+  sourceTxHash: string;
+  targetTxHash: string | null;
+}

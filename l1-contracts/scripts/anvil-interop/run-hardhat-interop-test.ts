@@ -1,0 +1,79 @@
+#!/usr/bin/env node
+
+import { spawnSync } from "child_process";
+import * as path from "path";
+
+const anvilInteropDir = __dirname;
+const l1ContractsDir = path.resolve(__dirname, "../..");
+
+function runOrThrow(command: string, args: string[], cwd: string, env?: NodeJS.ProcessEnv): void {
+  const result = spawnSync(command, args, {
+    cwd,
+    env: env || process.env,
+    stdio: "inherit",
+  });
+
+  if (result.status !== 0) {
+    throw new Error(`${command} ${args.join(" ")} failed with exit code ${result.status ?? "unknown"}`);
+  }
+}
+
+async function main(): Promise<void> {
+  const skipSetup = process.env.ANVIL_INTEROP_SKIP_SETUP === "1";
+  const skipCleanup = process.env.ANVIL_INTEROP_SKIP_CLEANUP === "1";
+  const setupRetries = Number(process.env.ANVIL_INTEROP_SETUP_RETRIES || "3");
+
+  try {
+    if (!skipSetup) {
+      let setupError: Error | null = null;
+      for (let attempt = 1; attempt <= setupRetries; attempt++) {
+        try {
+          console.log(`\n🔧 Setup attempt ${attempt}/${setupRetries}...`);
+          runOrThrow("yarn", ["cleanup"], anvilInteropDir);
+          runOrThrow("yarn", ["step1"], anvilInteropDir);
+          runOrThrow("yarn", ["step2"], anvilInteropDir);
+          runOrThrow("yarn", ["step3"], anvilInteropDir);
+          runOrThrow("yarn", ["step4"], anvilInteropDir);
+          runOrThrow("yarn", ["step5"], anvilInteropDir);
+          runOrThrow("yarn", ["deploy:test-token"], anvilInteropDir);
+          setupError = null;
+          break;
+        } catch (error: any) {
+          setupError = error;
+          console.error(`⚠️ Setup attempt ${attempt} failed: ${error.message}`);
+          runOrThrow("yarn", ["cleanup"], anvilInteropDir);
+        }
+      }
+      if (setupError) {
+        throw setupError;
+      }
+    }
+
+    runOrThrow(
+      "yarn",
+      [
+        "hardhat",
+        "test",
+        "scripts/anvil-interop/test/hardhat/token-transfer.spec.ts",
+        "--network",
+        "hardhat",
+        "--no-compile",
+      ],
+      l1ContractsDir,
+      {
+        ...process.env,
+        ANVIL_INTEROP_SKIP_SETUP: "1",
+        ANVIL_INTEROP_SKIP_CLEANUP: "1",
+      }
+    );
+  } finally {
+    if (!skipCleanup) {
+      runOrThrow("yarn", ["cleanup"], anvilInteropDir);
+    }
+  }
+}
+
+main().catch((error) => {
+  console.error("❌ Hardhat interop test failed:", error.message);
+  process.exit(1);
+});

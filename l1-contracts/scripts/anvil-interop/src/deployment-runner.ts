@@ -8,23 +8,16 @@ import { GatewaySetup } from "./gateway-setup";
 import { BatchSettler } from "./batch-settler";
 import { L1ToL2Relayer } from "./l1-to-l2-relayer";
 import { L2ToL2Relayer } from "./l2-to-l2-relayer";
-import type { AnvilConfig, ChainAddresses, CoreDeployedAddresses, CTMDeployedAddresses } from "./types";
+import type {
+  AnvilConfig,
+  ChainAddresses,
+  ChainInfo,
+  CoreDeployedAddresses,
+  CTMDeployedAddresses,
+  DeploymentState,
+} from "./types";
 import { getDefaultAccountPrivateKey, sleep } from "./utils";
 import { ETH_TOKEN_ADDRESS } from "./const";
-
-export interface ChainInfo {
-  l1: { chainId: number; rpcUrl: string; port: number } | null;
-  l2: Array<{ chainId: number; rpcUrl: string; port: number }>;
-  config: AnvilConfig["chains"];
-}
-
-export interface DeploymentState {
-  chains?: ChainInfo;
-  l1Addresses?: CoreDeployedAddresses;
-  ctmAddresses?: CTMDeployedAddresses;
-  chainAddresses?: ChainAddresses[];
-  testTokens?: { [chainId: number]: string };
-}
 
 export class DeploymentRunner {
   private stateDir: string;

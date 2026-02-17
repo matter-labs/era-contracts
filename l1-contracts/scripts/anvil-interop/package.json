@@ -17,6 +17,7 @@
     "step6": "ts-node step6-start-settler.ts",
     "step:all": "bash run-all-steps.sh",
     "test:interop": "ts-node test-interop.ts",
+    "test:hardhat": "yarn --cwd ../.. test:hardhat:interop",
     "send:interop": "ts-node send-interop-tx.ts",
     "send:l2-to-l2": "ts-node send-l2-to-l2.ts",
     "deploy:test-token": "ts-node deploy-test-token.ts",
