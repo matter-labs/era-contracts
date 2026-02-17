@@ -374,7 +374,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             // solhint-disable-next-line
             _processInteropCall(_chainId, bundleHash, interopCall, interopBundle.destinationChainId);
         }
-        // FIXME: this value can be zero leading to settlement failure.
         bytes32 destinationChainBaseTokenAssetId = _bridgehub().baseTokenAssetId(interopBundle.destinationChainId);
         _decreaseChainBalance(_chainId, destinationChainBaseTokenAssetId, totalBaseTokenAmount);
         interopBalanceChange[interopBundle.destinationChainId][bundleHash].baseTokenAmount = totalBaseTokenAmount;
