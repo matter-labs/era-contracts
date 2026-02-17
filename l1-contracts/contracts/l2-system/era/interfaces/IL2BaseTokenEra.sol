@@ -26,9 +26,6 @@ interface IL2BaseTokenEra is IL2BaseTokenBase {
     /// @param _amount The amount of ETH in wei being transferred
     function transferFromTo(address _from, address _to, uint256 _amount) external;
 
-    /// @notice Returns the total circulating supply of base tokens
-    function totalSupply() external view returns (uint256);
-
     /// @notice Increase the balance of the receiver by transferring from BaseTokenHolder
     /// @param _account The address which to mint the funds to
     /// @param _amount The amount of ETH in wei to be minted

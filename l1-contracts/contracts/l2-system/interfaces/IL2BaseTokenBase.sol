@@ -30,6 +30,9 @@ interface IL2BaseTokenBase {
     /// @param _additionalData Additional data to be sent to L1 with the withdrawal.
     function withdrawWithMessage(address _l1Receiver, bytes calldata _additionalData) external payable;
 
+    /// @notice Returns the total circulating supply of base tokens.
+    function totalSupply() external view returns (uint256);
+
     /// @notice Initializes the BaseTokenHolder's balance during genesis or V31 upgrade.
     /// @dev The implementation varies between Era and ZK OS but both require this initialization.
     function initializeBaseTokenHolderBalance() external;

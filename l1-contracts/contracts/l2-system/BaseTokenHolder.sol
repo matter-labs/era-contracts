@@ -22,9 +22,10 @@ import {Unauthorized} from "../common/L1ContractErrors.sol";
  *
  * ## Initial Balance
  *
- * During migration, this contract is initialized with 2^127 - 1 base tokens minus the existing total supply.
+ * During migration, this contract is initialized with 2^127 - 1 base tokens.
+ * On Era, the existing total supply is deducted from the initial balance.
+ * On ZK OS, the full amount is minted since balances are tracked natively.
  * This is sufficient for any reasonable base token, as no token has a total supply greater than 2^127.
- * The above is only applicable for Era chains, as total supply for ZK OS chains is not tracked (on-chain).
  *
  * ## Overflow/Underflow Prevention
  *
@@ -42,10 +43,11 @@ import {Unauthorized} from "../common/L1ContractErrors.sol";
  * ## Selfdestruct Caveat
  *
  * The implicit meaning of this contract's balance is "funds that the chain can still mint".
- * The totalSupply on Era is computed as INITIAL_BASE_TOKEN_HOLDER_BALANCE - balance[BaseTokenHolder].
+ * On Era, totalSupply is computed as INITIAL_BASE_TOKEN_HOLDER_BALANCE - eraAccountBalance[BaseTokenHolder].
+ * On ZK OS, totalSupply is computed as _zkosPreV31TotalSupply + (INITIAL - holder.balance).
  * If funds were sent to this contract via selfdestruct (bypassing access controls), the holder balance
- * would increase, causing totalSupply() to undercount. However, selfdestruct is not supported on Era,
- * so this invariant holds. On ZK OS, totalSupply is not tracked on-chain, so this is not an issue.
+ * would increase, causing totalSupply() to undercount. However, selfdestruct is not supported on Era.
+ * On ZK OS, selfdestruct would increase native balance, effectively returning tokens to the reserve.
  */
 // slither-disable-next-line locked-ether
 contract BaseTokenHolder is IBaseTokenHolder {
