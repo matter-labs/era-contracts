@@ -47,13 +47,7 @@ contract SetZkosPreV31TotalSupplyScript is Script {
         if (saveOutputOnly) {
             saveOutput(chainAdmin, calls);
         } else {
-            Utils.adminExecute(
-                chainAdmin,
-                address(0),
-                diamondProxy,
-                abi.encodeCall(IAdmin.setZkosPreV31TotalSupply, (preV31TotalSupply)),
-                0
-            );
+            Utils.adminExecuteCalls(chainAdmin, address(0), calls);
             console.log("Service transaction sent to set ZKOS pre-V31 total supply");
         }
     }

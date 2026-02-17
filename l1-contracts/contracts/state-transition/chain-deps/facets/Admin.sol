@@ -395,6 +395,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
             abi.encodeCall(IL2BaseTokenZKOS.setZkosPreV31TotalSupply, (_totalSupply))
         );
+        emit SetZkosPreV31TotalSupply(_totalSupply);
     }
 
     /*//////////////////////////////////////////////////////////////

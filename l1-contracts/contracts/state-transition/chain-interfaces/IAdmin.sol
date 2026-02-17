@@ -166,6 +166,9 @@ interface IAdmin is IZKChainBase {
     /// @notice The EVM emulator has been enabled
     event EnableEvmEmulator();
 
+    /// @notice Emitted when the ZKOS pre-V31 total supply is set via service transaction
+    event SetZkosPreV31TotalSupply(uint256 totalSupply);
+
     /// @notice New L2 DA commitment scheme set
     event NewL2DACommitmentScheme(
         L2DACommitmentScheme indexed oldL2DACommitmentScheme,
