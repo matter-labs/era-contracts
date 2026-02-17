@@ -136,6 +136,31 @@ library MessageHashing {
         }
     }
 
+    /// @notice Checks that the final proof node is well formed.
+    /// @param _proofData The proof data.
+    /// @dev This function is used to double check that the proof is well formed.
+    /// The requirements for this function should never be triggered in any real production, it is just
+    /// an additional safety check to prevent any potential issues in case any refactoring happens.
+    function checkWellFormedFinalProofNode(
+        ProofData memory _proofData
+    ) internal pure {
+        if (!_proofData.finalProofNode) {
+            revert NotAFinalProofNode();
+        }
+        if (_proofData.settlementLayerChainId != 0) {
+            revert SettlementLayerChainIdMustBeZeroForFinalProofNode();
+        }
+        if (_proofData.settlementLayerBatchNumber != 0) {
+            revert SettlementLayerBatchNumberMustBeZeroForFinalProofNode();
+        }
+        if (_proofData.settlementLayerBatchRootMask != 0) {
+            revert SettlementLayerBatchRootMaskMustBeZeroForFinalProofNode();
+        }
+        if (_proofData.chainIdLeaf != bytes32(0)) {
+            revert ChainIdLeafMustBeZeroForFinalProofNode();
+        }
+    }   
+
     /// @notice Parses and processes the proof and returns the resulting data.
     /// @param _chainId The chain id of the L2 where the leaf comes from.
     /// @param _batchNumber The batch number.
@@ -174,6 +199,8 @@ library MessageHashing {
             result.finalProofNode = proofMetadata.finalProofNode;
 
             if (proofMetadata.finalProofNode) {
+                // Double check to ensure safety
+                checkWellFormedFinalProofNode(result);
                 return result;
             }
             // Now, we'll have to check that the Gateway included the message.

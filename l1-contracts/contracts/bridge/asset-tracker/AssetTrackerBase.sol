@@ -38,6 +38,14 @@ abstract contract AssetTrackerBase is
     /// - Chains spend their balances when submitting withdrawals, processing failed deposits or sending tokens via interop.
     /// - The balances are increased when deposits are made to the chains and when they receive interop from other chains.
     /// - Also, the balances are increased or decreased when migrating the balance to/from the settlement layer.
+    /// - For a non-malicious chain, this number should be equal to the `totalSupply()` of the corresponding token in the chain's 
+    /// L2 storage (for the latest executed batch).
+    /// If it was not the case, the following can happen (once repeated migrations to Gateway are supported):
+    /// - Chain migrates to L1, and moves the entire `chainBalance` to L1, which includes unfinalized interop.
+    /// - When it migrates again to GW, it "leaves" L1AssetTracker.chainBalance - totalSupply() on L1, which makes the interops
+    /// that could be finalized in the future insolvent (the corresponding balance has stayed on L1). 
+    /// - Note, that we do not need to handle the case for deposits, since deposits are executed immediately, also during migration to L1, 
+    /// the chain's diamond proxy should require that there are no unprocessed deposits.
     /// @dev On L2AssetTracker:
     /// - The `chainBalance` is only used to track the balance of native tokens on the L2.
     /// - For all the other tokens it is expected to be 0.

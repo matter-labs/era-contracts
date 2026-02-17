@@ -303,6 +303,15 @@ struct LeafInclusionProof {
     bytes32[] proof;
 }
 
+/// @dev Struct used to define parameters for proving one layer of withdrawal finalization proofs inside the system.
+/// @param settlementLayerChainId The chain ID of the settlement layer, where the chain has settled to. If it is L1 (i.e. finalProofNode = true), then it MUST be zero.
+/// @param settlementLayerBatchNumber The batch number on the settlement layer. If it is L1 (i.e. finalProofNode = true), then it MUST be zero.
+/// @param settlementLayerBatchRootMask The bitmask indicating the position of the batch root in the Merkle tree. If it is L1 (i.e. finalProofNode = true), then it MUST be zero.
+/// @param batchLeafProofLen The length of the proof of inclusion of the leaf into the batch root of the chain.
+/// @param batchSettlementRoot The root of the chain of the L2 chain's batch.
+/// @param chainIdLeaf The leaf of the chain inside the merkle tree of the settlement layer. If it is L1 (i.e. finalProofNode = true), then it MUST be zero.
+/// @param ptr The pointer to the current position in the proof.
+/// @param finalProofNode Indicates whether this is the final proof node.
 struct ProofData {
     uint256 settlementLayerChainId;
     uint256 settlementLayerBatchNumber;
