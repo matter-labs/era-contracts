@@ -416,7 +416,7 @@ contract InteropCenter is
     /// while the rest of the fields are trusted to be populated correctly inside the `Mailbox` of the Gateway.
     /// @param _chainId Target chain ID.
     /// @param _canonicalTxHash Canonical L1 transaction hash.
-    /// @param _expirationTimestamp Expiration for gateway replay protection.
+    /// @param _expirationTimestamp Deprecated, always 0.
     /// @param _balanceChange Balance change for the transaction.
     function forwardTransactionOnGatewayWithBalanceChange(
         uint256 _chainId,

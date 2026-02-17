@@ -1,9 +1,18 @@
 use alloy::primitives::{Address, B256};
 
-pub fn bytecode_to_code(contract_name: &str) -> Vec<u8> {
+pub fn l1_contract_name_to_code(contract_name: &str) -> Vec<u8> {
     let path = format!("../../l1-contracts/out/{contract_name}.sol/{contract_name}.json");
+    contract_artifact_to_code(&path, contract_name)
+}
+
+pub fn da_contract_name_to_code(contract_name: &str) -> Vec<u8> {
+    let path = format!("../../da-contracts/out/{contract_name}.sol/{contract_name}.json");
+    contract_artifact_to_code(&path, contract_name)
+}
+
+fn contract_artifact_to_code(path: &str, contract_name: &str) -> Vec<u8> {
     let file_content =
-        std::fs::read_to_string(&path).expect("Failed to read contract bytecode file");
+        std::fs::read_to_string(path).expect(format!("Failed to read contract bytecode file {}", path).as_str());
     let artifact: serde_json::Value =
         serde_json::from_str(&file_content).expect("Failed to parse JSON file");
 

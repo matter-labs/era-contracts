@@ -16,6 +16,7 @@ const REQUIRED_CONTRACTS = [
   "IChainAssetHandler.sol",
   "IChainTypeManager.sol",
   "IAdmin.sol",
+  "IDiamondCut.sol",
   "IChainAdminOwnable.sol",
   "IRegisterZKChain.sol",
   "IDeployL2Contracts.sol",
@@ -34,13 +35,17 @@ const REQUIRED_CONTRACTS = [
   "IRegisterOnAllChains.sol",
   "IGatewayMigrateTokenBalances.sol",
   "IFinalizeUpgrade.sol",
+  "IL1NativeTokenVault.sol",
   "IL2NativeTokenVault.sol",
+  "IL1AssetRouter.sol",
   "IL2AssetRouter.sol",
   "IAssetTrackerBase.sol",
+  "IL1AssetTracker.sol",
   "IL2AssetTracker.sol",
   "IGWAssetTracker.sol",
   "IChainAdmin.sol",
   "ISetupLegacyBridge.sol",
+  "DefaultUpgrade.sol",
 ];
 
 async function copyContractAbi(src: string, dest: string): Promise<void> {

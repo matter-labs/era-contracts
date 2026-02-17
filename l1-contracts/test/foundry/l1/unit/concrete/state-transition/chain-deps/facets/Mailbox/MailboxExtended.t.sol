@@ -22,7 +22,7 @@ import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 import {L2Message, L2Log} from "contracts/common/Messaging.sol";
 import {InvalidChainId, ZeroAddress, AddressNotZero} from "contracts/common/L1ContractErrors.sol";
-import {DepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {DepositsPaused, NotHyperchain, NotL1, NotSettlementLayer} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {DepthMoreThanOneForRecursiveMerkleProof, OnlyGateway} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET} from "contracts/common/Config.sol";
 
@@ -72,7 +72,8 @@ contract MailboxOnGatewayTest is UtilsCallMockerTest {
         );
 
         address testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, bridgehub);
+        mockChainTypeManagerVerifier(testnetVerifier);
+        address diamondProxy = Utils.makeDiamondProxy(facetCuts, bridgehub);
 
         mailboxFacet = IMailbox(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);

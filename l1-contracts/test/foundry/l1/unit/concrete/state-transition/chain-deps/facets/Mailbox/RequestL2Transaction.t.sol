@@ -66,10 +66,9 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
 
         uint256 baseCost = mailboxFacet.l2TransactionBaseCost(10000000, 1000000, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
         uint256 l2Value = 1 ether;
-        uint256 mintValue = baseCost + l2Value;
 
-        vm.expectRevert(abi.encodeWithSelector(MsgValueTooLow.selector, mintValue, mintValue - 1));
-        mailboxFacet.requestL2Transaction{value: mintValue - 1}({
+        vm.expectRevert(abi.encodeWithSelector(MsgValueTooLow.selector, baseCost, baseCost - 1));
+        mailboxFacet.requestL2Transaction{value: baseCost - 1}({
             _contractL2: tempAddress,
             _l2Value: l2Value,
             _calldata: tempBytes,
@@ -147,5 +146,30 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
         assertEq(baseTokenBridgeAddress.balance, mintValue);
         assertEq(l1SharedBridge.chainBalance(eraChainId, ETH_TOKEN_ADDRESS), mintValue);
+    }
+
+    function test_success_requestL2Transaction_onlyBaseCostRequired() public {
+        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
+        utilsFacet.util_setPriorityTxMaxGasLimit(100000000);
+
+        uint256 l2GasLimit = 1000000;
+        uint256 baseCost = mailboxFacet.l2TransactionBaseCost(10000000, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
+        uint256 l2Value = type(uint256).max;
+
+        vm.deal(sender, baseCost);
+        vm.prank(sender);
+        bytes32 canonicalTxHash = mailboxFacet.requestL2Transaction{value: baseCost}({
+            _contractL2: tempAddress,
+            _l2Value: l2Value,
+            _calldata: tempBytes,
+            _l2GasLimit: l2GasLimit,
+            _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            _factoryDeps: new bytes[](0),
+            _refundRecipient: tempAddress
+        });
+
+        assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
+        assertEq(baseTokenBridgeAddress.balance, baseCost);
+        assertEq(l1SharedBridge.chainBalance(eraChainId, ETH_TOKEN_ADDRESS), baseCost);
     }
 }

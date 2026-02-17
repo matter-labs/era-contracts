@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
@@ -51,7 +52,15 @@ contract MessageRoot_Extended_Test is Test {
         );
         vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector), abi.encode(0));
 
-        messageRoot = new L1MessageRoot(bridgeHub, gatewayChainId);
+        messageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(bridgeHub, gatewayChainId, address(0))),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
+        );
         l2MessageRoot = new L2MessageRoot();
 
         uint256[] memory allZKChainChainIDs = new uint256[](1);
@@ -339,12 +348,22 @@ contract MessageRoot_Extended_Test is Test {
         vm.prank(bridgeHub);
         messageRoot.addNewChain(chainId, 0);
 
+        // Verify totalPublishedInteropRoots is 0 before any updates
+        assertEq(messageRoot.totalPublishedInteropRoots(), 0, "totalPublishedInteropRoots should be 0 before");
+
         // Add a batch root
         vm.prank(chainSender);
         messageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"));
 
         // Update the full tree
         messageRoot.updateFullTree();
+
+        // Verify totalPublishedInteropRoots incremented after updateFullTree
+        assertEq(
+            messageRoot.totalPublishedInteropRoots(),
+            1,
+            "totalPublishedInteropRoots should be 1 after updateFullTree"
+        );
 
         // Verify the aggregated root is updated
         bytes32 root = messageRoot.getAggregatedRoot();
@@ -371,9 +390,19 @@ contract MessageRoot_Extended_Test is Test {
         vm.prank(L2_BRIDGEHUB_ADDR);
         l2MessageRoot.addNewChain(chainId, 0);
 
+        // Verify totalPublishedInteropRoots is 0 before adding batch root
+        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 0, "totalPublishedInteropRoots should be 0 before");
+
         // Add a batch root
         vm.prank(GW_ASSET_TRACKER_ADDR);
         l2MessageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"));
+
+        // Verify totalPublishedInteropRoots incremented after addChainBatchRoot (L2MessageRoot calls _emitRoot)
+        assertEq(
+            l2MessageRoot.totalPublishedInteropRoots(),
+            1,
+            "totalPublishedInteropRoots should be 1 after addChainBatchRoot"
+        );
 
         // Check that historical root is set
         bytes32 historicalRoot = l2MessageRoot.historicalRoot(block.number);

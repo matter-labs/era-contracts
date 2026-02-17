@@ -7,7 +7,7 @@ import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializabl
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 
 import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH} from "./IMessageRoot.sol";
-import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, DepthMoreThanOneForRecursiveMerkleProof, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyChain, OnlyL1} from "../bridgehub/L1BridgehubErrors.sol";
+import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, DepthMoreThanOneForRecursiveMerkleProof, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyChain} from "../bridgehub/L1BridgehubErrors.sol";
 
 import {GW_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
@@ -52,7 +52,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     FullMerkle.FullTree public sharedTree;
 
     /// @dev The incremental merkle tree storing the chain message roots.
-    mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) internal chainTree;
+    mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) public chainTree;
 
     /// @notice The mapping from block number to the global message root.
     /// @dev Each block might have multiple txs that change the historical root. You can safely use the final root in the block,
@@ -76,12 +76,17 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// @dev We only update the chainTree on GW as of V31.
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
+    /// @notice The total number of published interop roots.
+    /// @dev Used inside the `NewInteropRoot` event, used for indexing purposes by the node.
+    /// @dev Note that it counts roots starting from V31 ONLY.
+    uint256 public totalPublishedInteropRoots;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[37] private __gap;
+    uint256[36] private __gap;
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
@@ -116,13 +121,6 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
             if (msg.sender != IBridgehubBase(_bridgehub()).getZKChain(_chainId)) {
                 revert OnlyChain(msg.sender, IBridgehubBase(_bridgehub()).getZKChain(_chainId));
             }
-        }
-        _;
-    }
-
-    modifier onlyL1() {
-        if (block.chainid != L1_CHAIN_ID()) {
-            revert OnlyL1();
         }
         _;
     }
@@ -203,7 +201,11 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
         bytes32[] memory _sides = new bytes32[](1);
         _sides[0] = _root;
-        emit NewInteropRoot(block.chainid, block.number, 0, _sides);
+
+        uint256 currentCount = totalPublishedInteropRoots;
+        totalPublishedInteropRoots = currentCount + 1;
+
+        emit NewInteropRoot(block.chainid, block.number, currentCount, _sides);
     }
 
     /// @notice Gets the aggregated root of all chains.
@@ -261,6 +263,14 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     //// IMessageVerification ////
     //////////////////////////////
 
+    function _proveL2LeafInclusionOnSettlementLayer(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        ProofData memory _proofData,
+        bytes32[] calldata _proof,
+        uint256 _depth
+    ) internal view virtual returns (bool);
+
     function _proveL2LeafInclusionRecursive(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -285,23 +295,13 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
             revert DepthMoreThanOneForRecursiveMerkleProof();
         }
 
-        // Assuming that `settlementLayerChainId` is an honest chain, the `chainIdLeaf` should belong
-        // to a chain's message root only if the chain has indeed executed its batch on top of it.
-        //
-        // We trust all chains whitelisted by the Bridgehub governance.
-        require(
-            IBridgehubBase(_bridgehub()).whitelistedSettlementLayers(proofData.settlementLayerChainId),
-            NotWhitelistedSettlementLayer(proofData.settlementLayerChainId)
-        );
-
         return
-            this.proveL2LeafInclusionSharedRecursive({
-                _chainId: proofData.settlementLayerChainId,
-                _blockOrBatchNumber: proofData.settlementLayerBatchNumber, // SL block number
-                _leafProofMask: proofData.settlementLayerBatchRootMask,
-                _leaf: proofData.chainIdLeaf,
-                _proof: MessageHashing.extractSliceUntilEnd(_proof, proofData.ptr),
-                _depth: _depth + 1
+            _proveL2LeafInclusionOnSettlementLayer({
+                _chainId: _chainId,
+                _batchNumber: _batchNumber,
+                _proofData: proofData,
+                _proof: _proof,
+                _depth: _depth
             });
     }
 
@@ -341,5 +341,15 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
                 _leaf: _leaf,
                 _proof: _proof
             });
+    }
+
+    /// @dev Returns merkle path in `sharedTree` for a certain chain.
+    /// @param _chainId Id of the chain to get merkle path for.
+    function getMerklePathForChain(uint256 _chainId) external view returns (bytes32[] memory) {
+        if (!chainRegistered(_chainId)) {
+            revert MessageRootNotRegistered();
+        }
+        uint256 index = chainIndex[_chainId];
+        return sharedTree.merklePath(index);
     }
 }

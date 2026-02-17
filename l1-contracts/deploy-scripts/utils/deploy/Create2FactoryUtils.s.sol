@@ -33,9 +33,6 @@ abstract contract Create2FactoryUtils is Script {
     /// @notice The input parameters for the Create2Factory.
     Create2FactoryParams internal create2FactoryParams;
 
-    /// @notice Constant for the known deterministic Create2Factory address.
-    address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
-
     /// @notice Initializes the Create2Factory parameters.
     /// @param _factoryAddress The preconfigured factory address (if any).
     /// @param _factorySalt The salt used for deterministic deployment.
@@ -55,7 +52,7 @@ abstract contract Create2FactoryUtils is Script {
     function instantiateCreate2Factory() internal {
         address deployedAddress;
         bool isConfigured = create2FactoryParams.factoryAddress != address(0);
-        bool isDeterministicDeployed = DETERMINISTIC_CREATE2_ADDRESS.code.length > 0;
+        bool isDeterministicDeployed = Utils.DETERMINISTIC_CREATE2_ADDRESS.code.length > 0;
 
         if (isConfigured) {
             if (create2FactoryParams.factoryAddress.code.length == 0) {
@@ -67,7 +64,7 @@ abstract contract Create2FactoryUtils is Script {
             deployedAddress = create2FactoryParams.factoryAddress;
             console.log("Using configured Create2Factory address:", deployedAddress);
         } else if (isDeterministicDeployed) {
-            deployedAddress = DETERMINISTIC_CREATE2_ADDRESS;
+            deployedAddress = Utils.DETERMINISTIC_CREATE2_ADDRESS;
             console.log("Using deterministic Create2Factory address:", deployedAddress);
         } else {
             deployedAddress = Utils.deployCreate2Factory();

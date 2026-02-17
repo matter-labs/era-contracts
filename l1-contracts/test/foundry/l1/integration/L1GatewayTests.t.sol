@@ -17,13 +17,14 @@ import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {GatewayDeployer} from "./_SharedGatewayDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L2CanonicalTransaction, L2Message, TxStatus, ConfirmTransferResultData} from "contracts/common/Messaging.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR, GW_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2CanonicalTransaction, L2Message, TxStatus, ConfirmTransferResultData, TokenBridgingData} from "contracts/common/Messaging.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
+import {IGWAssetTracker} from "contracts/bridge/asset-tracker/IGWAssetTracker.sol";
 
 import {IGetters, IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -35,6 +36,7 @@ import {InvalidProof, DepositDoesNotExist} from "contracts/common/L1ContractErro
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {GatewayUtils} from "deploy-scripts/gateway/GatewayUtils.s.sol";
 import {Utils} from "../unit/concrete/Utils/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -347,10 +349,24 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
             abi.encode(addresses.chainTypeManager.protocolVersion())
         );
+        TokenBridgingData memory baseTokenBridgingData = TokenBridgingData({
+            assetId: baseTokenAssetId,
+            originToken: makeAddr("baseTokenOrigin"),
+            originChainId: currentChainId
+        });
+        vm.expectCall(
+            GW_ASSET_TRACKER_ADDR,
+            abi.encodeCall(IGWAssetTracker.registerBaseTokenOnGateway, (baseTokenBridgingData))
+        );
+        vm.mockCall(
+            GW_ASSET_TRACKER_ADDR,
+            abi.encodeWithSelector(IGWAssetTracker.registerBaseTokenOnGateway.selector),
+            abi.encode()
+        );
 
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(migratingChainId);
 
-        bytes memory chainData = abi.encode(IAdmin(address(migratingChain)).prepareChainCommitment());
+        bytes memory chainData = abi.encode(IMigrator(address(migratingChain)).prepareChainCommitment());
         bytes memory ctmData = abi.encode(
             baseTokenAssetId,
             msg.sender,
@@ -359,12 +375,13 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
         BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
             chainId: migratingChainId,
-            baseTokenAssetId: baseTokenAssetId,
+            baseTokenBridgingData: baseTokenBridgingData,
             batchNumber: 0,
             ctmData: ctmData,
             chainData: chainData,
+            // +1 since during migrating back we the passed migration number gets incremented by 1 in the Gateway's ChainAssetHandler
             migrationNumber: IChainAssetHandler(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
-                .migrationNumber(migratingChainId)
+                .migrationNumber(migratingChainId) + 1
         });
         bytes memory bridgehubMintData = abi.encode(data);
         bytes memory message = abi.encodePacked(
@@ -652,7 +669,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         if (txStatus == TxStatus.Success) {
             vm.expectEmit();
-            emit IAdmin.DepositsUnpaused(migratingChainId);
+            emit IMigrator.DepositsUnpaused(migratingChainId);
         } else {
             vm.expectEmit();
             emit IL1AssetRouter.ClaimedFailedDepositAssetRouter(gatewayChainId, assetId, transferData);

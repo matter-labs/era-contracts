@@ -19,6 +19,8 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
+import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
@@ -43,6 +45,7 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
+import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 
 contract ChainTypeManagerTest is UtilsCallMockerTest {
     using stdStorage for StdStorage;
@@ -53,6 +56,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     L1Bridgehub internal bridgehub;
     L1ChainAssetHandler internal chainAssetHandler;
     L1MessageRoot internal messageroot;
+    PermissionlessValidator internal permissionlessValidator;
     address internal rollupL1DAValidator;
     address internal diamondInit;
     address internal interopCenterAddress;
@@ -88,14 +92,16 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         l1Nullifier = makeAddr("l1Nullifier");
         serverNotifier = makeAddr("serverNotifier");
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
-        messageroot = new L1MessageRoot(address(bridgehub), 1);
-        chainAssetHandler = new L1ChainAssetHandler(
-            governor,
-            address(bridgehub),
-            address(0),
-            address(messageroot),
-            address(0),
-            IL1Nullifier(address(0))
+        chainAssetHandler = new L1ChainAssetHandler(governor, address(bridgehub));
+        permissionlessValidator = new PermissionlessValidator();
+        messageroot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(address(bridgehub), 1, address(chainAssetHandler))),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
         );
         stdstore
             .target(address(messageroot))
@@ -110,6 +116,8 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             address(chainAssetHandler),
             address(0)
         );
+        vm.prank(governor);
+        chainAssetHandler.setAddresses();
 
         vm.mockCall(
             address(sharedBridge),
@@ -119,8 +127,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
 
         newChainAdmin = makeAddr("chainadmin");
 
-        vm.startPrank(address(bridgehub));
-        chainTypeManager = new EraChainTypeManager(address(bridgehub), interopCenterAddress, address(0));
+        chainTypeManager = new EraChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
         diamondInit = address(new DiamondInit(false));
         genesisUpgradeContract = new L1GenesisUpgrade();
 
@@ -134,7 +141,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         );
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)), false)),
+                facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)))),
                 action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: Utils.getAdminSelectors()
@@ -172,6 +179,22 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
                 selectors: Utils.getMailboxSelectors()
             })
         );
+        facetCuts.push(
+            Diamond.FacetCut({
+                facet: address(new MigratorFacet(block.chainid, false)),
+                action: Diamond.Action.Add,
+                isFreezable: false,
+                selectors: Utils.getMigratorSelectors()
+            })
+        );
+        facetCuts.push(
+            Diamond.FacetCut({
+                facet: address(new CommitterFacet(block.chainid)),
+                action: Diamond.Action.Add,
+                isFreezable: true,
+                selectors: Utils.getCommitterSelectors()
+            })
+        );
 
         ChainCreationParams memory chainCreationParams = ChainCreationParams({
             genesisUpgrade: address(genesisUpgradeContract),
@@ -187,6 +210,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -202,6 +226,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -213,13 +238,10 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         chainContractAddress = EraChainTypeManager(address(transparentUpgradeableProxy));
 
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
-
-        vm.stopPrank();
-        vm.startPrank(governor);
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
-        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain(testnetVerifier);
+        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain();
 
         bytes memory initCalldata = abi.encode(initializeData);
 
@@ -238,9 +260,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     }
 
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal returns (address) {
-        vm.stopPrank();
-        vm.prank(address(bridgehub));
-
         vm.mockCall(
             address(sharedBridge),
             abi.encodeWithSelector(IL1AssetRouter.L1_NULLIFIER.selector),
@@ -263,6 +282,8 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(18));
 
         mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge, baseTokenAssetId);
+
+        vm.prank(address(bridgehub));
         return
             chainContractAddress.createNewChain({
                 _chainId: chainId,
@@ -271,14 +292,9 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
                 _initData: abi.encode(abi.encode(_diamondCut), bytes("")),
                 _factoryDeps: new bytes[](0)
             });
-
-        vm.startPrank(governor);
     }
 
     function createNewChainWithId(Diamond.DiamondCutData memory _diamondCut, uint256 id) internal {
-        vm.stopPrank();
-        vm.prank(address(bridgehub));
-
         vm.mockCall(
             address(sharedBridge),
             abi.encodeWithSelector(IL1AssetRouter.L1_NULLIFIER.selector),
@@ -300,6 +316,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(18));
 
+        vm.prank(address(bridgehub));
         chainContractAddress.createNewChain({
             _chainId: id,
             _baseTokenAssetId: DataEncoding.encodeNTVAssetId(id, baseToken),
@@ -307,8 +324,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             _initData: abi.encode(abi.encode(_diamondCut), bytes("")),
             _factoryDeps: new bytes[](0)
         });
-
-        vm.startPrank(governor);
     }
 
     function _mockGetZKChainFromBridgehub(address _chainAddress) internal {

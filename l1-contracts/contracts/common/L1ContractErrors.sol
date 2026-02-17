@@ -37,8 +37,6 @@ error BadTransferDataLength();
 error BaseTokenGasPriceDenominatorNotSet();
 // 0x55ad3fd3
 error BatchHashMismatch(bytes32 expected, bytes32 actual);
-// 0x2078a6a0
-error BatchNotExecuted(uint256 batchNumber);
 // 0xbd4455ff
 error BatchNumberMismatch(uint256 expectedBatchNumber, uint256 providedBatchNumber);
 // 0x6cf12312
@@ -47,8 +45,6 @@ error BridgeHubAlreadyRegistered();
 error BridgeMintNotImplemented();
 // 0xaa5f6180
 error BurningNativeWETHNotSupported();
-// 0xccdd18d2
-error BytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0x25d8333c
 error CallerNotTimerAdmin();
 // 0x3331e9c0
@@ -113,18 +109,24 @@ error EmptyDeposit();
 error EmptyPrecommitData(uint256 batchNumber);
 // 0x456f8f7a
 error EmptyProofLength();
+// 0x876e8b23
+error EraBytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0x627e0872
 error ETHDepositNotSupported();
+// 0x61733a89
+error EVMBytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0xf4072616
 error ExecuteMessageFailed();
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
+// 0x3fce21be
+error FeeParamsChangeTooLarge(uint256 oldPrice, uint256 newPrice, uint256 maxAllowedPrice);
 // 0xc91cf3b1
 error GasPerPubdataMismatch();
-// 0x6d4a7df8
-error GenesisBatchCommitmentZero();
 // 0x5ca97564
 error GenesisBatchCommitmentIncorrect();
+// 0x6d4a7df8
+error GenesisBatchCommitmentZero();
 // 0x7940c83f
 error GenesisBatchHashZero();
 // 0xb4fc6835
@@ -192,6 +194,8 @@ error InvalidSelector(bytes4 func);
 error InvalidSystemLogsLength();
 // 0x7b7a98f1
 error InvalidThreshold(uint256 max, uint256 got);
+// 0xd857fbc0
+error InvalidTxCountInPriorityMode(uint256 l2TxCount, uint256 l1TxCount);
 // 0x5f1aa154
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xfb5c22e6
@@ -258,8 +262,6 @@ error NoLegacySharedBridge();
 error NonEmptyCalldata();
 // 0x536ec84b
 error NonEmptyMsgValue();
-// 0x230f9d11
-error NotEnoughSigners(uint256 provided, uint256 expected);
 // 0xd018e08e
 error NonIncreasingTimestamp();
 // 0x0105f9c0
@@ -276,8 +278,12 @@ error NotARestriction(address addr);
 error NotAssetRouter(address _sender, address _assetRouter);
 // 0xb49df1f2
 error NotAZKChain(address addr);
+// 0x7fdf8632
+error NotCompatibleWithPriorityMode();
 // 0x5e67e793
 error NotCurrentSettlementLayer();
+// 0x230f9d11
+error NotEnoughSigners(uint256 provided, uint256 expected);
 // 0xdd7e3621
 error NotInitializedReentrancyGuard();
 // 0xecb34449
@@ -288,6 +294,10 @@ error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
 error NotWhitelisted(address);
 // 0xf3ed9dfa
 error OnlyEraSupported();
+// 0x9d7bb13f
+error OnlyNormalMode();
+// 0xd702c443
+error OnlyPriorityMode();
 // 0x6c167909
 error OnlySelfAllowed();
 // 0x1a21feed
@@ -304,8 +314,16 @@ error PayloadTooShort();
 error PrecommitmentMismatch(uint256 batchNumber, bytes32 expected, bytes32 found);
 // 0x9b48e060
 error PreviousOperationNotExecuted();
+// 0x67c198fe
+error PriorityModeActivationTooEarly(uint256 earliestActivationTimestamp, uint256 currentTimestamp);
+// 0xdbfcbbef
+error PriorityModeIsNotAllowed();
+// 0x2b9d9c4c
+error PriorityModeRequiresPermanentRollup();
 // 0xd5a99014
 error PriorityOperationsRollingHashMismatch();
+// 0xbeda0935
+error PriorityOpsRequestTimestampMissing(uint256 requestId);
 // 0x1a4d284a
 error PriorityTxPubdataExceedsMaxPubDataPerBatch();
 // 0xa461f651
@@ -344,14 +362,14 @@ error SettlementLayersMustSettleOnL1();
 error SharedBridgeNotSet();
 // 0x7774d2f9
 error SharedBridgeValueNotSet(SharedBridgeKey);
-// 0xa665a34d
-error SignaturesLengthMismatch(uint256 expected, uint256 actual);
-// 0xa7781cbb
-error SignersNotSorted();
-// 0x3b94fe24
-error SignerNotAuthorized(address signer);
 // 0xabdc734e
 error SignatureNotValid(address signer);
+// 0xa665a34d
+error SignaturesLengthMismatch(uint256 expected, uint256 actual);
+// 0x3b94fe24
+error SignerNotAuthorized(address signer);
+// 0xa7781cbb
+error SignersNotSorted();
 // 0xdf3a8fdd
 error SlotOccupied();
 // 0xcc0f168b
@@ -366,6 +384,8 @@ error TimerAlreadyStarted();
 error TimestampError();
 // 0xa51fa558
 error TokenIsLegacy();
+// 0xb1e96bbd
+error TokenMultiplierChangeTooFrequent(uint256 nextAllowedTimestamp);
 // 0x1850b46b
 error TokenNotLegacy();
 // 0x06439c6b
@@ -418,6 +438,8 @@ error WithdrawalAlreadyFinalized();
 error WithdrawFailed();
 // 0xf20c5c2a
 error WrappedBaseTokenAlreadyRegistered();
+// 0xf1ff6cf6
+error WrongCTMDeployerVariant();
 // 0x15e8e429
 error WrongMagicValue(uint256 expectedMagicValue, uint256 providedMagicValue);
 // 0xd92e233d

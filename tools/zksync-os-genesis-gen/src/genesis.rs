@@ -1,9 +1,10 @@
 use crate::consts::{
-    EIP1967_ADMIN_SLOT, EIP1967_IMPLEMENTATION_SLOT, INITIAL_CONTRACTS, L2_COMPLEX_UPGRADER_ADDR,
-    L2_COMPLEX_UPGRADER_IMPL_ADDR, SYSTEM_CONTRACT_PROXY_ADMIN, SYSTEM_PROXY_ADMIN_OWNER_SLOT,
+    ContractSource, EIP1967_ADMIN_SLOT, EIP1967_IMPLEMENTATION_SLOT, INITIAL_CONTRACTS,
+    L2_COMPLEX_UPGRADER_ADDR, L2_COMPLEX_UPGRADER_IMPL_ADDR, SYSTEM_CONTRACT_PROXY_ADMIN,
+    SYSTEM_PROXY_ADMIN_OWNER_SLOT,
 };
 use crate::types::{InitialGenesisInput, LeafInfo, MAX_B256_VALUE, MERKLE_TREE_DEPTH};
-use crate::utils::{address_to_b256, bytecode_to_code};
+use crate::utils::{address_to_b256, da_contract_name_to_code, l1_contract_name_to_code};
 use alloy::consensus::{Header, EMPTY_OMMER_ROOT_HASH};
 use alloy::eips::eip1559::INITIAL_BASE_FEE;
 use alloy::primitives::{Address, Bloom, B256, B64, U256};
@@ -19,8 +20,12 @@ impl InitialGenesisInput {
         InitialGenesisInput {
             initial_contracts: INITIAL_CONTRACTS
                 .iter()
-                .map(|(addr, name)| {
-                    let code = bytecode_to_code(name);
+                .map(|(addr, source)| {
+                    let code = match source {
+                        ContractSource::L1ContractName(name) => l1_contract_name_to_code(name),
+                        ContractSource::DAContractName(name) => da_contract_name_to_code(name),
+                        ContractSource::Bytecode(bytecode) => bytecode.to_vec(),
+                    };
                     (*addr, alloy::primitives::Bytes::from(code))
                 })
                 .collect(),

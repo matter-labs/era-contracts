@@ -52,4 +52,8 @@ contract FullMerkleTest {
     function zeros(uint256 _index) external view returns (bytes32) {
         return tree._zeros[_index];
     }
+
+    function merklePath(uint256 _index) external view returns (bytes32[] memory) {
+        return tree.merklePath(_index);
+    }
 }
