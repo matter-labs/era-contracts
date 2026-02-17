@@ -3,24 +3,14 @@
 import { ethers, providers, Wallet, Contract } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { getDefaultAccountPrivateKey } from "./src/utils";
-
-const INTEROP_CENTER_ADDR = "0x000000000000000000000000000000000001000d";
-const L2_ASSET_ROUTER_ADDR = "0x0000000000000000000000000000000000010003";
-const L2_NATIVE_TOKEN_VAULT_ADDR = "0x0000000000000000000000000000000000010004";
-
-const INTEROP_CENTER_ABI = [
-  "function sendBundle(bytes calldata _destinationChainId, tuple(bytes to, bytes data, bytes[] callAttributes)[] calldata _callStarters, bytes[] calldata _bundleAttributes) external payable returns (bytes32)",
-];
-
-const TEST_TOKEN_ABI = [
-  "function balanceOf(address) view returns (uint256)",
-  "function approve(address spender, uint256 amount) returns (bool)",
-  "function allowance(address owner, address spender) view returns (uint256)",
-];
-
-const L2_ASSET_ROUTER_ABI = [
-  "function bridgehubDepositBaseToken(uint256 _chainId, bytes32 _assetId, address _originalCaller, uint256 _amount) external payable",
-];
+import { loadAbiFromOut } from "./src/utils";
+import {
+  INTEROP_BUNDLE_TUPLE_TYPE,
+  INTEROP_CENTER_ADDR,
+  L2_ASSET_ROUTER_ADDR,
+  L2_INTEROP_HANDLER_ADDR,
+  L2_NATIVE_TOKEN_VAULT_ADDR,
+} from "./src/const";
 
 /**
  * Encode a chain ID in ERC-7930 format (EVM chain without address)
@@ -71,6 +61,8 @@ async function main() {
   const privateKey = getDefaultAccountPrivateKey();
   const sourceProvider = new providers.JsonRpcProvider(sourceChain.rpcUrl);
   const sourceWallet = new Wallet(privateKey, sourceProvider);
+  const targetProvider = new providers.JsonRpcProvider(targetChain.rpcUrl);
+  const targetWallet = new Wallet(privateKey, targetProvider);
 
   const sourceTokenAddr = state.testTokens[sourceChainId];
   const targetTokenAddr = state.testTokens[targetChainId];
@@ -79,8 +71,10 @@ async function main() {
     throw new Error("Test tokens not found. Run 'yarn deploy:test-token' first.");
   }
 
-  const testToken = new Contract(sourceTokenAddr, TEST_TOKEN_ABI, sourceWallet);
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, INTEROP_CENTER_ABI, sourceWallet);
+  const testTokenAbi = loadAbiFromOut("TestnetERC20Token.sol/TestnetERC20Token.json");
+  const testToken = new Contract(sourceTokenAddr, testTokenAbi, sourceWallet);
+  const interopCenterAbi = loadAbiFromOut("InteropCenter.sol/InteropCenter.json");
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, interopCenterAbi, sourceWallet);
 
   console.log("Configuration:");
   console.log(`  Source Chain: ${sourceChainId}`);
@@ -118,41 +112,20 @@ async function main() {
   );
   console.log(`\n🔑 Asset ID: ${assetId}`);
 
-  // Ensure token is registered in L2NativeTokenVault
-  const l2NativeTokenVaultAbi = ["function assetId(address) view returns (bytes32)"];
+  // Ensure token is registered in L2NativeTokenVault on source chain
+  const l2NativeTokenVaultAbi = loadAbiFromOut("L2NativeTokenVault.sol/L2NativeTokenVault.json");
   const l2NativeTokenVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultAbi, sourceProvider);
 
   const registeredAssetId = await l2NativeTokenVault.assetId(sourceTokenAddr);
   if (registeredAssetId === "0x0000000000000000000000000000000000000000000000000000000000000000") {
     console.log(`\n📝 Registering token in L2NativeTokenVault...`);
+    const l2NativeTokenVaultWithWallet = l2NativeTokenVault.connect(sourceWallet);
+    const registerTx = await l2NativeTokenVaultWithWallet.registerToken(sourceTokenAddr);
+    await registerTx.wait();
 
-    // Use storage manipulation to register the token
-    // Storage layout in L2NativeTokenVault (found via testing):
-    // mapping(bytes32 assetId => uint256 originChainId) public originChainId; // slot 49
-    // mapping(bytes32 assetId => address tokenAddress) public tokenAddress;  // slot 50
-    // mapping(address tokenAddress => bytes32 assetId) public assetId;       // slot 51
-
-    // Set assetId[tokenAddress] = assetId (slot 51)
-    const assetIdSlot = ethers.utils.keccak256(abiCoder.encode(["address", "uint256"], [sourceTokenAddr, 51]));
-    await sourceProvider.send("anvil_setStorageAt", [L2_NATIVE_TOKEN_VAULT_ADDR, assetIdSlot, assetId]);
-
-    // Set tokenAddress[assetId] = tokenAddress (slot 50)
-    const tokenAddressSlot = ethers.utils.keccak256(abiCoder.encode(["bytes32", "uint256"], [assetId, 50]));
-    const paddedTokenAddress = abiCoder.encode(["address"], [sourceTokenAddr]);
-    await sourceProvider.send("anvil_setStorageAt", [L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddressSlot, paddedTokenAddress]);
-
-    // Set originChainId[assetId] = chainId (slot 49)
-    const originChainIdSlot = ethers.utils.keccak256(abiCoder.encode(["bytes32", "uint256"], [assetId, 49]));
-    const paddedChainId = abiCoder.encode(["uint256"], [sourceChainId]);
-    await sourceProvider.send("anvil_setStorageAt", [L2_NATIVE_TOKEN_VAULT_ADDR, originChainIdSlot, paddedChainId]);
-
-    // Verify registration
-    // Note: The contract getter may not work if L2NativeTokenVault isn't fully initialized,
-    // but the storage IS being set correctly (verified with cast storage)
     const verifyAssetId = await l2NativeTokenVault.assetId(sourceTokenAddr);
-    if (verifyAssetId !== assetId) {
-      console.log(`   ⚠️  Contract getter returns ${verifyAssetId}`);
-      console.log(`   But storage was set directly, proceeding anyway...`);
+    if (verifyAssetId === "0x0000000000000000000000000000000000000000000000000000000000000000") {
+      throw new Error("Token registration failed in L2NativeTokenVault");
     }
 
     console.log(`   ✅ Token registered in L2NativeTokenVault`);
@@ -212,6 +185,8 @@ async function main() {
   console.log(`   InteropCenter: ${INTEROP_CENTER_ADDR}`);
   console.log(`   Target: L2AssetRouter at ${L2_ASSET_ROUTER_ADDR}`);
 
+  const startBlock = await targetProvider.getBlockNumber();
+
   const tx = await interopCenter.sendBundle(
     destinationChainIdBytes,
     [callStarter],
@@ -231,9 +206,96 @@ async function main() {
   console.log("\n=== ✅ Token Transfer Message Sent ===");
   console.log(`Source Chain: ${sourceChainId}`);
   console.log(`Source Tx:    ${tx.hash}`);
-  console.log();
-  console.log("⏳ Message will be relayed by L2→L2 relayer daemon");
-  console.log("   Check daemon logs: tail -f /tmp/step6-output.log");
+
+  let interopBundle: any = null;
+  if (receipt?.logs) {
+    for (const log of receipt.logs) {
+      try {
+        const parsed = interopCenter.interface.parseLog({
+          topics: log.topics as string[],
+          data: log.data,
+        });
+        if (parsed && parsed.name === "InteropBundleSent") {
+          interopBundle = parsed.args.interopBundle;
+          break;
+        }
+      } catch {
+        // Ignore non-InteropCenter logs
+      }
+    }
+  }
+  if (!interopBundle) {
+    throw new Error("InteropBundleSent event not found in source transaction receipt");
+  }
+
+  let targetTxHash: string | null = null;
+  const maxAttempts = 60;
+  for (let attempt = 0; attempt < maxAttempts && !targetTxHash; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const currentBlock = await targetProvider.getBlockNumber();
+
+    for (let blockNum = startBlock; blockNum <= currentBlock; blockNum++) {
+      const block = await targetProvider.getBlock(blockNum);
+      if (!block) {
+        continue;
+      }
+
+      for (const blockTxHash of block.transactions) {
+        const blockTx = await targetProvider.getTransaction(blockTxHash);
+        const txTo = blockTx?.to?.toLowerCase();
+        if (txTo === L2_ASSET_ROUTER_ADDR.toLowerCase() || txTo === L2_INTEROP_HANDLER_ADDR.toLowerCase()) {
+          targetTxHash = blockTxHash;
+          break;
+        }
+      }
+
+      if (targetTxHash) {
+        break;
+      }
+    }
+  }
+
+  console.log("⚙️ Executing bundle directly on destination chain via L2InteropHandler...");
+  const interopHandlerAbi = loadAbiFromOut("InteropHandler.sol/InteropHandler.json");
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbi, targetWallet);
+
+  const mockProof = {
+    chainId: sourceChainId,
+    l1BatchNumber: 0,
+    l2MessageIndex: 0,
+    message: {
+      txNumberInBatch: 0,
+      sender: INTEROP_CENTER_ADDR,
+      data: "0x",
+    },
+    proof: [],
+  };
+
+  const bundleData = abiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]);
+  try {
+    const executeTx = await interopHandler.executeBundle(bundleData, mockProof, { gasLimit: 5_000_000 });
+    await executeTx.wait();
+    targetTxHash = executeTx.hash;
+    console.log(`   ✅ executeBundle tx: ${executeTx.hash}`);
+  } catch (error: any) {
+    const message = error?.message || String(error);
+    console.log(`   ⚠️ executeBundle failed: ${message}`);
+    const failedTxHash = error?.transactionHash;
+    if (!targetTxHash && failedTxHash) {
+      targetTxHash = failedTxHash;
+      console.log(`   ⚠️ using reverted executeBundle tx hash: ${failedTxHash}`);
+    }
+  }
+
+  if (targetTxHash) {
+    console.log(`Target Chain: ${targetChainId}`);
+    console.log(`Target Tx:    ${targetTxHash}`);
+  } else {
+    console.log(`Target Chain: ${targetChainId}`);
+    console.log("Target Tx:    not found yet (relay may still be pending)");
+    console.log("             Check daemon logs: tail -f /tmp/step6-output.log");
+    console.log("             Ensure step6 is running");
+  }
   console.log();
   console.log("✅ Token Bridging Infrastructure Status:");
   console.log("   ✓ Token approval working");
@@ -242,11 +304,11 @@ async function main() {
   console.log("   ✓ InteropCenter routes to L2AssetRouter.initiateIndirectCall");
   console.log("   ✓ L2→L2 relay working");
   console.log();
-  console.log("⚠️  L2AssetRouter requires full initialization:");
-  console.log("   - L2NativeTokenVault setup (bytecode hashes, beacons)");
-  console.log("   - Asset handler registration");
-  console.log("   - Token vault configuration");
-  console.log("   For production setup, see L2NativeTokenVault.initL2() requirements.");
+  console.log("Trace commands:");
+  console.log(`  cast run ${tx.hash} -r ${sourceChain.rpcUrl}`);
+  if (targetTxHash) {
+    console.log(`  cast run ${targetTxHash} -r ${targetChain.rpcUrl}`);
+  }
 }
 
 main().catch((error) => {

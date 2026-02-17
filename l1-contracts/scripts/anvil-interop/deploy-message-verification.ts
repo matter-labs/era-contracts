@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import * as fs from "fs";
-import * as path from "path";
 import { providers } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
+import { L2_MESSAGE_VERIFICATION_ADDR } from "./src/const";
+import { loadBytecodeFromOut } from "./src/utils";
 
 /**
  * Deploy MockL2MessageVerification on all L2 chains for Anvil testing
@@ -19,11 +19,7 @@ async function main() {
 
   console.log("\n=== Deploying MockL2MessageVerification (Anvil Testing) ===\n");
 
-  const L2_MESSAGE_VERIFICATION_ADDR = "0x0000000000000000000000000000000000010009";
-  const contractsRoot = path.resolve(__dirname, "../../..");
-  const contractPath = path.join(contractsRoot, "l1-contracts/out/MockL2MessageVerification.sol/MockL2MessageVerification.json");
-  const artifact = JSON.parse(fs.readFileSync(contractPath, "utf-8"));
-  const bytecode = artifact.deployedBytecode?.object || artifact.bytecode?.object;
+  const bytecode = loadBytecodeFromOut("MockL2MessageVerification.sol/MockL2MessageVerification.json");
 
   if (!bytecode || bytecode === "0x") {
     throw new Error("No bytecode found for MockL2MessageVerification");

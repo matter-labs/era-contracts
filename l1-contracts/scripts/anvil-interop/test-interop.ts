@@ -2,7 +2,7 @@
 
 import { providers, Wallet, Contract } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
-import { getDefaultAccountPrivateKey } from "./src/utils";
+import { getDefaultAccountPrivateKey, loadAbiFromOut } from "./src/utils";
 
 /**
  * Simple interop test:
@@ -49,10 +49,7 @@ async function main() {
 
   // Test 1: Check chain registration
   console.log("Test 1: Verifying chain registration...");
-  const bridgehubAbi = [
-    "function getZKChain(uint256 chainId) external view returns (address)",
-    "function requestL2TransactionDirect((uint256 chainId, uint256 mintValue, address l2Contract, uint256 l2Value, bytes l2Calldata, uint256 l2GasLimit, uint256 l2GasPerPubdataByteLimit, bytes[] factoryDeps, address refundRecipient) calldata request) external payable returns (bytes32)",
-  ];
+  const bridgehubAbi = loadAbiFromOut("IL1Bridgehub.sol/IL1Bridgehub.json");
 
   const bridgehub = new Contract(state.l1Addresses.bridgehub, bridgehubAbi, wallet);
 

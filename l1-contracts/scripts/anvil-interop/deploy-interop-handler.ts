@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import * as fs from "fs";
-import * as path from "path";
 import { providers } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
+import { L2_INTEROP_HANDLER_ADDR } from "./src/const";
+import { loadBytecodeFromOut } from "./src/utils";
 
 /**
  * Deploy L2InteropHandler on all L2 chains
@@ -18,11 +18,7 @@ async function main() {
 
   console.log("\n=== Deploying L2InteropHandler ===\n");
 
-  const L2_INTEROP_HANDLER_ADDR = "0x000000000000000000000000000000000001000e";
-  const contractsRoot = path.resolve(__dirname, "../../..");
-  const contractPath = path.join(contractsRoot, "l1-contracts/out/InteropHandler.sol/InteropHandler.json");
-  const artifact = JSON.parse(fs.readFileSync(contractPath, "utf-8"));
-  const bytecode = artifact.deployedBytecode?.object || artifact.bytecode?.object;
+  const bytecode = loadBytecodeFromOut("InteropHandler.sol/InteropHandler.json");
 
   if (!bytecode || bytecode === "0x") {
     throw new Error("No bytecode found for InteropHandler");

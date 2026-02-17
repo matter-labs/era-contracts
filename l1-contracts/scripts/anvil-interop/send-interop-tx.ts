@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
-import { providers, Wallet, Contract, AbiCoder, zeroPadValue, getBytes, hexlify } from "ethers";
+import { ethers, providers, Wallet, Contract } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
-import { getDefaultAccountPrivateKey } from "./src/utils";
+import { getDefaultAccountPrivateKey, loadAbiFromOut } from "./src/utils";
+import { CONTRACT_DEPLOYER_ADDR, INTEROP_CENTER_ADDR } from "./src/const";
 
 /**
  * Encode a chain ID in ERC-7930 format (EVM chain without address)
@@ -14,11 +15,11 @@ function encodeEvmChain(chainId: number): string {
   if (chainIdHex.length % 2 !== 0) {
     chainIdHex = "0" + chainIdHex;
   }
-  const chainRefBytes = getBytes("0x" + chainIdHex);
+  const chainRefBytes = ethers.utils.arrayify("0x" + chainIdHex);
   const chainRefLen = chainRefBytes.length;
 
   // Format: 0x00010000 (version 1, EVM chain) + chainRefLen + chainRef + 0x00 (no address)
-  return hexlify(
+  return ethers.utils.hexlify(
     new Uint8Array([
       0x00,
       0x01, // version 1
@@ -36,9 +37,9 @@ function encodeEvmChain(chainId: number): string {
  * Format: version(2) + chainType(2) + chainRefLen(1) + addrLen(1) + addr(20)
  */
 function encodeEvmAddress(address: string): string {
-  const addrBytes = getBytes(address);
+  const addrBytes = ethers.utils.arrayify(address);
   // Format: 0x000100000014 (version 1, EVM, no chain ref, 20-byte address) + address
-  return hexlify(
+  return ethers.utils.hexlify(
     new Uint8Array([
       0x00,
       0x01, // version 1
@@ -75,7 +76,7 @@ async function main() {
   // Parse arguments
   const sourceChainId = process.argv[2] ? parseInt(process.argv[2]) : 10;
   const targetChainId = process.argv[3] ? parseInt(process.argv[3]) : 12;
-  const targetAddress = process.argv[4] || "0x0000000000000000000000000000000000008006"; // ContractDeployer
+  const targetAddress = process.argv[4] || CONTRACT_DEPLOYER_ADDR; // ContractDeployer
   const targetCalldata = process.argv[5] || "0x"; // Empty calldata
 
   // Verify chains exist
@@ -100,14 +101,8 @@ async function main() {
   const sourceProvider = new providers.JsonRpcProvider(sourceChain.rpcUrl);
   const wallet = new Wallet(privateKey, sourceProvider);
 
-  // InteropCenter is deployed at system address
-  const INTEROP_CENTER_ADDR = "0x000000000000000000000000000000000001000d";
-
   // InteropCenter ABI - sendBundle function
-  const interopCenterAbi = [
-    "function sendBundle(bytes calldata _destinationChainId, tuple(bytes to, bytes data, bytes[] callAttributes)[] calldata _callStarters, bytes[] calldata _bundleAttributes) external payable returns (bytes32)",
-    "event InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, tuple(bytes32 canonicalHash, bytes32 chainTreeRoot, bytes32 destination, uint256 nonce, tuple(address target, uint256 value, bytes data)[] calls) interopBundle)",
-  ];
+  const interopCenterAbi = loadAbiFromOut("InteropCenter.sol/InteropCenter.json");
 
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, interopCenterAbi, wallet);
 

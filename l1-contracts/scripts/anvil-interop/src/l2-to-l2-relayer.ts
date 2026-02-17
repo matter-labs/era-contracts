@@ -1,7 +1,8 @@
 import type { providers } from "ethers";
 import { Contract, Wallet, utils } from "ethers";
 import type { ChainAddresses, CoreDeployedAddresses } from "./types";
-import { sleep } from "./utils";
+import { sleep, loadAbiFromOut } from "./utils";
+import { INTEROP_BUNDLE_TUPLE_TYPE, INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR } from "./const";
 
 /**
  * L2→L2 Cross-Chain Relayer
@@ -27,7 +28,7 @@ export class L2ToL2Relayer {
   private processedTxHashes: Set<string> = new Set();
 
   // InteropCenter system contract address
-  private readonly INTEROP_CENTER_ADDR = "0x000000000000000000000000000000000001000d";
+  private readonly INTEROP_CENTER_ADDR = INTEROP_CENTER_ADDR;
 
   // InteropBundleSent event signature
   // event InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle interopBundle)
@@ -209,7 +210,7 @@ export class L2ToL2Relayer {
         [
           "bytes32", // l2l1MsgHash
           "bytes32", // interopBundleHash
-          "tuple(bytes1,uint256,uint256,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes))", // InteropBundle
+          INTEROP_BUNDLE_TUPLE_TYPE, // InteropBundle
         ],
         interopEventLog.data
       );
@@ -253,8 +254,6 @@ export class L2ToL2Relayer {
     // In production, this would go through L1 settlement
     const targetWallet = new Wallet(this.l1Wallet.privateKey, targetProvider);
 
-    const L2_INTEROP_HANDLER_ADDR = "0x000000000000000000000000000000000001000e";
-
     // Encode the executeBundle call
     // For Anvil testing, we use an empty/mock proof since we're not doing full L1 settlement
     const mockProof = {
@@ -263,15 +262,13 @@ export class L2ToL2Relayer {
       l2MessageIndex: 0,
       message: {
         txNumberInBatch: 0,
-        sender: "0x000000000000000000000000000000000001000d", // InteropCenter
+        sender: INTEROP_CENTER_ADDR,
         data: "0x"
       },
       proof: []
     };
 
-    const interopHandlerAbi = [
-      "function executeBundle(bytes memory _bundle, tuple(uint256 chainId, uint256 l1BatchNumber, uint256 l2MessageIndex, tuple(uint16 txNumberInBatch, address sender, bytes data) message, bytes32[] proof) memory _proof) public"
-    ];
+    const interopHandlerAbi = loadAbiFromOut("InteropHandler.sol/InteropHandler.json");
 
     const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbi, targetWallet);
 
@@ -279,12 +276,12 @@ export class L2ToL2Relayer {
     // The event emits (l2l1MsgHash, interopBundleHash, InteropBundle)
     // We need to extract and re-encode just the InteropBundle for executeBundle
     const bundleData = abiCoder.encode(
-      ["tuple(bytes1,uint256,uint256,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes))"],
+      [INTEROP_BUNDLE_TUPLE_TYPE],
       [interopBundle]
     );
 
     try {
-      const tx = await interopHandler.getFunction("executeBundle")(bundleData, mockProof, {
+      const tx = await interopHandler.executeBundle(bundleData, mockProof, {
         gasLimit: 5000000,
       });
 

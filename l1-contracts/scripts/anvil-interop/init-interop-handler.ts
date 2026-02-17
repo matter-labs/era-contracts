@@ -2,7 +2,8 @@
 
 import { providers, Contract, Wallet } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
-import { getDefaultAccountPrivateKey } from "./src/utils";
+import { getDefaultAccountPrivateKey, loadAbiFromOut } from "./src/utils";
+import { L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_HANDLER_ADDR } from "./src/const";
 
 /**
  * Initialize L2InteropHandler on all L2 chains
@@ -17,14 +18,9 @@ async function main() {
 
   console.log("\n=== Initializing L2InteropHandler ===\n");
 
-  const L2_INTEROP_HANDLER_ADDR = "0x000000000000000000000000000000000001000e";
-  const L2_COMPLEX_UPGRADER_ADDR = "0x000000000000000000000000000000000000800f";
   const privateKey = getDefaultAccountPrivateKey();
 
-  const interopHandlerAbi = [
-    "function initL2(uint256 _l1ChainId) public",
-    "function L1_CHAIN_ID() external view returns (uint256)"
-  ];
+  const interopHandlerAbi = loadAbiFromOut("InteropHandler.sol/InteropHandler.json");
 
   for (const l2Chain of state.chains.l2) {
     console.log(`Chain ${l2Chain.chainId}:`);
@@ -38,7 +34,7 @@ async function main() {
     let isInitialized = false;
     try {
       const l1ChainId = await interopHandler.L1_CHAIN_ID();
-      if (l1ChainId === 1n) {
+      if (l1ChainId?.toString?.() === "1") {
         console.log(`   ✅ L2InteropHandler already initialized\n`);
         continue;
       }
@@ -54,7 +50,7 @@ async function main() {
       const signer = await provider.getSigner(L2_COMPLEX_UPGRADER_ADDR);
       const interopHandlerWithSigner = interopHandler.connect(signer);
 
-      const tx = await interopHandlerWithSigner.getFunction("initL2")(1); // L1 chain ID = 1
+      const tx = await interopHandlerWithSigner.initL2(1); // L1 chain ID = 1
       await tx.wait();
 
       await provider.send("anvil_stopImpersonatingAccount", [L2_COMPLEX_UPGRADER_ADDR]);

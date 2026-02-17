@@ -1,7 +1,7 @@
 import type { providers } from "ethers";
 import { Contract, Wallet, utils } from "ethers";
 import type { BatchState, L2Transaction, CommitBatchInfo, StoredBatchInfo, ProofInput, ChainAddresses } from "./types";
-import { sleep } from "./utils";
+import { sleep, loadAbiFromOut } from "./utils";
 
 export class BatchSettler {
   private l1Provider: providers.JsonRpcProvider;
@@ -134,9 +134,7 @@ export class BatchSettler {
         throw new Error(`Chain addresses not found for chain ${chainId}`);
       }
 
-      const executorAbi = [
-        "function commitBatchesSharedBridge(uint256 chainId, tuple(uint64 batchNumber, bytes32 batchHash, uint64 indexRepeatedStorageChanges, uint256 numberOfLayer1Txs, bytes32 priorityOperationsHash, bytes32 l2LogsTreeRoot, uint256 timestamp, bytes32 commitment) storedBatchInfo, tuple(uint64 batchNumber, uint256 timestamp, uint64 indexRepeatedStorageChanges, bytes32 newStateRoot, uint256 numberOfLayer1Txs, bytes32 priorityOperationsHash, bytes32 bootloaderHeapInitialContentsHash, bytes32 eventsQueueStateHash, bytes systemLogs, bytes operatorDAInput)[] commitBatchInfos) external",
-      ];
+      const executorAbi = loadAbiFromOut("Executor.sol/ExecutorFacet.json");
 
       const executor = new Contract(chainAddresses.diamondProxy, executorAbi, this.wallet);
 
@@ -181,9 +179,7 @@ export class BatchSettler {
         throw new Error(`Chain addresses not found for chain ${chainId}`);
       }
 
-      const executorAbi = [
-        "function proveBatchesSharedBridge(uint256 chainId, tuple(uint64 batchNumber, bytes32 batchHash, uint64 indexRepeatedStorageChanges, uint256 numberOfLayer1Txs, bytes32 priorityOperationsHash, bytes32 l2LogsTreeRoot, uint256 timestamp, bytes32 commitment) prevBatch, tuple(uint64 batchNumber, bytes32 batchHash, uint64 indexRepeatedStorageChanges, uint256 numberOfLayer1Txs, bytes32 priorityOperationsHash, bytes32 l2LogsTreeRoot, uint256 timestamp, bytes32 commitment)[] committedBatches, tuple(uint256[] recursiveAggregationInput, uint256[] serializedProof) proof) external",
-      ];
+      const executorAbi = loadAbiFromOut("Executor.sol/ExecutorFacet.json");
 
       const executor = new Contract(chainAddresses.diamondProxy, executorAbi, this.wallet);
 
@@ -239,9 +235,7 @@ export class BatchSettler {
         throw new Error(`Chain addresses not found for chain ${chainId}`);
       }
 
-      const executorAbi = [
-        "function executeBatchesSharedBridge(uint256 chainId, tuple(uint64 batchNumber, bytes32 batchHash, uint64 indexRepeatedStorageChanges, uint256 numberOfLayer1Txs, bytes32 priorityOperationsHash, bytes32 l2LogsTreeRoot, uint256 timestamp, bytes32 commitment)[] batchesData) external",
-      ];
+      const executorAbi = loadAbiFromOut("Executor.sol/ExecutorFacet.json");
 
       const executor = new Contract(chainAddresses.diamondProxy, executorAbi, this.wallet);
 

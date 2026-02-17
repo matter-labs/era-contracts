@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { providers, Wallet, ContractFactory, Contract } from "ethers";
+import { ethers, providers, Wallet, ContractFactory } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { getDefaultAccountPrivateKey } from "./src/utils";
 import * as fs from "fs";
@@ -21,18 +21,18 @@ async function main() {
 
   const privateKey = getDefaultAccountPrivateKey();
 
-  // Load TestToken artifact
-  const artifactPath = path.join(__dirname, "../../out/TestToken.sol/TestToken.json");
+  // Load TestnetERC20Token artifact
+  const artifactPath = path.join(__dirname, "../../out/TestnetERC20Token.sol/TestnetERC20Token.json");
 
   if (!fs.existsSync(artifactPath)) {
-    throw new Error(`TestToken artifact not found at ${artifactPath}. Run 'forge build' first.`);
+    throw new Error(`TestnetERC20Token artifact not found at ${artifactPath}. Run 'forge build' first.`);
   }
 
   const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf-8"));
   const abi = artifact.abi;
   const bytecode = artifact.bytecode.object;
 
-  console.log(`📦 TestToken bytecode length: ${bytecode.length} bytes\n`);
+  console.log(`📦 TestnetERC20Token bytecode length: ${bytecode.length} bytes\n`);
 
   const tokenAddresses: { [chainId: number]: string } = {};
 
@@ -44,17 +44,16 @@ async function main() {
     try {
       // Deploy TestToken contract
       const factory = new ContractFactory(abi, bytecode, wallet);
-      const token = await factory.deploy();
-      await token.waitForDeployment();
+      const token = await factory.deploy("Test Token", "TEST", 18);
+      await token.deployed();
 
-      const tokenAddress = await token.getAddress();
+      const tokenAddress = token.address;
       tokenAddresses[chain.chainId] = tokenAddress;
 
-      console.log(`   ✅ TestToken deployed at ${tokenAddress}`);
+      console.log(`   ✅ TestnetERC20Token deployed at ${tokenAddress}`);
 
-      // Mint some tokens to the deployer using the ABI
-      const mintInterface = new Contract(tokenAddress, ["function mint(address,uint256)"], wallet);
-      const mintTx = await mintInterface.mint(wallet.address, BigInt(1000) * BigInt(10) ** BigInt(18));
+      // Mint some tokens to the deployer
+      const mintTx = await token.mint(wallet.address, ethers.utils.parseUnits("1000", 18));
       await mintTx.wait();
 
       console.log(`   ✅ Minted 1000 TEST tokens to ${wallet.address}\n`);

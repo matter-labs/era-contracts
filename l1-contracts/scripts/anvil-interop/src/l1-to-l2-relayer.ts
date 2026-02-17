@@ -1,7 +1,7 @@
 import type { providers } from "ethers";
 import { Contract, Wallet, utils } from "ethers";
 import type { ChainAddresses, CoreDeployedAddresses } from "./types";
-import { sleep } from "./utils";
+import { sleep, loadAbiFromOut } from "./utils";
 
 /**
  * L1→L2 Transaction Relayer
@@ -91,9 +91,7 @@ export class L1ToL2Relayer {
     toBlock: number
   ): Promise<void> {
     // ABI for requestL2TransactionDirect function
-    const bridgehubAbi = [
-      "function requestL2TransactionDirect(tuple(uint256 chainId, uint256 mintValue, address l2Contract, uint256 l2Value, bytes l2Calldata, uint256 l2GasLimit, uint256 l2GasPerPubdataByteLimit, bytes[] factoryDeps, address refundRecipient) _request) external payable returns (bytes32)",
-    ];
+    const bridgehubAbi = loadAbiFromOut("IL1Bridgehub.sol/IL1Bridgehub.json");
 
     const bridgehub = new Contract(this.l1Addresses.bridgehub, bridgehubAbi, this.l1Provider);
     const iface = bridgehub.interface;

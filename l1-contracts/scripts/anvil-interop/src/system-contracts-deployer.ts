@@ -1,6 +1,24 @@
 import * as fs from "fs";
 import * as path from "path";
 import { providers, Contract, Wallet, utils } from "ethers";
+import { loadAbiFromOut } from "./utils";
+import {
+  ETH_TOKEN_ADDRESS,
+  INTEROP_CENTER_ADDR,
+  L2_ASSET_ROUTER_ADDR,
+  L2_ASSET_TRACKER_ADDR,
+  L2_BASE_TOKEN_ADDR,
+  L2_BRIDGEHUB_ADDR,
+  L2_CHAIN_ASSET_HANDLER_ADDR,
+  L2_COMPLEX_UPGRADER_ADDR,
+  L2_INTEROP_HANDLER_ADDR,
+  L2_MESSAGE_VERIFICATION_ADDR,
+  L2_NATIVE_TOKEN_VAULT_ADDR,
+  L2_TO_L1_MESSENGER_ADDR,
+  SERVICE_TX_SENDER_ADDR,
+  SYSTEM_CONTEXT_ADDR,
+  LEGACY_SHARED_BRIDGE_PLACEHOLDER,
+} from "./const";
 
 /**
  * SystemContractsDeployer
@@ -18,6 +36,10 @@ export class SystemContractsDeployer {
     this.l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
     this.l2Wallet = new Wallet(privateKey, this.l2Provider);
     this.contractsRoot = path.resolve(__dirname, "../../../..");
+  }
+
+  private isOne(value: any): boolean {
+    return value?.toString?.() === "1";
   }
 
   /**
@@ -67,7 +89,7 @@ export class SystemContractsDeployer {
     const contractWithSigner = contract.connect(signer);
 
     console.log(`   Initializing ${name}...`);
-    const tx = await contractWithSigner.getFunction(initFunction)(...args);
+    const tx = await (contractWithSigner as any)[initFunction](...args);
     await tx.wait();
 
     await this.l2Provider.send("anvil_stopImpersonatingAccount", [impersonatedAccount]);
@@ -82,7 +104,7 @@ export class SystemContractsDeployer {
 
     // 1. MockSystemContext at 0x800b
     await this.deploySystemContract(
-      "0x000000000000000000000000000000000000800b",
+      SYSTEM_CONTEXT_ADDR,
       "l1-contracts/out/MockSystemContext.sol/MockSystemContext.json",
       "MockSystemContext"
     );
@@ -96,36 +118,49 @@ export class SystemContractsDeployer {
     // 4. L2Bridgehub at 0x010002
     await this.deployL2Bridgehub(chainId);
 
-    // 5. InteropCenter at 0x1000d
+    // 5. L2MessageVerification at 0x10009
+    await this.deployL2MessageVerification();
+
+    // 6. InteropCenter at 0x1000d
     await this.deployInteropCenter();
 
-    // 6. L2InteropHandler at 0x1000e
+    // 7. L2InteropHandler at 0x1000e
     await this.deployL2InteropHandler();
 
-    // 7. L2AssetRouter at 0x010003
+    // 8. L2AssetRouter at 0x010003
     await this.deployL2AssetRouter();
 
-    // 8. L2ChainAssetHandler at 0x1000a
+    // 9. L2ChainAssetHandler at 0x1000a
     await this.deployL2ChainAssetHandler();
 
-    // 9. L2AssetTracker at 0x1000f
+    // 10. L2AssetTracker at 0x1000f
     await this.deployL2AssetTracker(chainId);
 
-    // 10. L2NativeTokenVault at 0x010004
+    // 11. L2NativeTokenVault at 0x010004
     await this.deployL2NativeTokenVault();
 
-    // 11. Register asset handlers for test tokens
+    // 12. Register asset handlers for test tokens
     await this.registerAssetHandlers(chainId);
 
     console.log(`✅ All system contracts deployed for chain ${chainId}`);
   }
 
   /**
+   * Deploy L2MessageVerification system contract.
+   * For anvil interop we deploy the mock implementation that always verifies inclusion.
+   */
+  private async deployL2MessageVerification(): Promise<void> {
+    await this.deploySystemContract(
+      L2_MESSAGE_VERIFICATION_ADDR,
+      "l1-contracts/out/MockL2MessageVerification.sol/MockL2MessageVerification.json",
+      "L2MessageVerification"
+    );
+  }
+
+  /**
    * Deploy L2ToL1Messenger system contract
    */
   private async deployL2ToL1Messenger(): Promise<void> {
-    const L2_TO_L1_MESSENGER_ADDR = "0x0000000000000000000000000000000000008008";
-
     // Check if already deployed
     const existingCode = await this.l2Provider.getCode(L2_TO_L1_MESSENGER_ADDR);
     if (existingCode !== "0x" && existingCode !== "0x0") {
@@ -145,8 +180,6 @@ export class SystemContractsDeployer {
    * Deploy mock L2ToL1Messenger (compiled version)
    */
   private async deployMockL2ToL1Messenger(): Promise<void> {
-    const L2_TO_L1_MESSENGER_ADDR = "0x0000000000000000000000000000000000008008";
-
     // Use the compiled MockL2ToL1Messenger bytecode
     const mockPath = path.join(
       this.contractsRoot,
@@ -168,8 +201,6 @@ export class SystemContractsDeployer {
    * Deploy L2BaseToken system contract
    */
   private async deployL2BaseToken(): Promise<void> {
-    const L2_BASE_TOKEN_ADDR = "0x000000000000000000000000000000000000800a";
-
     // Check if already deployed
     const existingCode = await this.l2Provider.getCode(L2_BASE_TOKEN_ADDR);
     if (existingCode !== "0x" && existingCode !== "0x0") {
@@ -189,8 +220,6 @@ export class SystemContractsDeployer {
    * Deploy minimal mock L2BaseToken if real one not available
    */
   private async deployMinimalL2BaseToken(): Promise<void> {
-    const L2_BASE_TOKEN_ADDR = "0x000000000000000000000000000000000000800a";
-
     // Use the compiled MockL2BaseToken bytecode
     const mockPath = path.join(
       this.contractsRoot,
@@ -212,21 +241,14 @@ export class SystemContractsDeployer {
    * Deploy and initialize L2Bridgehub
    */
   private async deployL2Bridgehub(chainId: number): Promise<void> {
-    const L2_BRIDGEHUB_ADDR = "0x0000000000000000000000000000000000010002";
-
-    const l2BridgehubAbi = [
-      "function initL2(uint256 _l1ChainId, address _owner, uint256 _maxNumberOfZKChains) external",
-      "function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external",
-      "function baseTokenAssetId(uint256 _chainId) external view returns (bytes32)",
-      "function L1_CHAIN_ID() external view returns (uint256)",
-    ];
+    const l2BridgehubAbi = loadAbiFromOut("L2Bridgehub.sol/L2Bridgehub.json");
 
     // Check if already initialized
     const l2Bridgehub = new Contract(L2_BRIDGEHUB_ADDR, l2BridgehubAbi, this.l2Provider);
     let isInitialized = false;
     try {
       const l1ChainId = await l2Bridgehub.L1_CHAIN_ID();
-      if (l1ChainId === 1n) {
+      if (this.isOne(l1ChainId)) {
         console.log(`   ✅ L2Bridgehub already initialized`);
         isInitialized = true;
       }
@@ -247,7 +269,7 @@ export class SystemContractsDeployer {
         l2BridgehubAbi,
         "initL2",
         [1, ownerAddress, 100],
-        "0x000000000000000000000000000000000000800f", // L2_COMPLEX_UPGRADER
+        L2_COMPLEX_UPGRADER_ADDR,
         "L2Bridgehub"
       );
     }
@@ -263,7 +285,7 @@ export class SystemContractsDeployer {
     const chains = [10, 11, 12];
     const abiCoder = new utils.AbiCoder();
     const ethAssetId = utils.keccak256(
-      abiCoder.encode(["uint256", "address"], [1, "0x0000000000000000000000000000000000000001"])
+      abiCoder.encode(["uint256", "address"], [1, ETH_TOKEN_ADDRESS])
     );
 
     for (const targetChainId of chains) {
@@ -279,20 +301,16 @@ export class SystemContractsDeployer {
 
       console.log(`   Registering chain ${targetChainId} on L2Bridgehub...`);
 
-      const SERVICE_TX_SENDER = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF";
-      await this.l2Provider.send("anvil_impersonateAccount", [SERVICE_TX_SENDER]);
-      await this.l2Provider.send("anvil_setBalance", [SERVICE_TX_SENDER, "0x56BC75E2D63100000"]);
+      await this.l2Provider.send("anvil_impersonateAccount", [SERVICE_TX_SENDER_ADDR]);
+      await this.l2Provider.send("anvil_setBalance", [SERVICE_TX_SENDER_ADDR, "0x56BC75E2D63100000"]);
 
-      const signer = await this.l2Provider.getSigner(SERVICE_TX_SENDER);
+      const signer = await this.l2Provider.getSigner(SERVICE_TX_SENDER_ADDR);
       const l2BridgehubWithSigner = l2Bridgehub.connect(signer);
 
-      const tx = await l2BridgehubWithSigner.getFunction("registerChainForInterop")(
-        targetChainId,
-        ethAssetId
-      );
+      const tx = await l2BridgehubWithSigner.registerChainForInterop(targetChainId, ethAssetId);
       await tx.wait();
 
-      await this.l2Provider.send("anvil_stopImpersonatingAccount", [SERVICE_TX_SENDER]);
+      await this.l2Provider.send("anvil_stopImpersonatingAccount", [SERVICE_TX_SENDER_ADDR]);
       console.log(`   ✅ Chain ${targetChainId} registered`);
     }
   }
@@ -301,14 +319,7 @@ export class SystemContractsDeployer {
    * Deploy and initialize InteropCenter
    */
   private async deployInteropCenter(): Promise<void> {
-    const INTEROP_CENTER_ADDR = "0x000000000000000000000000000000000001000d";
-
-    const interopCenterAbi = [
-      "function initL2(uint256 _l1ChainId, address _owner) external",
-      "function unpause() external",
-      "function paused() external view returns (bool)",
-      "function L1_CHAIN_ID() external view returns (uint256)",
-    ];
+    const interopCenterAbi = loadAbiFromOut("InteropCenter.sol/InteropCenter.json");
 
     const interopCenter = new Contract(INTEROP_CENTER_ADDR, interopCenterAbi, this.l2Provider);
 
@@ -316,7 +327,7 @@ export class SystemContractsDeployer {
     let isInitialized = false;
     try {
       const l1ChainId = await interopCenter.L1_CHAIN_ID();
-      if (l1ChainId === 1n) {
+      if (this.isOne(l1ChainId)) {
         console.log(`   ✅ InteropCenter already initialized`);
         isInitialized = true;
       }
@@ -337,17 +348,17 @@ export class SystemContractsDeployer {
         interopCenterAbi,
         "initL2",
         [1, ownerAddress],
-        "0x000000000000000000000000000000000000800f", // L2_COMPLEX_UPGRADER
+        L2_COMPLEX_UPGRADER_ADDR,
         "InteropCenter"
       );
     }
 
     // Unpause if needed
     const interopCenterWithOwner = interopCenter.connect(this.l2Wallet);
-    const isPaused = await interopCenterWithOwner.getFunction("paused")();
+    const isPaused = await interopCenterWithOwner.paused();
     if (isPaused) {
       console.log(`   Unpausing InteropCenter...`);
-      const tx = await interopCenterWithOwner.getFunction("unpause")();
+      const tx = await interopCenterWithOwner.unpause();
       await tx.wait();
       console.log(`   ✅ InteropCenter unpaused`);
     } else {
@@ -359,9 +370,6 @@ export class SystemContractsDeployer {
    * Deploy and initialize L2InteropHandler
    */
   private async deployL2InteropHandler(): Promise<void> {
-    const L2_INTEROP_HANDLER_ADDR = "0x000000000000000000000000000000000001000e";
-    const L2_COMPLEX_UPGRADER_ADDR = "0x000000000000000000000000000000000000800f";
-
     await this.deploySystemContract(
       L2_INTEROP_HANDLER_ADDR,
       "l1-contracts/out/InteropHandler.sol/InteropHandler.json",
@@ -369,10 +377,7 @@ export class SystemContractsDeployer {
     );
 
     // Initialize L2InteropHandler
-    const interopHandlerAbi = [
-      "function initL2(uint256 _l1ChainId) public",
-      "function L1_CHAIN_ID() external view returns (uint256)"
-    ];
+    const interopHandlerAbi = loadAbiFromOut("InteropHandler.sol/InteropHandler.json");
 
     const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbi, this.l2Provider);
 
@@ -380,7 +385,7 @@ export class SystemContractsDeployer {
     let isInitialized = false;
     try {
       const l1ChainId = await interopHandler.L1_CHAIN_ID();
-      if (l1ChainId === 1n) {
+      if (this.isOne(l1ChainId)) {
         console.log(`   ✅ L2InteropHandler already initialized`);
         isInitialized = true;
       }
@@ -402,12 +407,7 @@ export class SystemContractsDeployer {
    * Deploy and initialize L2AssetRouter for token bridging
    */
   private async deployL2AssetRouter(): Promise<void> {
-    const L2_ASSET_ROUTER_ADDR = "0x0000000000000000000000000000000000010003";
-
-    const l2AssetRouterAbi = [
-      "function initL2(uint256 _l1ChainId, uint256 _eraChainId, address _l1AssetRouter, address _legacySharedBridge, bytes32 _baseTokenAssetId, address _aliasedOwner) external",
-      "function L1_CHAIN_ID() external view returns (uint256)",
-    ];
+    const l2AssetRouterAbi = loadAbiFromOut("L2AssetRouter.sol/L2AssetRouter.json");
 
     const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, l2AssetRouterAbi, this.l2Provider);
 
@@ -415,7 +415,7 @@ export class SystemContractsDeployer {
     let isInitialized = false;
     try {
       const l1ChainId = await l2AssetRouter.L1_CHAIN_ID();
-      if (l1ChainId === 1n) {
+      if (this.isOne(l1ChainId)) {
         console.log(`   ✅ L2AssetRouter already initialized`);
         isInitialized = true;
       }
@@ -433,7 +433,7 @@ export class SystemContractsDeployer {
       const ownerAddress = await this.l2Wallet.getAddress();
       const abiCoder = new utils.AbiCoder();
       const ethAssetId = utils.keccak256(
-        abiCoder.encode(["uint256", "address"], [1, "0x0000000000000000000000000000000000000001"])
+        abiCoder.encode(["uint256", "address"], [1, ETH_TOKEN_ADDRESS])
       );
 
       await this.initializeContract(
@@ -444,11 +444,11 @@ export class SystemContractsDeployer {
           1, // L1 chain ID
           270, // Era chain ID
           "0x0000000000000000000000000000000000000001", // L1AssetRouter (dummy)
-          "0x0000000000000000000000000000000000000002", // LegacySharedBridge (dummy)
+          LEGACY_SHARED_BRIDGE_PLACEHOLDER,
           ethAssetId, // Base token asset ID
           ownerAddress,
         ],
-        "0x000000000000000000000000000000000000800f", // L2_COMPLEX_UPGRADER
+        L2_COMPLEX_UPGRADER_ADDR,
         "L2AssetRouter"
       );
     }
@@ -458,12 +458,7 @@ export class SystemContractsDeployer {
    * Deploy and initialize L2ChainAssetHandler at 0x1000a
    */
   private async deployL2ChainAssetHandler(): Promise<void> {
-    const L2_CHAIN_ASSET_HANDLER_ADDR = "0x000000000000000000000000000000000001000a";
-
-    const l2ChainAssetHandlerAbi = [
-      "function L1_CHAIN_ID() external view returns (uint256)",
-      "function migrationNumber(uint256 _chainId) external view returns (uint256)",
-    ];
+    const l2ChainAssetHandlerAbi = loadAbiFromOut("L2ChainAssetHandler.sol/L2ChainAssetHandler.json");
 
     const l2ChainAssetHandler = new Contract(L2_CHAIN_ASSET_HANDLER_ADDR, l2ChainAssetHandlerAbi, this.l2Provider);
 
@@ -496,14 +491,7 @@ export class SystemContractsDeployer {
    * Deploy and initialize L2AssetTracker at 0x1000f
    */
   private async deployL2AssetTracker(chainId: number): Promise<void> {
-    const L2_ASSET_TRACKER_ADDR = "0x000000000000000000000000000000000001000f";
-    const L2_COMPLEX_UPGRADER_ADDR = "0x000000000000000000000000000000000000800f";
-
-    const l2AssetTrackerAbi = [
-      "function L1_CHAIN_ID() external view returns (uint256)",
-      "function BASE_TOKEN_ASSET_ID() external view returns (bytes32)",
-      "function setAddresses(uint256 _l1ChainId, bytes32 _baseTokenAssetId) external",
-    ];
+    const l2AssetTrackerAbi = loadAbiFromOut("L2AssetTracker.sol/L2AssetTracker.json");
 
     const l2AssetTracker = new Contract(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAbi, this.l2Provider);
 
@@ -511,7 +499,7 @@ export class SystemContractsDeployer {
     let isInitialized = false;
     try {
       const l1ChainId = await l2AssetTracker.L1_CHAIN_ID();
-      if (l1ChainId === 1n) {
+      if (this.isOne(l1ChainId)) {
         console.log(`   ✅ L2AssetTracker already initialized`);
         isInitialized = true;
       }
@@ -531,7 +519,7 @@ export class SystemContractsDeployer {
 
       // Calculate ETH asset ID (utils.keccak256(abi.encode(1, 0x0000...0001)))
       const ethAssetId = utils.keccak256(
-        abiCoder.encode(["uint256", "address"], [1, "0x0000000000000000000000000000000000000001"])
+        abiCoder.encode(["uint256", "address"], [1, ETH_TOKEN_ADDRESS])
       );
 
       await this.initializeContract(
@@ -552,11 +540,8 @@ export class SystemContractsDeployer {
    * Deploy L2NativeTokenVault for token management
    */
   private async deployL2NativeTokenVault(): Promise<void> {
-    const L2_NATIVE_TOKEN_VAULT_ADDR = "0x0000000000000000000000000000000000010004";
-
-    const l2NativeTokenVaultAbi = [
-      "function L1_CHAIN_ID() external view returns (uint256)",
-    ];
+    const l2NativeTokenVaultAbi = loadAbiFromOut("L2NativeTokenVault.sol/L2NativeTokenVault.json");
+    const l2NativeTokenVaultDevAbi = loadAbiFromOut("L2NativeTokenVaultDev.sol/L2NativeTokenVaultDev.json");
 
     const l2NativeTokenVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultAbi, this.l2Provider);
 
@@ -564,7 +549,7 @@ export class SystemContractsDeployer {
     let isInitialized = false;
     try {
       const l1ChainId = await l2NativeTokenVault.L1_CHAIN_ID();
-      if (l1ChainId === 1n) {
+      if (this.isOne(l1ChainId)) {
         console.log(`   ✅ L2NativeTokenVault already initialized`);
         isInitialized = true;
       }
@@ -575,11 +560,45 @@ export class SystemContractsDeployer {
     if (!isInitialized) {
       await this.deploySystemContract(
         L2_NATIVE_TOKEN_VAULT_ADDR,
-        "l1-contracts/out/L2NativeTokenVault.sol/L2NativeTokenVault.json",
+        "l1-contracts/out/L2NativeTokenVaultDev.sol/L2NativeTokenVaultDev.json",
+        "L2NativeTokenVaultDev"
+      );
+
+      const ownerAddress = await this.l2Wallet.getAddress();
+      const abiCoder = new utils.AbiCoder();
+      const ethAssetId = utils.keccak256(
+        abiCoder.encode(["uint256", "address"], [1, ETH_TOKEN_ADDRESS])
+      );
+
+      await this.initializeContract(
+        L2_NATIVE_TOKEN_VAULT_ADDR,
+        l2NativeTokenVaultAbi,
+        "initL2",
+        [
+          1, // L1 chain ID
+          ownerAddress,
+          utils.keccak256(utils.toUtf8Bytes("anvil-l2-token-proxy")), // non-zero placeholder hash for anvil setup
+          "0x0000000000000000000000000000000000000000", // no legacy bridge in anvil setup
+          "0x0000000000000000000000000000000000000000", // no bridged token beacon in anvil setup
+          "0x0000000000000000000000000000000000000000", // no WETH token in anvil setup
+          [ethAssetId, 1, ETH_TOKEN_ADDRESS],
+          ["Ether", "ETH", 18],
+        ],
+        L2_COMPLEX_UPGRADER_ADDR,
         "L2NativeTokenVault"
       );
 
-      console.log(`   ✅ L2NativeTokenVault deployed (registerToken works without initialization)`);
+      // In Anvil, use the dev helper to deploy a beacon + implementation so bridged token deployment
+      // works in plain EVM mode during executeBundle.
+      const l2NativeTokenVaultDev = new Contract(
+        L2_NATIVE_TOKEN_VAULT_ADDR,
+        l2NativeTokenVaultDevAbi,
+        this.l2Wallet
+      );
+      const deployBridgedTokenTx = await l2NativeTokenVaultDev.deployBridgedStandardERC20(ownerAddress);
+      await deployBridgedTokenTx.wait();
+
+      console.log(`   ✅ L2NativeTokenVault deployed and initialized (dev bridged token beacon configured)`);
     }
   }
 
@@ -587,9 +606,6 @@ export class SystemContractsDeployer {
    * Register asset handlers for tokens
    */
   private async registerAssetHandlers(chainId: number): Promise<void> {
-    const L2_ASSET_ROUTER_ADDR = "0x0000000000000000000000000000000000010003";
-    const L2_NATIVE_TOKEN_VAULT_ADDR = "0x0000000000000000000000000000000000010004";
-
     // Get test token addresses from state
     // Use process.cwd() which gives the directory from where the script was run
     // This is more reliable than __dirname with ts-node
@@ -615,10 +631,7 @@ export class SystemContractsDeployer {
     console.log(`   Registering asset handler for token ${tokenAddress}...`);
     console.log(`   Asset ID: ${assetId}`);
 
-    const l2AssetRouterAbi = [
-      "function assetHandlerAddress(bytes32 _assetId) external view returns (address)",
-      "function setLegacyTokenAssetHandler(bytes32 _assetId) external",
-    ];
+    const l2AssetRouterAbi = loadAbiFromOut("L2AssetRouter.sol/L2AssetRouter.json");
 
     const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, l2AssetRouterAbi, this.l2Provider);
 
@@ -633,7 +646,7 @@ export class SystemContractsDeployer {
       const signer = await this.l2Provider.getSigner(L2_NATIVE_TOKEN_VAULT_ADDR);
       const l2AssetRouterWithSigner = l2AssetRouter.connect(signer);
 
-      const tx = await l2AssetRouterWithSigner.getFunction("setLegacyTokenAssetHandler")(assetId);
+      const tx = await l2AssetRouterWithSigner.setLegacyTokenAssetHandler(assetId);
       await tx.wait();
 
       await this.l2Provider.send("anvil_stopImpersonatingAccount", [L2_NATIVE_TOKEN_VAULT_ADDR]);
@@ -644,10 +657,7 @@ export class SystemContractsDeployer {
     }
 
     // Now register the token in L2NativeTokenVault
-    const l2NativeTokenVaultAbi = [
-      "function assetId(address _token) external view returns (bytes32)",
-      "function registerToken(address _nativeToken) external",
-    ];
+    const l2NativeTokenVaultAbi = loadAbiFromOut("L2NativeTokenVault.sol/L2NativeTokenVault.json");
 
     const l2NativeTokenVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultAbi, this.l2Provider);
 
@@ -670,7 +680,7 @@ export class SystemContractsDeployer {
     console.log(`   Calling registerToken(${tokenAddress})...`);
     try {
       const l2NativeTokenVaultWithWallet = l2NativeTokenVault.connect(this.l2Wallet);
-      const registerTx = await l2NativeTokenVaultWithWallet.getFunction("registerToken")(tokenAddress);
+      const registerTx = await l2NativeTokenVaultWithWallet.registerToken(tokenAddress);
       await registerTx.wait();
 
       console.log(`   ✅ Token registered in L2NativeTokenVault`);

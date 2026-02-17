@@ -10,6 +10,7 @@ import { L1ToL2Relayer } from "./l1-to-l2-relayer";
 import { L2ToL2Relayer } from "./l2-to-l2-relayer";
 import type { AnvilConfig, ChainAddresses, CoreDeployedAddresses, CTMDeployedAddresses } from "./types";
 import { getDefaultAccountPrivateKey, sleep } from "./utils";
+import { ETH_TOKEN_ADDRESS } from "./const";
 
 export interface ChainInfo {
   l1: { chainId: number; rpcUrl: string; port: number } | null;
@@ -138,7 +139,7 @@ export class DeploymentRunner {
       const addresses = await registry.registerChain({
         chainId: l2Chain.chainId,
         rpcUrl: l2Chain.rpcUrl,
-        baseToken: "0x0000000000000000000000000000000000000001",
+        baseToken: ETH_TOKEN_ADDRESS,
         validiumMode: false,
         isGateway,
       });

@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
 import { AbiCoder, keccak256 } from "ethers";
+import { ETH_TOKEN_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDR } from "./src/const";
 
 /**
  * Calculate asset ID for a token in NativeTokenVault
  * Asset ID = keccak256(abi.encode(originChainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress))
  */
 function calculateAssetId(chainId: number, tokenAddress: string): string {
-  const L2_NATIVE_TOKEN_VAULT_ADDR = "0x0000000000000000000000000000000000010004";
   const abiCoder = AbiCoder.defaultAbiCoder();
   return keccak256(abiCoder.encode(["uint256", "address", "address"], [chainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress]));
 }
@@ -17,7 +17,7 @@ function calculateAssetId(chainId: number, tokenAddress: string): string {
  * ETH token address is conventionally 0x0000...0001
  */
 function calculateEthAssetId(chainId: number): string {
-  return calculateAssetId(chainId, "0x0000000000000000000000000000000000000001");
+  return calculateAssetId(chainId, ETH_TOKEN_ADDRESS);
 }
 
 // Main execution

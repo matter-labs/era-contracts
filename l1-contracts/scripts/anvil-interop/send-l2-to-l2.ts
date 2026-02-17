@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
-import { providers, Wallet, Contract, AbiCoder } from "ethers";
+import { ethers, providers, Wallet, Contract } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
-import { getDefaultAccountPrivateKey } from "./src/utils";
+import { getDefaultAccountPrivateKey, loadAbiFromOut } from "./src/utils";
+import { CONTRACT_DEPLOYER_ADDR, INTEROP_CENTER_ADDR } from "./src/const";
 
 /**
  * Send a cross-chain message from one L2 chain to another L2 chain using InteropCenter
@@ -27,7 +28,7 @@ async function main() {
   // Parse arguments
   const sourceChainId = process.argv[2] ? parseInt(process.argv[2]) : 11;
   const targetChainId = process.argv[3] ? parseInt(process.argv[3]) : 12;
-  const targetAddress = process.argv[4] || "0x0000000000000000000000000000000000008006"; // ContractDeployer
+  const targetAddress = process.argv[4] || CONTRACT_DEPLOYER_ADDR; // ContractDeployer
   const targetCalldata = process.argv[5] || "0x"; // Empty calldata
 
   // Verify chains exist
@@ -52,19 +53,13 @@ async function main() {
   const sourceProvider = new providers.JsonRpcProvider(sourceChain.rpcUrl);
   const wallet = new Wallet(privateKey, sourceProvider);
 
-  // InteropCenter is deployed at system address
-  const INTEROP_CENTER_ADDR = "0x000000000000000000000000000000000001000d";
-
   // InteropCenter ABI - sendBundle function
-  const interopCenterAbi = [
-    "function sendBundle(bytes calldata _destinationChainId, tuple(address target, uint256 value, bytes data)[] calldata _callStarters, bytes[] calldata _bundleAttributes) external payable returns (bytes32)",
-    "event InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, tuple(bytes32 canonicalHash, bytes32 chainTreeRoot, bytes32 destination, uint256 nonce, tuple(address target, uint256 value, bytes data)[] calls) interopBundle)",
-  ];
+  const interopCenterAbi = loadAbiFromOut("InteropCenter.sol/InteropCenter.json");
 
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, interopCenterAbi, wallet);
 
   // Encode destination chain ID (uint256 as bytes)
-  const abiCoder = AbiCoder.defaultAbiCoder();
+  const abiCoder = ethers.utils.defaultAbiCoder;
   const destinationChainIdBytes = abiCoder.encode(["uint256"], [targetChainId]);
 
   // Create call starter

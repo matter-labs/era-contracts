@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { utils } from "ethers";
+import { L2_COMPLEX_UPGRADER_ADDR, L2_GENESIS_UPGRADE_ADDR } from "./const";
 
 /**
  * Helper for building L2GenesisUpgrade data structures
@@ -19,10 +20,6 @@ import { utils } from "ethers";
  *
  * DO NOT use zksolc or zkout/ - these contracts MUST come from regular Solc compilation.
  */
-
-// L2 Contract addresses (system contracts)
-const L2_COMPLEX_UPGRADER_ADDR = "0x000000000000000000000000000000000000800f";
-const L2_GENESIS_UPGRADE_ADDR = "0x0000000000000000000000000000000000008010";
 
 export interface BytecodeInfo {
   messageRootBytecodeInfo: string;

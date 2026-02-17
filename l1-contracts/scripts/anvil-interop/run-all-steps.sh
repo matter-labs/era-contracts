@@ -75,7 +75,7 @@ echo ""
 
 # Step 6: Start batch settler and relayers (in background)
 echo "📍 Step 6: Starting batch settler and relayers..."
-yarn step6 > /tmp/step6-output.log 2>&1 &
+nohup yarn step6 > /tmp/step6-output.log 2>&1 &
 STEP6_PID=$!
 echo "   Batch settler started (PID: $STEP6_PID)"
 echo "   Logs: /tmp/step6-output.log"

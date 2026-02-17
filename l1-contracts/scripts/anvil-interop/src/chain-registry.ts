@@ -2,11 +2,19 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
 import * as fs from "fs";
-import { providers, Contract, Wallet } from "ethers";
+import { providers, Contract, Wallet, utils } from "ethers";
 import type { ChainConfig, ChainAddresses, CoreDeployedAddresses, CTMDeployedAddresses } from "./types";
-import { parseForgeScriptOutput, ensureDirectoryExists, saveTomlConfig } from "./utils";
+import { parseForgeScriptOutput, ensureDirectoryExists, saveTomlConfig, loadAbiFromOut } from "./utils";
 import { buildComplexUpgraderCalldata, getL2ComplexUpgraderAddress } from "./l2-genesis-helper";
 import { SystemContractsDeployer } from "./system-contracts-deployer";
+import {
+  ETH_TOKEN_ADDRESS,
+  INTEROP_CENTER_ADDR,
+  L2_BRIDGEHUB_ADDR,
+  L2_COMPLEX_UPGRADER_ADDR,
+  SERVICE_TX_SENDER_ADDR,
+  SYSTEM_CONTEXT_ADDR,
+} from "./const";
 
 const execAsync = promisify(exec);
 
@@ -103,8 +111,6 @@ export class ChainRegistry {
 
     // Deploy mock SystemContext at 0x800b
     // This is needed because InteropCenter calls currentSettlementLayerChainId()
-    const SYSTEM_CONTEXT_ADDR = "0x000000000000000000000000000000000000800b";
-
     // Check if SystemContext already has code
     const existingSystemContextCode = await l2Provider.getCode(SYSTEM_CONTEXT_ADDR);
     if (existingSystemContextCode === "0x" || existingSystemContextCode === "0x0") {
@@ -126,14 +132,7 @@ export class ChainRegistry {
 
     // Deploy L2Bridgehub at 0x010002
     // This is needed because InteropCenter calls L2_BRIDGEHUB.baseTokenAssetId()
-    const L2_BRIDGEHUB_ADDR = "0x0000000000000000000000000000000000010002";
-
-    const l2BridgehubAbi = [
-      "function initL2(uint256 _l1ChainId, address _owner, uint256 _maxNumberOfZKChains) external",
-      "function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external",
-      "function baseTokenAssetId(uint256 _chainId) external view returns (bytes32)",
-      "function L1_CHAIN_ID() external view returns (uint256)",
-    ];
+    const l2BridgehubAbi = loadAbiFromOut("L2Bridgehub.sol/L2Bridgehub.json");
 
     // Check if L2Bridgehub already has code and is initialized
     let isL2BridgehubInitialized = false;
@@ -163,28 +162,26 @@ export class ChainRegistry {
       await l2Provider.send("anvil_setCode", [L2_BRIDGEHUB_ADDR, l2BridgehubBytecode]);
 
       // Initialize L2Bridgehub using L2_COMPLEX_UPGRADER
-      const L2_COMPLEX_UPGRADER = "0x000000000000000000000000000000000000800f";
-
-      await l2Provider.send("anvil_impersonateAccount", [L2_COMPLEX_UPGRADER]);
+      await l2Provider.send("anvil_impersonateAccount", [L2_COMPLEX_UPGRADER_ADDR]);
 
       const ownerAddress = await l2Wallet.getAddress();
       console.log(`   Initializing L2Bridgehub with owner: ${ownerAddress}...`);
 
-      const impersonatedSigner = await l2Provider.getSigner(L2_COMPLEX_UPGRADER);
+      const impersonatedSigner = await l2Provider.getSigner(L2_COMPLEX_UPGRADER_ADDR);
       const l2BridgehubWithSigner = l2Bridgehub.connect(impersonatedSigner);
 
       // Initialize with L1_CHAIN_ID=1, owner, maxChains=100
       const initTx = await l2BridgehubWithSigner.getFunction("initL2")(1, ownerAddress, 100);
       await initTx.wait();
 
-      await l2Provider.send("anvil_stopImpersonatingAccount", [L2_COMPLEX_UPGRADER]);
+      await l2Provider.send("anvil_stopImpersonatingAccount", [L2_COMPLEX_UPGRADER_ADDR]);
 
       console.log(`   ✅ L2Bridgehub initialized`);
     }
 
     // Register chains on L2Bridgehub for interop
-    // ETH base token asset ID (utils.keccak256(abi.encode(1, 0x0000000000000000000000000000000000000001)))
-    const ethAssetId = "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
+    const abiCoder = new utils.AbiCoder();
+    const ethAssetId = utils.keccak256(abiCoder.encode(["uint256", "address"], [1, ETH_TOKEN_ADDRESS]));
 
     // Register common chain IDs for Anvil test environment (10, 11, 12)
     const chainIdsToRegister = [10, 11, 12];
@@ -203,11 +200,10 @@ export class ChainRegistry {
       console.log(`   Registering chain ${targetChainId} on L2Bridgehub...`);
 
       // Use SERVICE_TRANSACTION_SENDER for registration (as defined in Config.sol)
-      const SERVICE_TX_SENDER = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF";
-      await l2Provider.send("anvil_impersonateAccount", [SERVICE_TX_SENDER]);
-      await l2Provider.send("anvil_setBalance", [SERVICE_TX_SENDER, "0x56BC75E2D63100000"]);
+      await l2Provider.send("anvil_impersonateAccount", [SERVICE_TX_SENDER_ADDR]);
+      await l2Provider.send("anvil_setBalance", [SERVICE_TX_SENDER_ADDR, "0x56BC75E2D63100000"]);
 
-      const serviceTxSigner = await l2Provider.getSigner(SERVICE_TX_SENDER);
+      const serviceTxSigner = await l2Provider.getSigner(SERVICE_TX_SENDER_ADDR);
       const l2BridgehubWithServiceSigner = l2Bridgehub.connect(serviceTxSigner);
 
       const registerTx = await l2BridgehubWithServiceSigner.getFunction("registerChainForInterop")(
@@ -216,7 +212,7 @@ export class ChainRegistry {
       );
       await registerTx.wait();
 
-      await l2Provider.send("anvil_stopImpersonatingAccount", [SERVICE_TX_SENDER]);
+      await l2Provider.send("anvil_stopImpersonatingAccount", [SERVICE_TX_SENDER_ADDR]);
 
       console.log(`   ✅ Chain ${targetChainId} registered on L2Bridgehub`);
     }
@@ -231,14 +227,7 @@ export class ChainRegistry {
     const interopCenterBytecode = interopCenterArtifact.deployedBytecode.object;
 
     // Use anvil_setCode to deploy InteropCenter at expected address
-    const INTEROP_CENTER_ADDR = "0x000000000000000000000000000000000001000d";
-
-    const interopCenterAbi = [
-      "function initL2(uint256 _l1ChainId, address _owner) external",
-      "function unpause() external",
-      "function paused() external view returns (bool)",
-      "function L1_CHAIN_ID() external view returns (uint256)",
-    ];
+    const interopCenterAbi = loadAbiFromOut("InteropCenter.sol/InteropCenter.json");
     const interopCenter = new Contract(INTEROP_CENTER_ADDR, interopCenterAbi, l2Provider);
 
     // Check if already initialized by checking L1_CHAIN_ID
@@ -260,29 +249,27 @@ export class ChainRegistry {
 
       // Initialize InteropCenter by calling initL2
       // We need to impersonate L2_COMPLEX_UPGRADER to call initL2 (it has onlyUpgrader modifier)
-      const L2_COMPLEX_UPGRADER = "0x000000000000000000000000000000000000800f";
-
       // Set balance for impersonated account
       await l2Provider.send("anvil_setBalance", [
-        L2_COMPLEX_UPGRADER,
+        L2_COMPLEX_UPGRADER_ADDR,
         "0x56BC75E2D63100000", // 100 ETH
       ]);
 
       // Impersonate and send initialization transaction
-      await l2Provider.send("anvil_impersonateAccount", [L2_COMPLEX_UPGRADER]);
+      await l2Provider.send("anvil_impersonateAccount", [L2_COMPLEX_UPGRADER_ADDR]);
 
       const ownerAddress = await l2Wallet.getAddress();
       console.log(`   Initializing InteropCenter with owner: ${ownerAddress}...`);
 
       // Create a signer from the impersonated account
-      const impersonatedSigner = await l2Provider.getSigner(L2_COMPLEX_UPGRADER);
+      const impersonatedSigner = await l2Provider.getSigner(L2_COMPLEX_UPGRADER_ADDR);
       const interopCenterWithSigner = interopCenter.connect(impersonatedSigner);
 
       // Call initL2 using getFunction to avoid TypeScript errors
       const initTx = await interopCenterWithSigner.getFunction("initL2")(1, ownerAddress);
       await initTx.wait();
 
-      await l2Provider.send("anvil_stopImpersonatingAccount", [L2_COMPLEX_UPGRADER]);
+      await l2Provider.send("anvil_stopImpersonatingAccount", [L2_COMPLEX_UPGRADER_ADDR]);
 
       console.log(`   InteropCenter initialized (L1_CHAIN_ID=1)`);
     }
@@ -305,10 +292,7 @@ export class ChainRegistry {
   async unpauseDeposits(chainId: number, chainProxy: string): Promise<void> {
     console.log(`🔓 Checking deposit status for chain ${chainId}...`);
 
-    const adminAbi = [
-      "function unpauseDeposits() external",
-      "function areDepositsPaused() external view returns (bool)"
-    ];
+    const adminAbi = loadAbiFromOut("AdminFacet.sol/AdminFacet.json");
     const adminContract = new Contract(chainProxy, adminAbi, this.wallet);
 
     // Check if deposits are already unpaused

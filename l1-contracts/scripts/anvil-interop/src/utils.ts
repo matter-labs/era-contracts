@@ -138,3 +138,18 @@ export function getDefaultAccountAddress(): string {
   // Default Anvil account #0 address
   return "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 }
+
+export function loadAbiFromOut(artifactRelativePath: string): any[] {
+  return loadArtifactFromOut(artifactRelativePath).abi;
+}
+
+export function loadBytecodeFromOut(artifactRelativePath: string): string {
+  const artifact = loadArtifactFromOut(artifactRelativePath);
+  return artifact.deployedBytecode?.object || artifact.bytecode?.object || "0x";
+}
+
+export function loadArtifactFromOut(artifactRelativePath: string): any {
+  const outRoot = path.resolve(__dirname, "../../../out");
+  const artifactPath = path.join(outRoot, artifactRelativePath);
+  return JSON.parse(fs.readFileSync(artifactPath, "utf-8"));
+}
