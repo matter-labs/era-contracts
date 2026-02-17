@@ -47,6 +47,7 @@ struct ProcessLogsInput {
     uint256 chainId;
     uint256 batchNumber;
     bytes32 chainBatchRoot;
+    // FIXME: the name is extremely confusing, need to rename
     bytes32 messageRoot;
 }
 

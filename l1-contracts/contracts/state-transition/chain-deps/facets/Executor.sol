@@ -153,6 +153,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             InteropRoot[][] memory dependencyRoots,
             L2Log[][] memory logs,
             bytes[][] memory messages,
+            // FIXME: the name is extremely confusing, need to rename
             bytes32[] memory messageRoots
         ) = BatchDecoder.decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
         uint256 nBatches = batchesData.length;
