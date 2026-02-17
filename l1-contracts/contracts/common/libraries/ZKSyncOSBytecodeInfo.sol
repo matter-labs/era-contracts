@@ -8,6 +8,9 @@ pragma solidity 0.8.28;
  * @notice Helper library for encoding and decoding ZKSync OS bytecode info that is
  * used for force deployments.
  */
+/// @dev Expected ABI-encoded length of bytecode info: (bytes32, uint32, bytes32) = 32 + 32 + 32 = 96 bytes.
+uint256 constant BYTECODE_INFO_LENGTH = 96;
+
 library ZKSyncOSBytecodeInfo {
     /// @notice Hashes EVM bytecode using keccak256.
     /// @param _bytecode The EVM bytecode to hash.

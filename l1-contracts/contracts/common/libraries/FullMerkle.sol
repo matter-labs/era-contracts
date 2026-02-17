@@ -123,7 +123,7 @@ library FullMerkle {
         bytes32[] memory _newRow = new bytes32[](newRowLength);
 
         uint256 length = _newNodes.length;
-        for (uint256 i; i < length; i += 2) {
+        for (uint256 i; i < length; i = i.uncheckedAdd(2)) {
             self._nodes[_height][i] = _newNodes[i];
             if (i + 1 < length) {
                 self._nodes[_height][i + 1] = _newNodes[i + 1];

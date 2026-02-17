@@ -32,7 +32,7 @@ import {ISystemContractProxy} from "./ISystemContractProxy.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 
-import {ZKSyncOSBytecodeInfo} from "../common/libraries/ZKSyncOSBytecodeInfo.sol";
+import {ZKSyncOSBytecodeInfo, BYTECODE_INFO_LENGTH} from "../common/libraries/ZKSyncOSBytecodeInfo.sol";
 
 /// @title L2GenesisForceDeploymentsHelper
 /// @author Matter Labs
@@ -95,8 +95,8 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     function unsafeForceDeployZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
-        // Validate canonical encoding for (bytes32, uint32, bytes32) = 32 + 32 + 32 = 96 bytes
-        require(_bytecodeInfo.length == 96, NonCanonicalRepresentation());
+        // Validate canonical encoding for (bytes32, uint32, bytes32)
+        require(_bytecodeInfo.length == BYTECODE_INFO_LENGTH, NonCanonicalRepresentation());
 
         emit ZKsyncOSForceDeployStarted(_newAddress);
 
@@ -153,7 +153,8 @@ library L2GenesisForceDeploymentsHelper {
 
         (bytes memory bytecodeInfo, bytes memory bytecodeInfoSystemProxy) = abi.decode((_bytecodeInfo), (bytes, bytes));
 
-        // Verify canonical encoding by re-encoding and comparing
+        // This data is provided by decentralized governance, so it can be trusted to be encoded correctly.
+        // We still verify canonical encoding as an extra safety measure.
         bytes memory canonicalEncoding = abi.encode(bytecodeInfo, bytecodeInfoSystemProxy);
         require(keccak256(_bytecodeInfo) == keccak256(canonicalEncoding), NonCanonicalRepresentation());
 
