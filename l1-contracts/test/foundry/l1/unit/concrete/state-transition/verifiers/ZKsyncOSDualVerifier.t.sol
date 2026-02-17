@@ -59,7 +59,11 @@ contract ZKsyncOSDualVerifierTest is Test {
         owner = makeAddr("owner");
         fflonkVerifier = new MockFflonkVerifierOS();
         plonkVerifier = new MockPlonkVerifierOS();
-        verifier = new ZKsyncOSDualVerifier(IVerifierV2(address(fflonkVerifier)), IVerifier(address(plonkVerifier)), owner);
+        verifier = new ZKsyncOSDualVerifier(
+            IVerifierV2(address(fflonkVerifier)),
+            IVerifier(address(plonkVerifier)),
+            owner
+        );
     }
 
     // ============ Constructor Tests ============

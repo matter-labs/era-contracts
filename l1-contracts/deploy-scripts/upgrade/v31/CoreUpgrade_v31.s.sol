@@ -59,29 +59,28 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
         prepareDefaultGovernanceCalls();
     }
 
-
-        function deployNewEcosystemContractsL1() public virtual override {
-            coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub", false);
-            coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot", false);
-            coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier", false);
-            coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter", false);
-            coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault", false);
-            (
-                coreAddresses.bridgehub.implementations.assetTracker,
-                coreAddresses.bridgehub.proxies.assetTracker
-            ) = deployTuppWithContract("L1AssetTracker", false);
-            coreAddresses.bridgehub.implementations.ctmDeploymentTracker = deploySimpleContract(
-                "CTMDeploymentTracker",
-                false
-            );
-            coreAddresses.bridgehub.implementations.chainAssetHandler = deploySimpleContract("L1ChainAssetHandler", false);
-            coreAddresses.bridgehub.implementations.chainRegistrationSender = deploySimpleContract(
-                "ChainRegistrationSender",
-                false
-            );
-            // deploySimpleContract("L1ChainTypeManager", false);
-            // Configure AssetTracker connections after deployment
-            updateContractConnections();
+    function deployNewEcosystemContractsL1() public virtual override {
+        coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub", false);
+        coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot", false);
+        coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier", false);
+        coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter", false);
+        coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault", false);
+        (
+            coreAddresses.bridgehub.implementations.assetTracker,
+            coreAddresses.bridgehub.proxies.assetTracker
+        ) = deployTuppWithContract("L1AssetTracker", false);
+        coreAddresses.bridgehub.implementations.ctmDeploymentTracker = deploySimpleContract(
+            "CTMDeploymentTracker",
+            false
+        );
+        coreAddresses.bridgehub.implementations.chainAssetHandler = deploySimpleContract("L1ChainAssetHandler", false);
+        coreAddresses.bridgehub.implementations.chainRegistrationSender = deploySimpleContract(
+            "ChainRegistrationSender",
+            false
+        );
+        // deploySimpleContract("L1ChainTypeManager", false);
+        // Configure AssetTracker connections after deployment
+        updateContractConnections();
     }
 
     /// @notice Configure contract connections after deployment
