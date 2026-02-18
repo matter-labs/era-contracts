@@ -97,10 +97,7 @@ contract MigratorFacet is ZKChainBase, IMigrator {
 
     /// @inheritdoc IMigrator
     function unpauseDeposits() external onlyAdmin onlyL1 {
-        require(
-            s.pausedDepositsTimestamp != 0,
-            DepositsNotPaused()
-        );
+        require(s.pausedDepositsTimestamp != 0, DepositsNotPaused());
         require(
             !IL1ChainAssetHandler(IL1Bridgehub(s.bridgehub).chainAssetHandler()).isMigrationInProgress(s.chainId),
             MigrationInProgress()
@@ -140,7 +137,10 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         require(s.priorityTree.getSize() == 0, PriorityQueueNotFullyProcessed());
 
         uint256 timestamp = s.pausedDepositsTimestamp;
-        require(timestamp != 0 && timestamp + CHAIN_MIGRATION_TIME_WINDOW_START <= block.timestamp, DepositsNotPaused());
+        require(
+            timestamp != 0 && timestamp + CHAIN_MIGRATION_TIME_WINDOW_START <= block.timestamp,
+            DepositsNotPaused()
+        );
 
         // We want to trust interop messages coming from Era chains which implies they can use only trusted settlement layers,
         // ie, controlled by the governance, which is currently Era Gateways and Ethereum.
