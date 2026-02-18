@@ -79,7 +79,8 @@ export class SystemContractsDeployer {
     initFunction: string,
     args: any[],
     impersonatedAccount: string,
-    name: string
+    name: string,
+    txOverrides?: Record<string, any>
   ): Promise<void> {
     await this.l2Provider.send("anvil_impersonateAccount", [impersonatedAccount]);
     await this.l2Provider.send("anvil_setBalance", [impersonatedAccount, "0x56BC75E2D63100000"]);
@@ -89,11 +90,11 @@ export class SystemContractsDeployer {
     const contractWithSigner = contract.connect(signer);
 
     console.log(`   Initializing ${name}...`);
-    const tx = await (contractWithSigner as any)[initFunction](...args);
+    const tx = await (contractWithSigner as any)[initFunction](...args, txOverrides || {});
     await tx.wait();
+    console.log(`   ✅ ${name} initialized`);
 
     await this.l2Provider.send("anvil_stopImpersonatingAccount", [impersonatedAccount]);
-    console.log(`   ✅ ${name} initialized`);
   }
 
   /**
@@ -564,11 +565,35 @@ export class SystemContractsDeployer {
         "L2NativeTokenVaultDev"
       );
 
+      const l2NativeTokenVaultDev = new Contract(
+        L2_NATIVE_TOKEN_VAULT_ADDR,
+        l2NativeTokenVaultDevAbi,
+        this.l2Wallet
+      );
+
       const ownerAddress = await this.l2Wallet.getAddress();
       const abiCoder = new utils.AbiCoder();
       const ethAssetId = utils.keccak256(
         abiCoder.encode(["uint256", "address"], [1, ETH_TOKEN_ADDRESS])
       );
+
+      const l2TokenProxyBytecodeHash = utils.keccak256(utils.toUtf8Bytes("anvil-l2-token-proxy"));
+      const legacyBridgeAddress = "0x0000000000000000000000000000000000000000";
+      const zeroAddress = "0x0000000000000000000000000000000000000000";
+      const baseTokenBridgingData: [string, number, string] = [ethAssetId, 1, ETH_TOKEN_ADDRESS];
+      const baseTokenMetadata: [string, string, number] = ["Ether", "ETH", 18];
+      const initializationGasLimit = 30_000_000;
+
+      // Ensure a non-empty beacon address exists before initL2 so initialization remains single-path.
+      let bridgedTokenBeacon = await l2NativeTokenVaultDev.bridgedTokenBeacon();
+      if (bridgedTokenBeacon === zeroAddress) {
+        const deployBridgedTokenTx = await l2NativeTokenVaultDev.deployBridgedStandardERC20(ownerAddress);
+        await deployBridgedTokenTx.wait();
+        bridgedTokenBeacon = await l2NativeTokenVaultDev.bridgedTokenBeacon();
+      }
+      if (bridgedTokenBeacon === zeroAddress) {
+        throw new Error("Failed to set bridged token beacon before initL2");
+      }
 
       await this.initializeContract(
         L2_NATIVE_TOKEN_VAULT_ADDR,
@@ -577,26 +602,17 @@ export class SystemContractsDeployer {
         [
           1, // L1 chain ID
           ownerAddress,
-          utils.keccak256(utils.toUtf8Bytes("anvil-l2-token-proxy")), // non-zero placeholder hash for anvil setup
-          "0x0000000000000000000000000000000000000000", // no legacy bridge in anvil setup
-          "0x0000000000000000000000000000000000000000", // no bridged token beacon in anvil setup
-          "0x0000000000000000000000000000000000000000", // no WETH token in anvil setup
-          [ethAssetId, 1, ETH_TOKEN_ADDRESS],
-          ["Ether", "ETH", 18],
+          l2TokenProxyBytecodeHash,
+          legacyBridgeAddress,
+          bridgedTokenBeacon,
+          zeroAddress, // no WETH token in anvil setup
+          baseTokenBridgingData,
+          baseTokenMetadata,
         ],
         L2_COMPLEX_UPGRADER_ADDR,
-        "L2NativeTokenVault"
+        "L2NativeTokenVault",
+        { gasLimit: initializationGasLimit }
       );
-
-      // In Anvil, use the dev helper to deploy a beacon + implementation so bridged token deployment
-      // works in plain EVM mode during executeBundle.
-      const l2NativeTokenVaultDev = new Contract(
-        L2_NATIVE_TOKEN_VAULT_ADDR,
-        l2NativeTokenVaultDevAbi,
-        this.l2Wallet
-      );
-      const deployBridgedTokenTx = await l2NativeTokenVaultDev.deployBridgedStandardERC20(ownerAddress);
-      await deployBridgedTokenTx.wait();
 
       console.log(`   ✅ L2NativeTokenVault deployed and initialized (dev bridged token beacon configured)`);
     }
