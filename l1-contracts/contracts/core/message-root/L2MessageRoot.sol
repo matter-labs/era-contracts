@@ -116,5 +116,4 @@ contract L2MessageRoot is MessageRootBase {
     function _noBatchFallback(uint256, uint256) internal pure override returns (bytes32) {
         return bytes32(0);
     }
-
 }
