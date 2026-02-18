@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
-import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-
-event InteropRootAdded(uint256 indexed chainId, uint256 indexed blockNumber, bytes32[] sides);
-error SidesLengthNotOne();
-error InteropRootAlreadyExists();
-error MessageRootIsZero();
+import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {Unauthorized} from "contracts/l2-system/zksync-os/errors/ZKOSContractErrors.sol";
+import {IL2InteropRootStorage} from "contracts/common/interfaces/IL2InteropRootStorage.sol";
+import {SidesLengthNotOne, InteropRootAlreadyExists, MessageRootIsZero} from "./InteropErrors.sol";
 
 /// @dev For both proof-based and commit-based interop, the `sides` parameter contains only the root.
 /// @dev Once pre-commit interop is introduced, `sides` will include both the root and its associated sides.
@@ -28,9 +26,17 @@ struct InteropRoot {
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
  * @notice InteropRootStorage contract responsible for storing the message roots of other chains on the L2.
- * FIXME: this file should be moved to the l1-contracts folder.
  */
-contract L2InteropRootStorage is SystemContractBase {
+contract L2InteropRootStorage is IL2InteropRootStorage {
+    /// @notice Modifier that makes sure that the method
+    /// can only be called from the bootloader.
+    modifier onlyCallFromBootloader() {
+        if (msg.sender != L2_BOOTLOADER_ADDRESS) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// @notice Mapping of chain ID to block or batch number to message root.
     mapping(uint256 chainId => mapping(uint256 blockOrBatchNumber => bytes32 interopRoot)) public interopRoots;
 
