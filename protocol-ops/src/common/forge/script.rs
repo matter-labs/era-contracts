@@ -187,12 +187,12 @@ const PROHIBITED_ARGS: [&str; 10] = [
 
 const WALLET_ARGS: [&str; 18] = [
     "-a",
-    "--froms",
+    "--from",
     "-i",
     "--private-keys",
     "--private-key",
     "--mnemonics",
-    "--mnenomic-passphrases",
+    "--mnemonic-passphrases",
     "--mnemonic-derivation-paths",
     "--mnemonic-indexes",
     "--keystore",
