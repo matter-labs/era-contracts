@@ -49,7 +49,7 @@ library AddressAliasHelper {
     function actualRefundRecipient(
         address _refundRecipient,
         address _originalCaller
-    ) internal view returns (address _recipient) {
+    ) internal pure returns (address _recipient) {
         if (_refundRecipient == address(0)) {
             // If the `_refundRecipient` is not provided, we use the `_originalCaller` as the recipient.
             // solhint-disable avoid-tx-origin

@@ -5,9 +5,6 @@ pragma solidity 0.8.28;
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {Create2} from "@openzeppelin/contracts-v4/utils/Create2.sol";
 
-import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
-
 import {L2NativeTokenVault} from "./L2NativeTokenVault.sol";
 
 /// @author Matter Labs
@@ -18,8 +15,6 @@ import {L2NativeTokenVault} from "./L2NativeTokenVault.sol";
 /// @dev For the ease of future use of ZKOS, this contract should not have ANY storage variables and all of those should be part of the
 /// parent `L2NativeTokenVault` contract.
 contract L2NativeTokenVaultZKOS is L2NativeTokenVault {
-    using SafeERC20 for IERC20;
-
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
     /// @dev This function uses raw call to ContractDeployer to make sure that exactly `L2_TOKEN_PROXY_BYTECODE_HASH` is used
     /// for the code of the proxy.
