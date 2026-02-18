@@ -128,11 +128,7 @@ contract EraMultisigValidatorTest is Test {
             );
     }
 
-    function _deployEraMultisig(
-        address _owner,
-        uint32 _delay,
-        address _validatorTimelock
-    ) internal returns (address) {
+    function _deployEraMultisig(address _owner, uint32 _delay, address _validatorTimelock) internal returns (address) {
         ProxyAdmin admin = new ProxyAdmin();
         EraMultisigValidator impl = new EraMultisigValidator(address(dummyBridgehub));
         return
@@ -557,9 +553,7 @@ contract EraMultisigValidatorTest is Test {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
 
         vm.prank(nonMember);
-        vm.expectRevert(
-            abi.encodeWithSelector(RoleAccessDenied.selector, chainAddress, executorRole, nonMember)
-        );
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, chainAddress, executorRole, nonMember));
         eraMultisig.executeBatchesSharedBridge(chainAddress, from, to, data);
     }
 
@@ -594,9 +588,7 @@ contract EraMultisigValidatorTest is Test {
 
     function test_precommit_revertsIfNotPrecommitterRole() public {
         vm.prank(nonMember);
-        vm.expectRevert(
-            abi.encodeWithSelector(RoleAccessDenied.selector, chainAddress, precommitterRole, nonMember)
-        );
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, chainAddress, precommitterRole, nonMember));
         eraMultisig.precommitSharedBridge(chainAddress, 1, hex"aa");
     }
 
@@ -611,9 +603,7 @@ contract EraMultisigValidatorTest is Test {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
 
         vm.prank(nonMember);
-        vm.expectRevert(
-            abi.encodeWithSelector(RoleAccessDenied.selector, chainAddress, committerRole, nonMember)
-        );
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, chainAddress, committerRole, nonMember));
         eraMultisig.commitBatchesSharedBridge(chainAddress, from, to, data);
     }
 
@@ -628,9 +618,7 @@ contract EraMultisigValidatorTest is Test {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
 
         vm.prank(nonMember);
-        vm.expectRevert(
-            abi.encodeWithSelector(RoleAccessDenied.selector, chainAddress, proverRole, nonMember)
-        );
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, chainAddress, proverRole, nonMember));
         eraMultisig.proveBatchesSharedBridge(chainAddress, from, to, data);
     }
 
@@ -641,9 +629,7 @@ contract EraMultisigValidatorTest is Test {
 
     function test_revertBatches_revertsIfNotReverterRole() public {
         vm.prank(nonMember);
-        vm.expectRevert(
-            abi.encodeWithSelector(RoleAccessDenied.selector, chainAddress, reverterRole, nonMember)
-        );
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, chainAddress, reverterRole, nonMember));
         eraMultisig.revertBatchesSharedBridge(chainAddress, 5);
     }
 

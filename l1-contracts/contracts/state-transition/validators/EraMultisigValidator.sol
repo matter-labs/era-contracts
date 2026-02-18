@@ -123,7 +123,7 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
         address _chainAddress,
         uint256 _l2BlockNumber,
         bytes calldata _l2Block
-    ) public onlyRole(_chainAddress, PRECOMMITTER_ROLE) override(ValidatorTimelock, IValidatorTimelock) {
+    ) public override(ValidatorTimelock, IValidatorTimelock) onlyRole(_chainAddress, PRECOMMITTER_ROLE) {
         _propagateToValidatorTimelock();
     }
 
@@ -131,7 +131,7 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
     function revertBatchesSharedBridge(
         address _chainAddress,
         uint256 _newLastBatch
-    ) public onlyRole(_chainAddress, REVERTER_ROLE) override(ValidatorTimelock, IValidatorTimelock) {
+    ) public override(ValidatorTimelock, IValidatorTimelock) onlyRole(_chainAddress, REVERTER_ROLE) {
         _propagateToValidatorTimelock();
     }
 
@@ -141,7 +141,7 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _batchData
-    ) public onlyRole(_chainAddress, COMMITTER_ROLE) override(ValidatorTimelock, IValidatorTimelock) {
+    ) public override(ValidatorTimelock, IValidatorTimelock) onlyRole(_chainAddress, COMMITTER_ROLE) {
         _propagateToValidatorTimelock();
     }
 
@@ -151,7 +151,7 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _batchData
-    ) public onlyRole(_chainAddress, PROVER_ROLE) override(ValidatorTimelock, IValidatorTimelock) {
+    ) public override(ValidatorTimelock, IValidatorTimelock) onlyRole(_chainAddress, PROVER_ROLE) {
         _propagateToValidatorTimelock();
     }
 
@@ -163,7 +163,7 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _batchData
-    ) public onlyRole(_chainAddress, EXECUTOR_ROLE) override(ValidatorTimelock, IValidatorTimelock) {
+    ) public override(ValidatorTimelock, IValidatorTimelock) onlyRole(_chainAddress, EXECUTOR_ROLE) {
         bytes32 approvedHash = calculateHash(_chainAddress, _processBatchFrom, _processBatchTo, _batchData);
         if (getApprovals(approvedHash) < threshold) {
             revert NotEnoughSignatures();

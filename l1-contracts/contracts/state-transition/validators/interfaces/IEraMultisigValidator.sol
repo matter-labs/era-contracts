@@ -53,11 +53,7 @@ interface IEraMultisigValidator is IValidatorTimelock {
     /// @param _initialOwner The initial owner of this contract.
     /// @param _initialExecutionDelay The initial execution delay for the timelock.
     /// @param _validatorTimelock The address of the downstream `ValidatorTimelock` (must be a deployed contract).
-    function initialize(
-        address _initialOwner,
-        uint32 _initialExecutionDelay,
-        address _validatorTimelock
-    ) external;
+    function initialize(address _initialOwner, uint32 _initialExecutionDelay, address _validatorTimelock) external;
 
     /// @notice Registers the caller's approval for a given execution hash.
     /// @dev Reverts if the caller is not a multisig member or has already approved this hash.
