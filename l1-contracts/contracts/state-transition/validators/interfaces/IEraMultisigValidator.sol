@@ -6,7 +6,7 @@ import {IValidatorTimelock} from "./IValidatorTimelock.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IEraMultisigValidator is IValidatorTimelock {
-    /// @notice Emitted when a multisig member approves an batch execution hash.
+    /// @notice Emitted when a multisig member approves a batch execution hash.
     /// @param member The address of the approving member.
     /// @param hash The approved batch execution hash.
     event HashApproved(address indexed member, bytes32 indexed hash);
