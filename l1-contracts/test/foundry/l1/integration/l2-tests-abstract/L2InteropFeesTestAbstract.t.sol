@@ -31,11 +31,6 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
     using stdStorage for StdStorage;
 
-    event InteropFeeUpdated(uint256 indexed oldFee, uint256 indexed newFee);
-    event ProtocolFeesAccumulated(address indexed coinbase, uint256 amount);
-    event FixedZKFeesAccumulated(address indexed payer, address indexed coinbase, uint256 amount);
-    event ProtocolFeesClaimed(address indexed coinbase, address indexed receiver, uint256 amount);
-    event ZKFeesClaimed(address indexed coinbase, address indexed receiver, uint256 amount);
 
     TestnetERC20Token internal zkToken;
 
@@ -70,7 +65,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         uint256 newFee = 0.02 ether;
 
         vm.expectEmit(true, true, false, false);
-        emit InteropFeeUpdated(oldFee, newFee);
+        emit IInteropCenter.InteropFeeUpdated(oldFee, newFee);
 
         vm.prank(L2_BOOTLOADER_ADDRESS);
         l2InteropCenter.setInteropFee(newFee);
@@ -288,7 +283,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         InteropCallStarter[] memory calls = _buildSimpleCall();
 
         vm.expectEmit(true, false, false, true);
-        emit ProtocolFeesAccumulated(coinbaseAddr, protocolFee);
+        emit IInteropCenter.ProtocolFeesAccumulated(coinbaseAddr, protocolFee);
 
         vm.prank(sender);
         l2InteropCenter.sendBundle{value: protocolFee}(
@@ -441,7 +436,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         InteropCallStarter[] memory calls = _buildSimpleCall();
 
         vm.expectEmit(true, true, false, true);
-        emit FixedZKFeesAccumulated(sender, coinbaseAddr, zkFeePerCall);
+        emit IInteropCenter.FixedZKFeesAccumulated(sender, coinbaseAddr, zkFeePerCall);
 
         vm.prank(sender);
         l2InteropCenter.sendBundle{value: 0}(
@@ -560,7 +555,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
         // Expect accumulation event instead of collection event
         vm.expectEmit(true, false, false, true);
-        emit ProtocolFeesAccumulated(address(revertingCoinbase), protocolFee);
+        emit IInteropCenter.ProtocolFeesAccumulated(address(revertingCoinbase), protocolFee);
 
         vm.prank(sender);
         l2InteropCenter.sendBundle{value: protocolFee}(
@@ -608,7 +603,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         uint256 receiverBalanceBefore = receiver.balance;
 
         vm.expectEmit(true, true, false, true);
-        emit ProtocolFeesClaimed(address(revertingCoinbase), receiver, protocolFee);
+        emit IInteropCenter.ProtocolFeesClaimed(address(revertingCoinbase), receiver, protocolFee);
 
         vm.prank(address(revertingCoinbase));
         l2InteropCenter.claimProtocolFees(receiver);
@@ -672,7 +667,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
         // Expect accumulation event
         vm.expectEmit(true, true, false, true);
-        emit FixedZKFeesAccumulated(sender, coinbaseAddr, zkFeePerCall);
+        emit IInteropCenter.FixedZKFeesAccumulated(sender, coinbaseAddr, zkFeePerCall);
 
         vm.prank(sender);
         l2InteropCenter.sendBundle{value: 0}(
@@ -737,7 +732,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         uint256 receiverZKBefore = zkToken.balanceOf(receiver);
 
         vm.expectEmit(true, true, false, true);
-        emit ZKFeesClaimed(coinbaseAddr, receiver, zkFeePerCall);
+        emit IInteropCenter.ZKFeesClaimed(coinbaseAddr, receiver, zkFeePerCall);
 
         vm.prank(coinbaseAddr);
         l2InteropCenter.claimZKFees(receiver);

@@ -562,7 +562,7 @@ contract InteropCenter is
         // Default value is direct call.
         callAttributes.indirectCall = false;
 
-        bytes4[5] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
+        bytes4[SUPPORTED_INTEROP_ATTRIBUTES] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
         // We can only pass each attribute once.
         bool[] memory attributeUsed = new bool[](ATTRIBUTE_SELECTORS.length);
 
@@ -630,7 +630,7 @@ contract InteropCenter is
     /// @param _attributeSelector The attribute selector to check.
     /// @return True if the attribute selector is supported, false otherwise.
     function supportsAttribute(bytes4 _attributeSelector) external pure override returns (bool) {
-        bytes4[5] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
+        bytes4[SUPPORTED_INTEROP_ATTRIBUTES] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
         uint256 attributeSelectorsLength = ATTRIBUTE_SELECTORS.length;
         for (uint256 i = 0; i < attributeSelectorsLength; ++i) {
             if (_attributeSelector == ATTRIBUTE_SELECTORS[i]) {

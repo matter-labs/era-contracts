@@ -135,7 +135,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     }
 
     /// @inheritdoc IGWAssetTracker
-    // vg todo. Only withdrawable by governance now. TBD by BD who has control over this.
     function withdrawGatewayFees(address _recipient) external onlyOwner {
         if (_recipient == address(0)) {
             revert InvalidFeeRecipient();
