@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IMigrator} from "../../chain-interfaces/IMigrator.sol";
-import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, L2DACommitmentScheme, ZKChainCommitment, CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "../../../common/Config.sol";
+import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, L2DACommitmentScheme, ZKChainCommitment, CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET} from "../../../common/Config.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {IZKChain} from "../../../state-transition/chain-interfaces/IZKChain.sol";
@@ -38,14 +38,8 @@ contract MigratorFacet is ZKChainBase, IMigrator {
     /// @notice The timestamp when chain migration becomes available.
     uint256 internal immutable CHAIN_MIGRATION_TIME_WINDOW_START;
 
-    /// @notice The timestamp when chain migration is no longer available.
-    uint256 internal immutable CHAIN_MIGRATION_TIME_WINDOW_END;
-
     /// @notice The timestamp when deposits start being paused.
     uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_START;
-
-    /// @notice The timestamp when deposits stop being paused.
-    uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_END;
 
     constructor(uint256 _l1ChainId, bool _isTestnet) {
         L1_CHAIN_ID = _l1ChainId;
@@ -53,15 +47,9 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         CHAIN_MIGRATION_TIME_WINDOW_START = _isTestnet
             ? CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET
             : CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET;
-        CHAIN_MIGRATION_TIME_WINDOW_END = _isTestnet
-            ? CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET
-            : CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET;
         PAUSE_DEPOSITS_TIME_WINDOW_START = _isTestnet
             ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET
             : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET;
-        PAUSE_DEPOSITS_TIME_WINDOW_END = _isTestnet
-            ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
-            : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET;
     }
 
     modifier onlyL1() {
@@ -87,7 +75,7 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         if (s.priorityModeInfo.canBeActivated) {
             revert NotCompatibleWithPriorityMode();
         }
-        require(s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_END < block.timestamp, DepositsAlreadyPaused());
+        require(s.pausedDepositsTimestamp == 0, DepositsAlreadyPaused());
         uint256 timestamp;
         // Note, if the chain is new (total number of priority transactions is 0) we allow admin to pause the deposits with immediate effect.
         // This is in place to allow for faster migration for newly spawned chains.
@@ -110,8 +98,7 @@ contract MigratorFacet is ZKChainBase, IMigrator {
     /// @inheritdoc IMigrator
     function unpauseDeposits() external onlyAdmin onlyL1 {
         require(
-            s.pausedDepositsTimestamp != 0 &&
-                s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_START <= block.timestamp,
+            s.pausedDepositsTimestamp != 0,
             DepositsNotPaused()
         );
         require(
@@ -153,11 +140,7 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         require(s.priorityTree.getSize() == 0, PriorityQueueNotFullyProcessed());
 
         uint256 timestamp = s.pausedDepositsTimestamp;
-        require(
-            timestamp + CHAIN_MIGRATION_TIME_WINDOW_START < block.timestamp &&
-                block.timestamp < timestamp + CHAIN_MIGRATION_TIME_WINDOW_END,
-            DepositsNotPaused()
-        );
+        require(timestamp != 0 && timestamp + CHAIN_MIGRATION_TIME_WINDOW_START <= block.timestamp, DepositsNotPaused());
 
         // We want to trust interop messages coming from Era chains which implies they can use only trusted settlement layers,
         // ie, controlled by the governance, which is currently Era Gateways and Ethereum.

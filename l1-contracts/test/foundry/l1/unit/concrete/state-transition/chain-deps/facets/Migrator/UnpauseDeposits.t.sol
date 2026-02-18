@@ -7,7 +7,6 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {DepositsNotPaused, MigrationInProgress} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
 contract UnpauseDepositsTest is MigratorTest {
     event DepositsUnpaused(uint256 chainId);
@@ -16,8 +15,8 @@ contract UnpauseDepositsTest is MigratorTest {
     bytes32 pausedDepositsTimestampSlot = bytes32(uint256(62));
 
     function setUp() public override {
-        // Timestamp needs to be late enough for `pauseDepositsBeforeInitiatingMigration` time checks
-        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET + 1);
+        // Avoid block.timestamp == 0 to keep paused-deposits sentinel semantics stable in tests.
+        vm.warp(1);
         super.setUp();
     }
 
@@ -41,17 +40,6 @@ contract UnpauseDepositsTest is MigratorTest {
         // Call reverts when deposits if deposits were not paused
         address admin = utilsFacet.util_getAdmin();
         vm.startPrank(admin);
-        vm.expectRevert(abi.encodeWithSelector(DepositsNotPaused.selector));
-        migratorFacet.unpauseDeposits();
-
-        // The priorityTree sits at slot 51 of ZKChainStorage
-        bytes32 slot = bytes32(uint256(51));
-        // Fake a deposit by extending the priority tree so `getTotalPriorityTxs` returns non-zero
-        vm.store(address(migratorFacet), slot, bytes32(uint256(1)));
-        // The `pausedDepositsTimestamp` will therefore be set to the current `block.timestamp`
-        _pauseDeposits();
-
-        // Call reverts before the paused window comes into effect
         vm.expectRevert(abi.encodeWithSelector(DepositsNotPaused.selector));
         migratorFacet.unpauseDeposits();
     }
