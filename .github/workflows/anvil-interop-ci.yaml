@@ -260,11 +260,14 @@ jobs:
             --ffi \
             -vvv
 
+      - name: Deploy test tokens for Hardhat interop test
+        working-directory: l1-contracts/scripts/anvil-interop
+        run: |
+          echo "Deploying test tokens to L2 chains..."
+          yarn deploy:test-token
+
       - name: Run Hardhat interop token transfer test
         working-directory: l1-contracts
-        env:
-          ANVIL_INTEROP_SKIP_SETUP: "1"
-          ANVIL_INTEROP_SKIP_CLEANUP: "1"
         run: |
           echo "Running Hardhat interop token transfer test..."
           yarn hardhat test scripts/anvil-interop/test/hardhat/token-transfer.spec.ts --network hardhat --no-compile
