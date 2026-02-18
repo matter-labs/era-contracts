@@ -292,6 +292,11 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         }
         // Note during the upgrade to V31 no chain will be on GW.
 
+        bytes32 baseTokenAssetId = IBridgehubBase(s.bridgehub).baseTokenAssetId(_chainId);
+        if (_baseTokenAmount > 0 && baseTokenAssetId == bytes32(0)) {
+            revert InvalidChainId();
+        }
+
         BalanceChange memory balanceChange;
         if (_getBalanceChange) {
             IL1AssetTracker assetTracker = IL1AssetTracker(s.assetTracker);
@@ -302,10 +307,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             address originToken = nativeTokenVault.originToken(assetId);
             balanceChange = BalanceChange({
                 version: BALANCE_CHANGE_VERSION,
-                // baseTokenAssetId is known on Gateway. If for some reason,
-                // it is not registered, the GW part of the function is expected to revert.
-                // FIXME: can it happen in non-malicious cases? If yes, it can lead to loss of funds.
-                baseTokenAssetId: bytes32(0),
+                baseTokenAssetId: baseTokenAssetId,
                 baseTokenAmount: _baseTokenAmount,
                 assetId: assetId,
                 amount: amount,
@@ -315,9 +317,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         } else {
             balanceChange = BalanceChange({
                 version: BALANCE_CHANGE_VERSION,
-                // baseTokenAssetId is known on Gateway. If for some reason,
-                // it is not registered, the GW part of the function is expected to revert.
-                baseTokenAssetId: bytes32(0),
+                baseTokenAssetId: baseTokenAssetId,
                 baseTokenAmount: _baseTokenAmount,
                 assetId: bytes32(0),
                 amount: 0,

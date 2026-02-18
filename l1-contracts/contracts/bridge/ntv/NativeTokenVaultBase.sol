@@ -144,8 +144,8 @@ abstract contract NativeTokenVaultBase is
         if (tokenAssetId == bytes32(0)) {
             revert TokenNotLegacy();
         }
-        // FIXME: a single token can be inserted twice as its index will be 0.
-        if (tokenIndex[tokenAssetId] != 0) {
+        uint256 index = tokenIndex[tokenAssetId];
+        if (index != 0 || (index == 0 && bridgedTokens[index] == tokenAssetId)) {
             revert TokenAlreadyInBridgedTokensList();
         }
         _addTokenToTokensList(tokenAssetId);
