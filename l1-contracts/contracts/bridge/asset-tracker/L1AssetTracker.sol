@@ -39,7 +39,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     IChainAssetHandler public chainAssetHandler;
 
     /// Todo Deprecate after V31 is finished.
-    mapping(bytes32 assetId => bool l1TotalSupplyMigrated) internal l1TotalSupplyMigrated;
+    mapping(bytes32 assetId => bool l1TotalSupplyMigrated) public l1TotalSupplyMigrated;
 
     function _nativeTokenVault() internal view override returns (INativeTokenVaultBase) {
         return NATIVE_TOKEN_VAULT;

@@ -87,13 +87,17 @@ contract L1MessageRoot is MessageRootBase {
             TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber()
         );
         require(
-            v31UpgradeChainBatchNumber[_chainId] == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE,
+            isChainPreV31(_chainId),
             V31UpgradeChainBatchNumberAlreadySet()
         );
         require(currentChainBatchNumber[_chainId] == 0, CurrentBatchNumberAlreadySet());
 
         currentChainBatchNumber[_chainId] = totalBatchesExecuted;
         v31UpgradeChainBatchNumber[_chainId] = totalBatchesExecuted + 1;
+    }
+
+    function isChainPreV31(uint256 _chainId) public view returns (bool) {
+        return v31UpgradeChainBatchNumber[_chainId] == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE;
     }
 
     function _proveL2LeafInclusionOnSettlementLayer(

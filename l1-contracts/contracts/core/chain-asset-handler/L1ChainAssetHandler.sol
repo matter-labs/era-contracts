@@ -11,6 +11,7 @@ import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1AssetHandler} from "../../bridge/interfaces/IL1AssetHandler.sol";
 import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
+import {IL1MessageRoot} from "../message-root/IL1MessageRoot.sol";
 import {IMessageRoot} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IChainAssetHandlerShared} from "./IChainAssetHandlerShared.sol";
@@ -154,6 +155,9 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     }
 
     function _setMigrationInProgressOnL1(uint256 _chainId) internal override {
+        if (IL1MessageRoot(_messageRoot()).isChainPreV31(_chainId)) {
+            revert MigrationPreV31NotAllowed();
+        }
         isMigrationInProgress[_chainId] = true;
     }
 

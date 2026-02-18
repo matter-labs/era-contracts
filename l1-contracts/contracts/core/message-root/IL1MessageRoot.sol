@@ -11,4 +11,6 @@ interface IL1MessageRoot {
     function v31UpgradeChainBatchNumber(uint256 _chainId) external view returns (uint256);
 
     function saveV31UpgradeChainBatchNumber(uint256 _chainId) external;
+
+    function isChainPreV31(uint256 _chainId) external view returns (bool);
 }
