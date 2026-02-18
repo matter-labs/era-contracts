@@ -64,6 +64,7 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
 
     /// @dev Shared initialization logic for EIP-712 and the validator timelock address.
     function _initializeEraMultisig(address _validatorTimelock) internal {
+        // Initialize the required EIP-712 domain to generate signatures for batch hashes
         __EIP712_init("EraMultisigValidator", "1");
         if (_validatorTimelock.code.length == 0) {
             revert AddressHasNoCode(_validatorTimelock);
