@@ -32,7 +32,7 @@ async function main() {
     // Deploy using anvil_setCode
     console.log(`   Deploying MockL2MessageVerification at ${L2_MESSAGE_VERIFICATION_ADDR}...`);
     await provider.send("anvil_setCode", [L2_MESSAGE_VERIFICATION_ADDR, mockBytecode]);
-    console.log(`   ✅ MockL2MessageVerification deployed (always returns true)\n`);
+    console.log("   ✅ MockL2MessageVerification deployed (always returns true)\n");
   }
 
   console.log("✅ MockL2MessageVerification deployed on all chains\n");

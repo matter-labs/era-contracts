@@ -33,9 +33,7 @@ async function main() {
   console.log("   ✓ Asset ID calculation correct");
   console.log("   ✓ InteropCenter sendBundle executed");
   console.log("   ✓ L2InteropHandler.executeBundle attempted");
-  console.log(
-    `   ✓ Source balance delta: ${BigInt(result.sourceBalanceBefore) - BigInt(result.sourceBalanceAfter)}`
-  );
+  console.log(`   ✓ Source balance delta: ${BigInt(result.sourceBalanceBefore) - BigInt(result.sourceBalanceAfter)}`);
   console.log(
     `   ✓ Destination balance delta: ${BigInt(result.destinationBalanceAfter) - BigInt(result.destinationBalanceBefore)}`
   );

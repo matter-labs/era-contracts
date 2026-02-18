@@ -33,7 +33,7 @@ async function main() {
     // Always redeploy the mock (force replace)
     console.log(`   Deploying MockL2MessageVerification at ${L2_MESSAGE_VERIFICATION_ADDR}...`);
     await provider.send("anvil_setCode", [L2_MESSAGE_VERIFICATION_ADDR, bytecode]);
-    console.log(`   ✅ MockL2MessageVerification deployed (bypasses proof verification)\n`);
+    console.log("   ✅ MockL2MessageVerification deployed (bypasses proof verification)\n");
   }
 
   console.log("✅ MockL2MessageVerification deployed on all chains\n");

@@ -43,9 +43,7 @@ export class AnvilManager {
     const anvilBinary = this.resolveAnvilBinary();
     const homeDir = process.env.HOME;
     const foundryBinPath = homeDir ? path.join(homeDir, ".foundry/bin") : "";
-    const enrichedPath = foundryBinPath
-      ? `${foundryBinPath}:${process.env.PATH || ""}`
-      : process.env.PATH;
+    const enrichedPath = foundryBinPath ? `${foundryBinPath}:${process.env.PATH || ""}` : process.env.PATH;
 
     const args = [
       "--port",

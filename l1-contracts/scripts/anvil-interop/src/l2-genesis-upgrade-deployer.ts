@@ -1,6 +1,10 @@
 import * as path from "path";
 import { Contract, providers, utils } from "ethers";
-import { buildAdditionalForceDeploymentsData, buildFixedForceDeploymentsData, getBytecodeInfo } from "./l2-genesis-helper";
+import {
+  buildAdditionalForceDeploymentsData,
+  buildFixedForceDeploymentsData,
+  getBytecodeInfo,
+} from "./l2-genesis-helper";
 import { encodeNtvAssetId, loadAbiFromOut, loadBytecodeFromOut } from "./utils";
 import {
   ETH_TOKEN_ADDRESS,

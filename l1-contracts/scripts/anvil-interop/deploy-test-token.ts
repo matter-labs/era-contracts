@@ -57,7 +57,6 @@ async function main() {
       await mintTx.wait();
 
       console.log(`   ✅ Minted 1000 TEST tokens to ${wallet.address}\n`);
-
     } catch (error: any) {
       console.error(`   ❌ Failed to deploy on chain ${chain.chainId}: ${error.message}\n`);
     }
@@ -65,10 +64,7 @@ async function main() {
 
   // Save token addresses to state by updating chains.json
   state.testTokens = tokenAddresses;
-  fs.writeFileSync(
-    path.join(__dirname, "outputs/state/chains.json"),
-    JSON.stringify(state, null, 2)
-  );
+  fs.writeFileSync(path.join(__dirname, "outputs/state/chains.json"), JSON.stringify(state, null, 2));
 
   console.log("=== ✅ TestToken Deployed to All Chains ===\n");
   console.log("Token Addresses:");

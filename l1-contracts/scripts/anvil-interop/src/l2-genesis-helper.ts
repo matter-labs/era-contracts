@@ -308,7 +308,11 @@ export function buildAdditionalForceDeploymentsData(baseTokenL1Address: string):
         data.predeployedL2WethAddress,
         data.baseTokenL1Address,
         [data.baseTokenMetadata.name, data.baseTokenMetadata.symbol, data.baseTokenMetadata.decimals],
-        [data.baseTokenBridgingData.assetId, data.baseTokenBridgingData.originChainId, data.baseTokenBridgingData.originToken],
+        [
+          data.baseTokenBridgingData.assetId,
+          data.baseTokenBridgingData.originChainId,
+          data.baseTokenBridgingData.originToken,
+        ],
       ],
     ]
   );

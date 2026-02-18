@@ -45,11 +45,7 @@ export class SystemContractsDeployer {
   /**
    * Deploy a system contract at a specific address using anvil_setCode
    */
-  private async deploySystemContract(
-    address: string,
-    contractPath: string,
-    name: string
-  ): Promise<void> {
+  private async deploySystemContract(address: string, contractPath: string, name: string): Promise<void> {
     const existingCode = await this.l2Provider.getCode(address);
     if (existingCode !== "0x" && existingCode !== "0x0") {
       console.log(`   ✅ ${name} already deployed at ${address}`);
@@ -173,7 +169,7 @@ export class SystemContractsDeployer {
 
     // Anvil is standard EVM, not zkSync EVM, so we MUST use the standard EVM mock
     // instead of zkout (which contains zkSync-specific bytecode that won't work in Anvil)
-    console.log(`   Using MockL2ToL1Messenger (standard EVM) instead of zkout (zkSync EVM)...`);
+    console.log("   Using MockL2ToL1Messenger (standard EVM) instead of zkout (zkSync EVM)...");
     await this.deployMockL2ToL1Messenger();
   }
 
@@ -182,10 +178,7 @@ export class SystemContractsDeployer {
    */
   private async deployMockL2ToL1Messenger(): Promise<void> {
     // Use the compiled MockL2ToL1Messenger bytecode
-    const mockPath = path.join(
-      this.contractsRoot,
-      "l1-contracts/out/MockL2ToL1Messenger.sol/MockL2ToL1Messenger.json"
-    );
+    const mockPath = path.join(this.contractsRoot, "l1-contracts/out/MockL2ToL1Messenger.sol/MockL2ToL1Messenger.json");
 
     const artifact = JSON.parse(fs.readFileSync(mockPath, "utf-8"));
     const bytecode = artifact.deployedBytecode?.object;
@@ -195,7 +188,7 @@ export class SystemContractsDeployer {
     }
 
     await this.l2Provider.send("anvil_setCode", [L2_TO_L1_MESSENGER_ADDR, bytecode]);
-    console.log(`   ✅ MockL2ToL1Messenger deployed`);
+    console.log("   ✅ MockL2ToL1Messenger deployed");
   }
 
   /**
@@ -213,7 +206,7 @@ export class SystemContractsDeployer {
 
     // Anvil is standard EVM, not zkSync EVM, so we MUST use the minimal mock
     // instead of zkout (which contains zkSync-specific bytecode that won't work in Anvil)
-    console.log(`   Using minimal L2BaseToken mock (standard EVM) instead of zkout (zkSync EVM)...`);
+    console.log("   Using minimal L2BaseToken mock (standard EVM) instead of zkout (zkSync EVM)...");
     await this.deployMinimalL2BaseToken();
   }
 
@@ -222,10 +215,7 @@ export class SystemContractsDeployer {
    */
   private async deployMinimalL2BaseToken(): Promise<void> {
     // Use the compiled MockL2BaseToken bytecode
-    const mockPath = path.join(
-      this.contractsRoot,
-      "l1-contracts/out/MockL2BaseToken.sol/MockL2BaseToken.json"
-    );
+    const mockPath = path.join(this.contractsRoot, "l1-contracts/out/MockL2BaseToken.sol/MockL2BaseToken.json");
 
     const artifact = JSON.parse(fs.readFileSync(mockPath, "utf-8"));
     const bytecode = artifact.deployedBytecode?.object;
@@ -235,7 +225,7 @@ export class SystemContractsDeployer {
     }
 
     await this.l2Provider.send("anvil_setCode", [L2_BASE_TOKEN_ADDR, bytecode]);
-    console.log(`   ✅ MockL2BaseToken deployed`);
+    console.log("   ✅ MockL2BaseToken deployed");
   }
 
   /**
@@ -250,7 +240,7 @@ export class SystemContractsDeployer {
     try {
       const l1ChainId = await l2Bridgehub.L1_CHAIN_ID();
       if (this.isOne(l1ChainId)) {
-        console.log(`   ✅ L2Bridgehub already initialized`);
+        console.log("   ✅ L2Bridgehub already initialized");
         isInitialized = true;
       }
     } catch {
@@ -285,9 +275,7 @@ export class SystemContractsDeployer {
   private async registerChainsOnBridgehub(l2Bridgehub: Contract): Promise<void> {
     const chains = [10, 11, 12];
     const abiCoder = new utils.AbiCoder();
-    const ethAssetId = utils.keccak256(
-      abiCoder.encode(["uint256", "address"], [1, ETH_TOKEN_ADDRESS])
-    );
+    const ethAssetId = utils.keccak256(abiCoder.encode(["uint256", "address"], [1, ETH_TOKEN_ADDRESS]));
 
     for (const targetChainId of chains) {
       try {
@@ -329,7 +317,7 @@ export class SystemContractsDeployer {
     try {
       const l1ChainId = await interopCenter.L1_CHAIN_ID();
       if (this.isOne(l1ChainId)) {
-        console.log(`   ✅ InteropCenter already initialized`);
+        console.log("   ✅ InteropCenter already initialized");
         isInitialized = true;
       }
     } catch {
@@ -358,12 +346,12 @@ export class SystemContractsDeployer {
     const interopCenterWithOwner = interopCenter.connect(this.l2Wallet);
     const isPaused = await interopCenterWithOwner.paused();
     if (isPaused) {
-      console.log(`   Unpausing InteropCenter...`);
+      console.log("   Unpausing InteropCenter...");
       const tx = await interopCenterWithOwner.unpause();
       await tx.wait();
-      console.log(`   ✅ InteropCenter unpaused`);
+      console.log("   ✅ InteropCenter unpaused");
     } else {
-      console.log(`   ✅ InteropCenter already unpaused`);
+      console.log("   ✅ InteropCenter already unpaused");
     }
   }
 
@@ -387,7 +375,7 @@ export class SystemContractsDeployer {
     try {
       const l1ChainId = await interopHandler.L1_CHAIN_ID();
       if (this.isOne(l1ChainId)) {
-        console.log(`   ✅ L2InteropHandler already initialized`);
+        console.log("   ✅ L2InteropHandler already initialized");
         isInitialized = true;
       }
     } catch {}
@@ -417,7 +405,7 @@ export class SystemContractsDeployer {
     try {
       const l1ChainId = await l2AssetRouter.L1_CHAIN_ID();
       if (this.isOne(l1ChainId)) {
-        console.log(`   ✅ L2AssetRouter already initialized`);
+        console.log("   ✅ L2AssetRouter already initialized");
         isInitialized = true;
       }
     } catch {
@@ -433,9 +421,7 @@ export class SystemContractsDeployer {
 
       const ownerAddress = await this.l2Wallet.getAddress();
       const abiCoder = new utils.AbiCoder();
-      const ethAssetId = utils.keccak256(
-        abiCoder.encode(["uint256", "address"], [1, ETH_TOKEN_ADDRESS])
-      );
+      const ethAssetId = utils.keccak256(abiCoder.encode(["uint256", "address"], [1, ETH_TOKEN_ADDRESS]));
 
       await this.initializeContract(
         L2_ASSET_ROUTER_ADDR,
@@ -468,7 +454,7 @@ export class SystemContractsDeployer {
     try {
       const code = await this.l2Provider.getCode(L2_CHAIN_ASSET_HANDLER_ADDR);
       if (code !== "0x") {
-        console.log(`   ✅ L2ChainAssetHandler already deployed`);
+        console.log("   ✅ L2ChainAssetHandler already deployed");
         isDeployed = true;
       }
     } catch {
@@ -484,7 +470,7 @@ export class SystemContractsDeployer {
 
       // For now, just deploy without initialization
       // Full initialization would require bridgehub, message root, asset router addresses
-      console.log(`   ⚠️  L2ChainAssetHandler deployed but not initialized`);
+      console.log("   ⚠️  L2ChainAssetHandler deployed but not initialized");
     }
   }
 
@@ -501,7 +487,7 @@ export class SystemContractsDeployer {
     try {
       const l1ChainId = await l2AssetTracker.L1_CHAIN_ID();
       if (this.isOne(l1ChainId)) {
-        console.log(`   ✅ L2AssetTracker already initialized`);
+        console.log("   ✅ L2AssetTracker already initialized");
         isInitialized = true;
       }
     } catch {
@@ -519,9 +505,7 @@ export class SystemContractsDeployer {
       const abiCoder = new utils.AbiCoder();
 
       // Calculate ETH asset ID (utils.keccak256(abi.encode(1, 0x0000...0001)))
-      const ethAssetId = utils.keccak256(
-        abiCoder.encode(["uint256", "address"], [1, ETH_TOKEN_ADDRESS])
-      );
+      const ethAssetId = utils.keccak256(abiCoder.encode(["uint256", "address"], [1, ETH_TOKEN_ADDRESS]));
 
       await this.initializeContract(
         L2_ASSET_TRACKER_ADDR,
@@ -551,7 +535,7 @@ export class SystemContractsDeployer {
     try {
       const l1ChainId = await l2NativeTokenVault.L1_CHAIN_ID();
       if (this.isOne(l1ChainId)) {
-        console.log(`   ✅ L2NativeTokenVault already initialized`);
+        console.log("   ✅ L2NativeTokenVault already initialized");
         isInitialized = true;
       }
     } catch {
@@ -565,17 +549,11 @@ export class SystemContractsDeployer {
         "L2NativeTokenVaultDev"
       );
 
-      const l2NativeTokenVaultDev = new Contract(
-        L2_NATIVE_TOKEN_VAULT_ADDR,
-        l2NativeTokenVaultDevAbi,
-        this.l2Wallet
-      );
+      const l2NativeTokenVaultDev = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultDevAbi, this.l2Wallet);
 
       const ownerAddress = await this.l2Wallet.getAddress();
       const abiCoder = new utils.AbiCoder();
-      const ethAssetId = utils.keccak256(
-        abiCoder.encode(["uint256", "address"], [1, ETH_TOKEN_ADDRESS])
-      );
+      const ethAssetId = utils.keccak256(abiCoder.encode(["uint256", "address"], [1, ETH_TOKEN_ADDRESS]));
 
       const l2TokenProxyBytecodeHash = utils.keccak256(utils.toUtf8Bytes("anvil-l2-token-proxy"));
       const legacyBridgeAddress = LEGACY_SHARED_BRIDGE_PLACEHOLDER;
@@ -614,7 +592,7 @@ export class SystemContractsDeployer {
         { gasLimit: initializationGasLimit }
       );
 
-      console.log(`   ✅ L2NativeTokenVault deployed and initialized (dev bridged token beacon configured)`);
+      console.log("   ✅ L2NativeTokenVault deployed and initialized (dev bridged token beacon configured)");
     }
   }
 
@@ -629,7 +607,7 @@ export class SystemContractsDeployer {
 
     console.log(`   Checking for test tokens in: ${stateFile}`);
     if (!fs.existsSync(stateFile)) {
-      console.log(`   ⚠️  State file not found, skipping asset handler registration`);
+      console.log("   ⚠️  State file not found, skipping asset handler registration");
       return;
     }
 
@@ -642,7 +620,9 @@ export class SystemContractsDeployer {
     const tokenAddress = state.testTokens[chainId];
     const abiCoder = new utils.AbiCoder();
     // Asset ID format: utils.keccak256(abi.encode(chainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress))
-    const assetId = utils.keccak256(abiCoder.encode(["uint256", "address", "address"], [chainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress]));
+    const assetId = utils.keccak256(
+      abiCoder.encode(["uint256", "address", "address"], [chainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress])
+    );
 
     console.log(`   Registering asset handler for token ${tokenAddress}...`);
     console.log(`   Asset ID: ${assetId}`);
@@ -680,7 +660,7 @@ export class SystemContractsDeployer {
     // Check if token is already registered
     const registeredAssetId = await l2NativeTokenVault.assetId(tokenAddress);
     if (registeredAssetId !== "0x0000000000000000000000000000000000000000000000000000000000000000") {
-      console.log(`   ✅ Token already registered in L2NativeTokenVault`);
+      console.log("   ✅ Token already registered in L2NativeTokenVault");
       return;
     }
 
@@ -688,7 +668,7 @@ export class SystemContractsDeployer {
     const tokenCode = await this.l2Provider.getCode(tokenAddress);
     if (tokenCode === "0x" || tokenCode === "0x0") {
       console.log(`   ⚠️  Token ${tokenAddress} not deployed on chain ${chainId}, skipping registration`);
-      console.log(`      (Deploy test tokens with 'yarn deploy:test-token' if needed)`);
+      console.log("      (Deploy test tokens with 'yarn deploy:test-token' if needed)");
       return;
     }
 
@@ -699,7 +679,7 @@ export class SystemContractsDeployer {
       const registerTx = await l2NativeTokenVaultWithWallet.registerToken(tokenAddress);
       await registerTx.wait();
 
-      console.log(`   ✅ Token registered in L2NativeTokenVault`);
+      console.log("   ✅ Token registered in L2NativeTokenVault");
       console.log(`      assetId: ${assetId}`);
     } catch (error: any) {
       console.error(`   ❌ registerToken failed: ${error.message}`);

@@ -30,8 +30,7 @@ export const SERVICE_TX_SENDER_ADDR = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFf
 export const INTEROP_CALL_TUPLE_TYPE = "tuple(bytes1,bool,address,address,uint256,bytes)";
 export const INTEROP_BUNDLE_TUPLE_TYPE =
   "tuple(bytes1,uint256,uint256,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes))";
-export const INTEROP_BUNDLE_SENT_TOPIC =
-  "0xd5e1642d9c6ff371d1f102384c70a9a38530493e4747a53919f128685013cb6e";
+export const INTEROP_BUNDLE_SENT_TOPIC = "0xd5e1642d9c6ff371d1f102384c70a9a38530493e4747a53919f128685013cb6e";
 
 export const ZK_CHAIN_SPECIFIC_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE =
   "tuple(address l2LegacySharedBridge, address predeployedL2WethAddress, address baseTokenL1Address, tuple(string name, string symbol, uint256 decimals) baseTokenMetadata, tuple(bytes32 assetId, uint256 originChainId, address originToken) baseTokenBridgingData)";

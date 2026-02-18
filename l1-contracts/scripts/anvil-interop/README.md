@@ -402,6 +402,7 @@ Edit `config/anvil-config.json` to:
 The environment is fully functional for cross-chain testing:
 
 ✅ **Working Components:**
+
 - L1 core contracts deployed (Bridgehub, SharedBridge, CTM)
 - 3 L2 chains registered (10, 11, 12)
 - L2 system contracts initialized using L2GenesisUpgrade
@@ -412,16 +413,19 @@ The environment is fully functional for cross-chain testing:
 The batch settler daemon runs but cannot commit batches to L1 due to missing facet configuration. When attempting to call `commitBatchesSharedBridge` on the diamond proxy, it reverts with error "F" (DiamondProxy.sol:35) which means "Proxy has no facet for this selector".
 
 **Why this happens:**
+
 - The batch settler is a simplified mock implementation for Anvil testing
 - Real batch commitment requires proper ExecutorFacet setup with all batch-related functions registered in the diamond
 - For this test environment, the relayers provide the core cross-chain functionality without requiring full batch settlement
 
 **What works:**
+
 - L1→L2 transactions via Bridgehub are successfully relayed to target chains
 - L2→L2 cross-chain messages via InteropCenter are processed correctly
 - All test scripts (`send:interop`, `send:l2-to-l2`) work as expected
 
 **Testing cross-chain functionality:**
+
 ```bash
 # Send L1→L2 transaction (requires 0.1 ETH deposit to cover L2 execution)
 yarn send:interop

@@ -32,14 +32,14 @@ async function main() {
     // Check if already deployed
     const existingCode = await provider.getCode(L2_INTEROP_HANDLER_ADDR);
     if (existingCode !== "0x" && existingCode !== "0x0") {
-      console.log(`   ✅ L2InteropHandler already deployed\n`);
+      console.log("   ✅ L2InteropHandler already deployed\n");
       continue;
     }
 
     // Deploy using anvil_setCode
     console.log(`   Deploying L2InteropHandler at ${L2_INTEROP_HANDLER_ADDR}...`);
     await provider.send("anvil_setCode", [L2_INTEROP_HANDLER_ADDR, bytecode]);
-    console.log(`   ✅ L2InteropHandler deployed\n`);
+    console.log("   ✅ L2InteropHandler deployed\n");
   }
 
   console.log("✅ L2InteropHandler deployed on all chains\n");

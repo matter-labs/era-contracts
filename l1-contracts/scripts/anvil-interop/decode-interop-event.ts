@@ -1,11 +1,7 @@
 #!/usr/bin/env node
 
 import { AbiCoder, providers } from "ethers";
-import {
-  INTEROP_BUNDLE_SENT_TOPIC,
-  INTEROP_BUNDLE_TUPLE_TYPE,
-  INTEROP_CENTER_ADDR,
-} from "./src/const";
+import { INTEROP_BUNDLE_SENT_TOPIC, INTEROP_BUNDLE_TUPLE_TYPE, INTEROP_CENTER_ADDR } from "./src/const";
 
 const abiCoder = AbiCoder.defaultAbiCoder();
 
@@ -28,9 +24,7 @@ async function getEventDataFromTx(txHash: string, rpcUrl: string, address: strin
   }
 
   const found = receipt.logs.find(
-    (log) =>
-      log.address.toLowerCase() === address.toLowerCase() &&
-      log.topics[0] === INTEROP_BUNDLE_SENT_TOPIC
+    (log) => log.address.toLowerCase() === address.toLowerCase() && log.topics[0] === INTEROP_BUNDLE_SENT_TOPIC
   );
 
   if (!found) {
@@ -41,14 +35,7 @@ async function getEventDataFromTx(txHash: string, rpcUrl: string, address: strin
 }
 
 function decodeEventData(eventData: string): void {
-  const decoded = abiCoder.decode(
-    [
-      "bytes32",
-      "bytes32",
-      INTEROP_BUNDLE_TUPLE_TYPE,
-    ],
-    eventData
-  );
+  const decoded = abiCoder.decode(["bytes32", "bytes32", INTEROP_BUNDLE_TUPLE_TYPE], eventData);
 
   console.log("\n=== InteropBundleSent Event Decoded ===\n");
   console.log("l2l1MsgHash:", decoded[0]);

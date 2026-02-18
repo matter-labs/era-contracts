@@ -5,7 +5,7 @@ import * as path from "path";
 import type { providers } from "ethers";
 import { AnvilManager } from "./src/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
-import { BatchSettler } from "./src/batch-settler";
+import type { BatchSettler } from "./src/batch-settler";
 import type { DeploymentContext, ChainAddresses } from "./src/types";
 import { sleep } from "./src/utils";
 
@@ -76,12 +76,11 @@ async function main() {
       }
     }
 
-    const { settler: batchSettler, l1ToL2Relayer, l2ToL2Relayer } = await runner.step6StartBatchSettler(
-      l1Provider,
-      l2Providers,
-      chainAddressesMap,
-      config
-    );
+    const {
+      settler: batchSettler,
+      l1ToL2Relayer,
+      l2ToL2Relayer,
+    } = await runner.step6StartBatchSettler(l1Provider, l2Providers, chainAddressesMap, config);
     settler = batchSettler;
 
     // Store context for potential future use

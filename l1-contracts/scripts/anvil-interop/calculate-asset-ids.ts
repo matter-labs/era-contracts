@@ -9,7 +9,9 @@ import { ETH_TOKEN_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDR } from "./src/const";
  */
 function calculateAssetId(chainId: number, tokenAddress: string): string {
   const abiCoder = AbiCoder.defaultAbiCoder();
-  return keccak256(abiCoder.encode(["uint256", "address", "address"], [chainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress]));
+  return keccak256(
+    abiCoder.encode(["uint256", "address", "address"], [chainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress])
+  );
 }
 
 /**

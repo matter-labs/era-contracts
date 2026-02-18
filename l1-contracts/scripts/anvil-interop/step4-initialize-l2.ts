@@ -15,12 +15,7 @@ async function main() {
     throw new Error("Chain addresses not found. Run 'yarn step3' first.");
   }
 
-  await runner.step4InitializeL2(
-    state.chains.l1.rpcUrl,
-    state.chainAddresses,
-    state.l1Addresses,
-    state.ctmAddresses
-  );
+  await runner.step4InitializeL2(state.chains.l1.rpcUrl, state.chainAddresses, state.l1Addresses, state.ctmAddresses);
 
   console.log("\n✅ L2 System Contracts Initialized");
   console.log("\nNext: Run 'yarn step5' to setup gateway");

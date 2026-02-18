@@ -3,12 +3,14 @@
 ## Setup (One Time)
 
 1. **Build contracts:**
+
    ```bash
    cd /path/to/contracts/l1-contracts
    forge build
    ```
 
 2. **Navigate to anvil-interop:**
+
    ```bash
    cd scripts/anvil-interop
    ```
@@ -16,6 +18,7 @@
 ## Running the Stack
 
 ### Option A: All at Once (Recommended)
+
 ```bash
 yarn step:all
 ```
@@ -23,6 +26,7 @@ yarn step:all
 This runs steps 1-5 automatically with proper error handling.
 
 ### Option B: Step by Step
+
 ```bash
 yarn step1  # Start Anvil chains
 yarn step2  # Deploy L1 contracts
@@ -52,6 +56,7 @@ Stops all Anvil processes and cleans up deployment state.
 ## Quick Check
 
 **Verify everything is running:**
+
 ```bash
 # Check Anvil processes
 ps aux | grep anvil
@@ -83,6 +88,7 @@ ls outputs/state/
 ## What's Next?
 
 After successful setup:
+
 - `yarn step6` - Start the settler daemon
 - `yarn test:interop` - Run interop tests
 - `yarn deploy:test-token` - Deploy test ERC20 token
@@ -91,5 +97,6 @@ After successful setup:
 ---
 
 For detailed technical information, see:
+
 - `FIXED_L2_SETUP.md` - Complete changelog
 - `L2_GENESIS_UPGRADE_CHANGES.md` - Technical details

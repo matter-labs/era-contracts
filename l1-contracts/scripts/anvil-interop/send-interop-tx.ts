@@ -155,7 +155,7 @@ async function main() {
             data: log.data,
           });
           if (parsed && parsed.name === "InteropBundleSent") {
-            console.log(`   ✅ InteropBundleSent event emitted`);
+            console.log("   ✅ InteropBundleSent event emitted");
             console.log(`      Bundle Hash: ${parsed.args.interopBundleHash}`);
             console.log(`      L2→L1 Msg Hash: ${parsed.args.l2l1MsgHash}`);
           }

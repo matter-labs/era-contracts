@@ -19,8 +19,9 @@ function runOrThrow(command: string, args: string[], cwd: string, env?: NodeJS.P
 }
 
 async function main(): Promise<void> {
+  const keepChains = process.argv.includes("--keep-chains") || process.env.ANVIL_INTEROP_KEEP_CHAINS === "1";
   const skipSetup = process.env.ANVIL_INTEROP_SKIP_SETUP === "1";
-  const skipCleanup = process.env.ANVIL_INTEROP_SKIP_CLEANUP === "1";
+  const skipCleanup = keepChains || process.env.ANVIL_INTEROP_SKIP_CLEANUP === "1";
   const setupRetries = Number(process.env.ANVIL_INTEROP_SETUP_RETRIES || "3");
   const interopEnv: NodeJS.ProcessEnv = {
     ...process.env,
@@ -73,6 +74,8 @@ async function main(): Promise<void> {
   } finally {
     if (!skipCleanup) {
       runOrThrow("yarn", ["cleanup"], anvilInteropDir, interopEnv);
+    } else if (keepChains) {
+      console.log("ℹ️ Keeping Anvil chains running (--keep-chains enabled).");
     }
   }
 }

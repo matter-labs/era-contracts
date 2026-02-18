@@ -86,10 +86,7 @@ export class L1ToL2Relayer {
     this.lastProcessedBlock = currentBlock;
   }
 
-  private async processBridgehubTransactions(
-    fromBlock: number,
-    toBlock: number
-  ): Promise<void> {
+  private async processBridgehubTransactions(fromBlock: number, toBlock: number): Promise<void> {
     // ABI for requestL2TransactionDirect function
     const bridgehubAbi = loadAbiFromOut("IL1Bridgehub.sol/IL1Bridgehub.json");
 
@@ -125,7 +122,7 @@ export class L1ToL2Relayer {
         }
       }
     } catch (error) {
-      console.error(`   Failed to process bridgehub transactions:`, error);
+      console.error("   Failed to process bridgehub transactions:", error);
     }
   }
 
@@ -150,10 +147,7 @@ export class L1ToL2Relayer {
     }
   }
 
-  private async executeOnL2(
-    chainId: number,
-    request: any
-  ): Promise<void> {
+  private async executeOnL2(chainId: number, request: any): Promise<void> {
     const l2Provider = this.l2Providers.get(chainId);
     if (!l2Provider) {
       throw new Error(`L2 provider not found for chain ${chainId}`);

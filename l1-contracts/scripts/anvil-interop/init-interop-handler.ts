@@ -31,17 +31,17 @@ async function main() {
     const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbi, provider);
 
     // Check if already initialized
-    let isInitialized = false;
+    const isInitialized = false;
     try {
       const l1ChainId = await interopHandler.L1_CHAIN_ID();
       if (l1ChainId?.toString?.() === "1") {
-        console.log(`   ✅ L2InteropHandler already initialized\n`);
+        console.log("   ✅ L2InteropHandler already initialized\n");
         continue;
       }
     } catch {}
 
     if (!isInitialized) {
-      console.log(`   Initializing L2InteropHandler...`);
+      console.log("   Initializing L2InteropHandler...");
 
       // Impersonate L2_COMPLEX_UPGRADER to call initL2
       await provider.send("anvil_impersonateAccount", [L2_COMPLEX_UPGRADER_ADDR]);
@@ -55,7 +55,7 @@ async function main() {
 
       await provider.send("anvil_stopImpersonatingAccount", [L2_COMPLEX_UPGRADER_ADDR]);
 
-      console.log(`   ✅ L2InteropHandler initialized\n`);
+      console.log("   ✅ L2InteropHandler initialized\n");
     }
   }
 

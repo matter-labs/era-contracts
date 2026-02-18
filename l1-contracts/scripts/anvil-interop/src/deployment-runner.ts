@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { providers } from "ethers";
-import { AnvilManager } from "./anvil-manager";
+import type { AnvilManager } from "./anvil-manager";
 import { ForgeDeployer } from "./deployer";
 import { ChainRegistry } from "./chain-registry";
 import { GatewaySetup } from "./gateway-setup";
@@ -45,9 +45,7 @@ export class DeploymentRunner {
     fs.writeFileSync(path.join(this.stateDir, "chains.json"), JSON.stringify(state, null, 2));
   }
 
-  async step1StartChains(
-    anvilManager: AnvilManager
-  ): Promise<{ chains: ChainInfo }> {
+  async step1StartChains(anvilManager: AnvilManager): Promise<{ chains: ChainInfo }> {
     console.log("=== Step 1: Starting Anvil Chains ===\n");
 
     const config = this.getConfig();

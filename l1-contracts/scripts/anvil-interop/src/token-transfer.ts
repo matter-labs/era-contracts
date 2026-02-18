@@ -133,12 +133,16 @@ export async function executeTokenTransfer(
   }
 
   const destinationTokenBefore = await targetVault.tokenAddress(assetId);
-  const destinationBalanceBefore = destinationTokenBefore === ethers.constants.AddressZero
-    ? BigNumber.from(0)
-    : await readTokenBalance(targetProvider, destinationTokenBefore, targetWallet.address);
+  const destinationBalanceBefore =
+    destinationTokenBefore === ethers.constants.AddressZero
+      ? BigNumber.from(0)
+      : await readTokenBalance(targetProvider, destinationTokenBefore, targetWallet.address);
 
   const NEW_ENCODING_VERSION = "0x01";
-  const transferData = abiCoder.encode(["uint256", "address", "address"], [amountWei, sourceWallet.address, sourceTokenAddr]);
+  const transferData = abiCoder.encode(
+    ["uint256", "address", "address"],
+    [amountWei, sourceWallet.address, sourceTokenAddr]
+  );
   const depositData = NEW_ENCODING_VERSION + abiCoder.encode(["bytes32", "bytes"], [assetId, transferData]).slice(2);
 
   log("\n📦 Encoded bridgehub deposit data");
@@ -253,9 +257,10 @@ export async function executeTokenTransfer(
 
   const sourceBalanceAfter = await sourceToken.balanceOf(sourceWallet.address);
   const destinationToken = await targetVault.tokenAddress(assetId);
-  const destinationBalanceAfter = destinationToken === ethers.constants.AddressZero
-    ? BigNumber.from(0)
-    : await readTokenBalance(targetProvider, destinationToken, targetWallet.address);
+  const destinationBalanceAfter =
+    destinationToken === ethers.constants.AddressZero
+      ? BigNumber.from(0)
+      : await readTokenBalance(targetProvider, destinationToken, targetWallet.address);
 
   log(`Target Chain: ${targetChainId}`);
   log(`Target Tx:    ${targetTxHash || "not found yet (relay may still be pending)"}`);

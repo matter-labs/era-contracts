@@ -127,7 +127,7 @@ export class ChainRegistry {
     // Get the contracts root (go up from scripts/anvil-interop to contracts/)
     const contractsRoot = path.resolve(this.projectRoot, "..");
 
-    console.log(`   Using Anvil unlocked mode to deploy system contracts...`);
+    console.log("   Using Anvil unlocked mode to deploy system contracts...");
     console.log(`   - Chain ID: ${chainId}`);
     console.log(`   - L2 RPC: ${l2RpcUrl}`);
 
@@ -147,9 +147,9 @@ export class ChainRegistry {
       const mockSystemContextBytecode = mockSystemContextArtifact.deployedBytecode.object;
 
       await l2Provider.send("anvil_setCode", [SYSTEM_CONTEXT_ADDR, mockSystemContextBytecode]);
-      console.log(`   ✅ Mock SystemContext deployed`);
+      console.log("   ✅ Mock SystemContext deployed");
     } else {
-      console.log(`   ✅ SystemContext already deployed`);
+      console.log("   ✅ SystemContext already deployed");
     }
 
     // Deploy L2Bridgehub at 0x010002
@@ -174,10 +174,7 @@ export class ChainRegistry {
       console.log(`   Deploying L2Bridgehub at ${L2_BRIDGEHUB_ADDR}...`);
 
       // Read L2Bridgehub bytecode from compiled artifact
-      const l2BridgehubPath = path.join(
-        contractsRoot,
-        "l1-contracts/out/L2Bridgehub.sol/L2Bridgehub.json"
-      );
+      const l2BridgehubPath = path.join(contractsRoot, "l1-contracts/out/L2Bridgehub.sol/L2Bridgehub.json");
       const l2BridgehubArtifact = JSON.parse(fs.readFileSync(l2BridgehubPath, "utf-8"));
       const l2BridgehubBytecode = l2BridgehubArtifact.deployedBytecode.object;
 
@@ -198,7 +195,7 @@ export class ChainRegistry {
 
       await l2Provider.send("anvil_stopImpersonatingAccount", [L2_COMPLEX_UPGRADER_ADDR]);
 
-      console.log(`   ✅ L2Bridgehub initialized`);
+      console.log("   ✅ L2Bridgehub initialized");
     }
 
     // Register chains on L2Bridgehub for interop
@@ -240,10 +237,7 @@ export class ChainRegistry {
     }
 
     // Read InteropCenter bytecode (compiled with Solc, stored in out/)
-    const interopCenterPath = path.join(
-      contractsRoot,
-      "l1-contracts/out/InteropCenter.sol/InteropCenter.json"
-    );
+    const interopCenterPath = path.join(contractsRoot, "l1-contracts/out/InteropCenter.sol/InteropCenter.json");
     const interopCenterArtifact = JSON.parse(fs.readFileSync(interopCenterPath, "utf-8"));
     // Use deployedBytecode (runtime bytecode) for anvil_setCode, not bytecode (deployment bytecode)
     const interopCenterBytecode = interopCenterArtifact.deployedBytecode.object;
@@ -293,19 +287,19 @@ export class ChainRegistry {
 
       await l2Provider.send("anvil_stopImpersonatingAccount", [L2_COMPLEX_UPGRADER_ADDR]);
 
-      console.log(`   InteropCenter initialized (L1_CHAIN_ID=1)`);
+      console.log("   InteropCenter initialized (L1_CHAIN_ID=1)");
     }
 
     // Unpause the contract if it's paused (only owner can unpause)
     const interopCenterWithOwner = interopCenter.connect(l2Wallet);
     const isPaused = await interopCenterWithOwner.getFunction("paused")();
     if (isPaused) {
-      console.log(`   Unpausing InteropCenter...`);
+      console.log("   Unpausing InteropCenter...");
       const unpauseTx = await interopCenterWithOwner.getFunction("unpause")();
       await unpauseTx.wait();
-      console.log(`   InteropCenter unpaused`);
+      console.log("   InteropCenter unpaused");
     } else {
-      console.log(`   ✅ InteropCenter already unpaused`);
+      console.log("   ✅ InteropCenter already unpaused");
     }
 
     console.log(`✅ L2 system contracts initialized for chain ${chainId}`);
@@ -325,7 +319,7 @@ export class ChainRegistry {
         return;
       }
     } catch (error) {
-      console.log(`   ℹ️  Could not check deposit status, attempting to unpause...`);
+      console.log("   ℹ️  Could not check deposit status, attempting to unpause...");
     }
 
     // Unpause deposits
@@ -369,7 +363,6 @@ export class ChainRegistry {
 
     return configPath;
   }
-
 
   private async runForgeScript(
     scriptPath: string,

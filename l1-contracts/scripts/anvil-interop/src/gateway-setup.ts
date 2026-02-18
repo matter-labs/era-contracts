@@ -20,7 +20,7 @@ export class GatewaySetup {
   }
 
   async designateAsGateway(_chainId: number): Promise<string> {
-    console.log(`🌐 Gateway setup for Anvil test environment...`);
+    console.log("🌐 Gateway setup for Anvil test environment...");
 
     // For the Anvil test environment, we skip gateway setup
     // Real gateway setup requires zkstack CLI commands:
@@ -40,9 +40,9 @@ export class GatewaySetup {
     const gatewayCTMAddr = this.ctmAddresses.chainTypeManager;
 
     console.log(`   Using existing CTM: ${gatewayCTMAddr}`);
-    console.log(`   ⚠️  Gateway conversion skipped (requires zkstack CLI)`);
-    console.log(`   ℹ️  For full gateway setup, use: zkstack chain gateway convert-to-gateway`);
-    console.log(`✅ Gateway setup complete (simplified for Anvil testing)`);
+    console.log("   ⚠️  Gateway conversion skipped (requires zkstack CLI)");
+    console.log("   ℹ️  For full gateway setup, use: zkstack chain gateway convert-to-gateway");
+    console.log("✅ Gateway setup complete (simplified for Anvil testing)");
 
     return gatewayCTMAddr;
   }

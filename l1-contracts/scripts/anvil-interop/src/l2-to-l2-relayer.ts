@@ -179,9 +179,9 @@ export class L2ToL2Relayer {
     try {
       await this.relayCrossChainMessage(sourceChainId, txHash, interopEventLog, provider);
       this.processedTxHashes.add(txHash);
-      console.log(`      ✅ Cross-chain message relayed`);
+      console.log("      ✅ Cross-chain message relayed");
     } catch (error: any) {
-      console.error(`      ❌ Failed to relay message:`, error.message);
+      console.error("      ❌ Failed to relay message:", error.message);
     }
   }
 
@@ -225,8 +225,8 @@ export class L2ToL2Relayer {
       // Convert tuple arrays to objects
       calls = rawCalls.map((call: any) => ({
         target: call[2], // address to (index 2) // address
-        value: call[4],  // uint256 value (index 4)  // uint256
-        data: call[5],   // bytes data (index 5)   // bytes
+        value: call[4], // uint256 value (index 4)  // uint256
+        data: call[5], // bytes data (index 5)   // bytes
       }));
 
       console.log(`      From Chain: ${sourceChainId}`);
@@ -237,7 +237,7 @@ export class L2ToL2Relayer {
         console.log(`      Call ${i + 1}: ${calls[i].target} with ${calls[i].data.length} bytes data`);
       }
     } catch (error) {
-      console.error(`      Failed to decode InteropBundleSent event:`, error);
+      console.error("      Failed to decode InteropBundleSent event:", error);
       return;
     }
 
@@ -248,7 +248,7 @@ export class L2ToL2Relayer {
       return;
     }
 
-    console.log(`      Executing bundle on target L2 chain via L2InteropHandler...`);
+    console.log("      Executing bundle on target L2 chain via L2InteropHandler...");
 
     // For Anvil testing, we directly call L2InteropHandler.executeBundle()
     // In production, this would go through L1 settlement
@@ -263,9 +263,9 @@ export class L2ToL2Relayer {
       message: {
         txNumberInBatch: 0,
         sender: INTEROP_CENTER_ADDR,
-        data: "0x"
+        data: "0x",
       },
-      proof: []
+      proof: [],
     };
 
     const interopHandlerAbi = loadAbiFromOut("InteropHandler.sol/InteropHandler.json");
@@ -275,10 +275,7 @@ export class L2ToL2Relayer {
     // Extract just the InteropBundle from the event data
     // The event emits (l2l1MsgHash, interopBundleHash, InteropBundle)
     // We need to extract and re-encode just the InteropBundle for executeBundle
-    const bundleData = abiCoder.encode(
-      [INTEROP_BUNDLE_TUPLE_TYPE],
-      [interopBundle]
-    );
+    const bundleData = abiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]);
 
     try {
       const tx = await interopHandler.executeBundle(bundleData, mockProof, {
