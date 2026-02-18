@@ -270,9 +270,9 @@
     "evmDeployedBytecodeLength": null
   },
   {
-    "contractName": "system-contracts/L2InteropRootStorage",
+    "contractName": "l1-contracts/L2InteropRootStorage",
     "zkBytecodeHash": "0x01000097cfe8b93fb96c3dca5170c85d6afd82802f86b1f5a334b9004e7d5d09",
-    "zkBytecodePath": "/system-contracts/zkout/L2InteropRootStorage.sol/L2InteropRootStorage.json",
+    "zkBytecodePath": "/l1-contracts/zkout/L2InteropRootStorage.sol/L2InteropRootStorage.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
     "evmDeployedBytecodeHash": null,
