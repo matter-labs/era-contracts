@@ -222,6 +222,19 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         historicalRoot[block.number] = sharedTreeRoot;
     }
 
+    /// @notice Emits a new interop root event when the shared tree root changes.
+    function _emitRoot(bytes32 _root) internal {
+        // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
+        // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
+        bytes32[] memory _sides = new bytes32[](1);
+        _sides[0] = _root;
+
+        uint256 currentCount = totalPublishedInteropRoots;
+        totalPublishedInteropRoots = currentCount + 1;
+
+        emit NewInteropRoot(block.chainid, block.number, currentCount, _sides);
+    }
+
     //////////////////////////////
     //// IMessageVerification ////
     //////////////////////////////

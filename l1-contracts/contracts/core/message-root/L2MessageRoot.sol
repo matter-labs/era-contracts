@@ -117,16 +117,4 @@ contract L2MessageRoot is MessageRootBase {
         return bytes32(0);
     }
 
-    /// @notice emit a new message root when committing a new batch
-    function _emitRoot(bytes32 _root) internal {
-        // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
-        // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
-        bytes32[] memory _sides = new bytes32[](1);
-        _sides[0] = _root;
-
-        uint256 currentCount = totalPublishedInteropRoots;
-        totalPublishedInteropRoots = currentCount + 1;
-
-        emit NewInteropRoot(block.chainid, block.number, currentCount, _sides);
-    }
 }

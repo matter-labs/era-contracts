@@ -179,7 +179,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     ) external onlyOwner {
         require(_migrationNumber == 0, MigrationNumberMismatch(0, _migrationNumber));
         require(!_interval.isActive, MigrationIntervalNotSet());
-        uint256 legacyGwChainId = IMessageRootBase(_messageRoot()).ERA_GATEWAY_CHAIN_ID();
+        uint256 legacyGwChainId = _messageRoot().ERA_GATEWAY_CHAIN_ID();
         require(
             _interval.settlementLayerChainId == legacyGwChainId,
             HistoricalSettlementLayerMismatch(legacyGwChainId, _interval.settlementLayerChainId)
@@ -276,7 +276,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
             _newMigrationNum == MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
             MigrationNumberMismatch(MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, _newMigrationNum)
         );
-        uint256 slBatchLowerBound = IMessageRoot(_messageRoot()).currentChainBatchNumber(_settlementChainId);
+        uint256 slBatchLowerBound = _messageRoot().currentChainBatchNumber(_settlementChainId);
         _migrationInterval[_chainId][_newMigrationNum] = MigrationInterval({
             migrateToGWBatchNumber: _batchNumber,
             migrateFromGWBatchNumber: 0,
@@ -305,7 +305,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         MigrationInterval storage interval = _migrationInterval[_chainId][MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER];
         require(interval.isActive, MigrationIntervalNotSet());
         interval.migrateFromGWBatchNumber = _batchNumber;
-        interval.settlementLayerBatchUpperBound = IMessageRoot(_messageRoot()).currentChainBatchNumber(
+        interval.settlementLayerBatchUpperBound = _messageRoot().currentChainBatchNumber(
             interval.settlementLayerChainId
         );
         interval.isActive = false;

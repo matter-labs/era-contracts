@@ -795,7 +795,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         address _legacyL2Bridge
     ) internal view returns (address) {
         bytes4 selector = DataEncoding.getSelector(_message);
-        if (selector == IMailboxImpl.finalizeEthWithdrawal.selector) {
+        if (selector == IMailboxLegacy.finalizeEthWithdrawal.selector) {
             return L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
         }
         if (selector == AssetRouterBase.finalizeDeposit.selector) {
