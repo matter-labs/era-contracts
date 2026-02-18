@@ -68,8 +68,8 @@ interface IEraMultisigValidator is IValidatorTimelock {
     /// @param _addressesToAdd Addresses to grant multisig membership.
     /// @param _addressesToRemove Addresses to revoke multisig membership.
     function changeExecutionMultisigMember(
-        address[] memory _addressesToAdd,
-        address[] memory _addressesToRemove
+        address[] calldata _addressesToAdd,
+        address[] calldata _addressesToRemove
     ) external;
 
     /// @notice Computes the EIP-712 digest used for multisig approval of a batch execution.

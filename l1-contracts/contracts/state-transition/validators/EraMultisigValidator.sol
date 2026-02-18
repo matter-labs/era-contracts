@@ -89,9 +89,9 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
         uint256 count = 0;
         address[] storage approvers = hashApprovers[_hash];
         uint256 length = approvers.length;
-        for (uint256 i = 0; i < length; i++) {
+        for (uint256 i = 0; i < length; ++i) {
             if (executionMultisigMember[approvers[i]]) {
-                count += 1;
+                ++count;
             }
         }
         return count;
@@ -105,14 +105,16 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
 
     /// @inheritdoc IEraMultisigValidator
     function changeExecutionMultisigMember(
-        address[] memory _addressesToAdd,
-        address[] memory _addressesToRemove
+        address[] calldata _addressesToAdd,
+        address[] calldata _addressesToRemove
     ) external onlyOwner {
-        for (uint256 i = 0; i < _addressesToAdd.length; i++) {
+        uint256 addLength = _addressesToAdd.length;
+        for (uint256 i = 0; i < addLength; ++i) {
             executionMultisigMember[_addressesToAdd[i]] = true;
             emit MultisigMemberChanged(_addressesToAdd[i], true);
         }
-        for (uint256 i = 0; i < _addressesToRemove.length; i++) {
+        uint256 removeLength = _addressesToRemove.length;
+        for (uint256 i = 0; i < removeLength; ++i) {
             executionMultisigMember[_addressesToRemove[i]] = false;
             emit MultisigMemberChanged(_addressesToRemove[i], false);
         }
@@ -121,8 +123,8 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
     /// @inheritdoc IValidatorTimelock
     function precommitSharedBridge(
         address _chainAddress,
-        uint256 _l2BlockNumber,
-        bytes calldata _l2Block
+        uint256,
+        bytes calldata
     ) public override(ValidatorTimelock, IValidatorTimelock) onlyRole(_chainAddress, PRECOMMITTER_ROLE) {
         _propagateToValidatorTimelock();
     }
@@ -130,7 +132,7 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
     /// @inheritdoc IValidatorTimelock
     function revertBatchesSharedBridge(
         address _chainAddress,
-        uint256 _newLastBatch
+        uint256
     ) public override(ValidatorTimelock, IValidatorTimelock) onlyRole(_chainAddress, REVERTER_ROLE) {
         _propagateToValidatorTimelock();
     }
@@ -138,9 +140,9 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
     /// @inheritdoc IValidatorTimelock
     function commitBatchesSharedBridge(
         address _chainAddress,
-        uint256 _processBatchFrom,
-        uint256 _processBatchTo,
-        bytes calldata _batchData
+        uint256,
+        uint256,
+        bytes calldata
     ) public override(ValidatorTimelock, IValidatorTimelock) onlyRole(_chainAddress, COMMITTER_ROLE) {
         _propagateToValidatorTimelock();
     }
@@ -148,9 +150,9 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
     /// @inheritdoc IValidatorTimelock
     function proveBatchesSharedBridge(
         address _chainAddress,
-        uint256 _processBatchFrom,
-        uint256 _processBatchTo,
-        bytes calldata _batchData
+        uint256,
+        uint256,
+        bytes calldata
     ) public override(ValidatorTimelock, IValidatorTimelock) onlyRole(_chainAddress, PROVER_ROLE) {
         _propagateToValidatorTimelock();
     }
