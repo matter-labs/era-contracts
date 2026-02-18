@@ -112,7 +112,7 @@ library Utils {
         logs[6] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+            uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY),
             bytes32(uint256(L2_DA_COMMITMENT_SCHEME))
         );
         logs[7] = constructL2Log(
@@ -139,10 +139,10 @@ library Utils {
 
     function createSystemLogsWithNoneDAValidator() public returns (bytes[] memory) {
         bytes[] memory systemLogs = createSystemLogs(bytes32(0));
-        systemLogs[uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)] = constructL2Log(
+        systemLogs[uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY)] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+            uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY),
             bytes32(uint256(L2DACommitmentScheme.NONE))
         );
 
@@ -406,13 +406,11 @@ library Utils {
     }
 
     function getMailboxSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](9);
+        bytes4[] memory selectors = new bytes4[](7);
         uint256 i = 0;
         selectors[i++] = MailboxFacet.proveL2MessageInclusion.selector;
         selectors[i++] = MailboxFacet.proveL2LogInclusion.selector;
         selectors[i++] = MailboxFacet.proveL1ToL2TransactionStatus.selector;
-        selectors[i++] = MailboxFacet.finalizeEthWithdrawal.selector;
-        selectors[i++] = MailboxFacet.requestL2Transaction.selector;
         selectors[i++] = MailboxFacet.bridgehubRequestL2Transaction.selector;
         selectors[i++] = MailboxFacet.l2TransactionBaseCost.selector;
         selectors[i++] = MailboxFacet.proveL2LeafInclusion.selector;

@@ -8,7 +8,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IServerNotifier} from "./IServerNotifier.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
-import {IChainAssetHandler} from "../core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHandler.sol";
 
 /// @title ServerNotifier
 /// @author Matter Labs
@@ -39,7 +39,7 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
 
     /// @notice Initializes the contract by setting the initial owner.
     /// @param _initialOwner The address that will be set as the contract owner.
-    function initialize(address _initialOwner) public reentrancyGuardInitializer {
+    function initialize(address _initialOwner) public initializer reentrancyGuardInitializer {
         if (_initialOwner == address(0)) {
             revert ZeroAddress();
         }
@@ -80,7 +80,7 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
     function _getMigrationNumber(uint256 _chainId) internal view returns (uint256) {
         address bridgehub = chainTypeManager.BRIDGE_HUB();
         address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
-        return IChainAssetHandler(chainAssetHandler).migrationNumber(_chainId);
+        return IChainAssetHandlerBase(chainAssetHandler).migrationNumber(_chainId);
     }
 
     /// @notice Set the expected upgrade timestamp for a specific protocol version. Only allowed to be called by ChainAdmin.

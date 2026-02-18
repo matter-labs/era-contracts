@@ -188,7 +188,7 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
             .with_key(validWhitelistedSL)
             .checked_write(block.chainid);
         vm.prank(addresses.bridgehub.owner());
-        addresses.bridgehub.registerSettlementLayer(validWhitelistedSL, true);
+        addresses.bridgehub.setSettlementLayerStatus(validWhitelistedSL, true);
 
         // Verify the settlement layer is whitelisted
         assertTrue(
@@ -256,11 +256,11 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
 
         // Whitelist chainId as a settlement layer (this should cause the test to pass the first two checks but fail the third)
         vm.prank(addresses.bridgehub.owner());
-        addresses.bridgehub.registerSettlementLayer(chainId, true);
+        addresses.bridgehub.setSettlementLayerStatus(chainId, true);
 
         // Whitelist the new settlement layer destination so the first check passes
         vm.prank(addresses.bridgehub.owner());
-        addresses.bridgehub.registerSettlementLayer(validWhitelistedSL, true);
+        addresses.bridgehub.setSettlementLayerStatus(validWhitelistedSL, true);
 
         // Verify both are whitelisted
         assertTrue(

@@ -15,7 +15,7 @@ import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
@@ -168,7 +168,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         BridgehubBase(address(bridgehub)).setAddresses(
             coreAddresses.bridges.proxies.l1AssetRouter,
             ICTMDeploymentTracker(coreAddresses.bridgehub.proxies.ctmDeploymentTracker),
-            IMessageRoot(coreAddresses.bridgehub.proxies.messageRoot),
+            IMessageRootBase(coreAddresses.bridgehub.proxies.messageRoot),
             coreAddresses.bridgehub.proxies.chainAssetHandler,
             coreAddresses.bridgehub.proxies.chainRegistrationSender
         );

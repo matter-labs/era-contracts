@@ -82,6 +82,9 @@ library BatchDecoder {
     function decodeAndCheckPrecommitData(
         bytes calldata _precommitData
     ) internal pure returns (PrecommitInfo memory precommitInfo) {
+        if (_precommitData.length == 0) {
+            revert EmptyData();
+        }
         uint8 encodingVersion = uint8(_precommitData[0]);
         if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
             (precommitInfo) = abi.decode(_precommitData[1:], (PrecommitInfo));
