@@ -31,8 +31,6 @@ error InvalidInteropCallVersion();
 error InteropRootAlreadyExists();
 // 0x32c2e156
 error MessageNotIncluded();
-// 0x9b5f85eb
-error MessageRootIsZero();
 // 0x95eb7603
 error ThisChainNotRegisteredForInterop(uint256 chainId);
 // 0x2f59bd0d
