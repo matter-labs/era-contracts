@@ -17,7 +17,7 @@ import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 import {FinalizeL1DepositParams, IL1Nullifier, TRANSIENT_SETTLEMENT_LAYER_SLOT} from "./interfaces/IL1Nullifier.sol";
 
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
-import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
+import {IMailboxLegacy} from "../state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {L2Log, L2Message, TxStatus, ConfirmTransferResultData} from "../common/Messaging.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
@@ -29,7 +29,7 @@ import {AddressAlreadySet, DepositDoesNotExist, DepositExists, InvalidProof, Inv
 import {EthAlreadyMigratedToL1NTV, NativeTokenVaultAlreadySet, WrongL2Sender} from "./L1BridgeContractErrors.sol";
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 import {TransientPrimitivesLib} from "../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {IMessageRoot} from "../core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -48,7 +48,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     address internal immutable ERA_DIAMOND_PROXY;
 
     /// @dev MessageRoot smart contract that is used to prove message inclusion.
-    IMessageRoot public immutable MESSAGE_ROOT;
+    IMessageRootBase public immutable MESSAGE_ROOT;
 
     /// @dev Stores the first batch number on the ZKsync Era Diamond Proxy that was settled after Diamond proxy upgrade.
     /// This variable is used to differentiate between pre-upgrade and post-upgrade Eth withdrawals. Withdrawals from batches older
@@ -135,7 +135,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
         IL1Bridgehub _bridgehub,
-        IMessageRoot _messageRoot,
+        IMessageRootBase _messageRoot,
         uint256 _eraChainId,
         address _eraDiamondProxy
     ) reentrancyGuardInitializer {
@@ -589,7 +589,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         address l1Receiver;
 
         bytes4 functionSignature = DataEncoding.getSelector(_l2ToL1message);
-        if (functionSignature == IMailboxImpl.finalizeEthWithdrawal.selector) {
+        if (functionSignature == IMailboxLegacy.finalizeEthWithdrawal.selector) {
             // slither-disable-next-line unused-return
             (, l1Receiver, amount) = DataEncoding.decodeBaseTokenFinalizeWithdrawalData(_l2ToL1message);
             assetId = BRIDGE_HUB.baseTokenAssetId(_chainId);

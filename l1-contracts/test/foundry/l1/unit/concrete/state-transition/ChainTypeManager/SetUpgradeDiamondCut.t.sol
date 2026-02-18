@@ -16,6 +16,7 @@ contract setUpgradeDiamondCutTest is ChainTypeManagerTest {
         Diamond.DiamondCutData memory newDiamondCutData = getDiamondCutData(address(randomDiamondInit));
         bytes32 newCutHash = keccak256(abi.encode(newDiamondCutData));
 
+        vm.prank(governor);
         chainContractAddress.setUpgradeDiamondCut(newDiamondCutData, 0);
 
         assertEq(chainContractAddress.upgradeCutHash(0), newCutHash, "Diamond cut upgrade was not successful");

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
+import {L2DACommitmentScheme} from "./Config.sol";
+
 // 0x5ecf2d7a
 error AccessToFallbackDenied(address target, address invoker);
 // 0x3995f750
@@ -109,6 +111,8 @@ error EmptyDeposit();
 error EmptyPrecommitData(uint256 batchNumber);
 // 0x456f8f7a
 error EmptyProofLength();
+// 0x05410cbc
+error EmptyPublicInputsLength();
 // 0x876e8b23
 error EraBytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0x627e0872
@@ -165,7 +169,7 @@ error InvalidDelay();
 // 0x075aaa80
 error InvalidInteropCalldata(bytes4);
 // 0x3f98a77e
-error InvalidL2DACommitmentScheme(uint8);
+error InvalidL2DACommitmentScheme(L2DACommitmentScheme);
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
 // 0x6eca2e4b
@@ -182,6 +186,8 @@ error InvalidNumberOfBlobs(uint256 expected, uint256 numCommitments, uint256 num
 error InvalidPackedPrecommitmentLength(uint256 length);
 // 0x09bde339
 error InvalidProof();
+// 0x5a1c353a
+error InvalidProofFormat();
 // 0x48c5fa28
 error InvalidProofLengthForFinalNode();
 // 0x5428eae7
@@ -258,6 +264,8 @@ error NoFunctionsForDiamondCut();
 error NoFundsTransferred();
 // 0xb20b58ce
 error NoLegacySharedBridge();
+// 0xc4dc2673
+error NonCanonicalRepresentation();
 // 0xc21b1ab7
 error NonEmptyCalldata();
 // 0x536ec84b
@@ -292,8 +300,6 @@ error NotL1(uint256 l1ChainId, uint256 blockChainId);
 error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
 // 0xdf17e316
 error NotWhitelisted(address);
-// 0xf3ed9dfa
-error OnlyEraSupported();
 // 0x9d7bb13f
 error OnlyNormalMode();
 // 0xd702c443
@@ -450,6 +456,10 @@ error ZeroChainId();
 error ZKChainLimitReached();
 // 0x646ac57e
 error ZKsyncOSNotForceDeployForExistingContract(address);
+// 0xb24b1ccb
+error ZKsyncOSNotForceDeployToPrecompileAddress(address);
+// 0x3d9d4821
+error ZKsyncOSPrecommitsNotSupported();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

@@ -35,7 +35,7 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
-import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
@@ -492,7 +492,13 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
 
         bytes memory l2Calldata = abi.encodeCall(
             IChainTypeManager.setNewVersionUpgrade,
-            (upgradeCutData, previousProtocolVersion, deadline, newProtocolVersion)
+            (
+                upgradeCutData,
+                previousProtocolVersion,
+                deadline,
+                newProtocolVersion,
+                gatewayConfig.gatewayStateTransition.verifiers.verifier
+            )
         );
 
         calls = _prepareL1ToGatewayCall(
@@ -507,7 +513,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeCall(IChainAssetHandler.pauseMigration, ());
+        bytes memory l2Calldata = abi.encodeCall(IChainAssetHandlerBase.pauseMigration, ());
 
         calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_CHAIN_ASSET_HANDLER_ADDR);
     }
@@ -516,7 +522,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeCall(IChainAssetHandler.unpauseMigration, ());
+        bytes memory l2Calldata = abi.encodeCall(IChainAssetHandlerBase.unpauseMigration, ());
 
         calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_CHAIN_ASSET_HANDLER_ADDR);
     }

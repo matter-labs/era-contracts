@@ -105,6 +105,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
             vm.startBroadcast(owner);
             // CTM is already registered from prepare(), no need to add it again
             addresses.bridgehub.addTokenAssetId(baseTokenAssetId);
+            // registerAlreadyDeployedZKChain records CTM for the chain; no separate addChainTypeManager needed here.
             addresses.bridgehub.registerAlreadyDeployedZKChain(chainId, chain);
             vm.stopBroadcast();
 

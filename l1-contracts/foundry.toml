@@ -1,5 +1,5 @@
 [profile.default]
-allow_paths = ["../l2-contracts/contracts", "../lib"]
+allow_paths = ["../l2-contracts/contracts", "../lib", "../system-contracts/contracts"]
 src = "contracts"
 out = "out"
 libs = ["./lib"]
@@ -45,6 +45,7 @@ remappings = [
   "murky/=lib/murky/src/",
   "foundry-test/=test/foundry/",
   "l2-contracts/=../l2-contracts/contracts/",
+    "system-contracts/=../system-contracts/",
   "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
   "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
 ]

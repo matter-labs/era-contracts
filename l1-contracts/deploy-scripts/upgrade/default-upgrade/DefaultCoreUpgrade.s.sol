@@ -19,7 +19,7 @@ import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.so
 import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {Governance} from "contracts/governance/Governance.sol";
-import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {BridgehubAddresses, BridgesDeployedAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 import {CoreDeployedAddresses} from "../../utils/Types.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
@@ -315,7 +315,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         result[0] = Call({
             target: coreAddresses.bridgehub.proxies.chainAssetHandler,
             value: 0,
-            data: abi.encodeCall(IChainAssetHandler.unpauseMigration, ())
+            data: abi.encodeCall(IChainAssetHandlerBase.unpauseMigration, ())
         });
     }
 
@@ -378,7 +378,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         result[0] = Call({
             target: coreAddresses.bridgehub.proxies.chainAssetHandler,
             value: 0,
-            data: abi.encodeCall(IChainAssetHandler.pauseMigration, ())
+            data: abi.encodeCall(IChainAssetHandlerBase.pauseMigration, ())
         });
     }
 

@@ -112,7 +112,7 @@ library Utils {
         logs[6] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+            uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY),
             bytes32(uint256(L2_DA_COMMITMENT_SCHEME))
         );
         logs[7] = constructL2Log(
@@ -139,10 +139,10 @@ library Utils {
 
     function createSystemLogsWithNoneDAValidator() public returns (bytes[] memory) {
         bytes[] memory systemLogs = createSystemLogs(bytes32(0));
-        systemLogs[uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)] = constructL2Log(
+        systemLogs[uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY)] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+            uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY),
             bytes32(uint256(L2DACommitmentScheme.NONE))
         );
 
@@ -406,13 +406,11 @@ library Utils {
     }
 
     function getMailboxSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](9);
+        bytes4[] memory selectors = new bytes4[](7);
         uint256 i = 0;
         selectors[i++] = MailboxFacet.proveL2MessageInclusion.selector;
         selectors[i++] = MailboxFacet.proveL2LogInclusion.selector;
         selectors[i++] = MailboxFacet.proveL1ToL2TransactionStatus.selector;
-        selectors[i++] = MailboxFacet.finalizeEthWithdrawal.selector;
-        selectors[i++] = MailboxFacet.requestL2Transaction.selector;
         selectors[i++] = MailboxFacet.bridgehubRequestL2Transaction.selector;
         selectors[i++] = MailboxFacet.l2TransactionBaseCost.selector;
         selectors[i++] = MailboxFacet.proveL2LeafInclusion.selector;
@@ -502,7 +500,7 @@ library Utils {
         return IVerifier(testnetVerifier);
     }
 
-    function makeInitializeData(address testnetVerifier, address bridgehub) public returns (InitializeData memory) {
+    function makeInitializeData(address bridgehub) public pure returns (InitializeData memory) {
         return
             InitializeData({
                 chainId: 1,
@@ -514,35 +512,26 @@ library Utils {
                 validatorTimelock: address(0x85430237648403822345345),
                 baseTokenAssetId: bytes32(uint256(0x923645439232223445)),
                 storedBatchZero: bytes32(0),
-                verifier: makeVerifier(testnetVerifier),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
             });
     }
 
-    function makeInitializeDataForNewChain(
-        address testnetVerifier,
-        address _permissionlessValidator
-    ) public pure returns (InitializeDataNewChain memory) {
+    function makeInitializeDataForNewChain() public pure returns (InitializeDataNewChain memory) {
         return
             InitializeDataNewChain({
-                verifier: makeVerifier(testnetVerifier),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
             });
     }
 
-    function makeDiamondProxy(
-        Diamond.FacetCut[] memory facetCuts,
-        address testnetVerifier,
-        address bridgehub
-    ) public returns (address) {
+    function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address bridgehub) public returns (address) {
         DiamondInit diamondInit = new DiamondInit(false);
         bytes memory diamondInitData = abi.encodeWithSelector(
             diamondInit.initialize.selector,
-            makeInitializeData(testnetVerifier, bridgehub)
+            makeInitializeData(bridgehub)
         );
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({

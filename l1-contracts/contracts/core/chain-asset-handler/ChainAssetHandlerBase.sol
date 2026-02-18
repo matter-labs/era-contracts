@@ -13,7 +13,7 @@ import {TokenBridgingData} from "../../common/Messaging.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
-import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol";
@@ -24,7 +24,8 @@ import {ChainIdNotRegistered, MigrationPaused, NotAssetRouter} from "../../commo
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetHandlerModifiers} from "../../bridge/interfaces/AssetHandlerModifiers.sol";
-import {IChainAssetHandler} from "./IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "./IChainAssetHandler.sol";
+import {IChainAssetHandlerShared} from "./IChainAssetHandlerShared.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -32,7 +33,8 @@ import {IChainAssetHandler} from "./IChainAssetHandler.sol";
 /// it is the IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
 abstract contract ChainAssetHandlerBase is
-    IChainAssetHandler,
+    IChainAssetHandlerBase,
+    IChainAssetHandlerShared,
     ReentrancyGuard,
     Ownable2StepUpgradeable,
     PausableUpgradeable,
@@ -48,7 +50,7 @@ abstract contract ChainAssetHandlerBase is
 
     function _bridgehub() internal view virtual returns (IL1Bridgehub);
 
-    function _messageRoot() internal view virtual returns (IMessageRoot);
+    function _messageRoot() internal view virtual returns (IMessageRootBase);
 
     function _assetRouter() internal view virtual returns (IAssetRouterBase);
 
@@ -69,7 +71,7 @@ abstract contract ChainAssetHandlerBase is
 
     /// @dev The message root contract.
     /// @dev Kept here for storage layout compatibility with previous versions.
-    IMessageRoot internal DEPRECATED_MESSAGE_ROOT;
+    IMessageRootBase internal DEPRECATED_MESSAGE_ROOT;
 
     /// @dev The asset router contract.
     /// @dev Kept here for storage layout compatibility with previous versions.
@@ -227,7 +229,7 @@ abstract contract ChainAssetHandlerBase is
         ++currentMigrationNum;
         migrationNumber[_chainId] = currentMigrationNum;
 
-        uint256 batchNumber = IMessageRoot(_messageRoot()).currentChainBatchNumber(_chainId);
+        uint256 batchNumber = IMessageRootBase(_messageRoot()).currentChainBatchNumber(_chainId);
 
         // Track migration interval for settlement layer validation.
         // When migrating FROM L1 TO a settlement layer, record the last L1 batch number and the SL chain ID.
@@ -348,16 +350,13 @@ abstract contract ChainAssetHandlerBase is
             }
             // We want to allow any chain to be migrated,
             IBridgehubBase(_bridgehub()).registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
-            IMessageRoot(_messageRoot()).addNewChain(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
+            _messageRoot().addNewChain(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
         } else {
             // Note, that here we rely on the correctness of the provided data.
             // A malicious settlement layer could provide invalid values here.
             // To support untrusted CTMs, we would need to at the very least enforce
             // that the `v31UpgradeChainBatchNumber` is not in conflict with the existing values.
-            IMessageRoot(_messageRoot()).setMigratingChainBatchNumber(
-                bridgehubMintData.chainId,
-                bridgehubMintData.batchNumber
-            );
+            _messageRoot().setMigratingChainBatchNumber(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
         }
 
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);

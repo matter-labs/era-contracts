@@ -7,8 +7,8 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
-import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
@@ -127,7 +127,7 @@ contract MessageRootTest is Test {
 
         vm.prank(bridgeHub);
         vm.expectEmit(true, false, false, false);
-        emit IMessageRoot.AddedChain(alphaChainId, 0);
+        emit IMessageRootBase.AddedChain(alphaChainId, 0);
         messageRoot.addNewChain(alphaChainId, 0);
 
         assertTrue(messageRoot.chainRegistered(alphaChainId), "alpha chain 2");
@@ -175,18 +175,24 @@ contract MessageRootTest is Test {
         vm.prank(L2_BRIDGEHUB_ADDR);
         l2MessageRoot.addNewChain(alphaChainId, 0);
 
-        // Verify totalPublishedInteropRoots is 0 before adding batch root
-        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 0, "totalPublishedInteropRoots should be 0 before");
+        // totalPublishedInteropRoots accounts for _emitRoot calls in _addNewChain:
+        // initL2 adds block.chainid (1), addNewChain(L1_CHAIN_ID) (2), addNewChain(alphaChainId) (3)
+        uint256 countBefore = l2MessageRoot.totalPublishedInteropRoots();
+        assertEq(countBefore, 3, "totalPublishedInteropRoots should be 3 after chain additions");
 
         vm.prank(alphaChainSender);
         vm.expectEmit(true, false, false, false);
-        emit IMessageRoot.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
+        emit IMessageRootBase.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
         vm.expectEmit(true, false, false, false);
-        emit IMessageRoot.NewChainRoot(alphaChainId, bytes32(0), bytes32(0));
+        emit IMessageRootBase.NewChainRoot(alphaChainId, bytes32(0), bytes32(0));
         l2MessageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
 
         // Verify totalPublishedInteropRoots incremented after addChainBatchRoot
-        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 1, "totalPublishedInteropRoots should be 1 after");
+        assertEq(
+            l2MessageRoot.totalPublishedInteropRoots(),
+            countBefore + 1,
+            "totalPublishedInteropRoots should increment by 1"
+        );
     }
 
     function test_addChainBatchRootWithRealData() public {

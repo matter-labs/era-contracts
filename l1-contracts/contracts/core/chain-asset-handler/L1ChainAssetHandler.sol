@@ -11,10 +11,11 @@ import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1AssetHandler} from "../../bridge/interfaces/IL1AssetHandler.sol";
 import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
-import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
-import {IChainAssetHandlerShared} from "./IChainAssetHandlerShared.sol";
 import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
+import {ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
+import {CTMNotRegistered} from "../../common/L1ContractErrors.sol";
 import {MigrationIntervalInvalid, MigrationIntervalNotSet, MigrationNumberMismatch, SettlementLayerMustNotBeL1, IteratedMigrationsNotSupported, HistoricalSettlementLayerMismatch} from "../bridgehub/L1BridgehubErrors.sol";
 import {MigrationInterval} from "./IChainAssetHandler.sol";
 
@@ -24,7 +25,7 @@ import {MigrationInterval} from "./IChainAssetHandler.sol";
 /// it is the IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
 /// @dev L1 version – keeps the cheap immutables set in the constructor.
-contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1ChainAssetHandler, IChainAssetHandlerShared {
+contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1ChainAssetHandler {
     /// @dev The assetId of the ETH.
     bytes32 public immutable override ETH_TOKEN_ASSET_ID;
 
@@ -46,7 +47,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     /// @dev The message root contract. Set via `setAddresses` after deployment because
     /// L1MessageRoot is deployed after L1ChainAssetHandler (so that L1MessageRoot can store
     /// the chain asset handler address as an immutable).
-    IMessageRoot internal messageRoot;
+    IMessageRootBase internal messageRoot;
 
     /// @dev The asset router contract. Set via `setAddresses` after deployment because
     /// L1AssetRouter is deployed after L1ChainAssetHandler.
@@ -62,13 +63,12 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     function _bridgehub() internal view override returns (IL1Bridgehub) {
         return BRIDGEHUB;
     }
-
-    function _messageRoot() internal view override returns (IMessageRoot) {
+    function _messageRoot() internal view override returns (IMessageRootBase) {
         return messageRoot;
     }
 
     // solhint-disable-next-line func-name-mixedcase
-    function MESSAGE_ROOT() public view override returns (IMessageRoot) {
+    function MESSAGE_ROOT() public view override returns (IMessageRootBase) {
         return messageRoot;
     }
 
@@ -117,10 +117,16 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
         uint256 chainId = bridgehubBurnData.chainId;
 
+        // Note: _chainId is the settlement layer chain (e.g. gateway) where the migration tx was proven,
+        // while bridgehubBurnData.chainId is the chain being migrated. These are intentionally different.
+
         (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeConfirmTransferResult(
             chainId,
             _txStatus
         );
+
+        require(zkChain != address(0), ZKChainNotRegistered());
+        require(ctm != address(0), CTMNotRegistered());
 
         IChainTypeManager(ctm).forwardedBridgeConfirmTransferResult({
             _chainId: chainId,
@@ -173,7 +179,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     ) external onlyOwner {
         require(_migrationNumber == 0, MigrationNumberMismatch(0, _migrationNumber));
         require(!_interval.isActive, MigrationIntervalNotSet());
-        uint256 legacyGwChainId = IMessageRoot(_messageRoot()).ERA_GATEWAY_CHAIN_ID();
+        uint256 legacyGwChainId = IMessageRootBase(_messageRoot()).ERA_GATEWAY_CHAIN_ID();
         require(
             _interval.settlementLayerChainId == legacyGwChainId,
             HistoricalSettlementLayerMismatch(legacyGwChainId, _interval.settlementLayerChainId)

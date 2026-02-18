@@ -285,7 +285,6 @@ library GatewayCTMDeployerHelper {
 
         // MailboxFacet
         bytes memory mailboxFacetArgs = abi.encode(
-            config.eraChainId,
             config.l1ChainId,
             L2_CHAIN_ASSET_HANDLER_ADDR,
             address(0), // eip7702Checker
@@ -777,7 +776,6 @@ library GatewayCTMDeployerHelper {
         });
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            verifier: IVerifier(config.verifier),
             l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
             l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
             l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
@@ -805,6 +803,7 @@ library GatewayCTMDeployerHelper {
             validatorTimelock: config.validatorTimelockProxy,
             chainCreationParams: chainCreationParams,
             protocolVersion: baseConfig.protocolVersion,
+            verifier: config.verifier,
             serverNotifier: result.serverNotifierProxy
         });
 
@@ -906,7 +905,6 @@ library GatewayCTMDeployerHelper {
         });
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            verifier: IVerifier(config.verifier),
             l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
             l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
             l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
@@ -934,6 +932,7 @@ library GatewayCTMDeployerHelper {
             validatorTimelock: config.validatorTimelockProxy,
             chainCreationParams: chainCreationParams,
             protocolVersion: baseConfig.protocolVersion,
+            verifier: config.verifier,
             serverNotifier: result.serverNotifierProxy
         });
 
@@ -994,7 +993,6 @@ library GatewayCTMDeployerHelper {
             CTMCoreDeploymentConfig({
                 isZKsyncOS: _config.isZKsyncOS,
                 testnetVerifier: _config.testnetVerifier,
-                eraChainId: _config.eraChainId,
                 l1ChainId: _config.l1ChainId,
                 bridgehubProxy: L2_BRIDGEHUB_ADDR,
                 interopCenterProxy: L2_INTEROP_CENTER_ADDR,
@@ -1063,7 +1061,7 @@ library GatewayCTMDeployerHelper {
         string memory fileName,
         bytes memory params,
         InnerDeployConfig memory config
-    ) private returns (address) {
+    ) private view returns (address) {
         bytes memory bytecode = Utils.readZKFoundryBytecodeL1(fileName, contractName);
 
         return
