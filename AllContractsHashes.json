@@ -1101,12 +1101,12 @@
   },
   {
     "contractName": "l1-contracts/EraMultisigValidator",
-    "zkBytecodeHash": "0x01000b8b8575919e4c07cfaf50b1c504222fafcf2f9aa102fb88457a0bed0b63",
+    "zkBytecodeHash": "0x01000b8b690cd52bce5518d5c3c6da26ee9e3bad7f206d6b74fa96c827669f66",
     "zkBytecodePath": "/l1-contracts/zkout/EraMultisigValidator.sol/EraMultisigValidator.json",
-    "evmBytecodeHash": "0xa1b7602d8f3999a95493b80c3fffd9c02fa3fd9fcc6a42307da6ff3c389d96a3",
+    "evmBytecodeHash": "0x4390b81c6b4173ede7168882ba102d0b871035272a6a843be1ff24b2a7f2045d",
     "evmBytecodePath": "/l1-contracts/out/EraMultisigValidator.sol/EraMultisigValidator.json",
-    "evmDeployedBytecodeHash": "0x7b6c595271f7b531d97acc92a3ddf515d14723b661228ffc333638b7b70a9a29",
-    "evmDeployedBytecodeBlakeHash": "0xb9bb155a2fb4fe320b652c45fc380b2a2a0fdd4a34cf62e8159edb2ecf90c41a",
+    "evmDeployedBytecodeHash": "0xe2c31b13dae45a819f4ff743b40847d31f64728fe518f74e046a1c26e1991808",
+    "evmDeployedBytecodeBlakeHash": "0x5b0ba0904620e2218468140530ac3232682cf28f6181a6d61413165e80d4ea74",
     "evmDeployedBytecodeLength": 12479
   },
   {
