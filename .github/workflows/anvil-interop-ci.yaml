@@ -6,14 +6,76 @@ permissions:
 on:
   pull_request:
     paths:
-      - "l1-contracts/scripts/anvil-interop/**"
       - ".github/workflows/anvil-interop-ci.yaml"
+      - ".github/actions/install-zksync-foundry/**"
+      - "l1-contracts/contracts/**"
+      - "l1-contracts/deploy-scripts/**"
+      - "l1-contracts/lib/**"
+      - "l1-contracts/scripts/**"
+      - "l1-contracts/test/**"
+      - "l1-contracts/foundry.toml"
+      - "l1-contracts/hardhat.config.ts"
+      - "l1-contracts/package.json"
+      - "l2-contracts/contracts/**"
+      - "l2-contracts/lib/**"
+      - "l2-contracts/src/**"
+      - "l2-contracts/test/**"
+      - "l2-contracts/foundry.toml"
+      - "l2-contracts/hardhat.config.ts"
+      - "l2-contracts/package.json"
+      - "system-contracts/bootloader/**"
+      - "system-contracts/contracts/**"
+      - "system-contracts/lib/**"
+      - "system-contracts/scripts/**"
+      - "system-contracts/test/**"
+      - "system-contracts/foundry.toml"
+      - "system-contracts/hardhat.config.ts"
+      - "system-contracts/package.json"
+      - "da-contracts/contracts/**"
+      - "da-contracts/lib/**"
+      - "da-contracts/test/**"
+      - "da-contracts/foundry.toml"
+      - "da-contracts/hardhat.config.ts"
+      - "da-contracts/package.json"
+      - "package.json"
+      - "yarn.lock"
   push:
     branches:
       - main
     paths:
-      - "l1-contracts/scripts/anvil-interop/**"
       - ".github/workflows/anvil-interop-ci.yaml"
+      - ".github/actions/install-zksync-foundry/**"
+      - "l1-contracts/contracts/**"
+      - "l1-contracts/deploy-scripts/**"
+      - "l1-contracts/lib/**"
+      - "l1-contracts/scripts/**"
+      - "l1-contracts/test/**"
+      - "l1-contracts/foundry.toml"
+      - "l1-contracts/hardhat.config.ts"
+      - "l1-contracts/package.json"
+      - "l2-contracts/contracts/**"
+      - "l2-contracts/lib/**"
+      - "l2-contracts/src/**"
+      - "l2-contracts/test/**"
+      - "l2-contracts/foundry.toml"
+      - "l2-contracts/hardhat.config.ts"
+      - "l2-contracts/package.json"
+      - "system-contracts/bootloader/**"
+      - "system-contracts/contracts/**"
+      - "system-contracts/lib/**"
+      - "system-contracts/scripts/**"
+      - "system-contracts/test/**"
+      - "system-contracts/foundry.toml"
+      - "system-contracts/hardhat.config.ts"
+      - "system-contracts/package.json"
+      - "da-contracts/contracts/**"
+      - "da-contracts/lib/**"
+      - "da-contracts/test/**"
+      - "da-contracts/foundry.toml"
+      - "da-contracts/hardhat.config.ts"
+      - "da-contracts/package.json"
+      - "package.json"
+      - "yarn.lock"
 
 jobs:
   test-anvil-interop:
@@ -197,6 +259,15 @@ jobs:
             --rpc-url http://127.0.0.1:9545 \
             --ffi \
             -vvv
+
+      - name: Run Hardhat interop token transfer test
+        working-directory: l1-contracts
+        env:
+          ANVIL_INTEROP_SKIP_SETUP: "1"
+          ANVIL_INTEROP_SKIP_CLEANUP: "1"
+        run: |
+          echo "Running Hardhat interop token transfer test..."
+          yarn hardhat test scripts/anvil-interop/test/hardhat/token-transfer.spec.ts --network hardhat --no-compile
 
       - name: Cleanup
         if: always()
