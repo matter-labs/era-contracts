@@ -54,12 +54,6 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         super.initialize(permanentValuesInputPath, newConfigPath, upgradeEcosystemOutputPath);
     }
 
-    /// @notice Returns the EOA broadcaster used for ownership-sensitive CTM actions.
-    /// @dev In nested script calls, `msg.sender` is the parent script contract, not the key owner.
-    function getDeployerAddress() public view virtual override returns (address) {
-        return tx.origin;
-    }
-
     /// @notice Deploy everything that should be deployed
     function deployNewCTMContracts() public virtual override {
         (ctmAddresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
