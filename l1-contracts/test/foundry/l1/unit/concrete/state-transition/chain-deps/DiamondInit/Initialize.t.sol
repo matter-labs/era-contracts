@@ -8,6 +8,7 @@ import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
@@ -15,7 +16,12 @@ import {EmptyAssetId, TooMuchGas, ZeroAddress} from "contracts/common/L1Contract
 
 contract InitializeTest is DiamondInitTest {
     function test_revertWhen_verifierIsZeroAddress() public {
-        initializeData.verifier = IVerifier(address(0));
+        // Mock CTM to return zero address for verifier
+        vm.mockCall(
+            initializeData.chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, initializeData.protocolVersion),
+            abi.encode(address(0))
+        );
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -93,6 +99,13 @@ contract InitializeTest is DiamondInitTest {
     }
 
     function test_valuesCorrectWhenSuccessfulInit() public {
+        // Mock CTM to return testnetVerifier for this protocol version
+        vm.mockCall(
+            initializeData.chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, initializeData.protocolVersion),
+            abi.encode(testnetVerifier)
+        );
+
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
@@ -108,7 +121,8 @@ contract InitializeTest is DiamondInitTest {
         assertEq(utilsFacet.util_getBaseTokenAssetId(), initializeData.baseTokenAssetId);
         assertEq(utilsFacet.util_getProtocolVersion(), initializeData.protocolVersion);
 
-        assertEq(address(utilsFacet.util_getVerifier()), address(initializeData.verifier));
+        // Verifier is now fetched from CTM
+        assertEq(address(utilsFacet.util_getVerifier()), testnetVerifier);
         assertEq(utilsFacet.util_getAdmin(), initializeData.admin);
         assertEq(utilsFacet.util_getValidator(initializeData.validatorTimelock), true);
 

@@ -5,31 +5,18 @@ pragma solidity ^0.8.21;
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
-import {L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
 import {IL1SharedBridgeLegacy} from "../interfaces/IL1SharedBridgeLegacy.sol";
-import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IL1CrossChainSender} from "../interfaces/IL1CrossChainSender.sol";
+import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
+import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
+import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {TxStatus} from "../../common/Messaging.sol";
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy, IL1CrossChainSender {
-    event BridgehubMintData(bytes bridgeMintData);
-
-    event BridgehubDepositFinalized(
-        uint256 indexed chainId,
-        bytes32 indexed txDataHash,
-        bytes32 indexed l2DepositTxHash
-    );
-
     event ClaimedFailedDepositAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
-
-    event AssetDeploymentTrackerSet(
-        bytes32 indexed assetId,
-        address indexed assetDeploymentTracker,
-        bytes32 indexed additionalData
-    );
 
     event LegacyDepositInitiated(
         uint256 indexed chainId,
@@ -79,11 +66,17 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy, IL1CrossCha
 
     function L1_WETH_TOKEN() external view returns (address);
 
-    function ERA_CHAIN_ID() external view returns (uint256);
-
     function ETH_TOKEN_ASSET_ID() external view returns (bytes32);
 
+    function BRIDGE_HUB() external view returns (IL1Bridgehub);
+
+    function ERA_CHAIN_ID() external view returns (uint256);
+
+    function ERA_DIAMOND_PROXY() external view returns (IZKChain);
+
     function nativeTokenVault() external view returns (INativeTokenVaultBase);
+
+    function legacyBridge() external view returns (IL1ERC20Bridge);
 
     function setAssetDeploymentTracker(bytes32 _assetRegistrationData, address _assetDeploymentTracker) external;
 
@@ -150,37 +143,22 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy, IL1CrossCha
         bytes32[] calldata _merkleProof
     ) external;
 
-    /// @notice Initiates a transfer transaction within Bridgehub, used by `requestL2TransactionTwoBridges`.
-    /// @param _chainId Destination chain ID.
-    /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
-    /// @param _value The `msg.value` to be deposited on the target chain.
-    /// @param _data The calldata for the second bridge deposit.
-    /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
-    /// @dev Data has the following abi encoding for legacy deposits:
-    /// address _l1Token,
-    /// uint256 _amount,
-    /// address _l2Receiver
-    /// for new deposits:
-    /// bytes32 _assetId,
-    /// bytes _transferData
-    function bridgehubDeposit(
-        uint256 _chainId,
-        address _originalCaller,
-        uint256 _value,
-        bytes calldata _data
-    ) external payable returns (L2TransactionRequestTwoBridgesInner memory request);
-
-    /// @notice Routes the confirmation to nullifier for backward compatibility.
-    /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
-    /// This function is utilized by `requestL2TransactionTwoBridges` to validate the execution of a transaction.
-    /// @param _chainId Destination chain ID.
-    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
-    /// @param _txHash The hash of the L1->L2 transaction to confirm the deposit.
-    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
-
     function isWithdrawalFinalized(
         uint256 _chainId,
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex
     ) external view returns (bool);
+
+    /// @notice Claim failed deposit using legacy approach
+    function claimFailedDeposit(
+        uint256 _chainId,
+        address _depositSender,
+        address _l1Token,
+        uint256 _amount,
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) external;
 }

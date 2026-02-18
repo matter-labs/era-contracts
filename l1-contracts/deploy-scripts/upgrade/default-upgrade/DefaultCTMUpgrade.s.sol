@@ -38,7 +38,7 @@ import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 import {BytecodePublisher} from "../../utils/bytecode/BytecodePublisher.s.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
-import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
@@ -695,7 +695,13 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             target: ctmAddresses.stateTransition.proxies.chainTypeManager,
             data: abi.encodeCall(
                 IChainTypeManager.setNewVersionUpgrade,
-                (upgradeCut, previousProtocolVersion, deadline, newProtocolVersion)
+                (
+                    upgradeCut,
+                    previousProtocolVersion,
+                    deadline,
+                    newProtocolVersion,
+                    ctmAddresses.stateTransition.verifiers.verifier
+                )
             ),
             value: 0
         });
@@ -714,7 +720,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         result[0] = Call({
             target: coreAddresses.bridgehub.proxies.chainAssetHandler,
             value: 0,
-            data: abi.encodeCall(IChainAssetHandler.pauseMigration, ())
+            data: abi.encodeCall(IChainAssetHandlerBase.pauseMigration, ())
         });
     }
 

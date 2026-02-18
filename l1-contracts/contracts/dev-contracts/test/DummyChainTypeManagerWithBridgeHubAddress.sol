@@ -19,6 +19,11 @@ contract DummyChainTypeManagerWBH is EraChainTypeManager {
         zkChain = _zkChain;
     }
 
+    /// @notice Sets verifier for a protocol version (no access control for testing)
+    function setProtocolVersionVerifierForTesting(uint256 _protocolVersion, address _verifier) external {
+        _setProtocolVersionVerifier(_protocolVersion, _verifier);
+    }
+
     // add this to be excluded from coverage report
     function test() internal {}
 }

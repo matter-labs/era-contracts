@@ -8,7 +8,7 @@ import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {InvalidProof, ZeroAddress, InvalidChainId, Unauthorized} from "../../common/L1ContractErrors.sol";
-import {IMessageRoot, V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../core/message-root/IMessageRoot.sol";
+import {IMessageRootBase, V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../core/message-root/IMessageRoot.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
@@ -23,7 +23,7 @@ import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {IChainAssetHandler} from "../../core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "../../core/chain-asset-handler/IChainAssetHandler.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {IL1MessageRoot} from "../../core/message-root/IL1MessageRoot.sol";
 
@@ -32,11 +32,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     INativeTokenVaultBase public immutable NATIVE_TOKEN_VAULT;
 
-    IMessageRoot public immutable MESSAGE_ROOT;
+    IMessageRootBase public immutable MESSAGE_ROOT;
 
     IL1Nullifier public immutable L1_NULLIFIER;
 
-    IChainAssetHandler public chainAssetHandler;
+    IChainAssetHandlerBase public chainAssetHandler;
 
     /// Todo Deprecate after V31 is finished.
     mapping(bytes32 assetId => bool l1TotalSupplyMigrated) internal l1TotalSupplyMigrated;
@@ -72,7 +72,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         BRIDGE_HUB = IBridgehubBase(_bridgehub);
         NATIVE_TOKEN_VAULT = INativeTokenVaultBase(_nativeTokenVault);
-        MESSAGE_ROOT = IMessageRoot(_messageRoot);
+        MESSAGE_ROOT = IMessageRootBase(_messageRoot);
         L1_NULLIFIER = IL1Nullifier(IL1NativeTokenVault(_nativeTokenVault).L1_NULLIFIER());
     }
 
@@ -82,7 +82,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     }
 
     function setAddresses() external onlyOwner {
-        chainAssetHandler = IChainAssetHandler(BRIDGE_HUB.chainAssetHandler());
+        chainAssetHandler = IChainAssetHandlerBase(BRIDGE_HUB.chainAssetHandler());
     }
 
     /// @notice This function is used to migrate the token balance from the NTV to the AssetTracker for V31 upgrade.

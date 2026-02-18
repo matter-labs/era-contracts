@@ -65,7 +65,8 @@ contract AdminTest is UtilsCallMockerTest {
 
         dummyBridgehub = new DummyBridgehub();
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), bytes32(0));
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, address(dummyBridgehub));
+        mockChainTypeManagerVerifier(testnetVerifier);
+        address diamondProxy = Utils.makeDiamondProxy(facetCuts, address(dummyBridgehub));
         adminFacet = IAdmin(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }

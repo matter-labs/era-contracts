@@ -6,7 +6,7 @@ import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {L2_GENESIS_UPGRADE_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {IMessageRoot} from "../core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
@@ -60,7 +60,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
         proposedUpgrade.l2ProtocolUpgradeTx.data = complexUpgraderCalldata;
         super.upgrade(proposedUpgrade);
-        IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());
+        IMessageRootBase messageRoot = IMessageRootBase(bridgehub.messageRoot());
 
         if (s.settlementLayer == address(0)) {
             IL1MessageRoot(address(messageRoot)).saveV31UpgradeChainBatchNumber(s.chainId);

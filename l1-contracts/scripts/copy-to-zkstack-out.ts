@@ -45,6 +45,7 @@ const REQUIRED_CONTRACTS = [
   "IGWAssetTracker.sol",
   "IChainAdmin.sol",
   "ISetupLegacyBridge.sol",
+  "DefaultUpgrade.sol",
 ];
 
 async function copyContractAbi(src: string, dest: string): Promise<void> {
@@ -82,7 +83,8 @@ async function main() {
 
   console.log("Copying contract ABIs to zkstack-out...");
 
-  // Create zkstack-out directory if it doesn't exist
+  // Remove existing zkstack-out directory to avoid stale files
+  await fs.rm(zkstackOutDir, { recursive: true, force: true });
   await fs.mkdir(zkstackOutDir, { recursive: true });
 
   // Copy each required contract directory, extracting ABIs from JSON files

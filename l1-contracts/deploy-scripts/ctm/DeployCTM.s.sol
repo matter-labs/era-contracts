@@ -22,7 +22,6 @@ import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IRollupDAManager} from "../interfaces/IRollupDAManager.sol";
-import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
 import {L2LegacySharedBridgeTestHelper} from "../dev/L2LegacySharedBridgeTestHelper.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
@@ -192,6 +191,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.stateTransition.implementations.chainTypeManager,
             ctmAddresses.stateTransition.proxies.chainTypeManager
         ) = deployTuppWithContract(ctmContractName, false);
+
         setChainTypeManagerInServerNotifier();
 
         updateOwners();
@@ -558,7 +558,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)));
         GettersFacet gettersFacet = new GettersFacet();
         MailboxFacet mailboxFacet = new MailboxFacet(
-            1,
             1,
             coreAddresses.bridgehub.proxies.chainAssetHandler,
             IEIP7702Checker(address(0)),

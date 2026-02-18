@@ -161,13 +161,11 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getMailboxSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](7);
+        bytes4[] memory selectors = new bytes4[](5);
         uint256 i = 0;
         selectors[i++] = mailbox.proveL2MessageInclusion.selector;
         selectors[i++] = mailbox.proveL2LogInclusion.selector;
         selectors[i++] = mailbox.proveL1ToL2TransactionStatus.selector;
-        selectors[i++] = mailbox.finalizeEthWithdrawal.selector;
-        selectors[i++] = mailbox.requestL2Transaction.selector;
         selectors[i++] = mailbox.bridgehubRequestL2Transaction.selector;
         selectors[i++] = mailbox.l2TransactionBaseCost.selector;
         return selectors;
@@ -275,7 +273,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         getters = new GettersFacet();
         executor = new TestExecutor();
         committer = new TestCommitter();
-        mailbox = new MailboxFacet(l2ChainId, block.chainid, address(chainAssetHandler), eip7702Checker, false);
+        mailbox = new MailboxFacet(block.chainid, address(chainAssetHandler), eip7702Checker, false);
 
         DummyCTM chainTypeManager = new DummyCTM(owner, address(0));
         vm.mockCall(
@@ -284,6 +282,13 @@ contract ExecutorTest is UtilsCallMockerTest {
             abi.encode(bool(true))
         );
         DiamondInit diamondInit = new DiamondInit(isZKsyncOS());
+        EraTestnetVerifier testnetVerifier = new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
+        // Mock the CTM to return a verifier for protocol version 0
+        vm.mockCall(
+            address(chainTypeManager),
+            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, uint256(0)),
+            abi.encode(address(testnetVerifier))
+        );
         validatorTimelock = ValidatorTimelock(deployValidatorTimelock(address(dummyBridgehub), owner, 0));
 
         bytes8 dummyHash = 0x1234567890123456;
@@ -299,7 +304,6 @@ contract ExecutorTest is UtilsCallMockerTest {
             timestamp: 0,
             commitment: bytes32("")
         });
-        EraTestnetVerifier testnetVerifier = new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
 
         InitializeData memory params = InitializeData({
             // TODO REVIEW
@@ -312,7 +316,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             validatorTimelock: address(validatorTimelock),
             baseTokenAssetId: baseTokenAssetId,
             storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
-            verifier: IVerifier(testnetVerifier), // verifier
+            // verifier is fetched from CTM
             l2BootloaderBytecodeHash: dummyHash,
             l2DefaultAccountBytecodeHash: dummyHash,
             l2EvmEmulatorBytecodeHash: dummyHash

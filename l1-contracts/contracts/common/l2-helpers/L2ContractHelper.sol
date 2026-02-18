@@ -182,7 +182,7 @@ library L2ContractHelper {
     function hashFactoryDeps(bytes[] memory _factoryDeps) internal pure returns (uint256[] memory hashedFactoryDeps) {
         uint256 factoryDepsLen = _factoryDeps.length;
         hashedFactoryDeps = new uint256[](factoryDepsLen);
-        for (uint256 i = 0; i < factoryDepsLen; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < factoryDepsLen; ++i) {
             bytes32 hashedBytecode = hashL2Bytecode(_factoryDeps[i]);
 
             // Store the resulting hash sequentially in words.

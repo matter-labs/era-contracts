@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
 import {IL2GenesisUpgrade} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
-import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_GENESIS_UPGRADE_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_GENESIS_UPGRADE_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {UpgradeableBeaconDeployer} from "contracts/bridge/UpgradeableBeaconDeployer.sol";
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
@@ -90,6 +90,7 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
 
         testHelper.setupMockCalls(
             vm,
+            L2_NATIVE_TOKEN_VAULT_ADDR,
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
             L2_BRIDGEHUB_ADDR,
             L2_ASSET_ROUTER_ADDR,

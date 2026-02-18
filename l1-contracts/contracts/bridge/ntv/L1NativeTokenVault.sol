@@ -116,6 +116,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @param _assetRouter Address of Asset Router on L1.
     /// @param _l1Nullifier Address of the nullifier contract, which handles transaction progress between L1 and ZK chains.
     constructor(address _wethToken, address _assetRouter, IL1Nullifier _l1Nullifier) {
+        _disableInitializers();
         WETH_TOKEN = IWETH9(_wethToken);
         ASSET_ROUTER = IAssetRouterBase(_assetRouter);
         L1_CHAIN_ID = block.chainid;
@@ -268,7 +269,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
                             INTERNAL & HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function _registerTokenIfBridgedLegacy(address) internal override returns (bytes32) {
+    function _registerTokenIfBridgedLegacy(address) internal pure override returns (bytes32) {
         // There are no legacy tokens present on L1.
         return bytes32(0);
     }
