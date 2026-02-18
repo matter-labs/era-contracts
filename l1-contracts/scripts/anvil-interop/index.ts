@@ -6,7 +6,7 @@ import type { providers } from "ethers";
 import { AnvilManager } from "./src/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
 import type { BatchSettler } from "./src/batch-settler";
-import type { DeploymentContext, ChainAddresses } from "./src/types";
+import type { ChainAddresses } from "./src/types";
 import { sleep } from "./src/utils";
 
 async function main() {
@@ -16,7 +16,6 @@ async function main() {
   const anvilManager = new AnvilManager();
   const config = runner.getConfig();
 
-  let context: DeploymentContext | undefined;
   let settler: BatchSettler | undefined;
 
   const cleanup = async () => {
@@ -76,22 +75,13 @@ async function main() {
       }
     }
 
-    const {
-      settler: batchSettler,
-      l1ToL2Relayer,
-      l2ToL2Relayer,
-    } = await runner.step6StartBatchSettler(l1Provider, l2Providers, chainAddressesMap, config);
-    settler = batchSettler;
-
-    // Store context for potential future use
-    context = {
+    const { settler: batchSettler } = await runner.step6StartBatchSettler(
       l1Provider,
       l2Providers,
-      l1Addresses,
-      ctmAddresses,
-      chainAddresses: chainAddressesMap,
-      gatewayChainId,
-    };
+      chainAddressesMap,
+      config
+    );
+    settler = batchSettler;
 
     console.log("\n=== ✅ Multi-Chain Environment Ready ===\n");
     console.log("Environment Details:");

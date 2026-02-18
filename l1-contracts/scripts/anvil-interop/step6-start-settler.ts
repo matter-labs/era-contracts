@@ -60,6 +60,7 @@ async function main() {
   process.on("SIGTERM", cleanup);
 
   // Keep alive
+  // eslint-disable-next-line no-constant-condition
   while (true) {
     await sleep(10000);
   }

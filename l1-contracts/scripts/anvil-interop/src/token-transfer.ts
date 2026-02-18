@@ -188,6 +188,7 @@ export async function executeTokenTransfer(
           data: logEntry.data,
         });
         if (parsed && parsed.name === "InteropBundleSent") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           interopBundle = (parsed.args as any).interopBundle;
           break;
         }
@@ -245,10 +246,10 @@ export async function executeTokenTransfer(
     await executeTx.wait();
     targetTxHash = executeTx.hash;
     log(`   ✅ executeBundle tx: ${executeTx.hash}`);
-  } catch (error: any) {
-    const message = error?.message || String(error);
+  } catch (error: unknown) {
+    const message = (error as Error)?.message || String(error);
     log(`   ⚠️ executeBundle failed: ${message}`);
-    const failedTxHash = error?.transactionHash;
+    const failedTxHash = (error as { transactionHash?: string })?.transactionHash;
     if (!targetTxHash && failedTxHash) {
       targetTxHash = failedTxHash;
       log(`   ⚠️ using reverted executeBundle tx hash: ${failedTxHash}`);

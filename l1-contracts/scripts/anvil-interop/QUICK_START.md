@@ -70,12 +70,12 @@ ls outputs/state/
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| "L2 chains not found" | Run `yarn step1` first |
-| step:all stops at step1 | **FIXED** - now uses detached processes |
-| "Could not read [Contract]" | Run `forge build` first |
-| Transaction reverted | Check gas limit (should be 50M), verify L1 deployed |
+| Issue                       | Solution                                            |
+| --------------------------- | --------------------------------------------------- |
+| "L2 chains not found"       | Run `yarn step1` first                              |
+| step:all stops at step1     | **FIXED** - now uses detached processes             |
+| "Could not read [Contract]" | Run `forge build` first                             |
+| Transaction reverted        | Check gas limit (should be 50M), verify L1 deployed |
 
 ## Key Changes
 

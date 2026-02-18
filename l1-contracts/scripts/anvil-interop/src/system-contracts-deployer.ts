@@ -38,6 +38,7 @@ export class SystemContractsDeployer {
     this.contractsRoot = path.resolve(__dirname, "../../../..");
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private isOne(value: any): boolean {
     return value?.toString?.() === "1";
   }
@@ -73,9 +74,11 @@ export class SystemContractsDeployer {
     contractAddress: string,
     abi: string[],
     initFunction: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     args: any[],
     impersonatedAccount: string,
     name: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     txOverrides?: Record<string, any>
   ): Promise<void> {
     await this.l2Provider.send("anvil_impersonateAccount", [impersonatedAccount]);
@@ -86,6 +89,7 @@ export class SystemContractsDeployer {
     const contractWithSigner = contract.connect(signer);
 
     console.log(`   Initializing ${name}...`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tx = await (contractWithSigner as any)[initFunction](...args, txOverrides || {});
     await tx.wait();
     console.log(`   ✅ ${name} initialized`);
@@ -231,7 +235,8 @@ export class SystemContractsDeployer {
   /**
    * Deploy and initialize L2Bridgehub
    */
-  private async deployL2Bridgehub(chainId: number): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private async deployL2Bridgehub(_chainId: number): Promise<void> {
     const l2BridgehubAbi = loadAbiFromOut("L2Bridgehub.sol/L2Bridgehub.json");
 
     // Check if already initialized
@@ -378,7 +383,9 @@ export class SystemContractsDeployer {
         console.log("   ✅ L2InteropHandler already initialized");
         isInitialized = true;
       }
-    } catch {}
+    } catch {
+      // Contract not deployed yet, will initialize below
+    }
 
     if (!isInitialized) {
       await this.initializeContract(
@@ -445,10 +452,6 @@ export class SystemContractsDeployer {
    * Deploy and initialize L2ChainAssetHandler at 0x1000a
    */
   private async deployL2ChainAssetHandler(): Promise<void> {
-    const l2ChainAssetHandlerAbi = loadAbiFromOut("L2ChainAssetHandler.sol/L2ChainAssetHandler.json");
-
-    const l2ChainAssetHandler = new Contract(L2_CHAIN_ASSET_HANDLER_ADDR, l2ChainAssetHandlerAbi, this.l2Provider);
-
     // Check if already deployed
     let isDeployed = false;
     try {
@@ -477,7 +480,8 @@ export class SystemContractsDeployer {
   /**
    * Deploy and initialize L2AssetTracker at 0x1000f
    */
-  private async deployL2AssetTracker(chainId: number): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private async deployL2AssetTracker(_chainId: number): Promise<void> {
     const l2AssetTrackerAbi = loadAbiFromOut("L2AssetTracker.sol/L2AssetTracker.json");
 
     const l2AssetTracker = new Contract(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAbi, this.l2Provider);
@@ -681,8 +685,8 @@ export class SystemContractsDeployer {
 
       console.log("   ✅ Token registered in L2NativeTokenVault");
       console.log(`      assetId: ${assetId}`);
-    } catch (error: any) {
-      console.error(`   ❌ registerToken failed: ${error.message}`);
+    } catch (error: unknown) {
+      console.error(`   ❌ registerToken failed: ${(error as Error).message}`);
       throw error;
     }
   }

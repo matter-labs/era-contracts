@@ -1,4 +1,4 @@
-import { providers, Contract, Wallet } from "ethers";
+import { providers, Wallet } from "ethers";
 import type { CoreDeployedAddresses, CTMDeployedAddresses } from "./types";
 
 export class GatewaySetup {
@@ -19,6 +19,7 @@ export class GatewaySetup {
     this.ctmAddresses = ctmAddresses;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async designateAsGateway(_chainId: number): Promise<string> {
     console.log("🌐 Gateway setup for Anvil test environment...");
 

@@ -1,5 +1,5 @@
 import type { providers } from "ethers";
-import { Contract, Wallet, utils } from "ethers";
+import { Contract, Wallet } from "ethers";
 import type { ChainAddresses, CoreDeployedAddresses } from "./types";
 import { sleep, loadAbiFromOut } from "./utils";
 
@@ -126,6 +126,7 @@ export class L1ToL2Relayer {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async processL1ToL2Transaction(txHash: string, request: any): Promise<void> {
     const chainId = Number(request.chainId);
 
@@ -142,11 +143,12 @@ export class L1ToL2Relayer {
       await this.executeOnL2(chainId, request);
       this.processedTxIds.add(txKey);
       console.log(`      ✅ L1→L2 transaction executed on chain ${chainId}`);
-    } catch (error: any) {
-      console.error(`      ❌ Failed to execute L1→L2 transaction on chain ${chainId}:`, error.message);
+    } catch (error: unknown) {
+      console.error(`      ❌ Failed to execute L1→L2 transaction on chain ${chainId}:`, (error as Error).message);
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async executeOnL2(chainId: number, request: any): Promise<void> {
     const l2Provider = this.l2Providers.get(chainId);
     if (!l2Provider) {

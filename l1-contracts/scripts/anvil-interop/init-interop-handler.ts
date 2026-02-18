@@ -26,7 +26,7 @@ async function main() {
     console.log(`Chain ${l2Chain.chainId}:`);
 
     const provider = new providers.JsonRpcProvider(l2Chain.rpcUrl);
-    const wallet = new Wallet(privateKey, provider);
+    new Wallet(privateKey, provider);
 
     const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbi, provider);
 
@@ -38,7 +38,9 @@ async function main() {
         console.log("   ✅ L2InteropHandler already initialized\n");
         continue;
       }
-    } catch {}
+    } catch {
+      // Contract might not exist yet, will initialize below
+    }
 
     if (!isInitialized) {
       console.log("   Initializing L2InteropHandler...");

@@ -168,12 +168,13 @@ async function main() {
       console.log("⚠️  Timeout waiting for relay (message may still be processing)");
       console.log("   Check daemon logs: tail -f /tmp/step6-output.log");
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as Error & { data?: string };
     console.error("\n❌ Transaction failed:");
-    console.error(`   ${error.message}`);
+    console.error(`   ${err.message}`);
 
-    if (error.data) {
-      console.error(`   Error data: ${error.data}`);
+    if (err.data) {
+      console.error(`   Error data: ${err.data}`);
     }
 
     throw error;

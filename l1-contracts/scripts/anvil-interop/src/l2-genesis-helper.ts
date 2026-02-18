@@ -200,7 +200,7 @@ export function getBytecodeInfo(contractsRoot: string): BytecodeInfo {
     { file: "L2AssetTracker.sol", name: "L2AssetTracker", key: "assetTrackerBytecodeInfo" },
   ];
 
-  const info: any = {};
+  const info: Record<string, string> = {};
 
   for (const contract of contracts) {
     const bytecode = readSolcBytecode(contractsRoot, contract.file, contract.name);

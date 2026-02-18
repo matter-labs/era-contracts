@@ -156,6 +156,7 @@ export class L2ToL2Relayer {
 
     // Check if any log is an InteropBundleSent event from InteropCenter
     let foundInteropEvent = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let interopEventLog: any = null;
 
     for (const log of receipt.logs) {
@@ -180,16 +181,18 @@ export class L2ToL2Relayer {
       await this.relayCrossChainMessage(sourceChainId, txHash, interopEventLog, provider);
       this.processedTxHashes.add(txHash);
       console.log("      ✅ Cross-chain message relayed");
-    } catch (error: any) {
-      console.error("      ❌ Failed to relay message:", error.message);
+    } catch (error: unknown) {
+      console.error("      ❌ Failed to relay message:", (error as Error).message);
     }
   }
 
   private async relayCrossChainMessage(
     sourceChainId: number,
-    sourceTxHash: string,
+    _sourceTxHash: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     interopEventLog: any,
-    sourceProvider: providers.JsonRpcProvider
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _sourceProvider: providers.JsonRpcProvider
   ): Promise<void> {
     // Parse InteropBundleSent event to extract destination chain and calls
     const abiCoder = new utils.AbiCoder();
@@ -201,6 +204,7 @@ export class L2ToL2Relayer {
 
     let targetChainId: number;
     let calls: Array<{ target: string; value: bigint; data: string }>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let interopBundle: any;
 
     try {
@@ -223,6 +227,7 @@ export class L2ToL2Relayer {
       // destinationChainId extracted above
 
       // Convert tuple arrays to objects
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       calls = rawCalls.map((call: any) => ({
         target: call[2], // address to (index 2) // address
         value: call[4], // uint256 value (index 4)  // uint256
@@ -287,8 +292,8 @@ export class L2ToL2Relayer {
       const receipt = await tx.wait();
       console.log(`      Confirmed in L2 block ${receipt?.blockNumber}`);
       console.log(`      Gas used: ${receipt?.gasUsed.toString()}`);
-    } catch (error: any) {
-      throw new Error(`Failed to execute bundle: ${error.message}`);
+    } catch (error: unknown) {
+      throw new Error(`Failed to execute bundle: ${(error as Error).message}`);
     }
   }
 

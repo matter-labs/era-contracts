@@ -43,9 +43,9 @@ async function main(): Promise<void> {
           runOrThrow("yarn", ["deploy:test-token"], anvilInteropDir, interopEnv);
           setupError = null;
           break;
-        } catch (error: any) {
+        } catch (error: unknown) {
           setupError = error;
-          console.error(`⚠️ Setup attempt ${attempt} failed: ${error.message}`);
+          console.error(`⚠️ Setup attempt ${attempt} failed: ${(error as Error).message}`);
           runOrThrow("yarn", ["cleanup"], anvilInteropDir, interopEnv);
         }
       }
