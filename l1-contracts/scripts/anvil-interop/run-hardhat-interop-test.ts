@@ -22,6 +22,10 @@ async function main(): Promise<void> {
   const skipSetup = process.env.ANVIL_INTEROP_SKIP_SETUP === "1";
   const skipCleanup = process.env.ANVIL_INTEROP_SKIP_CLEANUP === "1";
   const setupRetries = Number(process.env.ANVIL_INTEROP_SETUP_RETRIES || "3");
+  const interopEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    ANVIL_INTEROP_USE_L2_GENESIS_UPGRADE: process.env.ANVIL_INTEROP_USE_L2_GENESIS_UPGRADE || "1",
+  };
 
   try {
     if (!skipSetup) {
@@ -29,19 +33,19 @@ async function main(): Promise<void> {
       for (let attempt = 1; attempt <= setupRetries; attempt++) {
         try {
           console.log(`\n🔧 Setup attempt ${attempt}/${setupRetries}...`);
-          runOrThrow("yarn", ["cleanup"], anvilInteropDir);
-          runOrThrow("yarn", ["step1"], anvilInteropDir);
-          runOrThrow("yarn", ["step2"], anvilInteropDir);
-          runOrThrow("yarn", ["step3"], anvilInteropDir);
-          runOrThrow("yarn", ["step4"], anvilInteropDir);
-          runOrThrow("yarn", ["step5"], anvilInteropDir);
-          runOrThrow("yarn", ["deploy:test-token"], anvilInteropDir);
+          runOrThrow("yarn", ["cleanup"], anvilInteropDir, interopEnv);
+          runOrThrow("yarn", ["step1"], anvilInteropDir, interopEnv);
+          runOrThrow("yarn", ["step2"], anvilInteropDir, interopEnv);
+          runOrThrow("yarn", ["step3"], anvilInteropDir, interopEnv);
+          runOrThrow("yarn", ["step4"], anvilInteropDir, interopEnv);
+          runOrThrow("yarn", ["step5"], anvilInteropDir, interopEnv);
+          runOrThrow("yarn", ["deploy:test-token"], anvilInteropDir, interopEnv);
           setupError = null;
           break;
         } catch (error: any) {
           setupError = error;
           console.error(`⚠️ Setup attempt ${attempt} failed: ${error.message}`);
-          runOrThrow("yarn", ["cleanup"], anvilInteropDir);
+          runOrThrow("yarn", ["cleanup"], anvilInteropDir, interopEnv);
         }
       }
       if (setupError) {
@@ -61,14 +65,14 @@ async function main(): Promise<void> {
       ],
       l1ContractsDir,
       {
-        ...process.env,
+        ...interopEnv,
         ANVIL_INTEROP_SKIP_SETUP: "1",
         ANVIL_INTEROP_SKIP_CLEANUP: "1",
       }
     );
   } finally {
     if (!skipCleanup) {
-      runOrThrow("yarn", ["cleanup"], anvilInteropDir);
+      runOrThrow("yarn", ["cleanup"], anvilInteropDir, interopEnv);
     }
   }
 }

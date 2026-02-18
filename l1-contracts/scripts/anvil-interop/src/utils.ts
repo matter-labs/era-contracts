@@ -2,6 +2,7 @@ import { providers, utils } from "ethers";
 import { parse as parseToml } from "toml";
 import * as fs from "fs";
 import * as path from "path";
+import { L2_NATIVE_TOKEN_VAULT_ADDR } from "./const";
 
 export async function waitForChainReady(rpcUrl: string, maxAttempts = 30): Promise<boolean> {
   const provider = new providers.JsonRpcProvider(rpcUrl);
@@ -79,6 +80,13 @@ export function ensureDirectoryExists(dirPath: string): void {
 
 export function keccak256Hash(data: string): string {
   return utils.keccak256(utils.toUtf8Bytes(data));
+}
+
+export function encodeNtvAssetId(chainId: number, tokenAddress: string): string {
+  const abiCoder = new utils.AbiCoder();
+  return utils.keccak256(
+    abiCoder.encode(["uint256", "address", "address"], [chainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress])
+  );
 }
 
 export function encodeSystemLogs(logs: Array<{ data?: string }>): string {

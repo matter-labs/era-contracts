@@ -578,7 +578,7 @@ export class SystemContractsDeployer {
       );
 
       const l2TokenProxyBytecodeHash = utils.keccak256(utils.toUtf8Bytes("anvil-l2-token-proxy"));
-      const legacyBridgeAddress = "0x0000000000000000000000000000000000000000";
+      const legacyBridgeAddress = LEGACY_SHARED_BRIDGE_PLACEHOLDER;
       const zeroAddress = "0x0000000000000000000000000000000000000000";
       const baseTokenBridgingData: [string, number, string] = [ethAssetId, 1, ETH_TOKEN_ADDRESS];
       const baseTokenMetadata: [string, string, number] = ["Ether", "ETH", 18];

@@ -1,7 +1,14 @@
 import * as fs from "fs";
 import * as path from "path";
 import { utils } from "ethers";
-import { L2_COMPLEX_UPGRADER_ADDR, L2_GENESIS_UPGRADE_ADDR } from "./const";
+import {
+  ETH_TOKEN_ADDRESS,
+  L1_CHAIN_ID,
+  L2_COMPLEX_UPGRADER_ADDR,
+  L2_GENESIS_UPGRADE_ADDR,
+  ZK_CHAIN_SPECIFIC_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE,
+} from "./const";
+import { encodeNtvAssetId, loadAbiFromOut } from "./utils";
 
 /**
  * Helper for building L2GenesisUpgrade data structures
@@ -196,20 +203,11 @@ export function getBytecodeInfo(contractsRoot: string): BytecodeInfo {
   const info: any = {};
 
   for (const contract of contracts) {
-    try {
-      const bytecode = readSolcBytecode(contractsRoot, contract.file, contract.name);
-      const hash = hashL2Bytecode(bytecode); // Pads and hashes Solc bytecode
-      // Encode as bytes32 for L2GenesisUpgrade
-      const abiCoder = new utils.AbiCoder();
-      info[contract.key] = abiCoder.encode(["bytes32"], [hash]);
-    } catch (error: any) {
-      console.warn(`Warning: Could not read ${contract.name}: ${error.message}`);
-      // Use a placeholder hash if bytecode can't be read
-      info[contract.key] = new utils.AbiCoder().encode(
-        ["bytes32"],
-        ["0x0000000000000000000000000000000000000000000000000000000000000000"]
-      );
-    }
+    const bytecode = readSolcBytecode(contractsRoot, contract.file, contract.name);
+    const hash = hashL2Bytecode(bytecode); // Pads and hashes Solc bytecode
+    // Encode as bytes32 for L2GenesisUpgrade
+    const abiCoder = new utils.AbiCoder();
+    info[contract.key] = abiCoder.encode(["bytes32"], [hash]);
   }
 
   return info as BytecodeInfo;
@@ -221,14 +219,15 @@ export function getBytecodeInfo(contractsRoot: string): BytecodeInfo {
 export function buildFixedForceDeploymentsData(
   chainId: number,
   l1AssetRouter: string,
-  bytecodeInfo: BytecodeInfo
+  bytecodeInfo: BytecodeInfo,
+  gatewayChainId: number = L1_CHAIN_ID
 ): string {
   const data: FixedForceDeploymentsData = {
-    l1ChainId: BigInt(1), // L1 mainnet
-    gatewayChainId: BigInt(1), // Gateway chain ID
+    l1ChainId: BigInt(L1_CHAIN_ID),
+    gatewayChainId: BigInt(gatewayChainId),
     eraChainId: BigInt(chainId),
     l1AssetRouter: l1AssetRouter,
-    l2TokenProxyBytecodeHash: "0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70", // Placeholder
+    l2TokenProxyBytecodeHash: "0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70",
     aliasedL1Governance: "0x0000000000000000000000000000000000000001", // Placeholder
     maxNumberOfZKChains: BigInt(100),
     bridgehubBytecodeInfo: bytecodeInfo.bridgehubBytecodeInfo,
@@ -282,9 +281,12 @@ export function buildFixedForceDeploymentsData(
  * Build ZKChainSpecificForceDeploymentsData
  */
 export function buildAdditionalForceDeploymentsData(baseTokenL1Address: string): string {
+  const abiCoder = new utils.AbiCoder();
+  const baseTokenAssetId = encodeNtvAssetId(L1_CHAIN_ID, baseTokenL1Address);
+
   const data: ZKChainSpecificForceDeploymentsData = {
     l2LegacySharedBridge: "0x0000000000000000000000000000000000000000",
-    predeployedL2WethAddress: baseTokenL1Address,
+    predeployedL2WethAddress: ETH_TOKEN_ADDRESS,
     baseTokenL1Address: baseTokenL1Address,
     baseTokenMetadata: {
       name: "Ether",
@@ -292,17 +294,14 @@ export function buildAdditionalForceDeploymentsData(baseTokenL1Address: string):
       decimals: 18,
     },
     baseTokenBridgingData: {
-      assetId: "0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70",
-      originChainId: BigInt(1),
+      assetId: baseTokenAssetId,
+      originChainId: BigInt(L1_CHAIN_ID),
       originToken: baseTokenL1Address,
     },
   };
 
-  const abiCoder = new utils.AbiCoder();
   return abiCoder.encode(
-    [
-      "tuple(address l2LegacySharedBridge, address predeployedL2WethAddress, address baseTokenL1Address, tuple(string name, string symbol, uint8 decimals) baseTokenMetadata, tuple(bytes32 assetId, uint256 originChainId, address originToken) baseTokenBridgingData)",
-    ],
+    [ZK_CHAIN_SPECIFIC_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE],
     [
       [
         data.l2LegacySharedBridge,
@@ -323,32 +322,26 @@ export function buildL2GenesisUpgradeCalldata(
   ctmDeployerAddress: string,
   l1AssetRouter: string,
   baseTokenL1Address: string,
-  contractsRoot: string
+  contractsRoot: string,
+  gatewayChainId: number = L1_CHAIN_ID
 ): string {
   const bytecodeInfo = getBytecodeInfo(contractsRoot);
-  const fixedForceDeploymentsData = buildFixedForceDeploymentsData(chainId, l1AssetRouter, bytecodeInfo);
-  const additionalForceDeploymentsData = buildAdditionalForceDeploymentsData(baseTokenL1Address);
-
-  const abiCoder = new utils.AbiCoder();
-
-  // Encode IL2GenesisUpgrade.genesisUpgrade call
-  const genesisUpgradeCalldata = abiCoder.encode(
-    ["bytes4", "bool", "uint256", "address", "bytes", "bytes"],
-    [
-      "0xb8e9c5e6", // genesisUpgrade selector
-      true, // isZKsyncOS = true
-      chainId,
-      ctmDeployerAddress,
-      fixedForceDeploymentsData,
-      additionalForceDeploymentsData,
-    ]
+  const fixedForceDeploymentsData = buildFixedForceDeploymentsData(
+    chainId,
+    l1AssetRouter,
+    bytecodeInfo,
+    gatewayChainId
   );
-
-  // Remove the first 32 bytes (0x-prefixed offset from abi.encode)
-  // and keep from bytes4 selector onwards
-  const cleanCalldata = "0x" + genesisUpgradeCalldata.slice(66);
-
-  return cleanCalldata;
+  const additionalForceDeploymentsData = buildAdditionalForceDeploymentsData(baseTokenL1Address);
+  const genesisUpgradeAbi = loadAbiFromOut("L2GenesisUpgrade.sol/L2GenesisUpgrade.json");
+  const iface = new utils.Interface(genesisUpgradeAbi);
+  return iface.encodeFunctionData("genesisUpgrade", [
+    true,
+    chainId,
+    ctmDeployerAddress,
+    fixedForceDeploymentsData,
+    additionalForceDeploymentsData,
+  ]);
 }
 
 /**
@@ -367,32 +360,20 @@ export function buildComplexUpgraderCalldata(
   ctmDeployerAddress: string,
   l1AssetRouter: string,
   baseTokenL1Address: string,
-  contractsRoot: string
+  contractsRoot: string,
+  gatewayChainId: number = L1_CHAIN_ID
 ): string {
   const l2GenesisUpgradeCalldata = buildL2GenesisUpgradeCalldata(
     chainId,
     ctmDeployerAddress,
     l1AssetRouter,
     baseTokenL1Address,
-    contractsRoot
+    contractsRoot,
+    gatewayChainId
   );
-
-  const abiCoder = new utils.AbiCoder();
-
-  // Encode IComplexUpgrader.upgrade(address, bytes)
-  const complexUpgraderCalldata = abiCoder.encode(
-    ["bytes4", "address", "bytes"],
-    [
-      "0xd55ec697", // upgrade selector
-      L2_GENESIS_UPGRADE_ADDR,
-      l2GenesisUpgradeCalldata,
-    ]
-  );
-
-  // Clean up the calldata
-  const cleanCalldata = "0x" + complexUpgraderCalldata.slice(66);
-
-  return cleanCalldata;
+  const complexUpgraderAbi = loadAbiFromOut("L2ComplexUpgrader.sol/L2ComplexUpgrader.json");
+  const iface = new utils.Interface(complexUpgraderAbi);
+  return iface.encodeFunctionData("upgrade", [L2_GENESIS_UPGRADE_ADDR, l2GenesisUpgradeCalldata]);
 }
 
 export function getL2ComplexUpgraderAddress(): string {

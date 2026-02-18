@@ -13,11 +13,39 @@ export class AnvilManager {
     this.pidFilePath = path.join(__dirname, "../outputs/anvil-pids.json");
   }
 
+  private resolveAnvilBinary(): string {
+    const envBinary = process.env.ANVIL_BIN?.trim();
+    if (envBinary) {
+      return envBinary;
+    }
+
+    const homeDir = process.env.HOME;
+    const knownPaths = [
+      homeDir ? path.join(homeDir, ".foundry/bin/anvil") : "",
+      "/opt/homebrew/bin/anvil",
+      "/usr/local/bin/anvil",
+    ];
+
+    for (const binaryPath of knownPaths) {
+      if (binaryPath && fs.existsSync(binaryPath)) {
+        return binaryPath;
+      }
+    }
+
+    return "anvil";
+  }
+
   async startChain(config: Omit<AnvilChain, "rpcUrl" | "process">): Promise<void> {
     const { chainId, port, isL1 } = config;
     const rpcUrl = `http://127.0.0.1:${port}`;
 
     console.log(`🚀 Starting ${formatChainInfo(chainId, port, isL1)}...`);
+    const anvilBinary = this.resolveAnvilBinary();
+    const homeDir = process.env.HOME;
+    const foundryBinPath = homeDir ? path.join(homeDir, ".foundry/bin") : "";
+    const enrichedPath = foundryBinPath
+      ? `${foundryBinPath}:${process.env.PATH || ""}`
+      : process.env.PATH;
 
     const args = [
       "--port",
@@ -35,20 +63,31 @@ export class AnvilManager {
       "--auto-impersonate", // Allow impersonating any address without signatures
     ];
 
-    const process = spawn("anvil", args, {
+    const childProcess = spawn(anvilBinary, args, {
       stdio: "ignore", // Must ignore all streams for detached process to truly detach
       detached: true, // Detach from parent process
+      env: {
+        ...process.env,
+        PATH: enrichedPath,
+      },
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      childProcess.once("spawn", resolve);
+      childProcess.once("error", (error) => {
+        reject(new Error(`Failed to spawn anvil (${anvilBinary}): ${error.message}`));
+      });
     });
 
     // Unref the process so the parent can exit while child continues
-    process.unref();
+    childProcess.unref();
 
     const chain: AnvilChain = {
       chainId,
       port,
       isL1,
       rpcUrl,
-      process,
+      process: childProcess,
     };
 
     this.chains.set(chainId, chain);

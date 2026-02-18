@@ -7,6 +7,7 @@ import type { ChainConfig, ChainAddresses, CoreDeployedAddresses, CTMDeployedAdd
 import { parseForgeScriptOutput, ensureDirectoryExists, saveTomlConfig, loadAbiFromOut } from "./utils";
 import { buildComplexUpgraderCalldata, getL2ComplexUpgraderAddress } from "./l2-genesis-helper";
 import { SystemContractsDeployer } from "./system-contracts-deployer";
+import { L2GenesisUpgradeDeployer } from "./l2-genesis-upgrade-deployer";
 import {
   ETH_TOKEN_ADDRESS,
   INTEROP_CENTER_ADDR,
@@ -87,8 +88,29 @@ export class ChainRegistry {
   async initializeL2SystemContracts(chainId: number, _chainProxy: string, l2RpcUrl: string): Promise<void> {
     console.log(`🔧 Initializing L2 system contracts for chain ${chainId}...`);
 
-    // Use SystemContractsDeployer for systematic deployment
-    const deployer = new SystemContractsDeployer(l2RpcUrl, this.privateKey);
+    const configPath = path.join(__dirname, "../config/anvil-config.json");
+    let gatewayChainId = 1;
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+      gatewayChainId = config.chains?.find((chain: any) => chain.isGateway)?.chainId ?? 1;
+    }
+
+    const useGenesisUpgradeDeployer = process.env.ANVIL_INTEROP_USE_L2_GENESIS_UPGRADE !== "0";
+    const deployer = useGenesisUpgradeDeployer
+      ? new L2GenesisUpgradeDeployer(
+          l2RpcUrl,
+          this.privateKey,
+          this.l1Addresses.l1SharedBridge,
+          this.ctmAddresses.chainTypeManager,
+          gatewayChainId
+        )
+      : new SystemContractsDeployer(l2RpcUrl, this.privateKey);
+
+    if (useGenesisUpgradeDeployer) {
+      console.log("   Using L2GenesisUpgrade deployer path");
+    } else {
+      console.log("   Using direct SystemContractsDeployer path");
+    }
     await deployer.deployAllSystemContracts(chainId);
 
     console.log(`✅ L2 system contracts initialized for chain ${chainId}`);
