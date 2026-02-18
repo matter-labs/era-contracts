@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {IL2ToL1MessengerEra} from "./IL2ToL1MessengerEra.sol";
-import {IL2InteropRootStorage} from "../interfaces/IL2InteropRootStorage.sol";
+import {IL2InteropRootStorage} from "../../interop/IL2InteropRootStorage.sol";
 import {IMessageVerification} from "../interfaces/IMessageVerification.sol";
 import {IBaseToken} from "./IBaseToken.sol";
 import {IL2ContractDeployer} from "../interfaces/IL2ContractDeployer.sol";

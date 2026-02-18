@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Unauthorized} from "contracts/l2-system/zksync-os/errors/ZKOSContractErrors.sol";
-import {IL2InteropRootStorage} from "contracts/common/interfaces/IL2InteropRootStorage.sol";
+import {IL2InteropRootStorage} from "./IL2InteropRootStorage.sol";
 import {SidesLengthNotOne, InteropRootAlreadyExists, MessageRootIsZero} from "./InteropErrors.sol";
 
 /// @dev For both proof-based and commit-based interop, the `sides` parameter contains only the root.
