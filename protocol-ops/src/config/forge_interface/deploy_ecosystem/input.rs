@@ -142,7 +142,7 @@ pub struct TokensDeployL1Config {
     pub token_weth_address: Address,
 }
 
-// TODO check for ability to resuse Erc20DeploymentConfig
+// TODO check for ability to resume Erc20DeploymentConfig
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DeployErc20Config {
     pub create2_factory_salt: H256,
