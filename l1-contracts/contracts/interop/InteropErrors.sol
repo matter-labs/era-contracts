@@ -27,15 +27,15 @@ error InteroperableAddressNotEmpty(bytes interoperableAddress);
 error InvalidInteropBundleVersion();
 // 0xd5f13973
 error InvalidInteropCallVersion();
-// 0xf68d2048
+// 0x2d48e8cf
 error InteropRootAlreadyExists();
 // 0x32c2e156
 error MessageNotIncluded();
-// 0x2c898012
+// 0x9b5f85eb
 error MessageRootIsZero();
 // 0x95eb7603
 error ThisChainNotRegisteredForInterop(uint256 chainId);
-// 0x41ce0614
+// 0x2f59bd0d
 error SidesLengthNotOne();
 // 0x89fd2c76
 error UnauthorizedMessageSender(address expected, address actual);
