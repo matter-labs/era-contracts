@@ -224,35 +224,39 @@ export async function executeTokenTransfer(
     }
   }
 
-  log("⚙️ Executing bundle directly on destination chain via L2InteropHandler...");
-  const interopHandlerAbi = loadAbiFromOut("InteropHandler.sol/InteropHandler.json");
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbi, targetWallet);
+  if (targetTxHash) {
+    log("ℹ️ Bundle already appears on destination chain; skipping direct executeBundle call.");
+  } else {
+    log("⚙️ Executing bundle directly on destination chain via L2InteropHandler...");
+    const interopHandlerAbi = loadAbiFromOut("InteropHandler.sol/InteropHandler.json");
+    const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbi, targetWallet);
 
-  const mockProof = {
-    chainId: sourceChainId,
-    l1BatchNumber: 0,
-    l2MessageIndex: 0,
-    message: {
-      txNumberInBatch: 0,
-      sender: INTEROP_CENTER_ADDR,
-      data: "0x",
-    },
-    proof: [],
-  };
+    const mockProof = {
+      chainId: sourceChainId,
+      l1BatchNumber: 0,
+      l2MessageIndex: 0,
+      message: {
+        txNumberInBatch: 0,
+        sender: INTEROP_CENTER_ADDR,
+        data: "0x",
+      },
+      proof: [],
+    };
 
-  const bundleData = abiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]);
-  try {
-    const executeTx = await interopHandler.executeBundle(bundleData, mockProof, { gasLimit: 5_000_000 });
-    await executeTx.wait();
-    targetTxHash = executeTx.hash;
-    log(`   ✅ executeBundle tx: ${executeTx.hash}`);
-  } catch (error: unknown) {
-    const message = (error as Error)?.message || String(error);
-    log(`   ⚠️ executeBundle failed: ${message}`);
-    const failedTxHash = (error as { transactionHash?: string })?.transactionHash;
-    if (!targetTxHash && failedTxHash) {
-      targetTxHash = failedTxHash;
-      log(`   ⚠️ using reverted executeBundle tx hash: ${failedTxHash}`);
+    const bundleData = abiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]);
+    try {
+      const executeTx = await interopHandler.executeBundle(bundleData, mockProof, { gasLimit: 5_000_000 });
+      await executeTx.wait();
+      targetTxHash = executeTx.hash;
+      log(`   ✅ executeBundle tx: ${executeTx.hash}`);
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || String(error);
+      log(`   ⚠️ executeBundle failed: ${message}`);
+      const failedTxHash = (error as { transactionHash?: string })?.transactionHash;
+      if (!targetTxHash && failedTxHash) {
+        targetTxHash = failedTxHash;
+        log(`   ⚠️ using reverted executeBundle tx hash: ${failedTxHash}`);
+      }
     }
   }
 
