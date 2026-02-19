@@ -5,8 +5,11 @@ pragma solidity 0.8.28;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
-import {IAssetTrackerBase, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
-import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
+import {IAssetTrackerBase, MAX_TOKEN_BALANCE, TokenInteropStatus} from "./IAssetTrackerBase.sol";
+import {
+    GatewayToL1TokenBalanceMigrationData,
+    L1ToGatewayTokenBalanceMigrationData
+} from "../../common/Messaging.sol";
 
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
@@ -14,7 +17,7 @@ import {Unauthorized} from "../../common/L1ContractErrors.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
-import {InsufficientChainBalance} from "./AssetTrackerErrors.sol";
+import {AssetNotInteroperable, InsufficientChainBalance} from "./AssetTrackerErrors.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 
 abstract contract AssetTrackerBase is
@@ -25,31 +28,28 @@ abstract contract AssetTrackerBase is
 {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
 
-
-    enum TokenInteropStatus {
-        // Legacy tokens, pre-v31, also the default value.
-        NonInteroperable,
-        // Tokens that are in the process of becoming interoperable.
-        // Only on L1 AT
-        PendingInterop,
-        // Tokens that are fully interoperable.
-        Interoperable
-    }
-
     mapping(uint256 chainId => mapping(bytes32 assetId => TokenInteropStatus)) public tokenInteropStatus;
 
-    function _requireInteropable(bytes32 _assetId, uint256 _chainId) internal view {
+    function _requireInteroperable(bytes32 _assetId, uint256 _chainId) internal view {
         if (tokenInteropStatus[_chainId][_assetId] != TokenInteropStatus.Interoperable) {
             revert AssetNotInteroperable(_chainId, _assetId);
         }
     }
 
-    function _makeInteropable(bytes32 _assetId, uint256 _chainId) internal {
+    function _makeInteroperable(bytes32 _assetId, uint256 _chainId) internal {
         tokenInteropStatus[_chainId][_assetId] = TokenInteropStatus.Interoperable;
     }
 
-    function _isInteroperable(bytes32 assetId, uint256 _chainId) internal view returns (bool) {
+    function _setPendingInteroperable(bytes32 _assetId, uint256 _chainId) internal {
+        tokenInteropStatus[_chainId][_assetId] = TokenInteropStatus.PendingInteroperable;
+    }
+
+    function _isInteroperable(bytes32 _assetId, uint256 _chainId) internal view returns (bool) {
         return tokenInteropStatus[_chainId][_assetId] == TokenInteropStatus.Interoperable;
+    }
+
+    function _isAtLeastPendingInteroperable(bytes32 _assetId, uint256 _chainId) internal view returns (bool) {
+        return tokenInteropStatus[_chainId][_assetId] != TokenInteropStatus.NonInteroperable;
     }
 
     /// @notice Maps token balances for each chain to prevent unauthorized spending across ZK chains.
@@ -153,13 +153,21 @@ abstract contract AssetTrackerBase is
         chainBalance[_chainId][_assetId] -= _amount;
     }
 
-    /// @notice Sends token balance migration data to L1 through the L2->L1 messenger.
-    /// @dev This function is used by L2 and Gateway to initiate migration operations on L1.
-    /// @param data The migration data containing token information and amounts to migrate.
-    function _sendMigrationDataToL1(TokenBalanceMigrationData memory data) internal {
+    /// @notice Sends L1 -> Gateway migration data to L1 through the L2->L1 messenger.
+    /// @param _data The migration payload.
+    function _sendL1ToGatewayMigrationDataToL1(L1ToGatewayTokenBalanceMigrationData memory _data) internal {
         // slither-disable-next-line unused-return
         L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
-            abi.encodeCall(IAssetTrackerDataEncoding.receiveMigrationOnL1, data)
+            abi.encodeCall(IAssetTrackerDataEncoding.receiveL1ToGatewayMigrationOnL1, _data)
+        );
+    }
+
+    /// @notice Sends Gateway -> L1 migration data to L1 through the L2->L1 messenger.
+    /// @param _data The migration payload.
+    function _sendGatewayToL1MigrationDataToL1(GatewayToL1TokenBalanceMigrationData memory _data) internal {
+        // slither-disable-next-line unused-return
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+            abi.encodeCall(IAssetTrackerDataEncoding.receiveGatewayToL1MigrationOnL1, _data)
         );
     }
 

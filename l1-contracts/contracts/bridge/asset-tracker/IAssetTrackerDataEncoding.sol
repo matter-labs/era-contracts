@@ -2,8 +2,19 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
+import {
+    GatewayToL1TokenBalanceMigrationData,
+    L1ToGatewayTokenBalanceMigrationData,
+    MakeInteroperableData
+} from "../../common/Messaging.sol";
 
 interface IAssetTrackerDataEncoding {
-    function receiveMigrationOnL1(TokenBalanceMigrationData calldata _data) external;
+    /// @notice Selector-only helper used for decoding L1->Gateway migration messages on L1.
+    function receiveL1ToGatewayMigrationOnL1(L1ToGatewayTokenBalanceMigrationData calldata _data) external;
+
+    /// @notice Selector-only helper used for decoding Gateway->L1 migration messages on L1.
+    function receiveGatewayToL1MigrationOnL1(GatewayToL1TokenBalanceMigrationData calldata _data) external;
+
+    /// @notice Selector-only helper used for decoding interoperability conversion callback messages on L1.
+    function finalizeMakeInteroperable(MakeInteroperableData calldata _data) external;
 }

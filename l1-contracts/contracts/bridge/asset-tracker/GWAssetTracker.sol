@@ -3,7 +3,17 @@
 pragma solidity 0.8.28;
 
 import {BALANCE_CHANGE_VERSION, SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, INTEROP_BALANCE_CHANGE_VERSION} from "./IAssetTrackerBase.sol";
-import {BUNDLE_IDENTIFIER, BalanceChange, InteropBalanceChange, InteropBundle, InteropCall, L2Log, TokenBalanceMigrationData, TxStatus, AssetBalanceChange, TokenBridgingData} from "../../common/Messaging.sol";
+import {
+    BUNDLE_IDENTIFIER,
+    BalanceChange,
+    GatewayToL1TokenBalanceMigrationData,
+    InteropBundle,
+    InteropCall,
+    L2Log,
+    MigrationConfirmationData,
+    TokenBridgingData,
+    TxStatus
+} from "../../common/Messaging.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR, L2_ASSET_ROUTER, L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AssetRouterBase} from "../asset-router/AssetRouterBase.sol";
@@ -488,13 +498,13 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         _decreaseChainBalance(_chainId, _baseTokenAssetId, amount);
     }
 
-    /// @notice this function is a bit unintuitive since the Gateway AssetTracker checks the messages sent by the L2 AssetTracker,
-    /// since we check the messages from all built-in contracts.
-    /// However this is not where the receiveMigrationOnL1 function is processed, but on L1.
+    /// @notice Validates selectors for messages emitted by L2AssetTracker.
+    /// @dev Gateway only accepts selectors that L2AssetTracker can emit through L2ToL1Messenger.
     function _checkAssetTrackerMessageSelector(bytes memory _message) internal pure {
         bytes4 functionSignature = DataEncoding.getSelector(_message);
         require(
-            functionSignature == IAssetTrackerDataEncoding.receiveMigrationOnL1.selector,
+            functionSignature == IAssetTrackerDataEncoding.receiveL1ToGatewayMigrationOnL1.selector ||
+                functionSignature == IAssetTrackerDataEncoding.finalizeMakeInteroperable.selector,
             InvalidFunctionSignature(functionSignature)
         );
     }
@@ -523,18 +533,17 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         // We don't save chainBalance here since it might not be the final chainBalance for this value of the chainMigrationNumber.
         uint256 amount = _getOrSaveChainBalance(_chainId, _assetId, chainMigrationNumber);
 
-        TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
+        GatewayToL1TokenBalanceMigrationData memory tokenBalanceMigrationData = GatewayToL1TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+            originToken: originToken[_assetId],
             chainId: _chainId,
             assetId: _assetId,
             tokenOriginChainId: tokenOriginChainId[_assetId],
             amount: amount,
             chainMigrationNumber: chainMigrationNumber,
-            assetMigrationNumber: assetMigrationNumber[_chainId][_assetId],
-            originToken: originToken[_assetId],
-            isL1ToGateway: false
+            assetMigrationNumber: assetMigrationNumber[_chainId][_assetId]
         });
-        _sendMigrationDataToL1(tokenBalanceMigrationData);
+        _sendGatewayToL1MigrationDataToL1(tokenBalanceMigrationData);
 
         emit GatewayToL1MigrationInitiated(_assetId, _chainId, amount);
     }
@@ -581,7 +590,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     /// @notice Confirms a migration operation has been completed and updates the asset migration number.
     /// @param _data The migration confirmation data containing chain ID, asset ID, and migration number.
-    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _data) external onlyServiceTransactionSender {
+    function confirmMigrationOnGateway(MigrationConfirmationData calldata _data) external onlyServiceTransactionSender {
+        _confirmMigrationOnGateway(_data);
+    }
+
+    function _confirmMigrationOnGateway(MigrationConfirmationData memory _data) internal {
         assetMigrationNumber[_data.chainId][_data.assetId] = _data.assetMigrationNumber;
         // Register the token if it wasn't already
         _registerToken(_data.assetId, _data.originToken, _data.tokenOriginChainId);

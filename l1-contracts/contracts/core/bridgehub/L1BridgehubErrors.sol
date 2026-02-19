@@ -8,6 +8,8 @@ error AlreadyCurrentSL(uint256 blockChainId);
 error BatchZeroNotAllowed();
 // 0xb0b5006f
 error ChainAlreadyRegistered();
+// 0x7bcf7f4d
+error ChainNotReadyForMigration(uint256 chainId);
 // 0xbe263463
 error ChainBatchRootAlreadyExists(uint256 chainId, uint256 batchNumber);
 // 0x655c373c

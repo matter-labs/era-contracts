@@ -9,6 +9,8 @@ import {IServerNotifier} from "./IServerNotifier.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHandler.sol";
+import {IL1ChainAssetHandler} from "../core/chain-asset-handler/IL1ChainAssetHandler.sol";
+import {ChainNotReadyForMigration} from "../core/bridgehub/L1BridgehubErrors.sol";
 
 /// @title ServerNotifier
 /// @author Matter Labs
@@ -62,10 +64,12 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
     /// @dev The migration number is incremented by 1 to match the value that ChainAssetHandler will emit after increment.
     function migrateToGateway(uint256 _chainId) external onlyChainAdmin(_chainId) {
         uint256 migrationNumber = _getMigrationNumber(_chainId) + 1;
-
-        // FIXME: query the l1 chain asset handler to get the below
-        // it must be true.
-        isReadyForMigration(_chainId);
+        address bridgehub = chainTypeManager.BRIDGE_HUB();
+        address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
+        require(
+            IL1ChainAssetHandler(chainAssetHandler).isReadyForMigration(_chainId),
+            ChainNotReadyForMigration(_chainId)
+        );
 
         emit MigrateToGateway(_chainId, migrationNumber);
     }

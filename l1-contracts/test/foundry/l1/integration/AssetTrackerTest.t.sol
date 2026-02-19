@@ -17,7 +17,11 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
-import {L2Message, TokenBalanceMigrationData} from "contracts/common/Messaging.sol";
+import {
+    GatewayToL1TokenBalanceMigrationData,
+    L1ToGatewayTokenBalanceMigrationData,
+    MigrationConfirmationData
+} from "contracts/common/Messaging.sol";
 import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
@@ -166,29 +170,27 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         //     abi.encode(bytes32(0))
         // );
         // assetTracker.initiateL1ToGatewayMigrationOnL2(assetId);
-        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
+        L1ToGatewayTokenBalanceMigrationData memory data = L1ToGatewayTokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+            originToken: tokenAddress,
             chainId: eraZKChainId,
             assetId: assetId,
             tokenOriginChainId: originalChainId,
-            amount: amount,
             chainMigrationNumber: migrationNumber,
             assetMigrationNumber: migrationNumber - 1,
-            originToken: tokenAddress,
-            isL1ToGateway: true
+            totalWithdrawalsToL1: amount,
+            totalSuccessfulDepositsFromL1: 0
         });
-        TokenBalanceMigrationData memory confirmData = TokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
-            isL1ToGateway: true,
+        MigrationConfirmationData memory confirmData = MigrationConfirmationData({
             chainId: eraZKChainId,
             assetId: assetId,
             originToken: tokenAddress,
             tokenOriginChainId: originalChainId,
-            chainMigrationNumber: 0,
             assetMigrationNumber: migrationNumber,
-            amount: amount
+            amount: amount,
+            isL1ToGateway: true
         });
-        bytes memory encodedData = abi.encodeCall(IAssetTrackerDataEncoding.receiveMigrationOnL1, data);
+        bytes memory encodedData = abi.encodeCall(IAssetTrackerDataEncoding.receiveL1ToGatewayMigrationOnL1, data);
 
         FinalizeL1DepositParams memory finalizeWithdrawalParamsL1ToGateway = FinalizeL1DepositParams({
             chainId: eraZKChainId,
@@ -257,7 +259,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         // Capture balances before migration
         uint256 chainBalanceBefore = L1AssetTracker(address(assetTracker)).chainBalance(eraZKChainId, assetId);
 
-        IL1AssetTracker(assetTracker).receiveMigrationOnL1(finalizeWithdrawalParamsL1ToGateway);
+        IL1AssetTracker(assetTracker).receiveL1ToGatewayMigrationOnL1(finalizeWithdrawalParamsL1ToGateway);
 
         // Verify L1 migration was processed - chain balance should be updated
         uint256 chainBalanceAfterL1 = L1AssetTracker(address(assetTracker)).chainBalance(eraZKChainId, assetId);
@@ -341,35 +343,32 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         }
         assertTrue(foundEvent, "GatewayToL1MigrationInitiated event should be emitted");
 
-        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
+        GatewayToL1TokenBalanceMigrationData memory data = GatewayToL1TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+            originToken: tokenAddress,
             chainId: eraZKChainId,
             assetId: assetId,
             tokenOriginChainId: originalChainId,
             amount: amount,
             chainMigrationNumber: migrationNumber,
-            assetMigrationNumber: migrationNumber - 1,
-            originToken: tokenAddress,
-            isL1ToGateway: false
+            assetMigrationNumber: migrationNumber - 1
         });
-        TokenBalanceMigrationData memory confirmData = TokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
-            isL1ToGateway: false,
+        MigrationConfirmationData memory confirmData = MigrationConfirmationData({
             chainId: eraZKChainId,
             assetId: assetId,
             originToken: tokenAddress,
             tokenOriginChainId: originalChainId,
-            chainMigrationNumber: 0,
             assetMigrationNumber: migrationNumber,
-            amount: amount
+            amount: amount,
+            isL1ToGateway: false
         });
-        bytes memory encodedData = abi.encodeCall(IAssetTrackerDataEncoding.receiveMigrationOnL1, data);
+        bytes memory encodedData = abi.encodeCall(IAssetTrackerDataEncoding.receiveGatewayToL1MigrationOnL1, data);
 
         FinalizeL1DepositParams memory finalizeWithdrawalParamsGatewayToL1 = FinalizeL1DepositParams({
             chainId: gwChainId,
             l2BatchNumber: 0,
             l2MessageIndex: 0,
-            l2Sender: L2_ASSET_TRACKER_ADDR,
+            l2Sender: GW_ASSET_TRACKER_ADDR,
             l2TxNumberInBatch: 0,
             message: encodedData,
             merkleProof: new bytes32[](0)
@@ -429,7 +428,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         // Capture balance before migration
         uint256 gwChainBalanceBefore = L1AssetTracker(address(assetTracker)).chainBalance(gwChainId, assetId);
 
-        assetTracker.receiveMigrationOnL1(finalizeWithdrawalParamsGatewayToL1);
+        assetTracker.receiveGatewayToL1MigrationOnL1(finalizeWithdrawalParamsGatewayToL1);
 
         // Verify L1 processed the migration from Gateway
         uint256 gwChainBalanceAfter = L1AssetTracker(address(assetTracker)).chainBalance(gwChainId, assetId);

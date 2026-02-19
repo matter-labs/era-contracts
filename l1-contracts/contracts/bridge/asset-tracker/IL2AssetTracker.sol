@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
+import {MigrationConfirmationData} from "../../common/Messaging.sol";
 
 interface IL2AssetTracker {
     /// @notice Emitted when L1 to Gateway migration is initiated for an asset
@@ -15,13 +15,19 @@ interface IL2AssetTracker {
 
     function migrateTokenBalanceFromNTVV31(bytes32 _assetId) external;
 
-    function handleInitiateBridgingOnL2(bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId) external;
+    function handleInitiateBridgingOnL2(
+        uint256 _toChainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        uint256 _tokenOriginChainId
+    ) external;
 
     function handleInitiateBaseTokenBridgingOnL2(uint256 _amount) external;
 
     function handleFinalizeBaseTokenBridgingOnL2(uint256 _amount) external;
 
     function handleFinalizeBridgingOnL2(
+        uint256 _fromChainId,
         bytes32 _assetId,
         uint256 _amount,
         uint256 _tokenOriginChainId,
@@ -30,7 +36,9 @@ interface IL2AssetTracker {
 
     function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external;
 
-    function confirmMigrationOnL2(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
+    function confirmMigrationOnL2(MigrationConfirmationData calldata _migrationConfirmationData) external;
 
     function registerLegacyTokenOnChain(bytes32 _assetId) external;
+
+    function makeInteroperable(bytes32 _assetId) external;
 }

@@ -6,12 +6,12 @@ import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/console2.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 
-import {BalanceChange, TokenBalanceMigrationData} from "contracts/common/Messaging.sol";
+import {BalanceChange, MigrationConfirmationData} from "contracts/common/Messaging.sol";
 import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
-import {BALANCE_CHANGE_VERSION, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
 import {InvalidCanonicalTxHash, RegisterNewTokenNotAllowed} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
@@ -195,15 +195,13 @@ contract GWAssetTrackerTest is Test {
     }
 
     function test_ConfirmMigrationOnGateway_Unauthorized() public {
-        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+        MigrationConfirmationData memory data = MigrationConfirmationData({
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
             originToken: ORIGIN_TOKEN,
             tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
             assetMigrationNumber: MIGRATION_NUMBER,
-            chainMigrationNumber: 0,
             isL1ToGateway: false
         });
 
@@ -320,15 +318,13 @@ contract GWAssetTrackerTest is Test {
 
         uint256 initialBalance = gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID);
 
-        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+        MigrationConfirmationData memory data = MigrationConfirmationData({
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
             originToken: ORIGIN_TOKEN,
             tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
             assetMigrationNumber: MIGRATION_NUMBER,
-            chainMigrationNumber: 0,
             isL1ToGateway: true
         });
 
@@ -595,15 +591,13 @@ contract GWAssetTrackerTest is Test {
             abi.encode(0) // Return 0 to indicate not settled on current chain
         );
 
-        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+        MigrationConfirmationData memory data = MigrationConfirmationData({
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
             originToken: ORIGIN_TOKEN,
             tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
             assetMigrationNumber: MIGRATION_NUMBER,
-            chainMigrationNumber: 0,
             isL1ToGateway: false
         });
 
@@ -614,21 +608,19 @@ contract GWAssetTrackerTest is Test {
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), initialBalance - AMOUNT);
     }
 
-    function test_ConfirmMigrationOnGateway_InvalidVersion() public {
-        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
-            version: 0, // Invalid version
+    function test_ConfirmMigrationOnGateway_InsufficientBalanceReverts() public {
+        MigrationConfirmationData memory data = MigrationConfirmationData({
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
             originToken: ORIGIN_TOKEN,
             tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
             assetMigrationNumber: MIGRATION_NUMBER,
-            chainMigrationNumber: 0,
             isL1ToGateway: false
         });
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
-        // This should fail due to version check
+        // This should fail due to insufficient balance.
         vm.expectRevert();
         gwAssetTracker.confirmMigrationOnGateway(data);
     }
@@ -695,15 +687,13 @@ contract GWAssetTrackerTest is Test {
     }
 
     function test_ConfirmMigrationOnGateway_L1ToGateway_ZeroAmount() public {
-        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+        MigrationConfirmationData memory data = MigrationConfirmationData({
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
             originToken: ORIGIN_TOKEN,
             tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: 0,
             assetMigrationNumber: MIGRATION_NUMBER,
-            chainMigrationNumber: 0,
             isL1ToGateway: true
         });
 
@@ -719,15 +709,13 @@ contract GWAssetTrackerTest is Test {
     function testFuzz_ConfirmMigrationOnGateway_L1ToGateway(uint256 _amount) public {
         _amount = bound(_amount, 0, type(uint128).max);
 
-        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+        MigrationConfirmationData memory data = MigrationConfirmationData({
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
             originToken: ORIGIN_TOKEN,
             tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: _amount,
             assetMigrationNumber: MIGRATION_NUMBER,
-            chainMigrationNumber: 0,
             isL1ToGateway: true
         });
 

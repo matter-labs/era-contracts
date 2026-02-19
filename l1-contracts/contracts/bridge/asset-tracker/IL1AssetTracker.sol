@@ -19,7 +19,9 @@ interface IL1AssetTracker {
 
     function handleChainBalanceDecreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount) external;
 
-    function receiveMigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external;
+    function receiveL1ToGatewayMigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external;
+
+    function receiveGatewayToL1MigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external;
 
     function migrateTokenBalanceFromNTVV31(uint256 _chainId, bytes32 _assetId) external;
 
@@ -31,4 +33,13 @@ interface IL1AssetTracker {
     function setAddresses() external;
 
     function requestPauseDepositsForChainOnGateway(uint256 _chainId) external;
+
+    function initiateMakeInteroperable(uint256 _chainId, bytes32 _assetId) external;
+
+    function finalizeMakeInteroperable(
+        FinalizeL1DepositParams calldata _finalizeWithdrawalParams,
+        bytes32 _assetId
+    ) external;
+
+    function isInteroperable(uint256 _chainId, bytes32 _assetId) external view returns (bool);
 }

@@ -9,7 +9,11 @@ import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.s
 import {AssetIdMismatch, IncorrectTokenAddressFromNTV, InvalidNTVBurnData, L2WithdrawalMessageWrongLength, UnsupportedEncodingVersion, BadTransferDataLength, EmptyData} from "../L1ContractErrors.sol";
 import {WrongMsgLength} from "../../bridge/L1BridgeContractErrors.sol";
 import {UnsafeBytes} from "./UnsafeBytes.sol";
-import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
+import {
+    GatewayToL1TokenBalanceMigrationData,
+    L1ToGatewayTokenBalanceMigrationData,
+    MakeInteroperableData
+} from "../../common/Messaging.sol";
 import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol";
 
 /**
@@ -358,13 +362,31 @@ library DataEncoding {
         transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
     }
 
-    function decodeTokenBalanceMigrationData(
+    function decodeL1ToGatewayTokenBalanceMigrationData(
         bytes memory _l2ToL1message
-    ) internal pure returns (bytes4 functionSignature, TokenBalanceMigrationData memory data) {
+    ) internal pure returns (bytes4 functionSignature, L1ToGatewayTokenBalanceMigrationData memory data) {
         (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         functionSignature = bytes4(functionSignatureUint);
         bytes memory transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
-        data = abi.decode(transferData, (TokenBalanceMigrationData));
+        data = abi.decode(transferData, (L1ToGatewayTokenBalanceMigrationData));
+    }
+
+    function decodeGatewayToL1TokenBalanceMigrationData(
+        bytes memory _l2ToL1message
+    ) internal pure returns (bytes4 functionSignature, GatewayToL1TokenBalanceMigrationData memory data) {
+        (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
+        functionSignature = bytes4(functionSignatureUint);
+        bytes memory transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
+        data = abi.decode(transferData, (GatewayToL1TokenBalanceMigrationData));
+    }
+
+    function decodeMakeInteroperableData(
+        bytes memory _l2ToL1message
+    ) internal pure returns (bytes4 functionSignature, MakeInteroperableData memory data) {
+        (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
+        functionSignature = bytes4(functionSignatureUint);
+        bytes memory transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
+        data = abi.decode(transferData, (MakeInteroperableData));
     }
 
     function getSelector(bytes memory _data) internal pure returns (bytes4) {
