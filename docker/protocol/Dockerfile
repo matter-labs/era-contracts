@@ -104,7 +104,8 @@ FROM debian:bookworm-slim
 # === Pass build arg for copying the correct binary ===
 ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/usr/local/bin:$PATH \
-    FOUNDRY_DISABLE_NIGHTLY_WARNING=1
+    FOUNDRY_DISABLE_NIGHTLY_WARNING=1 \
+    XDG_CONFIG_HOME=/etc/xdg
 
 # Minimal runtime deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -130,8 +131,8 @@ COPY --from=build /contracts/AllContractsHashes.json /contracts/AllContractsHash
 COPY --from=build /contracts/SystemConfig.json /contracts/SystemConfig.json
 
 # Disable foundry-zksync telemetry prompt
-RUN mkdir -p /root/.config/zksync-tooling && \
-    echo '{"enabled":false}' > /root/.config/zksync-tooling/telemetry.json
+RUN mkdir -p /etc/xdg/zksync-tooling && \
+    echo '{"enabled": false}' > /etc/xdg/zksync-tooling/telemetry.json
 
 # Sanity
 RUN forge --version && cast --version && anvil --version && protocol_ops --help
