@@ -23,6 +23,7 @@ pub struct InitialDeploymentConfig {
     pub max_number_of_chains: u64,
     pub validator_timelock_execution_delay: u64,
     pub bridgehub_create_new_chain_salt: u64,
+    pub gateway_settlement_fee: U256,
 }
 
 impl Default for InitialDeploymentConfig {
@@ -36,6 +37,7 @@ impl Default for InitialDeploymentConfig {
             token_weth_address: Address::from_str("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
                 .unwrap(),
             bridgehub_create_new_chain_salt: 0,
+            gateway_settlement_fee: U256::from(1000000000),
         }
     }
 }

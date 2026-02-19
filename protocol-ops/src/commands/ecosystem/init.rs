@@ -55,10 +55,10 @@ pub struct EcosystemInitArgs {
     #[clap(long, default_value = "zksyncos")]
     pub vm_type: String,
     /// Use testnet verifier (default: true)
-    #[clap(long, default_value_t = true)]
+    #[clap(long, default_value_t = true, num_args = 0..=1, default_missing_value = "true")]
     pub with_testnet_verifier: bool,
     /// Enable support for legacy bridge testing (default: false)
-    #[clap(long, default_value_t = false)]
+    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true")]
     pub with_legacy_bridge: bool,
 
     // Output
@@ -205,12 +205,12 @@ pub async fn run(args: EcosystemInitArgs, shell: &Shell) -> anyhow::Result<()> {
 
     if is_simulation {
         logger::outro(format!(
-            "Ecosystem init simulation complete — Bridgehub Proxy: {:#x}, CTM Proxy: {:#x}",
+            "Ecosystem init simulation complete\n  Bridgehub Proxy: {:#x}\n  CTM Proxy: {:#x}",
             bridgehub_addr, ctm_proxy_addr
         ));
     } else {
         logger::outro(format!(
-            "Bridgehub Proxy deployed at: {:#x}, CTM Proxy deployed at: {:#x}",
+            "Bridgehub Proxy deployed at: {:#x}\nCTM Proxy deployed at: {:#x}",
             bridgehub_addr, ctm_proxy_addr
         ));
     }
@@ -227,6 +227,7 @@ fn build_output(
 ) -> serde_json::Value {
     let hub = &hub_output.deployed_addresses;
     let ctm = &ctm_output.deploy_output.deployed_addresses;
+    let ctm_config = &ctm_output.deploy_output.contracts_config;
 
     let runs: Vec<_> = runner.runs().iter().map(|r| json!({
         "script": r.script.display().to_string(),
@@ -239,6 +240,7 @@ fn build_output(
         "output": {
             "hub": {
                 "create2_factory_addr": format!("{:#x}", hub_output.contracts.create2_factory_addr),
+                "create2_factory_salt": format!("{:#x}", hub_output.contracts.create2_factory_salt),
                 "bridgehub_proxy_addr": format!("{:#x}", hub.bridgehub.bridgehub_proxy_addr),
                 "message_root_proxy_addr": format!("{:#x}", hub.bridgehub.message_root_proxy_addr),
                 "transparent_proxy_admin_addr": format!("{:#x}", hub.transparent_proxy_admin_addr),
@@ -250,15 +252,27 @@ fn build_output(
                 "l1_nullifier_proxy_addr": format!("{:#x}", hub.bridges.l1_nullifier_proxy_addr),
                 "governance_addr": format!("{:#x}", hub.governance_addr),
                 "chain_admin_addr": format!("{:#x}", hub.chain_admin),
+                "access_control_restriction_addr": format!("{:#x}", hub.access_control_restriction_addr),
             },
             "ctm": {
                 "state_transition_proxy_addr": format!("{:#x}", ctm.state_transition.state_transition_proxy_addr),
                 "verifier_addr": format!("{:#x}", ctm.state_transition.verifier_addr),
                 "genesis_upgrade_addr": format!("{:#x}", ctm.state_transition.genesis_upgrade_addr),
                 "default_upgrade_addr": format!("{:#x}", ctm.state_transition.default_upgrade_addr),
+                "bytecodes_supplier_addr": format!("{:#x}", ctm.state_transition.bytecodes_supplier_addr),
                 "validator_timelock_addr": format!("{:#x}", ctm.validator_timelock_addr),
                 "rollup_l1_da_validator_addr": format!("{:#x}", ctm.rollup_l1_da_validator_addr),
                 "no_da_validium_l1_validator_addr": format!("{:#x}", ctm.no_da_validium_l1_validator_addr),
+                "avail_l1_da_validator_addr": format!("{:#x}", ctm.avail_l1_da_validator_addr),
+                "l1_rollup_da_manager": format!("{:#x}", ctm.l1_rollup_da_manager),
+                "blobs_zksync_os_l1_da_validator_addr": ctm.blobs_zksync_os_l1_da_validator_addr.map(|a| format!("{:#x}", a)),
+                "server_notifier_proxy_addr": format!("{:#x}", ctm.server_notifier_proxy_addr),
+                "governance_addr": format!("{:#x}", ctm.governance_addr),
+                "chain_admin_addr": format!("{:#x}", ctm.chain_admin),
+                "transparent_proxy_admin_addr": format!("{:#x}", ctm.transparent_proxy_admin_addr),
+                "multicall3_addr": format!("{:#x}", ctm_output.deploy_output.multicall3_addr),
+                "diamond_cut_data": ctm_config.diamond_cut_data.clone(),
+                "force_deployments_data": ctm_config.force_deployments_data.clone(),
             },
         },
     })

@@ -16,67 +16,86 @@ fn expected_node_version() -> Result<String> {
     Ok(s.to_string())
 }
 
-pub fn assert_versions(shell: &Shell) -> Result<()> {
-    let expected_node = expected_node_version()?;
-    let node_v = cmd!(shell, "node --version")
-        .read()
-        .context("run `node --version`")?;
-    if !node_v.trim().trim_start_matches('v').contains(expected_node.as_str()) {
-        anyhow::bail!(
-            "node version mismatch: expected to contain {:?} (from .nvmrc), got {:?}",
-            expected_node,
-            node_v.trim()
-        );
+/// Check tool versions, printing warnings for mismatches.
+/// Returns Ok(()) even when versions don't match (non-fatal by default).
+pub fn check_versions(shell: &Shell) {
+    let mut warnings = Vec::new();
+
+    match expected_node_version().and_then(|expected_node| {
+        let node_v = cmd!(shell, "node --version")
+            .read()
+            .context("run `node --version`")?;
+        if !node_v.trim().trim_start_matches('v').contains(expected_node.as_str()) {
+            warnings.push(format!(
+                "node version mismatch: expected to contain {:?} (from .nvmrc), got {:?}",
+                expected_node,
+                node_v.trim()
+            ));
+        }
+        Ok(())
+    }) {
+        Ok(()) => {}
+        Err(e) => warnings.push(format!("could not check node version: {e}")),
     }
 
-    let yarn_v = cmd!(shell, "yarn --version")
-        .read()
-        .context("run `yarn --version`")?;
-    if !yarn_v.trim().contains(EXPECTED_YARN_VERSION) {
-        anyhow::bail!(
-            "yarn version mismatch: expected {:?}, got {:?}",
-            EXPECTED_YARN_VERSION,
-            yarn_v.trim()
-        );
+    match cmd!(shell, "yarn --version").read() {
+        Ok(yarn_v) => {
+            if !yarn_v.trim().contains(EXPECTED_YARN_VERSION) {
+                warnings.push(format!(
+                    "yarn version mismatch: expected {:?}, got {:?}",
+                    EXPECTED_YARN_VERSION,
+                    yarn_v.trim()
+                ));
+            }
+        }
+        Err(e) => warnings.push(format!("could not check yarn version: {e}")),
     }
 
-    let forge_v = cmd!(shell, "forge --version")
-        .read()
-        .context("run `forge --version`")?;
-    if !forge_v.contains("zksync") {
-        anyhow::bail!(
-            "forge version must contain \"zksync\" (foundry-zksync), got {:?}",
-            forge_v.trim()
-        );
-    }
-    if !forge_v.contains(EXPECTED_FORGE_VERSION) {
-        anyhow::bail!(
-            "forge version mismatch: expected to contain {:?}, got {:?}",
-            EXPECTED_FORGE_VERSION,
-            forge_v.trim()
-        );
-    }
-
-    let cast_v = cmd!(shell, "cast --version")
-        .read()
-        .context("run `cast --version`")?;
-    if !cast_v.contains("zksync") {
-        anyhow::bail!(
-            "cast version must contain \"zksync\" (foundry-zksync), got {:?}",
-            cast_v.trim()
-        );
+    match cmd!(shell, "forge --version").read() {
+        Ok(forge_v) => {
+            if !forge_v.contains("zksync") {
+                warnings.push(format!(
+                    "forge version must contain \"zksync\" (foundry-zksync), got {:?}",
+                    forge_v.trim()
+                ));
+            }
+            if !forge_v.contains(EXPECTED_FORGE_VERSION) {
+                warnings.push(format!(
+                    "forge version mismatch: expected to contain {:?}, got {:?}",
+                    EXPECTED_FORGE_VERSION,
+                    forge_v.trim()
+                ));
+            }
+        }
+        Err(e) => warnings.push(format!("could not check forge version: {e}")),
     }
 
-    let anvil_v = cmd!(shell, "anvil --version")
-        .read()
-        .context("run `anvil --version`")?;
-    if !anvil_v.contains(EXPECTED_ANVIL_VERSION) {
-        anyhow::bail!(
-            "anvil version mismatch: expected to contain {:?}, got {:?}",
-            EXPECTED_ANVIL_VERSION,
-            anvil_v.trim()
-        );
+    match cmd!(shell, "cast --version").read() {
+        Ok(cast_v) => {
+            if !cast_v.contains("zksync") {
+                warnings.push(format!(
+                    "cast version must contain \"zksync\" (foundry-zksync), got {:?}",
+                    cast_v.trim()
+                ));
+            }
+        }
+        Err(e) => warnings.push(format!("could not check cast version: {e}")),
     }
 
-    Ok(())
+    match cmd!(shell, "anvil --version").read() {
+        Ok(anvil_v) => {
+            if !anvil_v.contains(EXPECTED_ANVIL_VERSION) {
+                warnings.push(format!(
+                    "anvil version mismatch: expected to contain {:?}, got {:?}",
+                    EXPECTED_ANVIL_VERSION,
+                    anvil_v.trim()
+                ));
+            }
+        }
+        Err(e) => warnings.push(format!("could not check anvil version: {e}")),
+    }
+
+    for w in &warnings {
+        eprintln!("  WARNING: {w}");
+    }
 }

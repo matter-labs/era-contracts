@@ -129,6 +129,7 @@ contract DeployL1CoreUtils is DeployUtils {
                     abi.encode(
                         coreAddresses.bridgehub.proxies.bridgehub,
                         coreAddresses.bridgehub.proxies.messageRoot,
+                        address(0), // _interopCenter
                         config.eraChainId,
                         config.eraDiamondProxyAddress
                     );

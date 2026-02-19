@@ -66,7 +66,7 @@ impl ExecutionMode {
 /// - `--simulate` forces simulation mode (anvil fork with auto-impersonate)
 /// - Without `--simulate`:
 ///   - `--private-key` → Broadcast with that key
-///   - `--sender` (no key) → Simulate (implicit)
+///   - `--sender` (no key) → Broadcast (unlocked mode)
 /// - At least one of `--private-key` or `--sender` must be provided
 pub fn resolve_execution(
     private_key: Option<H256>,
@@ -111,12 +111,11 @@ pub fn resolve_execution(
             ExecutionMode::Broadcast,
         ))
     } else {
-        // No key and no --simulate → implicit simulation
-        let anvil = anvil::start_anvil_fork(l1_rpc_url)?;
+        // No key and no --simulate → broadcast (unlocked mode)
         Ok((
             SenderAuth::Unlocked(resolved_addr),
             resolved_addr,
-            ExecutionMode::Simulate(anvil),
+            ExecutionMode::Broadcast,
         ))
     }
 }

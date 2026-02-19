@@ -457,6 +457,68 @@ pub async fn call_script(
 // }
 
 #[allow(clippy::too_many_arguments)]
+pub async fn unpause_deposits(
+    shell: &Shell,
+    runner: &mut ForgeRunner,
+    forge_args: &ForgeScriptArgs,
+    foundry_contracts_path: &Path,
+    mode: AdminScriptMode,
+    chain_id: u64,
+    bridgehub: Address,
+    l1_rpc_url: String,
+) -> anyhow::Result<AdminScriptOutput> {
+    let calldata = ADMIN_FUNCTIONS
+        .encode(
+            "unpauseDeposits",
+            (bridgehub, U256::from(chain_id), mode.should_send()),
+        )
+        .unwrap();
+
+    call_script(
+        shell,
+        runner,
+        forge_args,
+        foundry_contracts_path,
+        mode,
+        calldata,
+        l1_rpc_url,
+        &format!("unpausing deposits for chain {}", chain_id),
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn make_permanent_rollup(
+    shell: &Shell,
+    runner: &mut ForgeRunner,
+    foundry_contracts_path: &Path,
+    chain_admin_addr: Address,
+    governor: &Wallet,
+    diamond_proxy_address: Address,
+    forge_args: &ForgeScriptArgs,
+    l1_rpc_url: String,
+) -> anyhow::Result<()> {
+    let forge_args = forge_args.clone();
+
+    let calldata = ADMIN_FUNCTIONS
+        .encode(
+            "makePermanentRollup",
+            (chain_admin_addr, diamond_proxy_address),
+        )
+        .unwrap();
+    let forge = Forge::new(foundry_contracts_path)
+        .script(
+            &ACCEPT_GOVERNANCE_SCRIPT_PARAMS.script(),
+            forge_args,
+        )
+        .with_ffi()
+        .with_rpc_url(l1_rpc_url)
+        .with_broadcast()
+        .with_calldata(&calldata);
+    accept_ownership(shell, runner, governor, forge).await
+}
+
+#[allow(clippy::too_many_arguments)]
 pub async fn set_da_validator_pair(
     shell: &Shell,
     runner: &mut ForgeRunner,

@@ -62,13 +62,13 @@ pub struct CtmDeployArgs {
     #[clap(long, default_value = "zksyncos")]
     pub vm_type: String,
     /// Reuse governance and admin contracts from hub (default: true)
-    #[clap(long, default_value_t = true)]
+    #[clap(long, default_value_t = true, num_args = 0..=1, default_missing_value = "true")]
     pub reuse_gov_and_admin: bool,
     /// Use testnet verifier (default: true)
-    #[clap(long, default_value_t = true)]
+    #[clap(long, default_value_t = true, num_args = 0..=1, default_missing_value = "true")]
     pub with_testnet_verifier: bool,
     /// Enable support for legacy bridge testing (default: false)
-    #[clap(long, default_value_t = false)]
+    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true")]
     pub with_legacy_bridge: bool,
 
     // Output

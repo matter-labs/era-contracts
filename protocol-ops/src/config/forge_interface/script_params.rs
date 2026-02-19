@@ -66,23 +66,29 @@ pub const REGISTER_CHAIN_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
 //     script_path: "deploy-scripts/DeployErc20.s.sol",
 // };
 
-// pub const DEPLOY_PAYMASTER_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
-//     input: "script-config/config-deploy-paymaster.toml",
-//     output: "script-out/output-deploy-paymaster.toml",
-//     script_path: "deploy-scripts/DeployPaymaster.s.sol",
-// };
+pub const DEPLOY_PAYMASTER_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
+    input: "script-config/config-deploy-paymaster.toml",
+    output: "script-out/output-deploy-paymaster.toml",
+    script_path: "deploy-scripts/chain/DeployPaymaster.s.sol",
+};
 
-// pub const SETUP_LEGACY_BRIDGE: ForgeScriptParams = ForgeScriptParams {
-//     input: "script-config/setup-legacy-bridge.toml",
-//     output: "script-out/setup-legacy-bridge.toml",
-//     script_path: "deploy-scripts/dev/SetupLegacyBridge.s.sol",
-// };
+pub const SETUP_LEGACY_BRIDGE: ForgeScriptParams = ForgeScriptParams {
+    input: "script-config/setup-legacy-bridge.toml",
+    output: "script-out/setup-legacy-bridge.toml",
+    script_path: "deploy-scripts/dev/SetupLegacyBridge.s.sol",
+};
 
-// pub const ENABLE_EVM_EMULATOR_PARAMS: ForgeScriptParams = ForgeScriptParams {
-//     input: "script-config/enable-evm-emulator.toml",
-//     output: "script-out/output-enable-evm-emulator.toml",
-//     script_path: "deploy-scripts/EnableEvmEmulator.s.sol",
-// };
+pub const ENABLE_EVM_EMULATOR_PARAMS: ForgeScriptParams = ForgeScriptParams {
+    input: "script-config/enable-evm-emulator.toml",
+    output: "script-out/output-enable-evm-emulator.toml",
+    script_path: "deploy-scripts/chain/EnableEvmEmulator.s.sol",
+};
+
+pub const REGISTER_ON_ALL_CHAINS_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
+    input: "script-config/register-on-all-chains.toml",
+    output: "script-out/output-register-on-all-chains.toml",
+    script_path: "deploy-scripts/ecosystem/RegisterOnAllChains.s.sol",
+};
 
 // pub const GATEWAY_UTILS_SCRIPT_PATH: &str = "deploy-scripts/gateway/GatewayUtils.s.sol";
 

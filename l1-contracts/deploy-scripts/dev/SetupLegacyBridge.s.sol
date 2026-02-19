@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {Utils} from "./../Utils.sol";
+import {Utils} from "../utils/Utils.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 

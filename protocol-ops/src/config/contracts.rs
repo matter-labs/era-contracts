@@ -17,7 +17,7 @@ use crate::config::{
         deploy_ctm::output::DeployCTMOutput,
         deploy_ecosystem::output::DeployL1CoreContractsOutput,
         deploy_l2_contracts::output::{
-            ConsensusRegistryOutput, DefaultL2UpgradeOutput, InitializeBridgeOutput, Multicall3Output,
+            ConsensusRegistryOutput, DefaultL2UpgradeOutput, Multicall3Output,
             TimestampAsserterOutput,
         },
         register_chain::output::RegisterChainOutput,
@@ -369,14 +369,10 @@ impl ContractsConfig {
         Ok(())
     }
 
-    pub fn set_l2_shared_bridge(
-        &mut self,
-        initialize_bridges_output: &InitializeBridgeOutput,
-    ) -> anyhow::Result<()> {
+    pub fn set_l2_shared_bridge(&mut self) -> anyhow::Result<()> {
         self.bridges.shared.l2_address = Some(L2_ASSET_ROUTER_ADDRESS);
         self.bridges.erc20.l2_address = Some(L2_ASSET_ROUTER_ADDRESS);
         self.l2.l2_native_token_vault_proxy_addr = Some(L2_NATIVE_TOKEN_VAULT_ADDRESS);
-        self.l2.da_validator_addr = Some(initialize_bridges_output.l2_da_validator_address);
         Ok(())
     }
 

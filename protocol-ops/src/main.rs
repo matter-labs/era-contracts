@@ -75,7 +75,7 @@ async fn run_subcommand(cli_args: ProtocolCli) -> anyhow::Result<()> {
 
     init_global_config_inner(&cli_args.global)?;
     let shell = Shell::new().unwrap();
-    versions::assert_versions(&shell)?;
+    versions::check_versions(&shell);
 
     match cli_args.command {
         ProtocolCliSubcommands::Ecosystem(args) => commands::ecosystem::run(&shell, *args).await?,

@@ -88,7 +88,8 @@ pub struct HubInitArgs {
     pub create2_factory_salt: Option<H256>,
 
     // Options
-    #[clap(long, help = "Enable support for legacy bridge testing", default_value_t = false)]
+    // Enable support for legacy bridge testing
+    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true")]
     pub with_legacy_bridge: bool,
     #[clap(long, help = "Era chain ID", default_value_t = 270)]
     pub era_chain_id: u64,
