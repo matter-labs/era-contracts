@@ -63,6 +63,10 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
         require(allZKChainsLength == 0, LocallyNoChainsAtGenesis());
     }
 
+    function isPreV31(uint256 chainId) external returns (bool) {
+        v31UpgradeChainBatchNumber[chainId] == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1;
+    }
+
     /// @dev This initializer is used in the v31 upgrade.
     function initializeL1V31Upgrade() external reinitializer(2) {
         uint256[] memory allZKChains = IBridgehubBase(BRIDGE_HUB).getAllZKChainChainIDs();

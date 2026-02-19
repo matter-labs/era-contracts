@@ -25,6 +25,33 @@ abstract contract AssetTrackerBase is
 {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
 
+
+    enum TokenInteropStatus {
+        // Legacy tokens, pre-v31, also the default value.
+        NonInteroperable,
+        // Tokens that are in the process of becoming interoperable.
+        // Only on L1 AT
+        PendingInterop,
+        // Tokens that are fully interoperable.
+        Interoperable
+    }
+
+    mapping(uint256 chainId => mapping(bytes32 assetId => TokenInteropStatus)) public tokenInteropStatus;
+
+    function _requireInteropable(bytes32 _assetId, uint256 _chainId) internal view {
+        if (tokenInteropStatus[_chainId][_assetId] != TokenInteropStatus.Interoperable) {
+            revert AssetNotInteroperable(_chainId, _assetId);
+        }
+    }
+
+    function _makeInteropable(bytes32 _assetId, uint256 _chainId) internal {
+        tokenInteropStatus[_chainId][_assetId] = TokenInteropStatus.Interoperable;
+    }
+
+    function _isInteroperable(bytes32 assetId, uint256 _chainId) internal view returns (bool) {
+        return tokenInteropStatus[_chainId][_assetId] == TokenInteropStatus.Interoperable;
+    }
+
     /// @notice Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// NOTE: this function may be removed in the future, don't rely on it!
     /// @dev On L1AssetTracker:

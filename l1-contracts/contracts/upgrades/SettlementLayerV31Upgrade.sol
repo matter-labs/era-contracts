@@ -70,6 +70,12 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
             require(IGetters(address(this)).getPriorityQueueSize() == 0, PriorityQueueNotReady());
         }
 
+        // Era chains automatically have it tracked.
+        // ZKsync OS chains dont have the corresponding function yet.
+        if (!s.zksyncOS) {
+            s.baseTokenHasTotalSupply = true;
+        }
+
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 }

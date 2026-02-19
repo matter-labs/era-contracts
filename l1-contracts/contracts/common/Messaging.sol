@@ -314,6 +314,12 @@ struct ProofData {
     bool finalProofNode;
 }
 
+// FIXME: split the struct into two:
+// One for migration from L1 to GW and the other one for migration from GW to L1.
+// Analyze carefully which fields are needed or not needed.
+// For decoding the messages, two separate selectors will be needed for that.
+// The one that migrates the funds to L1 contains only `amount`, while the one that migrates
+// to GW contains `totalSuccessfulDeposits` and `totalWithdrawn`. 
 struct TokenBalanceMigrationData {
     bytes1 version;
     bool isL1ToGateway;
@@ -321,6 +327,8 @@ struct TokenBalanceMigrationData {
     uint256 chainId;
     bytes32 assetId;
     uint256 tokenOriginChainId;
+    // For GW->L1 migration, it is the totalChainBalance of the chain
+    // For L1->GW migration, it is 
     uint256 amount;
     uint256 chainMigrationNumber;
     uint256 assetMigrationNumber;

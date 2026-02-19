@@ -125,6 +125,22 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), _l2TokenProxyBytecodeHash);
     }
 
+    function bridgeMint(
+        uint256 _chainId,
+        bytes32 _assetId,
+        bytes calldata _data
+    ) external payable override {
+        InteropStatus status = L2AssetTracker.getInteropStatus(block.chainid, _assetId);
+
+        if (status != Inteoperable) {
+            require (_chainId == _l1ChainId(), "Invalid chain ID");
+            require (L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == _l1ChainId, "non interoperable asset");
+        }
+
+
+        super.bridgeMint(_chainId, _assetId, _data);
+    }
+
     /// @notice Updates the contract.
     /// @dev This function is used to initialize the new implementation of L2NativeTokenVault on existing chains during
     /// the upgrade.
@@ -369,12 +385,12 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             : keccak256(abi.encode(_tokenOriginChainId, _l1Token));
     }
 
-    function _handleBridgeToChain(uint256, bytes32 _assetId, uint256 _amount) internal override {
+    function _handleBridgeToChain(uint256 _chainid, bytes32 _assetId, uint256 _amount) internal override {
         // on L2s we don't track the balance.
         // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
         // so L2NativeTokenVault doesn't have to handle balance changes on GW.
         // We need to check the migration number.
-        L2_ASSET_TRACKER.handleInitiateBridgingOnL2(_assetId, _amount, originChainId[_assetId]);
+        L2_ASSET_TRACKER.handleInitiateBridgingOnL2(_chainid, _assetId, _amount, originChainId[_assetId]);
     }
 
     function _handleBridgeFromChain(uint256, bytes32 _assetId, uint256 _amount) internal override {

@@ -38,6 +38,21 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     IChainAssetHandlerBase public chainAssetHandler;
 
+    struct InteropL1Info {
+        uint256 totalDeposited;
+        uint256 totalClaimed;
+        // Used for legacy tokens, 0 for others.
+        uint256 preInteropTransformDiff;
+        // Used for legacy tokens when they convert to being interoperable
+        uint256 recordedChainBalanceDuringTransform;
+    }
+
+    mapping(uint256 chainid => bytes32 assetid =>InteropL1Info info ) interopInfo;
+
+    function _recordL1Info(bytes32 assetId, uint256 chainId) internal returns (bool) {
+        return tokenInteropStatus[chainid][assetId] == PendingInterop or Interoperable;
+    }
+
     /// Todo Deprecate after V31 is finished.
     mapping(bytes32 assetId => bool l1TotalSupplyMigrated) internal l1TotalSupplyMigrated;
 
@@ -117,6 +132,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
         _assignMaxChainBalanceIfNeeded(_originChainId, _assetId);
+
+        _makeInteropable(_assetId, _originChainId);
     }
 
     function _assignMaxChainBalanceIfNeeded(uint256 _originChainId, bytes32 _assetId) internal {
@@ -124,6 +141,49 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             _assignMaxChainBalance(_originChainId, _assetId);
         }
     }
+
+    function initiateMakeInteroperable(uint256 chainId, bytes32 _assetId) external {
+        require(tokenInteropStatus[_chainId][_assetId] == NonInteroperable);
+        tokenInteropStatus[_chainId][_assetId] = PendingInteroperable;
+
+        // Note, that we heavily rely on the fact that this operation MUST succeed. For that, we need to ensure that:
+        // - Chain has v31 version
+        // - A zksync os chain has its base token's total Supply set up.
+        require(!IL1MessageRoot(address(MESSAGE_ROOT)).isPreV31());
+
+        // FIXME: query chain address from bridgehub and then assert Igetters(chain).baseTokenSupportsTotalSupply
+
+        // Security note: the chain can be malicious, and not process the corresponding messages correctly.
+        // The only thing that L1AT guarantees is that such chains wont spend more than they have 
+        // (preventing them from damaging the ecosystem)
+        address zkChain = Bridgehub(_bridgehub()).getZKChain(chainId);
+        IMailbox(zkChain).requestL2ServiceTransaction(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeCall(L2AssetTracker.makeInteroperable, assetId)
+        );
+        interopInfo[chainId][assetId].recordedChainBalanceDuringTransform = chainBalance[chainId][assetId];
+    }
+
+    function finalizeMakeInteroperable(
+        FinalizeL1DepositParams calldata _finalizeWithdrawalParams,
+        uint256 chainId, 
+        bytes32 _assetId
+    ) external {
+        require(tokenInteropStatus[_chainId][_assetId] == PendingInteroperable);
+        _proveMessageInclusion(_finalizeWithdrawalParams);
+
+        // FIXME: add the corresponding method to `DataEncoding`
+        (bytes4 functionSignature, MakeInteroperableParams memory data) = DataEncoding
+            .decodeMakeInteroperableParams(_finalizeWithdrawalParams.message);
+
+        // FIXME: check that all the params are as expected (signature, version, asset id)
+
+        uint256 totalSupply = data.totalSupply;
+        uint256 recordedChainBalance = interopInfo[chainId][_assetId].recordedChainBalanceBeforeTransform;
+    
+        tokenInteropStatus[_chainId][_assetId] == Interoperable;
+        interopInfo[chainId][_assetId].preInteropTransformDiff = recordedChainBalance - totalSupply;
+    }       
 
     /*//////////////////////////////////////////////////////////////
                     Token deposits and withdrawals
@@ -148,6 +208,12 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             bytes32 baseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
             if (baseTokenAssetId != _assetId) {
                 _setTransientBalanceChange(_chainId, _assetId, _amount);
+            }
+        } else {
+            // Chain settles on L1, so we record total deposits to the chain if the token is at least PendingInteropable
+
+            if(_recordL1Info(_assetId, _chainId)) {
+                interopInfo[_chainId][_assetId].totalDeposited += _amount;
             }
         }
 
@@ -188,6 +254,12 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _amount
     ) external onlyNativeTokenVault {
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
+
+        if(chainToUpdate == _chainId) {
+            if(_recordL1Info(_assetId, _chainId)) {
+                interopInfo[_chainId][_assetId].totalClaimed += _amount;
+            }
+        }
 
         _decreaseChainBalance(chainToUpdate, _assetId, _amount);
         chainBalance[block.chainid][_assetId] += _amount;
@@ -240,6 +312,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// i.e. the `amount` field in the `TokenBalanceMigrationData` and may be used by interop.
     /// If the chain downplays `amount`, it will restrict its users from additional interop,
     /// while if it overstates `amount`, it should be able to affect past withdrawals of the chain only.
+    /// FIXME: split the method into two: the one for migrating only L1->GW and the other one migrating only GW->L1
+    /// During split please ensure to minimize the code repetition as much as possible and any common parts should be moved
+    /// to internal methods
     function receiveMigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external {
         _proveMessageInclusion(_finalizeWithdrawalParams);
 
@@ -300,6 +375,17 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
             fromChainId = data.chainId;
             toChainId = currentSettlementLayer;
+
+            // When calling `_migrateFunds` we should migrate
+            // chainBalance - amountToKeep, i.e. 
+            // keep the `amountToKeep` on L1.
+            uint256 amountToKeep = _toKeepDuringL1ToGWMigration(
+                fromChainId,
+                data.assetId,
+                data.totalWithdrawalsToL1,
+                data.totalSuccessfulDeposits
+            );
+
         } else {
             // In this case we trust the TokenBalanceMigrationData data and the settlement layer = Gateway to be honest.
             require(
@@ -378,6 +464,18 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     function _migrateFunds(uint256 _fromChainId, uint256 _toChainId, bytes32 _assetId, uint256 _amount) internal {
         _decreaseChainBalance(_fromChainId, _assetId, _amount);
         chainBalance[_toChainId][_assetId] += _amount;
+    }
+
+    function _toKeepDuringL1ToGWMigration(uint256 _fromChainId, bytes32 _assetId, uint256 totalWithdrawnFromL2, uint256 totalSuccessfulDeposits) {
+        require(isInteroperable(chainId, assetId)); 
+
+        uint256 totalFailedDeposits = interopInfo[_fromChainId][_asset].totalDeposits - totalSuccessfulDeposits;
+
+
+        // We keep funds needed to serve any "withdraw" or "claim failed deposit" that would decrement the chains balance
+        // directly.
+        return 
+             totalWithdrawnFromL2 + totalFailedDeposits - interopInfo[_fromChainId][_asset].totalclaimed;
     }
 
     /// @notice Sends a transaction to a specific chain through its mailbox.

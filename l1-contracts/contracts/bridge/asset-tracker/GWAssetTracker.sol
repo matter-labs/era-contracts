@@ -63,10 +63,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     mapping(uint256 chainId => mapping(uint256 migrationNumber => mapping(bytes32 assetId => SavedTotalSupply savedChainBalance)))
         internal savedChainBalance;
 
-    /// @notice We save the interop call balance change
-    mapping(uint256 receivingChainId => mapping(bytes32 bundleHash => InteropBalanceChange interopBalanceChange))
-        internal interopBalanceChange;
-
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert Unauthorized(msg.sender);
@@ -243,8 +239,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
                 if (log.key == bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
                     _handleInteropCenterMessage(_processLogsInputs.chainId, message);
-                } else if (log.key == bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR)))) {
-                    _handleInteropHandlerReceiveMessage(_processLogsInputs.chainId, message, baseTokenAssetId);
                 } else if (log.key == bytes32(uint256(uint160(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)))) {
                     _handleBaseTokenSystemContractMessage(_processLogsInputs.chainId, baseTokenAssetId, message);
                 } else if (log.key == bytes32(uint256(uint160(L2_ASSET_ROUTER_ADDR)))) {
@@ -348,7 +342,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         InteropBundle memory interopBundle = abi.decode(_message[1:], (InteropBundle));
 
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(_chainId, _message[1:]);
-        interopBalanceChange[interopBundle.destinationChainId][bundleHash].version = INTEROP_BALANCE_CHANGE_VERSION;
 
         uint256 totalBaseTokenAmount = 0;
 
@@ -374,7 +367,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
         bytes32 destinationChainBaseTokenAssetId = _bridgehub().baseTokenAssetId(interopBundle.destinationChainId);
         _decreaseChainBalance(_chainId, destinationChainBaseTokenAssetId, totalBaseTokenAmount);
-        interopBalanceChange[interopBundle.destinationChainId][bundleHash].baseTokenAmount = totalBaseTokenAmount;
     }
 
     function _processInteropCall(
@@ -389,47 +381,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
         // solhint-disable-next-line func-named-parameters
         uint256 amount = _handleAssetRouterMessageInner(_chainId, _destinationChainId, assetId, transferData, true);
-
-        AssetBalanceChange memory change = AssetBalanceChange({assetId: assetId, amount: amount});
-        interopBalanceChange[_destinationChainId][_bundleHash].assetBalanceChanges.push(change);
-    }
-
-    function _handleInteropHandlerReceiveMessage(
-        uint256 _chainId,
-        bytes calldata _message,
-        bytes32 _baseTokenAssetId
-    ) internal {
-        bytes4 functionSelector = bytes4(_message[0:4]);
-        require(functionSelector == IInteropHandler.verifyBundle.selector, InvalidFunctionSignature(functionSelector));
-        bytes32 bundleHash = bytes32(_message[4:36]);
-
-        InteropBalanceChange memory receivedInteropBalanceChange = interopBalanceChange[_chainId][bundleHash];
-        require(
-            receivedInteropBalanceChange.version == INTEROP_BALANCE_CHANGE_VERSION,
-            InvalidInteropBalanceChange(bundleHash)
-        );
-        interopBalanceChange[_chainId][bundleHash].version = 0;
-
-        uint256 length = receivedInteropBalanceChange.assetBalanceChanges.length;
-        uint256 chainMigrationNumber = _getChainMigrationNumber(_chainId);
-        for (uint256 i = 0; i < length; ++i) {
-            uint256 amount = receivedInteropBalanceChange.assetBalanceChanges[i].amount;
-            interopBalanceChange[_chainId][bundleHash].assetBalanceChanges[i].assetId = bytes32(0);
-            interopBalanceChange[_chainId][bundleHash].assetBalanceChanges[i].amount = 0;
-            _increaseAndSaveChainBalance(
-                _chainId,
-                receivedInteropBalanceChange.assetBalanceChanges[i].assetId,
-                amount,
-                chainMigrationNumber
-            );
-        }
-        interopBalanceChange[_chainId][bundleHash].baseTokenAmount = 0;
-        _increaseAndSaveChainBalance(
-            _chainId,
-            _baseTokenAssetId,
-            receivedInteropBalanceChange.baseTokenAmount,
-            chainMigrationNumber
-        );
     }
 
     /// @notice L2->L1 withdrawals go through the L2AssetRouter directly.

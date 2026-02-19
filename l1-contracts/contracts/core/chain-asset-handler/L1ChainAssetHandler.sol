@@ -159,8 +159,22 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         });
     }
 
+    function isReadyForMigration(uint256 _chainId) public returns (bool) {
+        // checks that the chain is allowed to migrate.
+        // we only allow chains to migrate if their base token is `Interopable`.
+        // It already implies having v31 version. It MUST BE ENFORCED BY L1ASSETTRACKER
+        bytes32 baseAssetId = bridgehub.getBaseAssetId(chainId);
+
+        // FIXME: query the l1assettracker for this value. 
+        // the asset tracker should be preferrably obtain somehow programmatically. 
+        // in the worst case if it is very hard we can add it as a storage slot inside `setAddresses`. 
+        require(isInteroperable(_chainId, baseAssetId));
+    }
+
     function _setMigrationInProgressOnL1(uint256 _chainId) internal override {
         isMigrationInProgress[_chainId] = true;
+
+        require(isReadyForMigration(_chainId));
     }
 
     /*//////////////////////////////////////////////////////////////
