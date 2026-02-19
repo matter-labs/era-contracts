@@ -44,8 +44,9 @@ async function main(): Promise<void> {
           setupError = null;
           break;
         } catch (error: unknown) {
-          setupError = error;
-          console.error(`⚠️ Setup attempt ${attempt} failed: ${(error as Error).message}`);
+          const setupAttemptError = error instanceof Error ? error : new Error(String(error));
+          setupError = setupAttemptError;
+          console.error(`⚠️ Setup attempt ${attempt} failed: ${setupAttemptError.message}`);
           runOrThrow("yarn", ["cleanup"], anvilInteropDir, interopEnv);
         }
       }

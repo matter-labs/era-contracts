@@ -188,19 +188,33 @@ export function readSolcBytecode(contractsRoot: string, fileName: string, contra
  * Run 'forge build' (WITHOUT --zksync flag) to generate out/ artifacts.
  */
 export function getBytecodeInfo(contractsRoot: string): BytecodeInfo {
-  const contracts = [
-    { file: "L2MessageRoot.sol", name: "L2MessageRoot", key: "messageRootBytecodeInfo" },
-    { file: "L2NativeTokenVault.sol", name: "L2NativeTokenVault", key: "l2NtvBytecodeInfo" },
-    { file: "L2AssetRouter.sol", name: "L2AssetRouter", key: "l2AssetRouterBytecodeInfo" },
-    { file: "L2Bridgehub.sol", name: "L2Bridgehub", key: "bridgehubBytecodeInfo" },
-    { file: "L2ChainAssetHandler.sol", name: "L2ChainAssetHandler", key: "chainAssetHandlerBytecodeInfo" },
-    { file: "UpgradeableBeaconDeployer.sol", name: "UpgradeableBeaconDeployer", key: "beaconDeployerBytecodeInfo" },
-    { file: "InteropCenter.sol", name: "InteropCenter", key: "interopCenterBytecodeInfo" },
-    { file: "InteropHandler.sol", name: "InteropHandler", key: "interopHandlerBytecodeInfo" },
-    { file: "L2AssetTracker.sol", name: "L2AssetTracker", key: "assetTrackerBytecodeInfo" },
-  ];
+  const info: BytecodeInfo = {
+    messageRootBytecodeInfo: "",
+    l2NtvBytecodeInfo: "",
+    l2AssetRouterBytecodeInfo: "",
+    bridgehubBytecodeInfo: "",
+    chainAssetHandlerBytecodeInfo: "",
+    beaconDeployerBytecodeInfo: "",
+    interopCenterBytecodeInfo: "",
+    interopHandlerBytecodeInfo: "",
+    assetTrackerBytecodeInfo: "",
+  };
 
-  const info: Record<string, string> = {};
+  const contracts = [
+    { file: "L2MessageRoot.sol", name: "L2MessageRoot", key: "messageRootBytecodeInfo" as const },
+    { file: "L2NativeTokenVault.sol", name: "L2NativeTokenVault", key: "l2NtvBytecodeInfo" as const },
+    { file: "L2AssetRouter.sol", name: "L2AssetRouter", key: "l2AssetRouterBytecodeInfo" as const },
+    { file: "L2Bridgehub.sol", name: "L2Bridgehub", key: "bridgehubBytecodeInfo" as const },
+    { file: "L2ChainAssetHandler.sol", name: "L2ChainAssetHandler", key: "chainAssetHandlerBytecodeInfo" as const },
+    {
+      file: "UpgradeableBeaconDeployer.sol",
+      name: "UpgradeableBeaconDeployer",
+      key: "beaconDeployerBytecodeInfo" as const,
+    },
+    { file: "InteropCenter.sol", name: "InteropCenter", key: "interopCenterBytecodeInfo" as const },
+    { file: "InteropHandler.sol", name: "InteropHandler", key: "interopHandlerBytecodeInfo" as const },
+    { file: "L2AssetTracker.sol", name: "L2AssetTracker", key: "assetTrackerBytecodeInfo" as const },
+  ];
 
   for (const contract of contracts) {
     const bytecode = readSolcBytecode(contractsRoot, contract.file, contract.name);
@@ -210,7 +224,7 @@ export function getBytecodeInfo(contractsRoot: string): BytecodeInfo {
     info[contract.key] = abiCoder.encode(["bytes32"], [hash]);
   }
 
-  return info as BytecodeInfo;
+  return info;
 }
 
 /**
