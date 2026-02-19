@@ -31,7 +31,6 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
     using stdStorage for StdStorage;
 
-
     TestnetERC20Token internal zkToken;
 
     function setUp() public virtual override {
