@@ -12,7 +12,7 @@ import {ChainIdNotRegistered, InvalidInteropCalldata, InvalidMessage, Reconstruc
 import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRootBase, SHARED_ROOT_TREE_EMPTY_HASH} from "../../core/message-root/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
-import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "../../common/Config.sol";
+import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH, MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER} from "../../common/Config.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
@@ -167,8 +167,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes32 _canonicalTxHash,
         BalanceChange calldata _balanceChange
     ) external onlyL2InteropCenter {
-        // FIXME Q: can it be anything other than 1? If not, maybe add a require?
         uint256 chainMigrationNumber = _getChainMigrationNumber(_chainId);
+        require(
+            chainMigrationNumber == MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
+            InvalidChainMigrationNumber(MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, chainMigrationNumber)
+        );
 
         if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _balanceChange.assetId)) {
             _forceSetAssetMigrationNumber(_chainId, _balanceChange.assetId);
