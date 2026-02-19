@@ -258,14 +258,13 @@ contract InteropCenter is
     /// @param _totalIndirectCallsValue Sum of requested indirect call values.
     function _ensureCorrectTotalValue(
         uint256 _destinationChainId,
+        bytes32 _destinationBaseTokenAssetId,
         uint256 _totalBurnedCallsValue,
         uint256 _totalIndirectCallsValue
     ) internal {
-        bytes32 destinationChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
-        require(destinationChainBaseTokenAssetId != bytes32(0), DestinationChainNotRegistered(_destinationChainId));
         // We burn the value that is passed along the bundle here, on source chain.
         bytes32 thisChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(block.chainid);
-        if (destinationChainBaseTokenAssetId == thisChainBaseTokenAssetId) {
+        if (_destinationBaseTokenAssetId == thisChainBaseTokenAssetId) {
             require(
                 msg.value == _totalBurnedCallsValue + _totalIndirectCallsValue,
                 MsgValueMismatch(_totalBurnedCallsValue + _totalIndirectCallsValue, msg.value)
@@ -277,7 +276,7 @@ contract InteropCenter is
             if (_totalBurnedCallsValue > 0) {
                 IAssetRouterShared(L2_ASSET_ROUTER_ADDR).bridgehubDepositBaseToken(
                     _destinationChainId,
-                    destinationChainBaseTokenAssetId,
+                    _destinationBaseTokenAssetId,
                     msg.sender,
                     _totalBurnedCallsValue
                 );
@@ -300,10 +299,13 @@ contract InteropCenter is
         require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
 
         // Form an InteropBundle.
+        bytes32 destinationBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
+        require(destinationBaseTokenAssetId != bytes32(0), DestinationChainNotRegistered(_destinationChainId));
         InteropBundle memory bundle = InteropBundle({
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: block.chainid,
             destinationChainId: _destinationChainId,
+            destinationBaseTokenAssetId: destinationBaseTokenAssetId,
             interopBundleSalt: keccak256(abi.encodePacked(msg.sender, interopBundleNonce[msg.sender])),
             calls: new InteropCall[](_callStarters.length),
             bundleAttributes: _bundleAttributes
@@ -329,7 +331,12 @@ contract InteropCenter is
         }
 
         // Ensure that tokens required for bundle execution were received.
-        _ensureCorrectTotalValue(bundle.destinationChainId, totalBurnedCallsValue, totalIndirectCallsValue);
+        _ensureCorrectTotalValue(
+            bundle.destinationChainId,
+            bundle.destinationBaseTokenAssetId,
+            totalBurnedCallsValue,
+            totalIndirectCallsValue
+        );
 
         bytes32 msgHash;
         /// To avoid stack too deep error
@@ -341,11 +348,31 @@ contract InteropCenter is
             bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
         }
 
-        // Emit ERC-7786 MessageSent event for each call in the bundle
-        for (uint256 i = 0; i < callStartersLength; ++i) {
-            InteropCall memory currentCall = bundle.calls[i];
+        _emitMessageSent({
+            _calls: bundle.calls,
+            _destinationChainId: _destinationChainId,
+            _bundleHash: bundleHash,
+            _callStarters: _callStarters,
+            _originalCallAttributes: _originalCallAttributes
+        });
+
+        // Emit event stating that the bundle was sent out successfully.
+        emit InteropBundleSent(msgHash, bundleHash, bundle);
+    }
+
+    /// @notice Emits ERC-7786 MessageSent events for each call in a bundle.
+    function _emitMessageSent(
+        InteropCall[] memory _calls,
+        uint256 _destinationChainId,
+        bytes32 _bundleHash,
+        InteropCallStarterInternal[] memory _callStarters,
+        bytes[][] memory _originalCallAttributes
+    ) internal {
+        uint256 callsLength = _callStarters.length;
+        for (uint256 i = 0; i < callsLength; ++i) {
+            InteropCall memory currentCall = _calls[i];
             emit MessageSent({
-                sendId: keccak256(abi.encodePacked(bundleHash, i)),
+                sendId: keccak256(abi.encodePacked(_bundleHash, i)),
                 sender: InteroperableAddress.formatEvmV1(block.chainid, currentCall.from),
                 recipient: InteroperableAddress.formatEvmV1(_destinationChainId, currentCall.to),
                 payload: _callStarters[i].data,
@@ -353,9 +380,6 @@ contract InteropCenter is
                 attributes: _originalCallAttributes[i]
             });
         }
-
-        // Emit event stating that the bundle was sent out successfully.
-        emit InteropBundleSent(msgHash, bundleHash, bundle);
     }
 
     function _processCallStarter(

@@ -39,5 +39,7 @@ error UnbundlingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes unbund
 error WrongCallStatusLength(uint256 bundleCallsLength, uint256 providedCallStatusLength);
 // 0x4534e972
 error WrongDestinationChainId(bytes32 bundleHash, uint256 expected, uint256 actual);
+// 0xb99d46dc
+error WrongDestinationBaseTokenAssetId(bytes32 bundleHash, bytes32 expected, bytes32 actual);
 // 0x534ab1b2
 error WrongSourceChainId(bytes32 bundleHash, uint256 expected, uint256 actual);

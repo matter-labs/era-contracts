@@ -236,6 +236,7 @@ enum CallStatus {
 /// @dev A set of `InteropCall`s to send to another chain.
 /// @param version Version of the InteropBundle.
 /// @param destinationChainId ChainId of the target chain.
+/// @param destinationBaseTokenAssetId Asset ID of the base token of the target chain.
 /// @param interopBundleSalt Salt of the interopBundle. It's required to ensure that all bundles have distinct hashes.
 ///                          It's equal to the keccak256(abi.encodePacked(senderOfTheBundle, NumberOfBundleSentByTheSender))
 /// @param calls Array of InteropCall structs to execute.
@@ -244,6 +245,7 @@ struct InteropBundle {
     bytes1 version;
     uint256 sourceChainId;
     uint256 destinationChainId;
+    bytes32 destinationBaseTokenAssetId;
     bytes32 interopBundleSalt;
     InteropCall[] calls;
     BundleAttributes bundleAttributes;

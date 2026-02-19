@@ -333,6 +333,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: ERA_CHAIN_ID,
             destinationChainId: 31337,
+            destinationBaseTokenAssetId: keccak256("destinationBaseTokenAssetId"),
             interopBundleSalt: keccak256(abi.encodePacked(depositor, bytes32(0))),
             calls: calls,
             bundleAttributes: BundleAttributes({
