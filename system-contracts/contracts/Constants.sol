@@ -109,8 +109,23 @@ bytes32 constant L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = 0x72abee45b59e344af8a6e5202
 /// @dev The current version of state diff compression being used.
 uint256 constant STATE_DIFF_COMPRESSION_VERSION_NUMBER = 1;
 
-// solhint-disable-next-line no-unused-import
-import {SystemLogKey} from "./SystemLogKey.sol";
+/// @dev Enum used for system logs emitted by the bootloader.
+enum SystemLogKey {
+    L2_TO_L1_LOGS_TREE_ROOT_KEY,
+    PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+    CHAINED_PRIORITY_TXN_HASH_KEY,
+    NUMBER_OF_LAYER_1_TXS_KEY,
+    // Note, that it is important that `PREV_BATCH_HASH_KEY` has position
+    // `4` since it is the same as it was in the previous protocol version and
+    // it is the only one that is emitted before the system contracts are upgraded.
+    PREV_BATCH_HASH_KEY,
+    L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
+    USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY,
+    MESSAGE_ROOT_ROLLING_HASH_KEY,
+    L2_TXS_STATUS_ROLLING_HASH_KEY,
+    SETTLEMENT_LAYER_CHAIN_ID_KEY,
+    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
+}
 
 /// @dev The number of leaves in the L2->L1 log Merkle tree.
 /// While formally a tree of any length is acceptable, the node supports only a constant length of 16384 leaves.

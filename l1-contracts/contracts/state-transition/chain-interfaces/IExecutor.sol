@@ -4,9 +4,8 @@ pragma solidity ^0.8.21;
 
 import {IZKChainBase} from "./IZKChainBase.sol";
 import {L2Log} from "../../common/Messaging.sol";
-import {SystemLogKey} from "system-contracts/contracts/SystemLogKey.sol";
 // solhint-disable-next-line no-unused-import
-import {MAX_NUMBER_OF_BLOBS} from "system-contracts/contracts/Constants.sol";
+import {SystemLogKey, MAX_NUMBER_OF_BLOBS} from "system-contracts/contracts/Constants.sol";
 
 struct LogProcessingOutput {
     uint256 numberOfLayer1Txs;
