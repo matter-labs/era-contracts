@@ -270,7 +270,9 @@ contract InteropCenter is
                 MsgValueMismatch(_totalBurnedCallsValue + _totalIndirectCallsValue, msg.value)
             );
             // slither-disable-next-line arbitrary-send-eth
-            L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalBurnedCallsValue}();
+            if (_totalBurnedCallsValue > 0) {
+                L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalBurnedCallsValue}();
+            }
         } else {
             require(msg.value == _totalIndirectCallsValue, MsgValueMismatch(_totalIndirectCallsValue, msg.value));
             if (_totalBurnedCallsValue > 0) {
