@@ -3,7 +3,8 @@
 pragma solidity ^0.8.20;
 
 import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, L2_INTEROP_CENTER_ADDRESS, L2_INTEROP_HANDLER_ADDRESS, L2_NATIVE_TOKEN_VAULT} from "../Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, L2_INTEROP_CENTER_ADDRESS, L2_INTEROP_HANDLER_ADDRESS} from "../Constants.sol";
+import {L2_NATIVE_TOKEN_VAULT} from "../Contracts.sol";
 import {CallerMustBeBootloader, CallerMustBeEvmContract, CallerMustBeInteropCenterOrNTV, CallerMustBeSystemContract, SystemCallFlagRequired, Unauthorized} from "../SystemContractErrors.sol";
 
 /**
