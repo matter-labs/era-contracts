@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {BytecodeError, LengthIsNotDivisibleBy32, MalformedBytecode} from "../L1ContractErrors.sol";
 
 import {UncheckedMath} from "../libraries/UncheckedMath.sol";
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "./L2ContractAddresses.sol";
+import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "./L2ContractInterfaces.sol";
 import {CREATE2_PREFIX, CREATE_PREFIX} from "system-contracts/contracts/Constants.sol";
 
 /**
