@@ -6,6 +6,7 @@ import {BytecodeError, LengthIsNotDivisibleBy32, MalformedBytecode} from "../L1C
 
 import {UncheckedMath} from "../libraries/UncheckedMath.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "./L2ContractAddresses.sol";
+import {CREATE2_PREFIX, CREATE_PREFIX} from "system-contracts/contracts/Constants.sol";
 
 /**
  * @author Matter Labs
@@ -45,13 +46,6 @@ interface IContractDeployer {
  */
 library L2ContractHelper {
     using UncheckedMath for uint256;
-
-    /// @dev The prefix used to create CREATE2 addresses.
-    bytes32 private constant CREATE2_PREFIX = keccak256("zksyncCreate2");
-
-    /// @dev Prefix used during derivation of account addresses using CREATE
-    /// @dev keccak256("zksyncCreate")
-    bytes32 private constant CREATE_PREFIX = 0x63bae3a9951d38e8a3fbb7b70909afc1200610fc5bc55ade242f815974674f23;
 
     /// @notice Sends L2 -> L1 arbitrary-long message through the system contract messenger.
     /// @param _message Data to be sent to L1.
