@@ -25,7 +25,8 @@ struct BundleExecutionResult {
 abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
     uint256 l1ChainId = 9;
     uint256 destinationChainId = 271;
-    bytes32 destinationBaseTokenAssetId = keccak256(abi.encode(l1ChainId, L2_NATIVE_TOKEN_VAULT_ADDR, ETH_TOKEN_ADDRESS));
+    bytes32 destinationBaseTokenAssetId =
+        keccak256(abi.encode(l1ChainId, L2_NATIVE_TOKEN_VAULT_ADDR, ETH_TOKEN_ADDRESS));
 
     function extractAndExecuteSingleBundle(
         Vm.Log[] memory logs,
