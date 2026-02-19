@@ -17,6 +17,7 @@ import {IL2AssetTracker} from "../../bridge/asset-tracker/IL2AssetTracker.sol";
 import {IGWAssetTracker} from "../../bridge/asset-tracker/IGWAssetTracker.sol";
 import {ISystemContext} from "../interfaces/ISystemContext.sol";
 import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
+// solhint-disable-next-line no-unused-import
 import {SYSTEM_CONTRACTS_OFFSET, MSG_VALUE_SYSTEM_CONTRACT} from "system-contracts/contracts/Constants.sol";
 
 /// @dev the offset for the system hooks for ZKsync OS
