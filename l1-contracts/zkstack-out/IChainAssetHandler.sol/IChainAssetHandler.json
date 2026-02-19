@@ -1,0 +1,20 @@
+[
+  {
+    "type": "function",
+    "name": "setSettlementLayerChainId",
+    "inputs": [
+      {
+        "name": "_previousSettlementLayerChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_currentSettlementLayerChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  }
+]
