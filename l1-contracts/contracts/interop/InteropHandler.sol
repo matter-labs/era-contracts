@@ -180,6 +180,8 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         bytes memory _bundle,
         CallStatus[] calldata _providedCallStatus
     ) public {
+        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
+
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
             _bundle,
