@@ -656,6 +656,10 @@ object "Bootloader" {
                 ret := 0x000000000000000000000000000000000000800e
             }
 
+            function CODE_ORACLE_ADDR() -> ret {
+                ret := 0x0000000000000000000000000000000000008012
+            }
+
             function MAX_SYSTEM_CONTRACT_ADDR() -> ret {
                 ret := 0x000000000000000000000000000000000000ffff
             }
@@ -2103,58 +2107,18 @@ object "Bootloader" {
 
                 let value := getValue(innerTxDataOffset)
 
-                let isEvmDeployment := false
-                if eq(to, 0x0) {
-                    if eq(getReserved1(innerTxDataOffset), 1) {
-                        isEvmDeployment := true
-                    }
-                }
-
-                let actualTo := to
-                if isEvmDeployment {
-                    let nonce := getNonce(innerTxDataOffset)
-
-                    let nonceBumpDataPtr := 0
-                    mstore(nonceBumpDataPtr, 36)
-                    mstore(add(nonceBumpDataPtr, 32), shl(224, {{INCREMENT_MIN_NONCE_IF_EQUALS_SELECTOR}}))
-                    mstore(add(nonceBumpDataPtr, 36), nonce)
-
-                    let nonceBumpSuccess := mimicCallOnlyResult(
-                        NONCE_HOLDER_ADDR(),
-                        from,
-                        nonceBumpDataPtr,
-                        0,
-                        1,
-                        0,
-                        0,
-                        0
-                    )
-                    if iszero(nonceBumpSuccess) {
-                        revertWithReason(
-                            ETH_CALL_ERR_CODE(),
-                            1
-                        )
-                    }
-
-                    // `createEVM(bytes)` call encoding:
-                    // [selector (4)][offset (32)][length (32)][initCode (N)].
-                    // We place metadata right before the existing initCode bytes, so copying is not needed.
-                    let initCodeLength := mload(dataPtr)
-                    let createEvmCallDataPtr := safeSub(dataPtr, 68, "ev1")
-                    mstore(createEvmCallDataPtr, safeAdd(initCodeLength, 68, "ev2"))
-                    mstore(add(createEvmCallDataPtr, 32), shl(224, {{CREATE_EVM_SELECTOR}}))
-                    mstore(add(createEvmCallDataPtr, 36), 32)
-                    mstore(add(createEvmCallDataPtr, 68), initCodeLength)
-
-                    dataPtr := createEvmCallDataPtr
-                    actualTo := CONTRACT_DEPLOYER_ADDR()
-                }
+                let isEvmDeployment, actualTo, actualDataPtr := prepareEthCallForEvmDeployment(
+                    to,
+                    from,
+                    innerTxDataOffset,
+                    dataPtr
+                )
 
                 let success := msgValueSimulatorMimicCall(
                     actualTo,
                     from,
                     value,
-                    dataPtr
+                    actualDataPtr
                 )
 
                 if iszero(success) {
@@ -2182,11 +2146,146 @@ object "Bootloader" {
 
                 // Store results of the call in the memory.
                 if success {
+                    if isEvmDeployment {
+                        returnEvmDeploymentBytecode()
+                    }
+
                     let returnsize := returndatasize()
                     returndatacopy(0,0,returnsize)
                     return(0,returnsize)
                 }
 
+            }
+
+            function isEvmDeploymentEthCall(to, innerTxDataOffset) -> ret {
+                ret := and(
+                    eq(to, 0),
+                    eq(getReserved1(innerTxDataOffset), 1)
+                )
+            }
+
+            function bumpNonceForEvmDeployment(from, innerTxDataOffset) {
+                let nonce := getNonce(innerTxDataOffset)
+
+                let nonceBumpDataPtr := 0
+                mstore(nonceBumpDataPtr, 36)
+                mstore(add(nonceBumpDataPtr, 32), shl(224, {{INCREMENT_MIN_NONCE_IF_EQUALS_SELECTOR}}))
+                mstore(add(nonceBumpDataPtr, 36), nonce)
+
+                let nonceBumpSuccess := mimicCallOnlyResult(
+                    NONCE_HOLDER_ADDR(),
+                    from,
+                    nonceBumpDataPtr,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0
+                )
+                if iszero(nonceBumpSuccess) {
+                    revertWithReason(
+                        ETH_CALL_ERR_CODE(),
+                        1
+                    )
+                }
+            }
+
+            function encodeCreateEvmCalldata(dataPtr) -> ret {
+                // `createEVM(bytes)` call encoding:
+                // [selector (4)][offset (32)][length (32)][initCode (N)].
+                // We place metadata right before the existing initCode bytes, so copying is not needed.
+                let initCodeLength := mload(dataPtr)
+                ret := safeSub(dataPtr, 68, "ev1")
+                mstore(ret, safeAdd(initCodeLength, 68, "ev2"))
+                mstore(add(ret, 32), shl(224, {{CREATE_EVM_SELECTOR}}))
+                mstore(add(ret, 36), 32)
+                mstore(add(ret, 68), initCodeLength)
+            }
+
+            function prepareEthCallForEvmDeployment(
+                to,
+                from,
+                innerTxDataOffset,
+                dataPtr
+            ) -> isEvmDeployment, actualTo, actualDataPtr {
+                actualTo := to
+                actualDataPtr := dataPtr
+                isEvmDeployment := isEvmDeploymentEthCall(to, innerTxDataOffset)
+
+                if isEvmDeployment {
+                    bumpNonceForEvmDeployment(from, innerTxDataOffset)
+                    actualDataPtr := encodeCreateEvmCalldata(dataPtr)
+                    actualTo := CONTRACT_DEPLOYER_ADDR()
+                }
+            }
+
+            function getCreateEvmDeployedAddressFromReturndata() -> deployedAddress {
+                let createEvmReturndataSize := returndatasize()
+                // createEVM returns (uint256,address), i.e. exactly 64 bytes.
+                if iszero(eq(createEvmReturndataSize, 64)) {
+                    revertWithReason(
+                        ETH_CALL_ERR_CODE(),
+                        1
+                    )
+                }
+
+                returndatacopy(0, 0, 64)
+                deployedAddress := and(mload(32), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+            }
+
+            function getVersionedCodeHashByAddress(addr) -> versionedCodeHash {
+                mstore(0, {{RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR}})
+                mstore(4, addr)
+                let getRawCodeHashSuccess := staticcall(
+                    gas(),
+                    ACCOUNT_CODE_STORAGE_ADDR(),
+                    0,
+                    36,
+                    0,
+                    32
+                )
+                if iszero(getRawCodeHashSuccess) {
+                    revertWithReason(
+                        ETH_CALL_ERR_CODE(),
+                        1
+                    )
+                }
+
+                versionedCodeHash := mload(0)
+            }
+
+            function fetchBytecodeByVersionedHash(versionedCodeHash) -> retSize {
+                // CodeOracle expects exactly one word of calldata: versioned code hash.
+                mstore(0, versionedCodeHash)
+                let codeOracleSuccess := staticcall(
+                    gas(),
+                    CODE_ORACLE_ADDR(),
+                    0,
+                    32,
+                    0,
+                    0
+                )
+                if iszero(codeOracleSuccess) {
+                    revertWithReason(
+                        ETH_CALL_ERR_CODE(),
+                        1
+                    )
+                }
+
+                retSize := returndatasize()
+            }
+
+            function returnEvmDeploymentBytecode() {
+                let deployedAddress := getCreateEvmDeployedAddressFromReturndata()
+                let versionedCodeHash := getVersionedCodeHashByAddress(deployedAddress)
+                let deployedBytecodeSize := fetchBytecodeByVersionedHash(versionedCodeHash)
+                let runtimeBytecodeSize := extcodesize(deployedAddress)
+                if gt(deployedBytecodeSize, runtimeBytecodeSize) {
+                    deployedBytecodeSize := runtimeBytecodeSize
+                }
+
+                returndatacopy(0, 0, deployedBytecodeSize)
+                return(0, deployedBytecodeSize)
             }
             <!-- @endif -->
 
