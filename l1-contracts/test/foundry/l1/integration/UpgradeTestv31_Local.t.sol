@@ -18,7 +18,7 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {UpgradeIntegrationTestBase} from "./UpgradeTestShared.t.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "contracts/core/message-root/IMessageRoot.sol";
+import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "contracts/core/message-root/IMessageRoot.sol";
 
 /// @notice Test-only CTM upgrade that mocks large bytecode reads to avoid MemoryOOG
 contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
@@ -132,7 +132,7 @@ contract UpgradeIntegrationTest_Local is
         // v31UpgradeChainBatchNumber is at slot 50 in L1MessageRoot
         // Storage layout: Initializable(0), MessageRootBase vars(1-12), __gap[37](13-49), v31UpgradeChainBatchNumber(50)
         bytes32 v31MappingSlot = keccak256(abi.encode(eraZKChainId, uint256(50)));
-        vm.store(messageRoot, v31MappingSlot, bytes32(V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1));
+        vm.store(messageRoot, v31MappingSlot, bytes32(V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE));
     }
 
     function setUp() public {

@@ -520,15 +520,17 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         {
             address l2Sender = _finalizeWithdrawalParams.l2Sender;
             bool baseTokenWithdrawal = (assetId == BRIDGE_HUB.baseTokenAssetId(_finalizeWithdrawalParams.chainId));
-
-            bool isL2SenderCorrect = l2Sender == L2_ASSET_ROUTER_ADDR ||
-                l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR ||
-                l2Sender == __DEPRECATED_l2BridgeAddress[_finalizeWithdrawalParams.chainId];
-            require(isL2SenderCorrect, WrongL2Sender(l2Sender));
+            if (baseTokenWithdrawal) {
+                require(l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, WrongL2Sender(l2Sender));
+            } else {
+                bool isL2SenderCorrect = l2Sender == L2_ASSET_ROUTER_ADDR ||
+                    l2Sender == __DEPRECATED_l2BridgeAddress[_finalizeWithdrawalParams.chainId];
+                require(isL2SenderCorrect, WrongL2Sender(l2Sender));
+            }
 
             l2ToL1Message = L2Message({
                 txNumberInBatch: _finalizeWithdrawalParams.l2TxNumberInBatch,
-                sender: baseTokenWithdrawal ? L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR : l2Sender,
+                sender: l2Sender,
                 data: _finalizeWithdrawalParams.message
             });
         }
@@ -571,6 +573,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _l2ToL1message The encoded L2 -> L1 message.
     /// @return assetId The ID of the bridged asset.
     /// @return transferData The transfer data used to finalize withdrawal.
+    /// @dev The `transferData` is expected to be encoded using `DataEncoding.encodeBridgeMintData`.
+    /// Note, that the `_originalCaller`, `_originToken` and `_erc20Metadata` fields in the encoded `transferData` could be empty,
+    /// so they should not be relied upon.
     function _parseL2WithdrawalMessage(
         uint256 _chainId,
         bytes memory _l2ToL1message
@@ -773,11 +778,22 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             chainId: _chainId,
             l2BatchNumber: _l2BatchNumber,
             l2MessageIndex: _l2MessageIndex,
-            l2Sender: legacyL2Bridge,
+            l2Sender: _resolveLegacyL2Sender(_message, legacyL2Bridge),
             l2TxNumberInBatch: _l2TxNumberInBatch,
             message: _message,
             merkleProof: _merkleProof
         });
         finalizeDeposit(finalizeWithdrawalParams);
+    }
+
+    /// @dev Determines the correct L2 sender for legacy withdrawal messages.
+    /// Base token withdrawals originate from L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    /// while other withdrawals come from the legacy L2 bridge.
+    function _resolveLegacyL2Sender(bytes calldata _message, address _legacyL2Bridge) internal pure returns (address) {
+        bytes4 selector = DataEncoding.getSelector(_message);
+        if (selector == IMailboxLegacy.finalizeEthWithdrawal.selector) {
+            return L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
+        }
+        return _legacyL2Bridge;
     }
 }

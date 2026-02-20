@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 import {MessageVerification} from "./DummyMessageVerification.sol";
 import {MessageHashing, ProofData} from "./libraries/MessageHashing.sol";
-import {L2_INTEROP_ROOT_STORAGE} from "../Constants.sol";
+import {L2_INTEROP_ROOT_STORAGE} from "../Contracts.sol";
 
 contract DummyL2MessageVerification is MessageVerification {
     function _proveL2LeafInclusion(
