@@ -12,10 +12,8 @@ use crate::config::{
             input::{DeployL1Config, InitialDeploymentConfig},
             output::DeployL1CoreContractsOutput,
         },
-        permanent_values::PermanentValuesConfig,
         script_params::DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS,
     },
-    traits::SaveConfig,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -136,13 +134,6 @@ pub fn deploy(ctx: &mut ForgeContext, input: &DeployInput) -> anyhow::Result<Dep
     if let Some(salt) = input.create2_factory_salt {
         initial_config.create2_factory_salt = salt;
     }
-
-    // Update permanent-values.toml so Forge scripts use the correct factory
-    let permanent_values = PermanentValuesConfig::new(
-        initial_config.create2_factory_addr,
-        initial_config.create2_factory_salt,
-    );
-    permanent_values.save(ctx.shell, PermanentValuesConfig::path(ctx.foundry_scripts_path))?;
 
     let deploy_config = DeployL1Config::new(
         input.owner,

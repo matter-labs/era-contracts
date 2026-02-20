@@ -17,7 +17,6 @@ use crate::common::{
 };
 use crate::config::{
     forge_interface::{
-        permanent_values::PermanentValuesConfig,
         register_chain::{
             input::{NewChainParams, RegisterChainL1Config},
             output::RegisterChainOutput,
@@ -158,11 +157,6 @@ pub fn register_chain(
     ctx: &mut ForgeContext,
     input: &ChainInitInput,
 ) -> anyhow::Result<RegisterChainOutput> {
-    // Update permanent-values.toml so Forge scripts use the correct factory
-    let salt = input.create2_factory_salt.unwrap_or(H256::zero());
-    let permanent_values = PermanentValuesConfig::new(input.create2_factory_addr, salt);
-    permanent_values.save(ctx.shell, PermanentValuesConfig::path(ctx.foundry_scripts_path))?;
-
     let deploy_config = RegisterChainL1Config::new(
         &input.chain_params,
         input.create2_factory_addr.unwrap_or(Address::zero()),
