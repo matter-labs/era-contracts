@@ -789,10 +789,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Determines the correct L2 sender for legacy withdrawal messages.
     /// Base token withdrawals originate from L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     /// while other withdrawals come from the legacy L2 bridge.
-    function _resolveLegacyL2Sender(
-        bytes calldata _message,
-        address _legacyL2Bridge
-    ) internal view returns (address) {
+    function _resolveLegacyL2Sender(bytes calldata _message, address _legacyL2Bridge) internal pure returns (address) {
         bytes4 selector = DataEncoding.getSelector(_message);
         if (selector == IMailboxLegacy.finalizeEthWithdrawal.selector) {
             return L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
