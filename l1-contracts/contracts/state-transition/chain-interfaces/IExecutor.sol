@@ -4,7 +4,8 @@ pragma solidity ^0.8.21;
 
 import {IZKChainBase} from "./IZKChainBase.sol";
 import {L2Log} from "../../common/Messaging.sol";
-import {SystemLogKey} from "system-contracts/contracts/SystemLogKey.sol";
+// solhint-disable-next-line no-unused-import
+import {SystemLogKey, MAX_NUMBER_OF_BLOBS} from "system-contracts/contracts/Constants.sol";
 
 struct LogProcessingOutput {
     uint256 numberOfLayer1Txs;
@@ -62,9 +63,6 @@ uint256 constant L2_LOG_KEY_OFFSET = 24;
 
 /// @dev Offset used to pull Value From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch) + 20 (bytes for address) + 32 (bytes for key)
 uint256 constant L2_LOG_VALUE_OFFSET = 56;
-
-/// @dev Max number of blobs currently supported
-uint256 constant MAX_NUMBER_OF_BLOBS = 6;
 
 /// @dev The number of blobs that must be present in the commitment to a batch.
 /// It represents the maximal number of blobs that circuits can support and can be larger

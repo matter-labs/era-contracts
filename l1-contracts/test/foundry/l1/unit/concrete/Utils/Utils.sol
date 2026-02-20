@@ -18,7 +18,7 @@ import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrat
 import {FeeParams, IVerifier, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IExecutor, SystemLogKey, MAX_NUMBER_OF_BLOBS, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {InteropRoot, L2CanonicalTransaction, L2Log} from "contracts/common/Messaging.sol";
 
@@ -37,9 +37,6 @@ address constant L2_TO_L1_MESSENGER = 0x0000000000000000000000000000000000008008
 L2DACommitmentScheme constant L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.PUBDATA_KECCAK256;
 // Owner of the RollupDAManager in tests
 address constant TEST_ROLLUP_DA_MANAGER_OWNER = address(0x1234567890DEADBEEF);
-
-uint256 constant MAX_NUMBER_OF_BLOBS = 6;
-uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
 
 uint256 constant EVENT_INDEX = 0;
 

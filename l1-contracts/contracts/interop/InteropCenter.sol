@@ -8,7 +8,6 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IInteropCenter} from "./IInteropCenter.sol";
 
@@ -17,7 +16,7 @@ import {GW_ASSET_TRACKER, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_INTEROP_ATTRIBUTES} from "../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {BUNDLE_IDENTIFIER, BalanceChange, BundleAttributes, CallAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal} from "../common/Messaging.sol";
-import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
+import {MsgValueMismatch, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
 import {AttributeAlreadySet, AttributeViolatesRestriction, DestinationChainNotRegistered, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty, FeeWithdrawalFailed, ZKTokenNotAvailable} from "./InteropErrors.sol";
@@ -53,9 +52,6 @@ contract InteropCenter is
     /// L1 that is at the most base layer.
     uint256 public L1_CHAIN_ID;
 
-    /// @notice The asset ID of ETH on L1.
-    bytes32 internal ETH_TOKEN_ASSET_ID;
-
     /// @notice This mapping stores a number of interop bundles sent by an individual sender.
     ///         It's being used to derive interopBundleSalt in InteropBundle struct, whose role
     ///         is to ensure that each bundle has a unique hash.
@@ -86,16 +82,6 @@ contract InteropCenter is
     /// @dev Coinbase addresses can claim their accumulated fees via claimZKFees().
     mapping(address coinbase => uint256 amount) public accumulatedZKFees;
 
-    modifier onlyL1() {
-        require(L1_CHAIN_ID == block.chainid, NotL1(L1_CHAIN_ID, block.chainid));
-        _;
-    }
-
-    modifier onlyL2ToL2(uint256 _destinationChainId) {
-        _ensureL2ToL2(_destinationChainId);
-        _;
-    }
-
     modifier onlySettlementLayerRelayedSender() {
         require(msg.sender == SETTLEMENT_LAYER_RELAY_SENDER, Unauthorized(msg.sender));
         _;
@@ -104,8 +90,6 @@ contract InteropCenter is
     /// @dev Only allows calls from the complex upgrader contract on L2.
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
         _;
     }
 
@@ -171,17 +155,14 @@ contract InteropCenter is
     /*//////////////////////////////////////////////////////////////
                     InteropCenter entry points
     //////////////////////////////////////////////////////////////*/
-
     /// @notice Sends a single ERC-7786 message to another chain.
     /// @param recipient ERC-7930 address corresponding to the destination of a message. It must be corresponding to an EIP-155 chain.
     /// @param payload Payload to send.
-    /// @param attributes Attributes of the call.
-    /// @return sendId Hash of the sent bundle containing a single call.
     function sendMessage(
         bytes calldata recipient,
         bytes calldata payload,
         bytes[] calldata attributes
-    ) external payable whenNotPaused returns (bytes32 sendId) {
+    ) external payable whenNotPaused nonReentrant returns (bytes32 sendId) {
         (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(recipient);
 
         _ensureL2ToL2(recipientChainId);
@@ -228,7 +209,7 @@ contract InteropCenter is
         bytes calldata _destinationChainId,
         InteropCallStarter[] calldata _callStarters,
         bytes[] calldata _bundleAttributes
-    ) external payable whenNotPaused returns (bytes32 bundleHash) {
+    ) external payable whenNotPaused nonReentrant returns (bytes32 bundleHash) {
         // Validate that the destination chain ERC-7930 address has an empty address field.
         _ensureEmptyAddress(_destinationChainId);
 
@@ -345,15 +326,20 @@ contract InteropCenter is
         bool _useFixedFee,
         uint256 _callCount
     ) internal {
+        // Note, that non-zero `destinationChainBaseTokenAssetId` does not mean that the destination chain
+        // actually settles on the GW or is able to receive the message.
+        // However, this value is provided from L1 by chain asset handler, so it can be trusted to be correct.
         bytes32 destinationChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
         require(destinationChainBaseTokenAssetId != bytes32(0), DestinationChainNotRegistered(_destinationChainId));
-        // We burn the value that is passed along the bundle here, on source chain.
         bytes32 thisChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(block.chainid);
 
         // Calculate protocol fee - only charge base token fee if not using fixed ZK fees.
         // Fee is charged per-call.
         uint256 protocolFee = _useFixedFee ? 0 : interopProtocolFee * _callCount;
 
+        require(thisChainBaseTokenAssetId != bytes32(0), ThisChainNotRegisteredForInterop(block.chainid));
+
+        // We burn the value that is passed along the bundle here, on source chain.
         if (destinationChainBaseTokenAssetId == thisChainBaseTokenAssetId) {
             uint256 expectedValue = _totalBurnedCallsValue + _totalIndirectCallsValue + protocolFee;
             require(msg.value == expectedValue, MsgValueMismatch(expectedValue, msg.value));
@@ -536,9 +522,11 @@ contract InteropCenter is
         uint64 _expirationTimestamp,
         BalanceChange memory _balanceChange
     ) external override onlySettlementLayerRelayedSender {
-        if (L1_CHAIN_ID == block.chainid) {
-            revert NotInGatewayMode();
+        address zkChain = L2_BRIDGEHUB.getZKChain(_chainId);
+        if (zkChain == address(0)) {
+            revert DestinationChainNotRegistered(_chainId);
         }
+
         _balanceChange.baseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_chainId);
         GW_ASSET_TRACKER.handleChainBalanceIncreaseOnGateway({
             _chainId: _chainId,
@@ -546,7 +534,6 @@ contract InteropCenter is
             _balanceChange: _balanceChange
         });
 
-        address zkChain = L2_BRIDGEHUB.getZKChain(_chainId);
         IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     }
 
