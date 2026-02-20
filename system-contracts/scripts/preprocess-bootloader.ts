@@ -120,7 +120,7 @@ const params = {
   ),
   RIGHT_PADDED_PUBLISH_TIMESTAMP_DATA_TO_L1_SELECTOR: getPaddedSelector("SystemContext", "publishTimestampDataToL1"),
   RIGHT_PADDED_SET_L2_INTEROP_ROOT_SELECTOR: getPaddedSelector("L2InteropRootStorage", "addInteropRoot"),
-  RIGHT_PADDED_SET_INTEROP_FEE_SELECTOR: getPaddedSelector("InteropCenter", "setInteropFee"),
+  RIGHT_PADDED_SET_INTEROP_FEE_SELECTOR: getPaddedSelector("IInteropCenter", "setInteropFee"),
   COMPRESSED_BYTECODES_SLOTS: 196608,
   ENSURE_RETURNED_MAGIC: 1,
   FORBID_ZERO_GAS_PER_PUBDATA: 1,
