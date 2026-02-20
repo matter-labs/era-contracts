@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 // solhint-disable-next-line no-unused-import
-import {SYSTEM_CONTRACTS_OFFSET, MSG_VALUE_SYSTEM_CONTRACT} from "system-contracts/contracts/Constants.sol";
+import {SYSTEM_CONTRACTS_OFFSET} from "system-contracts/contracts/Constants.sol";
 
 /// @dev the offset for the system hooks for ZKsync OS
 uint160 constant SYSTEM_HOOKS_OFFSET = 0x7000;
@@ -53,7 +53,7 @@ address constant L2_FORCE_DEPLOYER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x07
 address constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x08);
 
 /// @dev the address of the msg value system contract
-// address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x09);
+address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x09);
 
 /// @dev The address of the eth token system contract
 address constant L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x0a);
