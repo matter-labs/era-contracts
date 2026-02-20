@@ -67,7 +67,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
     }
 
     function governanceRegisterGateway() public {
-        Call[] memory calls = _getRegisterSettlementLayerCalls();
+        Call[] memory calls = _getSetSettlementLayerCalls();
         Utils.executeCalls(L1Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner(), bytes32(0), 0, calls);
     }
 

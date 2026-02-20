@@ -22,7 +22,6 @@ import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IRollupDAManager} from "../interfaces/IRollupDAManager.sol";
-import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
 import {L2LegacySharedBridgeTestHelper} from "../dev/L2LegacySharedBridgeTestHelper.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
@@ -35,7 +34,7 @@ import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
@@ -48,6 +47,8 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
+import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
@@ -103,6 +104,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function getConfig() public view returns (Config memory) {
         return config;
+    }
+
+    /// @notice Returns the address to use as the deployer/owner for contracts.
+    function getDeployerAddress() public view returns (address) {
+        return tx.origin;
     }
 
     function runInner(
@@ -166,6 +172,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         (, ctmAddresses.stateTransition.proxies.validatorTimelock) = deployTuppWithContract("ValidatorTimelock", false);
 
         (
+            ctmAddresses.stateTransition.implementations.permissionlessValidator,
+            ctmAddresses.stateTransition.proxies.permissionlessValidator
+        ) = deployTuppWithContract("PermissionlessValidator", false);
+
+        (
             ctmAddresses.stateTransition.implementations.serverNotifier,
             ctmAddresses.stateTransition.proxies.serverNotifier
         ) = deployServerNotifier();
@@ -178,6 +189,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.stateTransition.implementations.chainTypeManager,
             ctmAddresses.stateTransition.proxies.chainTypeManager
         ) = deployTuppWithContract(ctmContractName, false);
+
         setChainTypeManagerInServerNotifier();
 
         updateOwners();
@@ -218,7 +230,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         if (config.isZKsyncOS) {
             // We add the verifier to the default execution version
-            vm.startBroadcast(msg.sender);
+            // Use getDeployerAddress() to ensure the correct sender even when called from nested contracts
+            vm.startBroadcast(getDeployerAddress());
             ZKsyncOSDualVerifier(ctmAddresses.stateTransition.verifiers.verifier).addVerifier(
                 DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
                 IVerifierV2(ctmAddresses.stateTransition.verifiers.verifierFflonk),
@@ -233,7 +246,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function setChainTypeManagerInServerNotifier() internal {
         ServerNotifier serverNotifier = ServerNotifier(ctmAddresses.stateTransition.proxies.serverNotifier);
-        vm.broadcast(msg.sender);
+        vm.broadcast(getDeployerAddress());
         serverNotifier.setChainTypeManager(IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager));
         console.log("ChainTypeManager set in ServerNotifier");
     }
@@ -243,7 +256,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function deployDAValidators() internal {
-        ctmAddresses.daAddresses.rollupDAManager = deployWithCreate2AndOwner("RollupDAManager", msg.sender, false);
+        ctmAddresses.daAddresses.rollupDAManager = deployWithCreate2AndOwner(
+            "RollupDAManager",
+            getDeployerAddress(),
+            false
+        );
         updateRollupDAManager();
 
         // This contract is located in the `da-contracts` folder, we output it the same way for consistency/ease of use.
@@ -263,7 +280,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         } else {
             ctmAddresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
         }
-        vm.startBroadcast(msg.sender);
+        vm.startBroadcast(getDeployerAddress());
         IRollupDAManager rollupDAManager = IRollupDAManager(ctmAddresses.daAddresses.rollupDAManager);
         rollupDAManager.updateDAPair(
             ctmAddresses.daAddresses.l1RollupDAValidator,
@@ -282,9 +299,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function updateRollupDAManager() internal virtual {
         IOwnable rollupDAManager = IOwnable(ctmAddresses.daAddresses.rollupDAManager);
-        if (rollupDAManager.owner() != address(msg.sender)) {
-            if (rollupDAManager.pendingOwner() == address(msg.sender)) {
-                vm.broadcast(msg.sender);
+        address deployer = getDeployerAddress();
+        if (rollupDAManager.owner() != deployer) {
+            if (rollupDAManager.pendingOwner() == deployer) {
+                vm.broadcast(deployer);
                 rollupDAManager.acceptOwnership();
             } else {
                 require(rollupDAManager.owner() == config.ownerAddress, "Ownership was not set correctly");
@@ -293,7 +311,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function updateOwners() internal {
-        vm.startBroadcast(msg.sender);
+        vm.startBroadcast(getDeployerAddress());
 
         ValidatorTimelock validatorTimelock = ValidatorTimelock(ctmAddresses.stateTransition.proxies.validatorTimelock);
         validatorTimelock.transferOwnership(config.ownerAddress);
@@ -534,20 +552,23 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function saveDiamondSelectors() public {
-        AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)), false);
+        AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)));
         GettersFacet gettersFacet = new GettersFacet();
         MailboxFacet mailboxFacet = new MailboxFacet(
-            1,
             1,
             coreAddresses.bridgehub.proxies.chainAssetHandler,
             IEIP7702Checker(address(0)),
             false
         );
         ExecutorFacet executorFacet = new ExecutorFacet(1);
+        MigratorFacet migratorFacet = new MigratorFacet(1, false);
+        CommitterFacet committerFacet = new CommitterFacet(1);
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);
         bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);
         bytes4[] memory mailboxFacetSelectors = Utils.getAllSelectors(address(mailboxFacet).code);
         bytes4[] memory executorFacetSelectors = Utils.getAllSelectors(address(executorFacet).code);
+        bytes4[] memory migratorFacetSelectors = Utils.getAllSelectors(address(migratorFacet).code);
+        bytes4[] memory committerFacetSelectors = Utils.getAllSelectors(address(committerFacet).code);
 
         string memory root = vm.projectRoot();
         string memory outputPath = string.concat(root, "/script-out/diamond-selectors.toml");
@@ -556,14 +577,18 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         bytes memory gettersFacetSelectorsBytes = abi.encode(gettersFacetSelectors);
         bytes memory mailboxFacetSelectorsBytes = abi.encode(mailboxFacetSelectors);
         bytes memory executorFacetSelectorsBytes = abi.encode(executorFacetSelectors);
+        bytes memory migratorFacetSelectorsBytes = abi.encode(migratorFacetSelectors);
+        bytes memory committerFacetSelectorsBytes = abi.encode(committerFacetSelectors);
 
         vm.serializeBytes("diamond_selectors", "admin_facet_selectors", adminFacetSelectorsBytes);
         vm.serializeBytes("diamond_selectors", "getters_facet_selectors", gettersFacetSelectorsBytes);
         vm.serializeBytes("diamond_selectors", "mailbox_facet_selectors", mailboxFacetSelectorsBytes);
+        vm.serializeBytes("diamond_selectors", "executor_facet_selectors", executorFacetSelectorsBytes);
+        vm.serializeBytes("diamond_selectors", "migrator_facet_selectors", migratorFacetSelectorsBytes);
         string memory toml = vm.serializeBytes(
             "diamond_selectors",
-            "executor_facet_selectors",
-            executorFacetSelectorsBytes
+            "committer_facet_selectors",
+            committerFacetSelectorsBytes
         );
 
         vm.writeToml(toml, outputPath);

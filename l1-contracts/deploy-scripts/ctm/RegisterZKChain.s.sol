@@ -12,8 +12,8 @@ import {IChainRegistrationSender} from "contracts/core/chain-registration/IChain
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {IValidatorTimelock} from "contracts/state-transition/IValidatorTimelock.sol";
+import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
+import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
@@ -49,6 +49,11 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
     using stdToml for string;
 
     bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewZKChain(uint256,address)");
+
+    /// @notice Returns the address to use as the deployer/owner for contracts.
+    function getDeployerAddress() public view returns (address) {
+        return tx.origin;
+    }
 
     struct LegacySharedBridgeParams {
         bytes implementationConstructorParams;
@@ -123,7 +128,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         // Grab config from output of l1 deployment
         string memory toml = vm.readFile(path);
 
-        config.deployerAddress = msg.sender;
+        config.deployerAddress = getDeployerAddress();
 
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
@@ -363,7 +368,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
                     ctmAddresses.stateTransition.proxies.chainTypeManager,
                     config.baseTokenAssetId,
                     config.bridgehubCreateNewChainSalt,
-                    msg.sender,
+                    getDeployerAddress(),
                     abi.encode(config.diamondCutData, config.forceDeploymentsData),
                     getFactoryDeps()
                 )
@@ -386,7 +391,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(ctmAddresses.stateTransition.proxies.validatorTimelock);
         address chainAddress = IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).getZKChain(config.chainChainId);
 
-        vm.startBroadcast(msg.sender);
+        vm.startBroadcast(getDeployerAddress());
 
         // Add committer role to the first two addresses (commit operators)
 
@@ -454,7 +459,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
     function configureZkSyncStateTransition() internal {
         IZKChain zkChain = IZKChain(output.diamondProxy);
 
-        vm.startBroadcast(msg.sender);
+        vm.startBroadcast(getDeployerAddress());
         zkChain.setTokenMultiplier(
             config.baseTokenGasPriceMultiplierNominator,
             config.baseTokenGasPriceMultiplierDenominator
@@ -471,7 +476,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
     function setPendingAdmin() internal {
         IZKChain zkChain = IZKChain(output.diamondProxy);
 
-        vm.startBroadcast(msg.sender);
+        vm.startBroadcast(getDeployerAddress());
         zkChain.setPendingAdmin(output.chainAdmin);
         vm.stopBroadcast();
         console.log("Owner for ", output.diamondProxy, "set to", output.chainAdmin);
@@ -519,7 +524,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         });
     }
 
-    function getFactoryDeps() internal view returns (bytes[] memory) {
+    function getFactoryDeps() internal pure returns (bytes[] memory) {
         bytes[] memory factoryDeps = new bytes[](0);
         return factoryDeps;
     }

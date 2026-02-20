@@ -15,7 +15,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "../utils/Utils.sol";
 
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -59,21 +59,21 @@ abstract contract GatewayGovernanceUtils is Script {
         _gatewayGovernanceConfig = config;
     }
 
-    function _getRegisterSettlementLayerCalls() internal view returns (Call[] memory calls) {
+    function _getSetSettlementLayerCalls() internal view returns (Call[] memory calls) {
         calls = new Call[](1);
         calls[0] = Call({
             target: _gatewayGovernanceConfig.bridgehubProxy,
             value: 0,
-            data: abi.encodeCall(IL1Bridgehub.registerSettlementLayer, (_gatewayGovernanceConfig.gatewayChainId, true))
+            data: abi.encodeCall(IL1Bridgehub.setSettlementLayerStatus, (_gatewayGovernanceConfig.gatewayChainId, true))
         });
     }
 
     function _prepareGatewayGovernanceCalls(
         PrepareGatewayGovernanceCalls memory prepareGWGovCallsStruct
-    ) internal returns (Call[] memory calls) {
+    ) internal view returns (Call[] memory calls) {
         {
             if (prepareGWGovCallsStruct._ctmRepresentativeChainId == _gatewayGovernanceConfig.gatewayChainId) {
-                calls = _getRegisterSettlementLayerCalls();
+                calls = _getSetSettlementLayerCalls();
             }
         }
 

@@ -3,11 +3,8 @@
 pragma solidity 0.8.28;
 
 import {ChainTypeManagerBase} from "./ChainTypeManagerBase.sol";
-import {Diamond} from "./libraries/Diamond.sol";
 import {ChainCreationParams} from "./IChainTypeManager.sol";
-import {GenesisIndexStorageZero, MigrationsNotPaused, GenesisBatchCommitmentZero, GenesisBatchHashZero, GenesisUpgradeZero} from "../common/L1ContractErrors.sol";
-import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
-import {IChainAssetHandler} from "../core/chain-asset-handler/IChainAssetHandler.sol";
+import {GenesisIndexStorageZero, GenesisBatchCommitmentZero, GenesisBatchHashZero, GenesisUpgradeZero} from "../common/L1ContractErrors.sol";
 
 /// @title Era Chain Type Manager contract
 /// @author Matter Labs
@@ -17,8 +14,9 @@ contract EraChainTypeManager is ChainTypeManagerBase {
     constructor(
         address _bridgehub,
         address _interopCenter,
-        address _l1BytecodesSupplier
-    ) ChainTypeManagerBase(_bridgehub, _interopCenter, _l1BytecodesSupplier) {}
+        address _l1BytecodesSupplier,
+        address _permissionlessValidator
+    ) ChainTypeManagerBase(_bridgehub, _interopCenter, _l1BytecodesSupplier, _permissionlessValidator) {}
 
     /// @notice Updates the parameters with which a new chain is created
     /// @param _chainCreationParams The new chain creation parameters
@@ -33,25 +31,6 @@ contract EraChainTypeManager is ChainTypeManagerBase {
 
         // Process the validated parameters
         _processValidatedChainCreationParams(_chainCreationParams);
-    }
-
-    /// @dev set New Version with upgrade from old version
-    /// @param _cutData the new diamond cut data
-    /// @param _oldProtocolVersion the old protocol version
-    /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
-    /// @param _newProtocolVersion the new protocol version
-    function setNewVersionUpgrade(
-        Diamond.DiamondCutData calldata _cutData,
-        uint256 _oldProtocolVersion,
-        uint256 _oldProtocolVersionDeadline,
-        uint256 _newProtocolVersion
-    ) external override onlyOwner {
-        // Era chains require migrations to be paused
-        if (!IChainAssetHandler(IL1Bridgehub(BRIDGE_HUB).chainAssetHandler()).migrationPaused()) {
-            revert MigrationsNotPaused();
-        }
-
-        _setNewVersionUpgrade(_cutData, _oldProtocolVersion, _oldProtocolVersionDeadline, _newProtocolVersion);
     }
 
     /// @notice Validates chain creation parameters common to all chain types

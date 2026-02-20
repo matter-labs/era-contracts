@@ -107,7 +107,7 @@ const params = {
     "appendTransactionToCurrentL2Block"
   ),
   RIGHT_PADDED_PUBLISH_TIMESTAMP_DATA_TO_L1_SELECTOR: getPaddedSelector("SystemContext", "publishTimestampDataToL1"),
-  RIGHT_PADDED_SET_L2_INTEROP_ROOT_SELECTOR: getPaddedSelector("L2InteropRootStorage", "addInteropRoot"),
+  RIGHT_PADDED_SET_L2_INTEROP_ROOT_SELECTOR: getPaddedSelector("DummyL2InteropRootStorage", "addInteropRoot"),
   COMPRESSED_BYTECODES_SLOTS: 196608,
   ENSURE_RETURNED_MAGIC: 1,
   FORBID_ZERO_GAS_PER_PUBDATA: 1,
@@ -132,7 +132,7 @@ function extractTestFunctionNames(sourceCode: string): string[] {
   // Remove multi-line comments
   sourceCode = sourceCode.replace(/\/\*[\s\S]*?\*\//g, "");
 
-  const regexPatterns = [/function\s+(TEST\w+)/g];
+  const regexPatterns = [/function\s+(TEST\w+)/g, /function\s+(INT_TEST\w+)/g];
 
   const results: string[] = [];
   for (const pattern of regexPatterns) {
@@ -152,22 +152,24 @@ function createTestFramework(tests: string[]): string {
     switch test_id
     case 0 {
         testing_totalTests(${tests.length})
+        return(0, 0)
     }
     `;
 
   tests.forEach((value, index) => {
+    const isIntTest = value.startsWith("INT_TEST");
     testFramework += `
         case ${index + 1} {
             testing_start("${value}")
-            ${value}()
+            ${value}()${isIntTest ? "" : "\n            return(0, 0)"}
         }
         `;
   });
 
   testFramework += `
         default {
+            return(0, 0)
         }
-    return (0, 0)
     `;
 
   return testFramework;

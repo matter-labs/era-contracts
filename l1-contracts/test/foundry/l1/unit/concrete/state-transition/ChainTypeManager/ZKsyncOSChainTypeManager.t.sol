@@ -10,7 +10,6 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -26,6 +25,7 @@ import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestne
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress, GenesisBatchHashZero, GenesisBatchCommitmentIncorrect, GenesisUpgradeZero} from "contracts/common/L1ContractErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
@@ -88,14 +88,15 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
 
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
-        messageroot = new L1MessageRoot(address(bridgehub), 1);
-        chainAssetHandler = new L1ChainAssetHandler(
-            governor,
-            address(bridgehub),
-            address(0),
-            address(messageroot),
-            address(0),
-            IL1Nullifier(address(0))
+        chainAssetHandler = new L1ChainAssetHandler(governor, address(bridgehub));
+        messageroot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(address(bridgehub), 1, address(chainAssetHandler))),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
         );
 
         stdstore
@@ -112,6 +113,8 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             address(chainAssetHandler),
             address(0)
         );
+        vm.prank(governor);
+        chainAssetHandler.setAddresses();
 
         vm.mockCall(
             address(sharedBridge),
@@ -120,7 +123,12 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         );
 
         vm.startPrank(address(bridgehub));
-        chainTypeManager = new ZKsyncOSChainTypeManager(address(bridgehub), interopCenterAddress, address(0));
+        chainTypeManager = new ZKsyncOSChainTypeManager(
+            address(bridgehub),
+            interopCenterAddress,
+            address(0),
+            address(0)
+        );
         diamondInit = address(new DiamondInit(false));
         genesisUpgradeContract = new L1GenesisUpgrade();
 
@@ -134,7 +142,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         );
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)), false)),
+                facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)))),
                 action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: Utils.getAdminSelectors()
@@ -159,13 +167,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         facetCuts.push(
             Diamond.FacetCut({
                 facet: address(
-                    new MailboxFacet(
-                        eraChainId,
-                        block.chainid,
-                        address(0),
-                        IEIP7702Checker(makeAddr("eip7702Checker")),
-                        false
-                    )
+                    new MailboxFacet(block.chainid, address(0), IEIP7702Checker(makeAddr("eip7702Checker")), false)
                 ),
                 action: Diamond.Action.Add,
                 isFreezable: false,
@@ -184,6 +186,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -197,7 +200,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
-        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain(testnetVerifier);
+        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain();
         bytes memory initCalldata = abi.encode(initializeData);
         return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
     }
@@ -210,6 +213,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         ZKsyncOSChainTypeManager ctm = new ZKsyncOSChainTypeManager(
             address(bridgehub),
             interopCenterAddress,
+            address(0),
             address(0)
         );
         assertEq(ctm.BRIDGE_HUB(), address(bridgehub));
@@ -235,6 +239,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -263,6 +268,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -295,6 +301,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -327,6 +334,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -355,6 +363,9 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
 
         chainContractAddress = _deployChainTypeManager(chainCreationParams);
 
+        // Mock migration paused check
+        vm.mockCall(address(chainAssetHandler), abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
+
         Diamond.DiamondCutData memory cutData = getDiamondCutData(address(diamondInit));
         uint256 oldProtocolVersion = 0;
         uint256 oldProtocolVersionDeadline = block.timestamp + 100;
@@ -365,11 +376,16 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             cutData,
             oldProtocolVersion,
             oldProtocolVersionDeadline,
-            newProtocolVersion
+            newProtocolVersion,
+            testnetVerifier
         );
 
         // Verify that the protocol version deadline was set
         assertEq(chainContractAddress.protocolVersionDeadline(oldProtocolVersion), oldProtocolVersionDeadline);
+        // Verify that the new protocol version is set
+        assertEq(chainContractAddress.protocolVersion(), newProtocolVersion);
+        // Verify that the verifier is set for the new protocol version
+        assertEq(chainContractAddress.protocolVersionVerifier(newProtocolVersion), testnetVerifier);
     }
 
     function test_RevertWhen_setNewVersionUpgradeNotOwner() public {
@@ -396,7 +412,8 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             cutData,
             oldProtocolVersion,
             oldProtocolVersionDeadline,
-            newProtocolVersion
+            newProtocolVersion,
+            testnetVerifier
         );
     }
 
@@ -443,6 +460,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 

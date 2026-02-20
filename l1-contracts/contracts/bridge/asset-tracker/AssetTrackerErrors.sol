@@ -5,8 +5,6 @@ pragma solidity ^0.8.21;
 error AssetIdNotRegistered(bytes32 _assetId);
 // 0x07859b3b
 error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
-// 0x2e19b556
-error InvalidAssetId(bytes32);
 // 0x95bddd6c
 error InvalidAssetMigrationNumber();
 // 0xd24c490f

@@ -2,21 +2,14 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
+// solhint-disable-next-line no-unused-import
+import {L2DACommitmentScheme, L2_TO_L1_LOG_SERIALIZE_SIZE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH, SUPPORTED_PROOF_METADATA_VERSION} from "system-contracts/contracts/Constants.sol";
+
 /// @dev `keccak256("")`
 bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
-/// @dev Bytes in raw L2 log
-/// @dev Equal to the bytes size of the tuple - (uint8 ShardId, bool isService, uint16 txNumberInBatch, address sender,
-/// bytes32 key, bytes32 value)
-uint256 constant L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
-
 /// @dev The maximum length of the bytes array with L2 -> L1 logs
 uint256 constant MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES = 4 + L2_TO_L1_LOG_SERIALIZE_SIZE * 512;
-
-/// @dev The value of default leaf hash for L2 -> L1 logs Merkle tree
-/// @dev An incomplete fixed-size tree is filled with this value to be a full binary tree
-/// @dev Actually equal to the `keccak256(new bytes(L2_TO_L1_LOG_SERIALIZE_SIZE))`
-bytes32 constant L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = 0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba;
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = bytes32(0);
 
@@ -38,9 +31,9 @@ uint256 constant ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE = 126;
 /// We are allowed to jump at most 100 minor versions at a time. The major version is always expected to be 0.
 uint256 constant MAX_ALLOWED_MINOR_VERSION_DELTA = 100;
 
-/// @dev The amount of time in seconds the validator has to process the priority transaction
-/// NOTE: The constant is set to zero for the Alpha release period
-uint256 constant PRIORITY_EXPIRATION = 0 days;
+/// @dev Maximum time a priority transaction may remain unprocessed before Priority Mode (escape hatch) can be activated.
+/// Note: This is not the full user exit window. The effective exit window is`UPGRADE_NOTICE_PERIOD` - `PRIORITY_EXPIRATION`.
+uint256 constant PRIORITY_EXPIRATION = 4 days;
 
 // @dev The chainId of Ethereum Mainnet
 uint256 constant MAINNET_CHAIN_ID = 1;
@@ -88,6 +81,14 @@ uint256 constant MAX_NEW_FACTORY_DEPS = 64;
 
 /// @dev The L2 gasPricePerPubdata required to be used in bridges.
 uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = 800;
+
+/// @dev Minimum interval between token multiplier updates.
+uint256 constant PRICE_UPDATE_INTERVAL = 1 days;
+/// @dev Max allowed price increase per update, as a ratio (e.g. 13/10 = 1.3x).
+uint256 constant MAX_PRICE_CHANGE_NUMERATOR = 13;
+uint256 constant MAX_PRICE_CHANGE_DENOMINATOR = 10;
+/// @dev Reference L1 gas price used for price-change bound calculations.
+uint256 constant PRICE_REFERENCE_L1_GAS = 1 gwei;
 
 /// @dev The native price for L1->L2 transactions in ZKsync OS.
 uint256 constant ZKSYNC_OS_L1_TX_NATIVE_PRICE = 10;
@@ -158,9 +159,6 @@ uint256 constant MAX_NUMBER_OF_ZK_CHAINS = 100;
 /// @dev Used as the `msg.sender` for transactions that relayed via a settlement layer.
 address constant SETTLEMENT_LAYER_RELAY_SENDER = address(uint160(0x1111111111111111111111111111111111111111));
 
-/// @dev The metadata version that is supported by the ZK Chains to prove that an L2->L1 log was included in a batch.
-uint256 constant SUPPORTED_PROOF_METADATA_VERSION = 1;
-
 /// @dev The virtual address of the L1 settlement layer.
 address constant L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS = address(
     uint160(uint256(keccak256("L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS")) - 1)
@@ -212,26 +210,8 @@ bytes32 constant DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH = bytes32(uint256(1));
 /// @dev The length of a packed transaction precommitment in bytes. It consists of two parts: 32-byte tx hash and 1-byte status (0 or 1).
 uint256 constant PACKED_L2_PRECOMMITMENT_LENGTH = 33;
 
-/// @dev Pubdata commitment scheme used for DA.
-/// @param NONE Invalid option.
-/// @param EMPTY_NO_DA No DA commitment, used by Validiums.
-/// @param PUBDATA_KECCAK256 Keccak of stateDiffHash and keccak(pubdata). Can be used by custom DA solutions.
-/// @param BLOBS_AND_PUBDATA_KECCAK256 This commitment includes EIP-4844 blobs data. Used by default RollupL1DAValidator.
-/// @param BLOBS_ZKSYNC_OS Keccak of blob versioned hashes filled with pubdata. This commitment scheme is used only for ZKsyncOS.
-enum L2DACommitmentScheme {
-    NONE,
-    EMPTY_NO_DA,
-    PUBDATA_KECCAK256,
-    BLOBS_AND_PUBDATA_KECCAK256,
-    BLOBS_ZKSYNC_OS
-}
-
 /// @dev The L2 data availability commitment scheme that permanent rollups are expected to use.
 L2DACommitmentScheme constant ROLLUP_L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256;
-
-uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 16_384;
-
-uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_DEPTH = 14 + 1;
 
 /// @dev The start of the pause deposits time window. We pause when migrating to/from gateway.
 uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET = 3 days + 12 hours;
@@ -281,3 +261,19 @@ PubdataPricingMode constant DEFAULT_PUBDATA_PRICING_MODE = PubdataPricingMode.Ro
 
 /// @dev Default maximum gas limit for priority transactions during chain creation.
 uint64 constant DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
+
+/// @dev Migration number used when a chain migrates from L1 to a settlement layer.
+uint256 constant MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER = 1;
+
+/// @dev Migration number used when a chain returns from a settlement layer back to L1.
+uint256 constant MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1 = 2;
+
+/// @dev Iterated migrations are not supported; chain can migrate only to settlement layer and back once.
+uint256 constant MAX_ALLOWED_NUMBER_OF_MIGRATIONS = 2;
+
+/// @dev The mask that should be applied to the packed log data containing both the number of L2 and L1 transactions
+/// processed in the batch. Applying this mask is equivalent to calculating modulo 2**128.
+uint256 constant PACKED_NUMBER_OF_L1_TRANSACTIONS_LOG_MASK = 0xffffffffffffffffffffffffffffffff;
+
+/// @dev Bit offset for extracting the upper 128 bits (L2 tx count) from the packed log value.
+uint256 constant PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS = 128;
