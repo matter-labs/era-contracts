@@ -8,7 +8,7 @@ import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {InvalidProof, ZeroAddress, InvalidChainId, Unauthorized} from "../../common/L1ContractErrors.sol";
-import {IMessageRootBase, V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../core/message-root/IMessageRoot.sol";
+import {IMessageRootBase, V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "../../core/message-root/IMessageRoot.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
@@ -210,21 +210,14 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         // We need to wait for the proper v31UpgradeChainBatchNumber to be set on the MessageRoot, otherwise we might decrement the chain's chainBalance instead of the gateway's.
         require(
-            v31UpgradeChainBatchNumber != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY,
+            v31UpgradeChainBatchNumber != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE,
             V31UpgradeChainBatchNumberNotSet()
         );
-        if (v31UpgradeChainBatchNumber != 0) {
-            /// For chains that were settling on GW before V31, we need to update the chain's chainBalance until the chain updates to V31.
-            /// Logic: If no settlement layer OR the batch number is before V31 upgrade, update the chain itself.
-            /// Otherwise, update the settlement layer (Gateway) balance.
-            chainToUpdate = settlementLayer == 0 || l2BatchNumber < v31UpgradeChainBatchNumber
-                ? _chainId
-                : settlementLayer;
-        } else {
-            /// For chains deployed at V31 or later, the logic is simpler:
-            /// Update the chain balance if settling on L1, otherwise update the settlement layer balance.
-            chainToUpdate = settlementLayer == 0 ? _chainId : settlementLayer;
-        }
+
+        /// For chains that were settling on GW before V31, we need to update the chain's chainBalance until the chain updates to V31.
+        /// Logic: If no settlement layer OR the batch number is before V31 upgrade, update the chain itself.
+        /// Otherwise, update the settlement layer (Gateway) balance.
+        chainToUpdate = settlementLayer == 0 || l2BatchNumber < v31UpgradeChainBatchNumber ? _chainId : settlementLayer;
     }
 
     /*//////////////////////////////////////////////////////////////

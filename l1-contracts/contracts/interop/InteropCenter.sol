@@ -6,18 +6,17 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IInteropCenter} from "./IInteropCenter.sol";
 
-import {GW_ASSET_TRACKER, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_COMPLEX_UPGRADER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_COMPLEX_UPGRADER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractInterfaces.sol";
 
-import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
+import {SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BUNDLE_IDENTIFIER, BalanceChange, BundleAttributes, CallAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal} from "../common/Messaging.sol";
-import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
+import {MsgValueMismatch, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
-import {AttributeAlreadySet, AttributeViolatesRestriction, DestinationChainNotRegistered, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty} from "./InteropErrors.sol";
+import {AttributeAlreadySet, AttributeViolatesRestriction, DestinationChainNotRegistered, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty, ThisChainNotRegisteredForInterop} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
@@ -43,23 +42,10 @@ contract InteropCenter is
     /// L1 that is at the most base layer.
     uint256 public L1_CHAIN_ID;
 
-    /// @notice The asset ID of ETH on L1.
-    bytes32 internal ETH_TOKEN_ASSET_ID;
-
     /// @notice This mapping stores a number of interop bundles sent by an individual sender.
     ///         It's being used to derive interopBundleSalt in InteropBundle struct, whose role
     ///         is to ensure that each bundle has a unique hash.
     mapping(address sender => uint256 numberOfBundlesSent) public interopBundleNonce;
-
-    modifier onlyL1() {
-        require(L1_CHAIN_ID == block.chainid, NotL1(L1_CHAIN_ID, block.chainid));
-        _;
-    }
-
-    modifier onlyL2ToL2(uint256 _destinationChainId) {
-        _ensureL2ToL2(_destinationChainId);
-        _;
-    }
 
     modifier onlySettlementLayerRelayedSender() {
         require(msg.sender == SETTLEMENT_LAYER_RELAY_SENDER, Unauthorized(msg.sender));
@@ -78,7 +64,6 @@ contract InteropCenter is
     function initL2(uint256 _l1ChainId, address _owner) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
         L1_CHAIN_ID = _l1ChainId;
-        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
 
         _transferOwnership(_owner);
     }
@@ -96,7 +81,7 @@ contract InteropCenter is
         bytes calldata recipient,
         bytes calldata payload,
         bytes[] calldata attributes
-    ) external payable whenNotPaused returns (bytes32 sendId) {
+    ) external payable whenNotPaused nonReentrant returns (bytes32 sendId) {
         (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(recipient);
 
         _ensureL2ToL2(recipientChainId);
@@ -150,7 +135,7 @@ contract InteropCenter is
         bytes calldata _destinationChainId,
         InteropCallStarter[] calldata _callStarters,
         bytes[] calldata _bundleAttributes
-    ) external payable whenNotPaused returns (bytes32 bundleHash) {
+    ) external payable whenNotPaused nonReentrant returns (bytes32 bundleHash) {
         // Validate that the destination chain ERC-7930 address has an empty address field.
         _ensureEmptyAddress(_destinationChainId);
 
@@ -261,10 +246,15 @@ contract InteropCenter is
         uint256 _totalBurnedCallsValue,
         uint256 _totalIndirectCallsValue
     ) internal {
+        // Note, that non-zero `destinationChainBaseTokenAssetId` does not mean that the destination chain
+        // actually settles on the GW or is able to receive the message.
+        // However, this value is provided from L1 by chain asset handler, so it can be trusted to be correct.
         bytes32 destinationChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
         require(destinationChainBaseTokenAssetId != bytes32(0), DestinationChainNotRegistered(_destinationChainId));
-        // We burn the value that is passed along the bundle here, on source chain.
         bytes32 thisChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(block.chainid);
+        require(thisChainBaseTokenAssetId != bytes32(0), ThisChainNotRegisteredForInterop(block.chainid));
+
+        // We burn the value that is passed along the bundle here, on source chain.
         if (destinationChainBaseTokenAssetId == thisChainBaseTokenAssetId) {
             require(
                 msg.value == _totalBurnedCallsValue + _totalIndirectCallsValue,
@@ -424,9 +414,11 @@ contract InteropCenter is
         uint64 _expirationTimestamp,
         BalanceChange memory _balanceChange
     ) external override onlySettlementLayerRelayedSender {
-        if (L1_CHAIN_ID == block.chainid) {
-            revert NotInGatewayMode();
+        address zkChain = L2_BRIDGEHUB.getZKChain(_chainId);
+        if (zkChain == address(0)) {
+            revert DestinationChainNotRegistered(_chainId);
         }
+
         _balanceChange.baseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_chainId);
         GW_ASSET_TRACKER.handleChainBalanceIncreaseOnGateway({
             _chainId: _chainId,
@@ -434,7 +426,6 @@ contract InteropCenter is
             _balanceChange: _balanceChange
         });
 
-        address zkChain = L2_BRIDGEHUB.getZKChain(_chainId);
         IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     }
 

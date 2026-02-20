@@ -19,7 +19,7 @@ import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol";
 
 import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1, MAX_ALLOWED_NUMBER_OF_MIGRATIONS} from "../../common/Config.sol";
-import {IncorrectChainAssetId, IncorrectSender, MigrationNotToL1, MigrationNumberMismatch, NotSystemContext, OnlyChain, SLHasDifferentCTM, ZKChainNotRegistered, IteratedMigrationsNotSupported} from "../bridgehub/L1BridgehubErrors.sol";
+import {BaseTokenOriginTokenNotRegistered, BaseTokenOriginChainIdNotRegistered, IncorrectChainAssetId, IncorrectSender, MigrationNotToL1, MigrationNumberMismatch, NotSystemContext, OnlyChain, SLHasDifferentCTM, ZKChainNotRegistered, IteratedMigrationsNotSupported} from "../bridgehub/L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused, NotAssetRouter} from "../../common/L1ContractErrors.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
@@ -283,6 +283,9 @@ abstract contract ChainAssetHandlerBase is
             INativeTokenVaultBase l1Ntv = l1AssetRouter.nativeTokenVault();
             baseTokenBridgingData.originToken = l1Ntv.originToken(assetId);
             baseTokenBridgingData.originChainId = l1Ntv.originChainId(assetId);
+
+            require(baseTokenBridgingData.originToken != address(0), BaseTokenOriginTokenNotRegistered());
+            require(baseTokenBridgingData.originChainId != uint256(0), BaseTokenOriginChainIdNotRegistered());
         }
 
         return
@@ -353,7 +356,7 @@ abstract contract ChainAssetHandlerBase is
             // A malicious settlement layer could provide invalid values here.
             // To support untrusted CTMs, we would need to at the very least enforce
             // that the `v31UpgradeChainBatchNumber` is not in conflict with the existing values.
-            _messageRoot().setMigratingChainBatchRoot(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
+            _messageRoot().setMigratingChainBatchNumber(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
         }
 
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);

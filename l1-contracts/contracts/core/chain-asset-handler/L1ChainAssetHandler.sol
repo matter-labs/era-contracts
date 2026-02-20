@@ -179,12 +179,16 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     ) external onlyOwner {
         require(_migrationNumber == 0, MigrationNumberMismatch(0, _migrationNumber));
         require(!_interval.isActive, MigrationIntervalNotSet());
-        uint256 legacyGwChainId = IMessageRootBase(_messageRoot()).ERA_GATEWAY_CHAIN_ID();
+        uint256 legacyGwChainId = _messageRoot().ERA_GATEWAY_CHAIN_ID();
         require(
             _interval.settlementLayerChainId == legacyGwChainId,
             HistoricalSettlementLayerMismatch(legacyGwChainId, _interval.settlementLayerChainId)
         );
         require(_interval.migrateFromGWBatchNumber > _interval.migrateToGWBatchNumber, MigrationIntervalInvalid());
+        require(
+            _interval.settlementLayerBatchUpperBound > _interval.settlementLayerBatchLowerBound,
+            MigrationIntervalInvalid()
+        );
         _migrationInterval[_chainId][_migrationNumber] = _interval;
     }
 
@@ -194,11 +198,13 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     /// @param _chainId The ID of the chain.
     /// @param _batchNumber The batch number to check.
     /// @param _claimedSettlementLayer The settlement layer chain ID claimed in the proof.
+    /// @param _claimedSettlementLayerBatchNumber The batch number claimed in the settlement layer.
     /// @return True if the claimed settlement layer is valid for this chain and batch.
     function isValidSettlementLayer(
         uint256 _chainId,
         uint256 _batchNumber,
-        uint256 _claimedSettlementLayer
+        uint256 _claimedSettlementLayer,
+        uint256 _claimedSettlementLayerBatchNumber
     ) external view returns (bool) {
         // Check all migration intervals for this chain (including legacy GW at index 0)
         // We iterate from 0 to current migration number to find which interval contains this batch
@@ -221,10 +227,22 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
                 return _claimedSettlementLayer == _l1ChainId();
             }
 
+            if (interval.isActive) {
+                // Batch is after migration to SL, and the chain hasn't returned yet, so it must be on the settlement layer.
+                return
+                    _claimedSettlementLayer == interval.settlementLayerChainId &&
+                    _claimedSettlementLayerBatchNumber >= interval.settlementLayerBatchLowerBound;
+            }
+
             // Batch is after migration to SL
-            if (interval.isActive || _batchNumber <= interval.migrateFromGWBatchNumber) {
-                // Batch is in the SL range: (migrateToSL, migrateFromSL] or chain hasn't returned
-                return _claimedSettlementLayer == interval.settlementLayerChainId;
+            if (_batchNumber <= interval.migrateFromGWBatchNumber) {
+                // Batch is in the SL range: (migrateToSL, migrateFromSL] or chain hasn't returned.
+                // Also verify the claimed SL batch number falls within the recorded bounds.
+                // For active intervals, the upper bound is not yet known so we only check the lower bound.
+                return
+                    _claimedSettlementLayer == interval.settlementLayerChainId &&
+                    _claimedSettlementLayerBatchNumber >= interval.settlementLayerBatchLowerBound &&
+                    _claimedSettlementLayerBatchNumber <= interval.settlementLayerBatchUpperBound;
             }
 
             // Batch is after migration back from SL, continue to check next interval
@@ -258,14 +276,23 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
             _newMigrationNum == MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
             MigrationNumberMismatch(MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, _newMigrationNum)
         );
+        uint256 slBatchLowerBound = _messageRoot().currentChainBatchNumber(_settlementChainId);
         _migrationInterval[_chainId][_newMigrationNum] = MigrationInterval({
             migrateToGWBatchNumber: _batchNumber,
             migrateFromGWBatchNumber: 0,
+            settlementLayerBatchLowerBound: slBatchLowerBound,
+            settlementLayerBatchUpperBound: 0,
             settlementLayerChainId: _settlementChainId,
             isActive: true
         });
     }
 
+    /// @notice Records that a chain has returned from a settlement layer back to L1.
+    /// @dev The `settlementLayerBatchUpperBound` is set to the settlement layer's current batch number at the time
+    /// this function is called (during `bridgeMint` on L1). This is not a perfect upper bound — the exact settlement
+    /// layer batch number is not trivially available, so we use the current value at finalization time. The sooner the
+    /// migration is finalized, the more precise this value is, since the settlement layer continues producing batches
+    /// in the meantime. A more precise solution will be introduced in future releases.
     function _recordMigrationFromSL(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -278,6 +305,9 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         MigrationInterval storage interval = _migrationInterval[_chainId][MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER];
         require(interval.isActive, MigrationIntervalNotSet());
         interval.migrateFromGWBatchNumber = _batchNumber;
+        interval.settlementLayerBatchUpperBound = _messageRoot().currentChainBatchNumber(
+            interval.settlementLayerChainId
+        );
         interval.isActive = false;
     }
 }
