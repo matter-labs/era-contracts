@@ -50,12 +50,6 @@ pub struct CtmDeployArgs {
     #[serde(flatten)]
     pub forge_args: ForgeArgs,
 
-    // Create2 factory options
-    #[clap(long, help = "CREATE2 factory address (if already deployed)", help_heading = "CREATE2 options")]
-    pub create2_factory_addr: Option<Address>,
-    #[clap(long, help = "CREATE2 factory salt (random by default)", help_heading = "CREATE2 options")]
-    pub create2_factory_salt: Option<H256>,
-
     // Options
     /// VM type: zksyncos (default) or eravm
     #[clap(long, default_value = "zksyncos")]
@@ -84,22 +78,12 @@ pub struct CtmDeployInput {
     pub reuse_gov_and_admin: bool,
     pub with_testnet_verifier: bool,
     pub with_legacy_bridge: bool,
-    pub create2_factory_addr: Option<Address>,
-    pub create2_factory_salt: Option<H256>,
 }
 
 /// Deploy CTM contracts and return the output.
 pub fn deploy(ctx: &mut ForgeContext, input: &CtmDeployInput) -> anyhow::Result<DeployCTMOutput> {
     let l1_network = L1Network::Localhost;
-    let mut initial_deployment_config = InitialDeploymentConfig::default();
-
-    // Override create2 factory settings if provided
-    if let Some(addr) = input.create2_factory_addr {
-        initial_deployment_config.create2_factory_addr = Some(addr);
-    }
-    if let Some(salt) = input.create2_factory_salt {
-        initial_deployment_config.create2_factory_salt = salt;
-    }
+    let initial_deployment_config = InitialDeploymentConfig::default();
 
     let deploy_config = DeployCTMConfig::new(
         input.owner,
@@ -186,8 +170,6 @@ pub async fn run(args: CtmDeployArgs, shell: &Shell) -> anyhow::Result<()> {
         reuse_gov_and_admin: args.reuse_gov_and_admin,
         with_testnet_verifier: args.with_testnet_verifier,
         with_legacy_bridge: args.with_legacy_bridge,
-        create2_factory_addr: args.create2_factory_addr,
-        create2_factory_salt: args.create2_factory_salt,
     };
 
     let output = deploy(&mut ctx, &input)?;

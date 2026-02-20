@@ -122,12 +122,6 @@ pub struct ChainInitArgs {
     #[serde(flatten)]
     pub forge_args: ForgeArgs,
 
-    // Create2 factory options
-    #[clap(long, help = "CREATE2 factory address (if already deployed)", help_heading = "CREATE2 options")]
-    pub create2_factory_addr: Option<Address>,
-    #[clap(long, help = "CREATE2 factory salt (random by default)", help_heading = "CREATE2 options")]
-    pub create2_factory_salt: Option<H256>,
-
     // Output
     #[clap(long, help = "Write full JSON output to file", help_heading = "Output")]
     pub out: Option<PathBuf>,
@@ -141,8 +135,6 @@ pub struct ChainInitInput {
     pub l1_da_validator: Address,
     pub chain_params: NewChainParams,
     pub with_legacy_bridge: bool,
-    pub create2_factory_addr: Option<Address>,
-    pub create2_factory_salt: Option<H256>,
 }
 
 /// Output from chain registration.
@@ -159,8 +151,6 @@ pub fn register_chain(
 ) -> anyhow::Result<RegisterChainOutput> {
     let deploy_config = RegisterChainL1Config::new(
         &input.chain_params,
-        input.create2_factory_addr.unwrap_or(Address::zero()),
-        input.create2_factory_salt,
         input.with_legacy_bridge,
     )?;
 
@@ -330,8 +320,6 @@ pub async fn run(args: ChainInitArgs, shell: &Shell) -> anyhow::Result<()> {
         l1_da_validator: args.l1_da_validator,
         chain_params: chain_params.clone(),
         with_legacy_bridge: args.with_legacy_bridge,
-        create2_factory_addr: args.create2_factory_addr,
-        create2_factory_salt: args.create2_factory_salt,
     };
 
     // Step 1: Register chain (as bridgehub admin)

@@ -38,12 +38,6 @@ pub struct HubDeployArgs {
     #[serde(flatten)]
     pub forge_args: ForgeArgs,
 
-    // Create2 factory options
-    #[clap(long, help = "CREATE2 factory address (if already deployed)", help_heading = "CREATE2 options")]
-    pub create2_factory_addr: Option<Address>,
-    #[clap(long, help = "CREATE2 factory salt (random by default)", help_heading = "CREATE2 options")]
-    pub create2_factory_salt: Option<H256>,
-
     // Options
     #[clap(long, help = "Enable support for legacy bridge testing", default_value_t = false)]
     pub with_legacy_bridge: bool,
@@ -61,8 +55,6 @@ pub struct DeployInput {
     pub owner: Address,
     pub era_chain_id: u64,
     pub with_legacy_bridge: bool,
-    pub create2_factory_addr: Option<Address>,
-    pub create2_factory_salt: Option<H256>,
 }
 
 pub async fn run(args: HubDeployArgs, shell: &Shell) -> anyhow::Result<()> {
@@ -97,8 +89,6 @@ pub async fn run(args: HubDeployArgs, shell: &Shell) -> anyhow::Result<()> {
         owner,
         era_chain_id: args.era_chain_id,
         with_legacy_bridge: args.with_legacy_bridge,
-        create2_factory_addr: args.create2_factory_addr,
-        create2_factory_salt: args.create2_factory_salt,
     };
 
     let output = deploy(&mut ctx, &input)?;
@@ -125,15 +115,7 @@ pub async fn run(args: HubDeployArgs, shell: &Shell) -> anyhow::Result<()> {
 
 /// Deploy hub contracts and return the output.
 pub fn deploy(ctx: &mut ForgeContext, input: &DeployInput) -> anyhow::Result<DeployL1CoreContractsOutput> {
-    let mut initial_config = InitialDeploymentConfig::default();
-
-    // Override create2 factory settings if provided
-    if let Some(addr) = input.create2_factory_addr {
-        initial_config.create2_factory_addr = Some(addr);
-    }
-    if let Some(salt) = input.create2_factory_salt {
-        initial_config.create2_factory_salt = salt;
-    }
+    let initial_config = InitialDeploymentConfig::default();
 
     let deploy_config = DeployL1Config::new(
         input.owner,
