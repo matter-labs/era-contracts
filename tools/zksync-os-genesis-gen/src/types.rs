@@ -27,7 +27,6 @@ pub struct InitialGenesisInput {
 
     /// Raw (already flattened) additional storage, kept for backward compatibility.
     /// Same format as before.
-    #[serde(skip)]
     pub additional_storage_raw: Vec<(B256, B256)>,
 }
 
