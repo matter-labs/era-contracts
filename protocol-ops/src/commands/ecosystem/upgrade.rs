@@ -39,9 +39,6 @@ pub struct EcosystemUpgradeArgs {
     /// Whether target chain is ZKsync OS (required for no-governance-prepare)
     #[clap(long)]
     pub is_zk_sync_os: Option<bool>,
-    /// CREATE2 factory salt (required for no-governance-prepare)
-    #[clap(long)]
-    pub create2_factory_salt: Option<H256>,
     /// Upgrade input path relative to l1-contracts root (for no-governance-prepare)
     #[clap(long, default_value = "/upgrade-envs/v0.31.0-interopB/local.toml")]
     pub upgrade_input_path: String,
@@ -90,9 +87,6 @@ fn run_no_governance_prepare(args: &EcosystemUpgradeArgs) -> anyhow::Result<()> 
     let is_zk_sync_os = args
         .is_zk_sync_os
         .ok_or_else(|| anyhow::anyhow!("--is-zk-sync-os is required for no-governance-prepare"))?;
-    let create2_salt = args.create2_factory_salt.ok_or_else(|| {
-        anyhow::anyhow!("--create2-factory-salt is required for no-governance-prepare")
-    })?;
     let rollup_da_manager = args.rollup_da_manager_address.unwrap_or_default();
     let governance = args.governance_address.unwrap_or_default();
 
@@ -105,13 +99,12 @@ fn run_no_governance_prepare(args: &EcosystemUpgradeArgs) -> anyhow::Result<()> 
     cmd.arg("script")
         .arg(script_path)
         .arg("--sig")
-        .arg("noGovernancePrepareWithArgs(address,address,address,address,bool,bytes32,string,string,address)")
+        .arg("noGovernancePrepareWithArgs(address,address,address,address,bool,string,string,address)")
         .arg(format!("{:#x}", bridgehub))
         .arg(format!("{:#x}", ctm))
         .arg(format!("{:#x}", bytecodes_supplier))
         .arg(format!("{:#x}", rollup_da_manager))
         .arg(if is_zk_sync_os { "true" } else { "false" })
-        .arg(format!("{:#x}", create2_salt))
         .arg(args.upgrade_input_path.as_str())
         .arg(args.upgrade_output_path.as_str())
         .arg(format!("{:#x}", governance))
