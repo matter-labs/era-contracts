@@ -34,14 +34,9 @@ import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
     /// @notice E2e upgrade generation
     function run() public virtual override {
-        initialize(
-            "/upgrade-envs/permanent-values/local.toml",
-            "/upgrade-envs/v0.31.0-interopB/local.toml",
-            vm.envString("V31_UPGRADE_ECOSYSTEM_OUTPUT")
+        revert(
+            "CoreUpgrade_v31.run() is deprecated. Use --sig initializeWithArgs(...) and call preparation methods explicitly"
         );
-
-        prepareEcosystemUpgrade();
-        prepareDefaultGovernanceCalls();
     }
 
     function deployNewEcosystemContractsL1() public virtual override {

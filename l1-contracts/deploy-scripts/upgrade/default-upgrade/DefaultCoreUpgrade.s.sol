@@ -23,7 +23,6 @@ import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainA
 import {BridgehubAddresses, CoreDeployedAddresses} from "../../utils/Types.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
-import {PermanentValuesHelper} from "../../utils/PermanentValuesHelper.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {Utils} from "../../utils/Utils.sol";
 
@@ -55,13 +54,23 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         string memory upgradeInputPath,
         string memory _outputPath
     ) public virtual {
-        string memory root = vm.projectRoot();
-        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
-        upgradeInputPath = string.concat(root, upgradeInputPath);
-        console.log("permanentValuesInputPath", permanentValuesInputPath);
-        console.log("root", root);
+        permanentValuesInputPath;
+        upgradeInputPath;
+        _outputPath;
+        revert("DefaultCoreUpgrade.initialize(permanent-values path,...) is deprecated. Use initializeWithArgs(...)");
+    }
 
-        initializeConfig(permanentValuesInputPath, upgradeInputPath);
+    function initializeWithArgs(
+        address bridgehubProxyAddress,
+        bool isZKsyncOS,
+        bytes32 create2FactorySalt,
+        string memory upgradeInputPath,
+        string memory _outputPath
+    ) public virtual {
+        string memory root = vm.projectRoot();
+        upgradeInputPath = string.concat(root, upgradeInputPath);
+
+        initializeConfigWithArgs(bridgehubProxyAddress, isZKsyncOS, create2FactorySalt, upgradeInputPath);
         instantiateCreate2Factory();
 
         upgradeConfig.outputPath = string.concat(root, _outputPath);
@@ -81,13 +90,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice E2e upgrade generation
     function run() public virtual {
-        initialize(
-            vm.envString("PERMANENT_VALUES_INPUT"),
-            vm.envString("UPGRADE_INPUT"),
-            vm.envString("UPGRADE_ECOSYSTEM_OUTPUT")
-        );
-        prepareEcosystemUpgrade();
-        prepareDefaultGovernanceCalls();
+        revert("DefaultCoreUpgrade.run() is deprecated. Use --sig initializeWithArgs(...) and call preparation methods explicitly");
     }
 
     function getOwnerAddress() public virtual returns (address) {
@@ -122,17 +125,22 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     }
 
     function initializeConfig(string memory permanentValuesInputPath, string memory upgradeInputPath) public virtual {
-        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
+        permanentValuesInputPath;
+        upgradeInputPath;
+        revert("DefaultCoreUpgrade.initializeConfig(permanent-values path,...) is deprecated. Use initializeConfigWithArgs(...)");
+    }
+
+    function initializeConfigWithArgs(
+        address bridgehubProxyAddress,
+        bool isZKsyncOS,
+        bytes32 create2FactorySalt,
+        string memory upgradeInputPath
+    ) public virtual {
         string memory upgradeToml = vm.readFile(upgradeInputPath);
 
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(
-            permanentValuesInputPath
-        );
-        _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
+        _initCreate2FactoryParams(Utils.DETERMINISTIC_CREATE2_ADDRESS, create2FactorySalt);
 
-        // Read isZKsyncOS flag from permanent values (required)
-        require(permanentValuesToml.keyExists("$.is_zk_sync_os"), "is_zk_sync_os flag is required in permanent values");
-        additionalConfig.isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
+        additionalConfig.isZKsyncOS = isZKsyncOS;
 
         // Optional override for v29 introspection selection
         if (upgradeToml.keyExists("$.use_v29_introspection")) {
@@ -143,9 +151,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         // Protocol version comes from genesis config
         additionalConfig.newProtocolVersion = loadProtocolVersionFromGenesis();
 
-        coreAddresses.bridgehub.proxies.bridgehub = permanentValuesToml.readAddress(
-            "$.core_contracts.bridgehub_proxy_addr"
-        );
+        coreAddresses.bridgehub.proxies.bridgehub = bridgehubProxyAddress;
         require(coreAddresses.bridgehub.proxies.bridgehub != address(0), "bridgehub_proxy_addr is zero");
         setAddressesBasedOnBridgehub();
         initializeL1CoreUtilsConfig();
