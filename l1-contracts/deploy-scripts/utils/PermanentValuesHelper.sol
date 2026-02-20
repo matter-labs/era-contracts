@@ -11,6 +11,8 @@ library PermanentValuesHelper {
     Vm internal constant vm = Vm(VM_ADDRESS);
 
     bytes32 internal constant DEFAULT_SALT = 0x88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5;
+    address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
+    string internal constant CREATE2_FACTORY_SALT_ENV = "CREATE2_FACTORY_SALT";
 
     using stdToml for string;
 
@@ -20,53 +22,39 @@ library PermanentValuesHelper {
         return string.concat(vm.projectRoot(), vm.envString("PERMANENT_VALUES_INPUT"));
     }
 
-    /// @notice Reads create2 factory values from the permanent values TOML file
+    /// @notice Reads create2 factory values.
+    /// @dev Scripts always use deterministic Create2 factory address and take salt from env var.
+    /// If CREATE2_FACTORY_SALT is not provided, DEFAULT_SALT is used.
     /// @param permanentValuesPath The path to the permanent values file
-    /// @return create2FactoryAddr The create2 factory address (if configured)
+    /// @return create2FactoryAddr The deterministic create2 factory address
     /// @return create2FactorySalt The create2 factory salt
     function getPermanentValues(
         string memory permanentValuesPath
     ) internal view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
-        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-        create2FactorySalt = permanentValuesToml.readBytes32("$.permanent_contracts.create2_factory_salt");
-        if (vm.keyExistsToml(permanentValuesToml, "$.permanent_contracts.create2_factory_addr")) {
-            create2FactoryAddr = permanentValuesToml.readAddress("$.permanent_contracts.create2_factory_addr");
-        }
+        permanentValuesPath;
+        create2FactoryAddr = DETERMINISTIC_CREATE2_ADDRESS;
+        create2FactorySalt = vm.envOr(CREATE2_FACTORY_SALT_ENV, DEFAULT_SALT);
     }
 
     /// @notice Convenience function to get permanent values without providing the path
-    /// @return create2FactoryAddr The create2 factory address (if configured)
+    /// @return create2FactoryAddr The deterministic create2 factory address
     /// @return create2FactorySalt The create2 factory salt
     function getPermanentValues() internal view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
         return getPermanentValues(getPermanentValuesPath());
     }
 
-    /// @notice Creates the permanent-values.toml file with defaults if it is missing
-    /// or if the create2_factory_salt key is absent.
+    /// @notice Deprecated no-op. Create2 salt no longer comes from permanent values.
     function createPermanentValuesIfNeeded() internal {
-        string memory permanentValuesPath = getPermanentValuesPath();
-        if (vm.isFile(permanentValuesPath)) {
-            string memory toml = vm.readFile(permanentValuesPath);
-            bool hasSalt = vm.keyExistsToml(toml, "$.permanent_contracts.create2_factory_salt");
-            bool hasAddr = vm.keyExistsToml(toml, "$.permanent_contracts.create2_factory_addr");
-            address create2FactoryAddr = hasAddr
-                ? toml.readAddress("$.permanent_contracts.create2_factory_addr")
-                : address(0);
-            if (hasSalt && hasAddr && create2FactoryAddr.code.length > 0) {
-                return; // Permanent values are already set and valid
-            }
-        }
-        savePermanentValues(address(0), DEFAULT_SALT);
+        // no-op
     }
 
-    /// @notice Writes create2 factory address and salt to the permanent values file
-    /// @param _create2FactoryAddr The create2 factory address
+    /// @notice Deprecated no-op. Kept for backward compatibility.
+    /// @param _create2FactoryAddr Unused. Kept for backward-compatible call sites.
     /// @param _create2FactorySalt The create2 factory salt
     function savePermanentValues(address _create2FactoryAddr, bytes32 _create2FactorySalt) internal {
-        vm.serializeString("permanent_contracts", "create2_factory_salt", vm.toString(_create2FactorySalt));
-        string memory inner = vm.serializeAddress("permanent_contracts", "create2_factory_addr", _create2FactoryAddr);
-        string memory toml = vm.serializeString("permanent_contracts_root", "permanent_contracts", inner);
-        vm.writeToml(toml, getPermanentValuesPath());
+        _create2FactoryAddr;
+        _create2FactorySalt;
+        // no-op
     }
 
     /// @notice Reads the legacy Gateway chain ID from the permanent values TOML file

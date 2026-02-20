@@ -43,7 +43,6 @@ import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2G
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
-import {PermanentValuesHelper} from "../../utils/PermanentValuesHelper.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 
@@ -122,10 +121,33 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         string memory newConfigPath,
         string memory _outputPath
     ) public virtual {
+        permanentValuesInputPath;
+        newConfigPath;
+        _outputPath;
+        revert("DefaultCTMUpgrade.initialize(permanent-values path,...) is deprecated. Use initializeWithArgs(...)");
+    }
+
+    function initializeWithArgs(
+        address ctmProxy,
+        address bytecodesSupplier,
+        bool isZKsyncOS,
+        address rollupDAManager,
+        bytes32 create2FactorySalt,
+        string memory newConfigPath,
+        string memory _outputPath,
+        address governance
+    ) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
-        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
-        initializeConfigFromFile(permanentValuesInputPath, newConfigPath);
+        initializeConfigFromArgs(
+            ctmProxy,
+            bytecodesSupplier,
+            isZKsyncOS,
+            rollupDAManager,
+            create2FactorySalt,
+            newConfigPath,
+            governance
+        );
         instantiateCreate2Factory();
 
         console.log("Initialized config from %s", newConfigPath);
@@ -175,47 +197,39 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
-    function initializePermanentConfig(
-        string memory permanentValuesInputPath
-    ) internal virtual returns (PermanentCTMConfig memory permanentConfig) {
-        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
-
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(
-            permanentValuesInputPath
-        );
-
-        address ctm = permanentValuesToml.readAddress("$.ctm_contracts.ctm_proxy_addr");
-        address bytecodesSupplier = permanentValuesToml.readAddress("$.ctm_contracts.l1_bytecodes_supplier_addr");
-
-        // TODO can we discover it?. Try to get it from the chain
-        bool isZKsyncOS;
-        if (permanentValuesToml.keyExists("$.is_zk_sync_os")) {
-            isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
-        }
-
-        permanentConfig = PermanentCTMConfig({
-            ctmProxy: ctm,
-            bytecodesSupplier: bytecodesSupplier,
-            isZKsyncOS: isZKsyncOS,
-            create2FactoryAddr: create2FactoryAddr,
-            create2FactorySalt: create2FactorySalt
-        });
-    }
-
     function initializeConfigFromFile(
         string memory permanentValuesInputPath,
         string memory newConfigPath
     ) internal virtual {
-        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
+        permanentValuesInputPath;
+        newConfigPath;
+        revert("DefaultCTMUpgrade.initializeConfigFromFile(...) is deprecated. Use initializeConfigFromArgs(...)");
+    }
+
+    function initializeConfigFromArgs(
+        address ctmProxy,
+        address bytecodesSupplier,
+        bool isZKsyncOS,
+        address rollupDAManager,
+        bytes32 create2FactorySalt,
+        string memory newConfigPath,
+        address governance
+    ) internal virtual {
         string memory toml = vm.readFile(newConfigPath);
 
-        PermanentCTMConfig memory permanentConfig = initializePermanentConfig(permanentValuesInputPath);
+        PermanentCTMConfig memory permanentConfig = PermanentCTMConfig({
+            ctmProxy: ctmProxy,
+            bytecodesSupplier: bytecodesSupplier,
+            isZKsyncOS: isZKsyncOS,
+            create2FactoryAddr: Utils.DETERMINISTIC_CREATE2_ADDRESS,
+            create2FactorySalt: create2FactorySalt
+        });
         // Set config.isZKsyncOS BEFORE calling getChainCreationParamsConfig, because
         // getChainCreationParamsConfig calls ChainCreationParamsLib.getChainCreationParams
         // which reads from config.isZKsyncOS
-        config.isZKsyncOS = permanentConfig.isZKsyncOS;
+        config.isZKsyncOS = isZKsyncOS;
         ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(
-            chainCreationParamsPath(permanentConfig.isZKsyncOS)
+            chainCreationParamsPath(isZKsyncOS)
         );
 
         // Optional override for v29 introspection selection
@@ -224,18 +238,15 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             newConfig.useV29IntrospectionOverride = toml.readBool("$.use_v29_introspection");
         }
 
-        initializeConfig(chainCreationParams, permanentConfig, address(0));
+        initializeConfig(chainCreationParams, permanentConfig, governance);
 
         // Read governance upgrade timer initial delay from config
         if (toml.keyExists("$.governance_upgrade_timer_initial_delay")) {
             newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
         }
 
-        // Read rollup DA manager from permanent config if it exists
-        if (permanentValuesToml.keyExists("$.ctm_contracts.rollup_da_manager")) {
-            ctmAddresses.stateTransition.rollupDAManager = permanentValuesToml.readAddress(
-                "$.ctm_contracts.rollup_da_manager"
-            );
+        if (rollupDAManager != address(0)) {
+            ctmAddresses.stateTransition.rollupDAManager = rollupDAManager;
         }
     }
 
@@ -308,17 +319,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
-        initialize(
-            vm.envString("PERMANENT_VALUES_INPUT"),
-            vm.envString("UPGRADE_CTM_INPUT"),
-            vm.envString("UPGRADE_CTM_OUTPUT")
-        );
-        prepareCTMUpgrade();
-
-        prepareDefaultGovernanceCalls();
-        prepareDefaultCTMAdminCalls();
-
-        prepareDefaultTestUpgradeCalls();
+        revert("DefaultCTMUpgrade.run() is deprecated. Use --sig initializeWithArgs(...) and call preparation methods explicitly");
     }
 
     function getOwnerAddress() public virtual returns (address) {

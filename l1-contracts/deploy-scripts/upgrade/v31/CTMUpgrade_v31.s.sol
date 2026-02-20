@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 // solhint-disable no-console, gas-custom-errors
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {stdToml} from "forge-std/StdToml.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
@@ -40,16 +39,9 @@ import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     /// @notice E2e upgrade generation
     function run() public virtual override {
-        initialize(
-            vm.envString("PERMANENT_VALUES_INPUT"),
-            vm.envString("UPGRADE_CTM_INPUT"),
-            vm.envString("UPGRADE_CTM_OUTPUT")
+        revert(
+            "CTMUpgrade_v31.run() is deprecated. Use --sig initializeWithArgs(...) and call preparation methods explicitly"
         );
-        prepareCTMUpgrade();
-
-        /// kl todo check that no chain is on GW. We can write a contract to check it and call it in V31 stage 0 calls.
-
-        prepareDefaultGovernanceCalls();
     }
 
     function initialize(
@@ -57,7 +49,32 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         string memory newConfigPath,
         string memory upgradeEcosystemOutputPath
     ) public virtual override {
-        super.initialize(permanentValuesInputPath, newConfigPath, upgradeEcosystemOutputPath);
+        permanentValuesInputPath;
+        newConfigPath;
+        upgradeEcosystemOutputPath;
+        revert("CTMUpgrade_v31.initialize(permanent-values path,...) is deprecated. Use initializeWithArgs(...)");
+    }
+
+    function initializeWithArgs(
+        address ctmProxy,
+        address bytecodesSupplier,
+        bool isZKsyncOS,
+        address rollupDAManager,
+        bytes32 create2FactorySalt,
+        string memory newConfigPath,
+        string memory upgradeEcosystemOutputPath,
+        address governance
+    ) public virtual override {
+        super.initializeWithArgs(
+            ctmProxy,
+            bytecodesSupplier,
+            isZKsyncOS,
+            rollupDAManager,
+            create2FactorySalt,
+            newConfigPath,
+            upgradeEcosystemOutputPath,
+            governance
+        );
     }
 
     /// @notice Deploy everything that should be deployed

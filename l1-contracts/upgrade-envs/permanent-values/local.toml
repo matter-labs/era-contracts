@@ -1,30 +1,13 @@
-era_chain_id = 270
+era_chain_id = 6565
+is_zk_sync_os = true
 
 [core_contracts]
-bridgehub_proxy_addr = "0xC0F09Cb637DCfDe54D8B7b5170736Ec21aBB33cd"
+bridgehub_proxy_addr = "0xd8f8df05efacd52f28cdf11be22ce3d6ae0fabf7"
 
 [ctm_contracts]
-ctm_proxy_addr = "0x7f5401a0a0340f6a68fe3162e7bb3a57e262d18e"
-rollup_da_manager = "0xeb7c0daaddfb52afa05400b489e7497b271d6122"
-l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
+ctm_proxy_addr = "0x7845be2ab080506883be3d3e4fb34b5557a453da"
+l1_bytecodes_supplier_addr = "0x9f3f32ea83c8a1c8e993fd9035d1d077545467ac"
 
 [permanent_contracts]
-create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
-create2_factory_salt = "0x0000000000000000000000000000000000000000000000000000000000000000"
-
-# Legacy Gateway configurastion for settlement layer validation
-# This section contains historical data about chains that settled on the legacy Gateway
-[legacy_gateway]
-# The chain ID of the legacy Gateway (9075 for mainnet)
-chain_id = 506
-
-# Historical migration intervals for chains that used the legacy GW
-# Each entry represents a chain that settled on the legacy GW before V31
-# Format: chain_id, migrate_to_sl_batch, migrate_from_sl_batch
-# Note: migrate_from_sl_batch must be > migrate_to_sl_batch
-# These values should be filled in before V31 deployment based on actual historical data
-# Example for Era on mainnet (chain_id = 270):
-# [[legacy_gateway.chain_intervals]]
-# chain_id = 270
-# migrate_to_sl_batch = 0  # Set to actual batch number when Era migrated to legacy GW (0 is valid if migration happened before any batches)
-# migrate_from_sl_batch = 0  # Set to actual batch number when Era migrated back (must be > migrate_to_sl_batch)
+create2_factory_addr = "0x4e59b44847b379578588920ca78fbf26c0b4956c"
+create2_factory_salt = "0xcfc937107789faff5acefe20604c1919be02564aad194eb94dc5a89f2c5726b4"
