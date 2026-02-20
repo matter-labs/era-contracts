@@ -2213,7 +2213,10 @@ object "Bootloader" {
                 isEvmDeployment := isEvmDeploymentEthCall(to, innerTxDataOffset)
 
                 if isEvmDeployment {
-                    bumpNonceForEvmDeployment(from, innerTxDataOffset)
+                    if isEOA(from) {
+                        // If the `from` is EOA, we need to bump the nonce before the deployment
+                        bumpNonceForEvmDeployment(from, innerTxDataOffset)
+                    }
                     actualDataPtr := encodeCreateEvmCalldata(dataPtr)
                     actualTo := CONTRACT_DEPLOYER_ADDR()
                 }
