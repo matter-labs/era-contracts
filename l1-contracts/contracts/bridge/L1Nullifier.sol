@@ -778,7 +778,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             chainId: _chainId,
             l2BatchNumber: _l2BatchNumber,
             l2MessageIndex: _l2MessageIndex,
-            l2Sender: _resolveLegacyL2Sender(_chainId, _message, legacyL2Bridge),
+            l2Sender: _resolveLegacyL2Sender(_message, legacyL2Bridge),
             l2TxNumberInBatch: _l2TxNumberInBatch,
             message: _message,
             merkleProof: _merkleProof
@@ -790,19 +790,12 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// Base token withdrawals originate from L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     /// while other withdrawals come from the legacy L2 bridge.
     function _resolveLegacyL2Sender(
-        uint256 _chainId,
         bytes calldata _message,
         address _legacyL2Bridge
     ) internal view returns (address) {
         bytes4 selector = DataEncoding.getSelector(_message);
         if (selector == IMailboxLegacy.finalizeEthWithdrawal.selector) {
             return L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
-        }
-        if (selector == AssetRouterBase.finalizeDeposit.selector) {
-            bytes32 assetId = bytes32(_message[36:68]);
-            if (assetId == BRIDGE_HUB.baseTokenAssetId(_chainId)) {
-                return L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
-            }
         }
         return _legacyL2Bridge;
     }
