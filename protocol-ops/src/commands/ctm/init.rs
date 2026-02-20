@@ -29,8 +29,6 @@ pub struct CtmInitInput {
     pub reuse_gov_and_admin: bool,
     pub with_testnet_verifier: bool,
     pub with_legacy_bridge: bool,
-    pub create2_factory_addr: Option<Address>,
-    pub create2_factory_salt: Option<H256>,
 }
 
 /// Output from ctm init.
@@ -68,8 +66,6 @@ pub async fn ctm_init(
         reuse_gov_and_admin: input.reuse_gov_and_admin,
         with_testnet_verifier: input.with_testnet_verifier,
         with_legacy_bridge: input.with_legacy_bridge,
-        create2_factory_addr: input.create2_factory_addr,
-        create2_factory_salt: input.create2_factory_salt,
     };
 
     let deploy_output = {
@@ -168,12 +164,6 @@ pub struct CtmInitArgs {
     #[clap(flatten)]
     #[serde(flatten)]
     pub forge_args: ForgeArgs,
-
-    // Create2 factory options
-    #[clap(long, help = "CREATE2 factory address (if already deployed)", help_heading = "CREATE2 options")]
-    pub create2_factory_addr: Option<Address>,
-    #[clap(long, help = "CREATE2 factory salt (random by default)", help_heading = "CREATE2 options")]
-    pub create2_factory_salt: Option<H256>,
 
     // Options
     /// VM type: zksyncos (default) or eravm
@@ -291,8 +281,6 @@ pub async fn run(args: CtmInitArgs, shell: &Shell) -> anyhow::Result<()> {
         reuse_gov_and_admin: args.reuse_gov_and_admin,
         with_testnet_verifier: args.with_testnet_verifier,
         with_legacy_bridge: args.with_legacy_bridge,
-        create2_factory_addr: args.create2_factory_addr,
-        create2_factory_salt: args.create2_factory_salt,
     };
 
     let deploy_output = {
