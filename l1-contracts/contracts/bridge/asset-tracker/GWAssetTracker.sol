@@ -356,7 +356,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         uint256 totalBaseTokenAmount = 0;
 
         uint256 interopBundleCallsLength = interopBundle.calls.length;
-
         for (uint256 callCount = 0; callCount < interopBundleCallsLength; ++callCount) {
             InteropCall memory interopCall = interopBundle.calls[callCount];
 
@@ -377,6 +376,12 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
         bytes32 destinationChainBaseTokenAssetId = _bridgehub().baseTokenAssetId(interopBundle.destinationChainId);
         _decreaseChainBalance(_chainId, destinationChainBaseTokenAssetId, totalBaseTokenAmount);
+        _increaseAndSaveChainBalance(
+            interopBundle.destinationChainId,
+            destinationChainBaseTokenAssetId,
+            totalBaseTokenAmount,
+            _getChainMigrationNumber(interopBundle.destinationChainId)
+        );
     }
 
     function _processInteropCall(
@@ -390,7 +395,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         require(_chainId == fromChainId, InvalidInteropChainId(fromChainId, _destinationChainId));
 
         // solhint-disable-next-line func-named-parameters
-        uint256 amount = _handleAssetRouterMessageInner(_chainId, _destinationChainId, assetId, transferData, true);
+        uint256 amount = _handleAssetRouterMessageInner(_chainId, _destinationChainId, assetId, transferData);
     }
 
     /// @notice L2->L1 withdrawals go through the L2AssetRouter directly.
@@ -403,7 +408,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             InvalidFunctionSignature(functionSignature)
         );
         // solhint-disable-next-line func-named-parameters
-        _handleAssetRouterMessageInner(_chainId, L1_CHAIN_ID, assetId, transferData, false);
+        _handleAssetRouterMessageInner(_chainId, L1_CHAIN_ID, assetId, transferData);
     }
 
     /// @notice Handles the logic of the AssetRouter message.
@@ -417,8 +422,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         uint256 _sourceChainId,
         uint256 _destinationChainId,
         bytes32 _assetId,
-        bytes memory _transferData,
-        bool _isInteropCall
+        bytes memory _transferData
     ) internal returns (uint256 amount) {
         address originalToken;
         bytes memory erc20Metadata;
@@ -434,7 +438,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             _destinationChainId: _destinationChainId,
             _assetId: _assetId,
             _amount: amount,
-            _isInteropCall: _isInteropCall
         });
     }
 
@@ -442,15 +445,14 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         uint256 _sourceChainId,
         uint256 _destinationChainId,
         bytes32 _assetId,
-        uint256 _amount,
-        bool _isInteropCall
+        uint256 _amount
     ) internal {
         if (_amount > 0) {
             /// Note, we don't track L1 chainBalance on Gateway.
             if (_sourceChainId != L1_CHAIN_ID) {
                 _decreaseChainBalance(_sourceChainId, _assetId, _amount);
             }
-            if (_destinationChainId != L1_CHAIN_ID && !_isInteropCall) {
+            if (_destinationChainId != L1_CHAIN_ID) {
                 uint256 chainMigrationNumber = _getChainMigrationNumber(_destinationChainId);
                 _increaseAndSaveChainBalance(_destinationChainId, _assetId, _amount, chainMigrationNumber);
             }
