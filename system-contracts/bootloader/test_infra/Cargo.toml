@@ -23,6 +23,8 @@ tracing = { version = "0.1.26", features = ["log"] }
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter", "time", "json"] }
 serde_json = "1.0.67"
 serde = { version = "1.0", features = ["derive"] }
+# Pin zerocopy below 0.8.39 to avoid stdarch_x86_avx512 unstable feature on nightly-2025-05-23
+zerocopy = ">=0.8, <0.8.39"
 
 [patch.crates-io]
 vise = { git = "https://github.com/matter-labs/vise.git", rev = "8d800385a108eb598cbaa6c8bc8ab4ef3bf69011" }
