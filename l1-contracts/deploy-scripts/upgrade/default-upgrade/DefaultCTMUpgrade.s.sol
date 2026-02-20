@@ -385,13 +385,13 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         // Use appropriate introspection based on version
         if (useV29Introspection) {
-            ctmAddresses = AddressIntrospector.getCTMAddressesV29(ctm, config.isZKsyncOS);
+            ctmAddresses = AddressIntrospector.getCTMAddressesV29(ctm);
             coreAddresses = AddressIntrospector.getCoreDeployedAddressesV29(bridgehubAddr);
 
             // V29 introspection returns zero for bytecodesSupplier, overwrite with correct value
             ctmAddresses.stateTransition.proxies.bytecodesSupplier = _bytecodesSupplier;
         } else {
-            ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm), config.isZKsyncOS);
+            ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
             coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubAddr);
         }
 
