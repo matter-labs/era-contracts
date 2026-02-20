@@ -1,5 +1,5 @@
 use crate::consts::{
-    ContractSource, EIP1967_ADMIN_SLOT, EIP1967_IMPLEMENTATION_SLOT, INITIAL_CONTRACTS,
+    BASE_TOKEN_HOLDER_ADDR, ContractSource, EIP1967_ADMIN_SLOT, EIP1967_IMPLEMENTATION_SLOT, INITIAL_CONTRACTS,
     L2_COMPLEX_UPGRADER_ADDR, L2_COMPLEX_UPGRADER_IMPL_ADDR, SYSTEM_CONTRACT_PROXY_ADMIN,
     SYSTEM_PROXY_ADMIN_OWNER_SLOT,
 };
@@ -7,7 +7,7 @@ use crate::types::{InitialGenesisInput, LeafInfo, MAX_B256_VALUE, MERKLE_TREE_DE
 use crate::utils::{address_to_b256, da_contract_name_to_code, l1_contract_name_to_code};
 use alloy::consensus::{Header, EMPTY_OMMER_ROOT_HASH};
 use alloy::eips::eip1559::INITIAL_BASE_FEE;
-use alloy::primitives::{Address, Bloom, B256, B64, U256};
+use alloy::primitives::{Address, Bloom, B256, B64, U256, Uint};
 use blake2::{Blake2s256, Digest};
 use std::collections::BTreeMap;
 use zk_os_api::helpers::{set_properties_code, set_properties_nonce};
@@ -30,7 +30,7 @@ impl InitialGenesisInput {
                 })
                 .collect(),
             additional_storage: construct_additional_storage(),
-            additional_storage_raw: Default::default(),
+            additional_storage_raw: additional_storage_raw(),
         }
     }
 }
@@ -261,4 +261,20 @@ fn construct_additional_storage() -> BTreeMap<Address, BTreeMap<B256, B256>> {
     map.insert(L2_COMPLEX_UPGRADER_ADDR, l2_complex_upgrader_storage);
 
     map
+}
+
+fn additional_storage_raw() -> Vec<(B256, B256)> {
+    let mut result = Vec::new();
+
+    let account_properties = AccountProperties {
+        balance: Uint::from(u128::MAX),
+        ..Default::default()
+    };
+
+    let flat_storage_key = account_properties_flat_key(BASE_TOKEN_HOLDER_ADDR);
+
+    let account_properties_hash = account_properties.compute_hash();
+    result.push((flat_storage_key, account_properties_hash.as_u8_array().into()));
+
+    result
 }
