@@ -2103,8 +2103,55 @@ object "Bootloader" {
 
                 let value := getValue(innerTxDataOffset)
 
+                let isEvmDeployment := false
+                if eq(to, 0x0) {
+                    if eq(getReserved1(innerTxDataOffset), 1) {
+                        isEvmDeployment := true
+                    }
+                }
+
+                let actualTo := to
+                if isEvmDeployment {
+                    let nonce := getNonce(innerTxDataOffset)
+
+                    let nonceBumpDataPtr := 0
+                    mstore(nonceBumpDataPtr, 36)
+                    mstore(add(nonceBumpDataPtr, 32), shl(224, {{INCREMENT_MIN_NONCE_IF_EQUALS_SELECTOR}}))
+                    mstore(add(nonceBumpDataPtr, 36), nonce)
+
+                    let nonceBumpSuccess := mimicCallOnlyResult(
+                        NONCE_HOLDER_ADDR(),
+                        from,
+                        nonceBumpDataPtr,
+                        0,
+                        1,
+                        0,
+                        0,
+                        0
+                    )
+                    if iszero(nonceBumpSuccess) {
+                        revertWithReason(
+                            ETH_CALL_ERR_CODE(),
+                            1
+                        )
+                    }
+
+                    // `createEVM(bytes)` call encoding:
+                    // [selector (4)][offset (32)][length (32)][initCode (N)].
+                    // We place metadata right before the existing initCode bytes, so copying is not needed.
+                    let initCodeLength := mload(dataPtr)
+                    let createEvmCallDataPtr := safeSub(dataPtr, 68, "ev1")
+                    mstore(createEvmCallDataPtr, safeAdd(initCodeLength, 68, "ev2"))
+                    mstore(add(createEvmCallDataPtr, 32), shl(224, {{CREATE_EVM_SELECTOR}}))
+                    mstore(add(createEvmCallDataPtr, 36), 32)
+                    mstore(add(createEvmCallDataPtr, 68), initCodeLength)
+
+                    dataPtr := createEvmCallDataPtr
+                    actualTo := CONTRACT_DEPLOYER_ADDR()
+                }
+
                 let success := msgValueSimulatorMimicCall(
-                    to,
+                    actualTo,
                     from,
                     value,
                     dataPtr
