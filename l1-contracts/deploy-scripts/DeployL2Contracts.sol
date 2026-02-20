@@ -43,7 +43,7 @@ contract DeployL2Script is Script {
         address consensusRegistryOwner;
     }
 
-    struct DeployedContrats {
+    struct DeployedContracts {
         address l2DaValidatorAddress;
         address forceDeployUpgraderAddress;
         address consensusRegistryImplementation;
