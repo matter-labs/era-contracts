@@ -11,7 +11,6 @@ use crate::config::{
     forge_interface::{
         deploy_ctm::{input::DeployCTMConfig, output::DeployCTMOutput},
         deploy_ecosystem::input::InitialDeploymentConfig,
-        permanent_values::PermanentValuesConfig,
         script_params::DEPLOY_CTM_SCRIPT_PARAMS,
     },
     traits::{ReadConfig, SaveConfig},
@@ -101,13 +100,6 @@ pub fn deploy(ctx: &mut ForgeContext, input: &CtmDeployInput) -> anyhow::Result<
     if let Some(salt) = input.create2_factory_salt {
         initial_deployment_config.create2_factory_salt = salt;
     }
-
-    // Update permanent-values.toml so Forge scripts use the correct factory
-    let permanent_values = PermanentValuesConfig::new(
-        initial_deployment_config.create2_factory_addr,
-        initial_deployment_config.create2_factory_salt,
-    );
-    permanent_values.save(ctx.shell, PermanentValuesConfig::path(ctx.foundry_scripts_path))?;
 
     let deploy_config = DeployCTMConfig::new(
         input.owner,
