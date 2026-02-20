@@ -567,6 +567,19 @@
   },
   {
     "type": "function",
+    "name": "isZKsyncOS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
     "name": "l1GenesisUpgrade",
     "inputs": [],
     "outputs": [
