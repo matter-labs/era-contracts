@@ -11,43 +11,46 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {TokenAlreadyInBridgedTokensList} from "contracts/bridge/L1BridgeContractErrors.sol";
 
-import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
 
 abstract contract L2NativeTokenVaultTokenIndexRegressionTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
+
+    function _deployLegacyL2Token() internal returns (address) {
+        return address(new TestnetERC20Token("LegacyToken", "LGC", 18));
+    }
+
+    function _setLegacyBridgeMapping(address _l2Token, address _l1Token) internal {
+        stdstore
+            .target(sharedBridgeLegacy)
+            .sig("l1TokenAddress(address)")
+            .with_key(_l2Token)
+            .checked_write(_l1Token);
+    }
 
     function test_regression_setLegacyTokenDataSetsTokenIndex() external {
         L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
         // First, add a dummy token to avoid the sentinel-0 issue
         // This ensures bridgedTokensCount > 0 before our test token
-        address dummyL2Token = makeAddr("dummyL2Token");
+        address dummyL2Token = _deployLegacyL2Token();
         address dummyL1Token = makeAddr("dummyL1Token");
-        vm.mockCall(
-            sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (dummyL2Token)),
-            abi.encode(dummyL1Token)
-        );
+        _setLegacyBridgeMapping(dummyL2Token, dummyL1Token);
         l2NativeTokenVault.setLegacyTokenAssetId(dummyL2Token);
 
         // Now set up the actual test token
-        address l2Token = makeAddr("l2LegacyToken");
+        address l2Token = _deployLegacyL2Token();
         address l1Token = makeAddr("l1Token");
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
 
-        // Mock the legacy bridge to return the L1 token address
-        vm.mockCall(
-            sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),
-            abi.encode(l1Token)
-        );
+        _setLegacyBridgeMapping(l2Token, l1Token);
 
         // Verify initial state
         uint256 initialCount = l2NativeTokenVault.bridgedTokensCount();
@@ -78,24 +81,15 @@ abstract contract L2NativeTokenVaultTokenIndexRegressionTestAbstract is Test, Sh
         L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
         // First, add a dummy token to move past index 0
-        address dummyL2Token = makeAddr("dummyL2Token");
+        address dummyL2Token = _deployLegacyL2Token();
         address dummyL1Token = makeAddr("dummyL1Token");
-        vm.mockCall(
-            sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (dummyL2Token)),
-            abi.encode(dummyL1Token)
-        );
+        _setLegacyBridgeMapping(dummyL2Token, dummyL1Token);
         l2NativeTokenVault.setLegacyTokenAssetId(dummyL2Token);
 
-        address l2Token = makeAddr("l2LegacyToken");
+        address l2Token = _deployLegacyL2Token();
         address l1Token = makeAddr("l1Token");
 
-        // Mock the legacy bridge
-        vm.mockCall(
-            sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),
-            abi.encode(l1Token)
-        );
+        _setLegacyBridgeMapping(l2Token, l1Token);
 
         // Register as legacy token (this sets tokenIndex to a value > 0)
         l2NativeTokenVault.setLegacyTokenAssetId(l2Token);
@@ -122,25 +116,16 @@ abstract contract L2NativeTokenVaultTokenIndexRegressionTestAbstract is Test, Sh
         L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
         // First, add a dummy token to move past index 0
-        address dummyL2Token = makeAddr("dummyL2Token");
+        address dummyL2Token = _deployLegacyL2Token();
         address dummyL1Token = makeAddr("dummyL1Token");
-        vm.mockCall(
-            sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (dummyL2Token)),
-            abi.encode(dummyL1Token)
-        );
+        _setLegacyBridgeMapping(dummyL2Token, dummyL1Token);
         l2NativeTokenVault.setLegacyTokenAssetId(dummyL2Token);
 
-        address l2Token = makeAddr("l2Token");
+        address l2Token = _deployLegacyL2Token();
         address l1Token = makeAddr("l1Token");
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
 
-        // Mock legacy bridge
-        vm.mockCall(
-            sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),
-            abi.encode(l1Token)
-        );
+        _setLegacyBridgeMapping(l2Token, l1Token);
 
         // Step 1: Register legacy token via setLegacyTokenAssetId
         l2NativeTokenVault.setLegacyTokenAssetId(l2Token);
@@ -181,13 +166,9 @@ abstract contract L2NativeTokenVaultTokenIndexRegressionTestAbstract is Test, Sh
         L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
         // First, add a dummy token to move past index 0
-        address dummyL2Token = makeAddr("dummyL2Token");
+        address dummyL2Token = _deployLegacyL2Token();
         address dummyL1Token = makeAddr("dummyL1Token");
-        vm.mockCall(
-            sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (dummyL2Token)),
-            abi.encode(dummyL1Token)
-        );
+        _setLegacyBridgeMapping(dummyL2Token, dummyL1Token);
         l2NativeTokenVault.setLegacyTokenAssetId(dummyL2Token);
 
         uint256 originChainId = L1_CHAIN_ID;
@@ -212,12 +193,8 @@ abstract contract L2NativeTokenVaultTokenIndexRegressionTestAbstract is Test, Sh
         assertTrue(initialCount > 0, "Should have at least one token from dummy setup");
         assertEq(l2NativeTokenVault.tokenIndex(assetId), 0, "tokenIndex should be 0 initially");
 
-        // Mock legacy bridge to trigger the legacy token path
-        vm.mockCall(
-            sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (expectedL2TokenAddress)),
-            abi.encode(originToken)
-        );
+        // Set legacy bridge mapping to trigger the legacy token path.
+        _setLegacyBridgeMapping(expectedL2TokenAddress, originToken);
         vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IBridgedStandardToken.bridgeMint, (receiver, amount)), "");
         vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20.totalSupply, ()), abi.encode(amount));
 
@@ -237,10 +214,10 @@ abstract contract L2NativeTokenVaultTokenIndexRegressionTestAbstract is Test, Sh
 
     /// @notice Test the consistency of tokenIndex and bridgedTokens array
     /// @dev Verifies that _addTokenToTokensList properly maintains the mapping
-    function testFuzz_regression_legacyTokenIndexConsistency(address l2Token, address l1Token) external {
-        vm.assume(l2Token != address(0));
+    function testFuzz_regression_legacyTokenIndexConsistency(address l1Token) external {
         vm.assume(l1Token != address(0));
-        vm.assume(l2Token != l1Token);
+
+        address l2Token = _deployLegacyL2Token();
 
         L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
@@ -249,13 +226,13 @@ abstract contract L2NativeTokenVaultTokenIndexRegressionTestAbstract is Test, Sh
         if (l2NativeTokenVault.assetId(l2Token) != bytes32(0)) {
             return;
         }
+        // Skip if this assetId is already bound to another token in the fixture.
+        address existingTokenAddress = l2NativeTokenVault.tokenAddress(assetId);
+        if (existingTokenAddress != address(0) && existingTokenAddress != l2Token) {
+            return;
+        }
 
-        // Mock legacy bridge
-        vm.mockCall(
-            sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),
-            abi.encode(l1Token)
-        );
+        _setLegacyBridgeMapping(l2Token, l1Token);
 
         uint256 countBefore = l2NativeTokenVault.bridgedTokensCount();
 
@@ -282,15 +259,11 @@ abstract contract L2NativeTokenVaultTokenIndexRegressionTestAbstract is Test, Sh
         // Note: In practice, there may be tokens already registered during setup
         uint256 initialCount = l2NativeTokenVault.bridgedTokensCount();
 
-        address l2Token = makeAddr("firstToken");
+        address l2Token = _deployLegacyL2Token();
         address l1Token = makeAddr("firstL1Token");
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
 
-        vm.mockCall(
-            sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),
-            abi.encode(l1Token)
-        );
+        _setLegacyBridgeMapping(l2Token, l1Token);
 
         // Register the token
         l2NativeTokenVault.setLegacyTokenAssetId(l2Token);

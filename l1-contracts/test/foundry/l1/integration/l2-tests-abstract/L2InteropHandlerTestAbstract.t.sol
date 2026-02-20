@@ -30,7 +30,6 @@ import {IMessageVerification} from "contracts/common/interfaces/IMessageVerifica
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
-import {NotInGatewayMode} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer {
     // Function selector for requestL2TransactionDirect(L2TransactionRequestDirect)
@@ -489,10 +488,9 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         );
     }
 
-    /// @notice Test that verifyBundle correctly reverts with NotInGatewayMode when settling on L1
-    /// @dev This test verifies the access to currentSettlementLayerChainId works but the
-    ///      business logic correctly rejects verification when not in gateway mode
-    function test_regression_verifyBundleRevertsWhenSettlingOnL1() public {
+    /// @notice Test that verifyBundle works while settling on L1.
+    /// @dev Bundle verification itself is not restricted to gateway mode.
+    function test_regression_verifyBundleWorksWhenSettlingOnL1() public {
         // Set the L1_CHAIN_ID storage variable in InteropHandler
         // (The test setup doesn't call initL2, so L1_CHAIN_ID is uninitialized at slot 0)
         vm.store(L2_INTEROP_HANDLER_ADDR, bytes32(0), bytes32(uint256(L1_CHAIN_ID)));
@@ -516,10 +514,14 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             abi.encode(L1_CHAIN_ID)
         );
 
-        // The call to currentSettlementLayerChainId should succeed (access control fixed),
-        // but the function should revert with NotInGatewayMode because we're settling on L1
-        vm.expectRevert(NotInGatewayMode.selector);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
+
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            1, // BundleStatus.Verified
+            "Bundle should be in Verified status"
+        );
     }
 
     /// @notice Test that executeBundle works in gateway mode by accessing currentSettlementLayerChainId

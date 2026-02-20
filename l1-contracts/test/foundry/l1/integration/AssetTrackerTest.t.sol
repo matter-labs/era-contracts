@@ -257,6 +257,12 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
             abi.encode(migrationNumber)
         );
+        // Ensure the token is registered before it can be migrated and NTV balance is already migrated.
+        vm.prank(address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault));
+        L1AssetTracker(address(assetTracker)).registerNewToken(assetId, originalChainId);
+        vm.prank(address(assetTracker));
+        IL1NativeTokenVault(address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault))
+            .migrateTokenBalanceToAssetTracker(eraZKChainId, assetId);
         // Capture balances before migration
         uint256 chainBalanceBefore = L1AssetTracker(address(assetTracker)).chainBalance(eraZKChainId, assetId);
 
@@ -424,6 +430,12 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
             abi.encode(migrationNumber)
         );
+        // Ensure the token is registered before it can be migrated and NTV balance is already migrated.
+        vm.prank(address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault));
+        L1AssetTracker(address(assetTracker)).registerNewToken(assetId, originalChainId);
+        vm.prank(address(assetTracker));
+        IL1NativeTokenVault(address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault))
+            .migrateTokenBalanceToAssetTracker(eraZKChainId, assetId);
         console.log("chainAssetHandler", address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler));
 
         // Capture balance before migration
@@ -463,12 +475,19 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         // Test migrating token balance from NTV for an L2 chain
         uint256 testChainId = eraZKChainId;
         uint256 migratedBalance = 5000;
+        uint256[] memory chainIds = new uint256[](1);
+        chainIds[0] = testChainId;
 
         // Set origin chain ID (different from test chain)
         vm.mockCall(
             address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault),
             abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, assetId),
             abi.encode(originalChainId)
+        );
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
+            abi.encode(chainIds)
         );
 
         // Mock the migrateTokenBalanceToAssetTracker call
@@ -482,12 +501,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encode(migratedBalance)
         );
 
-        // Set initial origin chain balance to MAX_TOKEN_BALANCE
-        bytes32 maxTokenBalance = bytes32(type(uint256).max);
-        vm.store(address(assetTracker), getChainBalanceLocation(assetId, originalChainId), maxTokenBalance);
-
         // Call the migration function
-        assetTracker.migrateTokenBalanceFromNTVV31(testChainId, assetId);
+        assetTracker.migrateTokenBalanceFromNTVV31(assetId);
 
         // Verify balances updated correctly
         uint256 originBalance = uint256(
@@ -529,7 +544,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.store(address(assetTracker), getChainBalanceLocation(assetId, differentOriginChain), maxTokenBalance);
 
         // Call the migration function for L1 (current chain)
-        assetTracker.migrateTokenBalanceFromNTVV31(originalChainId, assetId);
+        assetTracker.migrateTokenBalanceFromNTVV31(assetId);
 
         // Verify balances updated correctly
         uint256 originBalance = uint256(
@@ -577,6 +592,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, targetChainId),
             abi.encode(baseTokenAssetId)
         );
+        vm.prank(address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault));
+        L1AssetTracker(address(assetTracker)).registerNewToken(testAssetId, originalChainId);
 
         // Set up initial balances
         vm.store(address(assetTracker), getChainBalanceLocation(testAssetId, originalChainId), bytes32(uint256(10000)));
@@ -716,7 +733,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         // Attempt to migrate the unknown asset - should revert with InvalidChainId
         // Before the fix, this would succeed and poison state
         vm.expectRevert(InvalidChainId.selector);
-        assetTracker.migrateTokenBalanceFromNTVV31(testChainId, unknownAssetId);
+        assetTracker.migrateTokenBalanceFromNTVV31(unknownAssetId);
 
         // Verify state was NOT poisoned (chainBalance[0][unknownAssetId] should still be 0)
         uint256 finalChainBalance0 = uint256(vm.load(address(assetTracker), chainBalanceSlot0));
@@ -745,15 +762,17 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         // After the fix, this should revert immediately
         vm.expectRevert(InvalidChainId.selector);
-        assetTracker.migrateTokenBalanceFromNTVV31(attackerChainId, futureAssetId);
+        assetTracker.migrateTokenBalanceFromNTVV31(futureAssetId);
     }
 
     /// @notice Test that registered assets can still be migrated correctly
     /// @dev Ensures the fix doesn't break legitimate migration operations
     function test_regression_migrateTokenBalanceFromNTVV31_worksForRegisteredAsset() public {
-        // Use an already registered asset
+        // Use a known legacy asset (originChainId != 0)
         uint256 testChainId = eraZKChainId;
         uint256 migratedBalance = 5000;
+        uint256[] memory chainIds = new uint256[](1);
+        chainIds[0] = testChainId;
 
         // Mock origin chain to be different from testChainId and non-zero
         uint256 registeredOriginChain = originalChainId;
@@ -761,6 +780,11 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault),
             abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, assetId),
             abi.encode(registeredOriginChain)
+        );
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
+            abi.encode(chainIds)
         );
 
         // Mock the migration to return a balance
@@ -774,15 +798,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encode(migratedBalance)
         );
 
-        // Set initial origin chain balance
-        vm.store(
-            address(assetTracker),
-            getChainBalanceLocation(assetId, registeredOriginChain),
-            bytes32(type(uint256).max)
-        );
-
-        // This should succeed for a registered asset (originChainId != 0)
-        assetTracker.migrateTokenBalanceFromNTVV31(testChainId, assetId);
+        // This should succeed for a known asset (originChainId != 0)
+        assetTracker.migrateTokenBalanceFromNTVV31(assetId);
 
         // Verify balance was migrated correctly
         uint256 testChainBalance = uint256(
@@ -810,7 +827,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         // Should always revert for unknown assets
         vm.expectRevert(InvalidChainId.selector);
-        assetTracker.migrateTokenBalanceFromNTVV31(randomChainId, randomAssetId);
+        assetTracker.migrateTokenBalanceFromNTVV31(randomAssetId);
     }
 
     // add this to be excluded from coverage report
