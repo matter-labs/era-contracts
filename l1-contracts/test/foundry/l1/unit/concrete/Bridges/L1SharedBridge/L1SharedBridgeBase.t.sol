@@ -379,10 +379,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         vm.mockCall(
             messageRootAddress,
             // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                IMessageVerification.proveL2MessageInclusionShared.selector,
-                chainId
-            ),
+            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector, chainId),
             abi.encode(true)
         );
 
