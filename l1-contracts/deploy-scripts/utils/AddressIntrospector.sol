@@ -200,7 +200,10 @@ library AddressIntrospector {
         return _getCTMAddressesInternal(address(_ctm), false, _ctm.isZKsyncOS());
     }
 
-    function getCTMAddressesV29(address _ctmAddr, bool isZKsyncOS) public view returns (CTMDeployedAddresses memory info) {
+    function getCTMAddressesV29(
+        address _ctmAddr,
+        bool isZKsyncOS
+    ) public view returns (CTMDeployedAddresses memory info) {
         if (_ctmAddr == address(0) || _ctmAddr.code.length == 0) {
             return info;
         }
