@@ -197,22 +197,22 @@ library AddressIntrospector {
     // ============ CTM Addresses ============
 
     function getCTMAddresses(ChainTypeManagerBase _ctm) public view returns (CTMDeployedAddresses memory info) {
-        return _getCTMAddressesInternal(address(_ctm), false);
+        return _getCTMAddressesInternal(address(_ctm), false, _ctm.isZKsyncOS());
     }
 
-    function getCTMAddressesV29(address _ctmAddr) public view returns (CTMDeployedAddresses memory info) {
+    function getCTMAddressesV29(address _ctmAddr, bool isZKsyncOS) public view returns (CTMDeployedAddresses memory info) {
         if (_ctmAddr == address(0) || _ctmAddr.code.length == 0) {
             return info;
         }
-        return _getCTMAddressesInternal(_ctmAddr, true);
+        return _getCTMAddressesInternal(_ctmAddr, true, isZKsyncOS);
     }
 
     function _getCTMAddressesInternal(
         address _ctmAddr,
-        bool isV29
+        bool isV29,
+        bool isZKsyncOS
     ) private view returns (CTMDeployedAddresses memory info) {
         ChainTypeManagerBase ctm = ChainTypeManagerBase(_ctmAddr);
-        bool isZKsyncOS = ctm.isZKsyncOS();
 
         address validatorTimelock = ctm.validatorTimelockPostV29();
 

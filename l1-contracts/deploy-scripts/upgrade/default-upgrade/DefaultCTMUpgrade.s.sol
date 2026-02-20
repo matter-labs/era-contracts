@@ -385,7 +385,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         // Use appropriate introspection based on version
         if (useV29Introspection) {
-            ctmAddresses = AddressIntrospector.getCTMAddressesV29(ctm);
+            ctmAddresses = AddressIntrospector.getCTMAddressesV29(ctm, config.isZKsyncOS);
             coreAddresses = AddressIntrospector.getCoreDeployedAddressesV29(bridgehubAddr);
 
             // V29 introspection returns zero for bytecodesSupplier, overwrite with correct value
