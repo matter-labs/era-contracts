@@ -656,10 +656,6 @@ object "Bootloader" {
                 ret := 0x000000000000000000000000000000000000800e
             }
 
-            function CODE_ORACLE_ADDR() -> ret {
-                ret := 0x0000000000000000000000000000000000008012
-            }
-
             function MAX_SYSTEM_CONTRACT_ADDR() -> ret {
                 ret := 0x000000000000000000000000000000000000ffff
             }
@@ -2255,6 +2251,10 @@ object "Bootloader" {
                 }
 
                 versionedCodeHash := mload(0)
+            }
+
+            function CODE_ORACLE_ADDR() -> ret {
+                ret := 0x0000000000000000000000000000000000008012
             }
 
             function fetchBytecodeByVersionedHash(versionedCodeHash) -> retSize {
