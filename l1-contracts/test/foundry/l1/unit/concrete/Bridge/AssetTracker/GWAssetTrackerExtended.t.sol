@@ -21,7 +21,7 @@ import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol
 import {BALANCE_CHANGE_VERSION, INTEROP_BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
-import {InvalidCanonicalTxHash, RegisterNewTokenNotAllowed, InvalidFunctionSignature, InvalidBuiltInContractMessage, InvalidEmptyMessageRoot, InvalidL2ShardId, InvalidServiceLog, InvalidInteropBalanceChange} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {InvalidCanonicalTxHash, RegisterNewTokenNotAllowed, InvalidFunctionSignature, InvalidBuiltInContractMessage, InvalidEmptyMessageRoot, InvalidL2ShardId, InvalidServiceLog} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {Unauthorized, ChainIdNotRegistered, InvalidMessage, ReconstructionMismatch, InvalidInteropCalldata} from "contracts/common/L1ContractErrors.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -329,7 +329,14 @@ contract GWAssetTrackerExtendedTest is Test {
         );
 
         vm.prank(mockZKChain);
-        vm.expectRevert(abi.encodeWithSelector(InvalidInteropBalanceChange.selector, bundleHash));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                InvalidBuiltInContractMessage.selector,
+                uint256(0),
+                uint256(0),
+                bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR)))
+            )
+        );
         gwAssetTracker.processLogsAndMessages(input);
     }
 

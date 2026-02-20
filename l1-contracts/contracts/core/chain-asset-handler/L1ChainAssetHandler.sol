@@ -14,7 +14,6 @@ import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
-import {IL1AssetTracker} from "../../bridge/asset-tracker/IL1AssetTracker.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
 import {ChainNotReadyForMigration, ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
@@ -163,15 +162,14 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     }
 
     /// @notice Returns whether a chain can be migrated from L1 to a settlement layer.
-    /// @dev A chain is ready only when its base token has become interoperable on L1AssetTracker.
+    /// @dev A chain is ready only when its legacy base-token balance in L1NativeTokenVault has been migrated.
     /// @param _chainId The chain id to check.
     /// @return True if migration preconditions are met.
     function isReadyForMigration(uint256 _chainId) public view returns (bool) {
         bytes32 baseAssetId = BRIDGEHUB.baseTokenAssetId(_chainId);
         IL1AssetRouter l1AssetRouter = IL1AssetRouter(address(_assetRouter()));
         IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(address(l1AssetRouter.nativeTokenVault()));
-        IL1AssetTracker l1AssetTracker = nativeTokenVault.l1AssetTracker();
-        return l1AssetTracker.isInteroperable(_chainId, baseAssetId);
+        return nativeTokenVault.chainBalance(_chainId, baseAssetId) == 0;
     }
 
     function _setMigrationInProgressOnL1(uint256 _chainId) internal override {

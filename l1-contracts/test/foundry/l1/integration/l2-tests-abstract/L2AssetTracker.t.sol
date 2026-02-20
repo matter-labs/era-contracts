@@ -7,17 +7,20 @@ import {StdStorage, Test, stdStorage, console} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
-import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER, L2_ASSET_TRACKER_ADDR, L2_CHAIN_ASSET_HANDLER, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER, L2_ASSET_TRACKER_ADDR, L2_CHAIN_ASSET_HANDLER, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {MAX_TOKEN_BALANCE} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
+import {InvalidFunctionSignature} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 
 import {L2AssetTrackerData} from "./L2AssetTrackerData.sol";
 
 abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
+
+    bytes4 internal constant DEPRECATED_FINALIZE_INTEROP_SELECTOR = 0x8e29043a;
 
     function test_processLogsAndMessages() public {
         finalizeDepositWithChainId(271);
@@ -119,19 +122,71 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
                 abi.encodeCall(GW_ASSET_TRACKER.processLogsAndMessages, testData[i])
             );
 
-            if (!success) {
-                assembly {
-                    revert(add(data, 0x20), mload(data))
-                }
-            }
+            bool hasDeprecatedSelector = _containsDeprecatedAssetTrackerSelector(testData[i]);
+            if (hasDeprecatedSelector) {
+                assertFalse(
+                    success,
+                    string.concat("processLogsAndMessages should revert for deprecated selector at iteration ", vm.toString(i))
+                );
 
-            assertTrue(success, string.concat("processLogsAndMessages should succeed for iteration ", vm.toString(i)));
-            successCount++;
-            console.log("success", i);
+                bytes4 revertSelector;
+                bytes4 invalidFunctionSelector;
+                assembly {
+                    revertSelector := mload(add(data, 0x20))
+                    invalidFunctionSelector := mload(add(data, 0x24))
+                }
+                assertEq(
+                    revertSelector,
+                    InvalidFunctionSignature.selector,
+                    "Expected InvalidFunctionSignature for deprecated selector"
+                );
+                assertEq(
+                    invalidFunctionSelector,
+                    DEPRECATED_FINALIZE_INTEROP_SELECTOR,
+                    "Unexpected invalid function signature payload"
+                );
+            } else {
+                if (!success) {
+                    assembly {
+                        revert(add(data, 0x20), mload(data))
+                    }
+                }
+                assertTrue(success, string.concat("processLogsAndMessages should succeed for iteration ", vm.toString(i)));
+                successCount++;
+                console.log("success", i);
+            }
         }
 
-        // Verify all iterations succeeded
-        assertEq(successCount, testData.length, "All processLogsAndMessages calls should succeed");
+        // Verify all non-deprecated iterations succeeded
+        uint256 expectedSuccessCount = 0;
+        for (uint256 i = 0; i < testData.length; i++) {
+            if (!_containsDeprecatedAssetTrackerSelector(testData[i])) {
+                expectedSuccessCount++;
+            }
+        }
+        assertEq(successCount, expectedSuccessCount, "All non-deprecated processLogsAndMessages calls should succeed");
+    }
+
+    function _containsDeprecatedAssetTrackerSelector(ProcessLogsInput memory input) internal pure returns (bool) {
+        uint256 msgCount = 0;
+        bytes32 assetTrackerAddressKey = bytes32(uint256(uint160(L2_ASSET_TRACKER_ADDR)));
+
+        for (uint256 i = 0; i < input.logs.length; i++) {
+            if (input.logs[i].sender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
+                continue;
+            }
+
+            bytes memory message = input.messages[msgCount++];
+            if (
+                input.logs[i].key == assetTrackerAddressKey &&
+                message.length >= 4 &&
+                bytes4(message) == DEPRECATED_FINALIZE_INTEROP_SELECTOR
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     function getTxHashes(ProcessLogsInput memory input) public returns (bytes32[] memory) {
@@ -164,8 +219,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         /// its just here so that the ProcessLogsInput is printed in console
     }
 
-    function test_migrateTokenBalanceFromNTVV31() public {
-        // Test migrating token balance from NTV to AssetTracker for V31 upgrade
+    function test_populateTotalPreV31TotalSupply_nativeToken() public {
         bytes32 assetId = keccak256("test_asset_id");
 
         // Mock the asset as being native to the current chain
@@ -183,15 +237,6 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             .with_key(assetId)
             .checked_write(uint256(uint160(mockTokenAddress)));
 
-        // Set initial chainBalance (pre-V31 tracking)
-        uint256 initialChainBalance = 1000;
-        stdstore
-            .target(L2_ASSET_TRACKER_ADDR)
-            .sig("chainBalance(uint256,bytes32)")
-            .with_key(block.chainid)
-            .with_key(assetId)
-            .checked_write(initialChainBalance);
-
         // Mock NTV balance (tokens locked from previous bridge operations)
         uint256 ntvBalance = 300;
         vm.mockCall(
@@ -201,11 +246,11 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         );
 
         // Call the migration function
-        L2_ASSET_TRACKER.migrateTokenBalanceFromNTVV31(assetId);
+        L2_ASSET_TRACKER.populateTotalPreV31TotalSupply(assetId);
 
         // Verify chainBalance was calculated correctly
-        // Expected: MAX_TOKEN_BALANCE - initialChainBalance - ntvBalance
-        uint256 expectedBalance = MAX_TOKEN_BALANCE - initialChainBalance - ntvBalance;
+        // Expected: MAX_TOKEN_BALANCE - ntvBalance
+        uint256 expectedBalance = MAX_TOKEN_BALANCE - ntvBalance;
         uint256 actualBalance = L2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, assetId);
 
         assertEq(actualBalance, expectedBalance, "Chain balance should be correctly migrated");
@@ -215,6 +260,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         // Test handling base token bridging out from L2
         bytes32 baseTokenAssetId = keccak256("base_token_asset_id");
         uint256 amount = 500;
+        uint256 initialBalance = 1000;
 
         // Mock base token asset ID
         stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
@@ -226,8 +272,20 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             .with_key(baseTokenAssetId)
             .checked_write(block.chainid);
 
+        address mockBaseTokenAddress = address(0xBEEF);
+        stdstore
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
+            .sig("tokenAddress(bytes32)")
+            .with_key(baseTokenAssetId)
+            .checked_write(uint256(uint160(mockBaseTokenAddress)));
+
+        vm.mockCall(
+            mockBaseTokenAddress,
+            abi.encodeWithSelector(IERC20.totalSupply.selector),
+            abi.encode(initialBalance)
+        );
+
         // Set initial chain balance
-        uint256 initialBalance = 1000;
         stdstore
             .target(L2_ASSET_TRACKER_ADDR)
             .sig("chainBalance(uint256,bytes32)")

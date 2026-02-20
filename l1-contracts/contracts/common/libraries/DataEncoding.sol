@@ -11,8 +11,7 @@ import {WrongMsgLength} from "../../bridge/L1BridgeContractErrors.sol";
 import {UnsafeBytes} from "./UnsafeBytes.sol";
 import {
     GatewayToL1TokenBalanceMigrationData,
-    L1ToGatewayTokenBalanceMigrationData,
-    MakeInteroperableData
+    L1ToGatewayTokenBalanceMigrationData
 } from "../../common/Messaging.sol";
 import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol";
 
@@ -378,15 +377,6 @@ library DataEncoding {
         functionSignature = bytes4(functionSignatureUint);
         bytes memory transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
         data = abi.decode(transferData, (GatewayToL1TokenBalanceMigrationData));
-    }
-
-    function decodeMakeInteroperableData(
-        bytes memory _l2ToL1message
-    ) internal pure returns (bytes4 functionSignature, MakeInteroperableData memory data) {
-        (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
-        functionSignature = bytes4(functionSignatureUint);
-        bytes memory transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
-        data = abi.decode(transferData, (MakeInteroperableData));
     }
 
     function getSelector(bytes memory _data) internal pure returns (bytes4) {

@@ -322,8 +322,9 @@ struct ProofData {
 /// @param tokenOriginChainId Origin chain for the token.
 /// @param chainMigrationNumber Chain migration number this message is tied to.
 /// @param assetMigrationNumber Asset migration number currently known on L2.
-/// @param totalWithdrawalsToL1 Total withdrawals initiated from L2 to L1 since interoperability conversion.
-/// @param totalSuccessfulDepositsFromL1 Total successful deposits finalized on L2 since interoperability conversion.
+/// @param totalWithdrawalsToL1 Total withdrawals initiated from L2 to L1 since v31 tracking started.
+/// @param totalSuccessfulDepositsFromL1 Total successful deposits finalized on L2 since v31 tracking started.
+/// @param totalPreV31TotalSupply Token total supply snapshot captured on L2 before first post-v31 bridge operation.
 struct L1ToGatewayTokenBalanceMigrationData {
     bytes1 version;
     address originToken;
@@ -334,6 +335,7 @@ struct L1ToGatewayTokenBalanceMigrationData {
     uint256 assetMigrationNumber;
     uint256 totalWithdrawalsToL1;
     uint256 totalSuccessfulDepositsFromL1;
+    uint256 totalPreV31TotalSupply;
 }
 
 /// @dev L2 -> L1 message payload used when migrating token balance from Gateway tracking back to L1 tracking.
@@ -372,16 +374,6 @@ struct MigrationConfirmationData {
     uint256 amount;
     uint256 assetMigrationNumber;
     bool isL1ToGateway;
-}
-
-/// @dev L2 -> L1 callback payload for interoperability conversion.
-/// @param version Encoding version.
-/// @param assetId Asset id that has been converted on L2.
-/// @param totalSupply Current total supply reported by L2 at conversion finalization.
-struct MakeInteroperableData {
-    uint256 version;
-    bytes32 assetId;
-    uint256 totalSupply;
 }
 
 struct BalanceChange {

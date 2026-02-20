@@ -178,8 +178,9 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             tokenOriginChainId: originalChainId,
             chainMigrationNumber: migrationNumber,
             assetMigrationNumber: migrationNumber - 1,
-            totalWithdrawalsToL1: amount,
-            totalSuccessfulDepositsFromL1: 0
+            totalWithdrawalsToL1: 0,
+            totalSuccessfulDepositsFromL1: 0,
+            totalPreV31TotalSupply: 0
         });
         MigrationConfirmationData memory confirmData = MigrationConfirmationData({
             chainId: eraZKChainId,

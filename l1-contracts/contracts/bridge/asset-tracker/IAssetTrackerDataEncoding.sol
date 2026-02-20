@@ -4,8 +4,7 @@ pragma solidity ^0.8.21;
 
 import {
     GatewayToL1TokenBalanceMigrationData,
-    L1ToGatewayTokenBalanceMigrationData,
-    MakeInteroperableData
+    L1ToGatewayTokenBalanceMigrationData
 } from "../../common/Messaging.sol";
 
 interface IAssetTrackerDataEncoding {
@@ -14,7 +13,4 @@ interface IAssetTrackerDataEncoding {
 
     /// @notice Selector-only helper used for decoding Gateway->L1 migration messages on L1.
     function receiveGatewayToL1MigrationOnL1(GatewayToL1TokenBalanceMigrationData calldata _data) external;
-
-    /// @notice Selector-only helper used for decoding interoperability conversion callback messages on L1.
-    function finalizeMakeInteroperable(MakeInteroperableData calldata _data) external;
 }

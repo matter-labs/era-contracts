@@ -7,12 +7,10 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {
     MAX_TOKEN_BALANCE,
     SavedTotalSupply,
-    TOKEN_BALANCE_MIGRATION_DATA_VERSION,
-    TokenInteropStatus
+    TOKEN_BALANCE_MIGRATION_DATA_VERSION
 } from "./IAssetTrackerBase.sol";
 import {
     L1ToGatewayTokenBalanceMigrationData,
-    MakeInteroperableData,
     MigrationConfirmationData
 } from "../../common/Messaging.sol";
 import {
@@ -22,27 +20,20 @@ import {
     L2_COMPLEX_UPGRADER_ADDR,
     L2_NATIVE_TOKEN_VAULT,
     L2_NATIVE_TOKEN_VAULT_ADDR,
-    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT,
-    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
+    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
 } from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {InvalidChainId, Unauthorized} from "../../common/L1ContractErrors.sol";
 
 import {
     AssetIdNotRegistered,
-    InvalidInteropStatus,
     MaxChainBalanceAlreadyAssigned,
     MissingBaseTokenAssetId,
-    NonInteroperableTokenInvalidCounterpart,
-    NonInteroperableTokenWrongSettlementLayer,
     OnlyGatewaySettlementLayer,
     TokenBalanceNotMigratedToGateway
 } from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
-import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
-
-uint256 constant MAKE_INTEROPERABLE_MESSAGE_VERSION = 1;
 
 contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     struct InteropL2Info {
@@ -61,6 +52,15 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// @dev L2-side accounting used to compute the amount to keep on L1 during L1 -> Gateway migration.
     mapping(bytes32 assetId => InteropL2Info info) internal interopInfo;
+
+    /// @dev Token total supply snapshot captured before the first post-v31 bridge operation for each token.
+    /// @dev For tokens that existed before the chain migrated to v31, it should be equal to `totalSuccessfulDeposits - totalWithdrawalsToL1`.
+    /// - If a token is bridged tokens, it is equal to its `totalSupply()`. 
+    /// - If a token is a native token, it is equal to the `2^256-1 - balanceOf of the native token vault`, i.e. one 
+    /// could image there was a big successful deposit at the inception time of 2^256-1 and then the withdrawals behaved the same way as for
+    /// the bridged L2 tokens. 
+    /// @dev For native tokens, it is expected to be populated atomatically with `maxChainBalanceAssigned[block.chainid]`.
+    mapping(bytes32 assetId => SavedTotalSupply snapshot) internal totalPreV31TotalSupply;
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -112,10 +112,13 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _registerTokenOnL2(_assetId);
         if (_originChainId == block.chainid) {
             _assignMaxChainBalance(_originChainId, _assetId);
+            // By convention, we treat native tokens as those that had an infinite deposit
+            // at the inception of the chain, so we set the `totalPreV31TotalSupply` to MAX_TOKEN_BALANCE to reflect that. 
+            totalPreV31TotalSupply[_assetId] = SavedTotalSupply({
+                isSaved: true, 
+                amount: MAX_TOKEN_BALANCE
+            });
         }
-
-        // New tokens can be interoperable immediately since there is no legacy accounting to preserve.
-        _makeInteroperable(_assetId, block.chainid);
     }
 
     function _registerTokenOnL2(bytes32 _assetId) internal {
@@ -133,35 +136,11 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _registerTokenOnL2(_assetId);
     }
 
-    /// @notice Migrates token balance tracking from NativeTokenVault to AssetTracker for V31 upgrade.
-    /// @dev This function calculates the correct chainBalance by accounting for tokens currently held in the NTV.
-    /// @dev The chainBalance represents how much of the token supply is "available" for bridging out.
-    /// @param _assetId The asset id of the token to migrate the token balance for.
-    function migrateTokenBalanceFromNTVV31(bytes32 _assetId) external {
-        INativeTokenVaultBase ntv = _nativeTokenVault();
-
-        // Validate that this is a token native to the current L2
-        uint256 originChainId = ntv.originChainId(_assetId);
-        require(originChainId == block.chainid, InvalidChainId());
-
-        // Get token address
-        address tokenAddress = ntv.tokenAddress(_assetId);
-        require(tokenAddress != address(0), AssetIdNotRegistered(_assetId));
-
-        // Prevent re-initialization if already set
-        require(!maxChainBalanceAssigned[_assetId], MaxChainBalanceAlreadyAssigned(_assetId));
-
-        // Mark chainBalance as assigned
-        maxChainBalanceAssigned[_assetId] = true;
-
-        // Initialize chainBalance
-        // For origin chains, chainBalance starts at MAX_TOKEN_BALANCE and decreases as tokens are bridged out.
-        // We need to account for tokens currently locked in the NTV from previous bridge operations.
-        uint256 ntvBalance = IERC20(tokenAddress).balanceOf(address(ntv));
-        // First, flip the existing chainBalance calculation (was tracking bridged out, now tracks available).
-        chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE - chainBalance[originChainId][_assetId];
-        // Then subtract tokens currently locked in NTV (these were already "bridged out" in pre-V31).
-        chainBalance[originChainId][_assetId] -= ntvBalance;
+    /// @notice Stores token total supply snapshot used for pre-v31 migration accounting.
+    /// @dev Anyone can call this to eagerly initialize the snapshot before the first bridge operation.
+    function populateTotalPreV31TotalSupply(bytes32 _assetId) external {
+        address tokenAddress = _tryGetTokenAddress(_assetId);
+        _populateTotalPreV31TotalSupplyIfNeeded(_assetId, tokenAddress);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -179,10 +158,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 _amount,
         uint256 _tokenOriginChainId
     ) external onlyL2NativeTokenVault {
-        if (_assetId != BASE_TOKEN_ASSET_ID && !_isInteroperable(_assetId, block.chainid)) {
-            _requireNonInteroperableFlowFromOrToL1(_toChainId);
-        }
-
         _handleInitiateBridgingOnL2Inner(_toChainId, _assetId, _amount, _tokenOriginChainId);
     }
 
@@ -192,13 +167,16 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 _amount,
         uint256 _tokenOriginChainId
     ) internal {
+        address tokenAddress = _tryGetTokenAddress(_assetId);
+        _populateTotalPreV31TotalSupplyIfNeeded(_assetId, tokenAddress);
+
         _checkAssetMigrationNumber(_assetId);
         if (_tokenOriginChainId == block.chainid) {
             /// On the L2 we only save chainBalance for native tokens.
             _decreaseChainBalance(block.chainid, _assetId, _amount);
         }
 
-        if (_toChainId == L1_CHAIN_ID && _isInteroperable(_assetId, block.chainid)) {
+        if (_toChainId == L1_CHAIN_ID && L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == L1_CHAIN_ID) {
             interopInfo[_assetId].totalWithdrawalsToL1 += _amount;
         }
     }
@@ -241,10 +219,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 _tokenOriginChainId,
         address _tokenAddress
     ) external onlyL2NativeTokenVault {
-        if (_assetId != BASE_TOKEN_ASSET_ID && !_isInteroperable(_assetId, block.chainid)) {
-            _requireNonInteroperableFlowFromOrToL1(_fromChainId);
-        }
-
         _handleFinalizeBridgingOnL2Inner(_fromChainId, _assetId, _amount, _tokenOriginChainId, _tokenAddress);
     }
 
@@ -255,54 +229,68 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 _tokenOriginChainId,
         address _tokenAddress
     ) internal {
+        _populateTotalPreV31TotalSupplyIfNeeded(_assetId, _tokenAddress);
+
         if (_needToForceSetAssetMigrationOnL2(_assetId, _tokenOriginChainId, _tokenAddress)) {
             _forceSetAssetMigrationNumber(block.chainid, _assetId);
         }
 
-        /// We save the total supply for the first deposit after a migration.
-        uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
-        /// Here we don't care about the total supply, we only want to save it if it is not already saved.
-        // solhint-disable-next-line no-unused-vars
-        _getOrSaveTotalSupply(_assetId, migrationNumber, _tokenOriginChainId, _tokenAddress);
         /// On the L2 we only save chainBalance for native tokens.
         if (_tokenOriginChainId == block.chainid) {
             chainBalance[block.chainid][_assetId] += _amount;
         }
 
-        if (_fromChainId == L1_CHAIN_ID && _isInteroperable(_assetId, block.chainid)) {
+        if (_fromChainId == L1_CHAIN_ID && L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == L1_CHAIN_ID) {
             interopInfo[_assetId].totalSuccessfulDepositsFromL1 += _amount;
         }
     }
 
-    /// @notice This saves the total supply if it is not saved yet. It returns the saved total supply.
-    function _getOrSaveTotalSupply(
+    function _populateTotalPreV31TotalSupplyIfNeeded(
         bytes32 _assetId,
-        uint256 _migrationNumber,
-        uint256 _tokenOriginChainId,
         address _tokenAddress
     ) internal returns (uint256 _totalSupply) {
-        SavedTotalSupply memory tokenSavedTotalSupply = savedTotalSupply[_migrationNumber][_assetId];
-        if (!tokenSavedTotalSupply.isSaved) {
-            _totalSupply = _readTotalSupply(_assetId, _tokenOriginChainId, _tokenAddress);
-            /// This function saves the token supply before the first deposit after the chain migration is processed (in the same transaction).
-            /// This totalSupply is the chain's total supply at the moment of chain migration.
-            savedTotalSupply[_migrationNumber][_assetId] = SavedTotalSupply({isSaved: true, amount: _totalSupply});
-        } else {
-            _totalSupply = tokenSavedTotalSupply.amount;
+        // Firstly, we need to ensure that if the token is native to the current chain,
+        // it has its totalSupply correctly set up.
+        SavedTotalSupply memory snapshot = totalPreV31TotalSupply[_assetId];
+        if (snapshot.isSaved) {
+            return snapshot.amount;
         }
-    }
 
-    function _readTotalSupply(
-        bytes32 _assetId,
-        uint256 _tokenOriginChainId,
-        address _tokenAddress
-    ) internal view returns (uint256 _totalSupply) {
-        if (_tokenOriginChainId == block.chainid) {
-            _totalSupply = chainBalance[block.chainid][_assetId];
+        INativeTokenVaultBase ntv = _nativeTokenVault();
+
+        // Token is not new and yet it does not have the prev31 total supply saved,
+        // so it is a token that has been present on the chain before the v31 upgrade.
+        uint256 originChainId = ntv.originChainId(_assetId);
+        require(originChainId != 0, AssetIdNotRegistered(_assetId));
+        if(originChainId == block.chainid) {
+            // Invariant check: the only way how the max chain balance can be assigned to a chain
+            // is through the migraiton of the balance from the NTV.
+            require(!maxChainBalanceAssigned[_assetId], MaxChainBalanceAlreadyAssigned(_assetId));
+            // Invariant check: the chain balance of the origin chain should be 0 until the balance migration
+            // from NTV is complete.
+            require(chainBalance[originChainId][_assetId] == 0, "Chain balance should be 0 before migration");
+
+            // Initialize chainBalance
+            // For origin chains, chainBalance starts at MAX_TOKEN_BALANCE and decreases as tokens are bridged out.
+            // We need to account for tokens currently locked in the NTV from previous bridge operations.
+            // Note, that this logic treats "tokens sent direclty to L2NTV" and tokens bridged to L1 through NTV the same
+            // way. It is okay, since the tokens that have been sent to L1 are basically frozen anyway.
+            uint256 ntvBalance = IERC20(_tokenAddress).balanceOf(address(ntv));
+            uint256 chainTotalSupply = MAX_TOKEN_BALANCE - ntvBalance;
+
+            // We imagine that the chain started with MAX_TOKEN_BALANCE supply, and then some tokens were bridged out and are currently in the NTV.
+            chainBalance[originChainId][_assetId] = chainTotalSupply;
+
+            maxChainBalanceAssigned[_assetId] = true;
+
+            _totalSupply = chainTotalSupply;
+            totalPreV31TotalSupply[_assetId] = SavedTotalSupply({isSaved: true, amount: chainTotalSupply});
         } else {
             _totalSupply = IERC20(_tokenAddress).totalSupply();
+            totalPreV31TotalSupply[_assetId] = SavedTotalSupply({isSaved: true, amount: _totalSupply});
         }
     }
+        
 
     /// @notice Handles the finalization of incoming base token bridging operations on L2.
     /// @dev This function is specifically for the chain's native base token used for gas payments.
@@ -327,37 +315,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         );
     }
 
-    /// @notice Converts a legacy token into interoperable state and reports current counters to L1.
-    /// @param _assetId The asset id to convert.
-    function makeInteroperable(bytes32 _assetId) external onlyServiceTransactionSender {
-        TokenInteropStatus currentStatus = tokenInteropStatus[block.chainid][_assetId];
-        require(
-            currentStatus == TokenInteropStatus.NonInteroperable,
-            InvalidInteropStatus(
-                block.chainid,
-                _assetId,
-                TokenInteropStatus.NonInteroperable,
-                currentStatus
-            )
-        );
-
-        _makeInteroperable(_assetId, block.chainid);
-
-        address tokenAddress = _tryGetTokenAddress(_assetId);
-        uint256 originChainId = L2_NATIVE_TOKEN_VAULT.originChainId(_assetId);
-
-        MakeInteroperableData memory data = MakeInteroperableData({
-            version: MAKE_INTEROPERABLE_MESSAGE_VERSION,
-            assetId: _assetId,
-            totalSupply: _readTotalSupply(_assetId, originChainId, tokenAddress)
-        });
-
-        // slither-disable-next-line unused-return
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
-            abi.encodeCall(IAssetTrackerDataEncoding.finalizeMakeInteroperable, (data))
-        );
-    }
-
     /*//////////////////////////////////////////////////////////////
                     Gateway related token balance migration
     //////////////////////////////////////////////////////////////*/
@@ -371,9 +328,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
             OnlyGatewaySettlementLayer()
         );
-        _requireInteroperable(_assetId, block.chainid);
 
         address tokenAddress = _tryGetTokenAddress(_assetId);
+        uint256 readTotalPreV31TotalSupply = _populateTotalPreV31TotalSupplyIfNeeded(_assetId, tokenAddress);
 
         uint256 originChainId = L2_NATIVE_TOKEN_VAULT.originChainId(_assetId);
         address originalToken = L2_NATIVE_TOKEN_VAULT.originToken(_assetId);
@@ -384,7 +341,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             /// In this case the token was either already migrated, or the migration number was set using _forceSetAssetMigrationNumber.
             return;
         }
-        uint256 amount = _getOrSaveTotalSupply(_assetId, chainMigrationNumber, originChainId, tokenAddress);
 
         L1ToGatewayTokenBalanceMigrationData memory tokenBalanceMigrationData = L1ToGatewayTokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
@@ -395,11 +351,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             chainMigrationNumber: chainMigrationNumber,
             assetMigrationNumber: savedAssetMigrationNumber,
             totalWithdrawalsToL1: interopInfo[_assetId].totalWithdrawalsToL1,
-            totalSuccessfulDepositsFromL1: interopInfo[_assetId].totalSuccessfulDepositsFromL1
+            totalSuccessfulDepositsFromL1: interopInfo[_assetId].totalSuccessfulDepositsFromL1,
+            totalPreV31TotalSupply: readTotalPreV31TotalSupply
         });
         _sendL1ToGatewayMigrationDataToL1(tokenBalanceMigrationData);
 
-        emit IL2AssetTracker.L1ToGatewayMigrationInitiated(_assetId, block.chainid, amount);
+        emit IL2AssetTracker.L1ToGatewayMigrationInitiated(_assetId, block.chainid, readTotalPreV31TotalSupply);
     }
 
     /// @notice Confirms a migration operation has been completed and updates the asset migration number.
@@ -412,18 +369,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /*//////////////////////////////////////////////////////////////
                             Helper Functions
     //////////////////////////////////////////////////////////////*/
-
-    function _requireNonInteroperableFlowFromOrToL1(uint256 _counterpartChainId) internal view {
-        require(
-            _counterpartChainId == L1_CHAIN_ID,
-            NonInteroperableTokenInvalidCounterpart(_counterpartChainId, L1_CHAIN_ID)
-        );
-        uint256 currentSettlementLayer = L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId();
-        require(
-            currentSettlementLayer == L1_CHAIN_ID,
-            NonInteroperableTokenWrongSettlementLayer(currentSettlementLayer, L1_CHAIN_ID)
-        );
-    }
 
     /// @notice Determines if a token's migration number should be force-set during bridging operations.
     /// @param _assetId The asset ID of the token to check.

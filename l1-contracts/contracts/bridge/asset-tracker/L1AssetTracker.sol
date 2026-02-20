@@ -7,7 +7,6 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {
     GatewayToL1TokenBalanceMigrationData,
     L1ToGatewayTokenBalanceMigrationData,
-    MakeInteroperableData,
     MigrationConfirmationData
 } from "../../common/Messaging.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
@@ -24,29 +23,27 @@ import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {
-    ChainNotV31,
+    AmountToKeepOnL1NotUint256,
+    AssetNotMigratedFromNTV,
     InvalidAssetMigrationNumber,
     InvalidChainMigrationNumber,
     InvalidFunctionSignature,
-    InvalidInteropStatus,
-    InvalidMakeInteroperableAssetId,
     InvalidMigrationAmount,
     InvalidMigrationNumber,
-    InvalidPreInteropTransformDiff,
     InvalidSender,
     InvalidSettlementLayer,
     InvalidVersion,
     InvalidWithdrawalChainId,
     L1TotalSupplyAlreadyMigrated,
+    NTVChainBalanceNotMigrated,
     NotMigratedChain,
     OnlyWhitelistedSettlementLayer,
-    TotalSupplyNotAvailableForBaseToken,
     TransientBalanceChangeAlreadySet,
     UnexpectedSuccessfulDepositsValue
 } from "./AssetTrackerErrors.sol";
 import {V31UpgradeChainBatchNumberNotSet} from "../../core/bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
-import {TOKEN_BALANCE_MIGRATION_DATA_VERSION, TokenInteropStatus} from "./IAssetTrackerBase.sol";
+import {TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
@@ -54,21 +51,16 @@ import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IChainAssetHandlerBase} from "../../core/chain-asset-handler/IChainAssetHandler.sol";
 import {IL1MessageRoot} from "../../core/message-root/IL1MessageRoot.sol";
-import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
-
-uint256 constant MAKE_INTEROPERABLE_MESSAGE_VERSION = 1;
 
 contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
-    /// @dev Per-(chainId, assetId) interoperability accounting stored on L1.
-    /// @param totalDeposited Total amount deposited from L1 to the chain since interoperability conversion started.
-    /// @param totalClaimed Total amount claimed on L1 (withdrawals and failed deposits) since interoperability conversion started.
-    /// @param preInteropTransformDiff Difference between chain balance snapshot and L2-reported total supply at interoperability conversion finalization.
-    /// @param recordedChainBalanceDuringTransform Chain balance snapshot captured when interoperability conversion was initiated.
+    /// @dev Per-(chainId, assetId) migration accounting stored on L1.
+    /// @param preV31ChainBalance Chain balance that existed before v31 accounting started.
+    /// @param totalDepositedFromL1 Total amount deposited from L1 to the chain since v31 accounting started.
+    /// @param totalClaimedOnL1 Total amount claimed on L1 (withdrawals and failed deposits) since v31 accounting started.
     struct InteropL1Info {
-        uint256 totalDeposited;
-        uint256 totalClaimed;
-        uint256 preInteropTransformDiff;
-        uint256 recordedChainBalanceDuringTransform;
+        uint256 preV31ChainBalance;
+        uint256 totalDepositedFromL1;
+        uint256 totalClaimedOnL1;
     }
 
     IBridgehubBase public immutable BRIDGE_HUB;
@@ -130,13 +122,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         chainAssetHandler = IChainAssetHandlerBase(BRIDGE_HUB.chainAssetHandler());
     }
 
-    /// @notice Returns whether the token is interoperable for the provided chain.
-    /// @param _chainId Chain id to query.
-    /// @param _assetId Asset id to query.
-    function isInteroperable(uint256 _chainId, bytes32 _assetId) external view returns (bool) {
-        return _isInteroperable(_assetId, _chainId);
-    }
-
     /// @notice This function is used to migrate the token balance from the NTV to the AssetTracker for V31 upgrade.
     /// @param _chainId The chain id of the chain to migrate the token balance for.
     /// @param _assetId The asset id of the token to migrate the token balance for.
@@ -165,97 +150,21 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         _assignMaxChainBalanceIfNeeded(originChainId, _assetId);
         chainBalance[originChainId][_assetId] -= migratedBalance;
         chainBalance[_chainId][_assetId] += migratedBalance;
+        interopInfo[_chainId][_assetId].preV31ChainBalance += migratedBalance;
     }
 
     /// @inheritdoc AssetTrackerBase
     function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
         _assignMaxChainBalanceIfNeeded(_originChainId, _assetId);
-        _makeInteroperable(_assetId, _originChainId);
     }
 
     function _assignMaxChainBalanceIfNeeded(uint256 _originChainId, bytes32 _assetId) internal {
         if (!maxChainBalanceAssigned[_assetId]) {
             _assignMaxChainBalance(_originChainId, _assetId);
+            // For any new native token, we treat `preV31ChainBalance` as if at the moment of the inception
+            // there was an infinite deposit to the chain.
+            interopInfo[_originChainId][_assetId].preV31ChainBalance = type(uint256).max;
         }
-    }
-
-    /// @notice Starts interoperability conversion for a legacy token.
-    /// @dev This records chain balance snapshot and sends an L1->L2 service tx to convert the token on L2.
-    /// @param _chainId Chain id where the token is converted.
-    /// @param _assetId Asset id to convert.
-    function initiateMakeInteroperable(uint256 _chainId, bytes32 _assetId) external {
-        TokenInteropStatus currentStatus = tokenInteropStatus[_chainId][_assetId];
-        require(
-            currentStatus == TokenInteropStatus.NonInteroperable,
-            InvalidInteropStatus(
-                _chainId,
-                _assetId,
-                TokenInteropStatus.NonInteroperable,
-                currentStatus
-            )
-        );
-
-        // Note, that we start tracking interop info for the token even before we know that the L1->L2 transaction has succeeded,
-        // so it MUST succeed. It is expected to succeed if:
-        // - The chain is has at least version v31.
-        // - The total supply for the base token has been set (always the case except for zksync os chains that upgraded
-        // to v31) and their total supply needs to be backfilled.
-        require(!IL1MessageRoot(address(MESSAGE_ROOT)).isPreV31(_chainId), ChainNotV31(_chainId));
-
-        address zkChain = BRIDGE_HUB.getZKChain(_chainId);
-        require(zkChain != address(0), InvalidChainId());
-
-        // Legacy zksync-os chains may not have total supply for base token until a separate governance action.
-        bytes32 baseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
-        if (_assetId == baseTokenAssetId) {
-            require(IGetters(zkChain).baseTokenSupportsTotalSupply(), TotalSupplyNotAvailableForBaseToken(_chainId, _assetId));
-        }
-
-        _setPendingInteroperable(_assetId, _chainId);
-        interopInfo[_chainId][_assetId].recordedChainBalanceDuringTransform = chainBalance[_chainId][_assetId];
-
-        _sendToChain(_chainId, L2_ASSET_TRACKER_ADDR, abi.encodeCall(IL2AssetTracker.makeInteroperable, (_assetId)));
-    }
-
-    /// @notice Finalizes interoperability conversion for a legacy token.
-    /// @param _finalizeWithdrawalParams Inclusion proof data for the L2 callback message.
-    /// @param _assetId Asset id being finalized.
-    function finalizeMakeInteroperable(
-        FinalizeL1DepositParams calldata _finalizeWithdrawalParams,
-        bytes32 _assetId
-    ) external {
-        uint256 chainId = _finalizeWithdrawalParams.chainId;
-        TokenInteropStatus currentStatus = tokenInteropStatus[chainId][_assetId];
-        require(
-            currentStatus == TokenInteropStatus.PendingInteroperable,
-            InvalidInteropStatus(
-                chainId,
-                _assetId,
-                TokenInteropStatus.PendingInteroperable,
-                currentStatus
-            )
-        );
-
-        _proveMessageInclusion(_finalizeWithdrawalParams);
-
-        (bytes4 functionSignature, MakeInteroperableData memory data) = DataEncoding.decodeMakeInteroperableData(
-            _finalizeWithdrawalParams.message
-        );
-        require(
-            functionSignature == IAssetTrackerDataEncoding.finalizeMakeInteroperable.selector,
-            InvalidFunctionSignature(functionSignature)
-        );
-        require(data.version == MAKE_INTEROPERABLE_MESSAGE_VERSION, InvalidVersion());
-        require(data.assetId == _assetId, InvalidMakeInteroperableAssetId(_assetId, data.assetId));
-
-        uint256 recordedChainBalance = interopInfo[chainId][_assetId].recordedChainBalanceDuringTransform;
-        require(
-            recordedChainBalance >= data.totalSupply,
-            InvalidPreInteropTransformDiff(recordedChainBalance, data.totalSupply)
-        );
-
-        _makeInteroperable(_assetId, chainId);
-        interopInfo[chainId][_assetId].preInteropTransformDiff = recordedChainBalance - data.totalSupply;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -282,8 +191,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             if (baseTokenAssetId != _assetId) {
                 _setTransientBalanceChange(_chainId, _assetId, _amount);
             }
-        } else if (_isAtLeastPendingInteroperable(_assetId, _chainId)) {
-            interopInfo[_chainId][_assetId].totalDeposited += _amount;
+        } else {
+            interopInfo[_chainId][_assetId].totalDepositedFromL1 += _amount;
         }
 
         chainBalance[chainToUpdate][_assetId] += _amount;
@@ -324,8 +233,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     ) external onlyNativeTokenVault {
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
 
-        if (chainToUpdate == _chainId && _isAtLeastPendingInteroperable(_assetId, _chainId)) {
-            interopInfo[_chainId][_assetId].totalClaimed += _amount;
+        if (chainToUpdate == _chainId) {
+            interopInfo[_chainId][_assetId].totalClaimedOnL1 += _amount;
         }
 
         _decreaseChainBalance(chainToUpdate, _assetId, _amount);
@@ -389,6 +298,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         // We check the assetId to make sure the chain is not lying about it.
         DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
+        _requireMigratedFromNTV(data.chainId, data.assetId);
 
         uint256 currentSettlementLayer = BRIDGE_HUB.settlementLayer(data.chainId);
         require(currentSettlementLayer != block.chainid, NotMigratedChain());
@@ -410,7 +320,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             data.chainId,
             data.assetId,
             data.totalWithdrawalsToL1,
-            data.totalSuccessfulDepositsFromL1
+            data.totalSuccessfulDepositsFromL1,
+            data.totalPreV31TotalSupply
         );
         uint256 fromChainBalance = chainBalance[data.chainId][data.assetId];
         require(fromChainBalance >= amountToKeep, InvalidMigrationAmount(fromChainBalance, amountToKeep));
@@ -457,6 +368,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         );
 
         DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
+        _requireMigratedFromNTV(data.chainId, data.assetId);
 
         // In this case we trust the settlement layer to provide an honest amount.
         require(BRIDGE_HUB.whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId), InvalidWithdrawalChainId());
@@ -535,29 +447,89 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     }
 
     /// @notice Computes how much balance must remain on L1 when moving accounting to Gateway.
+    /// @dev Conceptually it should cover the finalization of all outstanding withdrawals or claimed failed deposits 
+    /// *that would reduce the chainBalance of the chain*. One could say it is `totalWithdrawalsToL1 + totalFailedDepositsFromL1 - totalClaimed`.
+    /// Note, both `totalWithdrawalsToL1` and `totalFailedDepositsFromL1` must only refer to messages that happened when the chain
+    /// settled on L1, while `totalClaimed` should only include claims for such withdrawlas/faield deposits.
+    /// We calculate `totalFailedDepositsFromL1` as the difference between the total deposits for when the chain settled on L1 and the total successful 
+    /// deposits from the same period. All in all, we get the following formula:
+    /// `amountToKeep = totalWithdrawalsToL1 + (totalDepositedFromL1 - totalSuccessfulDepositsFromL1) - totalClaimedOnL1`.
+    /// For some of the older tokens, we did not track neither of the values above, so when the balance is moved from the native token vault, we remember
+    /// its pre-v31 chain balance, which is equal to `totalDepositedFromL1BeforeV31 - totalClaimedOnL1BeforeV31`.
+    /// For similar reasons the chain should return its pre-v31 totalSupply on L2, which is equal to `totalSuccessfulDepositsFromL1 - totalWithdrawalsToL1`.
+    /// All-in-all, we get the following formula:
+    /// `amountToKeep = preV31ChainBalance + totalWithdrawalsToL1 + (totalDepositedFromL1 - totalSuccessfulDepositsFromL1) - totalClaimedOnL1 - _totalPreV31TotalSupply`
     /// @param _chainId Chain id being migrated.
     /// @param _assetId Asset id being migrated.
-    /// @param _totalWithdrawalsToL1 Total withdrawals tracked on L2 since interoperability conversion.
-    /// @param _totalSuccessfulDepositsFromL1 Total successful deposits tracked on L2 since interoperability conversion.
+    /// @param _totalWithdrawalsToL1 Total withdrawals tracked on L2 since v31 accounting started.
+    /// @param _totalSuccessfulDepositsFromL1 Total successful deposits tracked on L2 since v31 accounting started.
+    /// @param _totalPreV31TotalSupply Token total supply snapshot captured on L2 before first post-v31 bridge action.
     /// @return amountToKeep The amount that must stay on L1.
     function _toKeepDuringL1ToGWMigration(
         uint256 _chainId,
         bytes32 _assetId,
         uint256 _totalWithdrawalsToL1,
-        uint256 _totalSuccessfulDepositsFromL1
+        uint256 _totalSuccessfulDepositsFromL1,
+        uint256 _totalPreV31TotalSupply
     ) internal view returns (uint256 amountToKeep) {
-        _requireInteroperable(_assetId, _chainId);
-
         InteropL1Info memory info = interopInfo[_chainId][_assetId];
+
+        // The numbers in question are large especially for native tokens as their 
+        // preV31ChainBalance and _totalPreV31TotalSupply are very close to 2^256-1, so
+        // we need to work around overflows.
+        // It is expected however, that the resulting value is within the valid range for 2^256-1.
+
+        uint256 wraps = 0;
+        unchecked {
+            amountToKeep = info.preV31ChainBalance + _totalWithdrawalsToL1;
+            // Overflow => went above 2^256-1.
+            if (amountToKeep < info.preV31ChainBalance) {
+                wraps += 1;
+            }
+
+            amountToKeep += info.totalDepositedFromL1;
+
+            // Overflow => went above 2^256-1.
+            if (amountToKeep < info.totalDepositedFromL1) {
+                wraps += 1;
+            }
+
+            amountToKeep -= _totalSuccessfulDepositsFromL1;
+            // Underflow => went below 0.
+            if (amountToKeep > type(uint256).max - _totalSuccessfulDepositsFromL1) {
+                wraps -= 1;
+            }
+
+            amountToKeep -= info.totalClaimedOnL1;
+            // Underflow => went below 0.
+            if (amountToKeep > type(uint256).max - info.totalClaimedOnL1) {
+                wraps -= 1; 
+            }
+
+            amountToKeep -= _totalPreV31TotalSupply;
+            // Underflow => went below 0.
+            if (amountToKeep > type(uint256).max - _totalPreV31TotalSupply) {
+                wraps -= 1;
+            }
+        }
+
+        require(wraps == 0, AmountToKeepOnL1NotUint256());
+    }
+
+    function _requireMigratedFromNTV(uint256 _chainId, bytes32 _assetId) internal view {
+        uint256 ntvChainBalance = IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT)).chainBalance(_chainId, _assetId);
         require(
-            _totalSuccessfulDepositsFromL1 <= info.totalDeposited,
-            UnexpectedSuccessfulDepositsValue(_totalSuccessfulDepositsFromL1, info.totalDeposited)
+            ntvChainBalance == 0,
+            NTVChainBalanceNotMigrated(_chainId, _assetId, ntvChainBalance)
         );
 
-        uint256 totalFailedDeposits = info.totalDeposited - _totalSuccessfulDepositsFromL1;
-        uint256 availableAmount = _totalWithdrawalsToL1 + totalFailedDeposits + info.preInteropTransformDiff;
-        require(availableAmount >= info.totalClaimed, InvalidMigrationAmount(availableAmount, info.totalClaimed));
-        amountToKeep = availableAmount - info.totalClaimed;
+        // There are two cases when NTV balance for an asset is zero:
+        // 1. The asset is native to _chainId
+        // 2. The asset has never been deposited to the chain before.
+        //
+        // We do not care about case (2), 
+
+        require(maxChainBalanceAssigned[_assetId], AssetNotMigratedFromNTV(_assetId));
     }
 
     /// @notice Sends a transaction to a specific chain through its mailbox.

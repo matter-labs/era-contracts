@@ -13,8 +13,6 @@ interface IL2AssetTracker {
 
     function setAddresses(uint256 _l1ChainId, bytes32 _baseTokenAssetId) external;
 
-    function migrateTokenBalanceFromNTVV31(bytes32 _assetId) external;
-
     function handleInitiateBridgingOnL2(
         uint256 _toChainId,
         bytes32 _assetId,
@@ -40,5 +38,5 @@ interface IL2AssetTracker {
 
     function registerLegacyTokenOnChain(bytes32 _assetId) external;
 
-    function makeInteroperable(bytes32 _assetId) external;
+    function populateTotalPreV31TotalSupply(bytes32 _assetId) external;
 }

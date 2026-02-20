@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
-import {IAssetTrackerBase, MAX_TOKEN_BALANCE, TokenInteropStatus} from "./IAssetTrackerBase.sol";
+import {IAssetTrackerBase, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
 import {
     GatewayToL1TokenBalanceMigrationData,
     L1ToGatewayTokenBalanceMigrationData
@@ -17,7 +17,7 @@ import {Unauthorized} from "../../common/L1ContractErrors.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
-import {AssetNotInteroperable, InsufficientChainBalance} from "./AssetTrackerErrors.sol";
+import {InsufficientChainBalance} from "./AssetTrackerErrors.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 
 abstract contract AssetTrackerBase is
@@ -27,30 +27,6 @@ abstract contract AssetTrackerBase is
     ReentrancyGuard
 {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
-
-    mapping(uint256 chainId => mapping(bytes32 assetId => TokenInteropStatus)) public tokenInteropStatus;
-
-    function _requireInteroperable(bytes32 _assetId, uint256 _chainId) internal view {
-        if (tokenInteropStatus[_chainId][_assetId] != TokenInteropStatus.Interoperable) {
-            revert AssetNotInteroperable(_chainId, _assetId);
-        }
-    }
-
-    function _makeInteroperable(bytes32 _assetId, uint256 _chainId) internal {
-        tokenInteropStatus[_chainId][_assetId] = TokenInteropStatus.Interoperable;
-    }
-
-    function _setPendingInteroperable(bytes32 _assetId, uint256 _chainId) internal {
-        tokenInteropStatus[_chainId][_assetId] = TokenInteropStatus.PendingInteroperable;
-    }
-
-    function _isInteroperable(bytes32 _assetId, uint256 _chainId) internal view returns (bool) {
-        return tokenInteropStatus[_chainId][_assetId] == TokenInteropStatus.Interoperable;
-    }
-
-    function _isAtLeastPendingInteroperable(bytes32 _assetId, uint256 _chainId) internal view returns (bool) {
-        return tokenInteropStatus[_chainId][_assetId] != TokenInteropStatus.NonInteroperable;
-    }
 
     /// @notice Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// NOTE: this function may be removed in the future, don't rely on it!

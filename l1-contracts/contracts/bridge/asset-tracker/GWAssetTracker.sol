@@ -503,8 +503,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function _checkAssetTrackerMessageSelector(bytes memory _message) internal pure {
         bytes4 functionSignature = DataEncoding.getSelector(_message);
         require(
-            functionSignature == IAssetTrackerDataEncoding.receiveL1ToGatewayMigrationOnL1.selector ||
-                functionSignature == IAssetTrackerDataEncoding.finalizeMakeInteroperable.selector,
+            functionSignature == IAssetTrackerDataEncoding.receiveL1ToGatewayMigrationOnL1.selector,
             InvalidFunctionSignature(functionSignature)
         );
     }
