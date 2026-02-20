@@ -56,8 +56,10 @@ abstract contract AssetTrackerBase is
     /// - If a chain settles on L1, it is mostly unused since withdrawals are always allowed.
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber)) public assetMigrationNumber;
 
-    /// NOTE: this mapping may be removed in the future, don't rely on it!
-    mapping(bytes32 assetId => bool maxChainBalanceAssigned) internal maxChainBalanceAssigned;
+    /// @notice Denotes whether a token is registered or not.
+    /// - On L1AssetTracker, it means that all the chains have correct chainBalance and preV31Total supply set for this token.
+    /// - On L2AssetTracker, it means that the token's chainBalance is set correctly and its `totalPreV31TotalSupply` is tracked correctly.
+    mapping(bytes32 assetId => bool isTokenRegistered) public isTokenRegistered;
 
     function _nativeTokenVault() internal view virtual returns (INativeTokenVaultBase);
 
@@ -114,11 +116,6 @@ abstract contract AssetTrackerBase is
     //////////////////////////////////////////////////////////////*/
 
     function registerNewToken(bytes32 _assetId, uint256 _originChainId) public virtual;
-
-    function _assignMaxChainBalance(uint256 _originChainId, bytes32 _assetId) internal virtual {
-        chainBalance[_originChainId][_assetId] = MAX_TOKEN_BALANCE;
-        maxChainBalanceAssigned[_assetId] = true;
-    }
 
     /// @dev This function is used to decrease the chain balance of a token on a chain.
     /// @dev It makes debugging issues easier. Overflows don't usually happen, so there is no similar function to increase the chain balance.

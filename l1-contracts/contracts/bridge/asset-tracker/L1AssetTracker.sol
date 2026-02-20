@@ -43,7 +43,7 @@ import {
 } from "./AssetTrackerErrors.sol";
 import {V31UpgradeChainBatchNumberNotSet} from "../../core/bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
-import {TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
+import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
@@ -54,7 +54,11 @@ import {IL1MessageRoot} from "../../core/message-root/IL1MessageRoot.sol";
 
 contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @dev Per-(chainId, assetId) migration accounting stored on L1.
-    /// @param preV31ChainBalance Chain balance that existed before v31 accounting started.
+    /// @param preV31ChainBalance  Chain balance right before the v31 migration.
+    /// - For non-native tokens it is exactly equal to chainBalance before the *ecosystem* upgraded to v31 (0 for new tokens).
+    /// - For tokens native to the chain, we imagine that it received 2^256-1 token deposit at the inception point and so 
+    /// all the balances that are not present on the chain are from claimed withdrawals, i.e. for a token that was bridged
+    /// before v31 it is equal to `2^256-1 - <sum of other chainBalances, including l1>`. For new tokens it is exactly `2^256-1`. 
     /// @param totalDepositedFromL1 Total amount deposited from L1 to the chain since v31 accounting started.
     /// @param totalClaimedOnL1 Total amount claimed on L1 (withdrawals and failed deposits) since v31 accounting started.
     struct InteropL1Info {
@@ -122,49 +126,80 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         chainAssetHandler = IChainAssetHandlerBase(BRIDGE_HUB.chainAssetHandler());
     }
 
+    function _requireRegistered(bytes32 _assetId) internal {
+        require(isTokenRegistered[_assetId], "Asset not registered");
+    }
+
     /// @notice This function is used to migrate the token balance from the NTV to the AssetTracker for V31 upgrade.
-    /// @param _chainId The chain id of the chain to migrate the token balance for.
+    /// @dev The only way to register a legacy token.
+    /// @dev Note, that this function performs O(number of chains) calls to NTV. It relies on the fact
+    /// that the max number of chains is bound by 100, so this function should be always processable.
     /// @param _assetId The asset id of the token to migrate the token balance for.
-    function migrateTokenBalanceFromNTVV31(uint256 _chainId, bytes32 _assetId) external {
+    function migrateTokenBalanceFromNTVV31(bytes32 _assetId) public {
         IL1NativeTokenVault l1NTV = IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT));
         uint256 originChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
         require(originChainId != 0, InvalidChainId());
-        // We do not migrate the chainBalance for the originChain directly, but indirectly by subtracting from MAX_TOKEN_BALANCE.
-        // Its important to call this for all chains in the ecosystem so that the sum is accurate.
-        require(_chainId != originChainId, InvalidChainId());
-        uint256 migratedBalance;
-        if (_chainId != block.chainid) {
-            migratedBalance = l1NTV.migrateTokenBalanceToAssetTracker(_chainId, _assetId);
-        } else {
+
+        // This function is only intended to be used for legacy tokens that have not yet been registered.
+        require(!isTokenRegistered[_assetId], "Max chain balance already assigned");
+        isTokenRegistered[_assetId] = true;
+
+        uint256[] memory allZKChainIds = BRIDGE_HUB.getAllZKChainChainIDs();
+
+        uint256 totalBridgedOut = 0;
+
+        for (uint256 i = 0; i < allZKChainIds.length; i++) {
+            uint256 chainId = allZKChainIds[i];
+            // This require should never be triggered in production, it is an invariant check
+            // chainBalance inside the L1AT should never be incremented until the token is registered.
+            require(chainBalance[chainId][_assetId] == 0, "Chain balance already set");
+
+            // Origin chain id will be handled later.
+            if (chainId == originChainId) {
+                continue;
+            }
+
+            uint256 migratedBalance = l1NTV.migrateTokenBalanceToAssetTracker(chainId, _assetId);
+
+            chainBalance[chainId][_assetId] = migratedBalance;
+            interopInfo[chainId][_assetId].preV31ChainBalance = migratedBalance;
+            totalBridgedOut += migratedBalance;
+        }
+        // Similar to the above, it is just an invariant check that should never be hit
+        require(chainBalance[block.chainid][_assetId] == 0, "L1 chain balance already set");
+
+        // The token is not native to L1, so we also have to account for the amount bridged to L1.
+        if (originChainId != block.chainid) {
             address tokenAddress = NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
-            migratedBalance = IERC20(tokenAddress).totalSupply();
-            // Unlike the case where we migrate the balance for L2 chains, the balance inside `L1NativeTokenVault` is not reset to zero,
-            // and so we need to ensure via the mapping below that the total supply is migrated only once.
-            require(!l1TotalSupplyMigrated[_assetId], L1TotalSupplyAlreadyMigrated());
-            l1TotalSupplyMigrated[_assetId] = true;
+            // Note, that here we have an implicit invariant that the token's total supply
+            // can never be changed before this migration happens.
+            // So until a token is registered, all withdrawals must fail.
+            uint256 migratedBalance = IERC20(tokenAddress).totalSupply();
+            chainBalance[block.chainid][_assetId] = migratedBalance;
+            interopInfo[block.chainid][_assetId].preV31ChainBalance = migratedBalance;
+            totalBridgedOut += migratedBalance;
         }
 
-        // Note it might be the case that the token's balance has not been registered on L1 yet,
-        // in this case the chainBalance[originChainId][_assetId] is set to MAX_TOKEN_BALANCE if it was not already.
-        // Note before the token is migrated the MAX_TOKEN_BALANCE is not assigned, since the registerNewToken is only called for new tokens.
-        _assignMaxChainBalanceIfNeeded(originChainId, _assetId);
-        chainBalance[originChainId][_assetId] -= migratedBalance;
-        chainBalance[_chainId][_assetId] += migratedBalance;
-        interopInfo[_chainId][_assetId].preV31ChainBalance += migratedBalance;
+        chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE - totalBridgedOut;
+        interopInfo[originChainId][_assetId].preV31ChainBalance = MAX_TOKEN_BALANCE - totalBridgedOut;
+        isTokenRegistered[_assetId] = true;
     }
 
     /// @inheritdoc AssetTrackerBase
     function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
-        _assignMaxChainBalanceIfNeeded(_originChainId, _assetId);
+        _registerToken(_originChainId, _assetId);
     }
 
-    function _assignMaxChainBalanceIfNeeded(uint256 _originChainId, bytes32 _assetId) internal {
-        if (!maxChainBalanceAssigned[_assetId]) {
-            _assignMaxChainBalance(_originChainId, _assetId);
-            // For any new native token, we treat `preV31ChainBalance` as if at the moment of the inception
-            // there was an infinite deposit to the chain.
-            interopInfo[_originChainId][_assetId].preV31ChainBalance = type(uint256).max;
+    function _registerToken(uint256 _originChainId, bytes32 _assetId) internal {
+        if (isTokenRegistered[_assetId]) {
+            return;
         }
+
+        isTokenRegistered[_assetId] = true;
+        chainBalance[_originChainId][_assetId] = MAX_TOKEN_BALANCE;
+        // For any new native token, we treat `preV31ChainBalance` as if at the moment of the inception
+        // there was an infinite deposit to the chain.
+        interopInfo[_originChainId][_assetId].preV31ChainBalance = MAX_TOKEN_BALANCE;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -180,6 +215,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _amount,
         uint256 // _tokenOriginChainId
     ) external onlyNativeTokenVault {
+        _requireRegistered(_assetId);
         uint256 currentSettlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
         if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _assetId)) {
             _forceSetAssetMigrationNumber(_chainId, _assetId);
@@ -232,6 +268,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _amount
     ) external onlyNativeTokenVault {
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
+        _requireRegistered(_assetId);
+
 
         if (chainToUpdate == _chainId) {
             interopInfo[_chainId][_assetId].totalClaimedOnL1 += _amount;
@@ -273,6 +311,30 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             /// Update the chain balance if settling on L1, otherwise update the settlement layer balance.
             chainToUpdate = settlementLayer == 0 ? _chainId : settlementLayer;
         }
+    }
+
+    /// @notice This function is used to register tokens that are only deployed on L2.
+    /// @dev This is needed e.g. to enable interop for a token native to the chain that has never
+    /// been withdrawn to L1.
+    function _autoRegisterTokenFromMigration(
+        uint256 _originChainId,
+        bytes32 _assetId
+    ) internal {
+        // Firstly, we need to check whether we have already registered the token
+        if (isTokenRegistered[_assetId]) {
+            return;
+        }
+
+        // Token has never been registered, but there are two cases here:
+        // - The token existed prior to v31 and we simply did not migrate its balance from NTV.
+        // - The token is indeed bridged from L2 for the first time.
+        // We distinguish the cases above by querying NTV.
+
+        address tokenAddress = NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
+
+        require(tokenAddress == address(0), "Token balance not migrated from NTV");
+
+        _registerToken(_originChainId, _assetId);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -327,7 +389,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         require(fromChainBalance >= amountToKeep, InvalidMigrationAmount(fromChainBalance, amountToKeep));
         uint256 amountToMigrate = fromChainBalance - amountToKeep;
 
-        _assignMaxChainBalanceIfNeeded(data.tokenOriginChainId, data.assetId);
+        _autoRegisterTokenFromMigration(data.tokenOriginChainId, data.assetId);
         _migrateFunds({
             _fromChainId: data.chainId,
             _toChainId: currentSettlementLayer,
@@ -379,7 +441,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             InvalidAssetMigrationNumber()
         );
 
-        _assignMaxChainBalanceIfNeeded(data.tokenOriginChainId, data.assetId);
+        _autoRegisterTokenFromMigration(data.tokenOriginChainId, data.assetId);
         _migrateFunds({
             _fromChainId: _finalizeWithdrawalParams.chainId,
             _toChainId: data.chainId,
@@ -529,7 +591,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         //
         // We do not care about case (2), 
 
-        require(maxChainBalanceAssigned[_assetId], AssetNotMigratedFromNTV(_assetId));
+        require(isTokenRegistered[_assetId], AssetNotMigratedFromNTV(_assetId));
     }
 
     /// @notice Sends a transaction to a specific chain through its mailbox.

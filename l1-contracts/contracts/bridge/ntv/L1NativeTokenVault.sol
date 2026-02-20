@@ -135,6 +135,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     /// @inheritdoc IL1NativeTokenVault
     function registerEthToken() external {
+        if (assetId[ETH_TOKEN_ADDRESS] != bytes32(0)) {
+            return;
+        }
         _unsafeRegisterNativeToken(ETH_TOKEN_ADDRESS);
     }
 

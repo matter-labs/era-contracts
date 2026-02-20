@@ -271,7 +271,10 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         assetId[_expectedToken] = _assetId;
         originChainId[_assetId] = L1_CHAIN_ID;
         _addTokenToTokensList(_assetId);
-        L2_ASSET_TRACKER.registerLegacyTokenOnChain(_assetId);
+        // Note, that here we assume that `L2_ASSET_TRACKER.registerLegacyToken` can only succeed
+        // if the token has been registered on L2NTV before, so it is not possible that someone
+        // front-runs and registers the token before we call the function here.
+        L2_ASSET_TRACKER.registerLegacyToken(_assetId);
     }
 
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.

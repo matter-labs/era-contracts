@@ -126,7 +126,6 @@ abstract contract NativeTokenVaultBase is
         bytes32 currentAssetId = assetId[_nativeToken];
         if (currentAssetId == bytes32(0)) {
             tokenAssetId = _registerToken(_nativeToken);
-            _assetTracker().registerNewToken(tokenAssetId, block.chainid);
         } else {
             tokenAssetId = currentAssetId;
         }

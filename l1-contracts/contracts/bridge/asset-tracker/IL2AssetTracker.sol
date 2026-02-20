@@ -36,7 +36,5 @@ interface IL2AssetTracker {
 
     function confirmMigrationOnL2(MigrationConfirmationData calldata _migrationConfirmationData) external;
 
-    function registerLegacyTokenOnChain(bytes32 _assetId) external;
-
-    function populateTotalPreV31TotalSupply(bytes32 _assetId) external;
+    function registerLegacyToken(bytes32 _assetId) external;
 }

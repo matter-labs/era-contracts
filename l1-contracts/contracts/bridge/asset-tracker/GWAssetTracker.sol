@@ -437,7 +437,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             _sourceChainId: _sourceChainId,
             _destinationChainId: _destinationChainId,
             _assetId: _assetId,
-            _amount: amount,
+            _amount: amount
         });
     }
 
@@ -480,8 +480,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             _sourceChainId: _chainId,
             _destinationChainId: L1_CHAIN_ID,
             _assetId: expectedAssetId,
-            _transferData: transferData,
-            _isInteropCall: false
+            _transferData: transferData
         });
     }
 
