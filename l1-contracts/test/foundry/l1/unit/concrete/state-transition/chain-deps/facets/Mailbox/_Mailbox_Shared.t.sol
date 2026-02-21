@@ -19,7 +19,6 @@ import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainA
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
-import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
 contract MailboxTest is UtilsCallMockerTest {
     IMailbox internal mailboxFacet;

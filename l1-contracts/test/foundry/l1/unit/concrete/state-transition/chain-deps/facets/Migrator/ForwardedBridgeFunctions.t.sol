@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {MigratorTest} from "./_Migrator_Shared.t.sol";
 import {Unauthorized, NotAZKChain} from "contracts/common/L1ContractErrors.sol";
-import {NotL1, AlreadyMigrated, NotChainAdmin, NotEraChain, NotAllBatchesExecuted, ProtocolVersionNotUpToDate, OutdatedProtocolVersion, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, InvalidNumberOfBatchHashes, NotMigrated, NotHistoricalRoot, ContractNotDeployed} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {NotL1, AlreadyMigrated, NotChainAdmin, NotEraChain, NotAllBatchesExecuted, ProtocolVersionNotUpToDate, OutdatedProtocolVersion, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, InvalidNumberOfBatchHashes, NotMigrated, NotHistoricalRoot, ContractNotDeployed, DepositsNotPaused} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {ZKChainCommitment} from "contracts/common/Config.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 import {PriorityTreeCommitment} from "contracts/state-transition/libraries/PriorityTree.sol";
@@ -13,7 +13,7 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET, CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
+import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET} from "contracts/common/Config.sol";
 
 contract ForwardedBridgeFunctionsTest is MigratorTest {
     address chainAssetHandler;
@@ -65,13 +65,17 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
     }
 
     function _setupPausedDepositsState() internal {
-        // Set pausedDepositsTimestamp to allow migration (must be in valid time window)
-        // The check is: timestamp + CHAIN_MIGRATION_TIME_WINDOW_START < block.timestamp &&
-        //               block.timestamp < timestamp + CHAIN_MIGRATION_TIME_WINDOW_END
-        // Warp to a sufficiently large timestamp to avoid underflow
-        vm.warp(CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET + 10);
-        uint256 timestamp = block.timestamp - CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET - 1;
+        // Set pausedDepositsTimestamp to allow migration.
+        vm.warp(CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET + 1);
+        uint256 timestamp = block.timestamp - CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET;
         utilsFacet.util_setPausedDepositsTimestamp(timestamp);
+    }
+
+    function test_forwardedBridgeBurn_RevertWhen_DepositsNotPaused() public {
+        bytes memory data = abi.encode(utilsFacet.util_getProtocolVersion());
+        vm.prank(chainAssetHandler);
+        vm.expectRevert(DepositsNotPaused.selector);
+        migratorFacet.forwardedBridgeBurn(L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, admin, data);
     }
 
     function test_forwardedBridgeBurn_RevertWhen_NotAZKChain() public {
