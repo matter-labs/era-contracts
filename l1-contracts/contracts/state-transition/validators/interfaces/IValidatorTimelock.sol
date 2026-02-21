@@ -7,6 +7,9 @@ import {ICommitter} from "../../chain-interfaces/ICommitter.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
+/// @dev Note: In our CTM we have a single implementation of ValidatorTimelock for everyone,
+/// so the interface must remain backwards compatible as the same timelock is utilized
+/// for chains with different protocol versions.
 interface IValidatorTimelock is IExecutor, ICommitter {
     /// @notice Struct specifying which validator roles to grant or revoke in a single call.
     /// @param rotatePrecommitterRole Whether to rotate the PRECOMMITTER_ROLE.
@@ -135,6 +138,7 @@ interface IValidatorTimelock is IExecutor, ICommitter {
     ) external;
     /// @dev Check that batches were committed at least X time ago and
     /// make a call to the zkChain diamond contract with the same calldata.
+    /// @dev Settlement fee payer address is encoded within _batchData to maintain interface stability.
     function executeBatchesSharedBridge(
         address _chainAddress,
         uint256 _processBatchFrom,

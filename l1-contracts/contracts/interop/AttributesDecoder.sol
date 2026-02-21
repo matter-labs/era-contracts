@@ -13,4 +13,8 @@ library AttributesDecoder {
     function decodeInteroperableAddress(bytes calldata _data) internal pure returns (bytes memory) {
         return abi.decode(_data[4:], (bytes));
     }
+
+    function decodeBool(bytes calldata _data) internal pure returns (bool) {
+        return abi.decode(_data[4:], (bool));
+    }
 }

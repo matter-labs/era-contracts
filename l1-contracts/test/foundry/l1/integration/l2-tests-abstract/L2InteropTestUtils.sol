@@ -39,7 +39,7 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
                 logs[i].emitter == address(l2InteropCenter) &&
                 logs[i].topics[0] ==
                 keccak256(
-                    "InteropBundleSent(bytes32,bytes32,(bytes1,uint256,uint256,bytes32,(bytes1,bool,address,address,uint256,bytes)[],(bytes,bytes)))"
+                    "InteropBundleSent(bytes32,bytes32,(bytes1,uint256,uint256,bytes32,(bytes1,bool,address,address,uint256,bytes)[],(bytes,bytes,bool)))"
                 )
             ) {
                 data = logs[i].data;

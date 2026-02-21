@@ -149,7 +149,11 @@ library L2Utils {
         forceDeployWithoutConstructor("InteropCenter", L2_INTEROP_CENTER_ADDR);
         InteropCenter interopCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner);
+        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
+            _args.l1ChainId,
+            _args.aliasedOwner,
+            DataEncoding.encodeNTVAssetId(_args.eraChainId, address(uint160(uint256(keccak256("zkToken")))))
+        );
     }
 
     function forceDeployInteropHandler(SystemContractsArgs memory _args) internal {

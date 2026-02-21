@@ -262,6 +262,9 @@ PubdataPricingMode constant DEFAULT_PUBDATA_PRICING_MODE = PubdataPricingMode.Ro
 /// @dev Default maximum gas limit for priority transactions during chain creation.
 uint64 constant DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
 
+/// @dev The total number of support interop attributes.
+uint256 constant SUPPORTED_INTEROP_ATTRIBUTES = 5;
+
 /// @dev Migration number used when a chain migrates from L1 to a settlement layer.
 uint256 constant MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER = 1;
 

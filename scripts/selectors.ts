@@ -1,10 +1,30 @@
 import { Command } from "commander";
 import * as fs from "fs";
 import * as path from "path";
-import { spawn } from "./utils";
+import { spawn as _spawn } from "child_process";
 
-const SELECTORS_FILE = path.resolve(__dirname, "../selectors");
-const TEMP_SELECTORS_FILE = path.resolve(__dirname, "../selectors.tmp");
+// Runs relative to cwd so that `forge selectors list` picks up the right foundry.toml,
+// and the selectors file is written next to it.
+const SELECTORS_FILE = path.resolve(process.cwd(), "selectors");
+const TEMP_SELECTORS_FILE = path.resolve(process.cwd(), "selectors.tmp");
+
+// Executes a command in a new shell and pipes data to the parent's stdout/stderr.
+function spawn(command: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = _spawn(command.replace(/\n/g, " "), [], {
+      stdio: "inherit",
+      shell: true,
+    });
+
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`Command failed with exit code ${code}`));
+      }
+    });
+  });
+}
 
 // Computes the list of selectors by running `forge selectors list`, and writes output to a temporary file.
 async function computeSelectors(): Promise<void> {
@@ -60,6 +80,8 @@ async function main() {
     process.exit(1);
   }
 
+  const packageName = path.basename(process.cwd());
+
   try {
     console.log("Computing selectors using 'forge selectors list'...");
     await computeSelectors();
@@ -71,7 +93,7 @@ async function main() {
 
       if (!compareSelectors(computed, existing)) {
         console.error("\n❌ Error: Selectors file does not match computed selectors.");
-        console.error("To fix this issue, run: yarn l1 selectors --fix");
+        console.error(`To fix this issue, run: yarn workspace ${packageName} selectors --fix`);
         cleanup();
         process.exit(1);
       }
