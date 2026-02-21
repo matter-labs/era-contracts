@@ -483,7 +483,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @dev Conceptually it should cover the finalization of all outstanding withdrawals or claimed failed deposits
     /// *that would reduce the chainBalance of the chain*. One could say it is `totalWithdrawalsToL1 + totalFailedDepositsFromL1 - totalClaimed`.
     /// Note, both `totalWithdrawalsToL1` and `totalFailedDepositsFromL1` must only refer to messages that happened when the chain
-    /// settled on L1, while `totalClaimed` should only include claims for such withdrawlas/faield deposits.
+    /// settled on L1, while `totalClaimed` should only include claims for such withdrawlas/failed deposits.
     /// We calculate `totalFailedDepositsFromL1` as the difference between the total deposits for when the chain settled on L1 and the total successful
     /// deposits from the same period. All in all, we get the following formula:
     /// `amountToKeep = totalWithdrawalsToL1 + (totalDepositedFromL1 - totalSuccessfulDepositsFromL1) - totalClaimedOnL1`.
