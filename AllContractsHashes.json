@@ -280,6 +280,16 @@
     "evmDeployedBytecodeLength": null
   },
   {
+    "contractName": "system-contracts/L2InteropRootStorage",
+    "zkBytecodeHash": "0x0100003bba7fd383187a8b437224a041d32db0f8af54e40c23418bcf7aab1ac5",
+    "zkBytecodePath": "/system-contracts/zkout/L2InteropRootStorage.sol/L2InteropRootStorage.json",
+    "evmBytecodeHash": null,
+    "evmBytecodePath": null,
+    "evmDeployedBytecodeHash": null,
+    "evmDeployedBytecodeBlakeHash": null,
+    "evmDeployedBytecodeLength": null
+  },
+  {
     "contractName": "system-contracts/L2UpgradeUtils",
     "zkBytecodeHash": "0x010000075c7778a884562dbcd868fa230cbd344388d5952d28f604ea74f9a255",
     "zkBytecodePath": "/system-contracts/zkout/L2UpgradeUtils.sol/L2UpgradeUtils.json",
