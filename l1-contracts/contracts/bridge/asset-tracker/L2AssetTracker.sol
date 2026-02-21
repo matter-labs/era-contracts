@@ -35,7 +35,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// @dev On zkSync os chains, the `totalSupply()` of the base token is not available by default,
     /// so before we ever use it to do any migrations, we need to backfill it.
-    /// @dev This variable is expected to be deleted after v31 upgrade, once all the zksync os chains have their base token 
+    /// @dev This variable is expected to be deleted after v31 upgrade, once all the zksync os chains have their base token
     /// amount backfilled.
     bool public needBaseTokenTotalSupplyBackfill;
 
@@ -357,7 +357,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
         address tokenAddress = _tryGetTokenAddress(_assetId);
         uint256 readTotalPreV31TotalSupply = _registerLegacyTokenIfNeeded(_assetId, tokenAddress);
-        // Formally we could forbid the migration only for the base token in such case, 
+        // Formally we could forbid the migration only for the base token in such case,
         // but for the ease we'll just forbid any migration until the chain has backfilled the token.
         if (needBaseTokenTotalSupplyBackfill) {
             revert BaseTokenTotalSupplyBackfillRequired();
