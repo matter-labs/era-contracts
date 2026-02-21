@@ -7,7 +7,7 @@ import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 
 interface IL1AssetTracker {
     /// @notice Per-(chainId, assetId) migration accounting stored on L1.
-    /// @param preV31ChainBalance Chain balance right before the v31 migration.
+    /// @param preV31ChainBalance Chain balance right before the v31 upgrade.
     /// - For non-native tokens it is exactly equal to chainBalance before the *ecosystem* upgraded to v31 (0 for new tokens).
     /// - For tokens native to the chain, we imagine that it received 2^256-1 token deposit at the inception point and so
     /// all the balances that are not present on the chain are from claimed withdrawals, i.e. for a token that was bridged
