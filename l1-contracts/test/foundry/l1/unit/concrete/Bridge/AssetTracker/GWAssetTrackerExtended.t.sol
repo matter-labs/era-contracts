@@ -665,8 +665,8 @@ contract GWAssetTrackerExtendedTest is Test {
         gwAssetTracker.requestPauseDepositsForChain(CHAIN_ID);
     }
 
-    // Test confirmMigrationOnGateway with saved balance (lines 630-631)
-    function test_ConfirmMigrationOnGateway_GatewayToL1_WithSavedBalance() public {
+    // Test Gateway->L1 confirmation does not modify chain balance on Gateway.
+    function test_ConfirmMigrationOnGateway_GatewayToL1_LeavesBalanceUnchanged() public {
         // First increase chain balance
         BalanceChange memory balanceChange = BalanceChange({
             version: BALANCE_CHANGE_VERSION,
@@ -716,8 +716,8 @@ contract GWAssetTrackerExtendedTest is Test {
         vm.prank(SERVICE_TRANSACTION_SENDER);
         gwAssetTracker.confirmMigrationOnGateway(data);
 
-        // Verify balance was decreased (lines 624, 630-631)
-        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), balanceBefore - AMOUNT);
+        // Gateway state changes for this flow happen at migration initiation, not confirmation.
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), balanceBefore);
         // Verify token data
         assertEq(gwAssetTracker.getOriginToken(ASSET_ID), ORIGIN_TOKEN);
         assertEq(gwAssetTracker.getTokenOriginChainId(ASSET_ID), ORIGIN_CHAIN_ID);

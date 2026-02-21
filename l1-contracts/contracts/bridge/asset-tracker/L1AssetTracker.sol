@@ -27,7 +27,6 @@ import {
     AssetNotMigratedFromNTV,
     InvalidAssetMigrationNumber,
     InvalidChainMigrationNumber,
-    InvalidFunctionSignature,
     InvalidMigrationAmount,
     InvalidMigrationNumber,
     InvalidSender,
@@ -53,27 +52,6 @@ import {IChainAssetHandlerBase} from "../../core/chain-asset-handler/IChainAsset
 import {IL1MessageRoot} from "../../core/message-root/IL1MessageRoot.sol";
 
 contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
-    /// @notice Per-(chainId, assetId) migration accounting stored on L1.
-    /// @param preV31ChainBalance  Chain balance right before the v31 migration.
-    /// - For non-native tokens it is exactly equal to chainBalance before the *ecosystem* upgraded to v31 (0 for new tokens).
-    /// - For tokens native to the chain, we imagine that it received 2^256-1 token deposit at the inception point and so 
-    /// all the balances that are not present on the chain are from claimed withdrawals, i.e. for a token that was bridged
-    /// before v31 it is equal to `2^256-1 - <sum of other chainBalances, including l1>`. For new tokens it is exactly `2^256-1`. 
-    /// @param totalDepositedFromL1 Total amount deposited from L1 to the chain since v31 accounting started. Note, that it is not 
-    /// just about any L1->L2 deposit, but only those that debited the chainBalance on L1 directly and it is assumed that every such
-    /// deposit will be processed while the chain is still settling on L1. It is the responsbility of the chain admin to ensure that.
-    /// @param totalClaimedOnL1 Total amount claimed on L1 (withdrawals and failed deposits) since v31 accounting started. Note, that it is not just
-    /// about claim, but claims that affect `chainBalance` of the chain (i.e. the respective failed deposits or withdrawals were submitted
-    /// while the chain was settling on L1)).
-    /// @dev It is the responsibility of the *chain* and its admin to ensure that all deposits are processed before the migration to Gateway is complete
-    /// and vice versa, i.e. all deposits are either fully processed on L1 or fully processed while it settles on ZK Gateway. In case the chain violates 
-    /// this rule, invalid migration amount can be migrated, but it must only affect the chain and its users.
-    struct InteropL1Info {
-        uint256 preV31ChainBalance;
-        uint256 totalDepositedFromL1;
-        uint256 totalClaimedOnL1;
-    }
-
     IBridgehubBase public immutable BRIDGE_HUB;
 
     INativeTokenVaultBase public immutable NATIVE_TOKEN_VAULT;
@@ -85,9 +63,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     IChainAssetHandlerBase public chainAssetHandler;
 
     mapping(uint256 chainId => mapping(bytes32 assetId => InteropL1Info info)) internal interopInfo;
-
-    /// Todo Deprecate after V31 is finished.
-    mapping(bytes32 assetId => bool l1TotalSupplyMigrated) internal l1TotalSupplyMigrated;
 
     function _nativeTokenVault() internal view override returns (INativeTokenVaultBase) {
         return NATIVE_TOKEN_VAULT;
@@ -141,6 +116,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @dev The only way to register a legacy token.
     /// @dev Note, that this function performs O(number of chains) calls to NTV. It relies on the fact
     /// that the max number of chains is bound by 100, so this function should be always processable.
+    /// @dev We need to migrate the balance for every single chain first to ensure that the `preV31ChainBalance`
+    /// is set correctly for the origin chain.
     /// @param _assetId The asset id of the token to migrate the token balance for.
     function registerLegacyToken(bytes32 _assetId) public {
         IL1NativeTokenVault l1NTV = IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT));
@@ -340,7 +317,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         address tokenAddress = NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
 
-        require(tokenAddress == address(0), "Token balance not migrated from NTV");
+        require(tokenAddress == address(0), "Legacy Token balance not migrated from NTV");
 
         _registerToken(_originChainId, _assetId);
     }
@@ -356,10 +333,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         (bytes4 functionSignature, L1ToGatewayTokenBalanceMigrationData memory data) = DataEncoding
             .decodeL1ToGatewayTokenBalanceMigrationData(_finalizeWithdrawalParams.message);
-        require(
-            functionSignature == IAssetTrackerDataEncoding.receiveL1ToGatewayMigrationOnL1.selector,
-            InvalidFunctionSignature(functionSignature)
-        );
         require(data.version == TOKEN_BALANCE_MIGRATION_DATA_VERSION, InvalidVersion());
         require(
             assetMigrationNumber[data.chainId][data.assetId] < data.chainMigrationNumber,
@@ -426,10 +399,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         (bytes4 functionSignature, GatewayToL1TokenBalanceMigrationData memory data) = DataEncoding
             .decodeGatewayToL1TokenBalanceMigrationData(_finalizeWithdrawalParams.message);
-        require(
-            functionSignature == IAssetTrackerDataEncoding.receiveGatewayToL1MigrationOnL1.selector,
-            InvalidFunctionSignature(functionSignature)
-        );
         require(data.version == TOKEN_BALANCE_MIGRATION_DATA_VERSION, InvalidVersion());
         require(
             assetMigrationNumber[data.chainId][data.assetId] < data.chainMigrationNumber,
@@ -437,18 +406,34 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         );
 
         DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
-        _requireMigratedFromNTV(data.chainId, data.assetId);
 
-        // In this case we trust the settlement layer to provide an honest amount.
+        // Such messages are only allowed has settled on Gateway and returned back.
+        uint256 chainMigrationNumber = _getChainMigrationNumber(data.chainId);
+        require(
+            chainMigrationNumber == 2,
+            InvalidChainMigrationNumber(chainMigrationNumber, 2)
+        );
+        require(data.chainMigrationNumber == chainMigrationNumber, InvalidChainMigrationNumber(chainMigrationNumber, data.chainMigrationNumber));
+        
+        // It is expected that before a chain gets any balance of a token on GW, it is registered on L1AssetTracker.
+        // This requirement should never be violated in production, it is an invariant check.
+        _requireRegistered(data.assetId);
+
+        // We only allow whitelisted settlement layers' messages to be processed by this function, since
+        // it updates various chain-related parameters such as assetMigrationNumber.
+        // It does mean that if a past settlement layer does not have this status anymore, such messages
+        // wont be processable. This limitation will be fixed in the future releases. 
         require(BRIDGE_HUB.whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId), InvalidWithdrawalChainId());
 
+        // `assetMigrationNumber` can be either 0 or 1 (didnt migrate the balance to GW or did migrate).
+        // `data.assetMigrationNumber` should be also either 0 or 1.
+        // This check does not serve a specific purpose, it is an invariant check.
         uint256 readAssetMigrationNumber = assetMigrationNumber[data.chainId][data.assetId];
         require(
             readAssetMigrationNumber == data.assetMigrationNumber || readAssetMigrationNumber + 1 == data.assetMigrationNumber,
             InvalidAssetMigrationNumber()
         );
 
-        _autoRegisterTokenFromMigration(data.tokenOriginChainId, data.assetId);
         _migrateFunds({
             _fromChainId: _finalizeWithdrawalParams.chainId,
             _toChainId: data.chainId,
@@ -456,7 +441,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             _amount: data.amount
         });
 
-        assetMigrationNumber[data.chainId][data.assetId] = data.chainMigrationNumber;
+        assetMigrationNumber[data.chainId][data.assetId] = chainMigrationNumber;
 
         MigrationConfirmationData memory migrationConfirmationData = MigrationConfirmationData({
             chainId: data.chainId,
@@ -464,7 +449,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             tokenOriginChainId: data.tokenOriginChainId,
             originToken: data.originToken,
             amount: data.amount,
-            assetMigrationNumber: data.chainMigrationNumber,
+            assetMigrationNumber: chainMigrationNumber,
             isL1ToGateway: false
         });
 
@@ -583,22 +568,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         }
 
         require(wraps == 0, AmountToKeepOnL1NotUint256());
-    }
-
-    function _requireMigratedFromNTV(uint256 _chainId, bytes32 _assetId) internal view {
-        uint256 ntvChainBalance = IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT)).chainBalance(_chainId, _assetId);
-        require(
-            ntvChainBalance == 0,
-            NTVChainBalanceNotMigrated(_chainId, _assetId, ntvChainBalance)
-        );
-
-        // There are two cases when NTV balance for an asset is zero:
-        // 1. The asset is native to _chainId
-        // 2. The asset has never been deposited to the chain before.
-        //
-        // We do not care about case (2), 
-
-        require(isTokenRegistered[_assetId], AssetNotMigratedFromNTV(_assetId));
     }
 
     /// @notice Sends a transaction to a specific chain through its mailbox.

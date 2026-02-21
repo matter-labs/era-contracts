@@ -298,6 +298,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     }
 
     function test_migrationGatewayToL1() public {
+        uint256 chainMigrationNumber = 2;
+
         vm.chainId(gwChainId);
         {
             vm.mockCall(
@@ -318,12 +320,12 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             vm.mockCall(
                 address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler),
                 abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
-                abi.encode(migrationNumber)
+                abi.encode(chainMigrationNumber)
             );
             vm.mockCall(
                 address(L2_CHAIN_ASSET_HANDLER_ADDR),
                 abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
-                abi.encode(migrationNumber)
+                abi.encode(chainMigrationNumber)
             );
         }
 
@@ -357,15 +359,15 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             assetId: assetId,
             tokenOriginChainId: originalChainId,
             amount: amount,
-            chainMigrationNumber: migrationNumber,
-            assetMigrationNumber: migrationNumber - 1
+            chainMigrationNumber: chainMigrationNumber,
+            assetMigrationNumber: chainMigrationNumber - 1
         });
         MigrationConfirmationData memory confirmData = MigrationConfirmationData({
             chainId: eraZKChainId,
             assetId: assetId,
             originToken: tokenAddress,
             tokenOriginChainId: originalChainId,
-            assetMigrationNumber: migrationNumber,
+            assetMigrationNumber: chainMigrationNumber,
             amount: amount,
             isL1ToGateway: false
         });
@@ -418,17 +420,12 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.store(
             address(assetTracker),
             getAssetMigrationNumberLocation(assetId, eraZKChainId),
-            bytes32(migrationNumber - 1)
-        );
-        vm.store(
-            address(gwAssetTracker),
-            getAssetMigrationNumberLocation(assetId, eraZKChainId),
-            bytes32(migrationNumber - 1)
+            bytes32(chainMigrationNumber - 1)
         );
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler),
             abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
-            abi.encode(migrationNumber)
+            abi.encode(chainMigrationNumber)
         );
         // Ensure the token is registered before it can be migrated and NTV balance is already migrated.
         vm.prank(address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault));
@@ -454,6 +451,9 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.store(address(gwAssetTracker), chainBalanceLocation, bytes32(amount));
         vm.store(address(gwAssetTracker), getChainBalanceLocation(assetId, eraZKChainId), bytes32(amount));
 
+        address originTokenBeforeConfirmation = gwAssetTracker.getOriginToken(assetId);
+        uint256 tokenOriginChainIdBeforeConfirmation = gwAssetTracker.getTokenOriginChainId(assetId);
+
         vm.prank(SERVICE_TRANSACTION_SENDER);
         gwAssetTracker.confirmMigrationOnGateway(confirmData);
 
@@ -464,11 +464,11 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         );
         assertEq(
             assetMigrationNumGW,
-            migrationNumber,
+            chainMigrationNumber,
             "Asset migration number should be updated on Gateway after confirmation"
         );
-        assertEq(gwAssetTracker.getOriginToken(assetId), tokenAddress);
-        assertEq(gwAssetTracker.getTokenOriginChainId(assetId), originalChainId);
+        assertEq(gwAssetTracker.getOriginToken(assetId), originTokenBeforeConfirmation);
+        assertEq(gwAssetTracker.getTokenOriginChainId(assetId), tokenOriginChainIdBeforeConfirmation);
     }
 
     function test_registerLegacyToken_L2Chain() public {

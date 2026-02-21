@@ -59,6 +59,8 @@ abstract contract AssetTrackerBase is
     /// @notice Denotes whether a token is registered or not.
     /// - On L1AssetTracker, it means that all the chains have correct chainBalance and preV31Total supply set for this token.
     /// - On L2AssetTracker, it means that the token's chainBalance is set correctly and its `totalPreV31TotalSupply` is tracked correctly.
+    /// @dev Once we know that all legacy tokens have been registered (and all new ones have the corresponding logic performed automatically),
+    ///  we can remove the mapping. So DONT RELY ON IT! 
     mapping(bytes32 assetId => bool isTokenRegistered) public isTokenRegistered;
 
     function _nativeTokenVault() internal view virtual returns (INativeTokenVaultBase);

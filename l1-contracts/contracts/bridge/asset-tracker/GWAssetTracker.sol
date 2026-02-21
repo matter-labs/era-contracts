@@ -66,13 +66,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// empty messageRoot calculated for specific chain.
     mapping(uint256 chainId => bytes32 emptyMessageRoot) internal emptyMessageRoot;
 
-    /// @notice We save the chainBalance which equals the chains totalSupply before the first GW->L1 migration so that it can be replayed.
-    /// @dev Note, that the balance is only saved for even migration numbers, i.e. when the chain did not settle on top of Gateway.
-    /// This is needed so that in the future after e.g. a chain migrated with number N (odd number), we would remember how much funds did it
-    /// have right before the migration (when N - 1 was the migration number).
-    mapping(uint256 chainId => mapping(uint256 migrationNumber => mapping(bytes32 assetId => SavedTotalSupply savedChainBalance)))
-        internal savedChainBalance;
-
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert Unauthorized(msg.sender);
@@ -170,8 +163,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes32 _canonicalTxHash,
         BalanceChange calldata _balanceChange
     ) external onlyL2InteropCenter {
-        uint256 chainMigrationNumber = _getChainMigrationNumber(_chainId);
-
         if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _balanceChange.assetId)) {
             _forceSetAssetMigrationNumber(_chainId, _balanceChange.assetId);
         }
@@ -180,12 +171,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
 
         /// Note we don't decrease L1ChainBalance here, since we don't track L1 chainBalance on Gateway.
-        _increaseAndSaveChainBalance(_chainId, _balanceChange.assetId, _balanceChange.amount, chainMigrationNumber);
+        _increaseAndSaveChainBalance(_chainId, _balanceChange.assetId, _balanceChange.amount);
         _increaseAndSaveChainBalance(
             _chainId,
             _balanceChange.baseTokenAssetId,
-            _balanceChange.baseTokenAmount,
-            chainMigrationNumber
+            _balanceChange.baseTokenAmount
         );
 
         _registerToken(_balanceChange.assetId, _balanceChange.originToken, _balanceChange.tokenOriginChainId);
@@ -379,8 +369,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         _increaseAndSaveChainBalance(
             interopBundle.destinationChainId,
             destinationChainBaseTokenAssetId,
-            totalBaseTokenAmount,
-            _getChainMigrationNumber(interopBundle.destinationChainId)
+            totalBaseTokenAmount
         );
     }
 
@@ -453,8 +442,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 _decreaseChainBalance(_sourceChainId, _assetId, _amount);
             }
             if (_destinationChainId != L1_CHAIN_ID) {
-                uint256 chainMigrationNumber = _getChainMigrationNumber(_destinationChainId);
-                _increaseAndSaveChainBalance(_destinationChainId, _assetId, _amount, chainMigrationNumber);
+                _increaseAndSaveChainBalance(_destinationChainId, _assetId, _amount);
             }
         }
     }
@@ -521,8 +509,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     }
 
     /// @notice Migrates the token balance from Gateway to L1.
-    /// @dev This function can be called multiple times on the Gateway as it saves the chainBalance on the first call.
-    /// @dev This function is permissionless.
+    /// @dev This function is intended to be permissionless so that a chain that has moved out 
+    /// of Gateway has an easy way to migrate its balance out of the system.
     function initiateGatewayToL1MigrationOnGateway(uint256 _chainId, bytes32 _assetId) external {
         address zkChain = L2_BRIDGEHUB.getZKChain(_chainId);
         require(zkChain != address(0), ChainIdNotRegistered(_chainId));
@@ -530,9 +518,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         // If the chain already migrated back to GW, then we need the previous migration number.
         uint256 chainMigrationNumber = _calculatePreviousChainMigrationNumber(_chainId);
         require(assetMigrationNumber[_chainId][_assetId] < chainMigrationNumber, InvalidAssetMigrationNumber());
-        // We don't save chainBalance here since it might not be the final chainBalance for this value of the chainMigrationNumber.
-        uint256 amount = _getOrSaveChainBalance(_chainId, _assetId, chainMigrationNumber);
 
+        require(chainMigrationNumber == 2, "Chain must have migrated back to L1 before withdraing balance");
+        
+        uint256 amount = chainBalance[_chainId][_assetId];
         GatewayToL1TokenBalanceMigrationData memory tokenBalanceMigrationData = GatewayToL1TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             originToken: originToken[_assetId],
@@ -544,6 +533,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             assetMigrationNumber: assetMigrationNumber[_chainId][_assetId]
         });
         _sendGatewayToL1MigrationDataToL1(tokenBalanceMigrationData);
+
+        // We assign chain balance to the 0 and bump asset migration number for replay protection
+        chainBalance[_chainId][_assetId] = 0;
+        assetMigrationNumber[_chainId][_assetId] = chainMigrationNumber;
 
         emit GatewayToL1MigrationInitiated(_assetId, _chainId, amount);
     }
@@ -558,61 +551,22 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         return chainMigrationNumber;
     }
 
-    /// @notice Gets the chain balance for migration, saving it if this is the first time it's accessed.
-    /// @dev This function implements a "snapshot and clear" pattern for chain balances during migration.
-    /// @dev On first access, it saves the current chainBalance and sets it to 0 to prevent double-spending.
-    /// @dev Subsequent accesses return the saved value without modifying the current chainBalance.
-    /// @param _chainId The chain ID whose balance is being queried.
-    /// @param _assetId The asset ID of the token.
-    /// @param _migrationNumber The migration number for this operation.
-    /// @return The saved chain balance for this migration.
-    function _getOrSaveChainBalance(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _migrationNumber
-    ) internal returns (uint256) {
-        // Check if we've already saved the balance for this migration
-        SavedTotalSupply memory tokenSavedTotalSupply = savedChainBalance[_chainId][_migrationNumber][_assetId];
-        if (!tokenSavedTotalSupply.isSaved) {
-            // First time accessing this balance for this migration number
-            tokenSavedTotalSupply.amount = chainBalance[_chainId][_assetId];
-            // Persist the saved balance for this specific migration
-            savedChainBalance[_chainId][_migrationNumber][_assetId] = SavedTotalSupply({
-                isSaved: true,
-                amount: tokenSavedTotalSupply.amount
-            });
-        }
-
-        // Return the balance that was available at the time of this migration
-        return tokenSavedTotalSupply.amount;
-    }
-
     /// @notice Confirms a migration operation has been completed and updates the asset migration number.
     /// @param _data The migration confirmation data containing chain ID, asset ID, and migration number.
     function confirmMigrationOnGateway(MigrationConfirmationData calldata _data) external onlyServiceTransactionSender {
-        _confirmMigrationOnGateway(_data);
-    }
-
-    function _confirmMigrationOnGateway(MigrationConfirmationData memory _data) internal {
-        assetMigrationNumber[_data.chainId][_data.assetId] = _data.assetMigrationNumber;
-        // Register the token if it wasn't already
-        _registerToken(_data.assetId, _data.originToken, _data.tokenOriginChainId);
         if (_data.isL1ToGateway) {
+            assetMigrationNumber[_data.chainId][_data.assetId] = _data.assetMigrationNumber;
+            // Register the token if it wasn't already
+            _registerToken(_data.assetId, _data.originToken, _data.tokenOriginChainId);
+
             /// In this case the balance might never have been migrated back to L1.
             chainBalance[_data.chainId][_data.assetId] += _data.amount;
-        } else {
-            _decreaseChainBalance(_data.chainId, _data.assetId, _data.amount);
-
-            uint256 chainMigrationNumber = _calculatePreviousChainMigrationNumber(_data.chainId);
-            SavedTotalSupply memory savedBalance = savedChainBalance[_data.chainId][chainMigrationNumber][
-                _data.assetId
-            ];
-            if (savedBalance.isSaved) {
-                savedChainBalance[_data.chainId][chainMigrationNumber][_data.assetId].amount =
-                    savedBalance.amount -
-                    _data.amount;
-            }
         }
+        
+        // For migrations from GW, the chainBalance and assetMigrationNumber are updated at the initiation of the migration.
+        // Additionally, all the tokens are expected to be registered the first time they are deposited via the GWAssetTracker, i.e.
+        // the amount migrated can not be more than 0 if the token was not registered.
+        
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -622,14 +576,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function _increaseAndSaveChainBalance(
         uint256 _chainId,
         bytes32 _assetId,
-        uint256 _amount,
-        uint256 _chainMigrationNumber
+        uint256 _amount
     ) internal {
-        // We save the chainBalance for the previous migration number so that the chain balance can be migrated back to GW in case it was not migrated.
-        // Note, that for this logic to be correct, we need to ensure that `_chainMigrationNumber` is odd, i.e. the chain actually
-        // actively settles on top of Gateway.
-        _getOrSaveChainBalance(_chainId, _assetId, _chainMigrationNumber - 1);
-        // we increase the chain balance of the token.
         if (_amount > 0) {
             chainBalance[_chainId][_assetId] += _amount;
         }

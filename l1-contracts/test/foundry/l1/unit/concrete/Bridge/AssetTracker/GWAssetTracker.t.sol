@@ -566,7 +566,7 @@ contract GWAssetTrackerTest is Test {
         assertEq(gwAssetTracker.chainBalance(chainId2, ASSET_ID), 2000);
     }
 
-    function test_ConfirmMigrationOnGateway_GatewayToL1_DecreaseBalance() public {
+    function test_ConfirmMigrationOnGateway_GatewayToL1_NoBalanceChange() public {
         // First set up some balance
         BalanceChange memory balanceChange = BalanceChange({
             version: BALANCE_CHANGE_VERSION,
@@ -603,11 +603,12 @@ contract GWAssetTrackerTest is Test {
         vm.prank(SERVICE_TRANSACTION_SENDER);
         gwAssetTracker.confirmMigrationOnGateway(data);
 
-        // When isL1ToGateway is false, balance should decrease
-        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), initialBalance - AMOUNT);
+        // For Gateway->L1 confirmations, Gateway state is updated at initiation time,
+        // so confirmation should not modify chainBalance.
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), initialBalance);
     }
 
-    function test_ConfirmMigrationOnGateway_InsufficientBalanceReverts() public {
+    function test_ConfirmMigrationOnGateway_InsufficientBalanceDoesNotRevert() public {
         MigrationConfirmationData memory data = MigrationConfirmationData({
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
@@ -618,10 +619,14 @@ contract GWAssetTrackerTest is Test {
             isL1ToGateway: false
         });
 
+        uint256 initialBalance = gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID);
+        uint256 initialAssetMigrationNumber = gwAssetTracker.assetMigrationNumber(CHAIN_ID, ASSET_ID);
+
         vm.prank(SERVICE_TRANSACTION_SENDER);
-        // This should fail due to insufficient balance.
-        vm.expectRevert();
         gwAssetTracker.confirmMigrationOnGateway(data);
+
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), initialBalance);
+        assertEq(gwAssetTracker.assetMigrationNumber(CHAIN_ID, ASSET_ID), initialAssetMigrationNumber);
     }
 
     function test_ParseTokenData() public {
