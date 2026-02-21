@@ -35,6 +35,11 @@ import {
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 
+struct ZKsyncOSBaseTokenV31MigrationStatus {
+    bool needsBackFill;
+    uint256 totalSupply;
+}
+
 contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     struct InteropL2Info {
         uint256 totalWithdrawalsToL1;
@@ -60,7 +65,13 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// could image there was a big successful deposit at the inception time of 2^256-1 and then the withdrawals behaved the same way as for
     /// the bridged L2 tokens. 
     /// @dev For native tokens, it is expected to be populated atomatically with `isTokenRegistered[block.chainid]`.
+    /// @dev IMPORTANT: for base token this value may not be correct for zksync os chains until the totalSupply for the base
+    /// token has been backfilled, so before using this value for the base token, one should check that it was set (`zkSyncOSBaseTokenV31MigrationStatus.needsBackFill = false`).
     mapping(bytes32 assetId => SavedTotalSupply snapshot) internal totalPreV31TotalSupply;
+
+    /// @dev On zkSync os chains, the `totalSupply()` of the base token is not available by default,
+    /// so before we ever use it to do any migrations, we need to backfill it.
+    bool public needBasewTokenTotalSupplyBackfill;
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -90,13 +101,42 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _;
     }
 
+    // FIXME: this function will have to be called by the chain admin after the v31 upgrade to backfill the data.
+    // It will be fixed in a separate PR with the base token holder PR.
+    function backFillZKSyncOSBaseTokenV31MigrationData(
+        uint256 _amount
+    ) external onlyUpgrader {
+        require(needBasewTokenTotalSupplyBackfill, "Backfill not needed");
+
+        // We expect that method to be called after the `totalSupply()` has been already updated 
+        // to the correct one, so we can just register the token.
+        if (!isTokenRegistered[BASE_TOKEN_ASSET_ID]) {
+            registerLegacyToken(BASE_TOKEN_ASSET_ID);
+            return;
+        }
+
+        // We expect that for all registered tokens, the zero `totalPreV31TotalSupply` should be saved.
+
+        // The requires below should never be hit, these are just invariant checks.
+        require(totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID].isSaved, "Total supply should be saved for registered token");
+        require(totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID].amount == 0, "Total supply should be 0 before backfill");
+        totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID].amount = _amount;
+
+        needBasewTokenTotalSupplyBackfill = false;
+    }
+
     /// @notice Sets the L1 chain ID and base token asset ID for this L2 chain.
     /// @dev This function is called during contract initialization or upgrades.
     /// @param _l1ChainId The chain ID of the L1 network.
     /// @param _baseTokenAssetId The asset ID of the base token used for gas fees on this chain.
-    function setAddresses(uint256 _l1ChainId, bytes32 _baseTokenAssetId) external onlyUpgrader {
+    function initL2(
+        uint256 _l1ChainId, 
+        bytes32 _baseTokenAssetId,
+        bool _needBasewTokenTotalSupplyBackfill
+    ) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
+        needBasewTokenTotalSupplyBackfill = _needBasewTokenTotalSupplyBackfill;
     }
 
     function _l1ChainId() internal view returns (uint256) {
@@ -136,11 +176,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// @notice Stores token total supply snapshot used for pre-v31 migration accounting.
     /// @dev Anyone can call this to eagerly initialize the snapshot before the first bridge operation.
-    function registerLegacyToken(bytes32 _assetId) external override {
-        _registerLegacyTokenEntry(_assetId);
-    }
-
-    function _registerLegacyTokenEntry(bytes32 _assetId) internal {
+    function registerLegacyToken(bytes32 _assetId) public override {
         if (isTokenRegistered[_assetId]) {
             return;
         }
@@ -346,6 +382,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
         address tokenAddress = _tryGetTokenAddress(_assetId);
         uint256 readTotalPreV31TotalSupply = _registerLegacyTokenIfNeeded(_assetId, tokenAddress);
+        require(!needBasewTokenTotalSupplyBackfill, "The base token total supply needs to be backfilled");
 
         uint256 originChainId = L2_NATIVE_TOKEN_VAULT.originChainId(_assetId);
         address originalToken = L2_NATIVE_TOKEN_VAULT.originToken(_assetId);

@@ -113,7 +113,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.etch(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAddress.code);
         gwAssetTracker = GWAssetTrackerTestHelper(GW_ASSET_TRACKER_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2AssetTracker.setAddresses(block.chainid, bytes32(0));
+        l2AssetTracker.initL2(block.chainid, bytes32(0), false);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         gwAssetTracker.setAddresses(block.chainid);
 
@@ -471,7 +471,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         assertEq(gwAssetTracker.getTokenOriginChainId(assetId), originalChainId);
     }
 
-    function test_migrateTokenBalanceFromNTVV31_L2Chain() public {
+    function test_registerLegacyToken_L2Chain() public {
         // Test migrating token balance from NTV for an L2 chain
         uint256 testChainId = eraZKChainId;
         uint256 migratedBalance = 5000;
@@ -502,7 +502,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         );
 
         // Call the migration function
-        assetTracker.migrateTokenBalanceFromNTVV31(assetId);
+        assetTracker.registerLegacyToken(assetId);
 
         // Verify balances updated correctly
         uint256 originBalance = uint256(
@@ -516,7 +516,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         assertEq(testChainBalance, migratedBalance, "Test chain balance should increase");
     }
 
-    function test_migrateTokenBalanceFromNTVV31_L1Chain() public {
+    function test_registerLegacyToken_L1Chain() public {
         // Test migrating token balance for L1 chain (current chain)
         // Note: _chainId must be != originChainId, so we use a different origin chain
         uint256 totalSupply = 8000;
@@ -544,7 +544,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.store(address(assetTracker), getChainBalanceLocation(assetId, differentOriginChain), maxTokenBalance);
 
         // Call the migration function for L1 (current chain)
-        assetTracker.migrateTokenBalanceFromNTVV31(assetId);
+        assetTracker.registerLegacyToken(assetId);
 
         // Verify balances updated correctly
         uint256 originBalance = uint256(
@@ -713,7 +713,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         );
     }
 
-    function test_regression_migrateTokenBalanceFromNTVV31_revertsForUnknownAsset() public {
+    function test_regression_registerLegacyToken_revertsForUnknownAsset() public {
         // Create a predictable future assetId that is NOT registered in NTV
         bytes32 unknownAssetId = keccak256("unknown-asset-never-registered");
         uint256 testChainId = 999; // Some chain that's not the origin (since _chainId != originChainId is required)
@@ -733,14 +733,14 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         // Attempt to migrate the unknown asset - should revert with InvalidChainId
         // Before the fix, this would succeed and poison state
         vm.expectRevert(InvalidChainId.selector);
-        assetTracker.migrateTokenBalanceFromNTVV31(unknownAssetId);
+        assetTracker.registerLegacyToken(unknownAssetId);
 
         // Verify state was NOT poisoned (chainBalance[0][unknownAssetId] should still be 0)
         uint256 finalChainBalance0 = uint256(vm.load(address(assetTracker), chainBalanceSlot0));
         assertEq(finalChainBalance0, 0, "chainBalance[0] should not have been set to MAX_TOKEN_BALANCE");
     }
 
-    function test_regression_migrateTokenBalanceFromNTVV31_preventsStatePoisoning() public {
+    function test_regression_registerLegacyToken_preventsStatePoisoning() public {
         // Attacker picks a predictable future assetId (unknown to NTV: originChainId(assetId) == 0)
         bytes32 futureAssetId = keccak256(abi.encodePacked("future-token-", block.timestamp));
         uint256 attackerChainId = 12345;
@@ -753,7 +753,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         );
 
         // Before the fix, this attack would succeed:
-        // 1. Call migrateTokenBalanceFromNTVV31(attackerChainId, futureAssetId)
+        // 1. Call registerLegacyToken(attackerChainId, futureAssetId)
         // 2. originChainId = 0 (for unknown asset)
         // 3. Since attackerChainId != 0, the require(_chainId != originChainId) passes
         // 4. migrateTokenBalanceToAssetTracker returns 0 (no balance)
@@ -762,12 +762,12 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         // After the fix, this should revert immediately
         vm.expectRevert(InvalidChainId.selector);
-        assetTracker.migrateTokenBalanceFromNTVV31(futureAssetId);
+        assetTracker.registerLegacyToken(futureAssetId);
     }
 
     /// @notice Test that registered assets can still be migrated correctly
     /// @dev Ensures the fix doesn't break legitimate migration operations
-    function test_regression_migrateTokenBalanceFromNTVV31_worksForRegisteredAsset() public {
+    function test_regression_registerLegacyToken_worksForRegisteredAsset() public {
         // Use a known legacy asset (originChainId != 0)
         uint256 testChainId = eraZKChainId;
         uint256 migratedBalance = 5000;
@@ -799,7 +799,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         );
 
         // This should succeed for a known asset (originChainId != 0)
-        assetTracker.migrateTokenBalanceFromNTVV31(assetId);
+        assetTracker.registerLegacyToken(assetId);
 
         // Verify balance was migrated correctly
         uint256 testChainBalance = uint256(
@@ -810,7 +810,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
     /// @notice Fuzz test for unknown assetId rejection
     /// @dev Ensures any random assetId that returns originChainId=0 is rejected
-    function testFuzz_regression_migrateTokenBalanceFromNTVV31_revertsForAnyUnknownAsset(
+    function testFuzz_regression_registerLegacyToken_revertsForAnyUnknownAsset(
         bytes32 randomAssetId,
         uint256 randomChainId
     ) public {
@@ -827,7 +827,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         // Should always revert for unknown assets
         vm.expectRevert(InvalidChainId.selector);
-        assetTracker.migrateTokenBalanceFromNTVV31(randomAssetId);
+        assetTracker.registerLegacyToken(randomAssetId);
     }
 
     // add this to be excluded from coverage report

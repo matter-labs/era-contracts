@@ -575,7 +575,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         SavedTotalSupply memory tokenSavedTotalSupply = savedChainBalance[_chainId][_migrationNumber][_assetId];
         if (!tokenSavedTotalSupply.isSaved) {
             // First time accessing this balance for this migration number
-            // Save the current balance and reset the chainBalance to 0
             tokenSavedTotalSupply.amount = chainBalance[_chainId][_assetId];
             // Persist the saved balance for this specific migration
             savedChainBalance[_chainId][_migrationNumber][_assetId] = SavedTotalSupply({

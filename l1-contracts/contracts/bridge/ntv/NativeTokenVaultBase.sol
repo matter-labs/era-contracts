@@ -422,20 +422,21 @@ abstract contract NativeTokenVaultBase is
         bytes32 _assetId,
         address _originalCaller
     ) internal {
+        // Note, that in order to track `totalPreV31TotalSupply` correctly in L2AssetTracker,
+        // we have to call it before the any balance changes will be perforemd.
+        _handleBridgeToChain(_chainId, _assetId, _depositAmount);
+
         if (_assetId == _baseTokenAssetId()) {
             require(_depositAmount == msg.value, ValueMismatch(_depositAmount, msg.value));
             if (_isBridgedToken) {
                 // slither-disable-next-line arbitrary-send-eth
                 L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: msg.value}();
             }
-            _handleBridgeToChain(_chainId, _assetId, _depositAmount);
         } else {
             require(msg.value == 0, NonEmptyMsgValue());
             if (_isBridgedToken) {
                 IBridgedStandardToken(_tokenAddress).bridgeBurn(_originalCaller, _depositAmount);
-                _handleBridgeToChain(_chainId, _assetId, _depositAmount);
             } else {
-                _handleBridgeToChain(_chainId, _assetId, _depositAmount);
                 if (!_depositChecked) {
                     uint256 expectedDepositAmount = _depositFunds(
                         _originalCaller,

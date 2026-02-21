@@ -53,14 +53,21 @@ import {IChainAssetHandlerBase} from "../../core/chain-asset-handler/IChainAsset
 import {IL1MessageRoot} from "../../core/message-root/IL1MessageRoot.sol";
 
 contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
-    /// @dev Per-(chainId, assetId) migration accounting stored on L1.
+    /// @notice Per-(chainId, assetId) migration accounting stored on L1.
     /// @param preV31ChainBalance  Chain balance right before the v31 migration.
     /// - For non-native tokens it is exactly equal to chainBalance before the *ecosystem* upgraded to v31 (0 for new tokens).
     /// - For tokens native to the chain, we imagine that it received 2^256-1 token deposit at the inception point and so 
     /// all the balances that are not present on the chain are from claimed withdrawals, i.e. for a token that was bridged
     /// before v31 it is equal to `2^256-1 - <sum of other chainBalances, including l1>`. For new tokens it is exactly `2^256-1`. 
-    /// @param totalDepositedFromL1 Total amount deposited from L1 to the chain since v31 accounting started.
-    /// @param totalClaimedOnL1 Total amount claimed on L1 (withdrawals and failed deposits) since v31 accounting started.
+    /// @param totalDepositedFromL1 Total amount deposited from L1 to the chain since v31 accounting started. Note, that it is not 
+    /// just about any L1->L2 deposit, but only those that debited the chainBalance on L1 directly and it is assumed that every such
+    /// deposit will be processed while the chain is still settling on L1. It is the responsbility of the chain admin to ensure that.
+    /// @param totalClaimedOnL1 Total amount claimed on L1 (withdrawals and failed deposits) since v31 accounting started. Note, that it is not just
+    /// about claim, but claims that affect `chainBalance` of the chain (i.e. the respective failed deposits or withdrawals were submitted
+    /// while the chain was settling on L1)).
+    /// @dev It is the responsibility of the *chain* and its admin to ensure that all deposits are processed before the migration to Gateway is complete
+    /// and vice versa, i.e. all deposits are either fully processed on L1 or fully processed while it settles on ZK Gateway. In case the chain violates 
+    /// this rule, invalid migration amount can be migrated, but it must only affect the chain and its users.
     struct InteropL1Info {
         uint256 preV31ChainBalance;
         uint256 totalDepositedFromL1;
@@ -135,14 +142,13 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @dev Note, that this function performs O(number of chains) calls to NTV. It relies on the fact
     /// that the max number of chains is bound by 100, so this function should be always processable.
     /// @param _assetId The asset id of the token to migrate the token balance for.
-    function migrateTokenBalanceFromNTVV31(bytes32 _assetId) public {
+    function registerLegacyToken(bytes32 _assetId) public {
         IL1NativeTokenVault l1NTV = IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT));
         uint256 originChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
         require(originChainId != 0, InvalidChainId());
 
         // This function is only intended to be used for legacy tokens that have not yet been registered.
         require(!isTokenRegistered[_assetId], "Max chain balance already assigned");
-        isTokenRegistered[_assetId] = true;
 
         uint256[] memory allZKChainIds = BRIDGE_HUB.getAllZKChainChainIDs();
 
@@ -154,7 +160,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             // chainBalance inside the L1AT should never be incremented until the token is registered.
             require(chainBalance[chainId][_assetId] == 0, "Chain balance already set");
 
-            // Origin chain id will be handled later.
+            // Origin chain id will be handled later in this function.
             if (chainId == originChainId) {
                 continue;
             }
@@ -172,8 +178,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         if (originChainId != block.chainid) {
             address tokenAddress = NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
             // Note, that here we have an implicit invariant that the token's total supply
-            // can never be changed before this migration happens.
-            // So until a token is registered, all withdrawals must fail.
+            // can never be changed before this migration happens. So until a token is registered, all withdrawals must fail.
+            // Note, that if a token is a bridged token native to L2, its representation on L1
+            // is deployed by NativeTokenVault as `BridgedStandardERC20`, so we can safely assume the returned value 
+            // will be correct.
             uint256 migratedBalance = IERC20(tokenAddress).totalSupply();
             chainBalance[block.chainid][_assetId] = migratedBalance;
             interopInfo[block.chainid][_assetId].preV31ChainBalance = migratedBalance;
@@ -360,7 +368,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         // We check the assetId to make sure the chain is not lying about it.
         DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
-        _requireMigratedFromNTV(data.chainId, data.assetId);
+        _autoRegisterTokenFromMigration(data.tokenOriginChainId, data.assetId);
 
         uint256 currentSettlementLayer = BRIDGE_HUB.settlementLayer(data.chainId);
         require(currentSettlementLayer != block.chainid, NotMigratedChain());
@@ -389,7 +397,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         require(fromChainBalance >= amountToKeep, InvalidMigrationAmount(fromChainBalance, amountToKeep));
         uint256 amountToMigrate = fromChainBalance - amountToKeep;
 
-        _autoRegisterTokenFromMigration(data.tokenOriginChainId, data.assetId);
         _migrateFunds({
             _fromChainId: data.chainId,
             _toChainId: currentSettlementLayer,
@@ -467,7 +474,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @notice used to pause deposits on Gateway from L1 for migration back to L1.
     function requestPauseDepositsForChainOnGateway(uint256 _chainId) external onlyChain(_chainId) {
         uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
-        require(settlementLayer != 0, InvalidSettlementLayer());
+        require(settlementLayer != block.chainid, InvalidSettlementLayer());
         _sendToChain(
             settlementLayer,
             GW_ASSET_TRACKER_ADDR,
