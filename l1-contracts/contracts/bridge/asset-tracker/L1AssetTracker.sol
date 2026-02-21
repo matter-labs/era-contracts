@@ -21,7 +21,7 @@ import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {
     AmountToKeepOnL1NotUint256,
-    AssetNotMigratedFromNTV,
+  ,
     InvalidAssetMigrationNumber,
     InvalidChainMigrationNumber,
     InvalidMigrationAmount,
@@ -30,17 +30,16 @@ import {
     InvalidSettlementLayer,
     InvalidVersion,
     InvalidWithdrawalChainId,
-    L1TotalSupplyAlreadyMigrated,
-    NTVChainBalanceNotMigrated,
+  ,
+  ,
     NotMigratedChain,
     OnlyWhitelistedSettlementLayer,
     TransientBalanceChangeAlreadySet,
-    UnexpectedSuccessfulDepositsValue
+  
 } from "./AssetTrackerErrors.sol";
 import {V31UpgradeChainBatchNumberNotSet} from "../../core/bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
-import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";

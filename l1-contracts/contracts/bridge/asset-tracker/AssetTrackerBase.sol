@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
-import {IAssetTrackerBase, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
+import {IAssetTrackerBase} from "./IAssetTrackerBase.sol";
 import {
     GatewayToL1TokenBalanceMigrationData,
     L1ToGatewayTokenBalanceMigrationData

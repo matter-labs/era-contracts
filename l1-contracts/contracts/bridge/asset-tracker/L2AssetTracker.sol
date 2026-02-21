@@ -8,11 +8,11 @@ import {SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, MAX_TOKEN_BALANC
 import {L1ToGatewayTokenBalanceMigrationData, MigrationConfirmationData} from "../../common/Messaging.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
-import {InvalidChainId, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {Unauthorized} from "../../common/L1ContractErrors.sol";
 
 import {
     AssetIdNotRegistered,
-    MaxChainBalanceAlreadyAssigned,
+  ,
     MissingBaseTokenAssetId,
     OnlyGatewaySettlementLayer,
     TokenBalanceNotMigratedToGateway
