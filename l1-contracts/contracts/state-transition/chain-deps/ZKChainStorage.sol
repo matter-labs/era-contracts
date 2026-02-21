@@ -256,5 +256,7 @@ struct ZKChainStorage {
     /// @dev Timestamp of the last base token gas price multiplier update (setTokenMultiplier).
     /// @dev STORAGE SLOT: 69
     uint256 lastTokenMultiplierUpdateTimestamp;
+    /// @dev Whether the chain has correct base token total supply tracked. It is the case for all chains,
+    /// except for zksync os chains that have existed before the v31 upgrade.
     bool baseTokenHasTotalSupply;
 }

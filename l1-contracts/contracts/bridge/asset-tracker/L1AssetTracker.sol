@@ -25,6 +25,7 @@ import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IChainAssetHandlerBase} from "../../core/chain-asset-handler/IChainAssetHandler.sol";
 import {IL1MessageRoot} from "../../core/message-root/IL1MessageRoot.sol";
+import {MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1} from "../../common/Config.sol";
 
 contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     IBridgehubBase public immutable BRIDGE_HUB;
@@ -386,7 +387,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         // Such messages are only allowed has settled on Gateway and returned back.
         uint256 chainMigrationNumber = _getChainMigrationNumber(data.chainId);
-        require(chainMigrationNumber == 2, InvalidChainMigrationNumber(chainMigrationNumber, 2));
+        require(
+            chainMigrationNumber == MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1,
+            InvalidChainMigrationNumber(chainMigrationNumber, MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1)
+        );
         require(
             data.chainMigrationNumber == chainMigrationNumber,
             InvalidChainMigrationNumber(chainMigrationNumber, data.chainMigrationNumber)

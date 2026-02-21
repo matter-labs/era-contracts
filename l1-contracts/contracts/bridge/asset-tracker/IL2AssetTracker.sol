@@ -5,13 +5,18 @@ pragma solidity ^0.8.21;
 import {MigrationConfirmationData} from "../../common/Messaging.sol";
 
 interface IL2AssetTracker {
+    struct InteropL2Info {
+        uint256 totalWithdrawalsToL1;
+        uint256 totalSuccessfulDepositsFromL1;
+    }
+
     /// @notice Emitted when L1 to Gateway migration is initiated for an asset
     /// @param assetId The asset ID being migrated
     /// @param chainId The chain ID from which the migration is initiated
     /// @param amount The amount being migrated
     event L1ToGatewayMigrationInitiated(bytes32 indexed assetId, uint256 chainId, uint256 amount);
 
-    function initL2(uint256 _l1ChainId, bytes32 _baseTokenAssetId, bool _needBasewTokenTotalSupplyBackfill) external;
+    function initL2(uint256 _l1ChainId, bytes32 _baseTokenAssetId, bool _needBaseTokenTotalSupplyBackfill) external;
 
     function handleInitiateBridgingOnL2(
         uint256 _toChainId,

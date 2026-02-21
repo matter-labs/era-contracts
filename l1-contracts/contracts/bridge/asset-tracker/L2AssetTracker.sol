@@ -14,25 +14,10 @@ import {AssetIdNotRegistered, BaseTokenTotalSupplyBackfillNotNeeded, BaseTokenTo
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 
-struct ZKsyncOSBaseTokenV31MigrationStatus {
-    bool needsBackFill;
-    uint256 totalSupply;
-}
-
 contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
-    struct InteropL2Info {
-        uint256 totalWithdrawalsToL1;
-        uint256 totalSuccessfulDepositsFromL1;
-    }
-
     uint256 public L1_CHAIN_ID;
 
     bytes32 public BASE_TOKEN_ASSET_ID;
-
-    /// @notice We save the token balance in the first deposit after chain migration. For native tokens, this is the chainBalance; for foreign tokens, this is the total supply. See _handleFinalizeBridgingOnL2Inner for details.
-    /// @notice We need this to be able to migrate token balance to Gateway AssetTracker from the L1AssetTracker.
-    mapping(uint256 migrationNumber => mapping(bytes32 assetId => SavedTotalSupply savedTotalSupply))
-        internal savedTotalSupply;
 
     /// @dev L2-side accounting used to compute the amount to keep on L1 during L1 -> Gateway migration.
     mapping(bytes32 assetId => InteropL2Info info) internal interopInfo;
@@ -43,14 +28,16 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// - If a token is a native token, it is equal to the `2^256-1 - balanceOf of the native token vault`, i.e. one
     /// could image there was a big successful deposit at the inception time of 2^256-1 and then the withdrawals behaved the same way as for
     /// the bridged L2 tokens.
-    /// @dev For native tokens, it is expected to be populated atomatically with `isAssetRegistered[block.chainid]`.
+    /// @dev For native tokens, it is expected to be populated automatically with `isAssetRegistered[block.chainid]`.
     /// @dev IMPORTANT: for base token this value may not be correct for zksync os chains until the totalSupply for the base
-    /// token has been backfilled, so before using this value for the base token, one should check that it was set (`zkSyncOSBaseTokenV31MigrationStatus.needsBackFill = false`).
+    /// token has been backfilled, so before using this value for the base token, one should check that it was set (`needBaseTokenTotalSupplyBackfill = false`).
     mapping(bytes32 assetId => SavedTotalSupply snapshot) internal totalPreV31TotalSupply;
 
     /// @dev On zkSync os chains, the `totalSupply()` of the base token is not available by default,
     /// so before we ever use it to do any migrations, we need to backfill it.
-    bool public needBasewTokenTotalSupplyBackfill;
+    /// @dev This variable is expected to be deleted after v31 upgrade, once all the zksync os chains have their base token 
+    /// amount backfilled.
+    bool public needBaseTokenTotalSupplyBackfill;
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -83,7 +70,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     // FIXME: this function will have to be called by the chain admin after the v31 upgrade to backfill the data.
     // It will be fixed in a separate PR with the base token holder PR.
     function backFillZKSyncOSBaseTokenV31MigrationData(uint256 _amount) external onlyUpgrader {
-        if (!needBasewTokenTotalSupplyBackfill) {
+        if (!needBaseTokenTotalSupplyBackfill) {
             revert BaseTokenTotalSupplyBackfillNotNeeded();
         }
 
@@ -104,7 +91,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         );
         totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID].amount = _amount;
 
-        needBasewTokenTotalSupplyBackfill = false;
+        needBaseTokenTotalSupplyBackfill = false;
     }
 
     /// @notice Sets the L1 chain ID and base token asset ID for this L2 chain.
@@ -114,11 +101,11 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     function initL2(
         uint256 _l1ChainId,
         bytes32 _baseTokenAssetId,
-        bool _needBasewTokenTotalSupplyBackfill
+        bool _needBaseTokenTotalSupplyBackfill
     ) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
-        needBasewTokenTotalSupplyBackfill = _needBasewTokenTotalSupplyBackfill;
+        needBaseTokenTotalSupplyBackfill = _needBaseTokenTotalSupplyBackfill;
     }
 
     function _l1ChainId() internal view returns (uint256) {
@@ -302,7 +289,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             // For origin chains, chainBalance starts at MAX_TOKEN_BALANCE and decreases as tokens are bridged out.
             // We need to account for tokens currently locked in the NTV from previous bridge operations.
             // Note, that this logic treats "tokens sent directly to L2NTV" and tokens bridged to L1 through NTV the same
-            // way. It is okay, since the tokens that have been sent to L1 are basically frozen anyway.
+            // way. It is okay, since the tokens that have been sent to the L2NTV are basically frozen anyway.
             uint256 ntvBalance = IERC20(_tokenAddress).balanceOf(address(ntv));
             uint256 chainTotalSupply = MAX_TOKEN_BALANCE - ntvBalance;
             chainBalance[originChainId][_assetId] = chainTotalSupply;
@@ -370,7 +357,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
         address tokenAddress = _tryGetTokenAddress(_assetId);
         uint256 readTotalPreV31TotalSupply = _registerLegacyTokenIfNeeded(_assetId, tokenAddress);
-        if (needBasewTokenTotalSupplyBackfill) {
+        // Formally we could forbid the migration only for the base token in such case, 
+        // but for the ease we'll just forbid any migration until the chain has backfilled the token.
+        if (needBaseTokenTotalSupplyBackfill) {
             revert BaseTokenTotalSupplyBackfillRequired();
         }
 

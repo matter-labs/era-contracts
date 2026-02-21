@@ -15,11 +15,13 @@ import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
+import {IL1AssetTracker} from "../../bridge/asset-tracker/IL1AssetTracker.sol";
 import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
 import {ChainNotReadyForMigration, ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
 import {CTMNotRegistered} from "../../common/L1ContractErrors.sol";
 import {MigrationIntervalInvalid, MigrationIntervalNotSet, MigrationNumberMismatch, SettlementLayerMustNotBeL1, IteratedMigrationsNotSupported, HistoricalSettlementLayerMismatch} from "../bridgehub/L1BridgehubErrors.sol";
 import {MigrationInterval} from "./IChainAssetHandler.sol";
+import {IL1MessageRoot} from "../message-root/IL1MessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -167,9 +169,16 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     /// @return True if migration preconditions are met.
     function isReadyForMigration(uint256 _chainId) public view returns (bool) {
         bytes32 baseAssetId = BRIDGEHUB.baseTokenAssetId(_chainId);
+        address zkChain = BRIDGEHUB.getZKChain(_chainId);
+        require(zkChain != address(0), ZKChainNotRegistered());
         IL1AssetRouter l1AssetRouter = IL1AssetRouter(address(_assetRouter()));
         IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(address(l1AssetRouter.nativeTokenVault()));
-        return nativeTokenVault.chainBalance(_chainId, baseAssetId) == 0;
+        IL1AssetTracker l1AssetTracker = nativeTokenVault.l1AssetTracker();
+
+        return
+            !IL1MessageRoot(address(_messageRoot())).isPreV31(_chainId) &&
+            l1AssetTracker.isAssetRegistered(baseAssetId) &&
+            IZKChain(zkChain).baseTokenSupportsTotalSupply();
     }
 
     function _setMigrationInProgressOnL1(uint256 _chainId) internal override {

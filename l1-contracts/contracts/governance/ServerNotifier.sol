@@ -65,6 +65,8 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
     function migrateToGateway(uint256 _chainId) external onlyChainAdmin(_chainId) {
         uint256 migrationNumber = _getMigrationNumber(_chainId) + 1;
         address bridgehub = chainTypeManager.BRIDGE_HUB();
+
+        // Footgun check
         address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
         require(
             IL1ChainAssetHandler(chainAssetHandler).isReadyForMigration(_chainId),
