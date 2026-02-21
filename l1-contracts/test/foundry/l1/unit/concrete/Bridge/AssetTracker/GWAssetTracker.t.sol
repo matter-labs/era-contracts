@@ -23,8 +23,10 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
+import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 
 contract GWAssetTrackerTestHelper is GWAssetTracker {
+    constructor() GWAssetTracker() {}
     function getEmptyMessageRoot(uint256 _chainId) external returns (bytes32) {
         return _getEmptyMessageRoot(_chainId);
     }
@@ -98,9 +100,17 @@ contract GWAssetTrackerTest is Test {
         vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, address(mockNativeTokenVault).code);
         vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, address(mockChainAssetHandler).code);
 
+        // Mock the WETH_TOKEN() call on NativeTokenVault
+        address mockWrappedZKToken = makeAddr("mockWrappedZKToken");
+        vm.mockCall(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            abi.encodeWithSelector(IL2NativeTokenVault.WETH_TOKEN.selector),
+            abi.encode(mockWrappedZKToken)
+        );
+
         // Set up the contract
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        gwAssetTracker.setAddresses(L1_CHAIN_ID);
+        gwAssetTracker.initL2(L1_CHAIN_ID, address(this));
 
         vm.mockCall(
             L2_CHAIN_ASSET_HANDLER_ADDR,
@@ -109,18 +119,18 @@ contract GWAssetTrackerTest is Test {
         );
     }
 
-    function test_SetAddresses() public {
+    function test_InitL2() public {
         uint256 newL1ChainId = 999;
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        gwAssetTracker.setAddresses(newL1ChainId);
+        gwAssetTracker.initL2(newL1ChainId, address(this));
 
         assertEq(gwAssetTracker.L1_CHAIN_ID(), newL1ChainId);
     }
 
-    function test_SetAddresses_Unauthorized() public {
+    function test_InitL2_Unauthorized() public {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        gwAssetTracker.setAddresses(999);
+        gwAssetTracker.initL2(999, address(this));
     }
 
     function test_HandleChainBalanceIncreaseOnGateway() public {
@@ -408,9 +418,9 @@ contract GWAssetTrackerTest is Test {
         assertEq(gwAssetTracker.L1_CHAIN_ID(), L1_CHAIN_ID);
     }
 
-    function testFuzz_SetAddresses(uint256 _l1ChainId) public {
+    function testFuzz_InitL2(uint256 _l1ChainId) public {
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        gwAssetTracker.setAddresses(_l1ChainId);
+        gwAssetTracker.initL2(_l1ChainId, address(this));
 
         assertEq(gwAssetTracker.L1_CHAIN_ID(), _l1ChainId);
     }

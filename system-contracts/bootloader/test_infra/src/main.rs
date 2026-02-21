@@ -151,6 +151,7 @@ fn execute_internal_bootloader_test() {
         number: L1BatchNumber::from(1),
         timestamp: 14,
         fee_input: BatchFeeInput::sensible_l1_pegged_default(),
+        interop_fee: U256::zero(),
         fee_account: Address::default(),
 
         enforced_base_fee: None,

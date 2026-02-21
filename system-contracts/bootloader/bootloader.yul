@@ -447,6 +447,21 @@ object "Bootloader" {
                 ret := mload(SETTLEMENT_LAYER_CHAIN_ID_BYTE())
             }
 
+            /// @dev The slot dedicated for storing the interop fee.
+            function INTEROP_FEE_SLOT() -> ret {
+                ret := add(SETTLEMENT_LAYER_CHAIN_ID_SLOT(), 1)
+            }
+
+            /// @dev The byte starting from which the interop fee is stored.
+            function INTEROP_FEE_BYTE() -> ret {
+                ret := mul(INTEROP_FEE_SLOT(), 32)
+            }
+
+            /// @dev Returns the interop fee value for a given block index.
+            function getInteropFee() -> ret {
+                ret := mload(INTEROP_FEE_BYTE())
+            }
+
             /// @dev The slot starting from which the compressed bytecodes are located in the bootloader's memory.
             /// Each compressed bytecode is provided in the following format:
             /// - 32 byte formatted bytecode hash
@@ -458,7 +473,7 @@ object "Bootloader" {
             /// At the start of the bootloader, the value stored at the `TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT` is equal to
             /// `TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT + 32`, where the hash of the first compressed bytecode to publish should be stored.
             function COMPRESSED_BYTECODES_BEGIN_SLOT() -> ret {
-                ret := add(SETTLEMENT_LAYER_CHAIN_ID_SLOT(), 1)
+                ret := add(INTEROP_FEE_SLOT(), 1)
             }
 
             /// @dev The byte starting from which the compressed bytecodes are located in the bootloader's memory.
@@ -677,7 +692,7 @@ object "Bootloader" {
             }
 
             function L2_INTEROP_CENTER_ADDR() -> ret {
-                ret := 0x000000000000000000000000000000000001000b
+                ret := 0x000000000000000000000000000000000001000d
             }
 
             /// @dev The minimal allowed distance in bytes between the pointer to the compressed data
@@ -1761,7 +1776,7 @@ object "Bootloader" {
                 mstore(4, address)
                 let success := call(
                     gas(),
-                    KNOWN_CODES_CONTRACT_ADDR(),
+                    ACCOUNT_CODE_STORAGE_ADDR(),
                     0,
                     0,
                     36,
@@ -3131,16 +3146,22 @@ object "Bootloader" {
                 if iszero(success) {
                     debugLog("Failed to set new settlement layer chain id: ", currentSettlementLayerChainId)
 
-                    /// here during the upgrade the setting of the settlement layer chain will fail, as the system context is not yet upgraded.
-                    /// todo remove after v31 upgrade.
-                    /// We want to check if the interop center is deployed or not, i.e. did we execute V31 upgrade.
-                    let codeSize := getCodeSize(L2_INTEROP_CENTER_ADDR())
-                    debugLog("codeSize", codeSize)
-                    /// nothing is deployed at this address.
-                    let codeSize2 := getCodeSize(add(L2_INTEROP_ROOT_STORAGE(), 10))
-                    if iszero(eq(codeSize, codeSize2)) {
-                        revertWithReason(FAILED_TO_SET_NEW_SETTLEMENT_LAYER_CHAIN_ID_ERR_CODE(), 1)
-                    }
+                    /// During the upgrade the setting of the settlement layer chain will fail, as the system context is not yet upgraded.
+                    revertIfPostV31Upgrade(FAILED_TO_SET_NEW_SETTLEMENT_LAYER_CHAIN_ID_ERR_CODE())
+                }
+            }
+
+            /// @notice Some of the functionality is supported only after v31 upgrade is complete.
+            /// @param errCode The error code to revert with if the interop center is deployed, i.e. we are post v31 upgrade.
+            /// @dev To be removed after v31 upgrade.
+            /// We want to check if the interop center is deployed or not, i.e. did we execute V31 upgrade and
+            /// only if true revert. 
+            function revertIfPostV31Upgrade(errCode) {
+                let codeSize := getCodeSize(L2_INTEROP_CENTER_ADDR())
+                debugLog("InteropCenter codeSize", codeSize)
+                
+                if iszero(iszero(codeSize)) {
+                    revertWithReason(errCode, 1)
                 }
             }
 
@@ -3346,6 +3367,34 @@ object "Bootloader" {
                 mstore(sub(132, 96), rollingHashOfProcessedRoots)
                 rollingHashOfProcessedRoots := keccak256(36, add(32, add(64, mul(sidesLength, 32))))
                 mstore(INTEROP_ROOT_ROLLING_HASH_BYTE(), rollingHashOfProcessedRoots)
+            }
+
+            /// @notice Sets the interop fee on InteropCenter for the current batch.
+            /// @dev Called once per batch, before processing transactions.
+            function setInteropFeeForBatch() {
+                let fee := getInteropFee()
+                debugLog("Setting interop fee for batch: ", fee)
+
+                // Encode: setInteropFee(uint256)
+                mstore(0, {{RIGHT_PADDED_SET_INTEROP_FEE_SELECTOR}})
+                mstore(4, fee)
+
+                let success := call(
+                    gas(),
+                    L2_INTEROP_CENTER_ADDR(),
+                    0,
+                    0,
+                    36,
+                    0,
+                    0
+                )
+
+                if iszero(success) {
+                    debugLog("Failed to set interop fee: ", fee)
+
+                    /// During the upgrade the setting of the interop fee will fail, as the interop center is not yet upgraded.
+                    revertIfPostV31Upgrade(FAILED_TO_SET_INTEROP_FEE())
+                }
             }
 
             /// @notice Appends the transaction hash to the current L2 block.
@@ -4211,6 +4260,10 @@ object "Bootloader" {
                 ret := 38
             }
 
+            function FAILED_TO_SET_INTEROP_FEE() -> ret {
+                ret := 39
+            }
+
             /// @dev Accepts a 1-word literal and returns its length in bytes
             /// @param str A string literal
             function getStrLen(str) -> len {
@@ -4487,6 +4540,8 @@ object "Bootloader" {
                 GAS_PRICE_PER_PUBDATA := gasPerPubdataFromBaseFee(EXPECTED_BASE_FEE, FAIR_PUBDATA_PRICE)
 
                 <!-- @endif -->
+
+                setInteropFeeForBatch()
             }
 
             // Now, we iterate over all transactions, processing each of them

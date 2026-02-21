@@ -294,6 +294,11 @@
             "internalType": "address"
           },
           {
+            "name": "zkTokenAssetId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
             "name": "testnetVerifier",
             "type": "bool",
             "internalType": "bool"
