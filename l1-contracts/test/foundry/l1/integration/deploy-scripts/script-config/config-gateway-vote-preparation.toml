@@ -1,10 +1,12 @@
 force_deployments_data = "0x00"
 gateway_chain_id = 506
+gateway_settlement_fee = 0
 is_zk_sync_os = true
-owner_address = "0xc6268dEA580e5f0F7B1293457C1F7e6E22C839FC"
+owner_address = "0xD2BEa76AF8312f0335C8C27703BAfF5aC7Ec8088"
 refund_recipient = "0x000000000000000000000000000000000000bEEF"
 support_l2_legacy_shared_bridge_test = false
 testnet_verifier = true
+zk_token_asset_id = "0x01000000000000000000000000000000000000000000000000000000000a2a6f"
 
 [contracts]
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"

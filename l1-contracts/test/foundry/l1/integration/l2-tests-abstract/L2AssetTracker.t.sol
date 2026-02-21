@@ -21,6 +21,7 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {L2AssetTrackerData} from "./L2AssetTrackerData.sol";
+import {L2UtilsBase} from "../l2-tests-in-l1-context/L2UtilsBase.sol";
 
 abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
@@ -32,6 +33,12 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         finalizeDepositWithChainId(260);
 
         vm.chainId(GATEWAY_CHAIN_ID);
+
+        // Set up token balances for chain operators to pay settlement fees
+        uint256[] memory chainIds = new uint256[](2);
+        chainIds[0] = 271;
+        chainIds[1] = 260;
+        L2UtilsBase.setupTokenBalancesForChainOperators(chainIds);
 
         bytes[] memory input2 = L2AssetTrackerData.getData2();
         for (uint256 i = 0; i < input2.length; i++) {
@@ -59,6 +66,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         uint256 successCount = 0;
 
         for (uint256 i = 0; i < testData.length; i++) {
+            console.log("Processing test data index", i, "for chainId", testData[i].chainId);
             // Verify each test data entry has valid chain ID
             assertTrue(testData[i].chainId > 0, "Chain ID should be positive");
 
@@ -121,7 +129,15 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
                 vm.store(address(GW_ASSET_TRACKER), structSlot, bytes32(uint256(1)));
             }
 
-            vm.prank(L2_BRIDGEHUB.getZKChain(testData[i].chainId));
+            console.log("About to call processLogsAndMessages for index", i);
+
+            // Get the ZKChain address for this chain - this will be the caller and the settlement fee payer
+            address zkChainAddr = L2_BRIDGEHUB.getZKChain(testData[i].chainId);
+
+            // Update settlementFeePayer to be the ZKChain address (which has tokens and approval)
+            testData[i].settlementFeePayer = zkChainAddr;
+
+            vm.prank(zkChainAddr);
 
             (bool success, bytes memory data) = GW_ASSET_TRACKER_ADDR.call(
                 abi.encodeCall(GW_ASSET_TRACKER.processLogsAndMessages, testData[i])

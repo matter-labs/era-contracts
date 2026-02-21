@@ -20,4 +20,6 @@ interface IAssetTrackerBase {
     function registerNewToken(bytes32 _assetId, uint256 _originChainId) external;
 
     function chainBalance(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
+
+    function isAssetRegistered(bytes32 _assetId) external view returns (bool);
 }

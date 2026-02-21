@@ -36,15 +36,12 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         _;
     }
 
-    /// @notice Initializes the reentrancy guard.
+    /// @inheritdoc IInteropHandler
     function initL2(uint256 _l1ChainId) public reentrancyGuardInitializer onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
     }
 
-    /// @notice Executes a full bundle atomically.
-    /// @dev Reverts if any call fails, or if bundle has been processed already.
-    /// @param _bundle ABI-encoded InteropBundle to execute.
-    /// @param _proof Inclusion proof for the bundle message. The bundle message itself gets broadcasted by InteropCenter contract whenever a bundle is sent.
+    /// @inheritdoc IInteropHandler
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
@@ -119,10 +116,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         emit BundleExecuted(bundleHash);
     }
 
-    /// @notice Verifies receipt of a bundle without executing calls.
-    /// @dev Marks bundle as Verified on success.
-    /// @param _bundle ABI-encoded InteropBundle to verify.
-    /// @param _proof Inclusion proof for the bundle message. The bundle message itself gets broadcasted by InteropCenter contract whenever a bundle is sent.
+    /// @inheritdoc IInteropHandler
     function verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
@@ -149,11 +143,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         _verifyBundle(_bundle, _proof, bundleHash);
     }
 
-    /// @notice Function used to unbundle the bundle. It's present to give more flexibility in cancelling and overall processing of bundles.
-    ///         Can be invoked multiple times until all calls are processed.
-    /// @param _sourceChainId Originating chain ID of the bundle.
-    /// @param _bundle ABI-encoded InteropBundle to unbundle.
-    /// @param _providedCallStatus Array of desired statuses per call.
+    /// @inheritdoc IInteropHandler
     function unbundleBundle(
         uint256 _sourceChainId,
         bytes memory _bundle,

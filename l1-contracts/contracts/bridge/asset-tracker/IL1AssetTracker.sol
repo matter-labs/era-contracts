@@ -31,8 +31,6 @@ interface IL1AssetTracker {
 
     function BRIDGE_HUB() external view returns (IBridgehubBase);
 
-    function isAssetRegistered(bytes32 _assetId) external view returns (bool);
-
     function handleChainBalanceIncreaseOnL1(
         uint256 _chainId,
         bytes32 _assetId,

@@ -15,7 +15,7 @@ import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
-import {IL1AssetTracker} from "../../bridge/asset-tracker/IL1AssetTracker.sol";
+import {IAssetTrackerBase} from "../../bridge/asset-tracker/IAssetTrackerBase.sol";
 import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
 import {ChainNotReadyForMigration, ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
 import {CTMNotRegistered} from "../../common/L1ContractErrors.sol";
@@ -173,7 +173,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         require(zkChain != address(0), ZKChainNotRegistered());
         IL1AssetRouter l1AssetRouter = IL1AssetRouter(address(_assetRouter()));
         IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(address(l1AssetRouter.nativeTokenVault()));
-        IL1AssetTracker l1AssetTracker = nativeTokenVault.l1AssetTracker();
+        IAssetTrackerBase l1AssetTracker = IAssetTrackerBase(address(nativeTokenVault.l1AssetTracker()));
 
         return
             !IL1MessageRoot(address(_messageRoot())).isPreV31(_chainId) &&

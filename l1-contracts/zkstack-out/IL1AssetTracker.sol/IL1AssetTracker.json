@@ -94,25 +94,7 @@
   },
   {
     "type": "function",
-    "name": "migrateTokenBalanceFromNTVV31",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "receiveMigrationOnL1",
+    "name": "receiveGatewayToL1MigrationOnL1",
     "inputs": [
       {
         "name": "_finalizeWithdrawalParams",
@@ -155,6 +137,69 @@
             "internalType": "bytes32[]"
           }
         ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "receiveL1ToGatewayMigrationOnL1",
+    "inputs": [
+      {
+        "name": "_finalizeWithdrawalParams",
+        "type": "tuple",
+        "internalType": "struct FinalizeL1DepositParams",
+        "components": [
+          {
+            "name": "chainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "l2BatchNumber",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "l2MessageIndex",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "l2Sender",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "l2TxNumberInBatch",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "message",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "merkleProof",
+            "type": "bytes32[]",
+            "internalType": "bytes32[]"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "registerLegacyToken",
+    "inputs": [
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [],

@@ -4,25 +4,10 @@
     "name": "confirmMigrationOnL2",
     "inputs": [
       {
-        "name": "_tokenBalanceMigrationData",
+        "name": "_migrationConfirmationData",
         "type": "tuple",
-        "internalType": "struct TokenBalanceMigrationData",
+        "internalType": "struct MigrationConfirmationData",
         "components": [
-          {
-            "name": "version",
-            "type": "bytes1",
-            "internalType": "bytes1"
-          },
-          {
-            "name": "isL1ToGateway",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "originToken",
-            "type": "address",
-            "internalType": "address"
-          },
           {
             "name": "chainId",
             "type": "uint256",
@@ -39,12 +24,12 @@
             "internalType": "uint256"
           },
           {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "originToken",
+            "type": "address",
+            "internalType": "address"
           },
           {
-            "name": "chainMigrationNumber",
+            "name": "amount",
             "type": "uint256",
             "internalType": "uint256"
           },
@@ -52,6 +37,11 @@
             "name": "assetMigrationNumber",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "isL1ToGateway",
+            "type": "bool",
+            "internalType": "bool"
           }
         ]
       }
@@ -76,6 +66,11 @@
     "type": "function",
     "name": "handleFinalizeBridgingOnL2",
     "inputs": [
+      {
+        "name": "_fromChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
       {
         "name": "_assetId",
         "type": "bytes32",
@@ -118,6 +113,11 @@
     "name": "handleInitiateBridgingOnL2",
     "inputs": [
       {
+        "name": "_toChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
         "name": "_assetId",
         "type": "bytes32",
         "internalType": "bytes32"
@@ -138,6 +138,29 @@
   },
   {
     "type": "function",
+    "name": "initL2",
+    "inputs": [
+      {
+        "name": "_l1ChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_baseTokenAssetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_needBaseTokenTotalSupplyBackfill",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "initiateL1ToGatewayMigrationOnL2",
     "inputs": [
       {
@@ -151,41 +174,10 @@
   },
   {
     "type": "function",
-    "name": "migrateTokenBalanceFromNTVV31",
+    "name": "registerLegacyToken",
     "inputs": [
       {
         "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "registerLegacyTokenOnChain",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setAddresses",
-    "inputs": [
-      {
-        "name": "_l1ChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_baseTokenAssetId",
         "type": "bytes32",
         "internalType": "bytes32"
       }
