@@ -380,13 +380,13 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         // on L2s we don't track the balance.
         // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
         // so L2NativeTokenVault doesn't have to handle balance changes on GW.
-        L2_ASSET_TRACKER.handleFinalizeBridgingOnL2(
-            _chainId,
-            _assetId,
-            _amount,
-            originChainId[_assetId],
-            tokenAddress[_assetId]
-        );
+        L2_ASSET_TRACKER.handleFinalizeBridgingOnL2({
+            _fromChainId: _chainId,
+            _assetId: _assetId,
+            _amount: _amount,
+            _tokenOriginChainId: originChainId[_assetId],
+            _tokenAddress: tokenAddress[_assetId]
+        });
     }
 
     function _registerToken(address _nativeToken) internal override returns (bytes32) {

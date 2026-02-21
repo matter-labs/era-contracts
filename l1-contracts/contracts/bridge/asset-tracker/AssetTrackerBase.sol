@@ -6,10 +6,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
 import {IAssetTrackerBase} from "./IAssetTrackerBase.sol";
-import {
-    GatewayToL1TokenBalanceMigrationData,
-    L1ToGatewayTokenBalanceMigrationData
-} from "../../common/Messaging.sol";
+import {GatewayToL1TokenBalanceMigrationData, L1ToGatewayTokenBalanceMigrationData} from "../../common/Messaging.sol";
 
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
@@ -60,8 +57,8 @@ abstract contract AssetTrackerBase is
     /// - On L1AssetTracker, it means that all the chains have correct chainBalance and preV31Total supply set for this token.
     /// - On L2AssetTracker, it means that the token's chainBalance is set correctly and its `totalPreV31TotalSupply` is tracked correctly.
     /// @dev Once we know that all legacy tokens have been registered (and all new ones have the corresponding logic performed automatically),
-    ///  we can remove the mapping. So DONT RELY ON IT! 
-    mapping(bytes32 assetId => bool isTokenRegistered) public isTokenRegistered;
+    ///  we can remove the mapping. So DONT RELY ON IT!
+    mapping(bytes32 assetId => bool isAssetRegistered) public isAssetRegistered;
 
     function _nativeTokenVault() internal view virtual returns (INativeTokenVaultBase);
 

@@ -131,7 +131,10 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             if (hasDeprecatedSelector) {
                 assertFalse(
                     success,
-                    string.concat("processLogsAndMessages should revert for deprecated selector at iteration ", vm.toString(i))
+                    string.concat(
+                        "processLogsAndMessages should revert for deprecated selector at iteration ",
+                        vm.toString(i)
+                    )
                 );
 
                 bytes4 revertSelector;
@@ -156,7 +159,10 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
                         revert(add(data, 0x20), mload(data))
                     }
                 }
-                assertTrue(success, string.concat("processLogsAndMessages should succeed for iteration ", vm.toString(i)));
+                assertTrue(
+                    success,
+                    string.concat("processLogsAndMessages should succeed for iteration ", vm.toString(i))
+                );
                 successCount++;
                 console.log("success", i);
             }
@@ -291,11 +297,9 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         vm.prank(address(L2_NATIVE_TOKEN_VAULT_ADDR));
         L2_ASSET_TRACKER.handleFinalizeBridgingOnL2(L1_CHAIN_ID, assetId, amount, L1_CHAIN_ID, address(token));
 
-        stdstore
-            .target(sharedBridgeLegacy)
-            .sig("l1TokenAddress(address)")
-            .with_key(address(token))
-            .checked_write(l1Token);
+        stdstore.target(sharedBridgeLegacy).sig("l1TokenAddress(address)").with_key(address(token)).checked_write(
+            l1Token
+        );
         L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setLegacyTokenAssetId(address(token));
 
         vm.prank(address(L2_NATIVE_TOKEN_VAULT_ADDR));

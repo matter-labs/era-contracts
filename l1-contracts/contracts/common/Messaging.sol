@@ -366,6 +366,7 @@ struct GatewayToL1TokenBalanceMigrationData {
 /// @param amount Amount moved during the migration finalization on L1.
 /// @param assetMigrationNumber New migration number that should be persisted on L2/Gateway.
 /// @param isL1ToGateway Whether this confirmation corresponds to L1 -> Gateway direction.
+// solhint-disable-next-line gas-struct-packing
 struct MigrationConfirmationData {
     uint256 chainId;
     bytes32 assetId;

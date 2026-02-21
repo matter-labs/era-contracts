@@ -256,6 +256,5 @@ struct ZKChainStorage {
     /// @dev Timestamp of the last base token gas price multiplier update (setTokenMultiplier).
     /// @dev STORAGE SLOT: 69
     uint256 lastTokenMultiplierUpdateTimestamp;
-
     bool baseTokenHasTotalSupply;
 }

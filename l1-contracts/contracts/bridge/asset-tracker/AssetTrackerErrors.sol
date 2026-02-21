@@ -65,3 +65,7 @@ error NTVChainBalanceNotMigrated(uint256 _chainId, bytes32 _assetId, uint256 _nt
 error AssetNotMigratedFromNTV(bytes32 _assetId);
 // 0xde4db34f
 error AmountToKeepOnL1NotUint256();
+// 0x8f30b8e2
+error BaseTokenTotalSupplyBackfillNotNeeded();
+// 0x39d03970
+error BaseTokenTotalSupplyBackfillRequired();

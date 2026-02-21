@@ -754,7 +754,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         // 3. Since attackerChainId != 0, the require(_chainId != originChainId) passes
         // 4. migrateTokenBalanceToAssetTracker returns 0 (no balance)
         // 5. _registerAndAssignMaxChainBalanceIfNeeded(0, futureAssetId) sets chainBalance[0][futureAssetId] = MAX
-        // 6. State is now poisoned - isTokenRegistered[futureAssetId] = true
+        // 6. State is now poisoned - isAssetRegistered[futureAssetId] = true
 
         // After the fix, this should revert immediately
         vm.expectRevert(InvalidChainId.selector);

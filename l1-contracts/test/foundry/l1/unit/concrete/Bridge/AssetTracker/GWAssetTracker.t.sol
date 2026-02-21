@@ -742,12 +742,7 @@ contract GWAssetTrackerTest is Test {
         uint256 sourceBalanceBefore = gwAssetTracker.chainBalance(sourceChainId, assetId);
         uint256 destBalanceBefore = gwAssetTracker.chainBalance(destinationChainId, assetId);
 
-        gwAssetTracker.handleChainBalanceChangeOnGateway(
-            sourceChainId,
-            destinationChainId,
-            assetId,
-            transferAmount
-        );
+        gwAssetTracker.handleChainBalanceChangeOnGateway(sourceChainId, destinationChainId, assetId, transferAmount);
 
         // Source balance should decrease
         assertEq(
@@ -777,12 +772,7 @@ contract GWAssetTrackerTest is Test {
         uint256 sourceBalanceBefore = gwAssetTracker.chainBalance(sourceChainId, assetId);
         uint256 destBalanceBefore = gwAssetTracker.chainBalance(destinationChainId, assetId);
 
-        gwAssetTracker.handleChainBalanceChangeOnGateway(
-            sourceChainId,
-            destinationChainId,
-            assetId,
-            transferAmount
-        );
+        gwAssetTracker.handleChainBalanceChangeOnGateway(sourceChainId, destinationChainId, assetId, transferAmount);
 
         // Source balance should decrease
         assertEq(
@@ -810,12 +800,7 @@ contract GWAssetTrackerTest is Test {
         // Initial destination balance
         uint256 destBalanceInitial = gwAssetTracker.chainBalance(destinationChainId, assetId);
 
-        gwAssetTracker.handleChainBalanceChangeOnGateway(
-            sourceChainId,
-            destinationChainId,
-            assetId,
-            transferAmount
-        );
+        gwAssetTracker.handleChainBalanceChangeOnGateway(sourceChainId, destinationChainId, assetId, transferAmount);
 
         // A single call should increment destination by exactly transferAmount.
         assertEq(
@@ -858,9 +843,11 @@ contract GWAssetTrackerTest is Test {
         );
     }
 
-    function testFuzz_regression_chainBalanceChange(uint256 _sourceChainId, uint256 _destinationChainId, uint256 _amount)
-        public
-    {
+    function testFuzz_regression_chainBalanceChange(
+        uint256 _sourceChainId,
+        uint256 _destinationChainId,
+        uint256 _amount
+    ) public {
         // Bound inputs to reasonable values
         _sourceChainId = bound(_sourceChainId, 2, 1000);
         _destinationChainId = bound(_destinationChainId, 2, 1000);
@@ -877,12 +864,7 @@ contract GWAssetTrackerTest is Test {
         uint256 sourceBalanceBefore = gwAssetTracker.chainBalance(_sourceChainId, ASSET_ID);
         uint256 destBalanceBefore = gwAssetTracker.chainBalance(_destinationChainId, ASSET_ID);
 
-        gwAssetTracker.handleChainBalanceChangeOnGateway(
-            _sourceChainId,
-            _destinationChainId,
-            ASSET_ID,
-            _amount
-        );
+        gwAssetTracker.handleChainBalanceChangeOnGateway(_sourceChainId, _destinationChainId, ASSET_ID, _amount);
 
         // Source should always decrease
         assertEq(

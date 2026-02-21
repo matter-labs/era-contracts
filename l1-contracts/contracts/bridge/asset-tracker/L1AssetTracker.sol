@@ -4,11 +4,7 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {
-    GatewayToL1TokenBalanceMigrationData,
-    L1ToGatewayTokenBalanceMigrationData,
-    MigrationConfirmationData
-} from "../../common/Messaging.sol";
+import {GatewayToL1TokenBalanceMigrationData, L1ToGatewayTokenBalanceMigrationData, MigrationConfirmationData} from "../../common/Messaging.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {InvalidProof, ZeroAddress, InvalidChainId, Unauthorized} from "../../common/L1ContractErrors.sol";
@@ -19,24 +15,7 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {
-    AmountToKeepOnL1NotUint256,
-  ,
-    InvalidAssetMigrationNumber,
-    InvalidChainMigrationNumber,
-    InvalidMigrationAmount,
-    InvalidMigrationNumber,
-    InvalidSender,
-    InvalidSettlementLayer,
-    InvalidVersion,
-    InvalidWithdrawalChainId,
-  ,
-  ,
-    NotMigratedChain,
-    OnlyWhitelistedSettlementLayer,
-    TransientBalanceChangeAlreadySet,
-  
-} from "./AssetTrackerErrors.sol";
+import {AmountToKeepOnL1NotUint256, AssetIdNotRegistered, AssetNotMigratedFromNTV, InvalidAssetMigrationNumber, InvalidChainMigrationNumber, InvalidMigrationAmount, InvalidMigrationNumber, InvalidSender, InvalidSettlementLayer, InvalidVersion, InvalidWithdrawalChainId, MaxChainBalanceAlreadyAssigned, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet} from "./AssetTrackerErrors.sol";
 import {V31UpgradeChainBatchNumberNotSet} from "../../core/bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
@@ -105,7 +84,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     }
 
     function _requireRegistered(bytes32 _assetId) internal {
-        require(isTokenRegistered[_assetId], "Asset not registered");
+        if (!isAssetRegistered[_assetId]) {
+            revert AssetIdNotRegistered(_assetId);
+        }
     }
 
     /// @notice This function is used to migrate the token balance from the NTV to the AssetTracker for V31 upgrade.
@@ -121,17 +102,22 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         require(originChainId != 0, InvalidChainId());
 
         // This function is only intended to be used for legacy tokens that have not yet been registered.
-        require(!isTokenRegistered[_assetId], "Max chain balance already assigned");
+        if (isAssetRegistered[_assetId]) {
+            revert MaxChainBalanceAlreadyAssigned(_assetId);
+        }
 
         uint256[] memory allZKChainIds = BRIDGE_HUB.getAllZKChainChainIDs();
+        uint256 allZKChainIdsLength = allZKChainIds.length;
 
         uint256 totalBridgedOut = 0;
 
-        for (uint256 i = 0; i < allZKChainIds.length; i++) {
+        for (uint256 i = 0; i < allZKChainIdsLength; ++i) {
             uint256 chainId = allZKChainIds[i];
             // This require should never be triggered in production, it is an invariant check
             // chainBalance inside the L1AT should never be incremented until the token is registered.
-            require(chainBalance[chainId][_assetId] == 0, "Chain balance already set");
+            if (chainBalance[chainId][_assetId] != 0) {
+                revert MaxChainBalanceAlreadyAssigned(_assetId);
+            }
 
             // Origin chain id will be handled later in this function.
             if (chainId == originChainId) {
@@ -145,7 +131,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             totalBridgedOut += migratedBalance;
         }
         // Similar to the above, it is just an invariant check that should never be hit
-        require(chainBalance[block.chainid][_assetId] == 0, "L1 chain balance already set");
+        if (chainBalance[block.chainid][_assetId] != 0) {
+            revert MaxChainBalanceAlreadyAssigned(_assetId);
+        }
 
         // The token is not native to L1, so we also have to account for the amount bridged to L1.
         if (originChainId != block.chainid) {
@@ -153,7 +141,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             // Note, that here we have an implicit invariant that the token's total supply
             // can never be changed before this migration happens. So until a token is registered, all withdrawals must fail.
             // Note, that if a token is a bridged token native to L2, its representation on L1
-            // is deployed by NativeTokenVault as `BridgedStandardERC20`, so we can safely assume the returned value 
+            // is deployed by NativeTokenVault as `BridgedStandardERC20`, so we can safely assume the returned value
             // will be correct.
             uint256 migratedBalance = IERC20(tokenAddress).totalSupply();
             chainBalance[block.chainid][_assetId] = migratedBalance;
@@ -163,20 +151,20 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE - totalBridgedOut;
         interopInfo[originChainId][_assetId].preV31ChainBalance = MAX_TOKEN_BALANCE - totalBridgedOut;
-        isTokenRegistered[_assetId] = true;
+        isAssetRegistered[_assetId] = true;
     }
 
     /// @inheritdoc AssetTrackerBase
     function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
-        _registerToken(_originChainId, _assetId);
+        _registerNewTokenInner(_originChainId, _assetId);
     }
 
-    function _registerToken(uint256 _originChainId, bytes32 _assetId) internal {
-        if (isTokenRegistered[_assetId]) {
+    function _registerNewTokenInner(uint256 _originChainId, bytes32 _assetId) internal {
+        if (isAssetRegistered[_assetId]) {
             return;
         }
 
-        isTokenRegistered[_assetId] = true;
+        isAssetRegistered[_assetId] = true;
         chainBalance[_originChainId][_assetId] = MAX_TOKEN_BALANCE;
         // For any new native token, we treat `preV31ChainBalance` as if at the moment of the inception
         // there was an infinite deposit to the chain.
@@ -251,7 +239,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
         _requireRegistered(_assetId);
 
-
         if (chainToUpdate == _chainId) {
             interopInfo[_chainId][_assetId].totalClaimedOnL1 += _amount;
         }
@@ -290,12 +277,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @notice This function is used to register tokens that are only deployed on L2.
     /// @dev This is needed e.g. to enable interop for a token native to the chain that has never
     /// been withdrawn to L1.
-    function _autoRegisterTokenFromMigration(
-        uint256 _originChainId,
-        bytes32 _assetId
-    ) internal {
+    function _autoRegisterTokenFromMigration(uint256 _originChainId, bytes32 _assetId) internal {
         // Firstly, we need to check whether we have already registered the token
-        if (isTokenRegistered[_assetId]) {
+        if (isAssetRegistered[_assetId]) {
             return;
         }
 
@@ -306,9 +290,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         address tokenAddress = NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
 
-        require(tokenAddress == address(0), "Legacy Token balance not migrated from NTV");
+        if (tokenAddress != address(0)) {
+            revert AssetNotMigratedFromNTV(_assetId);
+        }
 
-        _registerToken(_originChainId, _assetId);
+        _registerNewTokenInner(_originChainId, _assetId);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -320,8 +306,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     function receiveL1ToGatewayMigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external {
         _proveMessageInclusion(_finalizeWithdrawalParams);
 
-        (bytes4 functionSignature, L1ToGatewayTokenBalanceMigrationData memory data) = DataEncoding
-            .decodeL1ToGatewayTokenBalanceMigrationData(_finalizeWithdrawalParams.message);
+        (, L1ToGatewayTokenBalanceMigrationData memory data) = DataEncoding.decodeL1ToGatewayTokenBalanceMigrationData(
+            _finalizeWithdrawalParams.message
+        );
         require(data.version == TOKEN_BALANCE_MIGRATION_DATA_VERSION, InvalidVersion());
         require(
             assetMigrationNumber[data.chainId][data.assetId] < data.chainMigrationNumber,
@@ -348,13 +335,13 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             InvalidMigrationNumber(chainMigrationNumber, assetMigrationNumber[data.chainId][data.assetId])
         );
 
-        uint256 amountToKeep = _toKeepDuringL1ToGWMigration(
-            data.chainId,
-            data.assetId,
-            data.totalWithdrawalsToL1,
-            data.totalSuccessfulDepositsFromL1,
-            data.totalPreV31TotalSupply
-        );
+        uint256 amountToKeep = _toKeepDuringL1ToGWMigration({
+            _chainId: data.chainId,
+            _assetId: data.assetId,
+            _totalWithdrawalsToL1: data.totalWithdrawalsToL1,
+            _totalSuccessfulDepositsFromL1: data.totalSuccessfulDepositsFromL1,
+            _totalPreV31TotalSupply: data.totalPreV31TotalSupply
+        });
         uint256 fromChainBalance = chainBalance[data.chainId][data.assetId];
         require(fromChainBalance >= amountToKeep, InvalidMigrationAmount(fromChainBalance, amountToKeep));
         uint256 amountToMigrate = fromChainBalance - amountToKeep;
@@ -386,8 +373,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     function receiveGatewayToL1MigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external {
         _proveMessageInclusion(_finalizeWithdrawalParams);
 
-        (bytes4 functionSignature, GatewayToL1TokenBalanceMigrationData memory data) = DataEncoding
-            .decodeGatewayToL1TokenBalanceMigrationData(_finalizeWithdrawalParams.message);
+        (, GatewayToL1TokenBalanceMigrationData memory data) = DataEncoding.decodeGatewayToL1TokenBalanceMigrationData(
+            _finalizeWithdrawalParams.message
+        );
         require(data.version == TOKEN_BALANCE_MIGRATION_DATA_VERSION, InvalidVersion());
         require(
             assetMigrationNumber[data.chainId][data.assetId] < data.chainMigrationNumber,
@@ -398,12 +386,12 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         // Such messages are only allowed has settled on Gateway and returned back.
         uint256 chainMigrationNumber = _getChainMigrationNumber(data.chainId);
+        require(chainMigrationNumber == 2, InvalidChainMigrationNumber(chainMigrationNumber, 2));
         require(
-            chainMigrationNumber == 2,
-            InvalidChainMigrationNumber(chainMigrationNumber, 2)
+            data.chainMigrationNumber == chainMigrationNumber,
+            InvalidChainMigrationNumber(chainMigrationNumber, data.chainMigrationNumber)
         );
-        require(data.chainMigrationNumber == chainMigrationNumber, InvalidChainMigrationNumber(chainMigrationNumber, data.chainMigrationNumber));
-        
+
         // It is expected that before a chain gets any balance of a token on GW, it is registered on L1AssetTracker.
         // This requirement should never be violated in production, it is an invariant check.
         _requireRegistered(data.assetId);
@@ -411,7 +399,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         // We only allow whitelisted settlement layers' messages to be processed by this function, since
         // it updates various chain-related parameters such as assetMigrationNumber.
         // It does mean that if a past settlement layer does not have this status anymore, such messages
-        // wont be processable. This limitation will be fixed in the future releases. 
+        // wont be processable. This limitation will be fixed in the future releases.
         require(BRIDGE_HUB.whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId), InvalidWithdrawalChainId());
 
         // `assetMigrationNumber` can be either 0 or 1 (didnt migrate the balance to GW or did migrate).
@@ -419,7 +407,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         // This check does not serve a specific purpose, it is an invariant check.
         uint256 readAssetMigrationNumber = assetMigrationNumber[data.chainId][data.assetId];
         require(
-            readAssetMigrationNumber == data.assetMigrationNumber || readAssetMigrationNumber + 1 == data.assetMigrationNumber,
+            readAssetMigrationNumber == data.assetMigrationNumber ||
+                readAssetMigrationNumber + 1 == data.assetMigrationNumber,
             InvalidAssetMigrationNumber()
         );
 
@@ -466,10 +455,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         _sendToChain(
             _settlementLayerChainId,
             GW_ASSET_TRACKER_ADDR,
-            abi.encodeCall(
-                IGWAssetTracker.confirmMigrationOnGateway,
-                (_migrationConfirmationData)
-            )
+            abi.encodeCall(IGWAssetTracker.confirmMigrationOnGateway, (_migrationConfirmationData))
         );
         _sendToChain(
             _migrationConfirmationData.chainId,
@@ -490,11 +476,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     }
 
     /// @notice Computes how much balance must remain on L1 when moving accounting to Gateway.
-    /// @dev Conceptually it should cover the finalization of all outstanding withdrawals or claimed failed deposits 
+    /// @dev Conceptually it should cover the finalization of all outstanding withdrawals or claimed failed deposits
     /// *that would reduce the chainBalance of the chain*. One could say it is `totalWithdrawalsToL1 + totalFailedDepositsFromL1 - totalClaimed`.
     /// Note, both `totalWithdrawalsToL1` and `totalFailedDepositsFromL1` must only refer to messages that happened when the chain
     /// settled on L1, while `totalClaimed` should only include claims for such withdrawlas/faield deposits.
-    /// We calculate `totalFailedDepositsFromL1` as the difference between the total deposits for when the chain settled on L1 and the total successful 
+    /// We calculate `totalFailedDepositsFromL1` as the difference between the total deposits for when the chain settled on L1 and the total successful
     /// deposits from the same period. All in all, we get the following formula:
     /// `amountToKeep = totalWithdrawalsToL1 + (totalDepositedFromL1 - totalSuccessfulDepositsFromL1) - totalClaimedOnL1`.
     /// For some of the older tokens, we did not track neither of the values above, so when the balance is moved from the native token vault, we remember
@@ -517,7 +503,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     ) internal view returns (uint256 amountToKeep) {
         InteropL1Info memory info = interopInfo[_chainId][_assetId];
 
-        // The numbers in question are large especially for native tokens as their 
+        // The numbers in question are large especially for native tokens as their
         // preV31ChainBalance and _totalPreV31TotalSupply are very close to 2^256-1, so
         // we need to work around overflows.
         // It is expected however, that the resulting value is within the valid range for 2^256-1.
@@ -527,32 +513,32 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             amountToKeep = info.preV31ChainBalance + _totalWithdrawalsToL1;
             // Overflow => went above 2^256-1.
             if (amountToKeep < info.preV31ChainBalance) {
-                wraps += 1;
+                ++wraps;
             }
 
             amountToKeep += info.totalDepositedFromL1;
 
             // Overflow => went above 2^256-1.
             if (amountToKeep < info.totalDepositedFromL1) {
-                wraps += 1;
+                ++wraps;
             }
 
             amountToKeep -= _totalSuccessfulDepositsFromL1;
             // Underflow => went below 0.
             if (amountToKeep > type(uint256).max - _totalSuccessfulDepositsFromL1) {
-                wraps -= 1;
+                --wraps;
             }
 
             amountToKeep -= info.totalClaimedOnL1;
             // Underflow => went below 0.
             if (amountToKeep > type(uint256).max - info.totalClaimedOnL1) {
-                wraps -= 1; 
+                --wraps;
             }
 
             amountToKeep -= _totalPreV31TotalSupply;
             // Underflow => went below 0.
             if (amountToKeep > type(uint256).max - _totalPreV31TotalSupply) {
-                wraps -= 1;
+                --wraps;
             }
         }
 

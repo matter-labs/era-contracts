@@ -10,13 +10,7 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 
-import {
-    AssetIdNotRegistered,
-  ,
-    MissingBaseTokenAssetId,
-    OnlyGatewaySettlementLayer,
-    TokenBalanceNotMigratedToGateway
-} from "./AssetTrackerErrors.sol";
+import {AssetIdNotRegistered, BaseTokenTotalSupplyBackfillNotNeeded, BaseTokenTotalSupplyBackfillRequired, MissingBaseTokenAssetId, OnlyGatewaySettlementLayer, TokenBalanceNotMigratedToGateway} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 
@@ -45,11 +39,11 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// @dev Token total supply snapshot captured before the first post-v31 bridge operation for each token.
     /// @dev For tokens that existed before the chain migrated to v31, it should be equal to `totalSuccessfulDeposits - totalWithdrawalsToL1`.
-    /// - If a token is bridged tokens, it is equal to its `totalSupply()`. 
-    /// - If a token is a native token, it is equal to the `2^256-1 - balanceOf of the native token vault`, i.e. one 
+    /// - If a token is bridged tokens, it is equal to its `totalSupply()`.
+    /// - If a token is a native token, it is equal to the `2^256-1 - balanceOf of the native token vault`, i.e. one
     /// could image there was a big successful deposit at the inception time of 2^256-1 and then the withdrawals behaved the same way as for
-    /// the bridged L2 tokens. 
-    /// @dev For native tokens, it is expected to be populated atomatically with `isTokenRegistered[block.chainid]`.
+    /// the bridged L2 tokens.
+    /// @dev For native tokens, it is expected to be populated atomatically with `isAssetRegistered[block.chainid]`.
     /// @dev IMPORTANT: for base token this value may not be correct for zksync os chains until the totalSupply for the base
     /// token has been backfilled, so before using this value for the base token, one should check that it was set (`zkSyncOSBaseTokenV31MigrationStatus.needsBackFill = false`).
     mapping(bytes32 assetId => SavedTotalSupply snapshot) internal totalPreV31TotalSupply;
@@ -88,14 +82,14 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     // FIXME: this function will have to be called by the chain admin after the v31 upgrade to backfill the data.
     // It will be fixed in a separate PR with the base token holder PR.
-    function backFillZKSyncOSBaseTokenV31MigrationData(
-        uint256 _amount
-    ) external onlyUpgrader {
-        require(needBasewTokenTotalSupplyBackfill, "Backfill not needed");
+    function backFillZKSyncOSBaseTokenV31MigrationData(uint256 _amount) external onlyUpgrader {
+        if (!needBasewTokenTotalSupplyBackfill) {
+            revert BaseTokenTotalSupplyBackfillNotNeeded();
+        }
 
-        // We expect that method to be called after the `totalSupply()` has been already updated 
+        // We expect that method to be called after the `totalSupply()` has been already updated
         // to the correct one, so we can just register the token.
-        if (!isTokenRegistered[BASE_TOKEN_ASSET_ID]) {
+        if (!isAssetRegistered[BASE_TOKEN_ASSET_ID]) {
             registerLegacyToken(BASE_TOKEN_ASSET_ID);
             return;
         }
@@ -103,8 +97,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         // We expect that for all registered tokens, the zero `totalPreV31TotalSupply` should be saved.
 
         // The requires below should never be hit, these are just invariant checks.
-        require(totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID].isSaved, "Total supply should be saved for registered token");
-        require(totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID].amount == 0, "Total supply should be 0 before backfill");
+        assert(totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID].isSaved);
+        assert(totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID].amount == 0);
         totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID].amount = _amount;
 
         needBasewTokenTotalSupplyBackfill = false;
@@ -115,7 +109,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @param _l1ChainId The chain ID of the L1 network.
     /// @param _baseTokenAssetId The asset ID of the base token used for gas fees on this chain.
     function initL2(
-        uint256 _l1ChainId, 
+        uint256 _l1ChainId,
         bytes32 _baseTokenAssetId,
         bool _needBasewTokenTotalSupplyBackfill
     ) external onlyUpgrader {
@@ -134,35 +128,29 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// @inheritdoc AssetTrackerBase
     function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
-        if (isTokenRegistered[_assetId]) {
+        if (isAssetRegistered[_assetId]) {
             return;
         }
-        isTokenRegistered[_assetId] = true;
+        isAssetRegistered[_assetId] = true;
 
         if (_originChainId == block.chainid) {
             chainBalance[_originChainId][_assetId] = MAX_TOKEN_BALANCE;
             // By convention, we treat native tokens as those that had an infinite deposit
-            // at the inception of the chain, so we set the `totalPreV31TotalSupply` to MAX_TOKEN_BALANCE to reflect that. 
-            totalPreV31TotalSupply[_assetId] = SavedTotalSupply({
-                isSaved: true, 
-                amount: MAX_TOKEN_BALANCE
-            });
+            // at the inception of the chain, so we set the `totalPreV31TotalSupply` to MAX_TOKEN_BALANCE to reflect that.
+            totalPreV31TotalSupply[_assetId] = SavedTotalSupply({isSaved: true, amount: MAX_TOKEN_BALANCE});
         } else {
             // We dont track chain balance for non-native tokens.
 
-            // If a token is not a native token and is bridged for the first time, 
+            // If a token is not a native token and is bridged for the first time,
             // we know that it has never been bridged before v31.
-            totalPreV31TotalSupply[_assetId] = SavedTotalSupply({
-                isSaved: true, 
-                amount: 0
-            });
+            totalPreV31TotalSupply[_assetId] = SavedTotalSupply({isSaved: true, amount: 0});
         }
     }
 
     /// @notice Stores token total supply snapshot used for pre-v31 migration accounting.
     /// @dev Anyone can call this to eagerly initialize the snapshot before the first bridge operation.
     function registerLegacyToken(bytes32 _assetId) public override {
-        if (isTokenRegistered[_assetId]) {
+        if (isAssetRegistered[_assetId]) {
             return;
         }
 
@@ -208,7 +196,10 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             _decreaseChainBalance(block.chainid, _assetId, _amount);
         }
 
-        if (_toChainId == L1_CHAIN_ID && L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == L1_CHAIN_ID) {
+        if (
+            _toChainId == L1_CHAIN_ID &&
+            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == L1_CHAIN_ID
+        ) {
             interopInfo[_assetId].totalWithdrawalsToL1 += _amount;
         }
     }
@@ -251,7 +242,13 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 _tokenOriginChainId,
         address _tokenAddress
     ) external onlyL2NativeTokenVault {
-        _handleFinalizeBridgingOnL2Inner(_fromChainId, _assetId, _amount, _tokenOriginChainId, _tokenAddress);
+        _handleFinalizeBridgingOnL2Inner({
+            _fromChainId: _fromChainId,
+            _assetId: _assetId,
+            _amount: _amount,
+            _tokenOriginChainId: _tokenOriginChainId,
+            _tokenAddress: _tokenAddress
+        });
     }
 
     function _handleFinalizeBridgingOnL2Inner(
@@ -272,17 +269,17 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             chainBalance[block.chainid][_assetId] += _amount;
         }
 
-        if (_fromChainId == L1_CHAIN_ID && L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == L1_CHAIN_ID) {
+        if (
+            _fromChainId == L1_CHAIN_ID &&
+            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == L1_CHAIN_ID
+        ) {
             interopInfo[_assetId].totalSuccessfulDepositsFromL1 += _amount;
         }
     }
 
     /// @notice Populates the totalPreV31TotalSupply.
     /// @dev Assumes that the token is not yet registered.
-    function _registerLegacyToken(
-        bytes32 _assetId,
-        address _tokenAddress
-    ) internal returns (uint256 totalSupply) {
+    function _registerLegacyToken(bytes32 _assetId, address _tokenAddress) internal returns (uint256 totalSupply) {
         INativeTokenVaultBase ntv = _nativeTokenVault();
 
         // Token is not new and yet it does not have the prev31 total supply saved,
@@ -292,7 +289,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         if (originChainId == block.chainid) {
             // Invariant check: the chain balance of the origin chain should be 0 until the balance migration
             // from NTV is complete.
-            require(chainBalance[originChainId][_assetId] == 0, "Chain balance should be 0 before migration");
+            assert(chainBalance[originChainId][_assetId] == 0);
 
             // Initialize chainBalance
             // For origin chains, chainBalance starts at MAX_TOKEN_BALANCE and decreases as tokens are bridged out.
@@ -311,14 +308,14 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             totalSupply = IERC20(_tokenAddress).totalSupply();
             totalPreV31TotalSupply[_assetId] = SavedTotalSupply({isSaved: true, amount: totalSupply});
         }
-        isTokenRegistered[_assetId] = true;
+        isAssetRegistered[_assetId] = true;
     }
 
     function _registerLegacyTokenIfNeeded(
         bytes32 _assetId,
         address _tokenAddress
     ) internal returns (uint256 totalSupply) {
-        if (isTokenRegistered[_assetId]) {
+        if (isAssetRegistered[_assetId]) {
             // If the token is already registered, then the totalPreV31TotalSupply should be already populated, so we can just return it.
             return totalPreV31TotalSupply[_assetId].amount;
         }
@@ -326,7 +323,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         // Note we assume that the token must be legacy, since we expect the NTV to call `registerNewToken` for any new tokens.
         return _registerLegacyToken(_assetId, _tokenAddress);
     }
-        
 
     /// @notice Handles the finalization of incoming base token bridging operations on L2.
     /// @dev This function is specifically for the chain's native base token used for gas payments.
@@ -342,13 +338,13 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             revert MissingBaseTokenAssetId();
         }
 
-        _handleFinalizeBridgingOnL2Inner(
-            L1_CHAIN_ID,
-            baseTokenAssetId,
-            _amount,
-            L1_CHAIN_ID,
-            address(L2_BASE_TOKEN_SYSTEM_CONTRACT)
-        );
+        _handleFinalizeBridgingOnL2Inner({
+            _fromChainId: L1_CHAIN_ID,
+            _assetId: baseTokenAssetId,
+            _amount: _amount,
+            _tokenOriginChainId: L1_CHAIN_ID,
+            _tokenAddress: address(L2_BASE_TOKEN_SYSTEM_CONTRACT)
+        });
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -367,7 +363,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
         address tokenAddress = _tryGetTokenAddress(_assetId);
         uint256 readTotalPreV31TotalSupply = _registerLegacyTokenIfNeeded(_assetId, tokenAddress);
-        require(!needBasewTokenTotalSupplyBackfill, "The base token total supply needs to be backfilled");
+        if (needBasewTokenTotalSupplyBackfill) {
+            revert BaseTokenTotalSupplyBackfillRequired();
+        }
 
         uint256 originChainId = L2_NATIVE_TOKEN_VAULT.originChainId(_assetId);
         address originalToken = L2_NATIVE_TOKEN_VAULT.originToken(_assetId);

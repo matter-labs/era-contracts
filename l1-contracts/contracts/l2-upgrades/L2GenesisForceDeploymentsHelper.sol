@@ -265,13 +265,13 @@ library L2GenesisForceDeploymentsHelper {
             _isGenesisUpgrade: _isGenesisUpgrade,
             _isZKsyncOS: _isZKsyncOS
         });
-        _finalizeDeployments(
-            _ctmDeployer,
-            fixedForceDeploymentsData,
-            additionalForceDeploymentsData,
-            _isZKsyncOS,
-            _isGenesisUpgrade
-        );
+        _finalizeDeployments({
+            _ctmDeployer: _ctmDeployer,
+            fixedForceDeploymentsData: fixedForceDeploymentsData,
+            additionalForceDeploymentsData: additionalForceDeploymentsData,
+            _isZKsyncOS: _isZKsyncOS,
+            _isGenesisUpgrade: _isGenesisUpgrade
+        });
     }
 
     function _setupProxyAdmin() private {

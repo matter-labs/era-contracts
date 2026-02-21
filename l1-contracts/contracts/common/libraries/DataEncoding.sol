@@ -11,10 +11,7 @@ import {WrongMsgLength} from "../../bridge/L1BridgeContractErrors.sol";
 import {InvalidFunctionSignature} from "../../bridge/asset-tracker/AssetTrackerErrors.sol";
 import {IAssetTrackerDataEncoding} from "../../bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
 import {UnsafeBytes} from "./UnsafeBytes.sol";
-import {
-    GatewayToL1TokenBalanceMigrationData,
-    L1ToGatewayTokenBalanceMigrationData
-} from "../../common/Messaging.sol";
+import {GatewayToL1TokenBalanceMigrationData, L1ToGatewayTokenBalanceMigrationData} from "../../common/Messaging.sol";
 import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol";
 
 /**

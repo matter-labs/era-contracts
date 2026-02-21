@@ -28,11 +28,7 @@ abstract contract L2NativeTokenVaultTokenIndexRegressionTestAbstract is Test, Sh
     }
 
     function _setLegacyBridgeMapping(address _l2Token, address _l1Token) internal {
-        stdstore
-            .target(sharedBridgeLegacy)
-            .sig("l1TokenAddress(address)")
-            .with_key(_l2Token)
-            .checked_write(_l1Token);
+        stdstore.target(sharedBridgeLegacy).sig("l1TokenAddress(address)").with_key(_l2Token).checked_write(_l1Token);
     }
 
     function test_regression_setLegacyTokenDataSetsTokenIndex() external {
