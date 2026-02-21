@@ -78,6 +78,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         // to the correct one, so we can just register the token.
         if (!isAssetRegistered[BASE_TOKEN_ASSET_ID]) {
             registerLegacyToken(BASE_TOKEN_ASSET_ID);
+            needBaseTokenTotalSupplyBackfill = false;
             return;
         }
 
