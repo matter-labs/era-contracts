@@ -69,3 +69,9 @@ error AmountToKeepOnL1NotUint256();
 error BaseTokenTotalSupplyBackfillNotNeeded();
 // 0x39d03970
 error BaseTokenTotalSupplyBackfillRequired();
+// 0xb0a14f0d
+error ChainBalanceMustBeZeroBeforeMigration(uint256 _chainId, bytes32 _assetId, uint256 _chainBalance);
+// 0x7eb19ff6
+error TotalPreV31SupplyNotSaved(bytes32 _assetId);
+// 0x9fd35ff5
+error TotalPreV31SupplyShouldBeZero(bytes32 _assetId, uint256 _totalSupply);

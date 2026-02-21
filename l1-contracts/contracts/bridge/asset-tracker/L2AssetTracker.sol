@@ -10,7 +10,7 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 
-import {AssetIdNotRegistered, BaseTokenTotalSupplyBackfillNotNeeded, BaseTokenTotalSupplyBackfillRequired, MissingBaseTokenAssetId, OnlyGatewaySettlementLayer, TokenBalanceNotMigratedToGateway} from "./AssetTrackerErrors.sol";
+import {AssetIdNotRegistered, BaseTokenTotalSupplyBackfillNotNeeded, BaseTokenTotalSupplyBackfillRequired, ChainBalanceMustBeZeroBeforeMigration, MissingBaseTokenAssetId, OnlyGatewaySettlementLayer, TokenBalanceNotMigratedToGateway, TotalPreV31SupplyNotSaved, TotalPreV31SupplyShouldBeZero} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 
@@ -96,9 +96,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
         // We expect that for all registered tokens, the zero `totalPreV31TotalSupply` should be saved.
 
-        // The requires below should never be hit, these are just invariant checks.
-        assert(totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID].isSaved);
-        assert(totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID].amount == 0);
+        SavedTotalSupply memory baseTokenPreV31TotalSupply = totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID];
+        require(baseTokenPreV31TotalSupply.isSaved, TotalPreV31SupplyNotSaved(BASE_TOKEN_ASSET_ID));
+        require(
+            baseTokenPreV31TotalSupply.amount == 0,
+            TotalPreV31SupplyShouldBeZero(BASE_TOKEN_ASSET_ID, baseTokenPreV31TotalSupply.amount)
+        );
         totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID].amount = _amount;
 
         needBasewTokenTotalSupplyBackfill = false;
@@ -289,7 +292,11 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         if (originChainId == block.chainid) {
             // Invariant check: the chain balance of the origin chain should be 0 until the balance migration
             // from NTV is complete.
-            assert(chainBalance[originChainId][_assetId] == 0);
+            uint256 originChainBalance = chainBalance[originChainId][_assetId];
+            require(
+                originChainBalance == 0,
+                ChainBalanceMustBeZeroBeforeMigration(originChainId, _assetId, originChainBalance)
+            );
 
             // Initialize chainBalance
             // For origin chains, chainBalance starts at MAX_TOKEN_BALANCE and decreases as tokens are bridged out.
