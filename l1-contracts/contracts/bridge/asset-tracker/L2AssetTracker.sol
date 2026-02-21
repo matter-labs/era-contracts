@@ -4,24 +4,9 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {
-    MAX_TOKEN_BALANCE,
-    SavedTotalSupply,
-    TOKEN_BALANCE_MIGRATION_DATA_VERSION
-} from "./IAssetTrackerBase.sol";
-import {
-    L1ToGatewayTokenBalanceMigrationData,
-    MigrationConfirmationData
-} from "../../common/Messaging.sol";
-import {
-    L2_BASE_TOKEN_SYSTEM_CONTRACT,
-    L2_BRIDGEHUB,
-    L2_CHAIN_ASSET_HANDLER,
-    L2_COMPLEX_UPGRADER_ADDR,
-    L2_NATIVE_TOKEN_VAULT,
-    L2_NATIVE_TOKEN_VAULT_ADDR,
-    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
-} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
+import {L1ToGatewayTokenBalanceMigrationData, MigrationConfirmationData} from "../../common/Messaging.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {InvalidChainId, Unauthorized} from "../../common/L1ContractErrors.sol";
 

@@ -16,13 +16,8 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 );
 
 // The value that is saved in the v31UpgradeChainBatchNumber mapping for all deployed chains until the chain upgrades to v31.
-uint256 constant V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY = uint256(
-    keccak256(abi.encodePacked("V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY"))
-);
-
-// The value that is saved in the v31UpgradeChainBatchNumber mapping for all deployed chains until the chain upgrades to v31.
-uint256 constant V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1 = uint256(
-    keccak256(abi.encodePacked("V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1"))
+uint256 constant V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE = uint256(
+    keccak256(abi.encodePacked("V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE"))
 );
 
 /**
@@ -52,7 +47,7 @@ interface IMessageRootBase is IMessageVerification {
     /// @notice Emitted whenever the sharedTree is updated, and the new InteropRoot (root of the sharedTree) is generated.
     /// @param chainId The ID of the chain where the sharedTree was updated.
     /// @param blockNumber The block number of the block in which the sharedTree was updated.
-    /// @param logId The ID of the log emitted when a new InteropRoot. In this release always equal to 0.
+    /// @param logId The ID of the log emitted when a new InteropRoot.
     /// @param sides The "sides" of the interop root. In this release which uses proof-based interop the sides is an array
     /// of length one, which only include the interop root itself. More on that in `L2InteropRootStorage` contract.
     event NewInteropRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);
@@ -78,7 +73,7 @@ interface IMessageRootBase is IMessageVerification {
         bytes32[] calldata _proof
     ) external pure returns (ProofData memory);
 
-    function setMigratingChainBatchRoot(uint256 _chainId, uint256 _batchNumber) external;
+    function setMigratingChainBatchNumber(uint256 _chainId, uint256 _batchNumber) external;
 
     function currentChainBatchNumber(uint256 _chainId) external view returns (uint256);
 
