@@ -16,7 +16,7 @@ import {GW_ASSET_TRACKER, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L
 import {SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_INTEROP_ATTRIBUTES} from "../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {BUNDLE_IDENTIFIER, BalanceChange, BundleAttributes, CallAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal} from "../common/Messaging.sol";
-import {MsgValueMismatch, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
+import {MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
 import {AttributeAlreadySet, AttributeViolatesRestriction, DestinationChainNotRegistered, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty, FeeWithdrawalFailed, ThisChainNotRegisteredForInterop, ZKTokenNotAvailable} from "./InteropErrors.sol";
@@ -133,21 +133,26 @@ contract InteropCenter is
         bytes32 _zkTokenAssetId
     ) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
-        _initInteropCenter(_l1ChainId, _owner, _zkTokenAssetId);
+
+        // Note, that it is used to query and cache the ZK token address,
+        // so in case someone tries to update it on L2, they should update the 
+        // zk token address as well.
+        require(_zkTokenAssetId != bytes32(0), ZKTokenNotAvailable());
+        ZK_TOKEN_ASSET_ID = _zkTokenAssetId;
+
+        _initInteropCenter(_l1ChainId, _owner);
     }
 
     /// @inheritdoc IInteropCenter
-    function updateL2(uint256 _l1ChainId, address _owner, bytes32 _zkTokenAssetId) public onlyUpgrader {
-        _initInteropCenter(_l1ChainId, _owner, _zkTokenAssetId);
+    function updateL2(uint256 _l1ChainId, address _owner) public onlyUpgrader {
+        _initInteropCenter(_l1ChainId, _owner);
     }
 
-    function _initInteropCenter(uint256 _l1ChainId, address _owner, bytes32 _zkTokenAssetId) private {
-        require(_zkTokenAssetId != bytes32(0), ZKTokenNotAvailable());
+    function _initInteropCenter(uint256 _l1ChainId, address _owner) private {
+        require(_owner != address(0), ZeroAddress());
 
         L1_CHAIN_ID = _l1ChainId;
-        ZK_TOKEN_ASSET_ID = _zkTokenAssetId;
         ZK_INTEROP_FEE = DEFAULT_ZK_INTEROP_FEE;
-
         _transferOwnership(_owner);
     }
 

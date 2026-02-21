@@ -118,8 +118,7 @@ interface IInteropCenter {
     ///      and for maintainability, so that future upgrade-specific logic can be added here.
     /// @param _l1ChainId The chain ID of L1.
     /// @param _owner The owner address.
-    /// @param _zkTokenAssetId The ZK token asset ID.
-    function updateL2(uint256 _l1ChainId, address _owner, bytes32 _zkTokenAssetId) external;
+    function updateL2(uint256 _l1ChainId, address _owner) external;
 
     /// @notice Forwards a transaction from the gateway to a chain mailbox (from L1).
     /// @dev Note, that `_canonicalTxHash` is provided by the chain and so should not be trusted to be unique,

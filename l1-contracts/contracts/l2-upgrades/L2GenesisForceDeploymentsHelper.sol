@@ -501,8 +501,7 @@ library L2GenesisForceDeploymentsHelper {
         } else {
             InteropCenter(L2_INTEROP_CENTER_ADDR).updateL2(
                 fixedForceDeploymentsData.l1ChainId,
-                fixedForceDeploymentsData.aliasedL1Governance,
-                fixedForceDeploymentsData.zkTokenAssetId
+                fixedForceDeploymentsData.aliasedL1Governance
             );
         }
         if (!(_isZKsyncOS && _isGenesisUpgrade)) {
