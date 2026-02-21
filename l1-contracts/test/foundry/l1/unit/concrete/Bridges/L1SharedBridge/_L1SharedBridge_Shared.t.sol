@@ -21,7 +21,7 @@ import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
-import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
+import {IBaseTokenAssetHandler} from "contracts/bridge/interfaces/IBaseTokenAssetHandler.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -301,12 +301,12 @@ contract L1AssetRouterTest is Test {
 
         vm.mockCall(
             address(nativeTokenVault),
-            abi.encodeWithSelector(IL1BaseTokenAssetHandler.tokenAddress.selector, tokenAssetId),
+            abi.encodeWithSelector(IBaseTokenAssetHandler.tokenAddress.selector, tokenAssetId),
             abi.encode(address(token))
         );
         vm.mockCall(
             address(nativeTokenVault),
-            abi.encodeWithSelector(IL1BaseTokenAssetHandler.tokenAddress.selector, ETH_TOKEN_ASSET_ID),
+            abi.encodeWithSelector(IBaseTokenAssetHandler.tokenAddress.selector, ETH_TOKEN_ASSET_ID),
             abi.encode(address(ETH_TOKEN_ADDRESS))
         );
         vm.mockCall(
