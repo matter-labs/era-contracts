@@ -135,7 +135,7 @@ contract InteropCenter is
         _disableInitializers();
 
         // Note, that it is used to query and cache the ZK token address,
-        // so in case someone tries to update it on L2, they should update the 
+        // so in case someone tries to update it on L2, they should update the
         // zk token address as well.
         require(_zkTokenAssetId != bytes32(0), ZKTokenNotAvailable());
         ZK_TOKEN_ASSET_ID = _zkTokenAssetId;
