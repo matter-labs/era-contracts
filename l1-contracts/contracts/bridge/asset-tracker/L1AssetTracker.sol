@@ -487,7 +487,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// We calculate `totalFailedDepositsFromL1` as the difference between the total deposits for when the chain settled on L1 and the total successful
     /// deposits from the same period. All in all, we get the following formula:
     /// `amountToKeep = totalWithdrawalsToL1 + (totalDepositedFromL1 - totalSuccessfulDepositsFromL1) - totalClaimedOnL1`.
-    /// For some of the older tokens, we did not track neither of the values above, so when the balance is moved from the native token vault, we remember
+    /// For some of the older tokens, we did not track neither of the values above, so when the token is registered inside this contract, we remember
     /// its pre-v31 chain balance, which is equal to `totalDepositedFromL1BeforeV31 - totalClaimedOnL1BeforeV31`.
     /// For similar reasons the chain should return its pre-v31 totalSupply on L2, which is equal to `totalSuccessfulDepositsFromL1 - totalWithdrawalsToL1`.
     /// All-in-all, we get the following formula:
