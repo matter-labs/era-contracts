@@ -199,6 +199,9 @@ library L2UtilsBase {
                 bytes32(uint256(_args.l2TokenProxyBytecodeHash))
             );
             L2NativeTokenVaultDev(L2_NATIVE_TOKEN_VAULT_ADDR).deployBridgedStandardERC20(_args.aliasedOwner);
+
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            L2NativeTokenVaultDev(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
         }
 
         // Initialize GWAssetTracker after NTV is deployed (needs WETH_TOKEN)

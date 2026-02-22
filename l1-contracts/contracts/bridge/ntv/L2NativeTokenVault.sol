@@ -109,7 +109,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             _baseTokenBridgingData,
             _baseTokenMetadata
         );
-        _assetTracker().registerNewToken(BASE_TOKEN_ASSET_ID, _baseTokenBridgingData.originChainId);
         if (_aliasedOwner == address(0)) {
             revert EmptyAddress();
         }
@@ -119,6 +118,14 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         _transferOwnership(_aliasedOwner);
         bridgedTokenBeacon = IBeacon(_bridgedTokenBeacon);
         emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), _l2TokenProxyBytecodeHash);
+    }
+
+    function registerBaseTokenIfNeeded() external onlyUpgrader {
+        if (_assetTracker().isAssetRegistered(BASE_TOKEN_ASSET_ID)) {
+            // Base token is already registered, no need to register it again
+            return;
+        }
+        _assetTracker().registerNewToken(BASE_TOKEN_ASSET_ID, originChainId[BASE_TOKEN_ASSET_ID]);
     }
 
     /// @notice Updates the contract.

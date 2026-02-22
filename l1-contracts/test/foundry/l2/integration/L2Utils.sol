@@ -74,6 +74,8 @@ library L2Utils {
         forceDeployL2L1Messenger(_args);
 
         initializeBridgehub(_args);
+
+        finalizeInitialization();
     }
 
     function forceDeployL2L1Messenger(SystemContractsArgs memory _args) internal {
@@ -169,6 +171,9 @@ library L2Utils {
         new L2AssetTracker();
 
         forceDeployWithoutConstructor("L2AssetTracker", L2_ASSET_TRACKER_ADDR);
+        bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(_args.l1ChainId, ethAssetId, false);
     }
 
     function forceDeployGWAssetTracker(SystemContractsArgs memory _args) internal {
@@ -217,6 +222,11 @@ library L2Utils {
             TokenBridgingData({assetId: ethAssetId, originChainId: _args.l1ChainId, originToken: ETH_TOKEN_ADDRESS}),
             TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18})
         );
+    }
+
+    function finalizeInitialization() internal {
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
     }
 
     function forceDeployWithoutConstructor(string memory _contractName, address _address) public {

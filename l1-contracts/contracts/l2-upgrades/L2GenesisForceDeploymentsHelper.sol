@@ -553,6 +553,9 @@ library L2GenesisForceDeploymentsHelper {
         );
 
         InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
+
+        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
+
         emit PerformForceDeployedContractsInitCompleted();
     }
 
