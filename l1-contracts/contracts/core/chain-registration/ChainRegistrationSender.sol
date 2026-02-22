@@ -15,7 +15,7 @@ import {L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 
 import {Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
-import {ChainAlreadyRegistered, NoEthAllowed, ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
+import {ChainAlreadyRegistered, ChainsSettlementLayerMismatch, NoEthAllowed, ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
 import {IL2Bridgehub} from "../bridgehub/IL2Bridgehub.sol";
 
 /// @dev The encoding version of the data.
@@ -57,10 +57,18 @@ contract ChainRegistrationSender is
     /// @notice used to register a chain for interop via a service transaction.abi
     /// @notice this is provided for ease of use, base tokens does not have to be provided.
     /// @notice to prevent spamming, we only allow this to be called once.
+    /// @notice only chains that are settling on the same settlement layer may be registered.
     /// @param chainToBeRegistered the chain to be registered
     /// @param chainRegisteredOn the chain to register on
     function registerChain(uint256 chainToBeRegistered, uint256 chainRegisteredOn) external {
         require(!chainRegisteredOnChain[chainToBeRegistered][chainRegisteredOn], ChainAlreadyRegistered());
+
+        uint256 chainToBeRegisteredSettlementLayer = BRIDGE_HUB.settlementLayer(chainToBeRegistered);
+        uint256 chainRegisteredOnSettlementLayer = BRIDGE_HUB.settlementLayer(chainRegisteredOn);
+        if (chainToBeRegisteredSettlementLayer != chainRegisteredOnSettlementLayer) {
+            revert ChainsSettlementLayerMismatch(chainToBeRegisteredSettlementLayer, chainRegisteredOnSettlementLayer);
+        }
+
         chainRegisteredOnChain[chainToBeRegistered][chainRegisteredOn] = true;
 
         IMailbox chainRegisteredOnAddress = IMailbox(BRIDGE_HUB.getZKChain(chainRegisteredOn));
