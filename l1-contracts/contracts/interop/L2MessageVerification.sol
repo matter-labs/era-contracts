@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 import {MessageVerification} from "../common/MessageVerification.sol";
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
-import {L2_INTEROP_ROOT_STORAGE} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_ROOT_STORAGE} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {DepthMoreThanOneForRecursiveMerkleProof} from "../core/bridgehub/L1BridgehubErrors.sol";
 
 /// @title The interface of the ZKsync L2MessageVerification contract that can be used to prove L2 message inclusion on the L2.
@@ -42,7 +42,8 @@ contract L2MessageVerification is MessageVerification {
         return
             this.proveL2LeafInclusionSharedRecursive({
                 _chainId: proofData.settlementLayerChainId,
-                _blockOrBatchNumber: proofData.settlementLayerBatchNumber, // SL block number
+                // Here we use SL *block* number, NOT batch number
+                _blockOrBatchNumber: proofData.settlementLayerBatchNumber,
                 _leafProofMask: proofData.settlementLayerBatchRootMask,
                 _leaf: proofData.chainIdLeaf,
                 _proof: MessageHashing.extractSliceUntilEnd(_proof, proofData.ptr),

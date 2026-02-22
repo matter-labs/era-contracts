@@ -7,8 +7,6 @@ error AttributeAlreadySet(bytes4 selector);
 error AttributeViolatesRestriction(bytes4 selector, uint256 restriction);
 // 0x5bba5111
 error BundleAlreadyProcessed(bytes32 bundleHash);
-// 0xa43d2953
-error BundleVerifiedAlready(bytes32 bundleHash);
 // 0xd5c7a376
 error CallAlreadyExecuted(bytes32 bundleHash, uint256 callIndex);
 // 0xc087b727
@@ -19,6 +17,8 @@ error CanNotUnbundle(bytes32 bundleHash);
 error DestinationChainNotRegistered(uint256 destinationChainId);
 // 0xe845be4c
 error ExecutingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes executionAddress);
+// 0x16b0fa00
+error FeeWithdrawalFailed();
 // 0x62d214aa
 error IndirectCallValueMismatch(uint256 expected, uint256 actual);
 // 0xfe8b1b16
@@ -29,8 +29,14 @@ error InteroperableAddressNotEmpty(bytes interoperableAddress);
 error InvalidInteropBundleVersion();
 // 0xd5f13973
 error InvalidInteropCallVersion();
+// 0x2d48e8cf
+error InteropRootAlreadyExists();
 // 0x32c2e156
 error MessageNotIncluded();
+// 0x95eb7603
+error ThisChainNotRegisteredForInterop(uint256 chainId);
+// 0x2f59bd0d
+error SidesLengthNotOne();
 // 0x89fd2c76
 error UnauthorizedMessageSender(address expected, address actual);
 // 0x0345c281
@@ -43,3 +49,5 @@ error WrongDestinationChainId(bytes32 bundleHash, uint256 expected, uint256 actu
 error WrongDestinationBaseTokenAssetId(bytes32 bundleHash, bytes32 expected, bytes32 actual);
 // 0x534ab1b2
 error WrongSourceChainId(bytes32 bundleHash, uint256 expected, uint256 actual);
+// 0x92196069
+error ZKTokenNotAvailable();

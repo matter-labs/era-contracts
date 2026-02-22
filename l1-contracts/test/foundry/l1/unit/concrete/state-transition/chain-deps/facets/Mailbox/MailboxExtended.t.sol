@@ -24,7 +24,6 @@ import {L2Message, L2Log} from "contracts/common/Messaging.sol";
 import {InvalidChainId, ZeroAddress, AddressNotZero} from "contracts/common/L1ContractErrors.sol";
 import {DepositsPaused, NotHyperchain, NotL1, NotSettlementLayer} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {DepthMoreThanOneForRecursiveMerkleProof, OnlyGateway} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
-import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET} from "contracts/common/Config.sol";
 
 contract MailboxOnGatewayTest is UtilsCallMockerTest {
     IMailbox internal mailboxFacet;

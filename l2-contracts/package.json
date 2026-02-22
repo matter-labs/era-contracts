@@ -48,7 +48,8 @@
     "upgrade-bridge-contracts": "ts-node src/upgrade-bridge-impl.ts",
     "update-l2-erc20-metadata": "ts-node src/update-l2-erc20-metadata.ts",
     "upgrade-consistency-checker": "ts-node src/upgrade-consistency-checker.ts",
-    "deploy-consensus-registry": "ts-node src/deploy-consensus-registry.ts"
+    "deploy-consensus-registry": "ts-node src/deploy-consensus-registry.ts",
+    "selectors": "ts-node ../scripts/selectors.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3"

@@ -41,7 +41,6 @@ import {Call} from "contracts/governance/Common.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Create2AndTransfer} from "../utils/deploy/Create2AndTransfer.sol";
 import {ZkChainAddresses, StateTransitionDeployedAddresses, CTMDeployedAddresses, CoreDeployedAddresses} from "../utils/Types.sol";
-import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 import {IRegisterZKChain, RegisterZKChainConfig} from "contracts/script-interfaces/IRegisterZKChain.sol";
 import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
 
@@ -89,8 +88,8 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
     function runForTest(address _chainTypeManagerProxy, uint256 _chainChainId) public {
         console.log("Deploying ZKChain");
 
-        // Timestamp needs to be late enough for `pauseDepositsBeforeInitiatingMigration` time checks
-        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET + 1);
+        // Avoid block.timestamp == 0 to keep paused-deposits sentinel semantics stable in tests.
+        vm.warp(1);
 
         initializeConfigTest(_chainTypeManagerProxy, _chainChainId);
         runInner(vm.envString("ZK_CHAIN_OUT"));

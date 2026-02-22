@@ -15,7 +15,7 @@ import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {IL2AssetRouter} from "../asset-router/IL2AssetRouter.sol";
 import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {IContractDeployer, L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 
 import {SystemContractsCaller} from "../../common/l2-helpers/SystemContractsCaller.sol";
@@ -58,11 +58,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
     bytes32 public L2_TOKEN_PROXY_BYTECODE_HASH;
-
-    /// @dev The address of the L2 asset router.
-    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
-    /// the old version where it was an immutable.
-    IAssetRouterBase public ASSET_ROUTER;
 
     /// @dev The address of the base token on its origin chain
     address public BASE_TOKEN_ORIGIN_TOKEN;
@@ -176,6 +171,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     function setAddresses(uint256 _baseTokenOriginChainId) external onlyUpgrader {
         originChainId[BASE_TOKEN_ASSET_ID] = _baseTokenOriginChainId;
         tokenAddress[BASE_TOKEN_ASSET_ID] = L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
+        assetId[L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR] = BASE_TOKEN_ASSET_ID;
     }
 
     function _registerTokenIfBridgedLegacy(address _tokenAddress) internal override returns (bytes32) {

@@ -304,12 +304,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
     function test_finalizeWithdrawal_BaseErcOnErc() public {
         _setBaseTokenAssetId(tokenAssetId);
 
-        bytes memory message = abi.encodePacked(
-            AssetRouterBase.finalizeDeposit.selector,
-            chainId,
-            tokenAssetId,
-            abi.encode(0, alice, 0, amount, new bytes(0))
-        );
+        bytes memory message = abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -319,14 +314,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         vm.mockCall(
             messageRootAddress,
             // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                IMessageVerification.proveL2MessageInclusionShared.selector,
-                chainId
-                // l2BatchNumber,
-                // l2MessageIndex,
-                // l2ToL1Message,
-                // merkleProof
-            ),
+            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector, chainId),
             abi.encode(true)
         );
 

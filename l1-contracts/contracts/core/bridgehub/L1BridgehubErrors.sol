@@ -4,6 +4,10 @@ pragma solidity ^0.8.21;
 
 // 0x587df426
 error AlreadyCurrentSL(uint256 blockChainId);
+// 0xd506f12c
+error BaseTokenOriginChainIdNotRegistered();
+// 0x178de541
+error BaseTokenOriginTokenNotRegistered();
 // 0xa695b1ef
 error BatchZeroNotAllowed();
 // 0xb0b5006f
