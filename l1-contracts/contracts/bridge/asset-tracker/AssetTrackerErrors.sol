@@ -29,8 +29,6 @@ error InvalidEmptyMessageRoot(bytes32 expectedMessageRoot, bytes32 providedMessa
 error InvalidFeeRecipient();
 // 0x532a43fc
 error InvalidFunctionSignature(bytes4 functionSignature);
-// 0xfbf8ed35
-error InvalidInteropBalanceChange(bytes32 bundleHash);
 // 0x203d8be5
 error InvalidInteropChainId(uint256 fromChainId, uint256 toChainId);
 // 0xeaa867a8
@@ -51,16 +49,12 @@ error InvalidSettlementLayer();
 error InvalidVersion();
 // 0xf76b228a
 error InvalidWithdrawalChainId();
-// 0xa16d8a80
-error L1TotalSupplyAlreadyMigrated();
 // 0xda4352c4
 error MaxChainBalanceAlreadyAssigned(bytes32 assetId);
 // 0x7e472272
 error MissingBaseTokenAssetId();
 // 0x8dfed13a
 error NotMigratedChain();
-// 0xf875e5fa
-error NTVChainBalanceNotMigrated(uint256 _chainId, bytes32 _assetId, uint256 _ntvChainBalance);
 // 0x4a22c4b8
 error OnlyGatewaySettlementLayer();
 // 0x0fd3385e
@@ -77,5 +71,3 @@ error TotalPreV31SupplyNotSaved(bytes32 _assetId);
 error TotalPreV31SupplyShouldBeZero(bytes32 _assetId, uint256 _totalSupply);
 // 0x03a5ba47
 error TransientBalanceChangeAlreadySet(uint256 storedAssetId, uint256 storedAmount);
-// 0xfcdbbe60
-error UnexpectedSuccessfulDepositsValue(uint256 _totalSuccessfulDeposits, uint256 _totalDeposited);
