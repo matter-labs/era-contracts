@@ -74,7 +74,10 @@ abstract contract NativeTokenVaultBase is
     /// @dev The number of bridged tokens.
     uint256 public bridgedTokensCount;
 
-    /// @dev The mapping of bridged tokens, count => assetId
+    /// @dev The mapping of bridged tokens, count => assetId.
+    /// @dev Note, that this mapping includes not only "bridged" assets, but also native ones
+    /// that were bridged to the other chains as well. For L2 chains it does not include the "base token"
+    /// system contract address.
     mapping(uint256 count => bytes32 assetId) public bridgedTokens;
 
     /// @dev Used to record the index of the bridged token in the bridgedTokens array.

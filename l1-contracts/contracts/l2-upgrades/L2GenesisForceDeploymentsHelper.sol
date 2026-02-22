@@ -552,10 +552,6 @@ library L2GenesisForceDeploymentsHelper {
             fixedForceDeploymentsData.aliasedL1Governance
         );
 
-        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setAddresses(
-            additionalForceDeploymentsData.baseTokenBridgingData.originChainId
-        );
-
         InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
         emit PerformForceDeployedContractsInitCompleted();
     }

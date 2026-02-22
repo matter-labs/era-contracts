@@ -109,6 +109,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             _baseTokenBridgingData,
             _baseTokenMetadata
         );
+        _assetTracker().registerNewToken(BASE_TOKEN_ASSET_ID, _baseTokenBridgingData.originChainId);
         if (_aliasedOwner == address(0)) {
             revert EmptyAddress();
         }
@@ -166,12 +167,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
 
     function _assetTracker() internal view override returns (IAssetTrackerBase) {
         return IAssetTrackerBase(L2_ASSET_TRACKER_ADDR);
-    }
-
-    function setAddresses(uint256 _baseTokenOriginChainId) external onlyUpgrader {
-        originChainId[BASE_TOKEN_ASSET_ID] = _baseTokenOriginChainId;
-        tokenAddress[BASE_TOKEN_ASSET_ID] = L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
-        assetId[L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR] = BASE_TOKEN_ASSET_ID;
     }
 
     function _registerTokenIfBridgedLegacy(address _tokenAddress) internal override returns (bytes32) {
