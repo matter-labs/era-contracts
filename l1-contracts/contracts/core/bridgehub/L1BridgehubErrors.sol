@@ -12,14 +12,14 @@ error BaseTokenOriginTokenNotRegistered();
 error BatchZeroNotAllowed();
 // 0xb0b5006f
 error ChainAlreadyRegistered();
-// 0x7bcf7f4d
-error ChainNotReadyForMigration(uint256 chainId);
 // 0xbe263463
 error ChainBatchRootAlreadyExists(uint256 chainId, uint256 batchNumber);
 // 0x655c373c
 error ChainBatchRootZero();
 // 0x65e8a019
 error ChainExists();
+// 0xf8d5f418
+error ChainNotReadyForMigration(uint256 chainId);
 // 0x5d03f19d
 error CurrentBatchNumberAlreadySet();
 // 0x68d91b49

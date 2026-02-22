@@ -1,8 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
+// 0x2c261f88
+error AmountToKeepOnL1NotUint256();
 // 0xda72d995
 error AssetIdNotRegistered(bytes32 _assetId);
+// 0xffaa9b75
+error AssetNotMigratedFromNTV(bytes32 _assetId);
+// 0xca9bc458
+error BaseTokenTotalSupplyBackfillNotNeeded();
+// 0xaab1af2a
+error BaseTokenTotalSupplyBackfillRequired();
+// 0xd054a77e
+error ChainBalanceMustBeZeroBeforeMigration(uint256 _chainId, bytes32 _assetId, uint256 _chainBalance);
 // 0x07859b3b
 error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
 // 0x95bddd6c
@@ -27,10 +37,10 @@ error InvalidInteropChainId(uint256 fromChainId, uint256 toChainId);
 error InvalidL1AssetRouter(address l1AssetRouter);
 // 0xe1fe041e
 error InvalidL2ShardId();
+// 0x37be5e51
+error InvalidMigrationAmount(uint256 _availableAmount, uint256 _requiredAmount);
 // 0x9530c5e1
 error InvalidMigrationNumber(uint256, uint256);
-// 0x4e8e15f3
-error InvalidMigrationAmount(uint256 _availableAmount, uint256 _requiredAmount);
 // 0xddb5de5e
 error InvalidSender();
 // 0xaca75b50
@@ -49,6 +59,8 @@ error MaxChainBalanceAlreadyAssigned(bytes32 assetId);
 error MissingBaseTokenAssetId();
 // 0x8dfed13a
 error NotMigratedChain();
+// 0xf875e5fa
+error NTVChainBalanceNotMigrated(uint256 _chainId, bytes32 _assetId, uint256 _ntvChainBalance);
 // 0x4a22c4b8
 error OnlyGatewaySettlementLayer();
 // 0x0fd3385e
@@ -59,23 +71,11 @@ error RegisterNewTokenNotAllowed();
 error SettlementFeePayerNotAgreed(address payer, uint256 chainId);
 // 0x90ed63bb
 error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
+// 0x34838ed2
+error TotalPreV31SupplyNotSaved(bytes32 _assetId);
+// 0x0a767367
+error TotalPreV31SupplyShouldBeZero(bytes32 _assetId, uint256 _totalSupply);
 // 0x03a5ba47
 error TransientBalanceChangeAlreadySet(uint256 storedAssetId, uint256 storedAmount);
-// 0x8c463dfd
+// 0xfcdbbe60
 error UnexpectedSuccessfulDepositsValue(uint256 _totalSuccessfulDeposits, uint256 _totalDeposited);
-// 0xa87cdc77
-error NTVChainBalanceNotMigrated(uint256 _chainId, bytes32 _assetId, uint256 _ntvChainBalance);
-// 0x8e72e449
-error AssetNotMigratedFromNTV(bytes32 _assetId);
-// 0xde4db34f
-error AmountToKeepOnL1NotUint256();
-// 0x8f30b8e2
-error BaseTokenTotalSupplyBackfillNotNeeded();
-// 0x39d03970
-error BaseTokenTotalSupplyBackfillRequired();
-// 0xb0a14f0d
-error ChainBalanceMustBeZeroBeforeMigration(uint256 _chainId, bytes32 _assetId, uint256 _chainBalance);
-// 0x7eb19ff6
-error TotalPreV31SupplyNotSaved(bytes32 _assetId);
-// 0x9fd35ff5
-error TotalPreV31SupplyShouldBeZero(bytes32 _assetId, uint256 _totalSupply);
