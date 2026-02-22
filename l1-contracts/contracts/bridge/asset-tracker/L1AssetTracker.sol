@@ -125,6 +125,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                 continue;
             }
 
+            // slither-disable-next-line reentrancy-eth
             uint256 migratedBalance = l1NTV.migrateTokenBalanceToAssetTracker(chainId, _assetId);
 
             chainBalance[chainId][_assetId] = migratedBalance;
@@ -307,6 +308,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     function receiveL1ToGatewayMigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external {
         _proveMessageInclusion(_finalizeWithdrawalParams);
 
+        // slither-disable-next-line unused-return
         (, L1ToGatewayTokenBalanceMigrationData memory data) = DataEncoding.decodeL1ToGatewayTokenBalanceMigrationData(
             _finalizeWithdrawalParams.message
         );
@@ -374,6 +376,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     function receiveGatewayToL1MigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external {
         _proveMessageInclusion(_finalizeWithdrawalParams);
 
+        // slither-disable-next-line unused-return
         (, GatewayToL1TokenBalanceMigrationData memory data) = DataEncoding.decodeGatewayToL1TokenBalanceMigrationData(
             _finalizeWithdrawalParams.message
         );

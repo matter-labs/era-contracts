@@ -129,6 +129,7 @@ abstract contract AssetTrackerBase is
     /// @param _data The migration payload.
     function _sendL1ToGatewayMigrationDataToL1(L1ToGatewayTokenBalanceMigrationData memory _data) internal {
         // slither-disable-next-line unused-return
+        // slither-disable-next-line reentrancy-eth
         L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
             abi.encodeCall(IAssetTrackerDataEncoding.receiveL1ToGatewayMigrationOnL1, _data)
         );
@@ -138,6 +139,7 @@ abstract contract AssetTrackerBase is
     /// @param _data The migration payload.
     function _sendGatewayToL1MigrationDataToL1(GatewayToL1TokenBalanceMigrationData memory _data) internal {
         // slither-disable-next-line unused-return
+        // slither-disable-next-line reentrancy-eth
         L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
             abi.encodeCall(IAssetTrackerDataEncoding.receiveGatewayToL1MigrationOnL1, _data)
         );
