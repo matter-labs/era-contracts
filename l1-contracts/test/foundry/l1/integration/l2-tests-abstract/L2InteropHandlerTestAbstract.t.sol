@@ -391,6 +391,42 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
     }
 
+    /// @notice Test that verifyBundle works while settling on L1.
+    /// @dev Bundle verification is not restricted to gateway mode.
+    function test_verifyBundleWorksWhenSettlingOnL1() public {
+        // Set the L1_CHAIN_ID storage variable in InteropHandler
+        // (The test setup doesn't call initL2, so L1_CHAIN_ID is uninitialized at slot 0)
+        vm.store(L2_INTEROP_HANDLER_ADDR, bytes32(0), bytes32(uint256(L1_CHAIN_ID)));
+
+        InteropBundle memory interopBundle = getInteropBundle(1);
+        bytes memory bundle = abi.encode(interopBundle);
+        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
+
+        // Mock message verification to return true
+        vm.mockCall(
+            address(L2_MESSAGE_VERIFICATION),
+            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
+            abi.encode(true)
+        );
+
+        // Mock currentSettlementLayerChainId to return L1_CHAIN_ID (not in gateway mode)
+        // This simulates the chain settling directly on L1
+        vm.mockCall(
+            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
+            abi.encode(L1_CHAIN_ID)
+        );
+
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
+
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            1, // BundleStatus.Verified
+            "Bundle should be in Verified status"
+        );
+    }
+
     /// @notice Test pause functionality in InteropCenter
     function test_interopCenter_pause() public {
         address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
@@ -482,42 +518,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
 
         // Verify the bundle status was updated correctly
-        assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
-            1, // BundleStatus.Verified
-            "Bundle should be in Verified status"
-        );
-    }
-
-    /// @notice Test that verifyBundle works while settling on L1.
-    /// @dev Bundle verification itself is not restricted to gateway mode.
-    function test_regression_verifyBundleWorksWhenSettlingOnL1() public {
-        // Set the L1_CHAIN_ID storage variable in InteropHandler
-        // (The test setup doesn't call initL2, so L1_CHAIN_ID is uninitialized at slot 0)
-        vm.store(L2_INTEROP_HANDLER_ADDR, bytes32(0), bytes32(uint256(L1_CHAIN_ID)));
-
-        InteropBundle memory interopBundle = getInteropBundle(1);
-        bytes memory bundle = abi.encode(interopBundle);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
-
-        // Mock message verification to return true
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
-
-        // Mock currentSettlementLayerChainId to return L1_CHAIN_ID (not in gateway mode)
-        // This simulates the chain settling directly on L1
-        vm.mockCall(
-            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
-            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
-            abi.encode(L1_CHAIN_ID)
-        );
-
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
-
         assertEq(
             uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
             1, // BundleStatus.Verified

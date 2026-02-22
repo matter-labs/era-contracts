@@ -145,10 +145,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
                     revert(add(data, 0x20), mload(data))
                 }
             }
-            assertTrue(
-                success,
-                string.concat("processLogsAndMessages should succeed for iteration ", vm.toString(i))
-            );
+            assertTrue(success, string.concat("processLogsAndMessages should succeed for iteration ", vm.toString(i)));
             successCount++;
             console.log("success", i);
         }
