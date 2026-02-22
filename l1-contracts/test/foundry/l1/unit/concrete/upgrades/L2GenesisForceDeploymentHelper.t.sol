@@ -10,6 +10,8 @@ import "forge-std/console.sol";
 import "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 import "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {TokenBridgingData} from "contracts/common/Messaging.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import "contracts/core/message-root/IMessageRoot.sol";
 import "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
@@ -32,7 +34,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
     // Test constants
     uint256 constant L1_CHAIN_ID = 1;
-    uint256 constant ERA_CHAIN_ID = 324;
+    uint256 constant ERA_CHAIN_ID = 270;
     uint256 constant MAX_ZK_CHAINS = 100;
 
     // Test addresses
@@ -196,7 +198,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
     // Helper functions
 
-    function _createFixedForceDeploymentsData(bool isGenesis) internal view returns (FixedForceDeploymentsData memory) {
+    function _createFixedForceDeploymentsData(bool isGenesis) internal returns (FixedForceDeploymentsData memory) {
         FixedForceDeploymentsData memory data;
         data.l1ChainId = L1_CHAIN_ID;
         data.eraChainId = ERA_CHAIN_ID;
@@ -247,10 +249,12 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
             data.beaconDeployerInfo = "";
         }
 
+        data.zkTokenAssetId = DataEncoding.encodeNTVAssetId(ERA_CHAIN_ID, makeAddr("zkToken"));
+
         return data;
     }
 
-    function _createEraFixedForceDeploymentsData() internal view returns (FixedForceDeploymentsData memory) {
+    function _createEraFixedForceDeploymentsData() internal returns (FixedForceDeploymentsData memory) {
         FixedForceDeploymentsData memory data;
         data.l1ChainId = L1_CHAIN_ID;
         data.eraChainId = ERA_CHAIN_ID;
@@ -268,6 +272,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         data.interopHandlerBytecodeInfo = abi.encode(keccak256("interopHandler"));
         data.assetTrackerBytecodeInfo = abi.encode(keccak256("assetTracker"));
         data.beaconDeployerInfo = abi.encode(keccak256("beaconDeployer"));
+        data.zkTokenAssetId = DataEncoding.encodeNTVAssetId(ERA_CHAIN_ID, makeAddr("zkToken"));
 
         return data;
     }

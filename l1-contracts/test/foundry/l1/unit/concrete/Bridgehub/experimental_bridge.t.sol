@@ -119,7 +119,7 @@ contract ExperimentalBridgeTest is Test {
         bridgehub = L1Bridgehub(address(dummyBridgehub));
         interopCenter = new InteropCenter();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        interopCenter.initL2(l1ChainId, bridgeOwner);
+        interopCenter.initL2(l1ChainId, bridgeOwner, DataEncoding.encodeNTVAssetId(eraChainId, makeAddr("zkToken")));
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(

@@ -214,24 +214,16 @@ uint256 constant PACKED_L2_PRECOMMITMENT_LENGTH = 33;
 L2DACommitmentScheme constant ROLLUP_L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256;
 
 /// @dev The start of the pause deposits time window. We pause when migrating to/from gateway.
-uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET = 3 days + 12 hours;
+/// @dev It is set to 0 in this release, since stage1 is not yet supported for chains that settle on top of ZK Gateway.
+uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET = 0;
 
-/// @dev The start of the chain migration window, it equals the PAUSE_DEPOSITS_TIME_WINDOW_START.
-uint256 constant CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET = 3 days + 12 hours;
+/// @dev The delay from `pausedDepositsTimestamp` from which the migration is allowed. It equals the PAUSE_DEPOSITS_TIME_WINDOW_START.
+/// @dev It is set to 0 in this release, since stage1 is not yet supported for chains that settle on top of ZK Gateway.
+uint256 constant CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET = 0;
 
-/// @dev The end of the chain migration window.
-uint256 constant CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET = 4 days + 12 hours;
+uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET = 0;
 
-/// @dev The end of the pause deposits time window. We pause when migrating to/from gateway.
-uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET = 7 days;
-
-uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET = 1;
-
-uint256 constant CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET = 1;
-
-uint256 constant CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET = 1 days;
-
-uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET = 2 days;
+uint256 constant CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET = 0;
 
 /// @dev Default overhead value in L1 gas for each batch during chain creation.
 uint32 constant DEFAULT_BATCH_OVERHEAD_L1_GAS = 1_000_000;
@@ -261,6 +253,9 @@ PubdataPricingMode constant DEFAULT_PUBDATA_PRICING_MODE = PubdataPricingMode.Ro
 
 /// @dev Default maximum gas limit for priority transactions during chain creation.
 uint64 constant DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
+
+/// @dev The total number of support interop attributes.
+uint256 constant SUPPORTED_INTEROP_ATTRIBUTES = 5;
 
 /// @dev Migration number used when a chain migrates from L1 to a settlement layer.
 uint256 constant MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER = 1;

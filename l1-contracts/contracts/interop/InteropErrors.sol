@@ -17,6 +17,8 @@ error CanNotUnbundle(bytes32 bundleHash);
 error DestinationChainNotRegistered(uint256 destinationChainId);
 // 0xe845be4c
 error ExecutingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes executionAddress);
+// 0x16b0fa00
+error FeeWithdrawalFailed();
 // 0x62d214aa
 error IndirectCallValueMismatch(uint256 expected, uint256 actual);
 // 0xfe8b1b16
@@ -45,3 +47,5 @@ error WrongCallStatusLength(uint256 bundleCallsLength, uint256 providedCallStatu
 error WrongDestinationChainId(bytes32 bundleHash, uint256 expected, uint256 actual);
 // 0x534ab1b2
 error WrongSourceChainId(bytes32 bundleHash, uint256 expected, uint256 actual);
+// 0x92196069
+error ZKTokenNotAvailable();

@@ -46,6 +46,56 @@ address result = _tryAddress(target, "someFunction()");
 - If you want to add an immutable for L1, always double check whether it is possible to deterministically obtain from other contracts.
 - If there is variable that can be an immutable on L1, but we need a similar field on L2, a common pattern is to create a method in the base contract that can be inherited by both. On L2 it can be either a constant (esp if it is an L2 built-in contract address) or a storage variable that must be initialized within during the genesis. For example, look how `initL2` functions are used.
 
+## Updating test_infra Git Dependencies (Bootloader Tests)
+
+### Problem
+
+The bootloader test infrastructure at `system-contracts/bootloader/test_infra/` uses `nightly-2025-05-23` and has git
+dependencies on `zksync-era`. When the git rev in `Cargo.toml` is updated, **do NOT run `cargo update` or regenerate
+the entire `Cargo.lock`**. A full re-resolve will pull in latest crates.io versions of transitive dependencies (e.g.,
+`crc-fast`, `zerocopy`) that use `stdarch_x86_avx512` intrinsics, which are not stabilized on this nightly toolchain.
+This causes CI build failures on x86_64 runners.
+
+### Correct Approach: Selective Lockfile Update
+
+When updating the zksync-era git rev in `Cargo.toml`, update the lockfile by targeting only the git dependencies:
+
+```bash
+cd system-contracts/bootloader/test_infra
+
+# Update only the git dependencies, keeping all crates.io deps pinned
+cargo update -p zksync_multivm -p zksync_types -p zksync_contracts \
+  -p zksync_utils -p zksync_state -p zksync_vlog
+```
+
+This swaps the git rev for the zksync-era crates while preserving all other dependency versions at their current
+(known-working) state.
+
+### If the Lockfile Is Already Broken
+
+If a full `cargo update` was already run and the lockfile has incompatible versions, restore from the last known-good
+commit and selectively update:
+
+```bash
+cd system-contracts/bootloader/test_infra
+
+# Restore the old working lockfile (find the last commit before the breakage)
+git show <last-good-commit>:system-contracts/bootloader/test_infra/Cargo.lock > Cargo.lock
+
+# Then selectively update only git deps
+cargo update -p zksync_multivm -p zksync_types -p zksync_contracts \
+  -p zksync_utils -p zksync_state -p zksync_vlog
+```
+
+### Known Incompatible Crate Versions (on nightly-2025-05-23)
+
+These versions require `stdarch_x86_avx512` (stabilized in Rust 1.89) and fail on `nightly-2025-05-23`:
+
+- `crc-fast >= 1.4` (all versions use AVX-512 intrinsics on x86_64)
+- `zerocopy >= 0.8.39`
+
+Known-good versions: `crc-fast 1.3.0`, `zerocopy 0.8.27`
+
 ## Debugging Strategies
 
 When debugging Solidity compilation or script failures:
