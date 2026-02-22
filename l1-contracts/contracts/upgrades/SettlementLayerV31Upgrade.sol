@@ -63,6 +63,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         IMessageRootBase messageRoot = IMessageRootBase(bridgehub.messageRoot());
 
         if (s.settlementLayer == address(0)) {
+            // slither-disable-next-line reentrancy-no-eth
             IL1MessageRoot(address(messageRoot)).saveV31UpgradeChainBatchNumber(s.chainId);
         }
 

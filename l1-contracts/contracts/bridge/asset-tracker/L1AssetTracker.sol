@@ -125,7 +125,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                 continue;
             }
 
-            // slither-disable-next-line reentrancy-eth
+            // slither-disable-next-line reentrancy-eth,reentrancy-no-eth
             uint256 migratedBalance = l1NTV.migrateTokenBalanceToAssetTracker(chainId, _assetId);
 
             chainBalance[chainId][_assetId] = migratedBalance;
