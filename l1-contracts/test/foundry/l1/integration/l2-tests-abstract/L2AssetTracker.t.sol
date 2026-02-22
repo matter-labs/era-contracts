@@ -8,13 +8,12 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER, L2_ASSET_TRACKER_ADDR, L2_CHAIN_ASSET_HANDLER, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {MAX_TOKEN_BALANCE} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
-import {AssetIdNotRegistered, InvalidFunctionSignature} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {AssetIdNotRegistered} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
@@ -25,8 +24,6 @@ import {L2UtilsBase} from "../l2-tests-in-l1-context/L2UtilsBase.sol";
 
 abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
-
-    bytes4 internal constant DEPRECATED_FINALIZE_INTEROP_SELECTOR = 0x8e29043a;
 
     function test_processLogsAndMessages() public {
         finalizeDepositWithChainId(271);
@@ -143,77 +140,20 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
                 abi.encodeCall(GW_ASSET_TRACKER.processLogsAndMessages, testData[i])
             );
 
-            bool hasDeprecatedSelector = _containsDeprecatedAssetTrackerSelector(testData[i]);
-            if (hasDeprecatedSelector) {
-                assertFalse(
-                    success,
-                    string.concat(
-                        "processLogsAndMessages should revert for deprecated selector at iteration ",
-                        vm.toString(i)
-                    )
-                );
-
-                bytes4 revertSelector;
-                bytes4 invalidFunctionSelector;
+            if (!success) {
                 assembly {
-                    revertSelector := mload(add(data, 0x20))
-                    invalidFunctionSelector := mload(add(data, 0x24))
+                    revert(add(data, 0x20), mload(data))
                 }
-                assertEq(
-                    revertSelector,
-                    InvalidFunctionSignature.selector,
-                    "Expected InvalidFunctionSignature for deprecated selector"
-                );
-                assertEq(
-                    invalidFunctionSelector,
-                    DEPRECATED_FINALIZE_INTEROP_SELECTOR,
-                    "Unexpected invalid function signature payload"
-                );
-            } else {
-                if (!success) {
-                    assembly {
-                        revert(add(data, 0x20), mload(data))
-                    }
-                }
-                assertTrue(
-                    success,
-                    string.concat("processLogsAndMessages should succeed for iteration ", vm.toString(i))
-                );
-                successCount++;
-                console.log("success", i);
             }
+            assertTrue(
+                success,
+                string.concat("processLogsAndMessages should succeed for iteration ", vm.toString(i))
+            );
+            successCount++;
+            console.log("success", i);
         }
 
-        // Verify all non-deprecated iterations succeeded
-        uint256 expectedSuccessCount = 0;
-        for (uint256 i = 0; i < testData.length; i++) {
-            if (!_containsDeprecatedAssetTrackerSelector(testData[i])) {
-                expectedSuccessCount++;
-            }
-        }
-        assertEq(successCount, expectedSuccessCount, "All non-deprecated processLogsAndMessages calls should succeed");
-    }
-
-    function _containsDeprecatedAssetTrackerSelector(ProcessLogsInput memory input) internal pure returns (bool) {
-        uint256 msgCount = 0;
-        bytes32 assetTrackerAddressKey = bytes32(uint256(uint160(L2_ASSET_TRACKER_ADDR)));
-
-        for (uint256 i = 0; i < input.logs.length; i++) {
-            if (input.logs[i].sender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
-                continue;
-            }
-
-            bytes memory message = input.messages[msgCount++];
-            if (
-                input.logs[i].key == assetTrackerAddressKey &&
-                message.length >= 4 &&
-                bytes4(message) == DEPRECATED_FINALIZE_INTEROP_SELECTOR
-            ) {
-                return true;
-            }
-        }
-
-        return false;
+        assertEq(successCount, testData.length, "All processLogsAndMessages calls should succeed");
     }
 
     function getTxHashes(ProcessLogsInput memory input) public returns (bytes32[] memory) {
