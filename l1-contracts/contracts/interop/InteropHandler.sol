@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_CENTER_ADDR, L2_BRIDGEHUB, L2_MESSAGE_VERIFICATION, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_MESSAGE_VERIFICATION, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
 import {BUNDLE_IDENTIFIER, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, BundleStatus, CallStatus, InteropBundle, InteropCall, MessageInclusionProof} from "../common/Messaging.sol";
 import {IERC7786Recipient} from "./IERC7786Recipient.sol";
@@ -63,7 +63,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         );
 
         // Verify that the destination base token asset ID of the bundle is equal to the base token asset ID of the chain
-        bytes32 baseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(block.chainid);
+        bytes32 baseTokenAssetId = L2_NATIVE_TOKEN_VAULT.BASE_TOKEN_ASSET_ID();
         require(
             interopBundle.destinationBaseTokenAssetId == baseTokenAssetId,
             WrongDestinationBaseTokenAssetId(bundleHash, interopBundle.destinationBaseTokenAssetId, baseTokenAssetId)
@@ -145,7 +145,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         );
 
         // Verify that the destination base token asset ID of the bundle is equal to the base token asset ID of the chain
-        bytes32 baseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(block.chainid);
+        bytes32 baseTokenAssetId = L2_NATIVE_TOKEN_VAULT.BASE_TOKEN_ASSET_ID();
         require(
             interopBundle.destinationBaseTokenAssetId == baseTokenAssetId,
             WrongDestinationBaseTokenAssetId(bundleHash, interopBundle.destinationBaseTokenAssetId, baseTokenAssetId)
