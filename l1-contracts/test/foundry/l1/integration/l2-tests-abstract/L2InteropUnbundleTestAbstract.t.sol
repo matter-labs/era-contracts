@@ -7,7 +7,7 @@ import {Vm} from "forge-std/Vm.sol";
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_VERIFICATION} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_VERIFICATION} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 import {InteropBundle, MessageInclusionProof, CallStatus, BundleStatus} from "contracts/common/Messaging.sol";
 
@@ -21,7 +21,7 @@ abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
         vm.deal(address(this), 1000 ether);
         vm.recordLogs();
 
-        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100);
+        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100, false);
         Vm.Log[] memory logs1 = vm.getRecordedLogs();
 
         // Verify the first bundle emission

@@ -17,12 +17,7 @@ interface IL1AssetTracker {
         uint256 _tokenOriginChainId
     ) external;
 
-    function handleChainBalanceDecreaseOnL1(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        uint256 _tokenOriginChainId
-    ) external;
+    function handleChainBalanceDecreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount) external;
 
     function receiveMigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external;
 

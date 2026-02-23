@@ -7,7 +7,7 @@ import {QueueIsEmpty} from "../../common/L1ContractErrors.sol";
 /// @notice The structure that contains meta information of the L2 transaction that was requested from L1
 /// @dev The weird size of fields was selected specifically to minimize the structure storage size
 /// @param canonicalTxHash Hashed L2 transaction data that is needed to process it
-/// @param expirationTimestamp Expiration timestamp for this request (must be satisfied before)
+/// @param expirationTimestamp Deprecated, always 0.
 /// @param layer2Tip Additional payment to the validator as an incentive to perform the operation
 struct PriorityOperation {
     bytes32 canonicalTxHash;

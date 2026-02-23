@@ -679,7 +679,7 @@
   },
   {
     "type": "function",
-    "name": "setMigratingChainBatchRoot",
+    "name": "setMigratingChainBatchNumber",
     "inputs": [
       {
         "name": "_chainId",
@@ -725,13 +725,6 @@
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "updateFullTree",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "event",
@@ -930,22 +923,6 @@
   },
   {
     "type": "error",
-    "name": "MerkleWrongLength",
-    "inputs": [
-      {
-        "name": "newLeavesLength",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "leafNumber",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "MessageRootNotRegistered",
     "inputs": []
   },
@@ -960,17 +937,6 @@
       },
       {
         "name": "batchNumber",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "NotWhitelistedSettlementLayer",
-    "inputs": [
-      {
-        "name": "chainId",
         "type": "uint256",
         "internalType": "uint256"
       }

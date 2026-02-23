@@ -1293,9 +1293,9 @@ export class Deployer {
     }
   }
 
-  public async registerSettlementLayer() {
+  public async setSettlementLayerStatus() {
     const bridgehub = this.bridgehubContract(this.deployWallet);
-    const calldata = bridgehub.interface.encodeFunctionData("registerSettlementLayer", [this.chainId, true]);
+    const calldata = bridgehub.interface.encodeFunctionData("setSettlementLayerStatus", [this.chainId, true]);
     await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, calldata);
     if (this.verbose) {
       console.log("Gateway registered");

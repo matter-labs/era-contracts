@@ -24,7 +24,7 @@ library EIP712Utils {
             );
     }
 
-    function buildDigest(bytes32 _domainHash, bytes32 _message) internal view returns (bytes32) {
+    function buildDigest(bytes32 _domainHash, bytes32 _message) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked("\x19\x01", _domainHash, _message));
     }
 }

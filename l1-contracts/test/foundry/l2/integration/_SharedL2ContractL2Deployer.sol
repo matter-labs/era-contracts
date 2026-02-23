@@ -16,16 +16,20 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
+import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 // import {DeployCTMIntegrationScript} from "../../l1/integration/deploy-scripts/DeployCTMIntegration.s.sol";
 
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
@@ -78,6 +82,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         initializeConfig(inputPath, permanentValuesInputPath, L2_BRIDGEHUB_ADDR);
         ctmAddresses.admin.transparentProxyAdmin = address(0x1);
         ctmAddresses.admin.governance = address(0x2); // Mock governance for tests
+        ctmAddresses.chainAdmin = address(0x3); // Mock chain admin for tests
         config.l1ChainId = _l1ChainId;
         // Generate mock force deployments data for L2 tests
         _generateMockForceDeploymentsData(_l1ChainId);
@@ -95,29 +100,36 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
                 abi.encodeCall(ValidatorTimelock.initialize, (config.deployerAddress, executionDelay))
             )
         );
-        ctmAddresses.stateTransition.facets.executorFacet = address(new ExecutorFacet(config.l1ChainId));
-        ctmAddresses.stateTransition.facets.adminFacet = address(
-            new AdminFacet(config.l1ChainId, RollupDAManager(ctmAddresses.daAddresses.rollupDAManager), true)
-        );
-        ctmAddresses.stateTransition.facets.mailboxFacet = address(
-            new MailboxFacet(
-                config.eraChainId,
-                config.l1ChainId,
-                L2_CHAIN_ASSET_HANDLER_ADDR,
-                IEIP7702Checker(address(0)),
-                false
+
+        address serverNotifierProxyAdmin = address(new ProxyAdmin());
+        ctmAddresses.stateTransition.implementations.serverNotifier = address(new ServerNotifier());
+        ctmAddresses.stateTransition.proxies.serverNotifier = address(
+            new TransparentUpgradeableProxy(
+                ctmAddresses.stateTransition.implementations.serverNotifier,
+                serverNotifierProxyAdmin,
+                abi.encodeCall(ServerNotifier.initialize, (ctmAddresses.chainAdmin))
             )
         );
+
+        ctmAddresses.stateTransition.facets.executorFacet = address(new ExecutorFacet(config.l1ChainId));
+        ctmAddresses.stateTransition.facets.adminFacet = address(
+            new AdminFacet(config.l1ChainId, RollupDAManager(ctmAddresses.daAddresses.rollupDAManager))
+        );
+        ctmAddresses.stateTransition.facets.mailboxFacet = address(
+            new MailboxFacet(config.l1ChainId, L2_CHAIN_ASSET_HANDLER_ADDR, IEIP7702Checker(address(0)), false)
+        );
         ctmAddresses.stateTransition.facets.gettersFacet = address(new GettersFacet());
+        ctmAddresses.stateTransition.facets.migratorFacet = address(new MigratorFacet(config.l1ChainId, true));
+        ctmAddresses.stateTransition.facets.committerFacet = address(new CommitterFacet(config.l1ChainId));
         ctmAddresses.stateTransition.facets.diamondInit = address(new DiamondInit(false));
         // Deploy ChainTypeManager implementation
         if (config.isZKsyncOS) {
             ctmAddresses.stateTransition.implementations.chainTypeManager = address(
-                new ZKsyncOSChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0))
+                new ZKsyncOSChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0))
             );
         } else {
             ctmAddresses.stateTransition.implementations.chainTypeManager = address(
-                new EraChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0))
+                new EraChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0))
             );
         }
 
