@@ -3,15 +3,18 @@ pragma solidity ^0.8.21;
 
 // 0x2c261f88
 error AmountToKeepOnL1NotUint256();
+// 0x7a734a36
+error AssetAlreadyRegistered(bytes32 assetId);
 // 0xda72d995
 error AssetIdNotRegistered(bytes32 _assetId);
 // 0xffaa9b75
 error AssetNotMigratedFromNTV(bytes32 _assetId);
+// 0x29b39a2b
+error BaseTokenTotalSupplyBackfillFailed();
 // 0xca9bc458
 error BaseTokenTotalSupplyBackfillNotNeeded();
 // 0xaab1af2a
 error BaseTokenTotalSupplyBackfillRequired();
-error BaseTokenTotalSupplyBackfillFailed();
 // 0xd054a77e
 error ChainBalanceMustBeZeroBeforeMigration(uint256 _chainId, bytes32 _assetId, uint256 _chainBalance);
 // 0x07859b3b
@@ -50,8 +53,6 @@ error InvalidSettlementLayer();
 error InvalidVersion();
 // 0xf76b228a
 error InvalidWithdrawalChainId();
-// 0xda4352c4
-error AssetAlreadyRegistered(bytes32 assetId);
 // 0x7e472272
 error MissingBaseTokenAssetId();
 // 0x8dfed13a

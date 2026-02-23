@@ -134,7 +134,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         }
         // Similar to the above, it is just an invariant check that should never be hit
         if (chainBalance[block.chainid][_assetId] != 0) {
-            revert ChainBalanceMustBeZeroBeforeMigration(block.chainid, _assetId, chainBalance[block.chainid][_assetId]);
+            revert ChainBalanceMustBeZeroBeforeMigration(
+                block.chainid,
+                _assetId,
+                chainBalance[block.chainid][_assetId]
+            );
         }
 
         // The token is not native to L1, so we also have to account for the amount bridged to L1.
