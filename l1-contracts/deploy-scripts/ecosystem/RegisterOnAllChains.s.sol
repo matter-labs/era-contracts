@@ -18,7 +18,8 @@ contract RegisterOnAllChainsScript is Script, IRegisterOnAllChains {
         for (uint256 i = 0; i < chainsToRegisterOn.length; i++) {
             if (
                 chainRegistrationSender.chainRegisteredOnChain(chainsToRegisterOn[i], _chainId) ||
-                !_sameSettlementLayerNotL1(bridgehub, chainsToRegisterOn[i], _chainId)
+                !_sameSettlementLayerNotL1(bridgehub, chainsToRegisterOn[i], _chainId) ||
+                chainsToRegisterOn[i] == _chainId
             ) {
                 continue;
             }
