@@ -423,7 +423,8 @@ contract CommitterFacet is ZKChainBase, ICommitter {
                 _newBatch.priorityOperationsHash,
                 _newBatch.l2LogsTreeRoot,
                 _expectedSystemContractUpgradeTxHash,
-                _newBatch.dependencyRootsRollingHash
+                _newBatch.dependencyRootsRollingHash,
+                block.chainid
             )
         );
 
