@@ -13,6 +13,7 @@ import {InteropBundle, MessageInclusionProof, BundleStatus, CallStatus} from "co
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
 
 /// @notice Struct to hold bundle execution result for assertions
@@ -23,10 +24,8 @@ struct BundleExecutionResult {
 }
 
 abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
-    uint256 l1ChainId = 9;
     uint256 destinationChainId = 271;
-    bytes32 destinationBaseTokenAssetId =
-        keccak256(abi.encode(l1ChainId, L2_NATIVE_TOKEN_VAULT_ADDR, ETH_TOKEN_ADDRESS));
+    bytes32 destinationBaseTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
 
     function extractAndExecuteSingleBundle(
         Vm.Log[] memory logs,
@@ -43,7 +42,7 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
                 logs[i].emitter == address(l2InteropCenter) &&
                 logs[i].topics[0] ==
                 keccak256(
-                    "InteropBundleSent(bytes32,bytes32,(bytes1,uint256,uint256,bytes32,(bytes1,bool,address,address,uint256,bytes)[],(bytes,bytes,bool)))"
+                    "InteropBundleSent(bytes32,bytes32,(bytes1,uint256,uint256,bytes32,bytes32,(bytes1,bool,address,address,uint256,bytes)[],(bytes,bytes,bool)))"
                 )
             ) {
                 data = logs[i].data;
