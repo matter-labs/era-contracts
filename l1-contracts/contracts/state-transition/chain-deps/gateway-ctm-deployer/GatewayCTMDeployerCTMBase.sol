@@ -8,7 +8,6 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "../../chain-interfaces/IDiamondInit.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "../../IChainTypeManager.sol";
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
-import {IVerifier} from "../../chain-interfaces/IVerifier.sol";
 
 import {Facets, GatewayCTMDeployerConfig, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "./GatewayCTMDeployer.sol";
 
@@ -67,6 +66,7 @@ abstract contract GatewayCTMDeployerCTMBase {
 
     /// @notice Deploys the ChainTypeManager implementation contract.
     /// @dev Must be implemented by subclasses to deploy the specific CTM type.
+    /// @dev PermissionlessValidator is hardcoded to address(0) since Priority Mode is L1-only.
     /// @param _salt Salt used for CREATE2 deployments.
     /// @return The address of the deployed CTM implementation.
     function _deployCTMImplementation(bytes32 _salt) internal virtual returns (address);
@@ -85,7 +85,7 @@ abstract contract GatewayCTMDeployerCTMBase {
         GatewayCTMDeployerConfig memory baseConfig = _config.baseConfig;
         Facets memory facets = _config.facets;
 
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](6);
         facetCuts[0] = Diamond.FacetCut({
             facet: facets.adminFacet,
             action: Diamond.Action.Add,
@@ -110,9 +110,21 @@ abstract contract GatewayCTMDeployerCTMBase {
             isFreezable: true,
             selectors: baseConfig.executorSelectors
         });
+        facetCuts[4] = Diamond.FacetCut({
+            facet: facets.migratorFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: baseConfig.migratorSelectors
+        });
+        facetCuts[5] = Diamond.FacetCut({
+            facet: facets.committerFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: baseConfig.committerSelectors
+        });
 
+        // Only system contract hashes are initialized here; verifier is fetched from CTM on-chain.
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            verifier: IVerifier(_config.verifier),
             l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
             l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
             l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
@@ -140,6 +152,7 @@ abstract contract GatewayCTMDeployerCTMBase {
             validatorTimelock: _config.validatorTimelockProxy,
             chainCreationParams: chainCreationParams,
             protocolVersion: baseConfig.protocolVersion,
+            verifier: _config.verifier,
             serverNotifier: _result.serverNotifierProxy
         });
 

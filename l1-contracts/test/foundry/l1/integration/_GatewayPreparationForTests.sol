@@ -67,7 +67,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
     }
 
     function governanceRegisterGateway() public {
-        Call[] memory calls = _getRegisterSettlementLayerCalls();
+        Call[] memory calls = _getSetSettlementLayerCalls();
         Utils.executeCalls(L1Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner(), bytes32(0), 0, calls);
     }
 
@@ -139,7 +139,8 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
                 // Some non-zero address
                 _gatewayServerNotifier: address(uint160(1)),
                 _refundRecipient: msg.sender,
-                _ctmRepresentativeChainId: 0
+                _ctmRepresentativeChainId: 0,
+                _gatewaySettlementFee: 0
             })
         );
         Utils.executeCalls(L1Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner(), bytes32(0), 0, calls);

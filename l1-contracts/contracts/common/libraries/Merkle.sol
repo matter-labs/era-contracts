@@ -26,7 +26,7 @@ library Merkle {
         _validatePathLengthForSingleProof(_index, pathLength);
 
         bytes32 currentHash = _itemHash;
-        for (uint256 i; i < pathLength; i = i.uncheckedInc()) {
+        for (uint256 i; i < pathLength; ++i) {
             currentHash = (_index % 2 == 0)
                 ? efficientHash(currentHash, _path[i])
                 : efficientHash(_path[i], currentHash);
@@ -52,7 +52,7 @@ library Merkle {
         _validatePathLengthForSingleProof(_index, pathLength);
 
         bytes32 currentHash = _itemHash;
-        for (uint256 i; i < pathLength; i = i.uncheckedInc()) {
+        for (uint256 i; i < pathLength; ++i) {
             currentHash = (_index % 2 == 0)
                 ? efficientHash(currentHash, _path[i])
                 : efficientHash(_path[i], currentHash);
@@ -95,12 +95,12 @@ library Merkle {
         }
         bytes32[] memory itemHashes = _itemHashes;
 
-        for (uint256 level; level < pathLength; level = level.uncheckedInc()) {
+        for (uint256 level; level < pathLength; ++level) {
             uint256 parity = _startIndex % 2;
             // We get an extra element on the next level if on the current level elements either
             // start on an odd index (`parity == 1`) or end on an even index (`levelLen % 2 == 1`)
             uint256 nextLevelLen = levelLen / 2 + (parity | (levelLen % 2));
-            for (uint256 i; i < nextLevelLen; i = i.uncheckedInc()) {
+            for (uint256 i; i < nextLevelLen; ++i) {
                 bytes32 lhs = (i == 0 && parity == 1) ? _startPath[level] : itemHashes[2 * i - parity];
                 bytes32 rhs = (i == nextLevelLen - 1 && (levelLen - parity) % 2 == 1)
                     ? _endPath[level]

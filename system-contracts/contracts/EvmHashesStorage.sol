@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {IEvmHashesStorage} from "./interfaces/IEvmHashesStorage.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT} from "./Contracts.sol";
 
 /**
  * @author Matter Labs

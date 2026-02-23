@@ -10,6 +10,7 @@ import {FeeParams, PubdataPricingMode, VerifierParams} from "contracts/state-tra
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Utils} from "../Utils/Utils.sol";
 import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManager.sol";
@@ -17,6 +18,9 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {DiamondAlreadyFrozen, DiamondNotFrozen, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {
     DiamondProxy private diamondProxy;
@@ -24,6 +28,7 @@ contract UpgradeLogicTest is DiamondCutTest {
     AdminFacet private adminFacet;
     AdminFacet private proxyAsAdmin;
     GettersFacet private proxyAsGetters;
+    PermissionlessValidator private permissionlessValidator;
     address interopCenter = makeAddr("interopCenter");
     address private admin;
     address private chainTypeManager;
@@ -55,8 +60,17 @@ contract UpgradeLogicTest is DiamondCutTest {
 
         diamondCutTestContract = new DiamondCutTestContract();
         diamondInit = new DiamondInit(false);
-        adminFacet = new AdminFacet(block.chainid, RollupDAManager(address(0)), false);
+        adminFacet = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         gettersFacet = new GettersFacet();
+        permissionlessValidator = new PermissionlessValidator();
+
+        // Mock CTM to return a verifier for protocol version 0
+        address testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+        vm.mockCall(
+            chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, uint256(0)),
+            abi.encode(testnetVerifier)
+        );
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
         facetCuts[0] = Diamond.FacetCut({
@@ -86,7 +100,6 @@ contract UpgradeLogicTest is DiamondCutTest {
             // genesisBatchHash: 0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,
             // genesisIndexRepeatedStorageChanges: 0,
             // genesisBatchCommitment: bytes32(0),
-            verifier: IVerifier(0x03752D8252d67f99888E741E3fB642803B29B155), // verifier
             // zkPorterIsAvailable: false,
             l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
             l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
