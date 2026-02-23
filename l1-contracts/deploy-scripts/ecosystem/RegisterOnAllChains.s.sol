@@ -18,7 +18,7 @@ contract RegisterOnAllChainsScript is Script, IRegisterOnAllChains {
         for (uint256 i = 0; i < chainsToRegisterOn.length; i++) {
             if (
                 chainRegistrationSender.chainRegisteredOnChain(chainsToRegisterOn[i], _chainId) ||
-                !_sameSettlementLayer(bridgehub, chainsToRegisterOn[i], _chainId)
+                !_sameSettlementLayerNotL1(bridgehub, chainsToRegisterOn[i], _chainId)
             ) {
                 continue;
             }
@@ -29,7 +29,7 @@ contract RegisterOnAllChainsScript is Script, IRegisterOnAllChains {
         for (uint256 i = 0; i < chainsToRegisterOn.length; i++) {
             if (
                 chainRegistrationSender.chainRegisteredOnChain(_chainId, chainsToRegisterOn[i]) ||
-                !_sameSettlementLayer(bridgehub, _chainId, chainsToRegisterOn[i]) ||
+                !_sameSettlementLayerNotL1(bridgehub, _chainId, chainsToRegisterOn[i]) ||
                 chainsToRegisterOn[i] == _chainId
             ) {
                 continue;
@@ -55,11 +55,13 @@ contract RegisterOnAllChainsScript is Script, IRegisterOnAllChains {
         return mailbox.depositsPaused();
     }
 
-    function _sameSettlementLayer(
+    function _sameSettlementLayerNotL1(
         IBridgehubBase bridgehub,
         uint256 chainToBeRegistered,
         uint256 chainToRegisterOn
     ) internal view returns (bool) {
-        return bridgehub.settlementLayer(chainToBeRegistered) == bridgehub.settlementLayer(chainToRegisterOn);
+        return
+            bridgehub.settlementLayer(chainToBeRegistered) == bridgehub.settlementLayer(chainToRegisterOn) &&
+            bridgehub.settlementLayer(chainToBeRegistered) != block.chainid;
     }
 }
