@@ -449,7 +449,7 @@ abstract contract NativeTokenVaultBase is
             require(_depositAmount == msg.value, ValueMismatch(_depositAmount, msg.value));
             if (_isBridgedToken) {
                 // slither-disable-next-line arbitrary-send-eth
-                L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: msg.value}();
+                L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: msg.value}(_chainId);
             }
         } else {
             require(msg.value == 0, NonEmptyMsgValue());

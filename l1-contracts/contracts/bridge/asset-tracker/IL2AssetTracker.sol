@@ -25,7 +25,7 @@ interface IL2AssetTracker {
         uint256 _tokenOriginChainId
     ) external;
 
-    function handleInitiateBaseTokenBridgingOnL2(uint256 _amount) external;
+    function handleInitiateBaseTokenBridgingOnL2(uint256 _maybeToBlockChainId, uint256 _amount) external;
 
     function handleFinalizeBaseTokenBridgingOnL2(uint256 _amount) external;
 
