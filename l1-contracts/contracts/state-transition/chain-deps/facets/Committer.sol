@@ -13,7 +13,7 @@ import {StoredBatchHashing} from "../StoredBatchHashing.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractInterfaces.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {BatchNumberMismatch, CanOnlyProcessOneBatch, EmptyPrecommitData, HashMismatch, IncorrectBatchChainId, InvalidBatchNumber, InvalidLogSender, InvalidNumberOfBlobs, InvalidPackedPrecommitmentLength, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, PrecommitmentMismatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, NonZeroBlobToVerifyZKsyncOS, InvalidBlockRange, InvalidTxCountInPriorityMode, ZKsyncOSPrecommitsNotSupported} from "../../../common/L1ContractErrors.sol";
+import {BatchNumberMismatch, CanOnlyProcessOneBatch, EmptyPrecommitData, HashMismatch, IncorrectBatchChainId, IncorrectBatchSLChainId, InvalidBatchNumber, InvalidLogSender, InvalidNumberOfBlobs, InvalidPackedPrecommitmentLength, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, PrecommitmentMismatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, NonZeroBlobToVerifyZKsyncOS, InvalidBlockRange, InvalidTxCountInPriorityMode, ZKsyncOSPrecommitsNotSupported} from "../../../common/L1ContractErrors.sol";
 import {MismatchL2DACommitmentScheme, SettlementLayerChainIdMismatch} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -407,6 +407,9 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         if (_newBatch.daCommitmentScheme != s.l2DACommitmentScheme) {
             revert MismatchL2DACommitmentScheme(uint256(_newBatch.daCommitmentScheme), uint256(s.l2DACommitmentScheme));
         }
+        if (_newBatch.slChainId != block.chainid) {
+            revert IncorrectBatchSLChainId(_newBatch.slChainId, block.chainid);
+        }
 
         // The batch proof public input can be calculated as keccak256(state_commitment_before & state_commitment_after & batch_output_hash)
         // batch output hash commits to information about batch that needs to be opened on l1.
@@ -423,7 +426,8 @@ contract CommitterFacet is ZKChainBase, ICommitter {
                 _newBatch.priorityOperationsHash,
                 _newBatch.l2LogsTreeRoot,
                 _expectedSystemContractUpgradeTxHash,
-                _newBatch.dependencyRootsRollingHash
+                _newBatch.dependencyRootsRollingHash,
+                _newBatch.slChainId
             )
         );
 
