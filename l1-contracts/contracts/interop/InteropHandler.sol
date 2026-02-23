@@ -66,7 +66,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         bytes32 baseTokenAssetId = L2_NATIVE_TOKEN_VAULT.BASE_TOKEN_ASSET_ID();
         require(
             interopBundle.destinationBaseTokenAssetId == baseTokenAssetId,
-            WrongDestinationBaseTokenAssetId(bundleHash, interopBundle.destinationBaseTokenAssetId, baseTokenAssetId)
+            WrongDestinationBaseTokenAssetId(bundleHash, baseTokenAssetId, interopBundle.destinationBaseTokenAssetId)
         );
 
         // If the execution address is not specified then the execution is permissionless.
@@ -148,7 +148,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         bytes32 baseTokenAssetId = L2_NATIVE_TOKEN_VAULT.BASE_TOKEN_ASSET_ID();
         require(
             interopBundle.destinationBaseTokenAssetId == baseTokenAssetId,
-            WrongDestinationBaseTokenAssetId(bundleHash, interopBundle.destinationBaseTokenAssetId, baseTokenAssetId)
+            WrongDestinationBaseTokenAssetId(bundleHash, baseTokenAssetId, interopBundle.destinationBaseTokenAssetId)
         );
 
         // If the bundle was already fully executed or unbundled, we revert stating that it was processed already.
