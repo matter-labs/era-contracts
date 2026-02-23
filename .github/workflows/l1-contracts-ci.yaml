@@ -38,16 +38,7 @@ jobs:
       - name: Build l1 contracts
         working-directory: l1-contracts
         run: |
-          rm -rf zkstack-out
           yarn build:foundry
-
-          # Fail if regenerated zkstack-out differs from what was committed
-          if [ -n "$(git status --porcelain -- zkstack-out)" ]; then
-            echo "::error::l1-contracts/zkstack-out is out of date. Run 'cd l1-contracts && yarn build:foundry' and commit the changes."
-            git --no-pager status --porcelain -- zkstack-out
-            git --no-pager diff -- zkstack-out || true
-            exit 1
-          fi
 
       - name: Build l2 contracts
         working-directory: l2-contracts
@@ -109,6 +100,41 @@ jobs:
 
       - name: Lint errors
         run: yarn l1 errors-lint --check
+
+  check-zkstack-out:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install foundry-zksync
+        uses: ./.github/actions/install-zksync-foundry
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.20.8
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build and check zkstack-out
+        working-directory: l1-contracts
+        run: |
+          rm -rf zkstack-out
+          yarn build:foundry
+
+          # Fail if regenerated zkstack-out differs from what was committed
+          if [ -n "$(git status --porcelain -- zkstack-out)" ]; then
+            echo "::error::l1-contracts/zkstack-out is out of date. Run 'cd l1-contracts && yarn build:foundry' and commit the changes."
+            git --no-pager status --porcelain -- zkstack-out
+            git --no-pager diff -- zkstack-out || true
+            exit 1
+          fi
 
   check-hashes:
     needs: [build]
@@ -235,48 +261,48 @@ jobs:
       #   run: forge test --match-test MeasureGas --gas-snapshot-check=true
 
   # FIXME: uncomment once fixed.
-  # test-foundry-zksync:
-  #   needs: [build, lint]
-  #   runs-on: ubuntu-latest
+  test-foundry-zksync:
+    needs: [build, lint]
+    runs-on: ubuntu-latest
 
-  #   steps:
-  #     - name: Checkout the repository
-  #       uses: actions/checkout@v4
-  #       with:
-  #         submodules: recursive
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-  #     - name: Use Node.js
-  #       uses: actions/setup-node@v3
-  #       with:
-  #         node-version: 18.20.8
-  #         cache: yarn
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.20.8
+          cache: yarn
 
-  #     - name: Install foundry-zksync
-  #       uses: ./.github/actions/install-zksync-foundry
+      - name: Install foundry-zksync
+        uses: ./.github/actions/install-zksync-foundry
 
-  #     - name: Install dependencies
-  #       run: yarn
+      - name: Install dependencies
+        run: yarn
 
-  #     - name: Build system contract artifacts
-  #       run: yarn sc build:foundry
+      - name: Build system contract artifacts
+        run: yarn sc build:foundry
 
-  #     - name: Restore artifacts cache
-  #       uses: actions/cache/restore@v3
-  #       with:
-  #         fail-on-cache-miss: true
-  #         key: artifacts-l1-${{ github.sha }}
-  #         path: |
-  #           da-contracts/out
-  #           l1-contracts/cache-forge
-  #           l1-contracts/out
-  #           # TODO: cached `zkout` and the one for tests produce different hashes and so it causes the tests to fail
-  #           l2-contracts/cache-forge
-  #           l2-contracts/zkout
-  #           system-contracts/zkout
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-l1-${{ github.sha }}
+          path: |
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+            # TODO: cached `zkout` and the one for tests produce different hashes and so it causes the tests to fail
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
 
-  #     - name: Run tests
-  #       working-directory: ./l1-contracts
-  #       run: yarn test:zkfoundry
+      - name: Run tests
+        working-directory: ./l1-contracts
+        run: yarn test:zkfoundry
 
   check-verifier-generator-l1:
     runs-on: ubuntu-latest
@@ -368,15 +394,14 @@ jobs:
           ref: v1.16
 
       # To ignore coverage for certain directories modify the paths in this step as needed. The
-      # below default ignores coverage results for the test and script directories. It also ignores
-      # the ChainRegistrar contract since it is unused. Alternatively, to include coverage in all
-      # directories, comment out this step. Note that because this filtering applies to the lcov
-      # file, the summary table generated in the previous step will still include all files and
-      # directories. The `--rc branch_coverage=1` part keeps branch info in the filtered report,
-      # since lcov defaults to removing branch info.
+      # below default ignores coverage results for the test and script directories. Alternatively,
+      # to include coverage in all directories, comment out this step. Note that because this
+      # filtering applies to the lcov file, the summary table generated in the previous step will
+      # still include all files and directories. The `--rc branch_coverage=1` part keeps branch info
+      # in the filtered report, since lcov defaults to removing branch info.
       - name: Filter directories
         run: |
-          lcov --ignore-errors unused --remove lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' 'contracts/chain-registrar/ChainRegistrar.sol' --output-file lcov.info --rc branch_coverage=1
+          lcov --ignore-errors unused --remove lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' --output-file lcov.info --rc branch_coverage=1
 
       # This step posts a detailed coverage report as a comment and deletes previous comments on
       # each push. The below step is used to fail coverage if the specified coverage threshold is

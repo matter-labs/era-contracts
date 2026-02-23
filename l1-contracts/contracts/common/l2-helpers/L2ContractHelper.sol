@@ -5,7 +5,8 @@ pragma solidity ^0.8.21;
 import {BytecodeError, LengthIsNotDivisibleBy32, MalformedBytecode} from "../L1ContractErrors.sol";
 
 import {UncheckedMath} from "../libraries/UncheckedMath.sol";
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "./L2ContractAddresses.sol";
+import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "./L2ContractInterfaces.sol";
+import {CREATE2_PREFIX, CREATE_PREFIX} from "system-contracts/contracts/Constants.sol";
 
 /**
  * @author Matter Labs
@@ -45,13 +46,6 @@ interface IContractDeployer {
  */
 library L2ContractHelper {
     using UncheckedMath for uint256;
-
-    /// @dev The prefix used to create CREATE2 addresses.
-    bytes32 private constant CREATE2_PREFIX = keccak256("zksyncCreate2");
-
-    /// @dev Prefix used during derivation of account addresses using CREATE
-    /// @dev keccak256("zksyncCreate")
-    bytes32 private constant CREATE_PREFIX = 0x63bae3a9951d38e8a3fbb7b70909afc1200610fc5bc55ade242f815974674f23;
 
     /// @notice Sends L2 -> L1 arbitrary-long message through the system contract messenger.
     /// @param _message Data to be sent to L1.
@@ -182,7 +176,7 @@ library L2ContractHelper {
     function hashFactoryDeps(bytes[] memory _factoryDeps) internal pure returns (uint256[] memory hashedFactoryDeps) {
         uint256 factoryDepsLen = _factoryDeps.length;
         hashedFactoryDeps = new uint256[](factoryDepsLen);
-        for (uint256 i = 0; i < factoryDepsLen; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < factoryDepsLen; ++i) {
             bytes32 hashedBytecode = hashL2Bytecode(_factoryDeps[i]);
 
             // Store the resulting hash sequentially in words.

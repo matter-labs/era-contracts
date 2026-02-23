@@ -5,11 +5,9 @@
 pragma solidity 0.8.28;
 
 import {MSG_VALUE_SYSTEM_CONTRACT} from "../l2-helpers/L2ContractAddresses.sol";
+import {MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT} from "system-contracts/contracts/Constants.sol";
 
 address constant SYSTEM_CALL_CALL_ADDRESS = address((1 << 16) - 11);
-/// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
-/// is non-zero, the call will be assumed to be a system one.
-uint256 constant MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT = 1;
 
 /// @notice The way to forward the calldata:
 /// - Use the current heap (i.e. the same as on EVM).

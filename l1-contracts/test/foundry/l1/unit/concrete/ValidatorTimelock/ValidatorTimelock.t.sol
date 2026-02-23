@@ -5,13 +5,15 @@ import {Test} from "forge-std/Test.sol";
 import {Utils} from "../Utils/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 
 import {RoleAccessDenied, TimeNotReached, NotAZKChain} from "contracts/common/L1ContractErrors.sol";
-import {IValidatorTimelock} from "contracts/state-transition/IValidatorTimelock.sol";
+import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
 
@@ -162,12 +164,12 @@ contract ValidatorTimelockTest is Test {
 
     function test_validatorCanMakeCall() public {
         // Setup Mock call to executor
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), "");
+        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), "");
 
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
-        IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
+        CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
 
-        IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](1);
         batchesToCommit[0] = batchToCommit;
 
         vm.prank(alice);
@@ -198,15 +200,15 @@ contract ValidatorTimelockTest is Test {
         vm.warp(timestamp);
         vm.mockCall(
             zkSync,
-            abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector),
+            abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector),
             abi.encode(eraChainId)
         );
 
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
-        IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
+        CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
 
         batchToCommit.batchNumber = batchNumber;
-        IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](1);
         batchesToCommit[0] = batchToCommit;
 
         vm.prank(alice);
@@ -220,12 +222,12 @@ contract ValidatorTimelockTest is Test {
     }
 
     function test_commitBatches() public {
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), abi.encode(chainId));
+        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), abi.encode(chainId));
 
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
-        IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
+        CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
 
-        IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](1);
         batchesToCommit[0] = batchToCommit;
 
         vm.prank(alice);
@@ -269,13 +271,13 @@ contract ValidatorTimelockTest is Test {
         uint64 timestamp = 123456;
         uint64 batchNumber = 123;
         // Commit batches first to have the valid timestamp
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), abi.encode(zkSync));
+        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), abi.encode(zkSync));
 
         IExecutor.StoredBatchInfo memory storedBatch1 = Utils.createStoredBatchInfo();
-        IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
+        CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
 
         batchToCommit.batchNumber = batchNumber;
-        IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](1);
         batchesToCommit[0] = batchToCommit;
 
         vm.prank(alice);
@@ -333,9 +335,9 @@ contract ValidatorTimelockTest is Test {
 
     function test_RevertWhen_validatorCanMakeCallNotValidator() public {
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
-        IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
+        CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
 
-        IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](1);
         batchesToCommit[0] = batchToCommit;
 
         vm.prank(bob);
@@ -394,13 +396,13 @@ contract ValidatorTimelockTest is Test {
         uint64 timestamp = 123456;
         uint64 batchNumber = 123;
         // Prove batches first to have the valid timestamp
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), abi.encode(chainId));
+        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), abi.encode(chainId));
 
         IExecutor.StoredBatchInfo memory storedBatch1 = Utils.createStoredBatchInfo();
-        IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
+        CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
 
         batchToCommit.batchNumber = batchNumber;
-        IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](1);
         batchesToCommit[0] = batchToCommit;
 
         vm.prank(alice);
@@ -503,7 +505,7 @@ contract ValidatorTimelockTest is Test {
     }
 
     function test_precommitSharedBridge() public {
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.precommitSharedBridge.selector), "");
+        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.precommitSharedBridge.selector), "");
 
         vm.prank(alice);
         validator.precommitSharedBridge(zkSync, 1, "");
@@ -569,21 +571,21 @@ contract ValidatorTimelockTest is Test {
     }
 
     function test_commitBatches_MultipleBatches() public {
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), abi.encode(chainId));
+        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), abi.encode(chainId));
 
         uint64 timestamp = 123456;
         uint64 batchNumberStart = 10;
 
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
-        IExecutor.CommitBatchInfo memory batch1 = Utils.createCommitBatchInfo();
-        IExecutor.CommitBatchInfo memory batch2 = Utils.createCommitBatchInfo();
-        IExecutor.CommitBatchInfo memory batch3 = Utils.createCommitBatchInfo();
+        CommitBatchInfo memory batch1 = Utils.createCommitBatchInfo();
+        CommitBatchInfo memory batch2 = Utils.createCommitBatchInfo();
+        CommitBatchInfo memory batch3 = Utils.createCommitBatchInfo();
 
         batch1.batchNumber = batchNumberStart;
         batch2.batchNumber = batchNumberStart + 1;
         batch3.batchNumber = batchNumberStart + 2;
 
-        IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](3);
+        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](3);
         batchesToCommit[0] = batch1;
         batchesToCommit[1] = batch2;
         batchesToCommit[2] = batch3;

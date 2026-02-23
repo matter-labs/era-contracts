@@ -16,6 +16,7 @@ const REQUIRED_CONTRACTS = [
   "IChainAssetHandler.sol",
   "IChainTypeManager.sol",
   "IAdmin.sol",
+  "IDiamondCut.sol",
   "IChainAdminOwnable.sol",
   "IRegisterZKChain.sol",
   "IDeployL2Contracts.sol",
@@ -34,13 +35,17 @@ const REQUIRED_CONTRACTS = [
   "IRegisterOnAllChains.sol",
   "IGatewayMigrateTokenBalances.sol",
   "IFinalizeUpgrade.sol",
+  "IL1NativeTokenVault.sol",
   "IL2NativeTokenVault.sol",
+  "IL1AssetRouter.sol",
   "IL2AssetRouter.sol",
   "IAssetTrackerBase.sol",
+  "IL1AssetTracker.sol",
   "IL2AssetTracker.sol",
   "IGWAssetTracker.sol",
   "IChainAdmin.sol",
   "ISetupLegacyBridge.sol",
+  "DefaultUpgrade.sol",
 ];
 
 async function copyContractAbi(src: string, dest: string): Promise<void> {
@@ -78,7 +83,8 @@ async function main() {
 
   console.log("Copying contract ABIs to zkstack-out...");
 
-  // Create zkstack-out directory if it doesn't exist
+  // Remove existing zkstack-out directory to avoid stale files
+  await fs.rm(zkstackOutDir, { recursive: true, force: true });
   await fs.mkdir(zkstackOutDir, { recursive: true });
 
   // Copy each required contract directory, extracting ABIs from JSON files

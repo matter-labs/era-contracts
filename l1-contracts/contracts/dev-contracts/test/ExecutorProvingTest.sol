@@ -3,8 +3,6 @@
 pragma solidity 0.8.28;
 
 import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.sol";
-import {PubdataPricingMode} from "../../state-transition/chain-deps/ZKChainStorage.sol";
-import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 
 contract ExecutorProvingTest is ExecutorFacet {
     constructor() ExecutorFacet(block.chainid) {}
@@ -14,24 +12,6 @@ contract ExecutorProvingTest is ExecutorFacet {
         bytes32 _currentBatchCommitment
     ) external pure returns (uint256) {
         return _getBatchProofPublicInput(_prevBatchCommitment, _currentBatchCommitment);
-    }
-
-    function createBatchCommitment(
-        CommitBatchInfo calldata _newBatchData,
-        bytes32 _stateDiffHash,
-        bytes32[] memory _blobCommitments,
-        bytes32[] memory _blobHashes
-    ) external view returns (bytes32) {
-        (, , bytes32 commitment) = _createBatchCommitment(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes);
-        return commitment;
-    }
-
-    function processL2Logs(
-        CommitBatchInfo calldata _newBatch,
-        bytes32 _expectedSystemContractUpgradeTxHash,
-        PubdataPricingMode
-    ) external returns (LogProcessingOutput memory logOutput) {
-        return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
     }
 
     /// Sets the DefaultAccount Hash, Bootloader Hash and EVM emulator Hash.

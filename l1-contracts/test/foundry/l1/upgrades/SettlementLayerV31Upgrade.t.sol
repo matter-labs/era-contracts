@@ -2,19 +2,20 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {SettlementLayerV31Upgrade, PriorityQueueNotReady, NotAllBatchesExecuted, GWNotV31} from "contracts/upgrades/SettlementLayerV31Upgrade.sol";
+import {SettlementLayerV31Upgrade, PriorityQueueNotReady, NotAllBatchesExecuted} from "contracts/upgrades/SettlementLayerV31Upgrade.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
-import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 contract DummySettlementLayerV31Upgrade is SettlementLayerV31Upgrade, BaseUpgradeUtils {
     function setTotalBatchesCommitted(uint256 _totalBatchesCommitted) public {
@@ -44,6 +45,10 @@ contract DummySettlementLayerV31Upgrade is SettlementLayerV31Upgrade, BaseUpgrad
     function getAssetTracker() public view returns (address) {
         return s.assetTracker;
     }
+
+    function setChainTypeManager(address _chainTypeManager) public override {
+        s.chainTypeManager = _chainTypeManager;
+    }
 }
 
 contract SettlementLayerV31UpgradeTest is BaseUpgrade {
@@ -56,6 +61,8 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
     address internal mockMessageRoot;
     address internal mockChainAssetHandler;
     address internal mockGWChain;
+    address internal mockChainTypeManager = makeAddr("mockChainTypeManager");
+    address internal mockVerifier = makeAddr("mockVerifier");
 
     uint256 internal testChainId = 123;
     uint256 internal gwChainId = 456;
@@ -69,16 +76,22 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
         mockMessageRoot = makeAddr("messageRoot");
         mockChainAssetHandler = makeAddr("chainAssetHandler");
         mockGWChain = makeAddr("gwChain");
+        mockChainTypeManager = makeAddr("chainTypeManager");
 
         upgrade = new DummySettlementLayerV31Upgrade();
         upgrade.setBridgehub(mockBridgehub);
         upgrade.setChainId(testChainId);
+        upgrade.setChainTypeManager(mockChainTypeManager);
         upgrade.setTotalBatchesCommitted(100);
         upgrade.setTotalBatchesExecuted(100);
         upgrade.setPriorityTxMaxGasLimit(1 ether);
         upgrade.setPriorityTxMaxPubdata(1000000);
 
         _prepareEmptyProposedUpgrade();
+
+        // Set up CTM for verifier lookup
+        upgrade.setChainTypeManager(mockChainTypeManager);
+        upgrade.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
     }
 
     function _setupMocks() internal {
@@ -141,7 +154,7 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
         // Mock messageRoot.ERA_GATEWAY_CHAIN_ID
         vm.mockCall(
             mockMessageRoot,
-            abi.encodeWithSelector(IMessageRoot.ERA_GATEWAY_CHAIN_ID.selector),
+            abi.encodeWithSelector(IMessageRootBase.ERA_GATEWAY_CHAIN_ID.selector),
             abi.encode(gwChainId)
         );
 
@@ -159,13 +172,6 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
             abi.encode(uint32(0), uint32(31), uint32(0)) // major=0, minor=31, patch=0
         );
 
-        // Mock chainAssetHandler.setMigrationNumberForV31
-        vm.mockCall(
-            mockChainAssetHandler,
-            abi.encodeWithSelector(IChainAssetHandler.setMigrationNumberForV31.selector, testChainId),
-            abi.encode()
-        );
-
         // Mock messageRoot.saveV31UpgradeChainBatchNumber
         vm.mockCall(
             mockMessageRoot,
@@ -179,6 +185,13 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
             abi.encodeWithSelector(IBridgehubBase.whitelistedSettlementLayers.selector, testChainId),
             abi.encode(false)
         );
+
+        // Mock chainTypeManager.PERMISSIONLESS_VALIDATOR
+        vm.mockCall(
+            mockChainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.PERMISSIONLESS_VALIDATOR.selector),
+            abi.encode(makeAddr("permissionlessValidator"))
+        );
     }
 
     function test_RevertWhen_NotAllBatchesExecuted() public {
@@ -189,20 +202,6 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
         upgrade.setTotalBatchesExecuted(50);
 
         vm.expectRevert(NotAllBatchesExecuted.selector);
-        upgrade.upgrade(proposedUpgrade);
-    }
-
-    function test_RevertWhen_GatewayNotV31() public {
-        _setupMocks();
-
-        // Override the GW version mock to return version < 30
-        vm.mockCall(
-            mockGWChain,
-            abi.encodeWithSelector(IGetters.getSemverProtocolVersion.selector),
-            abi.encode(uint32(0), uint32(29), uint32(0)) // minor=29 < 30
-        );
-
-        vm.expectRevert(abi.encodeWithSelector(GWNotV31.selector, gwChainId));
         upgrade.upgrade(proposedUpgrade);
     }
 

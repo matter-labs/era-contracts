@@ -48,10 +48,6 @@ error InvalidUnprocessedIndex(uint256 treeUnprocessedIndex, uint256 commitmentUn
 error L1DAValidatorAddressIsZero();
 // 0x7fbff2dd
 error L1DAValidatorInvalidSender(address msgSender);
-// 0xa969e486
-error LocalRootIsZero();
-// 0xbdaf7d42
-error LocalRootMustBeZero();
 // 0x9b5f85eb
 error MessageRootIsZero();
 // 0xf148c8da
@@ -62,6 +58,8 @@ error MismatchL2DACommitmentScheme(uint256 operatorProvidedScheme, uint256 expec
 error MismatchNumberOfLayer1Txs(uint256 numberOfLayer1Txs, uint256 expectedLength);
 // 0xf9ba09d6
 error NotAllBatchesExecuted();
+// 0x61d9af9e
+error NotAPatchUpgrade(uint256 oldProtocolVersion, uint256 newProtocolVersion);
 // 0xf05c64c6
 error NotChainAdmin(address prevMsgSender, address admin);
 // 0x8fd63d21
@@ -102,3 +100,5 @@ error UnsupportedProofMetadataVersion(uint256 metadataVersion);
 error ValL1DAWrongInputLength(uint256 inputLength, uint256 expectedLength);
 // 0x712d02d2
 error VerifiedIsNotConsistentWithCommitted(uint256 batchesVerified, uint256 batchesCommitted);
+// 0x311ca4b0
+error PriorityModeAlreadyAllowed();

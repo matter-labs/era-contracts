@@ -8,12 +8,12 @@ import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
-import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
+import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
 
 import {IAssetRouterBase, LEGACY_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
-import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
+import {IBaseTokenAssetHandler} from "contracts/bridge/interfaces/IBaseTokenAssetHandler.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
@@ -108,7 +108,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         // ToDo: remove the mock call and register custom asset handler?
         vm.mockCall(
             address(nativeTokenVault),
-            abi.encodeWithSelector(IL1BaseTokenAssetHandler.tokenAddress.selector, tokenAssetId),
+            abi.encodeWithSelector(IBaseTokenAssetHandler.tokenAddress.selector, tokenAssetId),
             abi.encode(address(token))
         );
         vm.prank(bridgehubAddress);
@@ -249,7 +249,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     }
 
     function test_finalizeWithdrawal_EthOnEth() public {
-        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, alice, amount);
+        bytes memory message = abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -368,14 +368,8 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
 
     function test_finalizeWithdrawal_BaseErcOnErc() public {
         _setBaseTokenAssetId(tokenAssetId);
-        // vm.prank(bridgehubAddress);
 
-        bytes memory message = abi.encodePacked(
-            AssetRouterBase.finalizeDeposit.selector,
-            chainId,
-            tokenAssetId,
-            abi.encode(0, alice, 0, amount, new bytes(0))
-        );
+        bytes memory message = abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -385,20 +379,13 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         vm.mockCall(
             messageRootAddress,
             // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                IMessageVerification.proveL2MessageInclusionShared.selector,
-                chainId
-                // l2BatchNumber,
-                // l2MessageIndex,
-                // l2ToL1Message,
-                // merkleProof
-            ),
+            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector, chainId),
             abi.encode(true)
         );
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit DepositFinalizedAssetRouter(chainId, tokenAssetId, abi.encode(amount, alice));
+        emit DepositFinalizedAssetRouter(chainId, tokenAssetId, message);
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
