@@ -197,14 +197,7 @@ library AddressIntrospector {
     // ============ CTM Addresses ============
 
     function getCTMAddresses(ChainTypeManagerBase _ctm) public view returns (CTMDeployedAddresses memory info) {
-        return _getCTMAddressesInternal(address(_ctm), false, false);
-    }
-
-    function getCTMAddresses(
-        ChainTypeManagerBase _ctm,
-        bool isZKsyncOS
-    ) public view returns (CTMDeployedAddresses memory info) {
-        return _getCTMAddressesInternal(address(_ctm), false, isZKsyncOS);
+        return _getCTMAddressesInternal(address(_ctm), false, _ctm.isZKsyncOS());
     }
 
     function getCTMAddressesV29(

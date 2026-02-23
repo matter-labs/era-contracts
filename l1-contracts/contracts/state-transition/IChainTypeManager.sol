@@ -98,6 +98,8 @@ interface IChainTypeManager {
     /// @notice Verifier address changed for a protocol version
     event NewProtocolVersionVerifier(uint256 indexed protocolVersion, address indexed verifier);
 
+    function isZKsyncOS() external pure returns (bool);
+
     function BRIDGE_HUB() external view returns (address);
 
     function PERMISSIONLESS_VALIDATOR() external view returns (address);

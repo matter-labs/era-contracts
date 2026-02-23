@@ -152,6 +152,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         _;
     }
 
+    /// @return flag whether CTM is for ZKsync OS or Era VM.
+    /// @dev To be defined in derived contracts.
+    function isZKsyncOS() external pure virtual returns (bool);
+
     /// @return The tuple of (major, minor, patch) protocol version.
     function getSemverProtocolVersion() external view returns (uint32, uint32, uint32) {
         // slither-disable-next-line unused-return
