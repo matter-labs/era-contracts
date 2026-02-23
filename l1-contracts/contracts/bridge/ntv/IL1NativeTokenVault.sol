@@ -11,7 +11,6 @@ import {IL1AssetTracker} from "../asset-tracker/IL1AssetTracker.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The NTV is an Asset Handler for the L1AssetRouter to handle native tokens
-// is IL1AssetHandler, IL1BaseTokenAssetHandler {
 interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracker {
     /// @notice The L1Nullifier contract
     function L1_NULLIFIER() external view returns (IL1Nullifier);
@@ -22,7 +21,8 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
     /// @notice Returns the total number of specific tokens locked for some chain
     function chainBalance(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
 
-    /// @notice Registers ETH token
+    /// @notice Registers ETH token. Should be called once on local/new deployments.
+    /// ETH token is expected to have been already initialized in production.
     function registerEthToken() external;
 
     /// Used for V31 migrating token balances to AssetTracker

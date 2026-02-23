@@ -46,6 +46,8 @@ error EncodedLengthNotFourTimesSmallerThanOriginal();
 error EVMBytecodeHash();
 // 0x536a56c8
 error EVMBytecodeHashUnknown();
+// 0xc4141521
+error EvmCreateNonZeroAddress();
 // 0xb9e6e31f
 error EVMEmulationNotSupported();
 // 0xe95a1fbe

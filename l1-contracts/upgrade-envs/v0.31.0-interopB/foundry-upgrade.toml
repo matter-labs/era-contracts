@@ -1,0 +1,9 @@
+# Foundry-specific upgrade configuration for local testing
+# Since genesis config deploys chains at v31.0.0, we need to upgrade to v32.0.0
+
+old_protocol_version = 0x1f00000000  # v31.0.0 (current genesis)
+v28_protocol_version = 0x1c00000000  # v28.0.0 (for reference)
+
+[contracts]
+new_protocol_version = 0x2000000000  # v32.0.0 (target for upgrade)
+latest_protocol_version = 0x2000000000  # v32.0.0

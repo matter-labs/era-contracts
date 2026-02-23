@@ -5,8 +5,6 @@ pragma solidity ^0.8.21;
 error AssetIdNotRegistered(bytes32 _assetId);
 // 0x07859b3b
 error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
-// 0x2e19b556
-error InvalidAssetId(bytes32);
 // 0x95bddd6c
 error InvalidAssetMigrationNumber();
 // 0xd24c490f
@@ -17,6 +15,8 @@ error InvalidCanonicalTxHash(bytes32);
 error InvalidChainMigrationNumber(uint256, uint256);
 // 0x24ef4f8a
 error InvalidEmptyMessageRoot(bytes32 expectedMessageRoot, bytes32 providedMessageRoot);
+// 0x768dc598
+error InvalidFeeRecipient();
 // 0x532a43fc
 error InvalidFunctionSignature(bytes4 functionSignature);
 // 0xfbf8ed35
@@ -53,6 +53,8 @@ error OnlyGatewaySettlementLayer();
 error OnlyWhitelistedSettlementLayer(address, address);
 // 0x174996d5
 error RegisterNewTokenNotAllowed();
+// 0xaad86dcd
+error SettlementFeePayerNotAgreed(address payer, uint256 chainId);
 // 0x90ed63bb
 error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
 // 0x03a5ba47

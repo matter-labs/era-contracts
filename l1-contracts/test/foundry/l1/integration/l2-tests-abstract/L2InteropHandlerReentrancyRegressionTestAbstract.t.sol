@@ -15,7 +15,7 @@ import {IMessageVerification} from "contracts/common/interfaces/IMessageVerifica
 import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
 
-import {L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_VERIFICATION} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_VERIFICATION} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 
@@ -256,7 +256,8 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         return
             BundleAttributes({
                 executionAddress: InteroperableAddress.formatEvmV1(destinationChainId, executor),
-                unbundlerAddress: InteroperableAddress.formatEvmV1(destinationChainId, executor)
+                unbundlerAddress: InteroperableAddress.formatEvmV1(destinationChainId, executor),
+                useFixedFee: false
             });
     }
 

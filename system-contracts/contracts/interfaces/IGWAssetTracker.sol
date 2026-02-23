@@ -8,5 +8,5 @@ pragma solidity ^0.8.20;
  * @notice The interface for the GWAssetTracker contract
  */
 interface IGWAssetTracker {
-    function setAddresses(uint256 _l1ChainId) external;
+    function initL2(uint256 _l1ChainId, address _owner) external;
 }

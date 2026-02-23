@@ -19,11 +19,12 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 
 import {EmptyToken, TokenAlreadyInBridgedTokensList} from "../L1BridgeContractErrors.sol";
 import {AddressMismatch, AmountMustBeGreaterThanZero, AssetIdAlreadyRegistered, AssetIdMismatch, BurningNativeWETHNotSupported, DeployingBridgedTokenForNativeToken, EmptyDeposit, NonEmptyMsgValue, TokenNotLegacy, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
+import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 
 /// @author Matter Labs
@@ -33,6 +34,7 @@ import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 abstract contract NativeTokenVaultBase is
     INativeTokenVaultBase,
     IAssetHandler,
+    ReentrancyGuard,
     Ownable2StepUpgradeable,
     PausableUpgradeable,
     AssetHandlerModifiers
@@ -55,12 +57,18 @@ abstract contract NativeTokenVaultBase is
     IBeacon public bridgedTokenBeacon;
 
     /// @dev A mapping assetId => originChainId
+    /// @dev It is assumed, that `originChainId`, `tokenAddress` and `assetId`
+    /// mappings are always atomically populated
     mapping(bytes32 assetId => uint256 originChainId) public originChainId;
 
     /// @dev A mapping assetId => tokenAddress
+    /// @dev It is assumed, that `originChainId`, `tokenAddress` and `assetId`
+    /// mappings are always atomically populated
     mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
 
     /// @dev A mapping tokenAddress => assetId
+    /// @dev It is assumed, that `originChainId`, `tokenAddress` and `assetId`
+    /// mappings are always atomically populated
     mapping(address tokenAddress => bytes32 assetId) public assetId;
 
     /// @dev The number of bridged tokens.
@@ -138,7 +146,8 @@ abstract contract NativeTokenVaultBase is
         if (tokenAssetId == bytes32(0)) {
             revert TokenNotLegacy();
         }
-        if (tokenIndex[tokenAssetId] != 0) {
+        uint256 index = tokenIndex[tokenAssetId];
+        if (index != 0 || (index == 0 && bridgedTokens[index] == tokenAssetId)) {
             revert TokenAlreadyInBridgedTokensList();
         }
         _addTokenToTokensList(tokenAssetId);
@@ -159,6 +168,15 @@ abstract contract NativeTokenVaultBase is
     /// @param _chainId The chainId that the message is from.
     /// @param _assetId The assetId of the asset being bridged.
     /// @param _data The abi.encoded transfer data.
+    /// @dev Note, the `_data` is provided by the potentially malicious `_chainId`. The best way to treat
+    /// the security of this function is "_chainId sent a message that _assetId needs to be minted with _data".
+    /// The following checks are applied to ensure safety:
+    /// - assetIdcheck must be performed. It does not verify the metadata.
+    /// - metadata not being verified is a known issue and will be addressed in the future releases. In the short term, we only expect
+    /// chains with decently trusted chain type managers. This issue might affect the user experience, but never lead
+    /// to loss of funds.
+    /// - To ensure no loss of funds, L1NativeTokenVault should track the balances using L1AssetTracker, while the L2NativeTokenVault trusts
+    /// the GWAssetTracker to track balances in case of interops and its L1 implementation to provide the valid data for `bridgeMint` in case of deposits.
     function bridgeMint(
         uint256 _chainId,
         bytes32 _assetId,
@@ -291,7 +309,7 @@ abstract contract NativeTokenVaultBase is
     function _decodeBurnAndCheckAssetId(
         bytes calldata _data,
         bytes32 _suppliedAssetId
-    ) internal returns (uint256 amount, address receiver, address parsedTokenAddress) {
+    ) internal view returns (uint256 amount, address receiver, address parsedTokenAddress) {
         (amount, receiver, parsedTokenAddress) = DataEncoding.decodeBridgeBurnData(_data);
 
         if (parsedTokenAddress == address(0)) {

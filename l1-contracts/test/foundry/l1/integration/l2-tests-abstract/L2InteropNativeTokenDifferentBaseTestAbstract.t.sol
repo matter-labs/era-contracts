@@ -14,7 +14,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
@@ -94,7 +94,7 @@ abstract contract L2InteropNativeTokenDifferentBaseTestAbstract is L2InteropTest
             data: empty,
             callAttributes: callAttributes
         });
-        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(UNBUNDLER_ADDRESS);
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false);
 
         L2_INTEROP_CENTER.sendBundle{value: amount}(
             InteroperableAddress.formatEvmV1(destinationChainId),

@@ -107,6 +107,8 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
             executorSelectors: new bytes4[](2),
             mailboxSelectors: new bytes4[](2),
             gettersSelectors: new bytes4[](2),
+            migratorSelectors: new bytes4[](2),
+            committerSelectors: new bytes4[](2),
             bootloaderHash: bytes32(uint256(0xabc)),
             defaultAccountHash: bytes32(uint256(0xdef)),
             evmEmulatorHash: bytes32(uint256(0xdef)),
@@ -127,6 +129,10 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
         config.mailboxSelectors[1] = bytes4(keccak256("mailboxFunction2()"));
         config.gettersSelectors[0] = bytes4(keccak256("gettersFunction1()"));
         config.gettersSelectors[1] = bytes4(keccak256("gettersFunction2()"));
+        config.migratorSelectors[0] = bytes4(keccak256("migratorFunction1()"));
+        config.migratorSelectors[1] = bytes4(keccak256("migratorFunction2()"));
+        config.committerSelectors[0] = bytes4(keccak256("committerFunction1()"));
+        config.committerSelectors[1] = bytes4(keccak256("committerFunction2()"));
 
         deployerConfig = config;
     }
@@ -230,6 +236,18 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
         // GettersFacet
         deployed = tester.deployDirect(directCalldata.gettersFacetCalldata);
         assertEq(deployed, calculatedContracts.stateTransition.facets.gettersFacet, "GettersFacet address mismatch");
+
+        // MigratorFacet
+        deployed = tester.deployDirect(directCalldata.migratorFacetCalldata);
+        assertEq(deployed, calculatedContracts.stateTransition.facets.migratorFacet, "MigratorFacet address mismatch");
+
+        // CommitterFacet
+        deployed = tester.deployDirect(directCalldata.committerFacetCalldata);
+        assertEq(
+            deployed,
+            calculatedContracts.stateTransition.facets.committerFacet,
+            "CommitterFacet address mismatch"
+        );
 
         // DiamondInit
         deployed = tester.deployDirect(directCalldata.diamondInitCalldata);

@@ -218,7 +218,7 @@
   },
   {
     "type": "event",
-    "name": "AssetDeploymentTrackerRegistered",
+    "name": "AssetDeploymentTrackerSet",
     "inputs": [
       {
         "name": "assetId",
@@ -227,16 +227,16 @@
         "internalType": "bytes32"
       },
       {
+        "name": "assetDeploymentTracker",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
         "name": "additionalData",
         "type": "bytes32",
         "indexed": true,
         "internalType": "bytes32"
-      },
-      {
-        "name": "assetDeploymentTracker",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
       }
     ],
     "anonymous": false
@@ -324,37 +324,6 @@
         "type": "bytes",
         "indexed": false,
         "internalType": "bytes"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "BridgehubWithdrawalInitiated",
-    "inputs": [
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "sender",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "assetDataHash",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
       }
     ],
     "anonymous": false
