@@ -150,8 +150,6 @@ error IncorrectBatchBounds(
 );
 // 0xc1b4bc7b
 error IncorrectBatchChainId(uint256, uint256);
-// 0xb3fd570a
-error IncorrectBatchSLChainId(uint256, uint256);
 // 0xdd381a4c
 error IncorrectBridgeHubAddress(address bridgehub);
 // 0x1929b7de

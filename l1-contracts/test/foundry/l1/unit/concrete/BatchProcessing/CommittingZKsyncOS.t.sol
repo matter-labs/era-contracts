@@ -403,7 +403,7 @@ contract CommittingTest is ExecutorTest {
         admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
 
         vm.prank(validator);
-        vm.expectRevert(abi.encodeWithSignature("IncorrectBatchSLChainId(uint256,uint256)", 999, block.chainid));
+        vm.expectRevert(abi.encodeWithSignature("SettlementLayerChainIdMismatch()"));
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
