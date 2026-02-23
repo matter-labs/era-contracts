@@ -11,6 +11,7 @@ error AssetNotMigratedFromNTV(bytes32 _assetId);
 error BaseTokenTotalSupplyBackfillNotNeeded();
 // 0xaab1af2a
 error BaseTokenTotalSupplyBackfillRequired();
+error BaseTokenTotalSupplyBackfillFailed();
 // 0xd054a77e
 error ChainBalanceMustBeZeroBeforeMigration(uint256 _chainId, bytes32 _assetId, uint256 _chainBalance);
 // 0x07859b3b
@@ -50,7 +51,7 @@ error InvalidVersion();
 // 0xf76b228a
 error InvalidWithdrawalChainId();
 // 0xda4352c4
-error MaxChainBalanceAlreadyAssigned(bytes32 assetId);
+error AssetAlreadyRegistered(bytes32 assetId);
 // 0x7e472272
 error MissingBaseTokenAssetId();
 // 0x8dfed13a

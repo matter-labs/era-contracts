@@ -335,7 +335,7 @@ struct ProofData {
 /// @param assetId Asset id being migrated.
 /// @param tokenOriginChainId Origin chain for the token.
 /// @param chainMigrationNumber Chain migration number this message is tied to.
-/// @param assetMigrationNumber Asset migration number currently known on L2.
+/// @param assetMigrationNumber Asset migration number currently known on L2. Not yet used, kept for future use.
 /// @param totalWithdrawalsToL1 Total withdrawals initiated from L2 to L1 since v31 tracking started.
 /// @param totalSuccessfulDepositsFromL1 Total successful deposits finalized on L2 since v31 tracking started.
 /// @param totalPreV31TotalSupply Token total supply snapshot captured on L2 before first post-v31 bridge operation.

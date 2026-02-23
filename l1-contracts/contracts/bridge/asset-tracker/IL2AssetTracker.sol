@@ -13,8 +13,7 @@ interface IL2AssetTracker {
     /// @notice Emitted when L1 to Gateway migration is initiated for an asset
     /// @param assetId The asset ID being migrated
     /// @param chainId The chain ID from which the migration is initiated
-    /// @param amount The amount being migrated
-    event L1ToGatewayMigrationInitiated(bytes32 indexed assetId, uint256 chainId, uint256 amount);
+    event L1ToGatewayMigrationInitiated(bytes32 indexed assetId, uint256 chainId);
 
     function initL2(uint256 _l1ChainId, bytes32 _baseTokenAssetId, bool _needBaseTokenTotalSupplyBackfill) external;
 

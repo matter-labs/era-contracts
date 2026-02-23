@@ -15,7 +15,7 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {AmountToKeepOnL1NotUint256, AssetIdNotRegistered, AssetNotMigratedFromNTV, InvalidAssetMigrationNumber, InvalidChainMigrationNumber, InvalidMigrationAmount, InvalidMigrationNumber, InvalidSender, InvalidSettlementLayer, InvalidVersion, InvalidWithdrawalChainId, MaxChainBalanceAlreadyAssigned, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet} from "./AssetTrackerErrors.sol";
+import {AmountToKeepOnL1NotUint256, AssetIdNotRegistered, AssetNotMigratedFromNTV, ChainBalanceMustBeZeroBeforeMigration, InvalidAssetMigrationNumber, InvalidChainMigrationNumber, InvalidMigrationAmount, InvalidMigrationNumber, InvalidSender, InvalidSettlementLayer, InvalidVersion, InvalidWithdrawalChainId, AssetAlreadyRegistered, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet} from "./AssetTrackerErrors.sol";
 import {V31UpgradeChainBatchNumberNotSet} from "../../core/bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
@@ -104,7 +104,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         // This function is only intended to be used for legacy tokens that have not yet been registered.
         if (isAssetRegistered[_assetId]) {
-            revert MaxChainBalanceAlreadyAssigned(_assetId);
+            revert AssetAlreadyRegistered(_assetId);
         }
 
         uint256[] memory allZKChainIds = BRIDGE_HUB.getAllZKChainChainIDs();
@@ -117,7 +117,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             // This require should never be triggered in production, it is an invariant check
             // chainBalance inside the L1AT should never be incremented until the token is registered.
             if (chainBalance[chainId][_assetId] != 0) {
-                revert MaxChainBalanceAlreadyAssigned(_assetId);
+                revert ChainBalanceMustBeZeroBeforeMigration(chainId, _assetId, chainBalance[chainId][_assetId]);
             }
 
             // Origin chain id will be handled later in this function.
@@ -134,7 +134,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         }
         // Similar to the above, it is just an invariant check that should never be hit
         if (chainBalance[block.chainid][_assetId] != 0) {
-            revert MaxChainBalanceAlreadyAssigned(_assetId);
+            revert ChainBalanceMustBeZeroBeforeMigration(block.chainid, _assetId, chainBalance[block.chainid][_assetId]);
         }
 
         // The token is not native to L1, so we also have to account for the amount bridged to L1.
@@ -261,7 +261,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         // all withdrawals coming from the chain are backed by the balance of this settlement layer.
         // Note, that since this method is used for claiming failed deposits, it implies that any failed deposit that has been processed
         // while the chain settled on top of Gateway, has been accredited to Gateway's balance.
-        // For all the batches smaller or equal to that, the responsibility lies with the chain itself.
+        // For all the batches smaller than that, the responsibility lies with the chain itself.
         uint256 v31UpgradeChainBatchNumber = IL1MessageRoot(address(MESSAGE_ROOT)).v31UpgradeChainBatchNumber(_chainId);
 
         // We need to wait for the proper v31UpgradeChainBatchNumber to be set on the MessageRoot, otherwise we might decrement the chain's chainBalance instead of the gateway's.

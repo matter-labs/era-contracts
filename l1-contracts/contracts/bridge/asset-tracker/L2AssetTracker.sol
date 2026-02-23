@@ -10,7 +10,7 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 
-import {AssetIdNotRegistered, BaseTokenTotalSupplyBackfillNotNeeded, BaseTokenTotalSupplyBackfillRequired, ChainBalanceMustBeZeroBeforeMigration, MissingBaseTokenAssetId, OnlyGatewaySettlementLayer, TokenBalanceNotMigratedToGateway, TotalPreV31SupplyNotSaved, TotalPreV31SupplyShouldBeZero} from "./AssetTrackerErrors.sol";
+import {AssetIdNotRegistered, BaseTokenTotalSupplyBackfillFailed, BaseTokenTotalSupplyBackfillNotNeeded, BaseTokenTotalSupplyBackfillRequired, ChainBalanceMustBeZeroBeforeMigration, MissingBaseTokenAssetId, OnlyGatewaySettlementLayer, TokenBalanceNotMigratedToGateway, TotalPreV31SupplyNotSaved, TotalPreV31SupplyShouldBeZero} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 
@@ -79,6 +79,11 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         if (!isAssetRegistered[BASE_TOKEN_ASSET_ID]) {
             registerLegacyToken(BASE_TOKEN_ASSET_ID);
             needBaseTokenTotalSupplyBackfill = false;
+
+            if (totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID].amount != _amount) {
+                // We should never catch this revert in production, this is just an invariant check.
+                revert BaseTokenTotalSupplyBackfillFailed();
+            }
             return;
         }
 
@@ -392,7 +397,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         });
         _sendL1ToGatewayMigrationDataToL1(tokenBalanceMigrationData);
 
-        emit IL2AssetTracker.L1ToGatewayMigrationInitiated(_assetId, block.chainid, readTotalPreV31TotalSupply);
+        emit IL2AssetTracker.L1ToGatewayMigrationInitiated(_assetId, block.chainid);
     }
 
     /// @notice Confirms a migration operation has been completed and updates the asset migration number.
