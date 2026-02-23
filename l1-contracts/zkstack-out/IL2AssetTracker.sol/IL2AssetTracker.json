@@ -100,6 +100,11 @@
     "name": "handleInitiateBaseTokenBridgingOnL2",
     "inputs": [
       {
+        "name": "_maybeToBlockChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
         "name": "_amount",
         "type": "uint256",
         "internalType": "uint256"
@@ -197,12 +202,6 @@
       },
       {
         "name": "chainId",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "amount",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"

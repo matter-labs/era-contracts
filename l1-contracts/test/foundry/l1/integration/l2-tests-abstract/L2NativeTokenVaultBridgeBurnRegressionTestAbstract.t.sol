@@ -66,12 +66,12 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         vm.mockCall(
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
             depositAmount,
-            abi.encodeCall(IBaseToken.burnMsgValue, ()),
+            abi.encodeWithSelector(IBaseToken.burnMsgValue.selector),
             abi.encode()
         );
 
         // Expect the burnMsgValue call
-        vm.expectCall(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, depositAmount, abi.encodeCall(IBaseToken.burnMsgValue, ()));
+        vm.expectCall(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, depositAmount, abi.encodeWithSelector(IBaseToken.burnMsgValue.selector));
 
         // Call bridgeBurn from the asset router (which is the only allowed caller)
         // Before the fix: This would revert because bridgeBurn would try to call
@@ -196,7 +196,7 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         vm.mockCall(
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
             depositAmount,
-            abi.encodeCall(IBaseToken.burnMsgValue, ()),
+            abi.encodeWithSelector(IBaseToken.burnMsgValue.selector),
             abi.encode()
         );
 
