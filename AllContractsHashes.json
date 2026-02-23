@@ -911,12 +911,12 @@
   },
   {
     "contractName": "l1-contracts/CommitterFacet",
-    "zkBytecodeHash": "0x010005cb4924e6cf837168516c4377123c1372dd9f81ac37fc2ab9db82a650ba",
+    "zkBytecodeHash": "0x010005cba9654ba818c963868faedcfeb559d0e6afef5531fa7697dd5d60e9c0",
     "zkBytecodePath": "/l1-contracts/zkout/Committer.sol/CommitterFacet.json",
-    "evmBytecodeHash": "0xa485cc1c3a14a62b518367870dd089197edc4bc1911258e7eaf71152c1531c28",
+    "evmBytecodeHash": "0xcf90010716cd2700bed2194807b22b56ad681c5474149ec2d2be1825ffdd3521",
     "evmBytecodePath": "/l1-contracts/out/Committer.sol/CommitterFacet.json",
-    "evmDeployedBytecodeHash": "0x24dcfbd1a903a8c9ca337532c69784f54da24e3e7df8225459f1b99975e4c10c",
-    "evmDeployedBytecodeBlakeHash": "0x69fb99bbe8dd9ff19d065008cfcf0c281c18aa0a9307f78d33183a84cddd92c1",
+    "evmDeployedBytecodeHash": "0xd7f7a71b9102b6cbf5efebe5af47e5a60f82f8c8ca88e20d24c88712cea9e7ff",
+    "evmDeployedBytecodeBlakeHash": "0xbf8cfd51c18824120d55c4e6b07ca820c95fe67683736823d9324acf6d97001b",
     "evmDeployedBytecodeLength": 14292
   },
   {
