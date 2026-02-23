@@ -28,6 +28,7 @@ import {BridgehubBurnCTMAssetData, IBridgehub} from "contracts/bridgehub/IBridge
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
@@ -60,6 +61,36 @@ contract AdminFunctions is Script {
             _value: 0,
             _delay: 0
         });
+    }
+
+    // This function should be called by governance to accept ownership of all core contracts
+    // Only accepts ownership for contracts that have pendingOwner set to governance
+    function governanceAcceptOwnerAggregated(address governor, address bridgehub) public {
+        // Query contract addresses from bridgehub
+        address assetRouter = IBridgehub(bridgehub).assetRouter();
+        address chainAssetHandler = IBridgehub(bridgehub).chainAssetHandler();
+        address ctmDeploymentTracker = address(IBridgehub(bridgehub).l1CtmDeployer());
+
+        // Query l1Nullifier from assetRouter
+        IL1AssetRouter assetRouterContract = IL1AssetRouter(assetRouter);
+        address l1Nullifier = address(assetRouterContract.L1_NULLIFIER());
+
+        // Accept ownership only for contracts with pending ownership
+        if (Ownable2Step(bridgehub).pendingOwner() == governor) {
+            governanceAcceptOwner(governor, bridgehub);
+        }
+        if (Ownable2Step(assetRouter).pendingOwner() == governor) {
+            governanceAcceptOwner(governor, assetRouter);
+        }
+        if (Ownable2Step(l1Nullifier).pendingOwner() == governor) {
+            governanceAcceptOwner(governor, l1Nullifier);
+        }
+        if (Ownable2Step(ctmDeploymentTracker).pendingOwner() == governor) {
+            governanceAcceptOwner(governor, ctmDeploymentTracker);
+        }
+        if (Ownable2Step(chainAssetHandler).pendingOwner() == governor) {
+            governanceAcceptOwner(governor, chainAssetHandler);
+        }
     }
 
     // This function should be called by the owner to accept the admin role

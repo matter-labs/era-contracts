@@ -30,6 +30,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
 import {BridgedStandardERC20, IBridgedStandardToken, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 
 contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
@@ -132,8 +133,9 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         BridgedStandardERC20 bridgedToken = BridgedStandardERC20(
             addresses.l1NativeTokenVault.tokenAddress(l2TokenAssetId)
         );
-        address owner = addresses.l1NativeTokenVault.owner();
-        vm.broadcast(owner);
+        address beaconAddress = address(addresses.l1NativeTokenVault.bridgedTokenBeacon());
+        address beaconOwner = UpgradeableBeacon(beaconAddress).owner();
+        vm.prank(beaconOwner);
         bridgedToken.reinitializeToken(
             BridgedStandardERC20.ERC20Getters({ignoreName: false, ignoreSymbol: false, ignoreDecimals: false}),
             "TestnetERC20Token",
