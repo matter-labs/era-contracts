@@ -58,7 +58,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
             (L2_GENESIS_UPGRADE_ADDR, l2GenesisUpgradeCalldata)
         );
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
-        proposedUpgrade.l2ProtocolUpgradeTx.data = complexUpgraderCalldata;
+        //proposedUpgrade.l2ProtocolUpgradeTx.data = complexUpgraderCalldata;
         super.upgrade(proposedUpgrade);
         IMessageRootBase messageRoot = IMessageRootBase(bridgehub.messageRoot());
 

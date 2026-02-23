@@ -196,10 +196,12 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(
             ctmAddresses.stateTransition.proxies.validatorTimelock
         ).executionDelay();
-        (bool ok, bytes memory data) = ctmAddresses.stateTransition.verifiers.verifier.staticcall(
-            abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
-        );
-        config.testnetVerifier = ok;
+        // TODO: restore introspection when L1 state is regenerated with ZKsyncOSTestnetVerifier.IS_TESTNET_VERIFIER
+        // (bool ok, bytes memory data) = ctmAddresses.stateTransition.verifiers.verifier.staticcall(
+        //     abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
+        // );
+        // config.testnetVerifier = ok;
+        config.testnetVerifier = true;
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
@@ -437,11 +439,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function getFullListOfFactoryDependencies() internal virtual returns (bytes[] memory factoryDeps) {
-        if (config.isZKsyncOS) {
-            // TODO: for now, we do not provide any factory deps for zksync os
-            return factoryDeps;
-        }
-
         bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
 
         string[] memory additionalForceDeployments = getAdditionalDependenciesNames();
@@ -541,12 +538,17 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function publishBytecodes() public virtual {
+        bytes[] memory allDeps = getFullListOfFactoryDependencies();
+
         if (config.isZKsyncOS) {
-            // TODO: for now, we do not provide any factory deps for zksync os
+            BytecodePublisher.publishEVMBytecodesInBatches(
+                BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier),
+                allDeps
+            );
+            upgradeConfig.factoryDepsPublished = true;
             return;
         }
 
-        bytes[] memory allDeps = getFullListOfFactoryDependencies();
         uint256[] memory factoryDeps = new uint256[](allDeps.length);
         require(factoryDeps.length <= 64, "Too many deps");
 
@@ -949,6 +951,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         }
         return super.getCreationCode(contractName, isZKBytecode);
     }
+
 
     function deployUpgradeStageValidator() internal {
         upgradeAddresses.upgradeStageValidator = deploySimpleContract("UpgradeStageValidator", false);
