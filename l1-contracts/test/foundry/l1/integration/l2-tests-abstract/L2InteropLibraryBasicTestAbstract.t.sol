@@ -74,11 +74,20 @@ abstract contract L2InteropLibraryBasicTestAbstract is L2InteropTestUtils {
             ) {
                 foundMessageSent = true;
                 checkedMessageSentPayload = true;
-                (bytes memory sender, bytes memory recipient, bytes memory payload, uint256 value, bytes[] memory attrs) =
-                    abi.decode(logs[i].data, (bytes, bytes, bytes, uint256, bytes[]));
+                (
+                    bytes memory sender,
+                    bytes memory recipient,
+                    bytes memory payload,
+                    uint256 value,
+                    bytes[] memory attrs
+                ) = abi.decode(logs[i].data, (bytes, bytes, bytes, uint256, bytes[]));
                 assertTrue(sender.length > 0, "MessageSent sender should be populated");
                 assertTrue(recipient.length > 0, "MessageSent recipient should be populated");
-                assertEq(payload, abi.encodeWithSignature("simpleCall()"), "MessageSent payload should match call data");
+                assertEq(
+                    payload,
+                    abi.encodeWithSignature("simpleCall()"),
+                    "MessageSent payload should match call data"
+                );
                 assertEq(value, 0, "MessageSent value should be zero for direct call");
                 assertEq(attrs.length, 3, "MessageSent should keep merged attributes from sendDirectCall");
             }
