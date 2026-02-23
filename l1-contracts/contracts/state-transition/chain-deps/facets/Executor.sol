@@ -174,26 +174,26 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Interop is only allowed on GW currently, so we go through the Asset Tracker when on Gateway.
         // When on L1, we append directly to the Message Root, though interop is not allowed there, it is only used for
         // message verification.
-        // if (block.chainid != L1_CHAIN_ID) {
-        //     uint256 messagesLength = messages.length;
-        //     for (uint256 i = 0; i < messagesLength; ++i) {
-        //         ProcessLogsInput memory processLogsInput = ProcessLogsInput({
-        //             logs: logs[i],
-        //             messages: messages[i],
-        //             chainId: s.chainId,
-        //             batchNumber: batchesData[i].batchNumber,
-        //             chainBatchRoot: batchesData[i].l2LogsTreeRoot,
-        //             messageRoot: messageRoots[i],
-        //             settlementFeePayer: settlementFeePayer
-        //         });
-        //         GW_ASSET_TRACKER.processLogsAndMessages(processLogsInput);
-        //     }
-        // } else {
-        uint256 batchesDataLength = batchesData.length;
-        for (uint256 i = 0; i < batchesDataLength; ++i) {
-            _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
+        if (block.chainid != L1_CHAIN_ID) {
+            uint256 messagesLength = messages.length;
+            for (uint256 i = 0; i < messagesLength; ++i) {
+                ProcessLogsInput memory processLogsInput = ProcessLogsInput({
+                    logs: logs[i],
+                    messages: messages[i],
+                    chainId: s.chainId,
+                    batchNumber: batchesData[i].batchNumber,
+                    chainBatchRoot: batchesData[i].l2LogsTreeRoot,
+                    messageRoot: messageRoots[i],
+                    settlementFeePayer: settlementFeePayer
+                });
+                GW_ASSET_TRACKER.processLogsAndMessages(processLogsInput);
+            }
+        } else {
+            uint256 batchesDataLength = batchesData.length;
+            for (uint256 i = 0; i < batchesDataLength; ++i) {
+                _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
+            }
         }
-        // }
 
         for (uint256 i = 0; i < nBatches; ++i) {
             _executeOneBatch(batchesData[i], priorityOpsData[i], dependencyRoots[i], i);
