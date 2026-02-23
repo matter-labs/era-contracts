@@ -2209,7 +2209,9 @@ object "Bootloader" {
                 isEvmDeployment := isEvmDeploymentEthCall(to, innerTxDataOffset)
 
                 if isEvmDeployment {
-                    if isEOA(from) {
+                    // `from` can be 0x0 if `from` isn't provided in eth_call (it is an optional field)
+                    // and in this case txOrigin also will be 0x0
+                    if or(isEOA(from), eq(from, 0x0)) {
                         // If the `from` is EOA, we need to bump the nonce before the deployment
                         bumpNonceForEvmDeployment(from, innerTxDataOffset)
                     }
