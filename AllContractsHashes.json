@@ -1778,7 +1778,7 @@
   {
     "contractName": "Bootloader",
     "zkBytecodePath": "/system-contracts/zkout/fee_estimate.yul/Bootloader.json",
-    "zkBytecodeHash": "0x01000a17fd11b0c9e6bf15535008bc9c3e6c58e74a7f19979476773059654519",
+    "zkBytecodeHash": "0x01000a197af745edfc4288afc5d64e55d57c6bdddb2fd0ebdfc693e5ee5b4b77",
     "evmBytecodePath": null,
     "evmBytecodeHash": null,
     "evmDeployedBytecodeHash": null
@@ -1794,7 +1794,7 @@
   {
     "contractName": "Bootloader",
     "zkBytecodePath": "/system-contracts/zkout/playground_batch.yul/Bootloader.json",
-    "zkBytecodeHash": "0x01000a1de0968a951a71effd9333d901eed2dd177c79a2603081d0624f56294d",
+    "zkBytecodeHash": "0x01000a1fd7408a6b556df1642ff12c87ca72f4c4b43fbf3354879f4e6e95660e",
     "evmBytecodePath": null,
     "evmBytecodeHash": null,
     "evmDeployedBytecodeHash": null
