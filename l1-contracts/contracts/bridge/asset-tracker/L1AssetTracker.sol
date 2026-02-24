@@ -351,7 +351,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             _assetId: data.assetId,
             _totalWithdrawalsToL1: data.totalWithdrawalsToL1,
             _totalSuccessfulDepositsFromL1: data.totalSuccessfulDepositsFromL1,
-            _totalPreV31TotalSupply: data.totalPreV31TotalSupply
+            _preV31TotalSupply: data.totalPreV31TotalSupply
         });
         uint256 fromChainBalance = chainBalance[data.chainId][data.assetId];
         require(fromChainBalance >= amountToKeep, InvalidMigrationAmount(fromChainBalance, amountToKeep));
@@ -498,27 +498,42 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// its pre-v31 chain balance, which is equal to `totalDepositedFromL1BeforeV31 - totalClaimedOnL1BeforeV31`.
     /// For similar reasons the chain should return its pre-v31 totalSupply on L2, which is equal to `totalSuccessfulDepositsFromL1 - totalWithdrawalsToL1`.
     /// All-in-all, we get the following formula:
-    /// `amountToKeep = preV31ChainBalance + totalWithdrawalsToL1 + (totalDepositedFromL1 - totalSuccessfulDepositsFromL1) - totalClaimedOnL1 - _totalPreV31TotalSupply`
+    /// `amountToKeep = preV31ChainBalance + totalWithdrawalsToL1 + (totalDepositedFromL1 - totalSuccessfulDepositsFromL1) - totalClaimedOnL1 - _preV31TotalSupply`
     /// @param _chainId Chain id being migrated.
     /// @param _assetId Asset id being migrated.
     /// @param _totalWithdrawalsToL1 Total withdrawals tracked on L2 since v31 accounting started.
     /// @param _totalSuccessfulDepositsFromL1 Total successful deposits tracked on L2 since v31 accounting started.
-    /// @param _totalPreV31TotalSupply Token total supply snapshot captured on L2 before first post-v31 bridge action.
+    /// @param _preV31TotalSupply Token total supply snapshot captured on L2 before first post-v31 bridge action.
     /// @return amountToKeep The amount that must stay on L1.
     function _toKeepDuringL1ToGWMigration(
         uint256 _chainId,
         bytes32 _assetId,
         uint256 _totalWithdrawalsToL1,
         uint256 _totalSuccessfulDepositsFromL1,
-        uint256 _totalPreV31TotalSupply
+        uint256 _preV31TotalSupply
     ) internal view returns (uint256 amountToKeep) {
         InteropL1Info memory info = interopInfo[_chainId][_assetId];
 
+
+        // Additional explanation for the math:
+        // Let's define:
+        // w1,...,wn -- all withdrawals
+        // d1,...,dm -- all deposits
+        // s1,...,st -- all successful deposits
+        // c1,...,cv -- all claims on L1.
+        // ​
+        // In essense we want to keep on L1 the following:
+        // (w1 + ... + wn) + (d1 + ... + dm) - (s1 + ... + st) - (c1 + ... + cv)
+        // ​
+        // preV31ChainBalance = d1 + ... + d_m* - c1 + ... + cv* for some m* and v*, i.e. for some segment right before the rest of the deposits and claimes started being tracked separately.
+        // So by making preV31ChainBalance + totalDepositedFromsL1 - totalClaimedOnL1 we calculate the
+        // (d1 + ... + dm) - (c1 + ... + cv) part
+        // Similarly, _preV31TotalSupply = (s1 + ... + st*) - (w1 + ... + wn*) and by adding the values after the upgrade I get (s1 + ... + st) - (w1 + ... + wn)
+
         // The numbers in question are large especially for native tokens as their
-        // preV31ChainBalance and _totalPreV31TotalSupply are very close to 2^256-1, so
+        // preV31ChainBalance and _preV31TotalSupply are very close to 2^256-1, so
         // we need to work around overflows.
         // It is expected however, that the resulting value is within the valid range for 2^256-1.
-
         uint256 wraps = 0;
         unchecked {
             amountToKeep = info.preV31ChainBalance + _totalWithdrawalsToL1;
@@ -546,9 +561,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                 --wraps;
             }
 
-            amountToKeep -= _totalPreV31TotalSupply;
+            amountToKeep -= _preV31TotalSupply;
             // Underflow => went below 0.
-            if (amountToKeep > type(uint256).max - _totalPreV31TotalSupply) {
+            if (amountToKeep > type(uint256).max - _preV31TotalSupply) {
                 --wraps;
             }
         }
