@@ -28,7 +28,7 @@ import {
     InvalidCanonicalTxHash,
     RegisterNewTokenNotAllowed
 } from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
-import {Unauthorized, ChainIdNotRegistered} from "contracts/common/L1ContractErrors.sol";
+import {ChainIdNotRegistered, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";

@@ -4,9 +4,9 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
-import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+
+
+
 import {
     MigrationPaused,
     MigrationsNotPaused,

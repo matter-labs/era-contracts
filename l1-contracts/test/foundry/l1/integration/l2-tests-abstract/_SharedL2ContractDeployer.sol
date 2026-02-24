@@ -46,7 +46,7 @@ import {
     MessageInclusionProof,
     TokenBridgingData
 } from "../../../../../contracts/common/Messaging.sol";
-import {IInteropCenter, InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
+import {InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
 import {L2WrappedBaseToken} from "../../../../../contracts/bridge/L2WrappedBaseToken.sol";
 import {L2SharedBridgeLegacy} from "../../../../../contracts/bridge/L2SharedBridgeLegacy.sol";
 import {MailboxFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -55,7 +55,7 @@ import {DataEncoding} from "../../../../../contracts/common/libraries/DataEncodi
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
+
 import {SystemContractsArgs} from "./Utils.sol";
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";

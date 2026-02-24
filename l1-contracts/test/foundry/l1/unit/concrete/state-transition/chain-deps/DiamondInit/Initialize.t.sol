@@ -10,9 +10,9 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
-import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
-import {EmptyAssetId, TooMuchGas, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+
+
+import {EmptyAssetId, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract InitializeTest is DiamondInitTest {
     function test_revertWhen_verifierIsZeroAddress() public {

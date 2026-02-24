@@ -27,7 +27,7 @@ import {
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {ZKSProvider} from "../provider/ZKSProvider.s.sol";
 
-import {Utils} from "../utils/Utils.sol";
+
 import {IGatewayMigrateTokenBalances} from "contracts/script-interfaces/IGatewayMigrateTokenBalances.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway

@@ -43,7 +43,7 @@ import {
 } from "../../common/L1ContractErrors.sol";
 
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
-import {TokenMetadata, TokenBridgingData} from "../../common/Messaging.sol";
+import {TokenBridgingData, TokenMetadata} from "../../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

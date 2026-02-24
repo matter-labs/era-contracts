@@ -18,10 +18,10 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+
 import {NotSettlementLayer} from "contracts/state-transition/L1StateTransitionErrors.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {GW_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+
+
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
 contract ZKChainBaseModifiersTest is UtilsCallMockerTest {

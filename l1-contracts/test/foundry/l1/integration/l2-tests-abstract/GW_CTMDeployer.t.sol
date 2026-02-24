@@ -3,9 +3,9 @@
 pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
-import {StdStorage, Test, stdStorage, console} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 
-import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
+
 import {
     GW_ASSET_TRACKER,
     GW_ASSET_TRACKER_ADDR,
@@ -15,9 +15,9 @@ import {
     L2_MESSAGE_ROOT,
     L2_MESSAGE_ROOT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
-import {L2AssetTrackerData} from "./L2AssetTrackerData.sol";
+
+
 
 import {
     GatewayCTMDeployerConfig,

@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {MigratorTest} from "./_Migrator_Shared.t.sol";
-import {Unauthorized, NotAZKChain} from "contracts/common/L1ContractErrors.sol";
+import {NotAZKChain, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {
     NotL1,
     AlreadyMigrated,
@@ -24,9 +24,9 @@ import {ZKChainCommitment} from "contracts/common/Config.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 import {PriorityTreeCommitment} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {
     L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS,

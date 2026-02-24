@@ -59,7 +59,7 @@ import {
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
-import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 
 /// We are testing all the specified revert and require cases.

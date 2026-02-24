@@ -6,7 +6,7 @@ import {
     EMPTY_PREPUBLISHED_COMMITMENT,
     POINT_EVALUATION_PRECOMPILE_RESULT
 } from "../BatchProcessing/_Executor_Shared.t.sol";
-import {Utils, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, Utils} from "../Utils/Utils.sol";
 import {
     IExecutor,
     SystemLogKey,

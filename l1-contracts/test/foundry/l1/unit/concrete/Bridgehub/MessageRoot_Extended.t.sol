@@ -19,7 +19,7 @@ import {
     TotalBatchesExecutedZero,
     V31UpgradeChainBatchNumberNotSet
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
-import {Unauthorized, InvalidCaller} from "contracts/common/L1ContractErrors.sol";
+
 import {
     GW_ASSET_TRACKER_ADDR,
     L2_BRIDGEHUB_ADDR,
@@ -28,9 +28,9 @@ import {
 
 import {ProofData} from "contracts/common/Messaging.sol";
 
-import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
+
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 contract MessageRoot_Extended_Test is Test {

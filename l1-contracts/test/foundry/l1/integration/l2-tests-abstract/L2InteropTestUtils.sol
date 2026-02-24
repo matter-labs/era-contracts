@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
 import {Vm} from "forge-std/Vm.sol";
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {
@@ -15,7 +15,7 @@ import {
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
-import {InteropBundle, MessageInclusionProof, BundleStatus, CallStatus} from "contracts/common/Messaging.sol";
+import {InteropBundle, MessageInclusionProof} from "contracts/common/Messaging.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";

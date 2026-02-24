@@ -6,7 +6,7 @@ import {
     FixedForceDeploymentsData,
     ZKChainSpecificForceDeploymentsData
 } from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
-import {TokenMetadata, TokenBridgingData} from "contracts/common/Messaging.sol";
+import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";

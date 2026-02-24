@@ -13,7 +13,7 @@ import {
     UpgradeTxVerifyParam,
     ValidateTxnNotEnoughGas
 } from "contracts/common/L1ContractErrors.sol";
-import {TX_SLOT_OVERHEAD_L2_GAS, MEMORY_OVERHEAD_GAS} from "contracts/common/Config.sol";
+import {MEMORY_OVERHEAD_GAS, TX_SLOT_OVERHEAD_L2_GAS} from "contracts/common/Config.sol";
 
 /// @notice Unit tests for TransactionValidator library
 contract TransactionValidatorTest is Test {

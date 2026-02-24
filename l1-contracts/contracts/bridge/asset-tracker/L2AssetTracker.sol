@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
+import {MAX_TOKEN_BALANCE, SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
 import {
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
@@ -16,7 +16,7 @@ import {
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
 } from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
-import {Unauthorized, InvalidChainId} from "../../common/L1ContractErrors.sol";
+import {InvalidChainId, Unauthorized} from "../../common/L1ContractErrors.sol";
 
 import {
     AssetIdNotRegistered,

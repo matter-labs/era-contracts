@@ -34,7 +34,7 @@ import {
     L2_INTEROP_CENTER_ADDR as INTEROP_CENTER_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
-import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
+
 
 import {
     BALANCE_CHANGE_VERSION,
@@ -62,17 +62,16 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
+
 import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 
-import {L2_TO_L1_LOGS_MERKLE_TREE_DEPTH, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH} from "contracts/common/Config.sol";
-import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
+
 import {DynamicIncrementalMerkleMemory} from "contracts/common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {GWAssetTrackerTestHelper} from "./GWAssetTracker.t.sol";
 import {ProcessLogsTestHelper} from "./ProcessLogsTestHelper.sol";

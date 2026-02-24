@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
-import {ETH_TOKEN_ADDRESS, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
+import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
 import {IL1Bridgehub} from "./IL1Bridgehub.sol";
 import {

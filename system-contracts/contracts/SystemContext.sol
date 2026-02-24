@@ -6,7 +6,7 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {ISystemContextDeprecated} from "./interfaces/ISystemContextDeprecated.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, SystemLogKey, HARD_CODED_CHAIN_ID} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, HARD_CODED_CHAIN_ID, SystemLogKey} from "./Constants.sol";
 import {COMPLEX_UPGRADER_CONTRACT, L2_CHAIN_ASSET_HANDLER} from "./Contracts.sol";
 import {
     CannotInitializeFirstVirtualBlock,

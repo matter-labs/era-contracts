@@ -22,9 +22,9 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/co
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
-import {ChainsSettlingOnL1, ChainsSettlementLayerMismatch} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {ChainsSettlementLayerMismatch, ChainsSettlingOnL1} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;

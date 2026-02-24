@@ -28,7 +28,7 @@ import {
     IBridgehubBase
 } from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {BridgehubBase} from "contracts/core/bridgehub/BridgehubBase.sol";
-import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
+
 
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";

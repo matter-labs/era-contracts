@@ -10,7 +10,7 @@ import {
 } from "../Constants.sol";
 import {COMPRESSOR_CONTRACT, PUBDATA_CHUNK_PUBLISHER} from "../Contracts.sol";
 import {EfficientCall} from "../libraries/EfficientCall.sol";
-import {ReconstructionMismatch, PubdataField, InvalidDACommitmentScheme} from "../SystemContractErrors.sol";
+import {InvalidDACommitmentScheme, PubdataField, ReconstructionMismatch} from "../SystemContractErrors.sol";
 import {Utils} from "./Utils.sol";
 
 /**

@@ -7,7 +7,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
-import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
+
 import {
     GatewayTransactionFilterer,
     MIN_ALLOWED_ADDRESS

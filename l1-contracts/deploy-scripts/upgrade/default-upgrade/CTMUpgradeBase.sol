@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import "../SystemContractsProcessing.s.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {DeployCTMUtils} from "../../ctm/DeployCTMUtils.s.sol";
+
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -15,12 +15,12 @@ import {
 import {SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../../utils/Types.sol";
+import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../utils/Types.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {DeployCTMScript} from "../../ctm/DeployCTM.s.sol";
-import {UpgradeUtils} from "./UpgradeUtils.sol";
+
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 abstract contract CTMUpgradeBase is DeployCTMScript {

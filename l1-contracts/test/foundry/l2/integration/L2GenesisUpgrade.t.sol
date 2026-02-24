@@ -27,7 +27,7 @@ import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_
 import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
 import {SystemContractsArgs} from "./L2Utils.sol";
 import {Create2FactoryUtils} from "deploy-scripts/utils/deploy/Create2FactoryUtils.s.sol";
-import {L2GenesisUpgradeTestHelper, BytecodeNames, ContractName} from "./L2GenesisUpgradeTestHelper.sol";
+import {BytecodeNames, ContractName, L2GenesisUpgradeTestHelper} from "./L2GenesisUpgradeTestHelper.sol";
 import {ChainCreationParamsConfig} from "deploy-scripts/utils/Types.sol";
 import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";

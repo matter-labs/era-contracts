@@ -11,7 +11,7 @@ import {
     L2_FORCE_DEPLOYER_ADDR,
     L2_COMPLEX_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IL2ContractDeployer, AllowedBytecodeTypes} from "contracts/common/interfaces/IL2ContractDeployer.sol";
+import {AllowedBytecodeTypes, IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {
     AcrossInfo,
     LensSpokePoolConstructorParams,

@@ -18,7 +18,7 @@ import {FinalizeL1DepositParams, IL1Nullifier, TRANSIENT_SETTLEMENT_LAYER_SLOT} 
 
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IMailboxLegacy} from "../state-transition/chain-interfaces/IMailboxLegacy.sol";
-import {L2Log, L2Message, TxStatus, ConfirmTransferResultData} from "../common/Messaging.sol";
+import {ConfirmTransferResultData, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";

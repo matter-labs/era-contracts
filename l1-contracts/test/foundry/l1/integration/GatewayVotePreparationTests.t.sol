@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+
 
 import {GatewayVotePreparation} from "deploy-scripts/gateway/GatewayVotePreparation.s.sol";
 import {

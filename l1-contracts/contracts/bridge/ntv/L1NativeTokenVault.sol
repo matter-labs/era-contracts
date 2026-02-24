@@ -34,7 +34,7 @@ import {
     WithdrawFailed,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
-import {ClaimFailedDepositFailed, WrongCounterpart, OnlyFailureStatusAllowed} from "../L1BridgeContractErrors.sol";
+import {ClaimFailedDepositFailed, OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

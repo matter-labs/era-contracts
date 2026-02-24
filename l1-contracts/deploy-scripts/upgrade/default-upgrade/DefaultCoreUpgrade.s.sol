@@ -12,22 +12,21 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
-import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
-import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
-import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
+
+import {BridgehubAddresses, DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
+
 import {Governance} from "contracts/governance/Governance.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
-import {BridgehubAddresses, BridgesDeployedAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 import {CoreDeployedAddresses} from "../../utils/Types.sol";
-import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
+
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {Utils} from "../../utils/Utils.sol";
-import {SemVer} from "contracts/common/libraries/SemVer.sol";
+
 import {ChainCreationParamsLib} from "../../ctm/ChainCreationParamsLib.sol";
 
 /// @notice Script used for default ecosystem upgrade flow should be run as a first for the upgrade.

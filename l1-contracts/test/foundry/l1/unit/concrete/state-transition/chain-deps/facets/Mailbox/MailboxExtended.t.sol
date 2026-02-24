@@ -5,30 +5,30 @@ import {Test} from "forge-std/Test.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
-import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
-import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
+
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
-import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
-import {L2Message, L2Log} from "contracts/common/Messaging.sol";
-import {InvalidChainId, ZeroAddress, AddressNotZero} from "contracts/common/L1ContractErrors.sol";
+
+
+import {AddressNotZero, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {
     DepositsPaused,
     NotHyperchain,
     NotL1,
     NotSettlementLayer
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
-import {DepthMoreThanOneForRecursiveMerkleProof, OnlyGateway} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+
 
 contract MailboxOnGatewayTest is UtilsCallMockerTest {
     IMailbox internal mailboxFacet;

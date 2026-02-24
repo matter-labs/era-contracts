@@ -23,15 +23,15 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {Transaction} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
-import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
-import {IAssetRouterBase, AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+
+
+import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
+
 
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {CallStatus, IInteropHandler} from "contracts/interop/IInteropHandler.sol";
-import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
+
 import {
     UnauthorizedMessageSender,
     WrongDestinationBaseTokenAssetId,
@@ -55,7 +55,7 @@ import {IMessageVerification} from "contracts/common/interfaces/IMessageVerifica
 
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
-import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
+
 import {NotInGatewayMode} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer {
