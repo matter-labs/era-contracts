@@ -416,13 +416,14 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         // wont be processable. This limitation will be fixed in the future releases.
         require(BRIDGE_HUB.whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId), InvalidWithdrawalChainId());
 
-        // `assetMigrationNumber` can be either 0 or 1 (didn't migrate the balance to GW or did migrate).
-        // `data.assetMigrationNumber` should be also either 0 or 1.
-        // This check does not serve a specific purpose, it is an invariant check.
-        uint256 readAssetMigrationNumber = assetMigrationNumber[data.chainId][data.assetId];
+        
+        // From all the requirements at the start of the file it follows that `assetMigrationNumber[data.chainId][data.assetId] < chainMigrationNumber = MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1`,
+        // i.e. assetMigrationNumber[data.chainId][data.assetId] must be equal to either 0 or 1.
+        // We also double check the same invarint for `data.assetMigrationNumber`, which should be also either 0 or 1.
+        // This check does not serve a specific purpose, since `data.assetMigrationNumber` is not used anywhere later, it is an invariant check.
         require(
-            readAssetMigrationNumber == data.assetMigrationNumber ||
-                readAssetMigrationNumber + 1 == data.assetMigrationNumber,
+            data.assetMigrationNumber == 0 ||
+                data.assetMigrationNumber == 1,
             InvalidAssetMigrationNumber()
         );
 
