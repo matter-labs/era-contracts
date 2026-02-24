@@ -108,6 +108,8 @@ abstract contract L2InteropNativeTokenDifferentBaseTestAbstract is L2InteropTest
 
         // Set BASE_TOKEN_ASSET_ID on destination chain L2AssetRouter (slot 256)
         vm.store(L2_ASSET_ROUTER_ADDR, bytes32(uint256(256)), otherBaseTokenAssetId);
+        // Set BASE_TOKEN_ASSET_ID on destination chain L2NativeTokenVault (slot 252)
+        vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(252)), otherBaseTokenAssetId);
 
         // Register asset handler on destination chain for source base token
         vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);

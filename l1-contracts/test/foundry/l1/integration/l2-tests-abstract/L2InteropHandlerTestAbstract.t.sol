@@ -19,7 +19,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {CallStatus, IInteropHandler} from "contracts/interop/IInteropHandler.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
-import {UnauthorizedMessageSender, WrongDestinationChainId} from "contracts/interop/InteropErrors.sol";
+import {UnauthorizedMessageSender, WrongDestinationBaseTokenAssetId, WrongDestinationChainId} from "contracts/interop/InteropErrors.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
@@ -332,6 +332,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: ERA_CHAIN_ID,
             destinationChainId: 31337,
+            destinationBaseTokenAssetId: baseTokenAssetId,
             interopBundleSalt: keccak256(abi.encodePacked(depositor, bytes32(0))),
             calls: calls,
             bundleAttributes: BundleAttributes({
@@ -405,7 +406,9 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         // Mock message verification to return true
         vm.mockCall(
             address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
+            abi.encodeWithSelector(
+                L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector
+            ),
             abi.encode(true)
         );
 
@@ -413,20 +416,62 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         // This simulates the chain settling directly on L1
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
-            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
+            abi.encodeWithSelector(
+                L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector
+            ),
             abi.encode(L1_CHAIN_ID)
         );
 
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
+        bytes32 bundleHash =
+            InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
+
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
 
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            uint256(
+                InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)
+            ),
             1, // BundleStatus.Verified
             "Bundle should be in Verified status"
         );
     }
 
+    /// @notice Regression test to ensure bundles can only be verified with matching destination base token asset ID
+    function test_verifyBundle_revertWhen_wrongDestinationBaseTokenAssetId() public {
+        InteropBundle memory interopBundle = getInteropBundle(1);
+
+        bytes32 wrongDestinationBaseTokenAssetId =
+            keccak256("wrongDestinationBaseTokenAssetId");
+        interopBundle.destinationBaseTokenAssetId =
+            wrongDestinationBaseTokenAssetId;
+
+        bytes memory bundle = abi.encode(interopBundle);
+        MessageInclusionProof memory proof =
+            getInclusionProof(L2_INTEROP_CENTER_ADDR);
+
+        // Mock message verification to return true
+        vm.mockCall(
+            address(L2_MESSAGE_VERIFICATION),
+            abi.encodeWithSelector(
+                L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector
+            ),
+            abi.encode(true)
+        );
+
+        bytes32 bundleHash =
+            InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                WrongDestinationBaseTokenAssetId.selector,
+                bundleHash,
+                baseTokenAssetId,
+                wrongDestinationBaseTokenAssetId
+            )
+        );
+
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
+    }
     /// @notice Test pause functionality in InteropCenter
     function test_interopCenter_pause() public {
         address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();

@@ -33,8 +33,6 @@ error InvalidInteropCallVersion();
 error InteropRootAlreadyExists();
 // 0x32c2e156
 error MessageNotIncluded();
-// 0x95eb7603
-error ThisChainNotRegisteredForInterop(uint256 chainId);
 // 0x2f59bd0d
 error SidesLengthNotOne();
 // 0x89fd2c76
@@ -45,6 +43,8 @@ error UnbundlingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes unbund
 error WrongCallStatusLength(uint256 bundleCallsLength, uint256 providedCallStatusLength);
 // 0x4534e972
 error WrongDestinationChainId(bytes32 bundleHash, uint256 expected, uint256 actual);
+// 0xb99d46dc
+error WrongDestinationBaseTokenAssetId(bytes32 bundleHash, bytes32 expected, bytes32 actual);
 // 0x534ab1b2
 error WrongSourceChainId(bytes32 bundleHash, uint256 expected, uint256 actual);
 // 0x92196069

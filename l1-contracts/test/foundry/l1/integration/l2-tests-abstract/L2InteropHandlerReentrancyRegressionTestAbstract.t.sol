@@ -73,6 +73,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: sourceChainId,
             destinationChainId: destinationChainId,
+            destinationBaseTokenAssetId: destinationBaseTokenAssetId,
             interopBundleSalt: bytes32(uint256(1)),
             calls: calls,
             bundleAttributes: _createBundleAttributes(bundleExecutor)
@@ -134,6 +135,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: sourceChainId,
             destinationChainId: destinationChainId,
+            destinationBaseTokenAssetId: destinationBaseTokenAssetId,
             interopBundleSalt: bytes32(uint256(1)),
             calls: calls1,
             bundleAttributes: _createBundleAttributes(bundleExecutor)
@@ -153,6 +155,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: sourceChainId,
             destinationChainId: destinationChainId,
+            destinationBaseTokenAssetId: destinationBaseTokenAssetId,
             interopBundleSalt: bytes32(uint256(2)),
             calls: calls2,
             bundleAttributes: _createBundleAttributes(bundleExecutor)
@@ -222,6 +225,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: sourceChainId,
             destinationChainId: destinationChainId,
+            destinationBaseTokenAssetId: destinationBaseTokenAssetId,
             interopBundleSalt: bytes32(uint256(1)),
             calls: calls,
             bundleAttributes: _createBundleAttributes(bundleExecutor)

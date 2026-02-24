@@ -18,6 +18,11 @@ contract ZKsyncOSChainTypeManager is ChainTypeManagerBase {
         address _permissionlessValidator
     ) ChainTypeManagerBase(_bridgehub, _interopCenter, _l1BytecodesSupplier, _permissionlessValidator) {}
 
+    /// @return flag whether CTM is for ZKsync OS or Era VM.
+    function isZKsyncOS() external pure override returns (bool) {
+        return true;
+    }
+
     /// @notice Updates the parameters with which a new chain is created
     /// @param _chainCreationParams The new chain creation parameters
     function _setChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal override {
