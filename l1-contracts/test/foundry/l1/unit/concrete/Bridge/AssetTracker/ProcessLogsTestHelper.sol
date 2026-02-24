@@ -55,11 +55,13 @@ library ProcessLogsTestHelper {
     ///      counted for settlement fees.
     /// @param _sourceChainId Source chain ID.
     /// @param _destinationChainId Destination chain ID.
+    /// @param _destinationBaseTokenAssetId Base token asset ID of the destination chain.
     /// @param _numCalls Number of calls in the bundle.
     /// @param _salt Salt for bundle uniqueness.
     function createSimpleInteropBundle(
         uint256 _sourceChainId,
         uint256 _destinationChainId,
+        bytes32 _destinationBaseTokenAssetId,
         uint256 _numCalls,
         bytes32 _salt
     ) internal pure returns (InteropBundle memory bundle) {
@@ -79,6 +81,7 @@ library ProcessLogsTestHelper {
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: _sourceChainId,
             destinationChainId: _destinationChainId,
+            destinationBaseTokenAssetId: _destinationBaseTokenAssetId,
             interopBundleSalt: _salt,
             calls: calls,
             bundleAttributes: BundleAttributes({executionAddress: "", unbundlerAddress: "", useFixedFee: false})

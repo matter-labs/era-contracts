@@ -19,7 +19,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {CallStatus, IInteropHandler} from "contracts/interop/IInteropHandler.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
-import {UnauthorizedMessageSender, WrongDestinationChainId} from "contracts/interop/InteropErrors.sol";
+import {UnauthorizedMessageSender, WrongDestinationBaseTokenAssetId, WrongDestinationChainId} from "contracts/interop/InteropErrors.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
@@ -333,6 +333,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: ERA_CHAIN_ID,
             destinationChainId: 31337,
+            destinationBaseTokenAssetId: baseTokenAssetId,
             interopBundleSalt: keccak256(abi.encodePacked(depositor, bytes32(0))),
             calls: calls,
             bundleAttributes: BundleAttributes({
@@ -389,6 +390,34 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             abi.encodeWithSelector(WrongDestinationChainId.selector, bundleHash, wrongChainId, block.chainid)
         );
 
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
+    }
+
+    /// @notice Regression test to ensure bundles can only be verified with matching destination base token asset ID
+    function test_verifyBundle_revertWhen_wrongDestinationBaseTokenAssetId() public {
+        InteropBundle memory interopBundle = getInteropBundle(1);
+        bytes32 wrongDestinationBaseTokenAssetId = keccak256("wrongDestinationBaseTokenAssetId");
+        interopBundle.destinationBaseTokenAssetId = wrongDestinationBaseTokenAssetId;
+
+        bytes memory bundle = abi.encode(interopBundle);
+        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
+
+        vm.mockCall(
+            address(L2_MESSAGE_VERIFICATION),
+            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
+            abi.encode(true)
+        );
+
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                WrongDestinationBaseTokenAssetId.selector,
+                bundleHash,
+                baseTokenAssetId,
+                wrongDestinationBaseTokenAssetId
+            )
+        );
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
     }
 
@@ -521,6 +550,26 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         // but the function should revert with NotInGatewayMode because we're settling on L1
         vm.expectRevert(NotInGatewayMode.selector);
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
+    }
+
+    /// @notice Test that unbundleBundle correctly reverts with NotInGatewayMode when settling on L1
+    function test_regression_unbundleBundleRevertsWhenSettlingOnL1() public {
+        // Ensure L1_CHAIN_ID is initialized for InteropHandler
+        vm.store(L2_INTEROP_HANDLER_ADDR, bytes32(0), bytes32(uint256(L1_CHAIN_ID)));
+
+        InteropBundle memory interopBundle = getInteropBundle(1);
+        bytes memory bundle = abi.encode(interopBundle);
+        CallStatus[] memory statuses = new CallStatus[](interopBundle.calls.length);
+
+        // Simulate settling directly on L1
+        vm.mockCall(
+            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
+            abi.encode(L1_CHAIN_ID)
+        );
+
+        vm.expectRevert(NotInGatewayMode.selector);
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(ERA_CHAIN_ID, bundle, statuses);
     }
 
     /// @notice Test that executeBundle works in gateway mode by accessing currentSettlementLayerChainId
